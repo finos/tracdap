@@ -1,0 +1,94 @@
+syntax = "proto3";
+package trac.api.meta;
+
+option java_package = "trac.common.api.meta";
+option java_multiple_files = true;
+
+import "trac/metadata/object.proto";
+import "trac/metadata/tag.proto";
+
+import "google/api/annotations.proto";
+
+
+service MetadataPublicWriteApi {
+
+    rpc saveNewObject (MetadataWriteRequest) returns (IdResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/{objectType}/new-object"
+            body: "tag"
+        };
+    }
+
+    rpc saveNewVersion (MetadataWriteRequest) returns (IdResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/{objectType}/{objectId}/versions/new-version"
+            body: "tag"
+        };
+    }
+
+    rpc saveNewTag (MetadataWriteRequest) returns (IdResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/new-tag"
+            body: "tag"
+        };
+    }
+}
+
+
+service MetadataTrustedWriteApi {
+
+    rpc saveNewObject (MetadataWriteRequest) returns (IdResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/trusted/{objectType}/new-object"
+            body: "tag"
+        };
+    }
+
+    rpc saveNewVersion (MetadataWriteRequest) returns (IdResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/trusted/{objectType}/{objectId}/versions/new-version"
+            body: "tag"
+        };
+    }
+
+    rpc saveNewTag (MetadataWriteRequest) returns (IdResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/trusted/{objectType}/{objectId}/versions/{objectVersion}/tags/new-tag"
+            body: "tag"
+        };
+    }
+
+    rpc preallocateId (MetadataWriteRequest) returns (IdResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/trusted/{objectType}/preallocate"
+            body: "tag"
+        };
+    }
+
+    rpc savePreallocatedObject (MetadataWriteRequest) returns (IdResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/trusted/{objectType}/{objectId}/save-preallocated"
+            body: "tag"
+        };
+    }
+}
+
+
+message MetadataWriteRequest {
+
+    string tenant = 1;
+    trac.metadata.ObjectType objectType = 2;
+
+    trac.metadata.Tag tag = 3;
+
+    string objectId = 4;
+    int32 objectVersion = 5;
+    int32 tagVersion = 6;
+}
+
+message IdResponse {
+
+    string objectId = 1;
+    int32 objectVersion = 2;
+    int32 tagVersion = 3;
+}

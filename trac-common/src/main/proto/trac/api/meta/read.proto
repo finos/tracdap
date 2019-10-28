@@ -1,0 +1,48 @@
+syntax = "proto3";
+package trac.api.meta;
+
+option java_package = "trac.common.api.meta";
+option java_multiple_files = true;
+
+import "trac/metadata/object.proto";
+import "trac/metadata/tag.proto";
+
+import "google/api/annotations.proto";
+
+
+service MetadataReadApi {
+
+    rpc loadTag(MetadataReadRequest) returns (trac.metadata.Tag) {
+        option (google.api.http) = {
+            get: "/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/{tagVersion}"
+        };
+    }
+
+    rpc loadLatestTag(MetadataReadRequest) returns (trac.metadata.Tag) {
+        option (google.api.http) = {
+            get: "/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/latest{tagVersion=0}"
+        };
+    }
+
+    rpc loadLatestObject(MetadataReadRequest) returns (trac.metadata.Tag) {
+        option (google.api.http) = {
+            get: "/{tenant}/{objectType}/{objectId}/versions/latest{version=0}/tags/latest{tagVersion=0}"
+        };
+    }
+
+};
+
+
+message MetadataReadRequest {
+
+    string tenant = 1;
+
+    trac.metadata.ObjectType objectType = 2;
+    string objectId = 3;
+    int32 objectVersion = 4;
+    int32 tagVersion = 5;
+
+    bool includeAttrs = 6;
+    bool includeDefinition = 7;
+    bool includeLinkedDefinitions = 8;
+};
