@@ -1,0 +1,25 @@
+syntax = "proto3";
+package trac.metadata;
+
+option java_package = "trac.common.metadata";
+option java_multiple_files = true;
+
+import "trac/metadata/object.proto";
+import "trac/metadata/data.proto";
+import "trac/metadata/model.proto";
+
+
+message Tag {
+
+    int32 tagVersion = 1;
+    map<string, PrimitiveValue> attrs = 2;
+
+    oneof definition {
+        DataDefinition data = 3;
+        ModelDefinition model = 4;
+    }
+}
+
+message TagList {
+    repeated Tag items = 1;
+}

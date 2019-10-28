@@ -1,0 +1,36 @@
+syntax = 'proto3';
+package trac.metadata;
+
+option java_package = "trac.common.metadata";
+option java_multiple_files = true;
+
+import "trac/metadata/object.proto";
+import "trac/metadata/data.proto";
+
+
+message Parameter {
+
+    string label = 1;
+
+    PrimitiveType paramType = 2;
+    PrimitiveValue defaultValue = 3;
+}
+
+
+message ModelDefinition {
+
+    ObjectHeader header = 1;
+
+    string language = 2;
+    string repository = 3;
+    string repositoryVersion = 4;
+    string path = 5;
+    string entryPoint = 6;
+
+    map<string, Parameter> params = 7;
+    map<string, TableDefinition> inputs = 8;
+    map<string, TableDefinition> outputs = 9;
+
+    bool overlay = 10;
+    bool schemaUnchanged = 11;
+}

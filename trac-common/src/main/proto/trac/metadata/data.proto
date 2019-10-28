@@ -1,0 +1,50 @@
+syntax = 'proto3';
+package trac.metadata;
+
+option java_package = "trac.common.metadata";
+option java_multiple_files = true;
+
+import "trac/metadata/object.proto";
+
+
+enum DataFormat {
+    UNKNOWN_FORMAT = 0;
+    CSV = 1;
+    PARQUET = 2;
+}
+
+message FormatSpec {
+
+}
+
+message FieldDefinition {
+
+    string fieldName = 1;
+    sint32 fieldOrder = 2;
+    PrimitiveType fieldType = 3;
+    string fieldLabel = 4;
+
+    bool businessKey = 5;
+    bool categorical = 6;
+
+    string formatCode = 7;
+    FormatSpec formatSpec = 8;
+}
+
+message TableDefinition {
+
+    repeated FieldDefinition fields = 1;
+}
+
+message DataDefinition {
+
+    ObjectHeader header = 1;
+
+    TableDefinition schema = 2;
+
+    repeated string storage = 3;
+    map<string, PrimitiveValue> storageInfo = 4;
+
+    string path = 5;
+    DataFormat format = 6;
+}
