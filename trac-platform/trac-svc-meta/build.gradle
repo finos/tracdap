@@ -1,0 +1,10 @@
+
+apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
+
+
+dependencies {
+
+    implementation project(':trac-common')
+
+    testImplementation group: 'io.grpc', name: 'grpc-testing', version: "$grpc_version"
+}

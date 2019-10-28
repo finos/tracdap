@@ -1,3 +1,6 @@
 rootProject.name = 'trac-system'
 
 include 'trac-common'
+include 'trac-svc-meta'
+
+project(":trac-svc-meta").projectDir = file("trac-platform/trac-svc-meta")
