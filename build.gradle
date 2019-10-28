@@ -1,0 +1,13 @@
+
+apply from: 'gradle/config.gradle'
+
+allprojects {
+
+    group 'trac'
+    version '0.0.1-SNAPSHOT'
+}
+
+subprojects {
+
+    buildDir = rootProject.buildDir.path + '/modules/' + project.name
+}

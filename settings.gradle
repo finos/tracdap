@@ -1,0 +1,3 @@
+rootProject.name = 'trac-system'
+
+include 'trac-common'
