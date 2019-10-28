@@ -15,8 +15,8 @@ message Tag {
     map<string, PrimitiveValue> attrs = 2;
 
     oneof definition {
-        DataDefinition data = 3;
-        ModelDefinition model = 4;
+        DataDefinition dataDefinition = 3;
+        ModelDefinition modelDefinition = 4;
     }
 }
 
