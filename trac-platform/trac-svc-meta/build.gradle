@@ -1,10 +1,23 @@
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
+apply plugin: "idea"
 
+
+sourceSets {
+
+    test.resources {
+        include 'src/main/sql/mysql/*'
+    }
+}
 
 dependencies {
 
     implementation project(':trac-common')
 
+    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: "$apache_dbcp_version"
+
     testImplementation group: 'io.grpc', name: 'grpc-testing', version: "$grpc_version"
+
+    testImplementation group: 'mysql', name: 'mysql-connector-java', version: "$mysql_version"
+    testImplementation group: 'ch.vorburger.mariaDB4j', name: 'mariaDB4j', version: "$mariadb4j_version"
 }
