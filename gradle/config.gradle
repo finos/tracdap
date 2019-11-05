@@ -7,5 +7,13 @@ ext {
     grpc_version = '1.24.0'
     gapi_version = '1.17.0'
 
+    apache_dbcp_version = '2.7.0'
+
+
+    // Test dependencies
+
     junit_version = '5.5.2'
+
+    mysql_version = '8.0.18'
+    mariadb4j_version = '2.4.0'
 }
