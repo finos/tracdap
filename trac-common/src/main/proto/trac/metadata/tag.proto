@@ -4,6 +4,7 @@ package trac.metadata;
 option java_package = "trac.common.metadata";
 option java_multiple_files = true;
 
+import "trac/metadata/primitive.proto";
 import "trac/metadata/object.proto";
 import "trac/metadata/data.proto";
 import "trac/metadata/model.proto";
@@ -11,12 +12,14 @@ import "trac/metadata/model.proto";
 
 message Tag {
 
-    int32 tagVersion = 1;
-    map<string, PrimitiveValue> attrs = 2;
+    ObjectHeader header = 1;
+    int32 tagVersion = 2;
+
+    map<string, PrimitiveValue> attrs = 3;
 
     oneof definition {
-        DataDefinition dataDefinition = 3;
-        ModelDefinition modelDefinition = 4;
+        DataDefinition dataDefinition = 4;
+        ModelDefinition modelDefinition = 5;
     }
 }
 

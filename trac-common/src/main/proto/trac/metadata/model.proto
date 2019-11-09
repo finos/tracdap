@@ -4,6 +4,7 @@ package trac.metadata;
 option java_package = "trac.common.metadata";
 option java_multiple_files = true;
 
+import "trac/metadata/primitive.proto";
 import "trac/metadata/object.proto";
 import "trac/metadata/data.proto";
 

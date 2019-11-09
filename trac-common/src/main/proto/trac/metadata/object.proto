@@ -5,32 +5,6 @@ option java_package = "trac.common.metadata";
 option java_multiple_files = true;
 
 
-enum PrimitiveType {
-    NONE_PRIMITIVE = 0;
-    BOOLEAN = 1;
-    INTEGER = 2;
-    FLOAT = 3;
-    DECIMAL = 4;
-    STRING = 5;
-    DATE = 6;
-    DATETIME = 7;
-}
-
-message PrimitiveValue {
-
-    PrimitiveType type = 1;
-
-    oneof value {
-        bool booleanValue = 2;
-        sint64 integerValue = 3;
-        double floatValue = 4;
-        string decimalValue = 5;
-        string stringValue = 6;
-        string dateValue = 7;
-        string datetimeValue = 8;
-    }
-}
-
 enum ObjectType {
     NONE_OBJECT = 0;
     DATA = 1;
@@ -38,11 +12,25 @@ enum ObjectType {
     FLOW = 3;
     JOB = 4;
     JOB_OUTPUT = 5;
+    CUSTOM = 6;
+    FILE = 7;
+}
+
+message UUID_parts {
+
+    sint64 hi = 1;
+    sint64 lo = 2;
+}
+
+message UUID {
+
+    sint64 hi = 1;
+    sint64 lo = 2;
 }
 
 message ObjectHeader {
 
     ObjectType objectType = 1;
-    string id = 2;
+    UUID id = 2;
     int32 version = 3;
 }
