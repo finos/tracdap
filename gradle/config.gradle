@@ -9,6 +9,9 @@ ext {
 
     apache_dbcp_version = '2.7.0'
 
+    slf4j_version = '1.7.29'
+    log4j_version = '2.12.1'
+
 
     // Test dependencies
 
