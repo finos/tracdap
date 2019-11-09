@@ -1,6 +1,6 @@
 package trac.svc.meta.dal.jdbc;
 
-import trac.svc.meta.exception.TracException;
+import trac.svc.meta.exception.TracError;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -19,24 +19,35 @@ class JdbcBaseDal {
         this.executor = executor;
     }
 
+    void executeDirect(JdbcAction func) throws SQLException {
+
+        try (var conn = source.getConnection()) {
+
+            conn.setAutoCommit(false);
+
+            func.apply(conn);
+            conn.commit();
+        }
+    }
+
     <TResult> CompletableFuture<TResult>
     wrapTransaction(JdbcFunction<TResult> func, JdbcErrorHandler jdbcHandler, TracErrorHandler tracHandler) {
 
         return CompletableFuture.supplyAsync(() -> {
 
-            try (Connection conn = source.getConnection()) {
+            try (var conn = source.getConnection()) {
 
                 conn.setAutoCommit(false);
 
-                TResult result = func.apply(conn);
+                var result = func.apply(conn);
                 conn.commit();
 
                 return result;
             }
             catch (SQLException error) {
-                throw new TracException("");
+                throw new TracError("", error);
             }
-            catch (TracException error) {
+            catch (TracError error) {
                 throw error;
             }
 
@@ -60,7 +71,7 @@ class JdbcBaseDal {
 
         return CompletableFuture.runAsync(() -> {
 
-            try (Connection conn = source.getConnection()) {
+            try (var conn = source.getConnection()) {
 
                 conn.setAutoCommit(false);
 
@@ -68,9 +79,9 @@ class JdbcBaseDal {
                 conn.commit();
             }
             catch (SQLException error) {
-                throw new TracException("");
+                throw new TracError("", error);
             }
-            catch (TracException error) {
+            catch (TracError error) {
                 throw error;
             }
 
@@ -110,6 +121,28 @@ class JdbcBaseDal {
     @FunctionalInterface
     interface TracErrorHandler {
 
-        void handle(TracException error, JdbcErrorCode code);
+        void handle(TracError error, JdbcErrorCode code);
+    }
+
+    static class KeyedItem<TItem> {
+
+        final long key;
+        final TItem item;
+
+        KeyedItem(long key, TItem item) {
+            this.key = key;
+            this.item = item;
+        }
+    }
+
+    static class KeyedItems<TItem> {
+
+        final long[] keys;
+        final TItem[] items;
+
+        KeyedItems(long[] keys, TItem[] items) {
+            this.keys = keys;
+            this.items = items;
+        }
     }
 }
