@@ -6,9 +6,11 @@ import trac.svc.meta.dal.jdbc.JdbcMetadataDal;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Scanner;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
@@ -21,6 +23,7 @@ import ch.vorburger.mariadb4j.DB;
 import ch.vorburger.mariadb4j.DBConfigurationBuilder;
 import ch.vorburger.mariadb4j.DBConfiguration;
 import com.mysql.cj.jdbc.MysqlDataSource;
+import trac.svc.meta.exception.MissingItemError;
 
 
 class MetadataDalTest {
@@ -205,6 +208,19 @@ class MetadataDalTest {
         throw new RuntimeException("Object type not supported for test data: " + objectType.name());
     }
 
+    private <T> T unwrap(CompletableFuture<T> future) throws Exception {
+
+        try {
+            return future.get();
+        }
+        catch (ExecutionException e) {
+            var cause = e.getCause();
+            if (cause instanceof Exception)
+                throw (Exception) cause;
+            throw e;
+        }
+    }
+
     @Test
     void roundTrip_oneObjectTypeOk() throws Exception {
 
@@ -216,7 +232,7 @@ class MetadataDalTest {
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
                 .thenCompose(x -> dal.loadTag(TEST_TENANT, origId, 1, 1));
 
-        assertEquals(origTag, future.get());
+        assertEquals(origTag, unwrap(future));
     }
 
     @Test
@@ -233,7 +249,7 @@ class MetadataDalTest {
                     .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
                     .thenCompose(x -> dal.loadTag(TEST_TENANT, origId, 1, 1));
 
-            assertEquals(origTag, future.get());
+            assertEquals(origTag, unwrap(future));
         }
     }
 
@@ -248,7 +264,7 @@ class MetadataDalTest {
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
                 .thenCompose(x -> dal.loadTag(TEST_TENANT, origId, 1, 1));
 
-        assertEquals(origTag, future.get());
+        assertEquals(origTag, unwrap(future));
     }
 
     @Test
@@ -256,12 +272,26 @@ class MetadataDalTest {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
 
-        var future = CompletableFuture.completedFuture(0)
+        var saveDup = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag));
 
-        assertThrows(DuplicateItemError.class, future::get);
+        var loadDup = CompletableFuture
+                .runAsync(() -> dal.loadTag(TEST_TENANT, origId, 1, 1));
+
+        assertThrows(DuplicateItemError.class, () -> unwrap(saveDup));
+        assertThrows(MissingItemError.class, () -> unwrap(loadDup));
+
+        var saveDup2 = CompletableFuture
+                .runAsync(() -> dal.saveNewObjects(TEST_TENANT, Arrays.asList(origTag, origTag)));
+
+        var loadDup2 = CompletableFuture
+                .runAsync(() -> dal.loadTag(TEST_TENANT, origId, 1, 1));
+
+        assertThrows(DuplicateItemError.class, () -> unwrap(saveDup2));
+        assertThrows(MissingItemError.class, () -> unwrap(loadDup2));
     }
 
     @Test
