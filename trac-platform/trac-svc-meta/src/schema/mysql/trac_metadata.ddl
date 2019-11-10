@@ -21,6 +21,8 @@ create table object_id (
     constraint fk_object_tenant foreign key (tenant_id) references tenant (tenant_id)
 );
 
+create unique index idx_object_unq on object_id (tenant_id, object_id_hi, object_id_lo);
+
 
 create table object_definition (
 
@@ -36,6 +38,8 @@ create table object_definition (
     constraint fk_definition_tenant foreign key (tenant_id) references tenant (tenant_id)
 );
 
+create unique index idx_definition_unq on object_definition (tenant_id, object_fk, object_version);
+
 
 create table tag (
 
@@ -49,6 +53,8 @@ create table tag (
     constraint fk_tag_definition foreign key (definition_fk) references object_definition (definition_pk),
     constraint fk_tag_tenant foreign key (tenant_id) references tenant (tenant_id)
 );
+
+create unique index idx_tag_unq on tag (tenant_id, definition_fk, tag_version);
 
 
 create table tag_attr (
@@ -70,3 +76,5 @@ create table tag_attr (
     constraint fk_attr_tag foreign key (tag_fk) references tag (tag_pk),
     constraint fk_attr_tenant foreign key (tenant_id) references tenant (tenant_id)
 );
+
+create unique index idx_attr_unq on tag_attr (tenant_id, tag_fk, attr_name);
