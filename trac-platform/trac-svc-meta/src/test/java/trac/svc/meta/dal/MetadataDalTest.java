@@ -1,6 +1,8 @@
 package trac.svc.meta.dal;
 
+import org.junit.jupiter.api.function.ThrowingSupplier;
 import trac.common.metadata.*;
+import trac.svc.meta.dal.jdbc.JdbcDialect;
 import trac.svc.meta.exception.DuplicateItemError;
 import trac.svc.meta.dal.jdbc.JdbcMetadataDal;
 
@@ -86,7 +88,7 @@ class MetadataDalTest {
         source.setPort(dbConfig.getPort());
         source.setDatabaseName("trac_test");
 
-        var dal = new JdbcMetadataDal(source, Runnable::run);
+        var dal = new JdbcMetadataDal(JdbcDialect.MYSQL, source, Runnable::run);
         dal.startup();
 
         this.dal = dal;
@@ -256,6 +258,7 @@ class MetadataDalTest {
     @Test
     void testSaveNewObject_ok() throws Exception {
 
+        // Save one
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
         var origId = MetadataCodec.decode(origDef.getHeader().getId());
@@ -265,6 +268,21 @@ class MetadataDalTest {
                 .thenCompose(x -> dal.loadTag(TEST_TENANT, origId, 1, 1));
 
         assertEquals(origTag, unwrap(future));
+
+        // Save multiple
+        var multi1 = dummyTagForObjectType(ObjectType.DATA);
+        var multi2 = dummyTagForObjectType(ObjectType.MODEL);
+
+        var future2 = CompletableFuture.runAsync(
+                () -> dal.saveNewObjects(TEST_TENANT, Arrays.asList(multi1, multi2)));
+
+        assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
+
+        var result1 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi1.getHeader().getId()), 1, 1).get();
+        var result2 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi2.getHeader().getId()), 1, 1).get();
+
+        assertEquals(multi1, result1);
+        assertEquals(multi2, result2);
     }
 
     @Test
@@ -274,9 +292,8 @@ class MetadataDalTest {
         var origTag = dummyTag(origDef);
         var origId = MetadataCodec.decode(origDef.getHeader().getId());
 
-        var saveDup = CompletableFuture.completedFuture(0)
-                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
-                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag));
+        var saveDup = CompletableFuture
+                .runAsync(() -> dal.saveNewObjects(TEST_TENANT, Arrays.asList(origTag, origTag)));
 
         var loadDup = CompletableFuture
                 .runAsync(() -> dal.loadTag(TEST_TENANT, origId, 1, 1));
@@ -284,14 +301,16 @@ class MetadataDalTest {
         assertThrows(DuplicateItemError.class, () -> unwrap(saveDup));
         assertThrows(MissingItemError.class, () -> unwrap(loadDup));
 
-        var saveDup2 = CompletableFuture
-                .runAsync(() -> dal.saveNewObjects(TEST_TENANT, Arrays.asList(origTag, origTag)));
+        var saveDup2 = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
+                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag));
 
         var loadDup2 = CompletableFuture
                 .runAsync(() -> dal.loadTag(TEST_TENANT, origId, 1, 1));
 
+        // First insert should succeed if they are run one by one
         assertThrows(DuplicateItemError.class, () -> unwrap(saveDup2));
-        assertThrows(MissingItemError.class, () -> unwrap(loadDup2));
+        assertDoesNotThrow(() -> unwrap(loadDup2));
     }
 
     @Test
