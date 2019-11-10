@@ -117,7 +117,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var tenantId = tenants.getTenantId(tenant);
 
             var objectType = readSingle.readObjectTypeById(conn, tenantId, objectId);
-            var definition = readSingle.readDefinitionByVersion(conn, tenantId, objectType.key, objectVersion);
+            var definition = readSingle.readDefinitionByVersion(conn, tenantId, objectType.item, objectType.key, objectVersion);
             var tagStub = readSingle.readTagRecordByVersion(conn, tenantId, definition.key, tagVersion);
             var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagStub.key);
 
@@ -127,10 +127,9 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
                     .setVersion(objectVersion)
                     .build();
 
-            return tagStub.item
+            return MetadataCodec.tagForDefinition(tagStub.item, objectType.item, definition.item)
                     .setHeader(header)
                     .putAllAttrs(tagAttrs)
-                    .setDataDefinition((DataDefinition) definition.item)
                     .build();
         });
     }
@@ -181,7 +180,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         parts.tagVersion = new int[] {tag.getTagVersion()};
 
         parts.tag = new Tag[] {tag};
-        parts.definition = new MessageLite[] {tag.getDataDefinition()};  // TODO: How to get the real one-of item
+        parts.definition = new MessageLite[] {MetadataCodec.definitionForTag(tag)};
 
         return parts;
     }
@@ -197,6 +196,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         parts.tagVersion = tags.stream().mapToInt(Tag::getTagVersion).toArray();
 
         parts.tag = tags.toArray(Tag[]::new);
+        parts.definition = tags.stream().map(MetadataCodec::definitionForTag).toArray(MessageLite[]::new);
 
         return parts;
     }

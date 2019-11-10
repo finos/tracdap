@@ -48,7 +48,10 @@ class JdbcReadImpl {
     }
 
     KeyedItem<MessageLite>
-    readDefinitionByVersion(Connection conn, short tenantId, long objectPk, int objectVersion) throws SQLException {
+    readDefinitionByVersion(
+            Connection conn, short tenantId,
+            ObjectType objectType, long objectPk, int objectVersion)
+            throws SQLException {
 
         var query =
                 "select definition_pk, definition\n" +
@@ -69,7 +72,7 @@ class JdbcReadImpl {
 
                 var defPk = rs.getLong(1);
                 var defEncoded = rs.getBytes(2);
-                var defDecoded = DataDefinition.parseFrom(defEncoded);
+                var defDecoded = MetadataCodec.decode(objectType, defEncoded);
 
                 return new KeyedItem<>(defPk, defDecoded);
             }

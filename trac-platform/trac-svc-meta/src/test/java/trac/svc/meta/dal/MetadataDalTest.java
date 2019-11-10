@@ -4,10 +4,6 @@ import trac.common.metadata.*;
 import trac.svc.meta.exception.DuplicateItemError;
 import trac.svc.meta.dal.jdbc.JdbcMetadataDal;
 
-import com.google.common.io.Resources;
-
-import java.io.InputStreamReader;
-import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Scanner;
@@ -80,7 +76,7 @@ class MetadataDalTest {
     }
 
     @BeforeEach
-    void setupDal() throws Exception {
+    void setupDal() {
 
         var source = new MysqlDataSource();
         source.setServerName("localhost");
@@ -127,6 +123,43 @@ class MetadataDalTest {
                 .build();
     }
 
+    private ModelDefinition dummyModelDef() {
+
+        return ModelDefinition.newBuilder()
+                .setHeader(ObjectHeader.newBuilder()
+                        .setObjectType(ObjectType.MODEL)
+                        .setId(MetadataCodec.encode(UUID.randomUUID()))
+                        .setVersion(1))
+                .setLanguage("python")
+                .setRepository("trac-test-repo")
+                .setRepositoryVersion("trac-test-repo-1.2.3-RC4")
+                .setPath("src/main/python")
+                .setEntryPoint("trac_test.test1.SampleModel1")
+                .putParams("param1", Parameter.newBuilder().setParamType(PrimitiveType.STRING).build())
+                .putParams("param2", Parameter.newBuilder().setParamType(PrimitiveType.INTEGER).build())
+                .putInputs("input1", TableDefinition.newBuilder()
+                        .addFields(FieldDefinition.newBuilder()
+                                .setFieldName("field1")
+                                .setFieldType(PrimitiveType.DATE)
+                                .build())
+                        .addFields(FieldDefinition.newBuilder()
+                                .setFieldName("field2")
+                                .setBusinessKey(true)
+                                .setFieldType(PrimitiveType.DECIMAL)
+                                .setFieldLabel("A display name")
+                                .setCategorical(true)
+                                .setFormatCode("GBP")
+                                .build())
+                        .build())
+                .putOutputs("output1", TableDefinition.newBuilder()
+                        .addFields(FieldDefinition.newBuilder()
+                                .setFieldName("checksum_field")
+                                .setFieldType(PrimitiveType.DECIMAL)
+                                .build())
+                        .build())
+                .build();
+    }
+
     Tag dummyTag(DataDefinition dataDef) {
 
         return Tag.newBuilder()
@@ -144,6 +177,66 @@ class MetadataDalTest {
                 .build();
     }
 
+    Tag dummyTag(ModelDefinition modelDef) {
+
+        return Tag.newBuilder()
+                .setHeader(modelDef.getHeader())
+                .setTagVersion(1)
+                .setModelDefinition(modelDef)
+                .putAttrs("dataset_key", PrimitiveValue.newBuilder()
+                        .setType(PrimitiveType.STRING)
+                        .setStringValue("widget_orders")
+                        .build())
+                .putAttrs("widget_type", PrimitiveValue.newBuilder()
+                        .setType(PrimitiveType.STRING)
+                        .setStringValue("non_standard_widget")
+                        .build())
+                .build();
+    }
+
+    Tag dummyTagForObjectType(ObjectType objectType) {
+
+        if (objectType == ObjectType.DATA)
+            return dummyTag(dummyDataDef());
+
+        if (objectType == ObjectType.MODEL)
+            return dummyTag(dummyModelDef());
+
+        throw new RuntimeException("Object type not supported for test data: " + objectType.name());
+    }
+
+    @Test
+    void roundTrip_oneObjectTypeOk() throws Exception {
+
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+
+        var future = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
+                .thenCompose(x -> dal.loadTag(TEST_TENANT, origId, 1, 1));
+
+        assertEquals(origTag, future.get());
+    }
+
+    @Test
+    void roundTrip_allObjectTypesOk() throws Exception {
+
+        var typesToTest = new ObjectType[] {ObjectType.DATA, ObjectType.MODEL};
+
+        for (var objectType: typesToTest) {
+
+            var origTag = dummyTagForObjectType(objectType);
+            var origId = MetadataCodec.decode(origTag.getHeader().getId());
+
+            var future = CompletableFuture.completedFuture(0)
+                    .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
+                    .thenCompose(x -> dal.loadTag(TEST_TENANT, origId, 1, 1));
+
+            assertEquals(origTag, future.get());
+        }
+    }
+
     @Test
     void testSaveNewObject_ok() throws Exception {
 
@@ -151,14 +244,11 @@ class MetadataDalTest {
         var origTag = dummyTag(origDef);
         var origId = MetadataCodec.decode(origDef.getHeader().getId());
 
-        var future = CompletableFuture.completedFuture(0);
-        var fut2 = future.thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag));
-        var fut3 = fut2.thenCompose(x -> {
-            var t = dal.loadTag(TEST_TENANT, origId, 1, 1);
-            return t;
-        });
+        var future = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
+                .thenCompose(x -> dal.loadTag(TEST_TENANT, origId, 1, 1));
 
-        assertEquals(origTag, fut3.get());
+        assertEquals(origTag, future.get());
     }
 
     @Test
