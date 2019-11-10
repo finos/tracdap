@@ -3,9 +3,13 @@ package trac.svc.meta.dal.jdbc;
 import com.google.protobuf.MessageLite;
 import trac.common.metadata.*;
 import trac.svc.meta.dal.IMetadataDal;
+import trac.svc.meta.dal.jdbc.dialects.IDialect;
+import trac.svc.meta.dal.jdbc.dialects.MySqlDialect;
+import trac.svc.meta.exception.DuplicateItemError;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -18,8 +22,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     private JdbcWriteBatchImpl writeBatch;
     private JdbcReadImpl readSingle;
 
-    public JdbcMetadataDal(DataSource dataSource, Executor executor) {
-        super(dataSource, executor);
+    public JdbcMetadataDal(JdbcDialect dialect, DataSource dataSource, Executor executor) {
+        super(dialect, dataSource, executor);
 
         tenants = new JdbcTenantImpl();
         writeBatch = new JdbcWriteBatchImpl();
@@ -66,6 +70,12 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts.version, parts.definition);
             long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.tag);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
+        },
+        (error, code) ->  {
+
+            // TODO: Standardise logging and error handling
+            if (code == JdbcErrorCode.INSERT_DUPLICATE)
+                throw new DuplicateItemError("Cannot insert duplicate item", error);
         });
     }
 
@@ -187,12 +197,12 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
     private ObjectParts separateParts(List<Tag> tags) {
 
-        var objectHeaders = tags.stream().map(Tag::getHeader);
+        var objectHeaders = tags.stream().map(Tag::getHeader).toArray(ObjectHeader[]::new);
 
         var parts = new ObjectParts();
-        parts.objectType = objectHeaders.map(ObjectHeader::getObjectType).toArray(ObjectType[]::new);
-        parts.objectId = objectHeaders.map(ObjectHeader::getId).map(MetadataCodec::decode).toArray(UUID[]::new);
-        parts.version = objectHeaders.mapToInt(ObjectHeader::getVersion).toArray();
+        parts.objectType = Arrays.stream(objectHeaders).map(ObjectHeader::getObjectType).toArray(ObjectType[]::new);
+        parts.objectId = Arrays.stream(objectHeaders).map(ObjectHeader::getId).map(MetadataCodec::decode).toArray(UUID[]::new);
+        parts.version = Arrays.stream(objectHeaders).mapToInt(ObjectHeader::getVersion).toArray();
         parts.tagVersion = tags.stream().mapToInt(Tag::getTagVersion).toArray();
 
         parts.tag = tags.toArray(Tag[]::new);

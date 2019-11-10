@@ -1,20 +1,26 @@
 package trac.svc.meta.dal.jdbc;
 
+import trac.svc.meta.dal.jdbc.dialects.Dialect;
+import trac.svc.meta.dal.jdbc.dialects.IDialect;
 import trac.svc.meta.exception.TracError;
+import trac.svc.meta.exception.TracInternalError;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.text.MessageFormat;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 
 class JdbcBaseDal {
 
+    private final IDialect dialect;
     private final DataSource source;
     private final Executor executor;
 
-    JdbcBaseDal(DataSource source, Executor executor) {
+    JdbcBaseDal(JdbcDialect dialect, DataSource source, Executor executor) {
+        this.dialect = Dialect.dialectFor(dialect);
         this.source = source;
         this.executor = executor;
     }
@@ -45,9 +51,35 @@ class JdbcBaseDal {
                 return result;
             }
             catch (SQLException error) {
-                throw new TracError("", error);
+
+                // TODO: Standardise logging and error handling
+
+                JdbcErrorCode code = dialect.mapErrorCode(error);
+
+                // If the error code is not recognised, throw an internal error type
+                if (code == JdbcErrorCode.UNKNOWN_ERROR_CODE) {
+
+                    var message = MessageFormat.format(
+                            "Unrecognised SQL Error code: {} {}",
+                            dialect.dialectCode(), error.getErrorCode());
+
+                    throw new TracInternalError(message, error);
+                }
+
+                if (jdbcHandler != null)
+                    jdbcHandler.handle(error, code);
+
+                // If the error code is not handled, throw an internal error type
+                var message = MessageFormat.format("Unhandled SQL Error code: {}", code.name());
+                throw new TracInternalError(message, error);
             }
             catch (TracError error) {
+
+                if (tracHandler != null)
+                    tracHandler.handle(error);
+
+                // If there is no explicit handler, re-throw the original error
+                // This should happen when an original error was handled lower down
                 throw error;
             }
 
@@ -69,23 +101,11 @@ class JdbcBaseDal {
     CompletableFuture<Void>
     wrapTransaction(JdbcAction func, JdbcErrorHandler jdbcHandler, TracErrorHandler tracHandler) {
 
-        return CompletableFuture.runAsync(() -> {
-
-            try (var conn = source.getConnection()) {
-
-                conn.setAutoCommit(false);
-
-                func.apply(conn);
-                conn.commit();
-            }
-            catch (SQLException error) {
-                throw new TracError("", error);
-            }
-            catch (TracError error) {
-                throw error;
-            }
-
-        }, executor);
+        return wrapTransaction(conn -> {
+            func.apply(conn);
+            return null;
+        },
+        jdbcHandler, tracHandler);
     }
 
     CompletableFuture<Void>
@@ -121,7 +141,7 @@ class JdbcBaseDal {
     @FunctionalInterface
     interface TracErrorHandler {
 
-        void handle(TracError error, JdbcErrorCode code);
+        void handle(TracError error);
     }
 
     static class KeyedItem<TItem> {
