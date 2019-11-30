@@ -36,7 +36,8 @@ class JdbcReadImpl {
 
             try (var rs = stmt.executeQuery()) {
 
-                rs.next();
+                if (!rs.next())
+                    throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
 
                 var objectPk = rs.getLong(1);
                 var objectTypeCode = rs.getString(2);
@@ -68,7 +69,8 @@ class JdbcReadImpl {
 
             try (var rs = stmt.executeQuery()) {
 
-                rs.next();
+                if (!rs.next())
+                    throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
 
                 var defPk = rs.getLong(1);
                 var defEncoded = rs.getBytes(2);
@@ -99,7 +101,8 @@ class JdbcReadImpl {
 
             try (var rs = stmt.executeQuery()) {
 
-                rs.next();
+                if (!rs.next())
+                    throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
 
                 var tagPk = rs.getLong(1);
                 var tagStub = Tag.newBuilder().setTagVersion(tagVersion);
