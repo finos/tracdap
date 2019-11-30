@@ -273,16 +273,15 @@ class MetadataDalTest {
         var multi1 = dummyTagForObjectType(ObjectType.DATA);
         var multi2 = dummyTagForObjectType(ObjectType.MODEL);
 
-        var future2 = CompletableFuture.runAsync(
-                () -> dal.saveNewObjects(TEST_TENANT, Arrays.asList(multi1, multi2)));
+        var future2 = dal.saveNewObjects(TEST_TENANT, Arrays.asList(multi1, multi2));
 
         assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
 
-        var result1 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi1.getHeader().getId()), 1, 1).get();
-        var result2 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi2.getHeader().getId()), 1, 1).get();
+        var result1 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi1.getHeader().getId()), 1, 1);
+        var result2 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi2.getHeader().getId()), 1, 1);
 
-        assertEquals(multi1, result1);
-        assertEquals(multi2, result2);
+        assertEquals(multi1, unwrap(result1));
+        assertEquals(multi2, unwrap(result2));
     }
 
     @Test
@@ -292,11 +291,8 @@ class MetadataDalTest {
         var origTag = dummyTag(origDef);
         var origId = MetadataCodec.decode(origDef.getHeader().getId());
 
-        var saveDup = CompletableFuture
-                .runAsync(() -> dal.saveNewObjects(TEST_TENANT, Arrays.asList(origTag, origTag)));
-
-        var loadDup = CompletableFuture
-                .runAsync(() -> dal.loadTag(TEST_TENANT, origId, 1, 1));
+        var saveDup =  dal.saveNewObjects(TEST_TENANT, Arrays.asList(origTag, origTag));
+        var loadDup = dal.loadTag(TEST_TENANT, origId, 1, 1);
 
         assertThrows(DuplicateItemError.class, () -> unwrap(saveDup));
         assertThrows(MissingItemError.class, () -> unwrap(loadDup));
@@ -305,8 +301,7 @@ class MetadataDalTest {
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag));
 
-        var loadDup2 = CompletableFuture
-                .runAsync(() -> dal.loadTag(TEST_TENANT, origId, 1, 1));
+        var loadDup2 = dal.loadTag(TEST_TENANT, origId, 1, 1);
 
         // First insert should succeed if they are run one by one
         assertThrows(DuplicateItemError.class, () -> unwrap(saveDup2));
