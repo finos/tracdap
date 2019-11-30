@@ -3,9 +3,6 @@ package trac.svc.meta.dal.jdbc;
 import com.google.protobuf.MessageLite;
 import trac.common.metadata.*;
 import trac.svc.meta.dal.IMetadataDal;
-import trac.svc.meta.dal.jdbc.dialects.IDialect;
-import trac.svc.meta.dal.jdbc.dialects.MySqlDialect;
-import trac.svc.meta.exception.DuplicateItemError;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
@@ -71,12 +68,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.tag);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
         },
-        (error, code) ->  {
-
-            // TODO: Standardise logging and error handling
-            if (code == JdbcErrorCode.INSERT_DUPLICATE)
-                throw new DuplicateItemError("Cannot insert duplicate item", error);
-        });
+        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));
     }
 
     @Override
@@ -122,6 +114,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     @Override public CompletableFuture<Tag>
     loadTag(String tenant, UUID objectId, int objectVersion, int tagVersion) {
 
+        var parts = assembleParts(objectId, objectVersion, tagVersion);
+
         return wrapTransaction(conn -> {
 
             var tenantId = tenants.getTenantId(tenant);
@@ -141,7 +135,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
                     .setHeader(header)
                     .putAllAttrs(tagAttrs)
                     .build();
-        });
+        },
+        (error, code) -> JdbcError.handleMissingItem(error, code, parts));
     }
 
     @Override public CompletableFuture<List<Tag>>
@@ -169,7 +164,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     // OBJECT PARTS
     // -----------------------------------------------------------------------------------------------------------------
 
-    private static class ObjectParts {
+    static class ObjectParts {
 
         ObjectType[] objectType;
         UUID[] objectId;
@@ -207,6 +202,16 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         parts.tag = tags.toArray(Tag[]::new);
         parts.definition = tags.stream().map(MetadataCodec::definitionForTag).toArray(MessageLite[]::new);
+
+        return parts;
+    }
+
+    private ObjectParts assembleParts(UUID id, int version, int tagVersion) {
+
+        var parts = new ObjectParts();
+        parts.objectId = new UUID[] {id};
+        parts.version = new int[] {version};
+        parts.tagVersion = new int[] {tagVersion};
 
         return parts;
     }
