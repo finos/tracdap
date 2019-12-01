@@ -15,7 +15,7 @@ message Tag {
     ObjectHeader header = 1;
     int32 tagVersion = 2;
 
-    map<string, PrimitiveValue> attrs = 3;
+    map<string, PrimitiveValue> attr = 3;
 
     oneof definition {
         DataDefinition dataDefinition = 4;
@@ -24,5 +24,5 @@ message Tag {
 }
 
 message TagList {
-    repeated Tag items = 1;
+    repeated Tag item = 1;
 }
