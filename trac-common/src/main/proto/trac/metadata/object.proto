@@ -16,12 +16,6 @@ enum ObjectType {
     FILE = 7;
 }
 
-message UUID_parts {
-
-    sint64 hi = 1;
-    sint64 lo = 2;
-}
-
 message UUID {
 
     sint64 hi = 1;
