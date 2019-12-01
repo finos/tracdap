@@ -34,7 +34,7 @@ message FieldDefinition {
 
 message TableDefinition {
 
-    repeated FieldDefinition fields = 1;
+    repeated FieldDefinition field = 1;
 }
 
 message DataDefinition {
