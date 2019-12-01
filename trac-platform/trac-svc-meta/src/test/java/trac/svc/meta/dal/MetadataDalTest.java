@@ -26,6 +26,7 @@ import ch.vorburger.mariadb4j.DBConfigurationBuilder;
 import ch.vorburger.mariadb4j.DBConfiguration;
 import com.mysql.cj.jdbc.MysqlDataSource;
 import trac.svc.meta.exception.MissingItemError;
+import trac.svc.meta.exception.WrongItemTypeError;
 
 
 class MetadataDalTest {
@@ -105,26 +106,44 @@ class MetadataDalTest {
                 .setPath("path/to/test/dataset")
                 .setFormat(DataFormat.CSV)
                 .setSchema(TableDefinition.newBuilder()
-                        .addFields(FieldDefinition.newBuilder()
+                        .addField(FieldDefinition.newBuilder()
                                 .setFieldName("transaction_id")
                                 .setFieldType(PrimitiveType.STRING)
                                 .setFieldOrder(1)
                                 .setBusinessKey(true))
-                        .addFields(FieldDefinition.newBuilder()
+                        .addField(FieldDefinition.newBuilder()
                                 .setFieldName("customer_id")
                                 .setFieldType(PrimitiveType.STRING)
                                 .setFieldOrder(2)
                                 .setBusinessKey(true))
-                        .addFields(FieldDefinition.newBuilder()
+                        .addField(FieldDefinition.newBuilder()
                                 .setFieldName("order_date")
                                 .setFieldType(PrimitiveType.DATE)
                                 .setFieldOrder(3)
                                 .setBusinessKey(true))
-                        .addFields(FieldDefinition.newBuilder()
+                        .addField(FieldDefinition.newBuilder()
                                 .setFieldName("widgets_ordered")
                                 .setFieldType(PrimitiveType.INTEGER)
                                 .setFieldOrder(4)
                                 .setBusinessKey(true)))
+                .build();
+    }
+
+    private DataDefinition nextDataDef(DataDefinition origDef) {
+
+        return origDef.toBuilder()
+                .mergeHeader(origDef.getHeader()
+                        .toBuilder()
+                        .setVersion(origDef.getHeader().getVersion() + 1)
+                        .build())
+                .mergeSchema(origDef.getSchema().toBuilder()
+                        .addField(FieldDefinition.newBuilder()
+                        .setFieldName("extra_field")
+                        .setFieldOrder(origDef.getSchema().getFieldCount())
+                        .setFieldType(PrimitiveType.FLOAT)
+                        .setFieldLabel("We got an extra field!")
+                        .setFormatCode("PERCENT")
+                        .build()).build())
                 .build();
     }
 
@@ -140,14 +159,14 @@ class MetadataDalTest {
                 .setRepositoryVersion("trac-test-repo-1.2.3-RC4")
                 .setPath("src/main/python")
                 .setEntryPoint("trac_test.test1.SampleModel1")
-                .putParams("param1", Parameter.newBuilder().setParamType(PrimitiveType.STRING).build())
-                .putParams("param2", Parameter.newBuilder().setParamType(PrimitiveType.INTEGER).build())
-                .putInputs("input1", TableDefinition.newBuilder()
-                        .addFields(FieldDefinition.newBuilder()
+                .putParam("param1", Parameter.newBuilder().setParamType(PrimitiveType.STRING).build())
+                .putParam("param2", Parameter.newBuilder().setParamType(PrimitiveType.INTEGER).build())
+                .putInput("input1", TableDefinition.newBuilder()
+                        .addField(FieldDefinition.newBuilder()
                                 .setFieldName("field1")
                                 .setFieldType(PrimitiveType.DATE)
                                 .build())
-                        .addFields(FieldDefinition.newBuilder()
+                        .addField(FieldDefinition.newBuilder()
                                 .setFieldName("field2")
                                 .setBusinessKey(true)
                                 .setFieldType(PrimitiveType.DECIMAL)
@@ -156,12 +175,23 @@ class MetadataDalTest {
                                 .setFormatCode("GBP")
                                 .build())
                         .build())
-                .putOutputs("output1", TableDefinition.newBuilder()
-                        .addFields(FieldDefinition.newBuilder()
+                .putOutput("output1", TableDefinition.newBuilder()
+                        .addField(FieldDefinition.newBuilder()
                                 .setFieldName("checksum_field")
                                 .setFieldType(PrimitiveType.DECIMAL)
                                 .build())
                         .build())
+                .build();
+    }
+
+    private ModelDefinition nextModelDef(ModelDefinition origDef) {
+
+        return origDef.toBuilder()
+                .mergeHeader(origDef.getHeader()
+                        .toBuilder()
+                        .setVersion(origDef.getHeader().getVersion() + 1)
+                        .build())
+                .putParam("param3", Parameter.newBuilder().setParamType(PrimitiveType.DATE).build())
                 .build();
     }
 
@@ -171,11 +201,11 @@ class MetadataDalTest {
                 .setHeader(dataDef.getHeader())
                 .setTagVersion(1)
                 .setDataDefinition(dataDef)
-                .putAttrs("dataset_key", PrimitiveValue.newBuilder()
+                .putAttr("dataset_key", PrimitiveValue.newBuilder()
                         .setType(PrimitiveType.STRING)
                         .setStringValue("widget_orders")
                         .build())
-                .putAttrs("widget_type", PrimitiveValue.newBuilder()
+                .putAttr("widget_type", PrimitiveValue.newBuilder()
                         .setType(PrimitiveType.STRING)
                         .setStringValue("non_standard_widget")
                         .build())
@@ -188,11 +218,11 @@ class MetadataDalTest {
                 .setHeader(modelDef.getHeader())
                 .setTagVersion(1)
                 .setModelDefinition(modelDef)
-                .putAttrs("dataset_key", PrimitiveValue.newBuilder()
+                .putAttr("dataset_key", PrimitiveValue.newBuilder()
                         .setType(PrimitiveType.STRING)
                         .setStringValue("widget_orders")
                         .build())
-                .putAttrs("widget_type", PrimitiveValue.newBuilder()
+                .putAttr("widget_type", PrimitiveValue.newBuilder()
                         .setType(PrimitiveType.STRING)
                         .setStringValue("non_standard_widget")
                         .build())
@@ -309,23 +339,118 @@ class MetadataDalTest {
     }
 
     @Test
-    void testSaveNewVersion_ok() {
-        fail("Not implemented");
+    void testSaveNewVersion_ok() throws Exception {
+
+        // Save one
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+
+        var nextDef = nextDataDef(origDef);
+        var nextTag = dummyTag(nextDef);
+
+        var future = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
+                .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextTag))
+                .thenCompose(x -> dal.loadTag(TEST_TENANT, origId, 2, 1));
+
+        assertEquals(nextTag, unwrap(future));
+
+        // Save multiple
+        var multi1 = dummyTagForObjectType(ObjectType.DATA);
+        var multi2 = dummyTagForObjectType(ObjectType.MODEL);
+
+        var multi1v2 = dummyTag(nextDataDef(multi1.getDataDefinition()));
+        var multi2v2 = dummyTag(nextModelDef(multi2.getModelDefinition()));
+
+        var future2 = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewObjects(TEST_TENANT, Arrays.asList(multi1, multi2)))
+                .thenCompose(x -> dal.saveNewVersions(TEST_TENANT, Arrays.asList(multi1v2, multi2v2)));
+
+        assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
+
+        var result1 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi1.getHeader().getId()), 2, 1);
+        var result2 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi2.getHeader().getId()), 2, 1);
+
+        assertEquals(multi1v2, unwrap(result1));
+        assertEquals(multi2v2, unwrap(result2));
     }
 
     @Test
-    void testSaveNewVersion_duplicate() {
-        fail("Not implemented");
+    void testSaveNewVersion_duplicate() throws Exception {
+
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+
+        var nextDef = nextDataDef(origDef);
+        var nextTag = dummyTag(nextDef);
+
+        var saveOrig = dal.saveNewObject(TEST_TENANT, origTag);
+        var saveDup =  dal.saveNewVersions(TEST_TENANT, Arrays.asList(nextTag, nextTag));
+        var loadDup = dal.loadTag(TEST_TENANT, origId, 2, 1);
+
+        unwrap(saveOrig);
+        assertThrows(DuplicateItemError.class, () -> unwrap(saveDup));
+        assertThrows(MissingItemError.class, () -> unwrap(loadDup));
+
+        var saveDup2 = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextTag))
+                .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextTag));
+
+        var loadDup2 = dal.loadTag(TEST_TENANT, origId, 2, 1);
+
+        // First insert should succeed if they are run one by one
+        assertThrows(DuplicateItemError.class, () -> unwrap(saveDup2));
+        assertDoesNotThrow(() -> unwrap(loadDup2));
     }
 
     @Test
-    void testSaveNewVersion_missingObject() {
-        fail("Not implemented");
+    void testSaveNewVersion_missingObject() throws Exception {
+
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var nextDef = nextDataDef(origDef);
+        var nextTag = dummyTag(nextDef);
+
+        // Save next version, single, without saving original
+        var saveNext =  dal.saveNewVersions(TEST_TENANT, Arrays.asList(nextTag, nextTag));
+        assertThrows(MissingItemError.class, () -> unwrap(saveNext));
+
+        var modelTag = dummyTagForObjectType(ObjectType.MODEL);
+        var nextModelTag = dummyTag(nextModelDef(modelTag.getModelDefinition()));
+
+        // Save next, multiple, one item does not have original
+        var saveOrig = dal.saveNewObject(TEST_TENANT, origTag);
+        var saveNextMulti = dal.saveNewVersions(TEST_TENANT, Arrays.asList(nextTag, nextModelTag));
+
+        unwrap(saveOrig);
+        assertThrows(MissingItemError.class, () -> unwrap(saveNextMulti));
     }
 
     @Test
-    void testSaveNewVersion_wrongObjectType() {
-        fail("Not implemented");
+    void testSaveNewVersion_wrongObjectType() throws Exception {
+
+        var dataTag = dummyTagForObjectType(ObjectType.DATA);
+        var nextDataTag = dummyTag(nextDataDef(dataTag.getDataDefinition()));
+
+        // Create a model def with the same ID as the data def
+        var modelDef = dummyModelDef().toBuilder()
+                .setHeader(dataTag.getHeader().toBuilder()
+                .setObjectType(ObjectType.MODEL).build())
+                .build();
+
+        var modelTag = dummyTag(modelDef);
+        var nextModelTag = dummyTag(nextModelDef(modelTag.getModelDefinition()));
+
+        // Save next version, single, without saving original
+        var saveOrig = dal.saveNewObject(TEST_TENANT, dataTag);
+        var saveNext =  dal.saveNewVersion(TEST_TENANT, nextModelTag);
+        var saveNextMulti =  dal.saveNewVersions(TEST_TENANT, Arrays.asList(nextDataTag, nextModelTag));
+
+        unwrap(saveOrig);
+        assertThrows(WrongItemTypeError.class, () -> unwrap(saveNext));
+        assertThrows(WrongItemTypeError.class, () -> unwrap(saveNextMulti));
     }
 
     @Test
