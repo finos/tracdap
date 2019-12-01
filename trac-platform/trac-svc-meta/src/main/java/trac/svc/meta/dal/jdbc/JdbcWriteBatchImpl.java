@@ -126,7 +126,7 @@ class JdbcWriteBatchImpl {
         try (var stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
 
             for (var i = 0; i < tagPk.length; i++) {
-                for (var attr : tag[i].getAttrsMap().entrySet()) {
+                for (var attr : tag[i].getAttrMap().entrySet()) {
 
 
                     stmt.setShort(1, tenantId);
