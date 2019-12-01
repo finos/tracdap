@@ -15,16 +15,20 @@ import java.util.concurrent.Executor;
 
 public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
-    private JdbcTenantImpl tenants;
-    private JdbcWriteBatchImpl writeBatch;
-    private JdbcReadImpl readSingle;
+    private final JdbcTenantImpl tenants;
+    private final JdbcReadImpl readSingle;
+    private final JdbcReadBatchImpl readBatch;
+    private final JdbcWriteBatchImpl writeBatch;
+
 
     public JdbcMetadataDal(JdbcDialect dialect, DataSource dataSource, Executor executor) {
+
         super(dialect, dataSource, executor);
 
         tenants = new JdbcTenantImpl();
-        writeBatch = new JdbcWriteBatchImpl();
         readSingle = new JdbcReadImpl();
+        readBatch = new JdbcReadBatchImpl();
+        writeBatch = new JdbcWriteBatchImpl();
     }
 
     public void startup() {
@@ -73,12 +77,31 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
     @Override
     public CompletableFuture<Void> saveNewVersion(String tenant, Tag tag) {
-        return null;
+
+        var parts = separateParts(tag);
+        return saveNewVersions(tenant, parts);
     }
 
     @Override
     public CompletableFuture<Void> saveNewVersions(String tenant, List<Tag> tags) {
-        return null;
+
+        var parts = separateParts(tags);
+        return saveNewVersions(tenant, parts);
+    }
+
+    private CompletableFuture<Void> saveNewVersions(String tenant, ObjectParts parts) {
+
+        return wrapTransaction(conn -> {
+
+            var tenantId = tenants.getTenantId(tenant);
+
+            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts.version, parts.definition);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.tag);
+            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
+        },
+        (error, code) -> JdbcError.handleMissingItem(error, code, parts),
+        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));
     }
 
     @Override
@@ -133,7 +156,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             return MetadataCodec.tagForDefinition(tagStub.item, objectType.item, definition.item)
                     .setHeader(header)
-                    .putAllAttrs(tagAttrs)
+                    .putAllAttr(tagAttrs)
                     .build();
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts));
