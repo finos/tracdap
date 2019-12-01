@@ -34,7 +34,7 @@ class JdbcBaseDal {
     }
 
     <TResult> CompletableFuture<TResult>
-    wrapTransaction(JdbcFunction<TResult> func, JdbcErrorHandler... jdbcHandlers) {
+    wrapTransaction(JdbcFunction<TResult> func, JdbcErrorHandler... errorHandlers) {
 
         return CompletableFuture.supplyAsync(() -> {
 
@@ -56,7 +56,7 @@ class JdbcBaseDal {
                 // If the error code is not recognised, throw an internal error type
                 JdbcError.handleUnknownError(error, code, dialect);
 
-                for (JdbcErrorHandler handler: jdbcHandlers)
+                for (JdbcErrorHandler handler: errorHandlers)
                     handler.handle(error, code);
 
                 // If the error code is not handled, throw an internal error type
@@ -67,9 +67,9 @@ class JdbcBaseDal {
     }
 
     CompletableFuture<Void>
-    wrapTransaction(JdbcAction func, JdbcErrorHandler... jdbcHandlers) {
+    wrapTransaction(JdbcAction func, JdbcErrorHandler... errorHandlers) {
 
-        return wrapTransaction(conn -> {func.apply(conn); return null;}, jdbcHandlers);
+        return wrapTransaction(conn -> {func.apply(conn); return null;}, errorHandlers);
     }
 
     @FunctionalInterface
