@@ -96,8 +96,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             prepareMappingTable(conn);
 
             var tenantId = tenants.getTenantId(tenant);
-
             var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts.version, parts.definition);
             long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.tag);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
@@ -108,12 +108,33 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
     @Override
     public CompletableFuture<Void> saveNewTag(String tenant, Tag tag) {
-        return null;
+
+        var parts = separateParts(tag);
+        return saveNewTags(tenant, parts);
     }
 
     @Override
     public CompletableFuture<Void> saveNewTags(String tenant, List<Tag> tags) {
-        return null;
+
+        var parts = separateParts(tags);
+        return saveNewTags(tenant, parts);
+    }
+
+    private CompletableFuture<Void> saveNewTags(String tenant, ObjectParts parts) {
+
+        return wrapTransaction(conn -> {
+
+            prepareMappingTable(conn);
+
+            var tenantId = tenants.getTenantId(tenant);
+            long[] objectPk = readBatch.lookupObjectPk(conn, tenantId, parts.objectId);
+            long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectPk, parts.version);
+
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.tag);
+            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
+        },
+        (error, code) -> JdbcError.handleMissingItem(error, code, parts),
+        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));
     }
 
     @Override
