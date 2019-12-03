@@ -43,6 +43,9 @@ class JdbcReadImpl {
                 var objectTypeCode = rs.getString(2);
                 var objectType = ObjectType.valueOf(objectTypeCode);
 
+                if (!rs.last())
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+
                 return new KeyedItem<>(objectPk, objectType);
             }
         }
@@ -76,6 +79,9 @@ class JdbcReadImpl {
                 var defEncoded = rs.getBytes(2);
                 var defDecoded = MetadataCodec.decode(objectType, defEncoded);
 
+                if (!rs.last())
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+
                 return new KeyedItem<>(defPk, defDecoded);
             }
             catch (InvalidProtocolBufferException e) {
@@ -106,6 +112,9 @@ class JdbcReadImpl {
 
                 var tagPk = rs.getLong(1);
                 var tagStub = Tag.newBuilder().setTagVersion(tagVersion);
+
+                if (!rs.last())
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
 
                 return new KeyedItem<>(tagPk, tagStub);
             }
