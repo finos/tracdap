@@ -22,6 +22,10 @@ class JdbcBaseDal {
         this.executor = executor;
     }
 
+    void prepareMappingTable(Connection conn) throws SQLException {
+        dialect.prepareMappingTable(conn);
+    }
+
     void executeDirect(JdbcAction func) throws SQLException {
 
         try (var conn = source.getConnection()) {

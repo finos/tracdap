@@ -93,6 +93,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         return wrapTransaction(conn -> {
 
+            prepareMappingTable(conn);
+
             var tenantId = tenants.getTenantId(tenant);
 
             var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
