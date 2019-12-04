@@ -29,6 +29,7 @@ public class MySqlDialect implements IDialect {
 
         errorCodes = new HashMap<>();
         errorCodes.put(1062, JdbcErrorCode.INSERT_DUPLICATE);
+        errorCodes.put(1452, JdbcErrorCode.INSERT_MISSING_FK);
 
         syntheticErrorCodes = new HashMap<>();
 
