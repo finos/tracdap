@@ -110,6 +110,9 @@ class JdbcReadBatchImpl {
                         throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
 
                     keys[i] = rs.getLong(1);
+
+                    if (rs.wasNull())
+                        throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
                 }
 
                 if (!rs.last())
