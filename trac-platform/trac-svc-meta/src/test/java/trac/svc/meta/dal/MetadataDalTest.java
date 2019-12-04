@@ -577,7 +577,7 @@ class MetadataDalTest {
 
         // Save object 1 version 2, and object 2 version 1
         unwrap(dal.saveNewVersion(TEST_TENANT, nextDefTag1));
-        unwrap(dal.saveNewObject(TEST_TENANT, origTag));
+        unwrap(dal.saveNewObject(TEST_TENANT, modelTag));
 
         // Save next tag (multiple), second item is missing the required object version
         var saveNextMulti = dal.saveNewTags(TEST_TENANT, Arrays.asList(nextDefTag2, nextModelTag2));
