@@ -470,7 +470,7 @@ class MetadataDalTest {
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef));
-        var nextDefTag2 = nextTag(origTag);
+        var nextDefTag2 = nextTag(nextDefTag1);
         var origId = MetadataCodec.decode(origDef.getHeader().getId());
 
         // Test saving tag v2 against object v2
@@ -519,8 +519,8 @@ class MetadataDalTest {
         assertThrows(MissingItemError.class, () -> unwrap(loadDup));
 
         var saveDup2 = CompletableFuture.completedFuture(0)
-                .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextTag))
-                .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextTag));
+                .thenCompose(x -> dal.saveNewTag(TEST_TENANT, nextTag))
+                .thenCompose(x -> dal.saveNewTag(TEST_TENANT, nextTag));
 
         var loadDup2 = dal.loadTag(TEST_TENANT, origId, 1, 2);
 
