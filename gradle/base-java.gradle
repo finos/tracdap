@@ -9,3 +9,7 @@ dependencies {
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: "$junit_version"
     testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: "$junit_version"
 }
+
+test {
+    useJUnitPlatform()
+}
