@@ -670,11 +670,11 @@ class MetadataDalTest {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
-        var nextDefTag1 = dummyTag(nextDataDef(origDef));
-        var origDefTag2 = nextTag(origTag);
         var origId = MetadataCodec.decode(origDef.getHeader().getId());
 
-        // Save v1 t1, v2 t1, v2 t2
+        var nextDefTag1 = dummyTag(nextDataDef(origDef));
+
+        // Save v1 t1, v2 t1
         var future = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
                 .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextDefTag1));
@@ -689,12 +689,14 @@ class MetadataDalTest {
         assertEquals(origTag, v1);
         assertEquals(nextDefTag1, v2);
 
-        // Save a new tag for
-        var v2t2 = CompletableFuture.completedFuture(0)
-                .thenCompose(x -> dal.saveNewTag(TEST_TENANT, origDefTag2))
-                .thenCompose(x -> dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 2));
+        // Save a new tag for object version 1
+        var origDefTag2 = nextTag(origTag);
 
-        assertEquals(origDefTag2, unwrap(v2t2));
+        var v1t2 = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewTag(TEST_TENANT, origDefTag2))
+                .thenCompose(x -> dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 1));
+
+        assertEquals(origDefTag2, unwrap(v1t2));
     }
 
     @Test

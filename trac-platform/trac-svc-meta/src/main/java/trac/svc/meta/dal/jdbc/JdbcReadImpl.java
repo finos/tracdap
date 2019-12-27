@@ -121,6 +121,42 @@ class JdbcReadImpl {
         }
     }
 
+    KeyedItem<Tag.Builder>
+    readTagRecordByLatest(Connection conn, short tenantId, long definitionPk) throws SQLException {
+
+        var query =
+                "select tag_pk, tag_version from tag\n" +
+                "where tenant_id = ?\n" +
+                "and definition_fk = ?\n" +
+                "and tag_version = (\n" +
+                "  select latest_tag\n" +
+                "  from latest_tag\n" +
+                "  where latest_tag.tenant_id = tag.tenant_id\n" +
+                "  and latest_tag.definition_fk = tag.definition_fk\n" +
+                ")";
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setShort(1, tenantId);
+            stmt.setLong(2, definitionPk);
+
+            try (var rs = stmt.executeQuery()) {
+
+                if (!rs.next())
+                    throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
+
+                var tagPk = rs.getLong(1);
+                var tagVersion = rs.getInt(2);
+                var tagStub = Tag.newBuilder().setTagVersion(tagVersion);
+
+                if (!rs.last())
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+
+                return new KeyedItem<>(tagPk, tagStub);
+            }
+        }
+    }
+
     Map<String, PrimitiveValue>
     readTagAttrs(Connection conn, short tenantId, long tagPk) throws SQLException {
 

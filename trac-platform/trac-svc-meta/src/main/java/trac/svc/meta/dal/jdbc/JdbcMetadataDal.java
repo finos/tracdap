@@ -209,7 +209,27 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         var parts = assembleParts(objectType, objectId, objectVersion, LATEST_TAG);
 
-        return null;
+        return wrapTransaction(conn -> {
+
+            var tenantId = tenants.getTenantId(tenant);
+
+            var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
+            var definition = readSingle.readDefinitionByVersion(conn, tenantId, objectType, storedType.key, objectVersion);
+            var tagStub = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
+            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagStub.key);
+
+            var header = ObjectHeader.newBuilder()
+                    .setObjectType(objectType)
+                    .setId(MetadataCodec.encode(objectId))
+                    .setVersion(objectVersion)
+                    .build();
+
+            return MetadataCodec.tagForDefinition(tagStub.item, objectType, definition.item)
+                    .setHeader(header)
+                    .putAllAttr(tagAttrs)
+                    .build();
+        },
+        (error, code) -> JdbcError.handleMissingItem(error, code, parts));
     }
 
     @Override public CompletableFuture<Tag>
