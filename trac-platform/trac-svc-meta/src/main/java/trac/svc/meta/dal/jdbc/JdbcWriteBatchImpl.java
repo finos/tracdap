@@ -6,6 +6,7 @@ import trac.common.metadata.PrimitiveType;
 import trac.common.metadata.Tag;
 
 import java.sql.*;
+import java.util.Arrays;
 import java.util.UUID;
 
 
@@ -74,7 +75,7 @@ class JdbcWriteBatchImpl {
 
     long[] writeTagRecord(
             Connection conn, short tenantId,
-            long[] definitionPk, int[] tagVersion, Tag[] tag)
+            long[] definitionPk, int[] tagVersion)
             throws SQLException {
 
         var query =
@@ -169,6 +170,112 @@ class JdbcWriteBatchImpl {
 
             stmt.executeBatch();
         }
+    }
+
+    void writeLatestVersion(
+            Connection conn, short tenantId,
+            long[] objectPk, int[] objectVersion)
+            throws SQLException {
+
+        var query =
+                "insert into latest_version (\n" +
+                "  tenant_id,\n" +
+                "  object_fk,\n" +
+                "  latest_version\n" +
+                ")\n" +
+                "values (?, ?, ?)";
+
+        try (var stmt = conn.prepareStatement(query)) {
+            writeLatest(stmt, tenantId, objectPk, objectVersion);
+        }
+    }
+
+    void writeLatestTag(
+            Connection conn, short tenantId,
+            long[] definitionFk, int[] tagVersion)
+            throws SQLException {
+
+        var query =
+                "insert into latest_tag (\n" +
+                "  tenant_id,\n" +
+                "  definition_fk,\n" +
+                "  latest_tag\n" +
+                ")\n" +
+                "values (?, ?, ?)";
+
+        try (var stmt = conn.prepareStatement(query)) {
+            writeLatest(stmt, tenantId, definitionFk, tagVersion);
+        }
+    }
+
+    private void writeLatest(
+            PreparedStatement stmt, short tenantId,
+            long[] pk, int[] version)
+            throws SQLException {
+
+        for (int i = 0; i < pk.length; i++) {
+
+            stmt.setShort(1, tenantId);
+            stmt.setLong(2, pk[i]);
+            stmt.setInt(3, version[i]);
+
+            stmt.addBatch();
+        }
+
+        stmt.executeBatch();
+    }
+
+    void updateLatestVersion(
+            Connection conn, short tenantId,
+            long[] objectPk, int[] objectVersion)
+            throws SQLException {
+
+        var query =
+                "update latest_version set \n" +
+                "  latest_version = ?\n" +
+                "where tenant_id = ?\n" +
+                "  and object_fk = ?";
+
+        try (var stmt = conn.prepareStatement(query)) {
+            updateLatest(stmt, tenantId, objectPk, objectVersion);
+        }
+    }
+
+    void updateLatestTag(
+            Connection conn, short tenantId,
+            long[] objectPk, int[] objectVersion)
+            throws SQLException {
+
+        var query =
+                "update latest_tag set \n" +
+                "  latest_tag = ?\n" +
+                "where tenant_id = ?\n" +
+                "  and definition_fk = ?";
+
+        try (var stmt = conn.prepareStatement(query)) {
+            updateLatest(stmt, tenantId, objectPk, objectVersion);
+        }
+    }
+
+    private void updateLatest(
+            PreparedStatement stmt, short tenantId,
+            long[] pk, int[] version)
+            throws SQLException {
+
+        for (int i = 0; i < pk.length; i++) {
+
+            stmt.setInt(1, version[i]);
+            stmt.setShort(2, tenantId);
+            stmt.setLong(3, pk[i]);
+
+            stmt.addBatch();
+        }
+
+        int[] updates = stmt.executeBatch();
+
+        // Updates fail silent if no records are matched, so make an explicit check
+        if (Arrays.stream(updates).anyMatch(count -> count != 1))
+            throw new JdbcException(JdbcErrorCode.INSERT_MISSING_FK.name(), JdbcErrorCode.INSERT_MISSING_FK);
     }
 
     private long[] generatedKeys(Statement stmt, int rowCount) throws SQLException {
