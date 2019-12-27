@@ -273,7 +273,7 @@ class MetadataDalTest {
 
         var future = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
-                .thenCompose(x -> dal.loadTag(TEST_TENANT, origId, 1, 1));
+                .thenCompose(x -> dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1));
 
         assertEquals(origTag, unwrap(future));
     }
@@ -290,7 +290,7 @@ class MetadataDalTest {
 
             var future = CompletableFuture.completedFuture(0)
                     .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
-                    .thenCompose(x -> dal.loadTag(TEST_TENANT, origId, 1, 1));
+                    .thenCompose(x -> dal.loadTag(TEST_TENANT, objectType, origId, 1, 1));
 
             assertEquals(origTag, unwrap(future));
         }
@@ -306,7 +306,7 @@ class MetadataDalTest {
 
         var future = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
-                .thenCompose(x -> dal.loadTag(TEST_TENANT, origId, 1, 1));
+                .thenCompose(x -> dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1));
 
         assertEquals(origTag, unwrap(future));
 
@@ -318,8 +318,8 @@ class MetadataDalTest {
 
         assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
 
-        var result1 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi1.getHeader().getId()), 1, 1);
-        var result2 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi2.getHeader().getId()), 1, 1);
+        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, MetadataCodec.decode(multi1.getHeader().getId()), 1, 1);
+        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, MetadataCodec.decode(multi2.getHeader().getId()), 1, 1);
 
         assertEquals(multi1, unwrap(result1));
         assertEquals(multi2, unwrap(result2));
@@ -333,7 +333,7 @@ class MetadataDalTest {
         var origId = MetadataCodec.decode(origDef.getHeader().getId());
 
         var saveDup =  dal.saveNewObjects(TEST_TENANT, Arrays.asList(origTag, origTag));
-        var loadDup = dal.loadTag(TEST_TENANT, origId, 1, 1);
+        var loadDup = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
 
         assertThrows(DuplicateItemError.class, () -> unwrap(saveDup));
         assertThrows(MissingItemError.class, () -> unwrap(loadDup));
@@ -342,7 +342,7 @@ class MetadataDalTest {
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag));
 
-        var loadDup2 = dal.loadTag(TEST_TENANT, origId, 1, 1);
+        var loadDup2 = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
 
         // First insert should succeed if they are run one by one
         assertThrows(DuplicateItemError.class, () -> unwrap(saveDup2));
@@ -363,7 +363,7 @@ class MetadataDalTest {
         var future = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
                 .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextTag))
-                .thenCompose(x -> dal.loadTag(TEST_TENANT, origId, 2, 1));
+                .thenCompose(x -> dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1));
 
         assertEquals(nextTag, unwrap(future));
 
@@ -380,8 +380,8 @@ class MetadataDalTest {
 
         assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
 
-        var result1 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi1.getHeader().getId()), 2, 1);
-        var result2 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi2.getHeader().getId()), 2, 1);
+        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, MetadataCodec.decode(multi1.getHeader().getId()), 2, 1);
+        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, MetadataCodec.decode(multi2.getHeader().getId()), 2, 1);
 
         assertEquals(multi1v2, unwrap(result1));
         assertEquals(multi2v2, unwrap(result2));
@@ -399,7 +399,7 @@ class MetadataDalTest {
 
         var saveOrig = dal.saveNewObject(TEST_TENANT, origTag);
         var saveDup =  dal.saveNewVersions(TEST_TENANT, Arrays.asList(nextTag, nextTag));
-        var loadDup = dal.loadTag(TEST_TENANT, origId, 2, 1);
+        var loadDup = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1);
 
         unwrap(saveOrig);
         assertThrows(DuplicateItemError.class, () -> unwrap(saveDup));
@@ -409,7 +409,7 @@ class MetadataDalTest {
                 .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextTag))
                 .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextTag));
 
-        var loadDup2 = dal.loadTag(TEST_TENANT, origId, 2, 1);
+        var loadDup2 = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1);
 
         // First insert should succeed if they are run one by one
         assertThrows(DuplicateItemError.class, () -> unwrap(saveDup2));
@@ -478,7 +478,7 @@ class MetadataDalTest {
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
                 .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextDefTag1))
                 .thenCompose(x -> dal.saveNewTag(TEST_TENANT, nextDefTag2))
-                .thenCompose(x -> dal.loadTag(TEST_TENANT, origId, 2, 2));
+                .thenCompose(x -> dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 2));
 
         assertEquals(nextDefTag2, unwrap(future));
 
@@ -495,8 +495,8 @@ class MetadataDalTest {
 
         assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
 
-        var result1 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi1.getHeader().getId()), 1, 2);
-        var result2 = dal.loadTag(TEST_TENANT, MetadataCodec.decode(multi2.getHeader().getId()), 1, 2);
+        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, MetadataCodec.decode(multi1.getHeader().getId()), 1, 2);
+        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, MetadataCodec.decode(multi2.getHeader().getId()), 1, 2);
 
         assertEquals(multi1v2, unwrap(result1));
         assertEquals(multi2v2, unwrap(result2));
@@ -512,7 +512,7 @@ class MetadataDalTest {
 
         var saveOrig = dal.saveNewObject(TEST_TENANT, origTag);
         var saveDup =  dal.saveNewTags(TEST_TENANT, Arrays.asList(nextTag, nextTag));
-        var loadDup = dal.loadTag(TEST_TENANT, origId, 1, 2);
+        var loadDup = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 2);
 
         unwrap(saveOrig);
         assertThrows(DuplicateItemError.class, () -> unwrap(saveDup));
@@ -522,7 +522,7 @@ class MetadataDalTest {
                 .thenCompose(x -> dal.saveNewTag(TEST_TENANT, nextTag))
                 .thenCompose(x -> dal.saveNewTag(TEST_TENANT, nextTag));
 
-        var loadDup2 = dal.loadTag(TEST_TENANT, origId, 1, 2);
+        var loadDup2 = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 2);
 
         // First insert should succeed if they are run one by one
         assertThrows(DuplicateItemError.class, () -> unwrap(saveDup2));
@@ -625,9 +625,9 @@ class MetadataDalTest {
         unwrap(future);
 
         // Load all three items by explicit version / tag number
-        var v1t1 = unwrap(dal.loadTag(TEST_TENANT, origId, 1, 1));
-        var v2t1 = unwrap(dal.loadTag(TEST_TENANT, origId, 2, 1));
-        var v2t2 = unwrap(dal.loadTag(TEST_TENANT, origId, 2, 2));
+        var v1t1 = unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1));
+        var v2t1 = unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1));
+        var v2t2 = unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 2));
 
         assertEquals(origTag, v1t1);
         assertEquals(nextDefTag1, v2t1);
@@ -646,21 +646,21 @@ class MetadataDalTest {
         // After save v1t1, latest version = v1t1
         var v1t1 = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
-                .thenCompose(x -> dal.loadLatestVersion(TEST_TENANT, origId));
+                .thenCompose(x -> dal.loadLatestVersion(TEST_TENANT, ObjectType.DATA, origId));
 
         assertEquals(origTag, unwrap(v1t1));
 
         // After save v2t1, latest version = v2t1
         var v2t1 = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextDefTag1))
-                .thenCompose(x -> dal.loadLatestVersion(TEST_TENANT, origId));
+                .thenCompose(x -> dal.loadLatestVersion(TEST_TENANT, ObjectType.DATA, origId));
 
         assertEquals(nextDefTag1, unwrap(v2t1));
 
         // After save v2t2, latest version = v2t2
         var v2t2 = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewTag(TEST_TENANT, nextDefTag2))
-                .thenCompose(x -> dal.loadLatestVersion(TEST_TENANT, origId));
+                .thenCompose(x -> dal.loadLatestVersion(TEST_TENANT, ObjectType.DATA, origId));
 
         assertEquals(nextDefTag2, unwrap(v2t2));
     }
@@ -682,8 +682,8 @@ class MetadataDalTest {
         unwrap(future);
 
         // Load latest tag for object versions 1 & 2
-        var v1 = unwrap(dal.loadLatestTag(TEST_TENANT, origId, 1));
-        var v2 = unwrap(dal.loadLatestTag(TEST_TENANT, origId, 2));
+        var v1 = unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 1));
+        var v2 = unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 2));
 
         // Should get v1 = v1t1, v2 = v2t1
         assertEquals(origTag, v1);
@@ -692,7 +692,7 @@ class MetadataDalTest {
         // Save a new tag for
         var v2t2 = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewTag(TEST_TENANT, origDefTag2))
-                .thenCompose(x -> dal.loadLatestTag(TEST_TENANT, origId, 2));
+                .thenCompose(x -> dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 2));
 
         assertEquals(origDefTag2, unwrap(v2t2));
     }
@@ -700,9 +700,9 @@ class MetadataDalTest {
     @Test
     void testLoadOne_missingItems() throws Exception {
 
-        assertThrows(MissingItemError.class, () -> unwrap(dal.loadTag(TEST_TENANT, UUID.randomUUID(), 1, 1)));
-        assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, UUID.randomUUID(), 1)));
-        assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestVersion(TEST_TENANT, UUID.randomUUID())));
+        assertThrows(MissingItemError.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, UUID.randomUUID(), 1, 1)));
+        assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, UUID.randomUUID(), 1)));
+        assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestVersion(TEST_TENANT, ObjectType.DATA, UUID.randomUUID())));
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
@@ -712,9 +712,9 @@ class MetadataDalTest {
         var future = dal.saveNewObject(TEST_TENANT, origTag);
         unwrap(future);
 
-        assertThrows(MissingItemError.class, () -> unwrap(dal.loadTag(TEST_TENANT, origId, 1, 2)));  // Missing tag
-        assertThrows(MissingItemError.class, () -> unwrap(dal.loadTag(TEST_TENANT, origId, 2, 1)));  // Missing ver
-        assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, origId, 2)));  // Missing ver
+        assertThrows(MissingItemError.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 2)));  // Missing tag
+        assertThrows(MissingItemError.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1)));  // Missing ver
+        assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 2)));  // Missing ver
     }
 
     @Test
