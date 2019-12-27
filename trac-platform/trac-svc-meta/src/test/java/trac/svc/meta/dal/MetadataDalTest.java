@@ -608,28 +608,113 @@ class MetadataDalTest {
     }
 
     @Test
-    void testLoadOneExplicit_ok() {
-        fail("Not implemented");
+    void testLoadOneExplicit_ok() throws Exception {
+
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var nextDefTag1 = dummyTag(nextDataDef(origDef));
+        var nextDefTag2 = nextTag(nextDefTag1);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+
+        // Save v1 t1, v2 t1, v2 t2
+        var future = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
+                .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextDefTag1))
+                .thenCompose(x -> dal.saveNewTag(TEST_TENANT, nextDefTag2));
+
+        unwrap(future);
+
+        // Load all three items by explicit version / tag number
+        var v1t1 = unwrap(dal.loadTag(TEST_TENANT, origId, 1, 1));
+        var v2t1 = unwrap(dal.loadTag(TEST_TENANT, origId, 2, 1));
+        var v2t2 = unwrap(dal.loadTag(TEST_TENANT, origId, 2, 2));
+
+        assertEquals(origTag, v1t1);
+        assertEquals(nextDefTag1, v2t1);
+        assertEquals(nextDefTag2, v2t2);
     }
 
     @Test
-    void testLoadOneLatestVersion_ok() {
-        fail("Not implemented");
+    void testLoadOneLatestVersion_ok() throws Exception {
+
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var nextDefTag1 = dummyTag(nextDataDef(origDef));
+        var nextDefTag2 = nextTag(nextDefTag1);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+
+        // After save v1t1, latest version = v1t1
+        var v1t1 = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
+                .thenCompose(x -> dal.loadLatestVersion(TEST_TENANT, origId));
+
+        assertEquals(origTag, unwrap(v1t1));
+
+        // After save v2t1, latest version = v2t1
+        var v2t1 = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextDefTag1))
+                .thenCompose(x -> dal.loadLatestVersion(TEST_TENANT, origId));
+
+        assertEquals(nextDefTag1, unwrap(v2t1));
+
+        // After save v2t2, latest version = v2t2
+        var v2t2 = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewTag(TEST_TENANT, nextDefTag2))
+                .thenCompose(x -> dal.loadLatestVersion(TEST_TENANT, origId));
+
+        assertEquals(nextDefTag2, unwrap(v2t2));
     }
 
     @Test
-    void testLoadOneLatestTag_ok() {
-        fail("Not implemented");
+    void testLoadOneLatestTag_ok() throws Exception {
+
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var nextDefTag1 = dummyTag(nextDataDef(origDef));
+        var origDefTag2 = nextTag(origTag);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+
+        // Save v1 t1, v2 t1, v2 t2
+        var future = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
+                .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextDefTag1));
+
+        unwrap(future);
+
+        // Load latest tag for object versions 1 & 2
+        var v1 = unwrap(dal.loadLatestTag(TEST_TENANT, origId, 1));
+        var v2 = unwrap(dal.loadLatestTag(TEST_TENANT, origId, 2));
+
+        // Should get v1 = v1t1, v2 = v2t1
+        assertEquals(origTag, v1);
+        assertEquals(nextDefTag1, v2);
+
+        // Save a new tag for
+        var v2t2 = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewTag(TEST_TENANT, origDefTag2))
+                .thenCompose(x -> dal.loadLatestTag(TEST_TENANT, origId, 2));
+
+        assertEquals(origDefTag2, unwrap(v2t2));
     }
 
     @Test
-    void testLoadOne_missingItems() {
-        fail("Not implemented");
-    }
+    void testLoadOne_missingItems() throws Exception {
 
-    @Test
-    void testLoadOne_wrongObjectType() {
-        fail("Not implemented");
+        assertThrows(MissingItemError.class, () -> unwrap(dal.loadTag(TEST_TENANT, UUID.randomUUID(), 1, 1)));
+        assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, UUID.randomUUID(), 1)));
+        assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestVersion(TEST_TENANT, UUID.randomUUID())));
+
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+
+        // Save an item
+        var future = dal.saveNewObject(TEST_TENANT, origTag);
+        unwrap(future);
+
+        assertThrows(MissingItemError.class, () -> unwrap(dal.loadTag(TEST_TENANT, origId, 1, 2)));  // Missing tag
+        assertThrows(MissingItemError.class, () -> unwrap(dal.loadTag(TEST_TENANT, origId, 2, 1)));  // Missing ver
+        assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, origId, 2)));  // Missing ver
     }
 
     @Test
