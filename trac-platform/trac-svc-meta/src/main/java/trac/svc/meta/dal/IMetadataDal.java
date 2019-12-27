@@ -30,20 +30,16 @@ public interface IMetadataDal {
     CompletableFuture<Void> savePreallocatedObjects(String tenant, List<Tag> tags);
 
 
-
-
     CompletableFuture<Tag>
-    loadTag(String tenant, UUID objectId, int objectVersion, int tagVersion);
+    loadTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion);
 
     CompletableFuture<List<Tag>>
-    loadTags(String tenant, List<UUID> objectId, List<Integer> objectVersion, List<Integer> tagVersion);
+    loadTags(String tenant, List<ObjectType> objectType, List<UUID> objectId, List<Integer> objectVersion, List<Integer> tagVersion);
 
     CompletableFuture<Tag>
-    loadLatestTag(String tenant, UUID objectId, int objectVersion);
+    loadLatestTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion);
 
     CompletableFuture<Tag>
-    loadLatestVersion(String tenant, UUID objectId);
-
-    CompletableFuture<Tag> loadLatestObject(String tenant, UUID objectId, int objectVersion);
+    loadLatestVersion(String tenant, ObjectType objectType, UUID objectId);
 
 }
