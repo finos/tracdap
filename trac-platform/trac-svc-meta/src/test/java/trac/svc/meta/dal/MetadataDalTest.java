@@ -720,6 +720,11 @@ class MetadataDalTest {
     }
 
     @Test
+    void testLoadOne_wrongObjectType() {
+        fail("Not implemented");
+    }
+
+    @Test
     void testLoadBatchExplicit_ok() {
         fail("Not implemented");
     }
