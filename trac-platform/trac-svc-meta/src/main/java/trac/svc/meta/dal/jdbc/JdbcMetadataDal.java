@@ -237,7 +237,27 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         var parts = assembleParts(objectType, objectId, LATEST_VERSION, LATEST_TAG);
 
-        return null;
+        return wrapTransaction(conn -> {
+
+            var tenantId = tenants.getTenantId(tenant);
+
+            var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
+            var definition = readSingle.readDefinitionByLatest(conn, tenantId, objectType, storedType.key);
+            var tagStub = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
+            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagStub.key);
+
+            var header = ObjectHeader.newBuilder()
+                    .setObjectType(objectType)
+                    .setId(MetadataCodec.encode(objectId))
+                    .setVersion(definition.item.version)
+                    .build();
+
+            return MetadataCodec.tagForDefinition(tagStub.item, objectType, definition.item.item)
+                    .setHeader(header)
+                    .putAllAttr(tagAttrs)
+                    .build();
+        },
+        (error, code) -> JdbcError.handleMissingItem(error, code, parts));
     }
 
 

@@ -115,4 +115,15 @@ class JdbcBaseDal {
             this.items = items;
         }
     }
+
+    static class VersionedItem<T> {
+
+        T item;
+        int version;
+
+        public VersionedItem(T item, int version) {
+            this.item = item;
+            this.version = version;
+        }
+    }
 }

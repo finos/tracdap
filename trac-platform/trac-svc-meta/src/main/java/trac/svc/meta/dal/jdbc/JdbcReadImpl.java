@@ -90,6 +90,51 @@ class JdbcReadImpl {
         }
     }
 
+    KeyedItem<JdbcBaseDal.VersionedItem<MessageLite>>
+    readDefinitionByLatest(
+            Connection conn, short tenantId,
+            ObjectType objectType, long objectPk)
+            throws SQLException {
+
+        var query =
+                "select definition_pk, object_version, definition\n" +
+                "from object_definition\n" +
+                "where tenant_id = ?\n" +
+                "and object_fk = ?\n" +
+                "and object_version = (\n" +
+                "  select latest_version\n" +
+                "  from latest_version\n" +
+                "  where latest_version.tenant_id = object_definition.tenant_id\n" +
+                "  and latest_version.object_fk = object_definition.object_fk\n" +
+                ")";
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setShort(1, tenantId);
+            stmt.setLong(2, objectPk);
+
+            try (var rs = stmt.executeQuery()) {
+
+                if (!rs.next())
+                    throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
+
+                var defPk = rs.getLong(1);
+                var version = rs.getInt(2);  // TODO: Validate?
+                var defEncoded = rs.getBytes(3);
+                var defDecoded = MetadataCodec.decode(objectType, defEncoded);
+                var defVersioned = new JdbcMetadataDal.VersionedItem<>(defDecoded, version);
+
+                if (!rs.last())
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+
+                return new KeyedItem<>(defPk, defVersioned);
+            }
+            catch (InvalidProtocolBufferException e) {
+                throw new CorruptItemError("Metadata decode failed", e);   // TODO: Error message + log
+            }
+        }
+    }
+
     KeyedItem<Tag.Builder>
     readTagRecordByVersion(Connection conn, short tenantId, long definitionPk, int tagVersion) throws SQLException {
 
