@@ -725,8 +725,38 @@ class MetadataDalTest {
     }
 
     @Test
-    void testLoadBatchExplicit_ok() {
-        fail("Not implemented");
+    void testLoadBatchExplicit_ok() throws Exception {
+
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var nextDefTag1 = dummyTag(nextDataDef(origDef));
+        var nextDefTag2 = nextTag(nextDefTag1);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+
+        var modelDef = dummyDataDef();
+        var modelTag = dummyTag(modelDef);
+        var modelId = MetadataCodec.decode(modelDef.getHeader().getId());
+
+        // Save everything first
+        var future = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
+                .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextDefTag1))
+                .thenCompose(x -> dal.saveNewTag(TEST_TENANT, nextDefTag2))
+                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, modelTag));
+
+        unwrap(future);
+
+        var types = Arrays.asList(ObjectType.DATA, ObjectType.DATA, ObjectType.DATA, ObjectType.MODEL);
+        var ids = Arrays.asList(origId, origId, origId, modelId);
+        var versions = Arrays.asList(1, 2, 2, 1);
+        var tagVersions = Arrays.asList(1, 1, 2, 1);
+
+        var result = unwrap(dal.loadTags(TEST_TENANT, types, ids, versions, tagVersions));
+
+        assertEquals(origTag, result.get(0));
+        assertEquals(nextDefTag1, result.get(1));
+        assertEquals(nextDefTag2, result.get(2));
+        assertEquals(modelTag, result.get(3));
     }
 
     @Test
