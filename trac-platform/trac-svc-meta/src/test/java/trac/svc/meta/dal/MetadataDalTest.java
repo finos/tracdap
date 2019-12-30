@@ -733,7 +733,7 @@ class MetadataDalTest {
         var nextDefTag2 = nextTag(nextDefTag1);
         var origId = MetadataCodec.decode(origDef.getHeader().getId());
 
-        var modelDef = dummyDataDef();
+        var modelDef = dummyModelDef();
         var modelTag = dummyTag(modelDef);
         var modelId = MetadataCodec.decode(modelDef.getHeader().getId());
 

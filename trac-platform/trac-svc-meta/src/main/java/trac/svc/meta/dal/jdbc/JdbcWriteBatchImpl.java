@@ -113,7 +113,8 @@ class JdbcWriteBatchImpl {
                 "  tenant_id,\n" +
                 "  tag_fk,\n" +
                 "  attr_name,\n" +
-                "  attr_value_bool,\n" +
+                "  attr_type,\n" +
+                "  attr_value_boolean,\n" +
                 "  attr_value_integer,\n" +
                 "  attr_value_float,\n" +
                 "  attr_value_decimal,\n" +
@@ -122,7 +123,7 @@ class JdbcWriteBatchImpl {
                 "  attr_value_datetime,\n" +
                 "  attr_value_datetime_zone\n" +
                 ")\n" +
-                "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (var stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
 
@@ -133,27 +134,28 @@ class JdbcWriteBatchImpl {
                     stmt.setShort(1, tenantId);
                     stmt.setLong(2, tagPk[i]);
                     stmt.setString(3, attr.getKey());
+                    stmt.setString(4, attr.getValue().getType().name());
 
-                    stmt.setNull(4, Types.BOOLEAN);
-                    stmt.setNull(5, Types.BIGINT);
-                    stmt.setNull(6, Types.DOUBLE);
-                    stmt.setNull(7, Types.DECIMAL);
-                    stmt.setNull(8, Types.VARCHAR);
-                    stmt.setNull(9, Types.DATE);
-                    stmt.setNull(10, Types.TIMESTAMP);
-                    stmt.setNull(11, Types.VARCHAR);
+                    stmt.setNull(5, Types.BOOLEAN);
+                    stmt.setNull(6, Types.BIGINT);
+                    stmt.setNull(7, Types.DOUBLE);
+                    stmt.setNull(8, Types.DECIMAL);
+                    stmt.setNull(9, Types.VARCHAR);
+                    stmt.setNull(10, Types.DATE);
+                    stmt.setNull(11, Types.TIMESTAMP);
+                    stmt.setNull(12, Types.VARCHAR);
 
                     var attrValue = attr.getValue();
                     var attrType = attrValue.getType();
 
                     if (attrType == PrimitiveType.BOOLEAN)
-                        stmt.setBoolean(4, attrValue.getBooleanValue());
+                        stmt.setBoolean(5, attrValue.getBooleanValue());
                     if (attrType == PrimitiveType.INTEGER)
-                        stmt.setLong(5, attrValue.getIntegerValue());
+                        stmt.setLong(6, attrValue.getIntegerValue());
                     if (attrType == PrimitiveType.FLOAT)
-                        stmt.setDouble(6, attrValue.getFloatValue());
+                        stmt.setDouble(7, attrValue.getFloatValue());
                     if (attrType == PrimitiveType.STRING)
-                        stmt.setString(8, attrValue.getStringValue());
+                        stmt.setString(9, attrValue.getStringValue());
 
                     /*
                     if (attrType == PrimitiveType.DECIMAL)

@@ -60,11 +60,12 @@ create unique index idx_tag_unq on tag (tenant_id, definition_fk, tag_version);
 create table tag_attr (
 
     tenant_id smallint not null,
-
     tag_fk bigint not null,
 
-    attr_name varchar(255) not null,
-    attr_value_bool boolean null,
+    attr_name varchar(256) not null,
+    attr_type varchar(16) not null,
+
+    attr_value_boolean boolean null,
     attr_value_integer bigint null,
     attr_value_float double null,
     attr_value_decimal decimal null,

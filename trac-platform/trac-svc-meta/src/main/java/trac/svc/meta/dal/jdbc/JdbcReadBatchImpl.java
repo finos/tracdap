@@ -1,9 +1,16 @@
 package trac.svc.meta.dal.jdbc;
 
-import trac.common.metadata.ObjectType;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.MessageLite;
+import trac.common.metadata.*;
+import trac.svc.meta.exception.CorruptItemError;
+import trac.svc.meta.exception.TracInternalError;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -19,20 +26,22 @@ class JdbcReadBatchImpl {
     JdbcBaseDal.KeyedItems<ObjectType>
     readObjectTypeById(Connection conn, short tenantId, UUID[] objectId) throws SQLException {
 
-        var selectQuery =
+        var mappingStage = insertIdForMapping(conn, objectId);
+        mapObjectById(conn, tenantId, mappingStage);
+
+        var query =
                 "select object_pk, object_type\n" +
                 "from object_id oid\n" +
                 "join key_mapping km\n" +
                 "  on oid.object_pk = km.pk\n" +
-                "where km.mapping_stage = ?\n" +
+                "where oid.tenant_id = ?\n" +
+                "  and km.mapping_stage = ?\n" +
                 "order by km.ordering";
 
-        var mappingStage = insertIdForMapping(conn, objectId);
-        mapObjectById(conn, tenantId, mappingStage);
+        try (var stmt = conn.prepareStatement(query)) {
 
-        try (var stmt = conn.prepareStatement(selectQuery)) {
-
-            stmt.setInt(1, mappingStage);
+            stmt.setShort(1, tenantId);
+            stmt.setInt(2, mappingStage);
 
             try (var rs = stmt.executeQuery()) {
 
@@ -59,6 +68,125 @@ class JdbcReadBatchImpl {
             }
         }
     }
+
+    JdbcBaseDal.KeyedItems<MessageLite>
+    readDefinitionByVersion(
+            Connection conn, short tenantId,
+            ObjectType[] objectType, long[] objectFk, int[] objectVersion)
+            throws SQLException {
+
+        var mappingStage = insertFkAndVersionForMapping(conn, objectFk, objectVersion);
+        mapDefinitionByVersion(conn, tenantId, mappingStage);
+
+        var query =
+                "select definition_pk, definition\n" +
+                "from object_definition def\n" +
+                "join key_mapping km\n" +
+                "  on def.definition_pk = km.pk\n" +
+                "where def.tenant_id = ?\n" +
+                "  and km.mapping_stage = ?\n" +
+                "order by km.ordering";
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setShort(1, tenantId);
+            stmt.setInt(2, mappingStage);
+
+            try (var rs = stmt.executeQuery()) {
+
+                long[] pks = new long[objectFk.length];
+                MessageLite[] defs = new MessageLite[objectFk.length];
+
+                for (var i = 0; i < objectFk.length; i++) {
+
+                    if (!rs.next())
+                        throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
+
+                    var defPk = rs.getLong(1);
+                    var defEncoded = rs.getBytes(2);
+                    var defDecoded = MetadataCodec.decode(objectType[i], defEncoded);
+
+                    pks[i] = defPk;
+                    defs[i] = defDecoded;
+                }
+
+                if (!rs.last())
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+
+                return new JdbcBaseDal.KeyedItems<>(pks, defs);
+            }
+            catch (InvalidProtocolBufferException e) {
+                throw new CorruptItemError("Metadata decode failed", e);   // TODO: Error message + log
+            }
+
+        }
+    }
+
+    JdbcBaseDal.KeyedItems<Tag.Builder>
+    readTagRecordByVersion(Connection conn, short tenantId, long[] definitionFk, int[] tagVersion) throws SQLException {
+
+        // Tag records contain no attributes, we only need pks and versions
+        // Note: Common attributes may be added to the tag table as search optimisations, but do not need to be read
+
+        var pks = lookupTagPk(conn, tenantId, definitionFk, tagVersion);
+        var stubs = Arrays.stream(tagVersion).mapToObj(v -> Tag.newBuilder().setTagVersion(v)).toArray(Tag.Builder[]::new);
+
+        return new JdbcBaseDal.KeyedItems<>(pks, stubs);
+    }
+
+    Map<String, PrimitiveValue>[]
+    readTagAttrs(Connection conn, short tenantId, long[] tagPk) throws SQLException {
+
+        var query =
+                "select ta.*\n" +
+                "from key_mapping km\n" +
+                "left join tag_attr ta\n" +
+                "  on ta.tag_fk = km.pk\n" +
+                "where ta.tenant_id = ?\n" +
+                "  and km.mapping_stage = ?\n" +
+                "order by km.ordering";
+
+        var mappingStage = insertPk(conn, tagPk);
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setInt(1, tenantId);
+            stmt.setInt(2, mappingStage);
+
+            try (var rs = stmt.executeQuery()) {
+
+
+                @SuppressWarnings("unchecked")
+                var result = (Map<String, PrimitiveValue>[]) new HashMap[tagPk.length];
+
+                var currentAttrs = new HashMap<String, PrimitiveValue>();
+                var currentIndex = 0;
+
+                while (rs.next()) {
+
+                    var currentPk = rs.getLong("tag_fk");
+                    var attrName = rs.getString("attr_name");
+                    var attrValue = JdbcReadHelpers.readAttrValue(rs);
+
+                    while (currentIndex < tagPk.length && currentPk != tagPk[currentIndex]) {
+                        result[currentIndex] = currentAttrs;
+                        currentAttrs = new HashMap<>();
+                        currentIndex++;
+                    }
+
+                    if (currentIndex == tagPk.length)
+                        throw new TracInternalError("Error reading tag attrs");  // TODO: Error message
+
+                    currentAttrs.put(attrName, attrValue);
+                }
+
+                result[currentIndex] = currentAttrs;
+
+                return result;
+            }
+        }
+    }
+
 
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -128,15 +256,41 @@ class JdbcReadBatchImpl {
     // KEY MAPPING FUNCTIONS
     // -----------------------------------------------------------------------------------------------------------------
 
+    private int insertPk(Connection conn, long[] pks) throws SQLException {
+
+        var query =
+                "insert into key_mapping (pk, mapping_stage, ordering)\n" +
+                "values (?, ?, ?)";
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            var mappingStage = nextMappingStage();
+
+            for (var i = 0; i < pks.length; i++) {
+
+                stmt.clearParameters();
+                stmt.setLong(1, pks[i]);
+                stmt.setInt(2, mappingStage);
+                stmt.setInt(3, i);
+
+                stmt.addBatch();
+            }
+
+            stmt.executeBatch();
+
+            return mappingStage;
+        }
+    }
+
     private int insertIdForMapping(Connection conn, UUID[] ids) throws SQLException {
 
         var insertQuery =
                 "insert into key_mapping (id_hi, id_lo, mapping_stage, ordering)\n" +
                 "values (?, ?, ?, ?)";
 
-        var mappingStage = nextMappingStage();
-
         try (var stmt = conn.prepareStatement(insertQuery)) {
+
+            var mappingStage = nextMappingStage();
 
             for (var i = 0; i < ids.length; i++) {
 
@@ -151,9 +305,9 @@ class JdbcReadBatchImpl {
             }
 
             stmt.executeBatch();
-        }
 
-        return mappingStage;
+            return mappingStage;
+        }
     }
 
     private int insertFkAndVersionForMapping(Connection conn, long[] fk, int[] version) throws SQLException {
@@ -162,9 +316,9 @@ class JdbcReadBatchImpl {
                 "insert into key_mapping (fk, ver, mapping_stage, ordering)\n" +
                 "values (?, ?, ?, ?)";
 
-        var mappingStage = nextMappingStage();
-
         try (var stmt = conn.prepareStatement(insertQuery)) {
+
+            var mappingStage = nextMappingStage();
 
             for (var i = 0; i < fk.length; i++) {
 
@@ -179,9 +333,9 @@ class JdbcReadBatchImpl {
             }
 
             stmt.executeBatch();
-        }
 
-        return mappingStage;
+            return mappingStage;
+        }
     }
 
     private void mapObjectById(Connection conn, short tenantId, int mappingStage) throws SQLException {

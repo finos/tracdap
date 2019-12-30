@@ -6,8 +6,7 @@ import trac.svc.meta.dal.IMetadataDal;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -182,16 +181,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var tagStub = readSingle.readTagRecordByVersion(conn, tenantId, definition.key, tagVersion);
             var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagStub.key);
 
-            var header = ObjectHeader.newBuilder()
-                    .setObjectType(objectType)
-                    .setId(MetadataCodec.encode(objectId))
-                    .setVersion(objectVersion)
-                    .build();
-
-            return MetadataCodec.tagForDefinition(tagStub.item, objectType, definition.item)
-                    .setHeader(header)
-                    .putAllAttr(tagAttrs)
-                    .build();
+            // TODO: Unnecessary tag builder
+            return buildTag(objectType, objectId, objectVersion, tagVersion, definition.item, tagAttrs);
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts));
     }
@@ -201,7 +192,20 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         var parts = assembleParts(objectTypes, objectIds, objectVersions, tagVersions);
 
-        return null;
+        return wrapTransaction(conn -> {
+
+            prepareMappingTable(conn);
+
+            var tenantId = tenants.getTenantId(tenant);
+
+            var storedType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+            var definition = readBatch.readDefinitionByVersion(conn, tenantId, parts.objectType, storedType.keys, parts.version);
+            var tag = readBatch.readTagRecordByVersion(conn, tenantId, definition.keys, parts.tagVersion);
+            var tagAttrs = readBatch.readTagAttrs(conn, tenantId, tag.keys);
+
+            // TODO: Unnecessary tag builder
+            return buildTags(parts.objectType, parts.objectId, parts.version, parts.tagVersion, definition.items, tagAttrs);
+        });
     }
 
     @Override public CompletableFuture<Tag>
@@ -218,16 +222,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var tagStub = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
             var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagStub.key);
 
-            var header = ObjectHeader.newBuilder()
-                    .setObjectType(objectType)
-                    .setId(MetadataCodec.encode(objectId))
-                    .setVersion(objectVersion)
-                    .build();
-
-            return MetadataCodec.tagForDefinition(tagStub.item, objectType, definition.item)
-                    .setHeader(header)
-                    .putAllAttr(tagAttrs)
-                    .build();
+            // TODO: Unnecessary tag builder
+            return buildTag(objectType, objectId, objectVersion, tagStub.item.getTagVersion(), definition.item, tagAttrs);
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts));
     }
@@ -246,16 +242,12 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var tagStub = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
             var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagStub.key);
 
-            var header = ObjectHeader.newBuilder()
-                    .setObjectType(objectType)
-                    .setId(MetadataCodec.encode(objectId))
-                    .setVersion(definition.item.version)
-                    .build();
-
-            return MetadataCodec.tagForDefinition(tagStub.item, objectType, definition.item.item)
-                    .setHeader(header)
-                    .putAllAttr(tagAttrs)
-                    .build();
+            // TODO: Unnecessary tag builder
+            return buildTag(objectType, objectId,
+                    definition.item.version,
+                    tagStub.item.getTagVersion(),
+                    definition.item.item,
+                    tagAttrs);
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts));
     }
@@ -327,5 +319,43 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         parts.tagVersion = tagVersions.stream().mapToInt(x -> x).toArray();
 
         return parts;
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // BUILD TAGS
+    // -----------------------------------------------------------------------------------------------------------------
+
+    private Tag buildTag(
+            ObjectType objectType, UUID objectId,
+            int objectVersion, int tagVersion,
+            MessageLite definition,
+            Map<String, PrimitiveValue> tagAttrs) {
+
+        var header = ObjectHeader.newBuilder()
+                .setObjectType(objectType)
+                .setId(MetadataCodec.encode(objectId))
+                .setVersion(objectVersion)
+                .build();
+
+        return MetadataCodec.tagForDefinition(objectType, definition)
+                .setHeader(header)
+                .setTagVersion(tagVersion)
+                .putAllAttr(tagAttrs)
+                .build();
+    }
+
+    private List<Tag> buildTags(
+            ObjectType[] objectType, UUID[] objectId,
+            int[] objectVersion, int[] tagVersion,
+            MessageLite[] definition,
+            Map<String, PrimitiveValue>[] tagAttrs) {
+
+        var result = new ArrayList<Tag>(objectId.length);
+
+        for (int i = 0; i < objectId.length; i++)
+            result.add(i, buildTag(objectType[i], objectId[i], objectVersion[i], tagVersion[i], definition[i], tagAttrs[i]));
+
+        return result;
     }
 }

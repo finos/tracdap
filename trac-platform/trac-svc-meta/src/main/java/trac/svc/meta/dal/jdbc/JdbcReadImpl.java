@@ -8,12 +8,10 @@ import trac.svc.meta.dal.jdbc.JdbcBaseDal.KeyedItem;
 import trac.svc.meta.exception.CorruptItemError;
 
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
 
 
 class JdbcReadImpl {
@@ -119,10 +117,12 @@ class JdbcReadImpl {
                     throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
 
                 var defPk = rs.getLong(1);
-                var version = rs.getInt(2);  // TODO: Validate?
+                var version = rs.getInt(2);
                 var defEncoded = rs.getBytes(3);
                 var defDecoded = MetadataCodec.decode(objectType, defEncoded);
                 var defVersioned = new JdbcMetadataDal.VersionedItem<>(defDecoded, version);
+
+                // TODO: Encode / decode helper, type = protobuf | json ?
 
                 if (!rs.last())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
@@ -222,43 +222,13 @@ class JdbcReadImpl {
                 while (rs.next()) {
 
                     var attrName = rs.getString("attr_name");
+                    var attrValue = JdbcReadHelpers.readAttrValue(rs);
 
-                    fetchAttrValue(attrs, attrName, ResultSet::getString, rs, "attr_value_string", PrimitiveType.STRING, Function.identity());
-
+                    attrs.put(attrName, attrValue);
                 }
 
                 return attrs;
             }
         }
-    }
-
-    private <TSqlValue, TValue>
-    boolean fetchAttrValue(
-            Map<String, PrimitiveValue> attrs, String attrName,
-            AttrGetter<TSqlValue> getter, ResultSet rs, String fieldName,
-            PrimitiveType primitiveType,
-            Function<TSqlValue, TValue> mapper)
-            throws SQLException {
-
-        var sqlValue = getter.get(rs, fieldName);
-
-        if (!rs.wasNull()) {
-            var attrValue = mapper.apply(sqlValue);
-            var primitiveValue = PrimitiveValue.newBuilder()
-                    .setType(primitiveType)
-                    .setStringValue(attrValue.toString())
-                    .build();
-            attrs.put(attrName, primitiveValue);
-
-            return true;
-        }
-
-        return false;
-    }
-
-    @FunctionalInterface
-    private interface AttrGetter<TSqlValue> {
-
-        TSqlValue get(ResultSet rs, String fieldName) throws SQLException;
     }
 }
