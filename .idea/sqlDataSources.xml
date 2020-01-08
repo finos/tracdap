@@ -9,7 +9,7 @@
           <option name="urls">
             <array>
               <option value="file://$PROJECT_DIR$/trac-platform/trac-svc-meta/src/schema/mysql/trac_metadata.ddl" />
-              <option value="file://$PROJECT_DIR$/trac-platform/trac-svc-meta/src/main/resources/jdbc/key_mapping_mysql.ddl" />
+              <option value="file://$PROJECT_DIR$/trac-platform/trac-svc-meta/src/main/resources/jdbc/mysql/key_mapping.ddl" />
             </array>
           </option>
         </State>
