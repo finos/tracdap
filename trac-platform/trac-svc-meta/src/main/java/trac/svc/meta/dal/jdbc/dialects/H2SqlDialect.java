@@ -8,20 +8,19 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
+public class H2SqlDialect extends Dialect {
 
-public class MySqlDialect extends Dialect {
-
-    private static final String DROP_KEY_MAPPING_DDL = "drop temporary table if exists key_mapping;";
+    private static final String DROP_KEY_MAPPING_DDL = "drop table if exists key_mapping;";
     private static final String CREATE_KEY_MAPPING_FILE = "jdbc/mysql/key_mapping.ddl";
 
     private Map<Integer, JdbcErrorCode> dialectErrorCodes;
 
     private final String createKeyMapping;
 
-    MySqlDialect() {
+    H2SqlDialect() {
 
         dialectErrorCodes = new HashMap<>();
-        dialectErrorCodes.put(1062, JdbcErrorCode.INSERT_DUPLICATE);
+        dialectErrorCodes.put(23505, JdbcErrorCode.INSERT_DUPLICATE);
         dialectErrorCodes.put(1452, JdbcErrorCode.INSERT_MISSING_FK);
 
         createKeyMapping = loadKeyMappingDdl(CREATE_KEY_MAPPING_FILE);
@@ -29,7 +28,7 @@ public class MySqlDialect extends Dialect {
 
     @Override
     public JdbcDialect dialectCode() {
-        return JdbcDialect.MYSQL;
+        return JdbcDialect.H2;
     }
 
     @Override
