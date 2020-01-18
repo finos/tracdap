@@ -361,18 +361,18 @@ abstract class MetadataDalWriteTest extends MetadataDalTestBase {
         var id1 = UUID.randomUUID();
 
         unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1));
-        assertThrows(DuplicateItemError.class, () ->
-                dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1));
+        assertThrows(DuplicateItemError.class,
+                () -> unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.MODEL);
         var id2 = MetadataCodec.decode(obj2.getHeader().getId());
         var id3 = UUID.randomUUID();
 
         unwrap(dal.saveNewObject(TEST_TENANT, obj2));
-        assertThrows(DuplicateItemError.class, () ->
-                dal.preallocateObjectIds(TEST_TENANT,
+        assertThrows(DuplicateItemError.class,
+                () -> unwrap(dal.preallocateObjectIds(TEST_TENANT,
                         Arrays.asList(ObjectType.MODEL, ObjectType.MODEL),
-                        Arrays.asList(id2, id3)));
+                        Arrays.asList(id2, id3))));
     }
 
     @Test
@@ -380,16 +380,16 @@ abstract class MetadataDalWriteTest extends MetadataDalTestBase {
 
         var obj1 = dummyTagForObjectType(ObjectType.MODEL);
 
-        assertThrows(MissingItemError.class, () ->
-                dal.savePreallocatedObject(TEST_TENANT, obj1));
+        assertThrows(MissingItemError.class,
+                () -> unwrap(dal.savePreallocatedObject(TEST_TENANT, obj1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.DATA);
         var id2 = MetadataCodec.decode(obj2.getHeader().getId());
 
         unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id2));
 
-        assertThrows(MissingItemError.class, () ->
-                dal.savePreallocatedObjects(TEST_TENANT, Arrays.asList(obj1, obj2)));
+        assertThrows(MissingItemError.class,
+                () -> unwrap(dal.savePreallocatedObjects(TEST_TENANT, Arrays.asList(obj1, obj2))));
     }
 
     @Test
@@ -400,15 +400,15 @@ abstract class MetadataDalWriteTest extends MetadataDalTestBase {
 
         unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1));
 
-        assertThrows(WrongItemTypeError.class, () ->
-                dal.savePreallocatedObject(TEST_TENANT, obj1));
+        assertThrows(WrongItemTypeError.class,
+                () -> unwrap(dal.savePreallocatedObject(TEST_TENANT, obj1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.DATA);
         var id2 = MetadataCodec.decode(obj2.getHeader().getId());
 
         unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id2));
 
-        assertThrows(WrongItemTypeError.class, () ->
-                dal.savePreallocatedObjects(TEST_TENANT, Arrays.asList(obj1, obj2)));
+        assertThrows(WrongItemTypeError.class,
+                () -> unwrap(dal.savePreallocatedObjects(TEST_TENANT, Arrays.asList(obj1, obj2))));
     }
 }
