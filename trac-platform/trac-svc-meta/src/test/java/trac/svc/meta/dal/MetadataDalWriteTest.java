@@ -12,12 +12,12 @@ import trac.svc.meta.exception.WrongItemTypeError;
 import static trac.svc.meta.dal.MetadataDalTestData.*;
 
 import java.util.Arrays;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.ThrowingSupplier;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assertions.fail;
 
 
 abstract class MetadataDalWriteTest extends MetadataDalTestBase {
@@ -320,22 +320,91 @@ abstract class MetadataDalWriteTest extends MetadataDalTestBase {
     }
 
     @Test
-    void testPreallocate_ok() {
-        fail("Not implemented");
+    void testPreallocate_ok() throws Exception {
+
+        // Save one
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+
+        var future = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, origId))
+                .thenCompose(x -> dal.savePreallocatedObject(TEST_TENANT, origTag))
+                .thenCompose(x -> dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1));
+
+        assertEquals(origTag, unwrap(future));
+
+        // Save multiple
+        var multi1 = dummyTagForObjectType(ObjectType.MODEL);
+        var multi2 = dummyTagForObjectType(ObjectType.MODEL);
+        var id1 = MetadataCodec.decode(multi1.getHeader().getId());
+        var id2 = MetadataCodec.decode(multi2.getHeader().getId());
+
+        var future2 = CompletableFuture.completedFuture(0)
+                .thenCompose(x -> dal.preallocateObjectIds(TEST_TENANT, ObjectType.MODEL, Arrays.asList(id1, id2)))
+                .thenCompose(x -> dal.savePreallocatedObjects(TEST_TENANT, Arrays.asList(multi1, multi2)));
+
+        assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
+
+        var result1 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, MetadataCodec.decode(multi1.getHeader().getId()), 1, 1);
+        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, MetadataCodec.decode(multi2.getHeader().getId()), 1, 1);
+
+        assertEquals(multi1, unwrap(result1));
+        assertEquals(multi2, unwrap(result2));
     }
 
     @Test
-    void testPreallocate_duplicate() {
-        fail("Not implemented");
+    void testPreallocate_duplicate() throws Exception {
+
+        var id1 = UUID.randomUUID();
+
+        unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1));
+        assertThrows(DuplicateItemError.class, () ->
+                dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1));
+
+        var obj2 = dummyTagForObjectType(ObjectType.MODEL);
+        var id2 = MetadataCodec.decode(obj2.getHeader().getId());
+        var id3 = UUID.randomUUID();
+
+        unwrap(dal.saveNewObject(TEST_TENANT, obj2));
+        assertThrows(DuplicateItemError.class, () ->
+                dal.preallocateObjectIds(TEST_TENANT, ObjectType.MODEL, Arrays.asList(id2, id3)));
     }
 
     @Test
-    void testPreallocate_missingObjectId() {
-        fail("Not implemented");
+    void testPreallocate_missingObjectId() throws Exception {
+
+        var obj1 = dummyTagForObjectType(ObjectType.MODEL);
+
+        assertThrows(MissingItemError.class, () ->
+                dal.savePreallocatedObject(TEST_TENANT, obj1));
+
+        var obj2 = dummyTagForObjectType(ObjectType.DATA);
+        var id2 = MetadataCodec.decode(obj2.getHeader().getId());
+
+        unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id2));
+
+        assertThrows(MissingItemError.class, () ->
+                dal.savePreallocatedObjects(TEST_TENANT, Arrays.asList(obj1, obj2)));
     }
 
     @Test
-    void testPreallocate_wrongObjectType() {
-        fail("Not implemented");
+    void testPreallocate_wrongObjectType() throws Exception {
+
+        var obj1 = dummyTagForObjectType(ObjectType.MODEL);
+        var id1 = MetadataCodec.decode(obj1.getHeader().getId());
+
+        unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1));
+
+        assertThrows(WrongItemTypeError.class, () ->
+                dal.savePreallocatedObject(TEST_TENANT, obj1));
+
+        var obj2 = dummyTagForObjectType(ObjectType.DATA);
+        var id2 = MetadataCodec.decode(obj2.getHeader().getId());
+
+        unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id2));
+
+        assertThrows(WrongItemTypeError.class, () ->
+                dal.savePreallocatedObjects(TEST_TENANT, Arrays.asList(obj1, obj2)));
     }
 }
