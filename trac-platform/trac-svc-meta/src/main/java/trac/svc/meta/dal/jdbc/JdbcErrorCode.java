@@ -5,5 +5,6 @@ public enum JdbcErrorCode {
     INSERT_DUPLICATE,
     INSERT_MISSING_FK,
     NO_DATA,
-    TOO_MANY_ROWS
+    TOO_MANY_ROWS,
+    WRONG_OBJECT_TYPE
 }

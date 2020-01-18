@@ -103,6 +103,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var tenantId = tenants.getTenantId(tenant);
             var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
 
+            checkObjectTypes(parts, objectType);
+
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts.version, parts.definition);
             long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
@@ -111,7 +113,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             writeBatch.writeLatestTag(conn, tenantId, defPk, parts.tagVersion);
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts),
-        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));
+        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),
+        (error, code) ->  JdbcError.newVersion_WrongType(error, code, parts));
     }
 
     @Override
@@ -135,16 +138,19 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             prepareMappingTable(conn);
 
             var tenantId = tenants.getTenantId(tenant);
-            long[] objectPk = readBatch.lookupObjectPk(conn, tenantId, parts.objectId);
-            long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectPk, parts.version);
+            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
 
+            checkObjectTypes(parts, objectType);
+
+            long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.version);
             long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
 
             writeBatch.updateLatestTag(conn, tenantId, defPk, parts.tagVersion);
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts),
-        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));
+        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),
+        (error, code) ->  JdbcError.newTag_WrongType(error, code, parts));
     }
 
     @Override
@@ -195,6 +201,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var tenantId = tenants.getTenantId(tenant);
             var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
 
+            checkObjectTypes(parts, objectType);
+
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts.version, parts.definition);
             long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
@@ -203,7 +211,15 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             writeBatch.writeLatestTag(conn, tenantId, defPk, parts.tagVersion);
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts),   // TODO: different errors
-        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));  // TODO: different errors
+        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),  // TODO: different errors
+        (error, code) ->  JdbcError.savePreallocated_WrongType(error, code, parts));
+    }
+
+    private void checkObjectTypes(ObjectParts parts, KeyedItems<ObjectType> existingTypes) throws JdbcException {
+
+        for (int i = 0; i < parts.objectType.length; i++)
+            if (parts.objectType[i] != existingTypes.items[i])
+                throw new JdbcException(JdbcErrorCode.WRONG_OBJECT_TYPE.name(), JdbcErrorCode.WRONG_OBJECT_TYPE);
     }
 
     @Override public CompletableFuture<Tag>

@@ -4,6 +4,7 @@ import trac.svc.meta.dal.jdbc.dialects.IDialect;
 import trac.svc.meta.exception.DuplicateItemError;
 import trac.svc.meta.exception.MissingItemError;
 import trac.svc.meta.exception.TracInternalError;
+import trac.svc.meta.exception.WrongItemTypeError;
 
 import java.sql.SQLException;
 import java.text.MessageFormat;
@@ -15,6 +16,8 @@ class JdbcError {
 
     static final String DUPLICATE_OBJECT_ID = "Duplicate object id {0}";
     static final String MISSING_ITEM = "Metadata item does not exist {0}";
+
+    static final String WRONG_OBJECT_TYPE = "Metadata item has the wrong type";
 
 
     static TracInternalError unhandledError(SQLException error, JdbcErrorCode code) {
@@ -47,4 +50,29 @@ class JdbcError {
             throw new MissingItemError(message, error);
         }
     }
+
+    static void newVersion_WrongType(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
+
+        if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
+            var message = MessageFormat.format(WRONG_OBJECT_TYPE, "");
+            throw new WrongItemTypeError(message, error);
+        }
+    }
+
+    static void newTag_WrongType(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
+
+        if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
+            var message = MessageFormat.format(WRONG_OBJECT_TYPE, "");
+            throw new WrongItemTypeError(message, error);
+        }
+    }
+
+    static void savePreallocated_WrongType(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
+
+        if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
+            var message = MessageFormat.format(WRONG_OBJECT_TYPE, "");
+            throw new WrongItemTypeError(message, error);
+        }
+    }
+
 }
