@@ -23,7 +23,7 @@ public interface IMetadataDal {
 
     CompletableFuture<Void> preallocateObjectId(String tenant, ObjectType objectType, UUID objectId);
 
-    CompletableFuture<Void> preallocateObjectIds(String tenant, ObjectType objectType, List<UUID> objectIds);
+    CompletableFuture<Void> preallocateObjectIds(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds);
 
     CompletableFuture<Void> savePreallocatedObject(String tenant, Tag tag);
 

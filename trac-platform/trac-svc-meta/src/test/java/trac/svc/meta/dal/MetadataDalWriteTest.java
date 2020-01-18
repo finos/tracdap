@@ -341,7 +341,9 @@ abstract class MetadataDalWriteTest extends MetadataDalTestBase {
         var id2 = MetadataCodec.decode(multi2.getHeader().getId());
 
         var future2 = CompletableFuture.completedFuture(0)
-                .thenCompose(x -> dal.preallocateObjectIds(TEST_TENANT, ObjectType.MODEL, Arrays.asList(id1, id2)))
+                .thenCompose(x -> dal.preallocateObjectIds(TEST_TENANT,
+                        Arrays.asList(ObjectType.MODEL, ObjectType.MODEL),
+                        Arrays.asList(id1, id2)))
                 .thenCompose(x -> dal.savePreallocatedObjects(TEST_TENANT, Arrays.asList(multi1, multi2)));
 
         assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
@@ -368,7 +370,9 @@ abstract class MetadataDalWriteTest extends MetadataDalTestBase {
 
         unwrap(dal.saveNewObject(TEST_TENANT, obj2));
         assertThrows(DuplicateItemError.class, () ->
-                dal.preallocateObjectIds(TEST_TENANT, ObjectType.MODEL, Arrays.asList(id2, id3)));
+                dal.preallocateObjectIds(TEST_TENANT,
+                        Arrays.asList(ObjectType.MODEL, ObjectType.MODEL),
+                        Arrays.asList(id2, id3)));
     }
 
     @Test

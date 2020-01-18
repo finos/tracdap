@@ -149,22 +149,61 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
     @Override
     public CompletableFuture<Void> preallocateObjectId(String tenant, ObjectType objectType, UUID objectId) {
-        return null;
+
+        var parts = separateParts(objectType, objectId);
+        return preallocateObjectIds(tenant, parts);
     }
 
     @Override
-    public CompletableFuture<Void> preallocateObjectIds(String tenant, ObjectType objectType, List<UUID> objectIds) {
-        return null;
+    public CompletableFuture<Void> preallocateObjectIds(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds) {
+
+        var parts = separateParts(objectTypes, objectIds);
+        return preallocateObjectIds(tenant, parts);
+    }
+
+    private CompletableFuture<Void> preallocateObjectIds(String tenant, ObjectParts parts) {
+
+        return wrapTransaction(conn -> {
+
+            var tenantId = tenants.getTenantId(tenant);
+
+            writeBatch.writeObjectId(conn, tenantId, parts.objectType, parts.objectId);
+        },
+        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));
     }
 
     @Override
     public CompletableFuture<Void> savePreallocatedObject(String tenant, Tag tag) {
-        return null;
+
+        var parts = separateParts(tag);
+        return savePreallocatedObjects(tenant, parts);
     }
 
     @Override
     public CompletableFuture<Void> savePreallocatedObjects(String tenant, List<Tag> tags) {
-        return null;
+
+        var parts = separateParts(tags);
+        return savePreallocatedObjects(tenant, parts);
+    }
+
+    private CompletableFuture<Void> savePreallocatedObjects(String tenant, ObjectParts parts) {
+
+        return wrapTransaction(conn -> {
+
+            prepareMappingTable(conn);
+
+            var tenantId = tenants.getTenantId(tenant);
+            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+
+            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts.version, parts.definition);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion);
+            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
+
+            writeBatch.writeLatestVersion(conn, tenantId, objectType.keys, parts.version);
+            writeBatch.writeLatestTag(conn, tenantId, defPk, parts.tagVersion);
+        },
+        (error, code) -> JdbcError.handleMissingItem(error, code, parts),   // TODO: different errors
+        (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));  // TODO: different errors
     }
 
     @Override public CompletableFuture<Tag>
@@ -295,6 +334,24 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         parts.tag = tags.toArray(Tag[]::new);
         parts.definition = tags.stream().map(MetadataCodec::definitionForTag).toArray(MessageLite[]::new);
+
+        return parts;
+    }
+
+    private ObjectParts separateParts(ObjectType objectType, UUID objectId) {
+
+        var parts = new ObjectParts();
+        parts.objectType = new ObjectType[] {objectType};
+        parts.objectId = new UUID[] {objectId};
+
+        return parts;
+    }
+
+    private ObjectParts separateParts(List<ObjectType> objectTypes, List<UUID> objectIds) {
+
+        var parts = new ObjectParts();
+        parts.objectType = objectTypes.toArray(ObjectType[]::new);
+        parts.objectId = objectIds.toArray(UUID[]::new);
 
         return parts;
     }
