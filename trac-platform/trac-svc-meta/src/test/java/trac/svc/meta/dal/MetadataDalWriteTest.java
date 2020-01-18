@@ -2,6 +2,7 @@ package trac.svc.meta.dal;
 
 import org.junit.jupiter.api.extension.ExtendWith;
 import trac.common.metadata.MetadataCodec;
+import trac.common.metadata.ObjectHeader;
 import trac.common.metadata.ObjectType;
 import trac.svc.meta.dal.impls.JdbcH2Impl;
 import trac.svc.meta.dal.impls.JdbcMysqlImpl;
@@ -317,6 +318,47 @@ abstract class MetadataDalWriteTest extends MetadataDalTestBase {
 
         // Saving the valid tag by itself should not throw
         assertDoesNotThrow(() -> dal.saveNewTag(TEST_TENANT, nextDefTag2));
+    }
+
+    @Test
+    void testSaveNewTag_wrongObjectType() throws Exception {
+
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+
+        var nextTag = nextTag(origTag)
+                .toBuilder()
+                .mergeHeader(ObjectHeader.newBuilder()
+                        .setObjectType(ObjectType.MODEL)
+                        .build())
+                .build();
+
+        var saveOrig = dal.saveNewObject(TEST_TENANT, origTag);
+        var saveTag =  dal.saveNewTag(TEST_TENANT, nextTag);
+        var loadWrongType = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 2);
+
+        unwrap(saveOrig);
+        assertThrows(WrongItemTypeError.class, () -> unwrap(saveTag));
+        assertThrows(MissingItemError.class, () -> unwrap(loadWrongType));
+
+        var origDef2 = dummyModelDef();
+        var origTag2 = dummyTag(origDef2);
+        var origId2 = MetadataCodec.decode(origDef2.getHeader().getId());
+
+        var nextTag2 = nextTag(origTag2);
+
+        var saveOrig2 = dal.saveNewObject(TEST_TENANT, origTag2);
+        var saveTag2 = dal.saveNewTags(TEST_TENANT, Arrays.asList(nextTag, nextTag2));
+        var loadWrongType2 = dal.loadTags(TEST_TENANT,
+                Arrays.asList(ObjectType.DATA, ObjectType.MODEL),
+                Arrays.asList(origId, origId2),
+                Arrays.asList(1, 1),
+                Arrays.asList(2, 2));
+
+        unwrap(saveOrig2);
+        assertThrows(WrongItemTypeError.class, () -> unwrap(saveTag2));
+        assertThrows(MissingItemError.class, () -> unwrap(loadWrongType2));
     }
 
     @Test
