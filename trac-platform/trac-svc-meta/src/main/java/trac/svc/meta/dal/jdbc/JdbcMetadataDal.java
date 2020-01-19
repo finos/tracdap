@@ -349,7 +349,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
                     tagStub.items,
                     tagAttrs);
         },
-        (error, code) -> JdbcError.handleMissingItem(error, code, parts));
+        (error, code) -> JdbcError.loadBatch_missingItem(error, code, parts),
+        (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, parts));
     }
 
     @Override public CompletableFuture<List<Tag>>
@@ -377,7 +378,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
                     tagStub.items,
                     tagAttrs);
         },
-        (error, code) -> JdbcError.handleMissingItem(error, code, parts));
+        (error, code) -> JdbcError.loadBatch_missingItem(error, code, parts),
+        (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, parts));
     }
 
 
@@ -402,9 +404,14 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var tagStub = readBatch.readTagRecordByLatest(conn, tenantId, definition.keys);
             var tagAttrs = readBatch.readTagAttrs(conn, tenantId, tagStub.keys);
 
-            return buildTags(parts.objectType, parts.objectId, definition.versions, definition.items, tagStub.items, tagAttrs);
+            return buildTags(parts.objectType, parts.objectId,
+                    definition.versions,
+                    definition.items,
+                    tagStub.items,
+                    tagAttrs);
         },
-        (error, code) -> JdbcError.handleMissingItem(error, code, parts));
+        (error, code) -> JdbcError.loadBatch_missingItem(error, code, parts),
+        (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, parts));
     }
 
 

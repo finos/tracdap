@@ -10,6 +10,7 @@ import trac.svc.meta.exception.MissingItemError;
 import static trac.svc.meta.dal.MetadataDalTestData.*;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -17,7 +18,6 @@ import org.junit.jupiter.api.Test;
 import trac.svc.meta.exception.WrongItemTypeError;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assertions.fail;
 
 
 abstract class MetadataDalReadTest extends MetadataDalTestBase {
@@ -254,12 +254,87 @@ abstract class MetadataDalReadTest extends MetadataDalTestBase {
     }
 
     @Test
-    void testLoadBatch_missingItems() {
-        fail("Not implemented");
+    void testLoadBatch_missingItems() throws Exception {
+
+        var loadTags = dal.loadTags(TEST_TENANT,
+                Collections.singletonList(ObjectType.DATA),
+                Collections.singletonList(UUID.randomUUID()),
+                Collections.singletonList(1),
+                Collections.singletonList(1));
+
+        var loadLatestTags = dal.loadLatestTags(TEST_TENANT,
+                Collections.singletonList(ObjectType.DATA),
+                Collections.singletonList(UUID.randomUUID()),
+                Collections.singletonList(1));
+
+        var loadLatestVersions = dal.loadLatestVersions(TEST_TENANT,
+                Collections.singletonList(ObjectType.DATA),
+                Collections.singletonList(UUID.randomUUID()));
+
+        assertThrows(MissingItemError.class, () -> unwrap(loadTags));
+        assertThrows(MissingItemError.class, () -> unwrap(loadLatestTags));
+        assertThrows(MissingItemError.class, () -> unwrap(loadLatestVersions));
+
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+
+        // Save an item
+        var future = dal.saveNewObject(TEST_TENANT, origTag);
+        unwrap(future);
+
+        var loadTags2 = dal.loadTags(TEST_TENANT,
+                Collections.singletonList(ObjectType.DATA),
+                Collections.singletonList(origId),
+                Collections.singletonList(1),
+                Collections.singletonList(2));
+
+        var loadTags3 = dal.loadTags(TEST_TENANT,
+                Collections.singletonList(ObjectType.DATA),
+                Collections.singletonList(UUID.randomUUID()),
+                Collections.singletonList(2),
+                Collections.singletonList(1));
+
+        var loadLatestTag2 = dal.loadLatestTags(TEST_TENANT,
+                Collections.singletonList(ObjectType.DATA),
+                Collections.singletonList(UUID.randomUUID()),
+                Collections.singletonList(2));
+
+        assertThrows(MissingItemError.class, () -> unwrap(loadTags2));  // Missing tag
+        assertThrows(MissingItemError.class, () -> unwrap(loadTags3));  // Missing ver
+        assertThrows(MissingItemError.class, () -> unwrap(loadLatestTag2));  // Missing ver
     }
 
     @Test
-    void testLoadBatch_wrongObjectType() {
-        fail("Not implemented");
+    void testLoadBatch_wrongObjectType() throws Exception {
+
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+
+        var origDef2 = dummyModelDef();
+        var origTag2 = dummyTag(origDef2);
+        var origId2 = MetadataCodec.decode(origDef2.getHeader().getId());
+
+        unwrap(dal.saveNewObjects(TEST_TENANT, Arrays.asList(origTag, origTag2)));
+
+        var loadTags = dal.loadTags(TEST_TENANT,
+                Arrays.asList(ObjectType.DATA, ObjectType.DATA),
+                Arrays.asList(origId, origId2),
+                Arrays.asList(1, 1),
+                Arrays.asList(1, 1));
+
+        var loadLatestTags = dal.loadLatestTags(TEST_TENANT,
+                Arrays.asList(ObjectType.DATA, ObjectType.DATA),
+                Arrays.asList(origId, origId2),
+                Arrays.asList(1, 1));
+
+        var loadLatestVersions = dal.loadLatestVersions(TEST_TENANT,
+                Arrays.asList(ObjectType.DATA, ObjectType.DATA),
+                Arrays.asList(origId, origId2));
+
+        assertThrows(WrongItemTypeError.class, () -> unwrap(loadTags));
+        assertThrows(WrongItemTypeError.class, () -> unwrap(loadLatestTags));
+        assertThrows(WrongItemTypeError.class, () -> unwrap(loadLatestVersions));
     }
 }
