@@ -8,7 +8,6 @@ import trac.svc.meta.dal.jdbc.JdbcBaseDal.KeyedItem;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,14 +35,14 @@ class JdbcReadImpl {
             try (var rs = stmt.executeQuery()) {
 
                 if (!rs.next())
-                    throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
+                    throw new JdbcException(JdbcErrorCode.NO_DATA);
 
                 var objectPk = rs.getLong(1);
                 var objectTypeCode = rs.getString(2);
                 var objectType = ObjectType.valueOf(objectTypeCode);
 
                 if (!rs.last())
-                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
                 return new KeyedItem<>(objectPk, objectType);
             }
@@ -106,7 +105,7 @@ class JdbcReadImpl {
         try (var rs = stmt.executeQuery()) {
 
             if (!rs.next())
-                throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
+                throw new JdbcException(JdbcErrorCode.NO_DATA);
 
             var defPk = rs.getLong(1);
             var version = rs.getInt(2);
@@ -116,12 +115,12 @@ class JdbcReadImpl {
             // TODO: Encode / decode helper, type = protobuf | json ?
 
             if (!rs.last())
-                throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+                throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
             return new KeyedItem<>(defPk, version, defDecoded);
         }
         catch (InvalidProtocolBufferException e) {
-            throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION.name(), JdbcErrorCode.INVALID_OBJECT_DEFINITION);
+            throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION);
         }
     }
 
@@ -172,14 +171,14 @@ class JdbcReadImpl {
         try (var rs = stmt.executeQuery()) {
 
             if (!rs.next())
-                throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
+                throw new JdbcException(JdbcErrorCode.NO_DATA);
 
             var tagPk = rs.getLong(1);
             var tagVersion = rs.getInt(2);
             var tagStub = Tag.newBuilder().setTagVersion(tagVersion);
 
             if (!rs.last())
-                throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+                throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
             return new KeyedItem<>(tagPk, tagVersion, tagStub);
         }

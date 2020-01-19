@@ -277,7 +277,7 @@ class JdbcWriteBatchImpl {
 
         // Updates fail silent if no records are matched, so make an explicit check
         if (Arrays.stream(updates).anyMatch(count -> count != 1))
-            throw new JdbcException(JdbcErrorCode.INSERT_MISSING_FK.name(), JdbcErrorCode.INSERT_MISSING_FK);
+            throw new JdbcException(JdbcErrorCode.INSERT_MISSING_FK);
     }
 
     private long[] generatedKeys(Statement stmt, int rowCount) throws SQLException {
@@ -292,7 +292,7 @@ class JdbcWriteBatchImpl {
             }
 
             if (!rs.last())
-                throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+                throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
             return keys;
         }

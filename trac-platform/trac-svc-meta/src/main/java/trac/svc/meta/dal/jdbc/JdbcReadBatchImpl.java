@@ -49,7 +49,7 @@ class JdbcReadBatchImpl {
                 for (int i = 0; i < objectId.length; i++) {
 
                     if (!rs.next())
-                        throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
+                        throw new JdbcException(JdbcErrorCode.NO_DATA);
 
                     var pk = rs.getLong(1);
                     var objectTypeCode = rs.getString(2);
@@ -60,7 +60,7 @@ class JdbcReadBatchImpl {
                 }
 
                 if (!rs.last())
-                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
                 return new JdbcBaseDal.KeyedItems<>(keys, types);
             }
@@ -120,7 +120,7 @@ class JdbcReadBatchImpl {
                 for (var i = 0; i < objectType.length; i++) {
 
                     if (!rs.next())
-                        throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
+                        throw new JdbcException(JdbcErrorCode.NO_DATA);
 
                     var defPk = rs.getLong(1);
                     var defVersion = rs.getInt(2);
@@ -135,12 +135,12 @@ class JdbcReadBatchImpl {
                 }
 
                 if (!rs.last())
-                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
                 return new JdbcBaseDal.KeyedItems<>(pks, versions, defs);
             }
             catch (InvalidProtocolBufferException e) {
-                throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION.name(), JdbcErrorCode.INVALID_OBJECT_DEFINITION);
+                throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION);
             }
 
         }
@@ -193,7 +193,7 @@ class JdbcReadBatchImpl {
                 for (var i = 0; i < length; i++) {
 
                     if (!rs.next())
-                        throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
+                        throw new JdbcException(JdbcErrorCode.NO_DATA);
 
                     var tagPk = rs.getLong(1);
                     var tagVersion = rs.getInt(2);
@@ -204,7 +204,7 @@ class JdbcReadBatchImpl {
                 }
 
                 if (!rs.last())
-                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
                 return new JdbcBaseDal.KeyedItems<>(pks, versions, tags);
             }
@@ -259,7 +259,7 @@ class JdbcReadBatchImpl {
                     }
 
                     if (currentIndex == tagPk.length)
-                        throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+                        throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
                     // Accumulate attr against the current tag index
                     currentAttrs.put(attrName, attrValue);
@@ -305,16 +305,16 @@ class JdbcReadBatchImpl {
                 for (int i = 0; i < length; i++) {
 
                     if (!rs.next())
-                        throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
+                        throw new JdbcException(JdbcErrorCode.NO_DATA);
 
                     keys[i] = rs.getLong(1);
 
                     if (rs.wasNull())
-                        throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
+                        throw new JdbcException(JdbcErrorCode.NO_DATA);
                 }
 
                 if (!rs.last())
-                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
                 return keys;
             }

@@ -506,13 +506,13 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         for (int i = 0; i < parts.objectType.length; i++)
             if (parts.objectType[i] != existingTypes.items[i])
-                throw new JdbcException(JdbcErrorCode.WRONG_OBJECT_TYPE.name(), JdbcErrorCode.WRONG_OBJECT_TYPE);
+                throw new JdbcException(JdbcErrorCode.WRONG_OBJECT_TYPE);
     }
 
     private void checkObjectType(ObjectParts parts, KeyedItem<ObjectType> existingType) throws JdbcException {
 
         if (parts.objectType[0] != existingType.item)
-            throw new JdbcException(JdbcErrorCode.WRONG_OBJECT_TYPE.name(), JdbcErrorCode.WRONG_OBJECT_TYPE);
+            throw new JdbcException(JdbcErrorCode.WRONG_OBJECT_TYPE);
     }
 
 
