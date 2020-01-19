@@ -3,8 +3,6 @@ package trac.svc.meta.dal.jdbc;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
 import trac.common.metadata.*;
-import trac.svc.meta.exception.CorruptItemError;
-import trac.svc.meta.exception.TracInternalError;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -106,6 +104,8 @@ class JdbcReadBatchImpl {
                     var defEncoded = rs.getBytes(2);
                     var defDecoded = MetadataCodec.decode(objectType[i], defEncoded);
 
+                    // TODO: Encode / decode helper, type = protobuf | json ?
+
                     pks[i] = defPk;
                     defs[i] = defDecoded;
                 }
@@ -116,7 +116,7 @@ class JdbcReadBatchImpl {
                 return new JdbcBaseDal.KeyedItems<>(pks, defs);
             }
             catch (InvalidProtocolBufferException e) {
-                throw new CorruptItemError("Metadata decode failed", e);   // TODO: Error message + log
+                throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION.name(), JdbcErrorCode.INVALID_OBJECT_DEFINITION);
             }
 
         }
@@ -137,8 +137,13 @@ class JdbcReadBatchImpl {
     Map<String, PrimitiveValue>[]
     readTagAttrs(Connection conn, short tenantId, long[] tagPk) throws SQLException {
 
+        // PKs are inserted into the key mapping table in the order of tag PK
+        // We read back attribute records according to those PKs
+        // There will be multiple entries per tagPk, i.e. [0, n)
+        // The order of attributes within each tag is not known
+
         var query =
-                "select ta.*\n" +
+                "select ta.*, km.ordering as tag_index\n" +
                 "from key_mapping km\n" +
                 "left join tag_attr ta\n" +
                 "  on ta.tag_fk = km.pk\n" +
@@ -155,31 +160,35 @@ class JdbcReadBatchImpl {
 
             try (var rs = stmt.executeQuery()) {
 
-
                 @SuppressWarnings("unchecked")
                 var result = (Map<String, PrimitiveValue>[]) new HashMap[tagPk.length];
 
+                // Start by storing attrs for tag index = 0
                 var currentAttrs = new HashMap<String, PrimitiveValue>();
                 var currentIndex = 0;
 
                 while (rs.next()) {
 
-                    var currentPk = rs.getLong("tag_fk");
+                    var tagIndex = rs.getInt("tag_index");
                     var attrName = rs.getString("attr_name");
                     var attrValue = JdbcReadHelpers.readAttrValue(rs);
 
-                    while (currentIndex < tagPk.length && currentPk != tagPk[currentIndex]) {
+                    // Check if the current tag index has moved on
+                    // If so store accumulated attrs for the previous index
+                    while (currentIndex != tagIndex && currentIndex < tagPk.length) {
                         result[currentIndex] = currentAttrs;
                         currentAttrs = new HashMap<>();
                         currentIndex++;
                     }
 
                     if (currentIndex == tagPk.length)
-                        throw new TracInternalError("Error reading tag attrs");  // TODO: Error message
+                        throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
 
+                    // Accumulate attr against the current tag index
                     currentAttrs.put(attrName, attrValue);
                 }
 
+                // Store accumulated attrs for the final tag index
                 result[currentIndex] = currentAttrs;
 
                 return result;

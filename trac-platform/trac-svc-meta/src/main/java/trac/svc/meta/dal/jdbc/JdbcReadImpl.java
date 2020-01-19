@@ -5,7 +5,6 @@ import com.google.protobuf.MessageLite;
 import trac.common.metadata.*;
 
 import trac.svc.meta.dal.jdbc.JdbcBaseDal.KeyedItem;
-import trac.svc.meta.exception.CorruptItemError;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -77,13 +76,15 @@ class JdbcReadImpl {
                 var defEncoded = rs.getBytes(2);
                 var defDecoded = MetadataCodec.decode(objectType, defEncoded);
 
+                // TODO: Encode / decode helper, type = protobuf | json ?
+
                 if (!rs.last())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
 
                 return new KeyedItem<>(defPk, defDecoded);
             }
             catch (InvalidProtocolBufferException e) {
-                throw new CorruptItemError("Metadata decode failed", e);   // TODO: Error message + log
+                throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION.name(), JdbcErrorCode.INVALID_OBJECT_DEFINITION);
             }
         }
     }
@@ -130,7 +131,7 @@ class JdbcReadImpl {
                 return new KeyedItem<>(defPk, defVersioned);
             }
             catch (InvalidProtocolBufferException e) {
-                throw new CorruptItemError("Metadata decode failed", e);   // TODO: Error message + log
+                throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION.name(), JdbcErrorCode.INVALID_OBJECT_DEFINITION);
             }
         }
     }
