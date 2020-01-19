@@ -340,6 +340,20 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         (error, code) -> JdbcError.handleMissingItem(error, code, parts));
     }
 
+    @Override public CompletableFuture<List<Tag>>
+    loadLatestTags(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds, List<Integer> objectVersions) {
+
+        return null;
+    }
+
+
+
+    @Override public CompletableFuture<List<Tag>>
+    loadLatestVersions(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds) {
+
+        return null;
+    }
+
 
     // -----------------------------------------------------------------------------------------------------------------
     // OBJECT PARTS

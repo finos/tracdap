@@ -39,7 +39,13 @@ public interface IMetadataDal {
     CompletableFuture<Tag>
     loadLatestTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion);
 
+    CompletableFuture<List<Tag>>
+    loadLatestTags(String tenant, List<ObjectType> objectType, List<UUID> objectId, List<Integer> objectVersion);
+
     CompletableFuture<Tag>
     loadLatestVersion(String tenant, ObjectType objectType, UUID objectId);
+
+    CompletableFuture<List<Tag>>
+    loadLatestVersions(String tenant, List<ObjectType> objectType, List<UUID> objectId);
 
 }
