@@ -97,10 +97,18 @@ class JdbcBaseDal {
     static class KeyedItem<TItem> {
 
         final long key;
+        final int version;
         final TItem item;
+
+        KeyedItem(long key, int version, TItem item) {
+            this.key = key;
+            this.version = version;
+            this.item = item;
+        }
 
         KeyedItem(long key, TItem item) {
             this.key = key;
+            this.version = 0;
             this.item = item;
         }
     }
@@ -108,22 +116,19 @@ class JdbcBaseDal {
     static class KeyedItems<TItem> {
 
         final long[] keys;
+        final int[] versions;
         final TItem[] items;
+
+        KeyedItems(long[] keys, int[] versions, TItem[] items) {
+            this.keys = keys;
+            this.versions = versions;
+            this.items = items;
+        }
 
         KeyedItems(long[] keys, TItem[] items) {
             this.keys = keys;
+            this.versions = null;
             this.items = items;
-        }
-    }
-
-    static class VersionedItem<T> {
-
-        T item;
-        int version;
-
-        public VersionedItem(T item, int version) {
-            this.item = item;
-            this.version = version;
         }
     }
 }

@@ -176,50 +176,50 @@ class JdbcWriteBatchImpl {
 
     void writeLatestVersion(
             Connection conn, short tenantId,
-            long[] objectPk, int[] objectVersion)
+            long[] objectFk, long[] definitionPk)
             throws SQLException {
 
         var query =
                 "insert into latest_version (\n" +
                 "  tenant_id,\n" +
                 "  object_fk,\n" +
-                "  latest_version\n" +
+                "  latest_definition_pk\n" +
                 ")\n" +
                 "values (?, ?, ?)";
 
         try (var stmt = conn.prepareStatement(query)) {
-            writeLatest(stmt, tenantId, objectPk, objectVersion);
+            writeLatest(stmt, tenantId, objectFk, definitionPk);
         }
     }
 
     void writeLatestTag(
             Connection conn, short tenantId,
-            long[] definitionFk, int[] tagVersion)
+            long[] definitionFk, long[] tagPk)
             throws SQLException {
 
         var query =
                 "insert into latest_tag (\n" +
                 "  tenant_id,\n" +
                 "  definition_fk,\n" +
-                "  latest_tag\n" +
+                "  latest_tag_pk\n" +
                 ")\n" +
                 "values (?, ?, ?)";
 
         try (var stmt = conn.prepareStatement(query)) {
-            writeLatest(stmt, tenantId, definitionFk, tagVersion);
+            writeLatest(stmt, tenantId, definitionFk, tagPk);
         }
     }
 
     private void writeLatest(
             PreparedStatement stmt, short tenantId,
-            long[] pk, int[] version)
+            long[] fk, long[] pk)
             throws SQLException {
 
         for (int i = 0; i < pk.length; i++) {
 
             stmt.setShort(1, tenantId);
-            stmt.setLong(2, pk[i]);
-            stmt.setInt(3, version[i]);
+            stmt.setLong(2, fk[i]);
+            stmt.setLong(3, pk[i]);
 
             stmt.addBatch();
         }
@@ -229,46 +229,46 @@ class JdbcWriteBatchImpl {
 
     void updateLatestVersion(
             Connection conn, short tenantId,
-            long[] objectPk, int[] objectVersion)
+            long[] objectFk, long[] definitionPk)
             throws SQLException {
 
         var query =
                 "update latest_version set \n" +
-                "  latest_version = ?\n" +
+                "  latest_definition_pk = ?\n" +
                 "where tenant_id = ?\n" +
                 "  and object_fk = ?";
 
         try (var stmt = conn.prepareStatement(query)) {
-            updateLatest(stmt, tenantId, objectPk, objectVersion);
+            updateLatest(stmt, tenantId, objectFk, definitionPk);
         }
     }
 
     void updateLatestTag(
             Connection conn, short tenantId,
-            long[] objectPk, int[] objectVersion)
+            long[] definitionFk, long[] tagPk)
             throws SQLException {
 
         var query =
                 "update latest_tag set \n" +
-                "  latest_tag = ?\n" +
+                "  latest_tag_pk = ?\n" +
                 "where tenant_id = ?\n" +
                 "  and definition_fk = ?";
 
         try (var stmt = conn.prepareStatement(query)) {
-            updateLatest(stmt, tenantId, objectPk, objectVersion);
+            updateLatest(stmt, tenantId, definitionFk, tagPk);
         }
     }
 
     private void updateLatest(
             PreparedStatement stmt, short tenantId,
-            long[] pk, int[] version)
+            long[] fk, long[] pk)
             throws SQLException {
 
-        for (int i = 0; i < pk.length; i++) {
+        for (int i = 0; i < fk.length; i++) {
 
-            stmt.setInt(1, version[i]);
+            stmt.setLong(1, pk[i]);
             stmt.setShort(2, tenantId);
-            stmt.setLong(3, pk[i]);
+            stmt.setLong(3, fk[i]);
 
             stmt.addBatch();
         }
@@ -292,8 +292,7 @@ class JdbcWriteBatchImpl {
             }
 
             if (!rs.last())
-                // TODO: Real exception type
-                throw new RuntimeException();
+                throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
 
             return keys;
         }

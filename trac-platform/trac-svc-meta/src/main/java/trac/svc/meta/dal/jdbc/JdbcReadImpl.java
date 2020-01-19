@@ -7,6 +7,8 @@ import trac.common.metadata.*;
 import trac.svc.meta.dal.jdbc.JdbcBaseDal.KeyedItem;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
@@ -55,7 +57,7 @@ class JdbcReadImpl {
             throws SQLException {
 
         var query =
-                "select definition_pk, definition\n" +
+                "select definition_pk, object_version, definition\n" +
                 "from object_definition\n" +
                 "where tenant_id = ?\n" +
                 "and object_fk = ?\n" +
@@ -67,29 +69,11 @@ class JdbcReadImpl {
             stmt.setLong(2, objectPk);
             stmt.setInt(3, objectVersion);
 
-            try (var rs = stmt.executeQuery()) {
-
-                if (!rs.next())
-                    throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
-
-                var defPk = rs.getLong(1);
-                var defEncoded = rs.getBytes(2);
-                var defDecoded = MetadataCodec.decode(objectType, defEncoded);
-
-                // TODO: Encode / decode helper, type = protobuf | json ?
-
-                if (!rs.last())
-                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
-
-                return new KeyedItem<>(defPk, defDecoded);
-            }
-            catch (InvalidProtocolBufferException e) {
-                throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION.name(), JdbcErrorCode.INVALID_OBJECT_DEFINITION);
-            }
+            return readDefinition(stmt, objectType);
         }
     }
 
-    KeyedItem<JdbcBaseDal.VersionedItem<MessageLite>>
+    KeyedItem<MessageLite>
     readDefinitionByLatest(
             Connection conn, short tenantId,
             ObjectType objectType, long objectPk)
@@ -99,40 +83,45 @@ class JdbcReadImpl {
                 "select definition_pk, object_version, definition\n" +
                 "from object_definition\n" +
                 "where tenant_id = ?\n" +
-                "and object_fk = ?\n" +
-                "and object_version = (\n" +
-                "  select latest_version\n" +
-                "  from latest_version\n" +
-                "  where latest_version.tenant_id = object_definition.tenant_id\n" +
-                "  and latest_version.object_fk = object_definition.object_fk\n" +
+                "and definition_pk = (\n" +
+                "  select lv.latest_definition_pk\n" +
+                "  from latest_version lv\n" +
+                "  where lv.tenant_id = ?\n" +
+                "  and lv.object_fk = ?\n" +
                 ")";
 
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
-            stmt.setLong(2, objectPk);
+            stmt.setShort(2, tenantId);
+            stmt.setLong(3, objectPk);
 
-            try (var rs = stmt.executeQuery()) {
+            return readDefinition(stmt, objectType);
+        }
+    }
 
-                if (!rs.next())
-                    throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
+    private KeyedItem<MessageLite>
+    readDefinition(PreparedStatement stmt, ObjectType objectType) throws SQLException {
 
-                var defPk = rs.getLong(1);
-                var version = rs.getInt(2);
-                var defEncoded = rs.getBytes(3);
-                var defDecoded = MetadataCodec.decode(objectType, defEncoded);
-                var defVersioned = new JdbcMetadataDal.VersionedItem<>(defDecoded, version);
+        try (var rs = stmt.executeQuery()) {
 
-                // TODO: Encode / decode helper, type = protobuf | json ?
+            if (!rs.next())
+                throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
 
-                if (!rs.last())
-                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+            var defPk = rs.getLong(1);
+            var version = rs.getInt(2);
+            var defEncoded = rs.getBytes(3);
+            var defDecoded = MetadataCodec.decode(objectType, defEncoded);
 
-                return new KeyedItem<>(defPk, defVersioned);
-            }
-            catch (InvalidProtocolBufferException e) {
-                throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION.name(), JdbcErrorCode.INVALID_OBJECT_DEFINITION);
-            }
+            // TODO: Encode / decode helper, type = protobuf | json ?
+
+            if (!rs.last())
+                throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+
+            return new KeyedItem<>(defPk, version, defDecoded);
+        }
+        catch (InvalidProtocolBufferException e) {
+            throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION.name(), JdbcErrorCode.INVALID_OBJECT_DEFINITION);
         }
     }
 
@@ -140,7 +129,7 @@ class JdbcReadImpl {
     readTagRecordByVersion(Connection conn, short tenantId, long definitionPk, int tagVersion) throws SQLException {
 
         var query =
-                "select tag_pk from tag\n" +
+                "select tag_pk, tag_version from tag\n" +
                 "where tenant_id = ?\n" +
                 "and definition_fk = ?\n" +
                 "and tag_version = ?";
@@ -151,19 +140,7 @@ class JdbcReadImpl {
             stmt.setLong(2, definitionPk);
             stmt.setInt(3, tagVersion);
 
-            try (var rs = stmt.executeQuery()) {
-
-                if (!rs.next())
-                    throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
-
-                var tagPk = rs.getLong(1);
-                var tagStub = Tag.newBuilder().setTagVersion(tagVersion);
-
-                if (!rs.last())
-                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
-
-                return new KeyedItem<>(tagPk, tagStub);
-            }
+            return readTagRecord(stmt);
         }
     }
 
@@ -173,33 +150,38 @@ class JdbcReadImpl {
         var query =
                 "select tag_pk, tag_version from tag\n" +
                 "where tenant_id = ?\n" +
-                "and definition_fk = ?\n" +
-                "and tag_version = (\n" +
-                "  select latest_tag\n" +
-                "  from latest_tag\n" +
-                "  where latest_tag.tenant_id = tag.tenant_id\n" +
-                "  and latest_tag.definition_fk = tag.definition_fk\n" +
-                ")";
+                "and tag_pk = (\n" +
+                "  select lt.latest_tag_pk\n" +
+                "  from latest_tag lt\n" +
+                "  where lt.tenant_id = ?\n" +
+                "  and lt.definition_fk = ?)";
 
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
-            stmt.setLong(2, definitionPk);
+            stmt.setShort(2, tenantId);
+            stmt.setLong(3, definitionPk);
 
-            try (var rs = stmt.executeQuery()) {
+            return readTagRecord(stmt);
+        }
+    }
 
-                if (!rs.next())
-                    throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
+    private KeyedItem<Tag.Builder>
+    readTagRecord(PreparedStatement stmt) throws SQLException {
 
-                var tagPk = rs.getLong(1);
-                var tagVersion = rs.getInt(2);
-                var tagStub = Tag.newBuilder().setTagVersion(tagVersion);
+        try (var rs = stmt.executeQuery()) {
 
-                if (!rs.last())
-                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+            if (!rs.next())
+                throw new JdbcException(JdbcErrorCode.NO_DATA.name(), JdbcErrorCode.NO_DATA);
 
-                return new KeyedItem<>(tagPk, tagStub);
-            }
+            var tagPk = rs.getLong(1);
+            var tagVersion = rs.getInt(2);
+            var tagStub = Tag.newBuilder().setTagVersion(tagVersion);
+
+            if (!rs.last())
+                throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS.name(), JdbcErrorCode.TOO_MANY_ROWS);
+
+            return new KeyedItem<>(tagPk, tagVersion, tagStub);
         }
     }
 

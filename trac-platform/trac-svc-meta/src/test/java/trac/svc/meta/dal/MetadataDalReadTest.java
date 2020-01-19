@@ -212,7 +212,7 @@ abstract class MetadataDalReadTest extends MetadataDalTestBase {
         unwrap(future);
 
         var types = Arrays.asList(ObjectType.DATA, ObjectType.MODEL);
-        var ids = Arrays.asList(origId, origId, origId, modelId);
+        var ids = Arrays.asList(origId, modelId);
 
         var result = unwrap(dal.loadLatestVersions(TEST_TENANT, types, ids));
 
@@ -242,8 +242,8 @@ abstract class MetadataDalReadTest extends MetadataDalTestBase {
 
         unwrap(future);
 
-        var types = Arrays.asList(ObjectType.DATA, ObjectType.DATA,ObjectType.MODEL);
-        var ids = Arrays.asList(origId, origId, origId, modelId);
+        var types = Arrays.asList(ObjectType.DATA, ObjectType.DATA, ObjectType.MODEL);
+        var ids = Arrays.asList(origId, origId, modelId);
         var versions = Arrays.asList(1, 2, 1);
 
         var result = unwrap(dal.loadLatestTags(TEST_TENANT, types, ids, versions));
