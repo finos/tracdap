@@ -14,6 +14,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.Test;
+import trac.svc.meta.exception.WrongItemTypeError;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -139,8 +141,17 @@ abstract class MetadataDalReadTest extends MetadataDalTestBase {
     }
 
     @Test
-    void testLoadOne_wrongObjectType() {
-        fail("Not implemented");
+    void testLoadOne_wrongObjectType() throws Exception {
+
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef);
+        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+
+        unwrap(dal.saveNewObject(TEST_TENANT, origTag));
+
+        assertThrows(WrongItemTypeError.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.MODEL, origId, 1, 1)));
+        assertThrows(WrongItemTypeError.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.MODEL, origId, 1)));
+        assertThrows(WrongItemTypeError.class, () -> unwrap(dal.loadLatestVersion(TEST_TENANT, ObjectType.MODEL, origId)));
     }
 
     @Test

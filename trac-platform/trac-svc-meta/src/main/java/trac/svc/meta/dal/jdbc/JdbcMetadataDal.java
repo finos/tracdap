@@ -49,6 +49,16 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         // Noop
     }
 
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // SAVE METHODS
+    // -----------------------------------------------------------------------------------------------------------------
+
+    // Assume that save methods are not highly sensitive to latency
+    // So, use the same implementation for save one and save many
+    // I.e. no special optimisation for saving a single item, even though this is the common case
+
+
     @Override
     public CompletableFuture<Void> saveNewObject(String tenant, Tag tag) {
 
@@ -215,6 +225,18 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         (error, code) ->  JdbcError.savePreallocated_WrongType(error, code, parts));
     }
 
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // LOAD METHODS (SINGLE ITEM)
+    // -----------------------------------------------------------------------------------------------------------------
+
+    // Load methods *are* highly sensitive to latency
+    // This is because UI applications use metadata queries to decide what to display
+    // These queries may also be recursive, i.e. query a job, then related data/models or dependent jobs
+    // We want these multiple queries to complete in < 100 ms for a fluid user experience
+    // So, optimising the common case of querying a single item makes sense
+
+
     @Override public CompletableFuture<Tag>
     loadTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion) {
 
@@ -223,17 +245,77 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         return wrapTransaction(conn -> {
 
             var tenantId = tenants.getTenantId(tenant);
-
             var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
+
+            checkObjectType(parts, storedType);
+
             var definition = readSingle.readDefinitionByVersion(conn, tenantId, objectType, storedType.key, objectVersion);
             var tagStub = readSingle.readTagRecordByVersion(conn, tenantId, definition.key, tagVersion);
             var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagStub.key);
 
-            // TODO: Unnecessary tag builder
             return buildTag(objectType, objectId, objectVersion, tagVersion, definition.item, tagAttrs);
         },
-        (error, code) -> JdbcError.handleMissingItem(error, code, parts));
+        (error, code) -> JdbcError.loadOne_missingItem(error, code, parts),
+        (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, parts));
     }
+
+    @Override public CompletableFuture<Tag>
+    loadLatestTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion) {
+
+        var parts = assembleParts(objectType, objectId, objectVersion, LATEST_TAG);
+
+        return wrapTransaction(conn -> {
+
+            var tenantId = tenants.getTenantId(tenant);
+            var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
+
+            checkObjectType(parts, storedType);
+
+            var definition = readSingle.readDefinitionByVersion(conn, tenantId, objectType, storedType.key, objectVersion);
+            var tagStub = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
+            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagStub.key);
+
+            return buildTag(objectType, objectId, objectVersion, tagStub.item.getTagVersion(), definition.item, tagAttrs);
+        },
+        (error, code) -> JdbcError.loadOne_missingItem(error, code, parts),
+        (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, parts));
+    }
+
+    @Override public CompletableFuture<Tag>
+    loadLatestVersion(String tenant, ObjectType objectType, UUID objectId) {
+
+        var parts = assembleParts(objectType, objectId, LATEST_VERSION, LATEST_TAG);
+
+        return wrapTransaction(conn -> {
+
+            var tenantId = tenants.getTenantId(tenant);
+            var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
+
+            checkObjectType(parts, storedType);
+
+            var definition = readSingle.readDefinitionByLatest(conn, tenantId, objectType, storedType.key);
+            var tagStub = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
+            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagStub.key);
+
+            return buildTag(objectType, objectId,
+                    definition.item.version,
+                    tagStub.item.getTagVersion(),
+                    definition.item.item,
+                    tagAttrs);
+        },
+        (error, code) -> JdbcError.loadOne_missingItem(error, code, parts),
+        (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, parts));
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // LOAD METHODS (MULTIPLE ITEMS)
+    // -----------------------------------------------------------------------------------------------------------------
+
+    // Load batch methods may be used e.g. to query all items needs for a job in a single query
+    // This can be used both by the platform (e.g. to set up a job) and applications / UI (e.g. to display a job)
+    // Latency remains important, optimisations are in ReadBatchImpl
+
 
     @Override public CompletableFuture<List<Tag>>
     loadTags(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds, List<Integer> objectVersions, List<Integer> tagVersions) {
@@ -253,75 +335,18 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var tag = readBatch.readTagRecordByVersion(conn, tenantId, definition.keys, parts.tagVersion);
             var tagAttrs = readBatch.readTagAttrs(conn, tenantId, tag.keys);
 
-            // TODO: Unnecessary tag builder
             return buildTags(parts.objectType, parts.objectId, parts.version, parts.tagVersion, definition.items, tagAttrs);
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts));
-    }
-
-    @Override public CompletableFuture<Tag>
-    loadLatestTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion) {
-
-        var parts = assembleParts(objectType, objectId, objectVersion, LATEST_TAG);
-
-        return wrapTransaction(conn -> {
-
-            var tenantId = tenants.getTenantId(tenant);
-            var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
-
-            checkObjectTypes(parts, storedType);
-
-            var definition = readSingle.readDefinitionByVersion(conn, tenantId, objectType, storedType.key, objectVersion);
-            var tagStub = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
-            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagStub.key);
-
-            // TODO: Unnecessary tag builder
-            return buildTag(objectType, objectId, objectVersion, tagStub.item.getTagVersion(), definition.item, tagAttrs);
-        },
-        (error, code) -> JdbcError.handleMissingItem(error, code, parts));
-    }
-
-    @Override public CompletableFuture<Tag>
-    loadLatestVersion(String tenant, ObjectType objectType, UUID objectId) {
-
-        var parts = assembleParts(objectType, objectId, LATEST_VERSION, LATEST_TAG);
-
-        return wrapTransaction(conn -> {
-
-            var tenantId = tenants.getTenantId(tenant);
-
-            var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
-            var definition = readSingle.readDefinitionByLatest(conn, tenantId, objectType, storedType.key);
-            var tagStub = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
-            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagStub.key);
-
-            // TODO: Unnecessary tag builder
-            return buildTag(objectType, objectId,
-                    definition.item.version,
-                    tagStub.item.getTagVersion(),
-                    definition.item.item,
-                    tagAttrs);
-        },
-        (error, code) -> JdbcError.handleMissingItem(error, code, parts));
-    }
-
-    private void checkObjectTypes(ObjectParts parts, KeyedItems<ObjectType> existingTypes) throws JdbcException {
-
-        for (int i = 0; i < parts.objectType.length; i++)
-            if (parts.objectType[i] != existingTypes.items[i])
-                throw new JdbcException(JdbcErrorCode.WRONG_OBJECT_TYPE.name(), JdbcErrorCode.WRONG_OBJECT_TYPE);
-    }
-
-    private void checkObjectTypes(ObjectParts parts, KeyedItem<ObjectType> existingType) throws JdbcException {
-
-        if (parts.objectType[0] != existingType.item)
-            throw new JdbcException(JdbcErrorCode.WRONG_OBJECT_TYPE.name(), JdbcErrorCode.WRONG_OBJECT_TYPE);
     }
 
 
     // -----------------------------------------------------------------------------------------------------------------
     // OBJECT PARTS
     // -----------------------------------------------------------------------------------------------------------------
+
+    // Break down requests / results into a standard set of parts
+
 
     static class ObjectParts {
 
@@ -403,6 +428,24 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         parts.tagVersion = tagVersions.stream().mapToInt(x -> x).toArray();
 
         return parts;
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // CHECK OBJECT TYPES
+    // -----------------------------------------------------------------------------------------------------------------
+
+    private void checkObjectTypes(ObjectParts parts, KeyedItems<ObjectType> existingTypes) throws JdbcException {
+
+        for (int i = 0; i < parts.objectType.length; i++)
+            if (parts.objectType[i] != existingTypes.items[i])
+                throw new JdbcException(JdbcErrorCode.WRONG_OBJECT_TYPE.name(), JdbcErrorCode.WRONG_OBJECT_TYPE);
+    }
+
+    private void checkObjectType(ObjectParts parts, KeyedItem<ObjectType> existingType) throws JdbcException {
+
+        if (parts.objectType[0] != existingType.item)
+            throw new JdbcException(JdbcErrorCode.WRONG_OBJECT_TYPE.name(), JdbcErrorCode.WRONG_OBJECT_TYPE);
     }
 
 

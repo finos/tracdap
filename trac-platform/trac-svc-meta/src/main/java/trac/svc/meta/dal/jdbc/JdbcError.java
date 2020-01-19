@@ -16,8 +16,10 @@ class JdbcError {
 
     static final String DUPLICATE_OBJECT_ID = "Duplicate object id {0}";
     static final String MISSING_ITEM = "Metadata item does not exist {0}";
-
     static final String WRONG_OBJECT_TYPE = "Metadata item has the wrong type";
+
+    static final String LOAD_ONE_MISSING_ITEM = "Metadata item does not exist {0}";
+    static final String LOAD_ONE_WRONG_OBJECT_TYPE = "Metadata item has the wrong type";
 
 
     static TracInternalError unhandledError(SQLException error, JdbcErrorCode code) {
@@ -71,6 +73,22 @@ class JdbcError {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(WRONG_OBJECT_TYPE, "");
+            throw new WrongItemTypeError(message, error);
+        }
+    }
+
+    static void loadOne_missingItem(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
+
+        if (code == JdbcErrorCode.NO_DATA) {
+            var message = MessageFormat.format(LOAD_ONE_MISSING_ITEM, "");
+            throw new MissingItemError(message, error);
+        }
+    }
+
+    static void loadOne_WrongObjectType(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
+
+        if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
+            var message = MessageFormat.format(LOAD_ONE_WRONG_OBJECT_TYPE, "");
             throw new WrongItemTypeError(message, error);
         }
     }
