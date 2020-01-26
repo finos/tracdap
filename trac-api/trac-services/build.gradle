@@ -21,7 +21,7 @@ sourceSets {
 
 dependencies {
 
-    api project(':trac-api-metadata')
+    compile project(':trac-api-metadata')
 
     // Protoc generates code using the 'Generated' annotation from this package
     compile group: 'javax.annotation', name: 'javax.annotation-api', version: "$javax_annotation_version"
