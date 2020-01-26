@@ -28,7 +28,7 @@ public class JdbcH2Impl implements BeforeAllCallback, BeforeEachCallback, AfterE
         source.setUser("sa");
         source.setPassword("sa");
 
-        var inputStream = JdbcH2Impl.class.getResourceAsStream("/mysql/trac_metadata.ddl");
+        var inputStream = JdbcH2Impl.class.getResourceAsStream("/h2/trac_metadata.ddl");
         var scanner = new Scanner(inputStream, StandardCharsets.UTF_8.name()).useDelimiter("\\A");
         var deployScript = scanner.next();
 

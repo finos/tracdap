@@ -85,9 +85,7 @@ create table latest_version (
 
     tenant_id smallint not null,
     object_fk bigint not null,
-
     latest_definition_pk bigint not null,
-    latest_definition_version int not null,
 
     constraint pk_latest_ver primary key (object_fk),
     constraint fk_latest_ver_object foreign key (object_fk) references object_id (object_pk),
@@ -100,9 +98,7 @@ create table latest_tag (
 
     tenant_id smallint not null,
     definition_fk bigint not null,
-
     latest_tag_pk bigint not null,
-    latest_tag_version int not null,
 
     constraint pk_latest_tag primary key (definition_fk),
     constraint fk_latest_tag_definition foreign key (definition_fk) references object_definition (definition_pk),
