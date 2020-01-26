@@ -1,6 +1,29 @@
+
+pluginManagement.plugins {
+    id 'com.google.protobuf' version "0.8.10"
+}
+
 rootProject.name = 'trac-system'
 
-include 'trac-common'
+// API components
+
+include 'trac-api-metadata'
+include 'trac-api-services'
+
+project(":trac-api-metadata").projectDir = file("trac-api/trac-metadata")
+project(":trac-api-services").projectDir = file("trac-api/trac-services")
+
+
+// Java libraries
+
+
+include 'trac-lib-common'
+
+project(":trac-lib-common").projectDir = file("trac-libs/trac-lib-common")
+
+
+// Java services
+
 include 'trac-svc-meta'
 
 project(":trac-svc-meta").projectDir = file("trac-platform/trac-svc-meta")

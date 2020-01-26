@@ -1,6 +1,10 @@
 
+plugins {
+    id "java"
+    id "idea"
+}
+
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
-apply plugin: "idea"
 
 
 sourceSets {
@@ -13,7 +17,9 @@ sourceSets {
 
 dependencies {
 
-    implementation project(':trac-common')
+    implementation project(':trac-api-metadata')
+    implementation project(':trac-api-services')
+    implementation project(':trac-lib-common')
 
     implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: "$apache_dbcp_version"
 
