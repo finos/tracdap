@@ -1,6 +1,7 @@
 
 plugins {
-    id "com.google.protobuf" version "0.8.10"
+    id "com.google.protobuf"
+    id "java-library"
     id "idea"
 }
 
@@ -20,11 +21,10 @@ sourceSets {
 
 dependencies {
 
+    api project(':trac-api-metadata')
+
     // Protoc generates code using the 'Generated' annotation from this package
     compile group: 'javax.annotation', name: 'javax.annotation-api', version: "$javax_annotation_version"
-
-    // Core protobuf for Java
-    compile group: 'com.google.protobuf', name: 'protobuf-java', version: "$proto_version"
 
     // GRPC for Protobuf / Netty
     compile group: 'io.grpc', name: 'grpc-protobuf', version: "$grpc_version"
@@ -53,12 +53,12 @@ protobuf {
     generateProtoTasks {
         all().each { task ->
 
-        task.builtins {
-            java { }
-        }
+            task.builtins {
+                java { }
+            }
 
-        task.plugins {
-            grpc { }
-        }
-    }}
+            task.plugins {
+                grpc { }
+            }
+        }}
 }
