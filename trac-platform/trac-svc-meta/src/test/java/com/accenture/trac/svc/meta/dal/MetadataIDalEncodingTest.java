@@ -2,20 +2,26 @@ package com.accenture.trac.svc.meta.dal;
 
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
-
 import static com.accenture.trac.svc.meta.dal.MetadataDalTestData.*;
 
 import java.util.concurrent.CompletableFuture;
 
+import com.accenture.trac.svc.meta.test.IDalTestable;
+import com.accenture.trac.svc.meta.test.JdbcH2Impl;
+import com.accenture.trac.svc.meta.test.JdbcMysqlImpl;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import com.accenture.trac.svc.meta.dal.impls.JdbcH2Impl;
-import com.accenture.trac.svc.meta.dal.impls.JdbcMysqlImpl;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
-abstract class MetadataDalEncodingTest extends MetadataDalTestBase {
+abstract class MetadataDalEncodingTest implements IDalTestable {
+
+    private IMetadataDal dal;
+
+    public void setDal(IMetadataDal dal) {
+        this.dal = dal;
+    }
 
     @ExtendWith(JdbcMysqlImpl.class)
     static class JdbcMysql extends MetadataDalEncodingTest {}

@@ -7,7 +7,7 @@
     <file url="file://$PROJECT_DIR$/trac-platform/trac-svc-meta/src/main/resources/jdbc/mysql/key_mapping.ddl" dialect="MySQL" />
     <file url="file://$PROJECT_DIR$/trac-platform/trac-svc-meta/src/schema/h2" dialect="H2" />
     <file url="file://$PROJECT_DIR$/trac-platform/trac-svc-meta/src/schema/mysql" dialect="MySQL" />
-    <file url="file://$PROJECT_DIR$/trac-platform/trac-svc-meta/src/test/java/com/accenture/trac/svc/meta/dal/impls/JdbcMysqlImpl.java" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/trac-platform/trac-svc-meta/src/test/java/com/accenture/trac/svc/meta/test/JdbcMysqlImpl.java" dialect="MySQL" />
     <file url="PROJECT" dialect="SQL92" />
   </component>
 </project>

@@ -1,12 +1,9 @@
 package com.accenture.trac.svc.meta.dal;
 
-import com.accenture.trac.svc.meta.dal.impls.JdbcH2Impl;
-import com.accenture.trac.svc.meta.dal.impls.JdbcMysqlImpl;
 import com.accenture.trac.svc.meta.exception.MissingItemError;
 import com.accenture.trac.svc.meta.exception.WrongItemTypeError;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
-
 import static com.accenture.trac.svc.meta.dal.MetadataDalTestData.*;
 
 import java.util.Arrays;
@@ -14,13 +11,22 @@ import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import com.accenture.trac.svc.meta.test.IDalTestable;
+import com.accenture.trac.svc.meta.test.JdbcH2Impl;
+import com.accenture.trac.svc.meta.test.JdbcMysqlImpl;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 
-abstract class MetadataDalReadTest extends MetadataDalTestBase {
+abstract class MetadataDalReadTest implements IDalTestable {
+
+    private IMetadataDal dal;
+
+    public void setDal(IMetadataDal dal) {
+        this.dal = dal;
+    }
 
     @ExtendWith(JdbcMysqlImpl.class)
     static class JdbcMysql extends MetadataDalReadTest {}

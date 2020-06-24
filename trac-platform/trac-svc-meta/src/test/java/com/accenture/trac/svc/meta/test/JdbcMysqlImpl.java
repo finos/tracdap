@@ -1,4 +1,4 @@
-package com.accenture.trac.svc.meta.dal.impls;
+package com.accenture.trac.svc.meta.test;
 
 import ch.vorburger.mariadb4j.DB;
 import ch.vorburger.mariadb4j.DBConfiguration;
@@ -6,10 +6,10 @@ import ch.vorburger.mariadb4j.DBConfigurationBuilder;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
 import com.mysql.cj.jdbc.MysqlDataSource;
-import com.accenture.trac.svc.meta.dal.MetadataDalTestBase;
 
 import static com.accenture.trac.svc.meta.dal.MetadataDalTestData.*;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.*;
 
 import java.io.IOException;
@@ -69,6 +69,12 @@ public class JdbcMysqlImpl implements BeforeAllCallback, BeforeEachCallback, Aft
     @Override
     public void beforeEach(ExtensionContext context) {
 
+        var testClass = context.getTestClass();
+
+        if (testClass.isEmpty() || !IDalTestable.class.isAssignableFrom(testClass.get())) {
+            Assertions.fail("JUnit extension for DAL testing requires the test class to implement IDalTestable");
+        }
+
         var source = new MysqlDataSource();
         source.setServerName("localhost");
         source.setPort(dbConfig.getPort());
@@ -82,7 +88,7 @@ public class JdbcMysqlImpl implements BeforeAllCallback, BeforeEachCallback, Aft
         var instance = context.getTestInstance();
 
         if (instance.isPresent()) {
-            var testCase = (MetadataDalTestBase) instance.get();
+            var testCase = (IDalTestable) instance.get();
             testCase.setDal(dal);
         }
     }

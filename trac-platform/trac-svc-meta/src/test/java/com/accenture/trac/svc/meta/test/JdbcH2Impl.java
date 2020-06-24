@@ -1,10 +1,10 @@
-package com.accenture.trac.svc.meta.dal.impls;
+package com.accenture.trac.svc.meta.test;
 
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
 import org.h2.jdbcx.JdbcDataSource;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.*;
-import com.accenture.trac.svc.meta.dal.MetadataDalTestBase;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
@@ -21,10 +21,10 @@ public class JdbcH2Impl implements BeforeAllCallback, BeforeEachCallback, AfterE
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
 
-        var dbid = UUID.randomUUID();
+        var dbId = UUID.randomUUID();
 
         source = new JdbcDataSource();
-        source.setURL("jdbc:h2:mem:" + dbid + ";DB_CLOSE_DELAY=-1");
+        source.setURL("jdbc:h2:mem:" + dbId + ";DB_CLOSE_DELAY=-1");
         source.setUser("sa");
         source.setPassword("sa");
 
@@ -49,6 +49,12 @@ public class JdbcH2Impl implements BeforeAllCallback, BeforeEachCallback, AfterE
     @Override
     public void beforeEach(ExtensionContext context) {
 
+        var testClass = context.getTestClass();
+
+        if (testClass.isEmpty() || !IDalTestable.class.isAssignableFrom(testClass.get())) {
+            Assertions.fail("JUnit extension for DAL testing requires the test class to implement IDalTestable");
+        }
+
         var dal = new JdbcMetadataDal(JdbcDialect.H2, source, Runnable::run);
         dal.startup();
 
@@ -57,7 +63,7 @@ public class JdbcH2Impl implements BeforeAllCallback, BeforeEachCallback, AfterE
         var instance = context.getTestInstance();
 
         if (instance.isPresent()) {
-            var testCase = (MetadataDalTestBase) instance.get();
+            var testCase = (IDalTestable) instance.get();
             testCase.setDal(dal);
         }
     }
