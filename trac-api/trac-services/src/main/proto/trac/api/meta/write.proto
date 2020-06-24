@@ -78,7 +78,6 @@ message MetadataWriteRequest {
 
     string tenant = 1;
     trac.metadata.ObjectType objectType = 2;
-
     trac.metadata.Tag tag = 3;
 
     string objectId = 4;
@@ -88,7 +87,7 @@ message MetadataWriteRequest {
 
 message IdResponse {
 
-    string objectId = 1;
+    trac.metadata.UUID objectId = 1;
     int32 objectVersion = 2;
     int32 tagVersion = 3;
 }

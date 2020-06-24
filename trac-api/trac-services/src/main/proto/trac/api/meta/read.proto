@@ -38,7 +38,7 @@ message MetadataReadRequest {
     string tenant = 1;
 
     trac.metadata.ObjectType objectType = 2;
-    string objectId = 3;
+    trac.metadata.UUID objectId = 3;
     int32 objectVersion = 4;
     int32 tagVersion = 5;
 
