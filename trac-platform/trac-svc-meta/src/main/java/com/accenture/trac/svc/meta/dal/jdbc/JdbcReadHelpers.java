@@ -1,8 +1,8 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
 import com.accenture.trac.svc.meta.exception.TracInternalError;
-import trac.common.metadata.PrimitiveType;
-import trac.common.metadata.PrimitiveValue;
+import com.accenture.trac.common.metadata.PrimitiveType;
+import com.accenture.trac.common.metadata.PrimitiveValue;
 
 import java.sql.Date;
 import java.sql.ResultSet;

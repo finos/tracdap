@@ -1,14 +1,14 @@
 package com.accenture.trac.svc.meta.dal;
 
-import org.junit.jupiter.api.extension.ExtendWith;
-import trac.common.metadata.MetadataCodec;
-import trac.common.metadata.ObjectType;
+import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.ObjectType;
 
 import static com.accenture.trac.svc.meta.dal.MetadataDalTestData.*;
 
 import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import com.accenture.trac.svc.meta.dal.impls.JdbcH2Impl;
 import com.accenture.trac.svc.meta.dal.impls.JdbcMysqlImpl;
 

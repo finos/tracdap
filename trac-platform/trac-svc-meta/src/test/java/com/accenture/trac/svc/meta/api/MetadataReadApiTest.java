@@ -1,15 +1,17 @@
 package com.accenture.trac.svc.meta.api;
 
+import com.accenture.trac.common.metadata.ObjectType;
+import com.accenture.trac.common.metadata.Tag;
+import com.accenture.trac.common.api.meta.MetadataReadApiGrpc;
+import com.accenture.trac.common.api.meta.MetadataReadRequest;
+
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.testing.GrpcCleanupRule;
+
 import org.junit.Rule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import trac.common.api.meta.MetadataReadApiGrpc;
-import trac.common.api.meta.MetadataReadRequest;
-import trac.common.metadata.ObjectType;
-import trac.common.metadata.Tag;
 
 import static org.junit.jupiter.api.Assertions.*;
 

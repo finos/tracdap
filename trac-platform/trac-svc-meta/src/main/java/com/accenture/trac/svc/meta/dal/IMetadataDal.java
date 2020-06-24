@@ -1,6 +1,7 @@
 package com.accenture.trac.svc.meta.dal;
 
-import trac.common.metadata.*;
+import com.accenture.trac.common.metadata.ObjectType;
+import com.accenture.trac.common.metadata.Tag;
 
 import java.util.List;
 import java.util.UUID;

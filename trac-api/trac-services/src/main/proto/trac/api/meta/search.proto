@@ -1,5 +1,5 @@
 syntax = "proto3";
 package trac.api.meta;
 
-option java_package = "trac.common.api.meta";
+option java_package = "com.accenture.trac.common.api.meta";
 option java_multiple_files = true;

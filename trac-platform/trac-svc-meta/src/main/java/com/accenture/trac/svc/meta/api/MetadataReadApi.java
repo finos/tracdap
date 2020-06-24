@@ -2,8 +2,8 @@ package com.accenture.trac.svc.meta.api;
 
 import com.accenture.trac.svc.meta.exception.TracInternalError;
 import com.accenture.trac.svc.meta.logic.MetadataReadLogic;
-import trac.common.api.meta.*;
-import trac.common.metadata.Tag;
+import com.accenture.trac.common.metadata.Tag;
+import com.accenture.trac.common.api.meta.*;
 
 import io.grpc.stub.StreamObserver;
 

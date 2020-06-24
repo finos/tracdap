@@ -1,8 +1,8 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
-import com.google.protobuf.MessageLite;
-import trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
+import com.accenture.trac.common.metadata.*;
+import com.google.protobuf.MessageLite;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;

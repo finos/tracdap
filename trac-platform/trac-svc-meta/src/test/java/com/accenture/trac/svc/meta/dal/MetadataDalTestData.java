@@ -1,6 +1,6 @@
 package com.accenture.trac.svc.meta.dal;
 
-import trac.common.metadata.*;
+import com.accenture.trac.common.metadata.*;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;

@@ -1,9 +1,9 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.common.metadata.ObjectType;
+import com.accenture.trac.common.metadata.PrimitiveType;
+import com.accenture.trac.common.metadata.Tag;
 import com.google.protobuf.MessageLite;
-import trac.common.metadata.ObjectType;
-import trac.common.metadata.PrimitiveType;
-import trac.common.metadata.Tag;
 
 import java.sql.*;
 import java.util.Arrays;

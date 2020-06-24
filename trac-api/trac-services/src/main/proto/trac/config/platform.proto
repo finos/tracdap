@@ -1,7 +1,7 @@
 syntax = 'proto3';
 package trac.config;
 
-option java_package = "trac.common.config";
+option java_package = "com.accenture.trac.common.config";
 option java_multiple_files = true;
 
 

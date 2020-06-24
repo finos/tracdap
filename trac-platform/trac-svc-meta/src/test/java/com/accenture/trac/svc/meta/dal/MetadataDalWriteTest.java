@@ -3,13 +3,11 @@ package com.accenture.trac.svc.meta.dal;
 import com.accenture.trac.svc.meta.exception.DuplicateItemError;
 import com.accenture.trac.svc.meta.exception.MissingItemError;
 import com.accenture.trac.svc.meta.exception.WrongItemTypeError;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.extension.ExtendWith;
-import trac.common.metadata.MetadataCodec;
-import trac.common.metadata.ObjectHeader;
-import trac.common.metadata.ObjectType;
 import com.accenture.trac.svc.meta.dal.impls.JdbcH2Impl;
 import com.accenture.trac.svc.meta.dal.impls.JdbcMysqlImpl;
+import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.ObjectHeader;
+import com.accenture.trac.common.metadata.ObjectType;
 
 import static com.accenture.trac.svc.meta.dal.MetadataDalTestData.*;
 
@@ -19,6 +17,8 @@ import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.ThrowingSupplier;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.extension.ExtendWith;
 import static org.junit.jupiter.api.Assertions.*;
 
 

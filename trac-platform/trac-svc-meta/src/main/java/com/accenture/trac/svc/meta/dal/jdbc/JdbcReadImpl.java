@@ -1,10 +1,12 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.svc.meta.dal.jdbc.JdbcBaseDal.KeyedItem;
+import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.ObjectType;
+import com.accenture.trac.common.metadata.PrimitiveValue;
+import com.accenture.trac.common.metadata.Tag;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
-import trac.common.metadata.*;
-
-import com.accenture.trac.svc.meta.dal.jdbc.JdbcBaseDal.KeyedItem;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;

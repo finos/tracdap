@@ -1,4 +1,4 @@
-package trac.common.metadata;
+package com.accenture.trac.common.metadata;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
@@ -8,15 +8,15 @@ import java.util.UUID;
 
 public class MetadataCodec {
 
-    public static trac.common.metadata.UUID encode(java.util.UUID uuid) {
+    public static com.accenture.trac.common.metadata.UUID encode(java.util.UUID uuid) {
 
-        return trac.common.metadata.UUID.newBuilder()
+        return com.accenture.trac.common.metadata.UUID.newBuilder()
                 .setHi(uuid.getMostSignificantBits())
                 .setLo(uuid.getLeastSignificantBits())
                 .build();
     }
 
-    public static java.util.UUID decode(trac.common.metadata.UUID uuid) {
+    public static java.util.UUID decode(com.accenture.trac.common.metadata.UUID uuid) {
 
         return new UUID(uuid.getHi(), uuid.getLo());
     }
