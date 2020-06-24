@@ -6,6 +6,7 @@ import trac.svc.meta.dal.jdbc.JdbcErrorCode;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+
 public interface IDialect {
 
     JdbcDialect dialectCode();

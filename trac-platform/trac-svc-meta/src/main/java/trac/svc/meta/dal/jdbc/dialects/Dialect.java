@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+
 public abstract class Dialect implements IDialect {
 
     public static IDialect dialectFor(JdbcDialect dialect) {
@@ -27,7 +28,7 @@ public abstract class Dialect implements IDialect {
     }
 
 
-    private Map<Integer, JdbcErrorCode> syntheticErrorCodes;
+    private final Map<Integer, JdbcErrorCode> syntheticErrorCodes;
 
     protected Dialect() {
 

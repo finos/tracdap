@@ -8,12 +8,13 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
+
 public class H2SqlDialect extends Dialect {
 
     private static final String DROP_KEY_MAPPING_DDL = "drop table if exists key_mapping;";
     private static final String CREATE_KEY_MAPPING_FILE = "jdbc/mysql/key_mapping.ddl";
 
-    private Map<Integer, JdbcErrorCode> dialectErrorCodes;
+    private final Map<Integer, JdbcErrorCode> dialectErrorCodes;
 
     private final String createKeyMapping;
 

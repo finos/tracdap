@@ -14,7 +14,7 @@ public class MySqlDialect extends Dialect {
     private static final String DROP_KEY_MAPPING_DDL = "drop temporary table if exists key_mapping;";
     private static final String CREATE_KEY_MAPPING_FILE = "jdbc/mysql/key_mapping.ddl";
 
-    private Map<Integer, JdbcErrorCode> dialectErrorCodes;
+    private final Map<Integer, JdbcErrorCode> dialectErrorCodes;
 
     private final String createKeyMapping;
 
