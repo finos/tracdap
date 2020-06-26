@@ -41,7 +41,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef));
         var nextDefTag2 = nextTag(nextDefTag1);
-        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         // Save v1 t1, v2 t1, v2 t2
         var future = CompletableFuture.completedFuture(0)
@@ -68,7 +68,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef));
         var nextDefTag2 = nextTag(nextDefTag1);
-        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         // After save v1t1, latest version = v1t1
         var v1t1 = CompletableFuture.completedFuture(0)
@@ -97,7 +97,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
-        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         var nextDefTag1 = dummyTag(nextDataDef(origDef));
 
@@ -135,7 +135,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
-        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         // Save an item
         var future = dal.saveNewObject(TEST_TENANT, origTag);
@@ -151,7 +151,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
-        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         unwrap(dal.saveNewObject(TEST_TENANT, origTag));
 
@@ -167,11 +167,11 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef));
         var nextDefTag2 = nextTag(nextDefTag1);
-        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         var modelDef = dummyModelDef();
         var modelTag = dummyTag(modelDef);
-        var modelId = MetadataCodec.decode(modelDef.getHeader().getId());
+        var modelId = MetadataCodec.decode(modelDef.getHeader().getObjectId());
 
         // Save everything first
         var future = CompletableFuture.completedFuture(0)
@@ -202,11 +202,11 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef));
         var nextDefTag2 = nextTag(nextDefTag1);
-        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         var modelDef = dummyModelDef();
         var modelTag = dummyTag(modelDef);
-        var modelId = MetadataCodec.decode(modelDef.getHeader().getId());
+        var modelId = MetadataCodec.decode(modelDef.getHeader().getObjectId());
 
         // Save everything first
         var future = CompletableFuture.completedFuture(0)
@@ -233,11 +233,11 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef));
         var nextDefTag2 = nextTag(nextDefTag1);
-        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         var modelDef = dummyModelDef();
         var modelTag = dummyTag(modelDef);
-        var modelId = MetadataCodec.decode(modelDef.getHeader().getId());
+        var modelId = MetadataCodec.decode(modelDef.getHeader().getObjectId());
 
         // Save everything first
         var future = CompletableFuture.completedFuture(0)
@@ -283,7 +283,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
-        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         // Save an item
         var future = dal.saveNewObject(TEST_TENANT, origTag);
@@ -316,11 +316,11 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
-        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         var origDef2 = dummyModelDef();
         var origTag2 = dummyTag(origDef2);
-        var origId2 = MetadataCodec.decode(origDef2.getHeader().getId());
+        var origId2 = MetadataCodec.decode(origDef2.getHeader().getObjectId());
 
         unwrap(dal.saveNewObjects(TEST_TENANT, Arrays.asList(origTag, origTag2)));
 

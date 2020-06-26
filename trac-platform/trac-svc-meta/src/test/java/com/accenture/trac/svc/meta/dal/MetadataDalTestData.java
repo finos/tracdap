@@ -11,65 +11,72 @@ public class MetadataDalTestData {
 
     public static final String TEST_TENANT = "ACME_CORP";
 
-    static DataDefinition dummyDataDef() {
+    static ObjectDefinition dummyDataDef() {
 
-        return DataDefinition.newBuilder()
-                .setHeader(ObjectHeader.newBuilder()
-                        .setObjectType(ObjectType.DATA)
-                        .setId(MetadataCodec.encode(UUID.randomUUID()))
-                        .setVersion(1))
-                .addStorage("test-storage")
-                .setPath("path/to/test/dataset")
-                .setFormat(DataFormat.CSV)
-                .setSchema(TableDefinition.newBuilder()
-                        .addField(FieldDefinition.newBuilder()
-                                .setFieldName("transaction_id")
-                                .setFieldType(PrimitiveType.STRING)
-                                .setFieldOrder(1)
-                                .setBusinessKey(true))
-                        .addField(FieldDefinition.newBuilder()
-                                .setFieldName("customer_id")
-                                .setFieldType(PrimitiveType.STRING)
-                                .setFieldOrder(2)
-                                .setBusinessKey(true))
-                        .addField(FieldDefinition.newBuilder()
-                                .setFieldName("order_date")
-                                .setFieldType(PrimitiveType.DATE)
-                                .setFieldOrder(3)
-                                .setBusinessKey(true))
-                        .addField(FieldDefinition.newBuilder()
-                                .setFieldName("widgets_ordered")
-                                .setFieldType(PrimitiveType.INTEGER)
-                                .setFieldOrder(4)
-                                .setBusinessKey(true)))
-                .build();
+        return ObjectDefinition.newBuilder()
+            .setHeader(ObjectHeader.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
+                .setObjectVersion(1))
+            .setData(DataDefinition.newBuilder()
+            .addStorage("test-storage")
+            .setPath("path/to/test/dataset")
+            .setFormat(DataFormat.CSV)
+            .setSchema(TableDefinition.newBuilder()
+                .addField(FieldDefinition.newBuilder()
+                        .setFieldName("transaction_id")
+                        .setFieldType(PrimitiveType.STRING)
+                        .setFieldOrder(1)
+                        .setBusinessKey(true))
+                .addField(FieldDefinition.newBuilder()
+                        .setFieldName("customer_id")
+                        .setFieldType(PrimitiveType.STRING)
+                        .setFieldOrder(2)
+                        .setBusinessKey(true))
+                .addField(FieldDefinition.newBuilder()
+                        .setFieldName("order_date")
+                        .setFieldType(PrimitiveType.DATE)
+                        .setFieldOrder(3)
+                        .setBusinessKey(true))
+                .addField(FieldDefinition.newBuilder()
+                        .setFieldName("widgets_ordered")
+                        .setFieldType(PrimitiveType.INTEGER)
+                        .setFieldOrder(4)
+                        .setBusinessKey(true))))
+            .build();
     }
 
-    static DataDefinition nextDataDef(DataDefinition origDef) {
+    static ObjectDefinition nextDataDef(ObjectDefinition origDef) {
+
+        if (origDef.getHeader().getObjectType() != ObjectType.DATA || !origDef.hasData())
+            throw new RuntimeException("Original object is not a valid data definition");
 
         return origDef.toBuilder()
                 .mergeHeader(origDef.getHeader()
                         .toBuilder()
-                        .setVersion(origDef.getHeader().getVersion() + 1)
+                        .setObjectVersion(origDef.getHeader().getObjectVersion() + 1)
                         .build())
-                .mergeSchema(origDef.getSchema().toBuilder()
-                        .addField(FieldDefinition.newBuilder()
-                        .setFieldName("extra_field")
-                        .setFieldOrder(origDef.getSchema().getFieldCount())
-                        .setFieldType(PrimitiveType.FLOAT)
-                        .setFieldLabel("We got an extra field!")
-                        .setFormatCode("PERCENT")
-                        .build()).build())
+                .setData(origDef.getData()
+                        .toBuilder()
+                        .mergeSchema(origDef.getData().getSchema().toBuilder()
+                                .addField(FieldDefinition.newBuilder()
+                                .setFieldName("extra_field")
+                                .setFieldOrder(origDef.getData().getSchema().getFieldCount())
+                                .setFieldType(PrimitiveType.FLOAT)
+                                .setFieldLabel("We got an extra field!")
+                                .setFormatCode("PERCENT")
+                                .build()).build()))
                 .build();
     }
 
-    static ModelDefinition dummyModelDef() {
+    static ObjectDefinition dummyModelDef() {
 
-        return ModelDefinition.newBuilder()
+        return ObjectDefinition.newBuilder()
                 .setHeader(ObjectHeader.newBuilder()
                         .setObjectType(ObjectType.MODEL)
-                        .setId(MetadataCodec.encode(UUID.randomUUID()))
-                        .setVersion(1))
+                        .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
+                        .setObjectVersion(1))
+                .setModel(ModelDefinition.newBuilder()
                 .setLanguage("python")
                 .setRepository("trac-test-repo")
                 .setRepositoryVersion("trac-test-repo-1.2.3-RC4")
@@ -80,60 +87,44 @@ public class MetadataDalTestData {
                 .putInput("input1", TableDefinition.newBuilder()
                         .addField(FieldDefinition.newBuilder()
                                 .setFieldName("field1")
-                                .setFieldType(PrimitiveType.DATE)
-                                .build())
+                                .setFieldType(PrimitiveType.DATE))
                         .addField(FieldDefinition.newBuilder()
                                 .setFieldName("field2")
                                 .setBusinessKey(true)
                                 .setFieldType(PrimitiveType.DECIMAL)
                                 .setFieldLabel("A display name")
                                 .setCategorical(true)
-                                .setFormatCode("GBP")
-                                .build())
+                                .setFormatCode("GBP"))
                         .build())
                 .putOutput("output1", TableDefinition.newBuilder()
                         .addField(FieldDefinition.newBuilder()
                                 .setFieldName("checksum_field")
-                                .setFieldType(PrimitiveType.DECIMAL)
-                                .build())
-                        .build())
+                                .setFieldType(PrimitiveType.DECIMAL))
+                        .build()))
                 .build();
     }
 
-    static ModelDefinition nextModelDef(ModelDefinition origDef) {
+    static ObjectDefinition nextModelDef(ObjectDefinition origDef) {
+
+        if (origDef.getHeader().getObjectType() != ObjectType.MODEL || !origDef.hasModel())
+            throw new RuntimeException("Original object is not a valid model definition");
 
         return origDef.toBuilder()
                 .mergeHeader(origDef.getHeader()
                         .toBuilder()
-                        .setVersion(origDef.getHeader().getVersion() + 1)
+                        .setObjectVersion(origDef.getHeader().getObjectVersion() + 1)
                         .build())
-                .putParam("param3", Parameter.newBuilder().setParamType(PrimitiveType.DATE).build())
+                .setModel(origDef.getModel()
+                        .toBuilder()
+                        .putParam("param3", Parameter.newBuilder().setParamType(PrimitiveType.DATE).build()))
                 .build();
     }
 
-    static Tag dummyTag(DataDefinition dataDef) {
+    static Tag dummyTag(ObjectDefinition definition) {
 
         return Tag.newBuilder()
-                .setHeader(dataDef.getHeader())
+                .setDefinition(definition)
                 .setTagVersion(1)
-                .setDataDefinition(dataDef)
-                .putAttr("dataset_key", PrimitiveValue.newBuilder()
-                        .setType(PrimitiveType.STRING)
-                        .setStringValue("widget_orders")
-                        .build())
-                .putAttr("widget_type", PrimitiveValue.newBuilder()
-                        .setType(PrimitiveType.STRING)
-                        .setStringValue("non_standard_widget")
-                        .build())
-                .build();
-    }
-
-    static Tag dummyTag(ModelDefinition modelDef) {
-
-        return Tag.newBuilder()
-                .setHeader(modelDef.getHeader())
-                .setTagVersion(1)
-                .setModelDefinition(modelDef)
                 .putAttr("dataset_key", PrimitiveValue.newBuilder()
                         .setType(PrimitiveType.STRING)
                         .setStringValue("widget_orders")

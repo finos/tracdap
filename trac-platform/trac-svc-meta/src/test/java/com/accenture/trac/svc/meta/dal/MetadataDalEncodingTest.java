@@ -34,7 +34,7 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
-        var origId = MetadataCodec.decode(origDef.getHeader().getId());
+        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         var future = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
@@ -51,7 +51,7 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
         for (var objectType: typesToTest) {
 
             var origTag = dummyTagForObjectType(objectType);
-            var origId = MetadataCodec.decode(origTag.getHeader().getId());
+            var origId = MetadataCodec.decode(origTag.getDefinition().getHeader().getObjectId());
 
             var future = CompletableFuture.completedFuture(0)
                     .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))

@@ -2,18 +2,15 @@ package com.accenture.trac.svc.meta.api;
 
 import com.accenture.trac.common.api.meta.MetadataTrustedWriteApiGrpc;
 import com.accenture.trac.common.api.meta.MetadataWriteRequest;
-import com.accenture.trac.common.metadata.DataDefinition;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.ObjectType;
-import com.accenture.trac.common.metadata.Tag;
+import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.common.api.meta.MetadataReadApiGrpc;
 import com.accenture.trac.common.api.meta.MetadataReadRequest;
-
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
 import com.accenture.trac.svc.meta.test.IDalTestable;
 import com.accenture.trac.svc.meta.test.JdbcH2Impl;
 import com.accenture.trac.svc.meta.logic.MetadataReadLogic;
+
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.testing.GrpcCleanupRule;
@@ -22,8 +19,6 @@ import org.junit.Rule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-
-import java.util.UUID;
 
 import static com.accenture.trac.svc.meta.dal.MetadataDalTestData.TEST_TENANT;
 import static org.junit.jupiter.api.Assertions.*;
@@ -76,11 +71,12 @@ class MetadataReadApiTest implements IDalTestable {
     @Test
     void loadTag_ok() {
 
-        var dataDef = DataDefinition.newBuilder()
-                .addStorage("TEST");
+        var dataDef = ObjectDefinition.newBuilder()
+                .setData(DataDefinition.newBuilder()
+                    .addStorage("TEST"));
 
         var origTag = Tag.newBuilder()
-                .setDataDefinition(dataDef);
+                .setDefinition(dataDef);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -102,7 +98,7 @@ class MetadataReadApiTest implements IDalTestable {
 
         Tag tag = readApi.loadTag(readRequest);
 
-        assertEquals(objectId, MetadataCodec.decode(tag.getHeader().getId()));
+        assertEquals(objectId, MetadataCodec.decode(tag.getDefinition().getHeader().getObjectId()));
     }
 
     @Test
