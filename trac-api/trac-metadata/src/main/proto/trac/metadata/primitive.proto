@@ -20,7 +20,9 @@ enum PrimitiveType {
 
 message Decimal {
 
-    // TODO
+    bytes rawBytes = 1;
+    uint32 precision = 2;
+    sint32 scale = 3;
 }
 
 message Date {
@@ -46,9 +48,6 @@ message PrimitiveValue {
         string stringValue = 6;
         Date dateValue = 7;
         DateTime datetimeValue = 8;
-
-        PrimitiveArray arrayValue = 9;
-        PrimitiveObject objectValue = 10;
     }
 }
 

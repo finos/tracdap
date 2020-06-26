@@ -5,7 +5,6 @@ option java_package = "com.accenture.trac.common.metadata";
 option java_multiple_files = true;
 
 import "trac/metadata/primitive.proto";
-import "trac/metadata/object.proto";
 import "trac/metadata/data.proto";
 
 
@@ -20,18 +19,16 @@ message Parameter {
 
 message ModelDefinition {
 
-    ObjectHeader header = 1;
+    string language = 1;
+    string repository = 2;
+    string repositoryVersion = 3;
+    string path = 4;
+    string entryPoint = 5;
 
-    string language = 2;
-    string repository = 3;
-    string repositoryVersion = 4;
-    string path = 5;
-    string entryPoint = 6;
+    map<string, Parameter> param = 6;
+    map<string, TableDefinition> input = 7;
+    map<string, TableDefinition> output = 8;
 
-    map<string, Parameter> param = 7;
-    map<string, TableDefinition> input = 8;
-    map<string, TableDefinition> output = 9;
-
-    bool overlay = 10;
-    bool schemaUnchanged = 11;
+    bool overlay = 9;
+    bool schemaUnchanged = 10;
 }

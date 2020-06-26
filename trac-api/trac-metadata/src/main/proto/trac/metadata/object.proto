@@ -4,6 +4,9 @@ package trac.metadata;
 option java_package = "com.accenture.trac.common.metadata";
 option java_multiple_files = true;
 
+import "trac/metadata/data.proto";
+import "trac/metadata/model.proto";
+
 
 enum ObjectType {
     NONE_OBJECT = 0;
@@ -25,6 +28,16 @@ message UUID {
 message ObjectHeader {
 
     ObjectType objectType = 1;
-    UUID id = 2;
-    int32 version = 3;
+    UUID objectId = 2;
+    int32 objectVersion = 3;
+}
+
+message ObjectDefinition {
+
+    ObjectHeader header = 1;
+
+    oneof definition {
+        DataDefinition data = 2;
+        ModelDefinition model = 3;
+    }
 }
