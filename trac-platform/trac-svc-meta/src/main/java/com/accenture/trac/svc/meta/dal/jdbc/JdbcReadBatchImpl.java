@@ -1,9 +1,6 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.ObjectType;
-import com.accenture.trac.common.metadata.PrimitiveValue;
-import com.accenture.trac.common.metadata.Tag;
+import com.accenture.trac.common.metadata.*;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
 
@@ -70,7 +67,7 @@ class JdbcReadBatchImpl {
         }
     }
 
-    JdbcBaseDal.KeyedItems<MessageLite>
+    JdbcBaseDal.KeyedItems<ObjectDefinition>
     readDefinitionByVersion(
             Connection conn, short tenantId,
             ObjectType[] objectType, long[] objectFk, int[] objectVersion)
@@ -82,7 +79,7 @@ class JdbcReadBatchImpl {
         return readDefinition(conn, tenantId, objectType, mappingStage);
     }
 
-    JdbcBaseDal.KeyedItems<MessageLite>
+    JdbcBaseDal.KeyedItems<ObjectDefinition>
     readDefinitionByLatest(
             Connection conn, short tenantId,
             ObjectType[] objectType, long[] objectFk)
@@ -94,7 +91,7 @@ class JdbcReadBatchImpl {
         return readDefinition(conn, tenantId, objectType, mappingStage);
     }
 
-    private JdbcBaseDal.KeyedItems<MessageLite>
+    private JdbcBaseDal.KeyedItems<ObjectDefinition>
     readDefinition(
             Connection conn, short tenantId,
             ObjectType[] objectType, int mappingStage)
@@ -118,7 +115,7 @@ class JdbcReadBatchImpl {
 
                 long[] pks = new long[objectType.length];
                 int[] versions = new int[objectType.length];
-                MessageLite[] defs = new MessageLite[objectType.length];
+                ObjectDefinition[] defs = new ObjectDefinition[objectType.length];
 
                 for (var i = 0; i < objectType.length; i++) {
 
@@ -128,7 +125,7 @@ class JdbcReadBatchImpl {
                     var defPk = rs.getLong(1);
                     var defVersion = rs.getInt(2);
                     var defEncoded = rs.getBytes(3);
-                    var defDecoded = MetadataCodec.decode(objectType[i], defEncoded);
+                    var defDecoded = ObjectDefinition.parseFrom(defEncoded);
 
                     // TODO: Encode / decode helper, type = protobuf | json ?
 

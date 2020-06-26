@@ -1,9 +1,9 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.common.metadata.ObjectDefinition;
 import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.PrimitiveType;
 import com.accenture.trac.common.metadata.Tag;
-import com.google.protobuf.MessageLite;
 
 import java.sql.*;
 import java.util.Arrays;
@@ -43,7 +43,7 @@ class JdbcWriteBatchImpl {
 
     long[] writeObjectDefinition(
             Connection conn, short tenantId,
-            long[] objectPk, int[] objectVersion, MessageLite[] definition)
+            long[] objectPk, int[] objectVersion, ObjectDefinition[] definition)
             throws SQLException {
 
         var query =

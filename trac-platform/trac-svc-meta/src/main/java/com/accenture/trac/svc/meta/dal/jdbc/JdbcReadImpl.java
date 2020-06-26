@@ -1,10 +1,7 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcBaseDal.KeyedItem;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.ObjectType;
-import com.accenture.trac.common.metadata.PrimitiveValue;
-import com.accenture.trac.common.metadata.Tag;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
 
@@ -51,7 +48,7 @@ class JdbcReadImpl {
         }
     }
 
-    KeyedItem<MessageLite>
+    KeyedItem<ObjectDefinition>
     readDefinitionByVersion(
             Connection conn, short tenantId,
             ObjectType objectType, long objectPk, int objectVersion)
@@ -74,7 +71,7 @@ class JdbcReadImpl {
         }
     }
 
-    KeyedItem<MessageLite>
+    KeyedItem<ObjectDefinition>
     readDefinitionByLatest(
             Connection conn, short tenantId,
             ObjectType objectType, long objectPk)
@@ -101,7 +98,7 @@ class JdbcReadImpl {
         }
     }
 
-    private KeyedItem<MessageLite>
+    private KeyedItem<ObjectDefinition>
     readDefinition(PreparedStatement stmt, ObjectType objectType) throws SQLException {
 
         try (var rs = stmt.executeQuery()) {
@@ -112,7 +109,7 @@ class JdbcReadImpl {
             var defPk = rs.getLong(1);
             var version = rs.getInt(2);
             var defEncoded = rs.getBytes(3);
-            var defDecoded = MetadataCodec.decode(objectType, defEncoded);
+            var defDecoded = ObjectDefinition.parseFrom(defEncoded);
 
             // TODO: Encode / decode helper, type = protobuf | json ?
 
