@@ -27,11 +27,15 @@ public class MetadataWriteLogic {
 
         var header = ObjectHeader.newBuilder()
                 .setObjectType(objectType)
-                .setId(encode(objectId))
-                .setVersion(objectVersion);
+                .setObjectId(encode(objectId))
+                .setObjectVersion(objectVersion);
+
+        var definition = tag.getDefinition()
+                .toBuilder()
+                .setHeader(header);
 
         var tagToSave = tag.toBuilder()
-                .setHeader(header)
+                .setDefinition(definition)
                 .setTagVersion(tagVersion)
                 .build();
 
