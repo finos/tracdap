@@ -4,8 +4,11 @@ package trac.metadata;
 option java_package = "com.accenture.trac.common.metadata";
 option java_multiple_files = true;
 
+import "trac/metadata/primitive.proto";
 import "trac/metadata/data.proto";
 import "trac/metadata/model.proto";
+import "trac/metadata/flow.proto";
+import "trac/metadata/job.proto";
 
 
 enum ObjectType {
@@ -17,12 +20,6 @@ enum ObjectType {
     JOB_OUTPUT = 5;
     CUSTOM = 6;
     FILE = 7;
-}
-
-message UUID {
-
-    sint64 hi = 1;
-    sint64 lo = 2;
 }
 
 message ObjectHeader {
@@ -39,5 +36,7 @@ message ObjectDefinition {
     oneof definition {
         DataDefinition data = 2;
         ModelDefinition model = 3;
+        FlowDefinition flow = 4;
+        JobDefinition job = 5;
     }
 }

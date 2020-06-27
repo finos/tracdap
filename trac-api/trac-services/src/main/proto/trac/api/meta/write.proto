@@ -4,6 +4,7 @@ package trac.api.meta;
 option java_package = "com.accenture.trac.common.api.meta";
 option java_multiple_files = true;
 
+import "trac/metadata/primitive.proto";
 import "trac/metadata/object.proto";
 import "trac/metadata/tag.proto";
 

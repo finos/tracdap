@@ -1,0 +1,46 @@
+syntax = 'proto3';
+package trac.metadata;
+
+option java_package = "com.accenture.trac.common.metadata";
+option java_multiple_files = true;
+
+import "trac/metadata/primitive.proto";
+import "trac/metadata/data.proto";
+import "trac/metadata/model.proto";
+
+
+enum FlowNodeType {
+  INVALID_NODE_TYPE = 0;
+  INPUT_NODE = 1;
+  OUTPUT_NODE = 2;
+  MODEL_NODE = 3;
+}
+
+message FlowNode {
+
+  FlowNodeType nodeType = 1;
+}
+
+
+message FlowSocket {
+
+  string node = 1;
+  string socket = 2;
+}
+
+message FlowEdge {
+
+  FlowSocket start = 1;
+  FlowSocket end = 2;
+}
+
+
+message FlowDefinition {
+
+  map<string, FlowNode> node = 1;
+  repeated FlowEdge edge = 2;
+
+  map<string, ModelParameter> param = 3;
+  map<string, TableDefinition> input = 4;
+  map<string, TableDefinition> output = 5;
+}

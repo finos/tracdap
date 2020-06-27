@@ -82,8 +82,8 @@ public class MetadataDalTestData {
                 .setRepositoryVersion("trac-test-repo-1.2.3-RC4")
                 .setPath("src/main/python")
                 .setEntryPoint("trac_test.test1.SampleModel1")
-                .putParam("param1", Parameter.newBuilder().setParamType(PrimitiveType.STRING).build())
-                .putParam("param2", Parameter.newBuilder().setParamType(PrimitiveType.INTEGER).build())
+                .putParam("param1", ModelParameter.newBuilder().setParamType(PrimitiveType.STRING).build())
+                .putParam("param2", ModelParameter.newBuilder().setParamType(PrimitiveType.INTEGER).build())
                 .putInput("input1", TableDefinition.newBuilder()
                         .addField(FieldDefinition.newBuilder()
                                 .setFieldName("field1")
@@ -116,7 +116,7 @@ public class MetadataDalTestData {
                         .build())
                 .setModel(origDef.getModel()
                         .toBuilder()
-                        .putParam("param3", Parameter.newBuilder().setParamType(PrimitiveType.DATE).build()))
+                        .putParam("param3", ModelParameter.newBuilder().setParamType(PrimitiveType.DATE).build()))
                 .build();
     }
 

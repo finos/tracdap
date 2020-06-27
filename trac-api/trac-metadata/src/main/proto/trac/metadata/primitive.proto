@@ -35,6 +35,12 @@ message DateTime {
     // TODO (includes tz)
 }
 
+message UUID {
+
+    sint64 hi = 1;
+    sint64 lo = 2;
+}
+
 message PrimitiveValue {
 
     PrimitiveType type = 1;

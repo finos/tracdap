@@ -8,14 +8,13 @@ import "trac/metadata/primitive.proto";
 import "trac/metadata/data.proto";
 
 
-message Parameter {
+message ModelParameter {
 
     string label = 1;
 
     PrimitiveType paramType = 2;
     PrimitiveValue defaultValue = 3;
 }
-
 
 message ModelDefinition {
 
@@ -25,7 +24,7 @@ message ModelDefinition {
     string path = 4;
     string entryPoint = 5;
 
-    map<string, Parameter> param = 6;
+    map<string, ModelParameter> param = 6;
     map<string, TableDefinition> input = 7;
     map<string, TableDefinition> output = 8;
 
