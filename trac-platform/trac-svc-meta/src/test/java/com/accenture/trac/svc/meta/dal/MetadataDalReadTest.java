@@ -15,6 +15,7 @@ import com.accenture.trac.svc.meta.test.IDalTestable;
 import com.accenture.trac.svc.meta.test.JdbcH2Impl;
 import com.accenture.trac.svc.meta.test.JdbcMysqlImpl;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.junit.jupiter.api.Assertions.*;
@@ -28,11 +29,13 @@ abstract class MetadataDalReadTest implements IDalTestable {
         this.dal = dal;
     }
 
-    @ExtendWith(JdbcMysqlImpl.class)
-    static class JdbcMysql extends MetadataDalReadTest {}
-
     @ExtendWith(JdbcH2Impl.class)
     static class JdbcH2 extends MetadataDalReadTest {}
+
+    @Tag("integration")
+    @Tag("int-mysql")
+    @ExtendWith(JdbcMysqlImpl.class)
+    static class JdbcMysql extends MetadataDalReadTest {}
 
     @Test
     void testLoadOneExplicit_ok() throws Exception {

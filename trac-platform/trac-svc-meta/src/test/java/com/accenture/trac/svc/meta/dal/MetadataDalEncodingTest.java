@@ -10,6 +10,7 @@ import com.accenture.trac.svc.meta.test.IDalTestable;
 import com.accenture.trac.svc.meta.test.JdbcH2Impl;
 import com.accenture.trac.svc.meta.test.JdbcMysqlImpl;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,11 +24,13 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
         this.dal = dal;
     }
 
-    @ExtendWith(JdbcMysqlImpl.class)
-    static class JdbcMysql extends MetadataDalEncodingTest {}
-
     @ExtendWith(JdbcH2Impl.class)
     static class JdbcH2 extends MetadataDalEncodingTest {}
+
+    @Tag("integration")
+    @Tag("int-mysql")
+    @ExtendWith(JdbcMysqlImpl.class)
+    static class JdbcMysql extends MetadataDalEncodingTest {}
 
     @Test
     void roundTrip_oneObjectTypeOk() throws Exception {
