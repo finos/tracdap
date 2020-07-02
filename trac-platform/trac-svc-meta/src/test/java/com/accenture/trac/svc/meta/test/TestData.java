@@ -18,6 +18,8 @@ public class TestData {
 
             case DATA: return dummyDataDef();
             case MODEL: return dummyModelDef();
+            case FLOW: return dummyFlowDef();
+            case JOB: return dummyJobDef();
             case FILE: return dummyFileDef();
             case CUSTOM: return dummyCustomDef();
 
@@ -132,6 +134,42 @@ public class TestData {
                 .setModel(origDef.getModel()
                         .toBuilder()
                         .putParam("param3", ModelParameter.newBuilder().setParamType(PrimitiveType.DATE).build()))
+                .build();
+    }
+
+    public static ObjectDefinition dummyFlowDef() {
+
+        return ObjectDefinition.newBuilder()
+                .setHeader(ObjectHeader.newBuilder()
+                    .setObjectType(ObjectType.FLOW)
+                    .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
+                    .setObjectVersion(1))
+                .setFlow(FlowDefinition.newBuilder()
+                    .putNode("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                    .putNode("main_model", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE).build())
+                    .putNode("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                    .addEdge(FlowEdge.newBuilder()
+                            .setStart(FlowSocket.newBuilder().setNode("input_1"))
+                            .setEnd(FlowSocket.newBuilder().setNode("main_model").setSocket("input_1")))
+                    .addEdge(FlowEdge.newBuilder()
+                            .setStart(FlowSocket.newBuilder().setNode("main_model").setSocket("output_1"))
+                            .setEnd(FlowSocket.newBuilder().setNode("output_1"))))
+                .build();
+    }
+
+    public static ObjectDefinition dummyJobDef() {
+
+        // Job will be invalid because the model ID it points to does not exist!
+        // Ok for e.g. DAL testing, but will fail metadata validation
+
+        return ObjectDefinition.newBuilder()
+                .setHeader(ObjectHeader.newBuilder()
+                    .setObjectType(ObjectType.JOB)
+                    .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
+                    .setObjectVersion(1))
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.RUN_MODEL)
+                        .setTargetId(MetadataCodec.encode(UUID.randomUUID())))
                 .build();
     }
 

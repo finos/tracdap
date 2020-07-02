@@ -1,9 +1,7 @@
 package com.accenture.trac.svc.meta.api;
 
 import com.accenture.trac.common.api.meta.*;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.ObjectHeader;
-import com.accenture.trac.common.metadata.ObjectType;
+import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 
 import com.accenture.trac.svc.meta.logic.MetadataReadLogic;
@@ -209,12 +207,57 @@ public class MetadataWriteApiTest implements IDalTestable {
 
     @Test
     void saveNewObject_invalidContent() {
-        fail();
+
+        var validFlow = TestData.dummyFlowDef();
+
+        var brokenEdges = validFlow.getFlow().toBuilder()
+                .addEdge(FlowEdge.newBuilder()
+                    .setStart(FlowSocket.newBuilder().setNode("node_totally_not_present"))
+                    .setEnd(FlowSocket.newBuilder().setNode("another_absent_node").setSocket("missing_socket")))
+                .build();
+
+        var invalidFlow = validFlow.toBuilder()
+                .setFlow(brokenEdges)
+                .build();
+
+        var tagToSave = TestData.dummyTag(invalidFlow);
+
+        // Try to save the flow with a broken graph, should fail validation
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setTag(tagToSave)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewObject(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
     void saveNewObject_controlledAttrs() {
-        fail();
+
+        var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
+        var validTag = TestData.dummyTag(objToSave);
+
+        var invalidTag = validTag.toBuilder()
+                .putAttr("trac_anything_reserved", PrimitiveValue.newBuilder().setType(PrimitiveType.FLOAT).setFloatValue(1.0).build())
+                .build();
+
+        // Request to save a MODEL, even though the definition is for DATA
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.CUSTOM)
+                .setTag(invalidTag)
+                .build();
+
+        // Setting reserved attributes is allowed through the trusted API but not the public API
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewObject(writeRequest));
+        assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
+
+        assertDoesNotThrow(() -> trustedApi.saveNewObject(writeRequest));
     }
 
     @Test
