@@ -20,7 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import static com.accenture.trac.svc.meta.dal.MetadataDalTestData.TEST_TENANT;
+import static com.accenture.trac.svc.meta.test.TestData.TEST_TENANT;
 import static org.junit.jupiter.api.Assertions.*;
 
 

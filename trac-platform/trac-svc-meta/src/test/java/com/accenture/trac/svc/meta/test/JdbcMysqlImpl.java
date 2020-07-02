@@ -7,7 +7,7 @@ import com.accenture.trac.svc.meta.dal.jdbc.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
 import com.mysql.cj.jdbc.MysqlDataSource;
 
-import static com.accenture.trac.svc.meta.dal.MetadataDalTestData.*;
+import static com.accenture.trac.svc.meta.test.TestData.*;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.*;

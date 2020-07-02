@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 import java.util.UUID;
 
-import static com.accenture.trac.svc.meta.dal.MetadataDalTestData.TEST_TENANT;
+import static com.accenture.trac.svc.meta.test.TestData.TEST_TENANT;
 
 
 public class JdbcH2Impl implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback, AfterAllCallback {

@@ -5,7 +5,7 @@ import com.accenture.trac.svc.meta.exception.MissingItemError;
 import com.accenture.trac.svc.meta.exception.WrongItemTypeError;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
-import static com.accenture.trac.svc.meta.dal.MetadataDalTestData.*;
+import static com.accenture.trac.svc.meta.test.TestData.*;
 
 import java.util.Arrays;
 import java.util.UUID;

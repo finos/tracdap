@@ -2,7 +2,7 @@ package com.accenture.trac.svc.meta.dal;
 
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
-import static com.accenture.trac.svc.meta.dal.MetadataDalTestData.*;
+import static com.accenture.trac.svc.meta.test.TestData.*;
 
 import java.util.concurrent.CompletableFuture;
 

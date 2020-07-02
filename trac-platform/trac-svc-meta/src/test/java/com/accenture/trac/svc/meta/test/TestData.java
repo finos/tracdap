@@ -1,4 +1,4 @@
-package com.accenture.trac.svc.meta.dal;
+package com.accenture.trac.svc.meta.test;
 
 import com.accenture.trac.common.metadata.*;
 
@@ -7,11 +7,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 
-public class MetadataDalTestData {
+public class TestData {
 
     public static final String TEST_TENANT = "ACME_CORP";
 
-    static ObjectDefinition dummyDataDef() {
+    public static ObjectDefinition dummyDataDef() {
 
         return ObjectDefinition.newBuilder()
             .setHeader(ObjectHeader.newBuilder()
@@ -46,7 +46,7 @@ public class MetadataDalTestData {
             .build();
     }
 
-    static ObjectDefinition nextDataDef(ObjectDefinition origDef) {
+    public static ObjectDefinition nextDataDef(ObjectDefinition origDef) {
 
         if (origDef.getHeader().getObjectType() != ObjectType.DATA || !origDef.hasData())
             throw new RuntimeException("Original object is not a valid data definition");
@@ -69,7 +69,7 @@ public class MetadataDalTestData {
                 .build();
     }
 
-    static ObjectDefinition dummyModelDef() {
+    public static ObjectDefinition dummyModelDef() {
 
         return ObjectDefinition.newBuilder()
                 .setHeader(ObjectHeader.newBuilder()
@@ -104,7 +104,7 @@ public class MetadataDalTestData {
                 .build();
     }
 
-    static ObjectDefinition nextModelDef(ObjectDefinition origDef) {
+    public static ObjectDefinition nextModelDef(ObjectDefinition origDef) {
 
         if (origDef.getHeader().getObjectType() != ObjectType.MODEL || !origDef.hasModel())
             throw new RuntimeException("Original object is not a valid model definition");
@@ -120,7 +120,7 @@ public class MetadataDalTestData {
                 .build();
     }
 
-    static Tag dummyTag(ObjectDefinition definition) {
+    public static Tag dummyTag(ObjectDefinition definition) {
 
         return Tag.newBuilder()
                 .setDefinition(definition)
@@ -136,7 +136,7 @@ public class MetadataDalTestData {
                 .build();
     }
 
-    static Tag nextTag(Tag previous) {
+    public static Tag nextTag(Tag previous) {
 
         return previous.toBuilder()
                 .setTagVersion(previous.getTagVersion() + 1)
@@ -147,7 +147,7 @@ public class MetadataDalTestData {
                 .build();
     }
 
-    static Tag dummyTagForObjectType(ObjectType objectType) {
+    public static Tag dummyTagForObjectType(ObjectType objectType) {
 
         if (objectType == ObjectType.DATA)
             return dummyTag(dummyDataDef());
@@ -158,7 +158,7 @@ public class MetadataDalTestData {
         throw new RuntimeException("Object type not supported for test data: " + objectType.name());
     }
 
-    static <T> T unwrap(CompletableFuture<T> future) throws Exception {
+    public static <T> T unwrap(CompletableFuture<T> future) throws Exception {
 
         try {
             return future.get();
