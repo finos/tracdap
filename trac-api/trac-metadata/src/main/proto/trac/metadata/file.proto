@@ -1,0 +1,21 @@
+syntax = 'proto3';
+package trac.metadata;
+
+option java_package = "com.accenture.trac.common.metadata";
+option java_multiple_files = true;
+
+import "trac/metadata/primitive.proto";
+
+
+message FileDefinition {
+
+  repeated string storage = 1;
+  map<string, PrimitiveValue> storageInfo = 2;
+  string storagePath = 3;
+
+  string name = 4;
+  string extension = 5;
+  uint64 size = 6;
+
+  string mimeType = 7;
+}

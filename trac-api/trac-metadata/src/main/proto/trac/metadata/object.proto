@@ -9,17 +9,17 @@ import "trac/metadata/data.proto";
 import "trac/metadata/model.proto";
 import "trac/metadata/flow.proto";
 import "trac/metadata/job.proto";
+import "trac/metadata/file.proto";
+import "trac/metadata/custom.proto";
 
 
 enum ObjectType {
-    NONE_OBJECT = 0;
-    DATA = 1;
-    MODEL = 2;
-    FLOW = 3;
-    JOB = 4;
-    JOB_OUTPUT = 5;
-    CUSTOM = 6;
-    FILE = 7;
+    DATA = 0;
+    MODEL = 1;
+    FLOW = 2;
+    JOB = 3;
+    FILE = 4;
+    CUSTOM = 5;
 }
 
 message ObjectHeader {
@@ -38,5 +38,7 @@ message ObjectDefinition {
         ModelDefinition model = 3;
         FlowDefinition flow = 4;
         JobDefinition job = 5;
+        FileDefinition file = 6;
+        CustomDefinition custom = 7;
     }
 }
