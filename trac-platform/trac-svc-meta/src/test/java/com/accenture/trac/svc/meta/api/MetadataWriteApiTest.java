@@ -1,14 +1,18 @@
 package com.accenture.trac.svc.meta.api;
 
-import com.accenture.trac.common.api.meta.MetadataPublicWriteApiGrpc;
-import com.accenture.trac.common.api.meta.MetadataReadApiGrpc;
-import com.accenture.trac.common.api.meta.MetadataTrustedWriteApiGrpc;
+import com.accenture.trac.common.api.meta.*;
+import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.ObjectHeader;
+import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 
 import com.accenture.trac.svc.meta.logic.MetadataReadLogic;
 import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
 import com.accenture.trac.svc.meta.test.IDalTestable;
 import com.accenture.trac.svc.meta.test.JdbcH2Impl;
+import com.accenture.trac.svc.meta.test.TestData;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.testing.GrpcCleanupRule;
@@ -17,8 +21,14 @@ import org.junit.Rule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
-import static org.junit.jupiter.api.Assertions.fail;
+import java.util.UUID;
+import java.util.function.Function;
+
+import static com.accenture.trac.svc.meta.test.TestData.TEST_TENANT;
+import static org.junit.jupiter.api.Assertions.*;
 
 
 @ExtendWith(JdbcH2Impl.class)
@@ -72,34 +82,129 @@ public class MetadataWriteApiTest implements IDalTestable {
                 grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
     }
 
-    @Test
-    void saveNewObject_ok() {
-        fail();
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED"})
+    void saveNewObject_trustedTypesOk(ObjectType objectType) {
+
+        saveNewObject_ok(objectType, request -> trustedApi.saveNewObject(request));
     }
 
-    @Test
-    void saveNewObject_trustedTypesOk() {
-        fail();
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE, names = {
+            "FLOW",
+            "CUSTOM"})
+    void saveNewObject_publicTypesOk(ObjectType objectType) {
+
+        // All object types should be either in this test, or publicTypesNotAllowed
+
+        saveNewObject_ok(objectType, request -> publicApi.saveNewObject(request));
     }
 
-    @Test
-    void saveNewObject_publicTypesOk() {
-        fail();
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE, names = {
+            "UNRECOGNIZED",
+            "FLOW",
+            "CUSTOM"})
+    void saveNewObject_publicTypesNotAllowed(ObjectType objectType) {
+
+        var objToSave = TestData.dummyDefinitionForType(objectType);
+        var tagToSave = TestData.dummyTag(objToSave);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(objectType)
+                .setTag(tagToSave)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewObject(writeRequest));
+        assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
     }
 
-    @Test
-    void saveNewObject_publicTypesNotAllowed() {
-        fail();
+    void saveNewObject_ok(ObjectType objectType, Function<MetadataWriteRequest, IdResponse> saveApiCall) {
+
+        var objToSave = TestData.dummyDefinitionForType(objectType);
+        var tagToSave = TestData.dummyTag(objToSave);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(objectType)
+                .setTag(tagToSave)
+                .build();
+
+        var idResponse = saveApiCall.apply(writeRequest);
+        var objectId = MetadataCodec.decode(idResponse.getObjectId());
+
+        assertNotNull(objectId);
+        assertNotEquals(new UUID(0, 0), objectId);
+        assertEquals(1, idResponse.getObjectVersion());
+        assertEquals(1, idResponse.getTagVersion());
+
+        var expectedHeader = ObjectHeader.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(idResponse.getObjectId())
+                .setObjectVersion(1);
+
+        var expectedObj = objToSave.toBuilder()
+                .setHeader(expectedHeader)
+                .build();
+
+        MetadataReadRequest readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(objectType)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(1)
+                .setTagVersion(1)
+                .build();
+
+        var tagFromStore = readApi.loadTag(readRequest);
+        var objFromStore = tagFromStore.getDefinition();
+
+        assertEquals(expectedObj, objFromStore);
+
+        // TODO: Tag comparison
     }
 
     @Test
     void saveNewObject_headerNotNull() {
-        fail();
+
+        var objToSave = TestData.dummyDefinitionForType(ObjectType.DATA);
+
+        // Saving object headers is not allowed, they will be generated by the metadata service
+        // Even if the header is empty it should be rejected
+        objToSave = objToSave.toBuilder()
+                .setHeader(ObjectHeader.newBuilder().build())
+                .build();
+
+        var tagToSave = TestData.dummyTag(objToSave);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(tagToSave)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewObject(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
     void saveNewObject_wrongType() {
-        fail();
+
+        var objToSave = TestData.dummyDefinitionForType(ObjectType.DATA);
+        var tagToSave = TestData.dummyTag(objToSave);
+
+        // Request to save a MODEL, even though the definition is for DATA
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setTag(tagToSave)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewObject(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.accenture.trac.svc.meta.test;
 
 import com.accenture.trac.common.metadata.*;
+import com.google.protobuf.ByteString;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -10,6 +11,20 @@ import java.util.concurrent.ExecutionException;
 public class TestData {
 
     public static final String TEST_TENANT = "ACME_CORP";
+
+    public static ObjectDefinition dummyDefinitionForType(ObjectType objectType) {
+
+        switch (objectType) {
+
+            case DATA: return dummyDataDef();
+            case MODEL: return dummyModelDef();
+            case FILE: return dummyFileDef();
+            case CUSTOM: return dummyCustomDef();
+
+            default:
+                throw new RuntimeException("No dummy data available for object type " + objectType.name());
+        }
+    }
 
     public static ObjectDefinition dummyDataDef() {
 
@@ -117,6 +132,41 @@ public class TestData {
                 .setModel(origDef.getModel()
                         .toBuilder()
                         .putParam("param3", ModelParameter.newBuilder().setParamType(PrimitiveType.DATE).build()))
+                .build();
+    }
+
+    public static ObjectDefinition dummyFileDef() {
+
+        return ObjectDefinition.newBuilder()
+                .setHeader(ObjectHeader.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
+                        .setObjectVersion(1))
+                .setFile(FileDefinition.newBuilder()
+                        .addStorage("test-storage")
+                        .setStoragePath("<preallocated_id>/contents/magic_template.xlsx")
+                        .setName("magic_template")
+                        .setExtension("docx")
+                        .setSize(45285)
+                        .setMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                        .build())
+                .build();
+    }
+
+    public static ObjectDefinition dummyCustomDef() {
+
+        String jsonReportDef = "{ reportType: 'magic', mainGraph: { content: 'more_magic' } }";
+
+        return ObjectDefinition.newBuilder()
+                .setHeader(ObjectHeader.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
+                        .setObjectVersion(1))
+                .setCustom(CustomDefinition.newBuilder()
+                        .setCustomType("REPORT")
+                        .setCustomSchemaVersion(2)
+                        .setCustomData(ByteString.copyFromUtf8(jsonReportDef))
+                        .build())
                 .build();
     }
 
