@@ -338,7 +338,6 @@ public class MetadataWriteApiTest implements IDalTestable {
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
-
     void saveNewVersion_ok(ObjectType objectType, Function<MetadataWriteRequest, IdResponse> saveApiCall) {
 
         var v1SavedTag = saveNewVersion_prepareV1(objectType);
@@ -363,7 +362,7 @@ public class MetadataWriteApiTest implements IDalTestable {
         var expectedHeader = ObjectHeader.newBuilder()
                 .setObjectType(objectType)
                 .setObjectId(v2IdResponse.getObjectId())
-                .setObjectVersion(1);
+                .setObjectVersion(2);
 
         var expectedObj = v2Obj.toBuilder()
                 .setHeader(expectedHeader)
@@ -373,7 +372,7 @@ public class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setObjectId(MetadataCodec.encode(v2ObjectId))
-                .setObjectVersion(1)
+                .setObjectVersion(2)
                 .setTagVersion(1)
                 .build();
 
@@ -876,7 +875,7 @@ public class MetadataWriteApiTest implements IDalTestable {
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
+                .setObjectType(ObjectType.DATA)
                 .setTag(t2Tag)
                 .build();
 
@@ -901,7 +900,7 @@ public class MetadataWriteApiTest implements IDalTestable {
 
         var v2t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
+                .setObjectType(ObjectType.DATA)
                 .setTag(v2t2Tag)
                 .build();
 
@@ -929,18 +928,18 @@ public class MetadataWriteApiTest implements IDalTestable {
 
         var t3Tag = TestData.nextTag(t2Tag, KEEP_ORIGINAL_TAG_VERSION);
 
-        var v2t2WriteRequest = MetadataWriteRequest.newBuilder()
+        var t3WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
+                .setObjectType(ObjectType.DATA)
                 .setTag(t3Tag)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewTag(v2t2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewTag(t3WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewTag(v2t2WriteRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewTag(t3WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
     }
 
@@ -953,7 +952,7 @@ public class MetadataWriteApiTest implements IDalTestable {
 
         var v2t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
+                .setObjectType(ObjectType.DATA)
                 .setTag(t2Tag)
                 .build();
 

@@ -78,7 +78,8 @@ public class TestData {
             return defUpdate.build();
 
         else
-            return defUpdate.mergeHeader(defUpdate.getHeader()
+            return defUpdate
+                .setHeader(defUpdate.getHeader()
                 .toBuilder()
                 .setObjectVersion(defUpdate.getHeader().getObjectVersion() + 1)
                 .build())
@@ -125,7 +126,7 @@ public class TestData {
         var defUpdate = origDef.toBuilder()
                 .setData(origDef.getData()
                 .toBuilder()
-                .mergeSchema(origDef.getData().getSchema().toBuilder()
+                .setSchema(origDef.getData().getSchema().toBuilder()
                     .addField(FieldDefinition.newBuilder()
                     .setFieldName("extra_field")
                     .setFieldOrder(origDef.getData().getSchema().getFieldCount())

@@ -40,12 +40,46 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
 
     @Override
     public void saveNewVersion(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
-        super.saveNewVersion(request, responseObserver);
+
+        ApiHelpers.wrapUnaryCall(responseObserver, () -> {
+
+            var tenant = request.getTenant();
+            var objectType = request.getObjectType();
+            var tag = request.getTag();
+
+            var saveResult = writeLogic.saveNewVersion(tenant, objectType, tag);
+
+            var idResponse = saveResult
+                    .thenApply(objectVersion -> IdResponse.newBuilder()
+                    .setObjectId(tag.getDefinition().getHeader().getObjectId())
+                    .setObjectVersion(objectVersion)
+                    .setTagVersion(1)
+                    .build());
+
+            return idResponse;
+        });
     }
 
     @Override
     public void saveNewTag(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
-        super.saveNewTag(request, responseObserver);
+
+        ApiHelpers.wrapUnaryCall(responseObserver, () -> {
+
+            var tenant = request.getTenant();
+            var objectType = request.getObjectType();
+            var tag = request.getTag();
+
+            var saveResult = writeLogic.saveNewTag(tenant, objectType, tag);
+
+            var idResponse = saveResult
+                    .thenApply(tagVersion -> IdResponse.newBuilder()
+                    .setObjectId(tag.getDefinition().getHeader().getObjectId())
+                    .setObjectVersion(tag.getDefinition().getHeader().getObjectVersion())
+                    .setTagVersion(tagVersion)
+                    .build());
+
+            return idResponse;
+        });
     }
 
     @Override

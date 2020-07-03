@@ -1,9 +1,6 @@
 package com.accenture.trac.svc.meta.logic;
 
-import com.accenture.trac.common.metadata.ObjectDefinition;
-import com.accenture.trac.common.metadata.ObjectHeader;
-import com.accenture.trac.common.metadata.ObjectType;
-import com.accenture.trac.common.metadata.Tag;
+import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.exception.InputValidationError;
 
@@ -12,8 +9,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static com.accenture.trac.common.metadata.MetadataCodec.encode;
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.TRAC_RESERVED_IDENTIFIER;
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.VALID_IDENTIFIER;
+import static com.accenture.trac.svc.meta.logic.MetadataConstants.*;
 
 
 public class MetadataWriteLogic {
@@ -81,5 +77,63 @@ public class MetadataWriteLogic {
 
         return dal.saveNewObject(tenant, tagToSave)
                 .thenApply(_ok -> objectId);
+    }
+
+    public CompletableFuture<Integer> saveNewVersion(String tenant, ObjectType objectType, Tag tag) {
+
+        var definition = tag.getDefinition();
+
+        // TODO: Validation
+
+        var priorHeader = definition.getHeader();
+        var priorVersion = priorHeader.getObjectVersion();
+        var objectId = MetadataCodec.decode(priorHeader.getObjectId());
+        var objectVersion = priorVersion + 1;
+
+        var header = ObjectHeader.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(encode(objectId))
+                .setObjectVersion(objectVersion);
+
+        var definitionToSave = tag.getDefinition()
+                .toBuilder()
+                .setHeader(header);
+
+        var tagToSave = tag.toBuilder()
+                .setDefinition(definitionToSave)
+                .setTagVersion(TAG_FIRST_VERSION)
+                .build();
+
+        // TODO: Is prior tag version relevant?
+
+        return dal.loadLatestTag(tenant, objectType, objectId, priorVersion)
+            .thenApply(priorTag -> priorTag)
+            .thenCompose(priorTag -> dal.saveNewVersion(tenant, tagToSave))
+            .thenApply(_ok -> objectVersion);
+    }
+
+    public CompletableFuture<Integer> saveNewTag(String tenant, ObjectType objectType, Tag tag) {
+
+        var definition = tag.getDefinition();
+
+        // TODO: Validation
+
+        var header = definition.getHeader();
+        var objectId = MetadataCodec.decode(header.getObjectId());
+        var objectVersion = header.getObjectVersion();
+
+        var priorTagVersion = tag.getTagVersion();
+        var tagVersion = priorTagVersion + 1;
+
+        var tagToSave = tag.toBuilder()
+                .setDefinition(definition)
+                .setTagVersion(tagVersion)
+                .build();
+
+        // TODO: Is prior tag version relevant?
+
+        return dal.loadTag(tenant, objectType, objectId, objectVersion, priorTagVersion)
+                .thenCompose(priorTag -> dal.saveNewTag(tenant, tagToSave))
+                .thenApply(_ok -> tagVersion);
     }
 }
