@@ -22,14 +22,14 @@ service MetadataPublicWriteApi {
 
     rpc saveNewVersion (MetadataWriteRequest) returns (IdResponse) {
         option (google.api.http) = {
-            post: "/{tenant}/{objectType}/{objectId}/versions/new-version"
+            post: "/{tenant}/{objectType}/new-version"
             body: "tag"
         };
     }
 
     rpc saveNewTag (MetadataWriteRequest) returns (IdResponse) {
         option (google.api.http) = {
-            post: "/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/new-tag"
+            post: "/{tenant}/{objectType}/new-tag"
             body: "tag"
         };
     }
@@ -47,14 +47,14 @@ service MetadataTrustedWriteApi {
 
     rpc saveNewVersion (MetadataWriteRequest) returns (IdResponse) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/{objectType}/{objectId}/versions/new-version"
+            post: "/{tenant}/trusted/{objectType}/new-version"
             body: "tag"
         };
     }
 
     rpc saveNewTag (MetadataWriteRequest) returns (IdResponse) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/{objectType}/{objectId}/versions/{objectVersion}/tags/new-tag"
+            post: "/{tenant}/trusted/{objectType}/new-tag"
             body: "tag"
         };
     }
@@ -68,7 +68,7 @@ service MetadataTrustedWriteApi {
 
     rpc savePreallocatedObject (MetadataWriteRequest) returns (IdResponse) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/{objectType}/{objectId}/save-preallocated"
+            post: "/{tenant}/trusted/{objectType}/save-preallocated"
             body: "tag"
         };
     }
@@ -78,12 +78,9 @@ service MetadataTrustedWriteApi {
 message MetadataWriteRequest {
 
     string tenant = 1;
+
     trac.metadata.ObjectType objectType = 2;
     trac.metadata.Tag tag = 3;
-
-    string objectId = 4;
-    int32 objectVersion = 5;
-    int32 tagVersion = 6;
 }
 
 message IdResponse {

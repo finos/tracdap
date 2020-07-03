@@ -27,7 +27,7 @@ service MetadataReadApi {
 
     rpc loadLatestObject(MetadataReadRequest) returns (trac.metadata.Tag) {
         option (google.api.http) = {
-            get: "/{tenant}/{objectType}/{objectId}/versions/latest{version=0}/tags/latest{tagVersion=0}"
+            get: "/{tenant}/{objectType}/{objectId}/versions/latest{objectVersion=0}/tags/latest{tagVersion=0}"
         };
     }
 
