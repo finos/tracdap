@@ -25,7 +25,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
             var objectType = request.getObjectType();
             var tag = request.getTag();
 
-            var saveResult = writeLogic.saveNewObject(tenant, objectType, tag);
+            var saveResult = writeLogic.saveNewObject(tenant, objectType, tag, MetadataWriteLogic.TRUSTED);
 
             var idResponse = saveResult
                     .thenApply(objectId -> IdResponse.newBuilder()

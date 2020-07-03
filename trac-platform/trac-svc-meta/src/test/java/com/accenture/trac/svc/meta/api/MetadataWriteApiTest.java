@@ -180,7 +180,7 @@ public class MetadataWriteApiTest implements IDalTestable {
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
+                .setObjectType(ObjectType.CUSTOM)
                 .setTag(tagToSave)
                 .build();
 
@@ -581,7 +581,7 @@ public class MetadataWriteApiTest implements IDalTestable {
 
         // Save V2 once should be ok
 
-        assertDoesNotThrow(() -> trustedApi.saveNewObject(v2WriteRequest));
+        assertDoesNotThrow(() -> trustedApi.saveNewVersion(v2WriteRequest));
 
         // Trying to create V2 a second time is an error
 

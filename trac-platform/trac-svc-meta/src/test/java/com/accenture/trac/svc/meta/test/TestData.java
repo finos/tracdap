@@ -186,15 +186,15 @@ public class TestData {
 
         var def = ObjectDefinition.newBuilder()
                 .setFlow(FlowDefinition.newBuilder()
-                    .putNode("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
-                    .putNode("main_model", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE).build())
-                    .putNode("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
-                    .addEdge(FlowEdge.newBuilder()
-                            .setStart(FlowSocket.newBuilder().setNode("input_1"))
-                            .setEnd(FlowSocket.newBuilder().setNode("main_model").setSocket("input_1")))
-                    .addEdge(FlowEdge.newBuilder()
-                            .setStart(FlowSocket.newBuilder().setNode("main_model").setSocket("output_1"))
-                            .setEnd(FlowSocket.newBuilder().setNode("output_1"))));
+                .putNode("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNode("main_model", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE).build())
+                .putNode("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .addEdge(FlowEdge.newBuilder()
+                        .setStart(FlowSocket.newBuilder().setNode("input_1"))
+                        .setEnd(FlowSocket.newBuilder().setNode("main_model").setSocket("input_1")))
+                .addEdge(FlowEdge.newBuilder()
+                        .setStart(FlowSocket.newBuilder().setNode("main_model").setSocket("output_1"))
+                        .setEnd(FlowSocket.newBuilder().setNode("output_1"))));
 
         return newObjectHeader(ObjectType.FLOW, def, includeHeader);
     }
@@ -205,13 +205,9 @@ public class TestData {
         // Ok for e.g. DAL testing, but will fail metadata validation
 
         var def = ObjectDefinition.newBuilder()
-                .setHeader(ObjectHeader.newBuilder()
-                    .setObjectType(ObjectType.JOB)
-                    .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
-                    .setObjectVersion(1))
                 .setJob(JobDefinition.newBuilder()
-                        .setJobType(JobType.RUN_MODEL)
-                        .setTargetId(MetadataCodec.encode(UUID.randomUUID())));
+                .setJobType(JobType.RUN_MODEL)
+                .setTargetId(MetadataCodec.encode(UUID.randomUUID())));
 
         return newObjectHeader(ObjectType.JOB, def, includeHeader);
     }
@@ -220,13 +216,13 @@ public class TestData {
 
         var def = ObjectDefinition.newBuilder()
                 .setFile(FileDefinition.newBuilder()
-                        .addStorage("test-storage")
-                        .setStoragePath("<preallocated_id>/contents/magic_template.xlsx")
-                        .setName("magic_template")
-                        .setExtension("docx")
-                        .setSize(45285)
-                        .setMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                        .build());
+                .addStorage("test-storage")
+                .setStoragePath("<preallocated_id>/contents/magic_template.xlsx")
+                .setName("magic_template")
+                .setExtension("docx")
+                .setSize(45285)
+                .setMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                .build());
 
         return newObjectHeader(ObjectType.FILE, def, includeHeader);
     }
@@ -236,15 +232,11 @@ public class TestData {
         var jsonReportDef = "{ reportType: 'magic', mainGraph: { content: 'more_magic' } }";
 
         var def = ObjectDefinition.newBuilder()
-                .setHeader(ObjectHeader.newBuilder()
-                        .setObjectType(ObjectType.DATA)
-                        .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
-                        .setObjectVersion(1))
                 .setCustom(CustomDefinition.newBuilder()
-                        .setCustomType("REPORT")
-                        .setCustomSchemaVersion(2)
-                        .setCustomData(ByteString.copyFromUtf8(jsonReportDef))
-                        .build());
+                .setCustomType("REPORT")
+                .setCustomSchemaVersion(2)
+                .setCustomData(ByteString.copyFromUtf8(jsonReportDef))
+                .build());
 
         return newObjectHeader(ObjectType.CUSTOM, def, includeHeader);
     }
