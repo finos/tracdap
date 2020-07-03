@@ -42,8 +42,4 @@ message MetadataReadRequest {
     trac.metadata.UUID objectId = 3;
     int32 objectVersion = 4;
     int32 tagVersion = 5;
-
-    bool includeAttrs = 6;
-    bool includeDefinition = 7;
-    bool includeLinkedDefinitions = 8;
 };
