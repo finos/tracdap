@@ -16,7 +16,11 @@ public class TestData {
     public static final boolean UPDATE_HEADER = true;
     public static final boolean KEEP_ORIGINAL_HEADER = false;
 
+    public static final boolean UPDATE_TAG_VERSION = true;
+    public static final boolean KEEP_ORIGINAL_TAG_VERSION = false;
+
     public static final String TEST_TENANT = "ACME_CORP";
+
 
     public static ObjectDefinition dummyDefinitionForType(ObjectType objectType, boolean includeHeader) {
 
@@ -32,6 +36,11 @@ public class TestData {
             default:
                 throw new RuntimeException("No dummy data available for object type " + objectType.name());
         }
+    }
+
+    public static Tag dummyTagForObjectType(ObjectType objectType) {
+
+        return dummyTag(dummyDefinitionForType(objectType, INCLUDE_HEADER));
     }
 
     public static ObjectDefinition dummyVersionForType(ObjectDefinition definition, boolean updateHeader) {
@@ -272,26 +281,21 @@ public class TestData {
                 .build();
     }
 
-    public static Tag nextTag(Tag previous) {
+    public static Tag nextTag(Tag previous, boolean updateTagVersion) {
 
-        return previous.toBuilder()
-                .setTagVersion(previous.getTagVersion() + 1)
+        var updatedTag = previous.toBuilder()
                 .putAttr("extra_attr", PrimitiveValue.newBuilder()
                         .setType(PrimitiveType.STRING)
                         .setStringValue("A new descriptive value")
-                        .build())
+                        .build());
+
+        if (updateTagVersion == KEEP_ORIGINAL_TAG_VERSION)
+            return updatedTag.build();
+
+        else
+            return updatedTag
+                .setTagVersion(previous.getTagVersion() + 1)
                 .build();
-    }
-
-    public static Tag dummyTagForObjectType(ObjectType objectType) {
-
-        if (objectType == ObjectType.DATA)
-            return dummyTag(dummyDataDef(INCLUDE_HEADER));
-
-        if (objectType == ObjectType.MODEL)
-            return dummyTag(dummyModelDef(INCLUDE_HEADER));
-
-        throw new RuntimeException("Object type not supported for test data: " + objectType.name());
     }
 
     public static <T> T unwrap(CompletableFuture<T> future) throws Exception {

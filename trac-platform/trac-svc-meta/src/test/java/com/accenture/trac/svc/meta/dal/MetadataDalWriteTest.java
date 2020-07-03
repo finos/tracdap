@@ -213,7 +213,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
-        var nextDefTag2 = nextTag(nextDefTag1);
+        var nextDefTag2 = nextTag(nextDefTag1, UPDATE_TAG_VERSION);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         // Test saving tag v2 against object v2
@@ -229,8 +229,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var multi1 = dummyTagForObjectType(ObjectType.DATA);
         var multi2 = dummyTagForObjectType(ObjectType.MODEL);
 
-        var multi1v2 = nextTag(multi1);
-        var multi2v2 = nextTag(multi2);
+        var multi1v2 = nextTag(multi1, UPDATE_TAG_VERSION);
+        var multi2v2 = nextTag(multi2, UPDATE_TAG_VERSION);
 
         var future2 = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObjects(TEST_TENANT, Arrays.asList(multi1, multi2)))
@@ -250,7 +250,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
-        var nextTag = nextTag(origTag);
+        var nextTag = nextTag(origTag, UPDATE_TAG_VERSION);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         var saveOrig = dal.saveNewObject(TEST_TENANT, origTag);
@@ -277,7 +277,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
-        var nextTag = nextTag(origTag);
+        var nextTag = nextTag(origTag, UPDATE_TAG_VERSION);
 
         // Save next tag, single, without saving object
         var saveNext =  dal.saveNewTag(TEST_TENANT, nextTag);
@@ -301,7 +301,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var origTag = dummyTag(origDef);
         var nextDef = nextDataDef(origDef, UPDATE_HEADER);
         var nextDefTag1 = dummyTag(nextDef);
-        var nextDefTag2 = nextTag(nextDefTag1);
+        var nextDefTag2 = nextTag(nextDefTag1, UPDATE_TAG_VERSION);
 
         // Save next tag (single) on an unknown object version
         // This is an error, even for tag v1
@@ -316,7 +316,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         var modelTag = dummyTagForObjectType(ObjectType.MODEL);
         var nextModelTag = dummyTag(nextModelDef(modelTag.getDefinition(), UPDATE_HEADER));
-        var nextModelTag2 = nextTag(nextModelTag);
+        var nextModelTag2 = nextTag(nextModelTag, UPDATE_TAG_VERSION);
 
         // Save object 1 version 2, and object 2 version 1
         unwrap(dal.saveNewVersion(TEST_TENANT, nextDefTag1));
@@ -346,7 +346,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
                 .toBuilder()
                 .setHeader(nextHeader);
 
-        var nextTag = nextTag(origTag)
+        var nextTag = nextTag(origTag, UPDATE_TAG_VERSION)
                 .toBuilder()
                 .setDefinition(nextDef)
                 .build();
@@ -363,7 +363,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var origTag2 = dummyTag(origDef2);
         var origId2 = MetadataCodec.decode(origDef2.getHeader().getObjectId());
 
-        var nextTag2 = nextTag(origTag2);
+        var nextTag2 = nextTag(origTag2, UPDATE_TAG_VERSION);
 
         var saveOrig2 = dal.saveNewObject(TEST_TENANT, origTag2);
         var saveTag2 = dal.saveNewTags(TEST_TENANT, Arrays.asList(nextTag, nextTag2));

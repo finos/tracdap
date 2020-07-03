@@ -43,7 +43,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
-        var nextDefTag2 = nextTag(nextDefTag1);
+        var nextDefTag2 = nextTag(nextDefTag1, UPDATE_TAG_VERSION);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         // Save v1 t1, v2 t1, v2 t2
@@ -70,7 +70,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
-        var nextDefTag2 = nextTag(nextDefTag1);
+        var nextDefTag2 = nextTag(nextDefTag1, UPDATE_TAG_VERSION);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         // After save v1t1, latest version = v1t1
@@ -120,7 +120,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         assertEquals(nextDefTag1, v2);
 
         // Save a new tag for object version 1
-        var origDefTag2 = nextTag(origTag);
+        var origDefTag2 = nextTag(origTag, UPDATE_TAG_VERSION);
 
         var v1t2 = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewTag(TEST_TENANT, origDefTag2))
@@ -169,7 +169,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
-        var nextDefTag2 = nextTag(nextDefTag1);
+        var nextDefTag2 = nextTag(nextDefTag1, UPDATE_TAG_VERSION);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         var modelDef = dummyModelDef(INCLUDE_HEADER);
@@ -204,7 +204,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
-        var nextDefTag2 = nextTag(nextDefTag1);
+        var nextDefTag2 = nextTag(nextDefTag1, UPDATE_TAG_VERSION);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         var modelDef = dummyModelDef(INCLUDE_HEADER);
@@ -235,7 +235,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
-        var nextDefTag2 = nextTag(nextDefTag1);
+        var nextDefTag2 = nextTag(nextDefTag1, UPDATE_TAG_VERSION);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
         var modelDef = dummyModelDef(INCLUDE_HEADER);
