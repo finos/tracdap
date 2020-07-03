@@ -4,7 +4,6 @@ import com.accenture.trac.svc.meta.exception.MissingItemError;
 import com.accenture.trac.svc.meta.exception.WrongItemTypeError;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
-import static com.accenture.trac.svc.meta.test.TestData.*;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -14,6 +13,7 @@ import java.util.concurrent.CompletableFuture;
 import com.accenture.trac.svc.meta.test.IDalTestable;
 import com.accenture.trac.svc.meta.test.JdbcH2Impl;
 import com.accenture.trac.svc.meta.test.JdbcMysqlImpl;
+import static com.accenture.trac.svc.meta.test.TestData.*;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -42,7 +42,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
-        var nextDefTag1 = dummyTag(nextDataDef(origDef));
+        var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
         var nextDefTag2 = nextTag(nextDefTag1);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
@@ -69,7 +69,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
-        var nextDefTag1 = dummyTag(nextDataDef(origDef));
+        var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
         var nextDefTag2 = nextTag(nextDefTag1);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
@@ -102,7 +102,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origTag = dummyTag(origDef);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
-        var nextDefTag1 = dummyTag(nextDataDef(origDef));
+        var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
 
         // Save v1 t1, v2 t1
         var future = CompletableFuture.completedFuture(0)
@@ -168,7 +168,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
-        var nextDefTag1 = dummyTag(nextDataDef(origDef));
+        var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
         var nextDefTag2 = nextTag(nextDefTag1);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
@@ -203,7 +203,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
-        var nextDefTag1 = dummyTag(nextDataDef(origDef));
+        var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
         var nextDefTag2 = nextTag(nextDefTag1);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
@@ -234,7 +234,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef);
-        var nextDefTag1 = dummyTag(nextDataDef(origDef));
+        var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
         var nextDefTag2 = nextTag(nextDefTag1);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 

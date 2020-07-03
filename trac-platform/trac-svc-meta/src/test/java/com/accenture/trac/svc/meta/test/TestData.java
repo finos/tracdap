@@ -10,6 +10,9 @@ import java.util.concurrent.ExecutionException;
 
 public class TestData {
 
+    public static final boolean UPDATE_HEADER = true;
+    public static final boolean KEEP_ORIGINAL_HEADER = false;
+
     public static final String TEST_TENANT = "ACME_CORP";
 
     public static ObjectDefinition dummyDefinitionForType(ObjectType objectType) {
@@ -25,6 +28,21 @@ public class TestData {
 
             default:
                 throw new RuntimeException("No dummy data available for object type " + objectType.name());
+        }
+    }
+
+    public static ObjectDefinition dummyVersionForType(ObjectDefinition definition, boolean updateHeader) {
+
+        var objectType = definition.getHeader().getObjectType();
+
+        switch (objectType) {
+
+            case DATA: return nextDataDef(definition, updateHeader);
+            case MODEL: return nextModelDef(definition, updateHeader);
+            case CUSTOM: return nextCustomDef(definition, updateHeader);
+
+            default:
+                throw new RuntimeException("No second version available in dummy data for object type " + objectType.name());
         }
     }
 
@@ -63,26 +81,31 @@ public class TestData {
             .build();
     }
 
-    public static ObjectDefinition nextDataDef(ObjectDefinition origDef) {
+    public static ObjectDefinition nextDataDef(ObjectDefinition origDef, boolean updateHeader) {
 
         if (origDef.getHeader().getObjectType() != ObjectType.DATA || !origDef.hasData())
             throw new RuntimeException("Original object is not a valid data definition");
 
-        return origDef.toBuilder()
-                .mergeHeader(origDef.getHeader()
-                        .toBuilder()
-                        .setObjectVersion(origDef.getHeader().getObjectVersion() + 1)
-                        .build())
+        var defUpdate = origDef.toBuilder()
                 .setData(origDef.getData()
-                        .toBuilder()
-                        .mergeSchema(origDef.getData().getSchema().toBuilder()
-                                .addField(FieldDefinition.newBuilder()
-                                .setFieldName("extra_field")
-                                .setFieldOrder(origDef.getData().getSchema().getFieldCount())
-                                .setFieldType(PrimitiveType.FLOAT)
-                                .setFieldLabel("We got an extra field!")
-                                .setFormatCode("PERCENT")
-                                .build()).build()))
+                .toBuilder()
+                .mergeSchema(origDef.getData().getSchema().toBuilder()
+                    .addField(FieldDefinition.newBuilder()
+                    .setFieldName("extra_field")
+                    .setFieldOrder(origDef.getData().getSchema().getFieldCount())
+                    .setFieldType(PrimitiveType.FLOAT)
+                    .setFieldLabel("We got an extra field!")
+                    .setFormatCode("PERCENT")
+                    .build()).build()));
+
+        if (updateHeader == KEEP_ORIGINAL_HEADER)
+            return defUpdate.build();
+
+        else
+            return defUpdate.mergeHeader(origDef.getHeader()
+                .toBuilder()
+                .setObjectVersion(origDef.getHeader().getObjectVersion() + 1)
+                .build())
                 .build();
     }
 
@@ -121,19 +144,24 @@ public class TestData {
                 .build();
     }
 
-    public static ObjectDefinition nextModelDef(ObjectDefinition origDef) {
+    public static ObjectDefinition nextModelDef(ObjectDefinition origDef, boolean updateHeader) {
 
         if (origDef.getHeader().getObjectType() != ObjectType.MODEL || !origDef.hasModel())
             throw new RuntimeException("Original object is not a valid model definition");
 
-        return origDef.toBuilder()
-                .mergeHeader(origDef.getHeader()
-                        .toBuilder()
-                        .setObjectVersion(origDef.getHeader().getObjectVersion() + 1)
-                        .build())
+        var defUpdate = origDef.toBuilder()
                 .setModel(origDef.getModel()
-                        .toBuilder()
-                        .putParam("param3", ModelParameter.newBuilder().setParamType(PrimitiveType.DATE).build()))
+                .toBuilder()
+                .putParam("param3", ModelParameter.newBuilder().setParamType(PrimitiveType.DATE).build()));
+
+        if (updateHeader == KEEP_ORIGINAL_HEADER)
+            return defUpdate.build();
+
+        else
+            return defUpdate.mergeHeader(origDef.getHeader()
+                .toBuilder()
+                .setObjectVersion(origDef.getHeader().getObjectVersion() + 1)
+                .build())
                 .build();
     }
 
@@ -193,7 +221,7 @@ public class TestData {
 
     public static ObjectDefinition dummyCustomDef() {
 
-        String jsonReportDef = "{ reportType: 'magic', mainGraph: { content: 'more_magic' } }";
+        var jsonReportDef = "{ reportType: 'magic', mainGraph: { content: 'more_magic' } }";
 
         return ObjectDefinition.newBuilder()
                 .setHeader(ObjectHeader.newBuilder()
@@ -205,6 +233,30 @@ public class TestData {
                         .setCustomSchemaVersion(2)
                         .setCustomData(ByteString.copyFromUtf8(jsonReportDef))
                         .build())
+                .build();
+    }
+
+    public static ObjectDefinition nextCustomDef(ObjectDefinition origDef, boolean updateHeader) {
+
+        if (origDef.getHeader().getObjectType() != ObjectType.CUSTOM || !origDef.hasCustom())
+            throw new RuntimeException("Original object is not a valid custom definition");
+
+        var ver = origDef.getHeader().getObjectVersion();
+        var jsonReportDef = "{ reportType: 'magic', mainGraph: { content: 'more_magic_" + ver + " ' } }";
+
+        var defUpdate = origDef.toBuilder()
+                .setCustom(origDef.getCustom()
+                .toBuilder()
+                .setCustomData(ByteString.copyFromUtf8(jsonReportDef)));
+
+        if (updateHeader == KEEP_ORIGINAL_HEADER)
+            return defUpdate.build();
+
+        else
+            return defUpdate.mergeHeader(origDef.getHeader()
+                .toBuilder()
+                .setObjectVersion(origDef.getHeader().getObjectVersion() + 1)
+                .build())
                 .build();
     }
 
