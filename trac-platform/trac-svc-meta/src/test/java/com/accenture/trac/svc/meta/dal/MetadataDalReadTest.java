@@ -40,7 +40,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
     @Test
     void testLoadOneExplicit_ok() throws Exception {
 
-        var origDef = dummyDataDef();
+        var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
         var nextDefTag2 = nextTag(nextDefTag1);
@@ -67,7 +67,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
     @Test
     void testLoadOneLatestVersion_ok() throws Exception {
 
-        var origDef = dummyDataDef();
+        var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
         var nextDefTag2 = nextTag(nextDefTag1);
@@ -98,7 +98,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
     @Test
     void testLoadOneLatestTag_ok() throws Exception {
 
-        var origDef = dummyDataDef();
+        var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
@@ -136,7 +136,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, UUID.randomUUID(), 1)));
         assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestVersion(TEST_TENANT, ObjectType.DATA, UUID.randomUUID())));
 
-        var origDef = dummyDataDef();
+        var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
@@ -152,7 +152,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
     @Test
     void testLoadOne_wrongObjectType() throws Exception {
 
-        var origDef = dummyDataDef();
+        var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
@@ -166,13 +166,13 @@ abstract class MetadataDalReadTest implements IDalTestable {
     @Test
     void testLoadBatchExplicit_ok() throws Exception {
 
-        var origDef = dummyDataDef();
+        var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
         var nextDefTag2 = nextTag(nextDefTag1);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
-        var modelDef = dummyModelDef();
+        var modelDef = dummyModelDef(INCLUDE_HEADER);
         var modelTag = dummyTag(modelDef);
         var modelId = MetadataCodec.decode(modelDef.getHeader().getObjectId());
 
@@ -201,13 +201,13 @@ abstract class MetadataDalReadTest implements IDalTestable {
     @Test
     void testLoadBatchLatestVersion_ok() throws Exception {
 
-        var origDef = dummyDataDef();
+        var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
         var nextDefTag2 = nextTag(nextDefTag1);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
-        var modelDef = dummyModelDef();
+        var modelDef = dummyModelDef(INCLUDE_HEADER);
         var modelTag = dummyTag(modelDef);
         var modelId = MetadataCodec.decode(modelDef.getHeader().getObjectId());
 
@@ -232,13 +232,13 @@ abstract class MetadataDalReadTest implements IDalTestable {
     @Test
     void testLoadBatchLatestTag_ok() throws Exception {
 
-        var origDef = dummyDataDef();
+        var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var nextDefTag1 = dummyTag(nextDataDef(origDef, UPDATE_HEADER));
         var nextDefTag2 = nextTag(nextDefTag1);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
-        var modelDef = dummyModelDef();
+        var modelDef = dummyModelDef(INCLUDE_HEADER);
         var modelTag = dummyTag(modelDef);
         var modelId = MetadataCodec.decode(modelDef.getHeader().getObjectId());
 
@@ -284,7 +284,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         assertThrows(MissingItemError.class, () -> unwrap(loadLatestTags));
         assertThrows(MissingItemError.class, () -> unwrap(loadLatestVersions));
 
-        var origDef = dummyDataDef();
+        var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
@@ -317,11 +317,11 @@ abstract class MetadataDalReadTest implements IDalTestable {
     @Test
     void testLoadBatch_wrongObjectType() throws Exception {
 
-        var origDef = dummyDataDef();
+        var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
-        var origDef2 = dummyModelDef();
+        var origDef2 = dummyModelDef(INCLUDE_HEADER);
         var origTag2 = dummyTag(origDef2);
         var origId2 = MetadataCodec.decode(origDef2.getHeader().getObjectId());
 

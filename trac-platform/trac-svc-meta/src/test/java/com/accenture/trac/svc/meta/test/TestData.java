@@ -10,21 +10,24 @@ import java.util.concurrent.ExecutionException;
 
 public class TestData {
 
+    public static final boolean INCLUDE_HEADER = true;
+    public static final boolean NO_HEADER = false;
+
     public static final boolean UPDATE_HEADER = true;
     public static final boolean KEEP_ORIGINAL_HEADER = false;
 
     public static final String TEST_TENANT = "ACME_CORP";
 
-    public static ObjectDefinition dummyDefinitionForType(ObjectType objectType) {
+    public static ObjectDefinition dummyDefinitionForType(ObjectType objectType, boolean includeHeader) {
 
         switch (objectType) {
 
-            case DATA: return dummyDataDef();
-            case MODEL: return dummyModelDef();
-            case FLOW: return dummyFlowDef();
-            case JOB: return dummyJobDef();
-            case FILE: return dummyFileDef();
-            case CUSTOM: return dummyCustomDef();
+            case DATA: return dummyDataDef(includeHeader);
+            case MODEL: return dummyModelDef(includeHeader);
+            case FLOW: return dummyFlowDef(includeHeader);
+            case JOB: return dummyJobDef(includeHeader);
+            case FILE: return dummyFileDef(includeHeader);
+            case CUSTOM: return dummyCustomDef(includeHeader);
 
             default:
                 throw new RuntimeException("No dummy data available for object type " + objectType.name());
@@ -46,13 +49,36 @@ public class TestData {
         }
     }
 
-    public static ObjectDefinition dummyDataDef() {
+    public static ObjectDefinition newObjectHeader(ObjectType objectType, ObjectDefinition.Builder def, boolean includeHeader) {
 
-        return ObjectDefinition.newBuilder()
-            .setHeader(ObjectHeader.newBuilder()
-                .setObjectType(ObjectType.DATA)
+        if (includeHeader == NO_HEADER)
+            return def.build();
+
+        else
+            return def
+                .setHeader(ObjectHeader.newBuilder()
+                .setObjectType(objectType)
                 .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
                 .setObjectVersion(1))
+                .build();
+    }
+
+    public static ObjectDefinition newVersionHeader(ObjectDefinition.Builder defUpdate, boolean updateHeader) {
+
+        if (updateHeader == KEEP_ORIGINAL_HEADER)
+            return defUpdate.build();
+
+        else
+            return defUpdate.mergeHeader(defUpdate.getHeader()
+                .toBuilder()
+                .setObjectVersion(defUpdate.getHeader().getObjectVersion() + 1)
+                .build())
+                .build();
+    }
+
+    public static ObjectDefinition dummyDataDef(boolean includeHeader) {
+
+        var def = ObjectDefinition.newBuilder()
             .setData(DataDefinition.newBuilder()
             .addStorage("test-storage")
             .setPath("path/to/test/dataset")
@@ -77,8 +103,9 @@ public class TestData {
                         .setFieldName("widgets_ordered")
                         .setFieldType(PrimitiveType.INTEGER)
                         .setFieldOrder(4)
-                        .setBusinessKey(true))))
-            .build();
+                        .setBusinessKey(true))));
+
+        return newObjectHeader(ObjectType.DATA, def, includeHeader);
     }
 
     public static ObjectDefinition nextDataDef(ObjectDefinition origDef, boolean updateHeader) {
@@ -98,24 +125,12 @@ public class TestData {
                     .setFormatCode("PERCENT")
                     .build()).build()));
 
-        if (updateHeader == KEEP_ORIGINAL_HEADER)
-            return defUpdate.build();
-
-        else
-            return defUpdate.mergeHeader(origDef.getHeader()
-                .toBuilder()
-                .setObjectVersion(origDef.getHeader().getObjectVersion() + 1)
-                .build())
-                .build();
+        return newVersionHeader(defUpdate, updateHeader);
     }
 
-    public static ObjectDefinition dummyModelDef() {
+    public static ObjectDefinition dummyModelDef(boolean includeHeader) {
 
-        return ObjectDefinition.newBuilder()
-                .setHeader(ObjectHeader.newBuilder()
-                        .setObjectType(ObjectType.MODEL)
-                        .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
-                        .setObjectVersion(1))
+        var def = ObjectDefinition.newBuilder()
                 .setModel(ModelDefinition.newBuilder()
                 .setLanguage("python")
                 .setRepository("trac-test-repo")
@@ -140,8 +155,9 @@ public class TestData {
                         .addField(FieldDefinition.newBuilder()
                                 .setFieldName("checksum_field")
                                 .setFieldType(PrimitiveType.DECIMAL))
-                        .build()))
-                .build();
+                        .build()));
+
+        return newObjectHeader(ObjectType.MODEL, def, includeHeader);
     }
 
     public static ObjectDefinition nextModelDef(ObjectDefinition origDef, boolean updateHeader) {
@@ -154,24 +170,12 @@ public class TestData {
                 .toBuilder()
                 .putParam("param3", ModelParameter.newBuilder().setParamType(PrimitiveType.DATE).build()));
 
-        if (updateHeader == KEEP_ORIGINAL_HEADER)
-            return defUpdate.build();
-
-        else
-            return defUpdate.mergeHeader(origDef.getHeader()
-                .toBuilder()
-                .setObjectVersion(origDef.getHeader().getObjectVersion() + 1)
-                .build())
-                .build();
+        return newVersionHeader(defUpdate, updateHeader);
     }
 
-    public static ObjectDefinition dummyFlowDef() {
+    public static ObjectDefinition dummyFlowDef(boolean includeHeader) {
 
-        return ObjectDefinition.newBuilder()
-                .setHeader(ObjectHeader.newBuilder()
-                    .setObjectType(ObjectType.FLOW)
-                    .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
-                    .setObjectVersion(1))
+        var def = ObjectDefinition.newBuilder()
                 .setFlow(FlowDefinition.newBuilder()
                     .putNode("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
                     .putNode("main_model", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE).build())
@@ -181,33 +185,31 @@ public class TestData {
                             .setEnd(FlowSocket.newBuilder().setNode("main_model").setSocket("input_1")))
                     .addEdge(FlowEdge.newBuilder()
                             .setStart(FlowSocket.newBuilder().setNode("main_model").setSocket("output_1"))
-                            .setEnd(FlowSocket.newBuilder().setNode("output_1"))))
-                .build();
+                            .setEnd(FlowSocket.newBuilder().setNode("output_1"))));
+
+        return newObjectHeader(ObjectType.FLOW, def, includeHeader);
     }
 
-    public static ObjectDefinition dummyJobDef() {
+    public static ObjectDefinition dummyJobDef(boolean includeHeader) {
 
         // Job will be invalid because the model ID it points to does not exist!
         // Ok for e.g. DAL testing, but will fail metadata validation
 
-        return ObjectDefinition.newBuilder()
+        var def = ObjectDefinition.newBuilder()
                 .setHeader(ObjectHeader.newBuilder()
                     .setObjectType(ObjectType.JOB)
                     .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
                     .setObjectVersion(1))
                 .setJob(JobDefinition.newBuilder()
                         .setJobType(JobType.RUN_MODEL)
-                        .setTargetId(MetadataCodec.encode(UUID.randomUUID())))
-                .build();
+                        .setTargetId(MetadataCodec.encode(UUID.randomUUID())));
+
+        return newObjectHeader(ObjectType.JOB, def, includeHeader);
     }
 
-    public static ObjectDefinition dummyFileDef() {
+    public static ObjectDefinition dummyFileDef(boolean includeHeader) {
 
-        return ObjectDefinition.newBuilder()
-                .setHeader(ObjectHeader.newBuilder()
-                        .setObjectType(ObjectType.DATA)
-                        .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
-                        .setObjectVersion(1))
+        var def = ObjectDefinition.newBuilder()
                 .setFile(FileDefinition.newBuilder()
                         .addStorage("test-storage")
                         .setStoragePath("<preallocated_id>/contents/magic_template.xlsx")
@@ -215,15 +217,16 @@ public class TestData {
                         .setExtension("docx")
                         .setSize(45285)
                         .setMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                        .build())
-                .build();
+                        .build());
+
+        return newObjectHeader(ObjectType.FILE, def, includeHeader);
     }
 
-    public static ObjectDefinition dummyCustomDef() {
+    public static ObjectDefinition dummyCustomDef(boolean includeHeader) {
 
         var jsonReportDef = "{ reportType: 'magic', mainGraph: { content: 'more_magic' } }";
 
-        return ObjectDefinition.newBuilder()
+        var def = ObjectDefinition.newBuilder()
                 .setHeader(ObjectHeader.newBuilder()
                         .setObjectType(ObjectType.DATA)
                         .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
@@ -232,8 +235,9 @@ public class TestData {
                         .setCustomType("REPORT")
                         .setCustomSchemaVersion(2)
                         .setCustomData(ByteString.copyFromUtf8(jsonReportDef))
-                        .build())
-                .build();
+                        .build());
+
+        return newObjectHeader(ObjectType.CUSTOM, def, includeHeader);
     }
 
     public static ObjectDefinition nextCustomDef(ObjectDefinition origDef, boolean updateHeader) {
@@ -249,15 +253,7 @@ public class TestData {
                 .toBuilder()
                 .setCustomData(ByteString.copyFromUtf8(jsonReportDef)));
 
-        if (updateHeader == KEEP_ORIGINAL_HEADER)
-            return defUpdate.build();
-
-        else
-            return defUpdate.mergeHeader(origDef.getHeader()
-                .toBuilder()
-                .setObjectVersion(origDef.getHeader().getObjectVersion() + 1)
-                .build())
-                .build();
+        return newVersionHeader(defUpdate, updateHeader);
     }
 
     public static Tag dummyTag(ObjectDefinition definition) {
@@ -290,10 +286,10 @@ public class TestData {
     public static Tag dummyTagForObjectType(ObjectType objectType) {
 
         if (objectType == ObjectType.DATA)
-            return dummyTag(dummyDataDef());
+            return dummyTag(dummyDataDef(INCLUDE_HEADER));
 
         if (objectType == ObjectType.MODEL)
-            return dummyTag(dummyModelDef());
+            return dummyTag(dummyModelDef(INCLUDE_HEADER));
 
         throw new RuntimeException("Object type not supported for test data: " + objectType.name());
     }

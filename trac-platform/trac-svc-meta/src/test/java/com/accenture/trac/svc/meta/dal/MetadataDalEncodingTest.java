@@ -35,7 +35,7 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
     @Test
     void roundTrip_oneObjectTypeOk() throws Exception {
 
-        var origDef = dummyDataDef();
+        var origDef = dummyDataDef(INCLUDE_HEADER);
         var origTag = dummyTag(origDef);
         var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
 
