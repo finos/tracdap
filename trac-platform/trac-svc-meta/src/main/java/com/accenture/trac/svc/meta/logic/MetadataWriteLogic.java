@@ -83,9 +83,27 @@ public class MetadataWriteLogic {
 
         var definition = tag.getDefinition();
 
-        // TODO: Validation
+        if (!definition.hasHeader())
+            throw new InputValidationError("Object header must be null when saving a new object");
 
         var priorHeader = definition.getHeader();
+
+        if (priorHeader.getObjectType() == ObjectType.UNRECOGNIZED ||
+                !priorHeader.hasObjectId() ||
+                priorHeader.getObjectVersion() < OBJECT_FIRST_VERSION)
+
+            throw new InputValidationError("Object header must contain a valid type, ID and version");
+
+        if (priorHeader.getObjectType() != objectType)
+            throw new InputValidationError(String.format(
+                    "Incorrect object type (expected %s, got %s)",
+                    objectType, priorHeader.getObjectType()));
+
+        if (tag.getTagVersion() < TAG_FIRST_VERSION)
+            throw new InputValidationError("Tag must contain a valid tag version");
+
+        // TODO: Validation
+
         var priorVersion = priorHeader.getObjectVersion();
         var objectId = MetadataCodec.decode(priorHeader.getObjectId());
         var objectVersion = priorVersion + 1;
@@ -116,9 +134,27 @@ public class MetadataWriteLogic {
 
         var definition = tag.getDefinition();
 
-        // TODO: Validation
+        if (!definition.hasHeader())
+            throw new InputValidationError("Object header must be null when saving a new object");
 
         var header = definition.getHeader();
+
+        if (header.getObjectType() == ObjectType.UNRECOGNIZED ||
+            !header.hasObjectId() ||
+            header.getObjectVersion() < OBJECT_FIRST_VERSION)
+
+            throw new InputValidationError("Object header must contain a valid type, ID and version");
+
+        if (header.getObjectType() != objectType)
+            throw new InputValidationError(String.format(
+                    "Incorrect object type (expected %s, got %s)",
+                    objectType, header.getObjectType()));
+
+        if (tag.getTagVersion() < TAG_FIRST_VERSION)
+            throw new InputValidationError("Tag must contain a valid tag version");
+
+        // TODO: Validation
+
         var objectId = MetadataCodec.decode(header.getObjectId());
         var objectVersion = header.getObjectVersion();
 
