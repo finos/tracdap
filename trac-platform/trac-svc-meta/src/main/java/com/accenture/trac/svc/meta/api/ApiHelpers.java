@@ -79,6 +79,7 @@ public class ApiHelpers {
 
     private static final Map<Class<?>, Status.Code> ERROR_MAPPING = Map.of(
 
+            AuthorisationError.class, Status.Code.PERMISSION_DENIED,
             InputValidationError.class, Status.Code.INVALID_ARGUMENT,
 
             MissingItemError.class, Status.Code.NOT_FOUND,

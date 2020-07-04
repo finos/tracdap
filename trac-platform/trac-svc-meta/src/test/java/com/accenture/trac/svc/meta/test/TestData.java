@@ -24,18 +24,17 @@ public class TestData {
 
     public static ObjectDefinition dummyDefinitionForType(ObjectType objectType, boolean includeHeader) {
 
-        switch (objectType) {
+        return switch (objectType) {
 
-            case DATA: return dummyDataDef(includeHeader);
-            case MODEL: return dummyModelDef(includeHeader);
-            case FLOW: return dummyFlowDef(includeHeader);
-            case JOB: return dummyJobDef(includeHeader);
-            case FILE: return dummyFileDef(includeHeader);
-            case CUSTOM: return dummyCustomDef(includeHeader);
+            case DATA -> dummyDataDef(includeHeader);
+            case MODEL -> dummyModelDef(includeHeader);
+            case FLOW -> dummyFlowDef(includeHeader);
+            case JOB -> dummyJobDef(includeHeader);
+            case FILE -> dummyFileDef(includeHeader);
+            case CUSTOM -> dummyCustomDef(includeHeader);
 
-            default:
-                throw new RuntimeException("No dummy data available for object type " + objectType.name());
-        }
+            default -> throw new RuntimeException("No dummy data available for object type " + objectType.name());
+        };
     }
 
     public static Tag dummyTagForObjectType(ObjectType objectType) {
@@ -45,17 +44,22 @@ public class TestData {
 
     public static ObjectDefinition dummyVersionForType(ObjectDefinition definition, boolean updateHeader) {
 
+        // Not all object types have semantics defined for versioning
+        // It is sometimes helpful to create versions anyway for testing
+        // E.g. to test that version increments are rejected for objects that don't support versioning!
+
         var objectType = definition.getHeader().getObjectType();
 
-        switch (objectType) {
+        return switch (objectType) {
 
-            case DATA: return nextDataDef(definition, updateHeader);
-            case MODEL: return nextModelDef(definition, updateHeader);
-            case CUSTOM: return nextCustomDef(definition, updateHeader);
+            case DATA -> nextDataDef(definition, updateHeader);
+            case MODEL -> nextModelDef(definition, updateHeader);
+            case CUSTOM -> nextCustomDef(definition, updateHeader);
 
-            default:
-                throw new RuntimeException("No second version available in dummy data for object type " + objectType.name());
-        }
+            case FLOW, JOB, FILE -> definition;
+
+            default -> throw new RuntimeException("No second version available in dummy data for object type " + objectType.name());
+        };
     }
 
     public static ObjectDefinition newObjectHeader(ObjectType objectType, ObjectDefinition.Builder def, boolean includeHeader) {

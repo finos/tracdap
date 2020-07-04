@@ -1,11 +1,12 @@
 package com.accenture.trac.svc.meta.logic;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.regex.Pattern;
 
 
 public class MetadataConstants {
+
+    public static final boolean TRUSTED_API = true;
+    public static final boolean PUBLIC_API = false;
 
     public static final int OBJECT_FIRST_VERSION = 1;
     public static final int TAG_FIRST_VERSION = 1;
@@ -19,5 +20,5 @@ public class MetadataConstants {
 
     // Identifiers starting trac_ are reserved for use by the TRAC platform
 
-    public static final Pattern TRAC_RESERVED_IDENTIFIER = Pattern.compile("^trac_", Pattern.CASE_INSENSITIVE);
+    public static final Pattern TRAC_RESERVED_IDENTIFIER = Pattern.compile("\\Atrac_.*", Pattern.CASE_INSENSITIVE);
 }

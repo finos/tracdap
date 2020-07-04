@@ -14,6 +14,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import static com.accenture.trac.svc.meta.logic.MetadataConstants.PUBLIC_API;
+
 
 public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataPublicWriteApiImplBase {
 
@@ -44,7 +46,7 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
                 return CompletableFuture.failedFuture(status.asRuntimeException());
             }
 
-            var saveResult = writeLogic.saveNewObject(tenant, objectType, tag, MetadataWriteLogic.PUBLIC);
+            var saveResult = writeLogic.saveNewObject(tenant, objectType, tag, PUBLIC_API);
 
             var idResponse = saveResult
                     .thenApply(objectId -> IdResponse.newBuilder()
@@ -72,7 +74,7 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
                 return CompletableFuture.failedFuture(status.asRuntimeException());
             }
 
-            var saveResult = writeLogic.saveNewVersion(tenant, objectType, tag);
+            var saveResult = writeLogic.saveNewVersion(tenant, objectType, tag, PUBLIC_API);
 
             var idResponse = saveResult
                     .thenApply(objectVersion -> IdResponse.newBuilder()
@@ -94,7 +96,7 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
             var objectType = request.getObjectType();
             var tag = request.getTag();
 
-            var saveResult = writeLogic.saveNewTag(tenant, objectType, tag);
+            var saveResult = writeLogic.saveNewTag(tenant, objectType, tag, PUBLIC_API);
 
             var idResponse = saveResult
                     .thenApply(tagVersion -> IdResponse.newBuilder()

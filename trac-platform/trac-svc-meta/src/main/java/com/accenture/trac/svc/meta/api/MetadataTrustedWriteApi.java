@@ -7,6 +7,8 @@ import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
 import io.grpc.stub.StreamObserver;
 
+import static com.accenture.trac.svc.meta.logic.MetadataConstants.TRUSTED_API;
+
 
 public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.MetadataTrustedWriteApiImplBase {
 
@@ -25,7 +27,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
             var objectType = request.getObjectType();
             var tag = request.getTag();
 
-            var saveResult = writeLogic.saveNewObject(tenant, objectType, tag, MetadataWriteLogic.TRUSTED);
+            var saveResult = writeLogic.saveNewObject(tenant, objectType, tag, TRUSTED_API);
 
             var idResponse = saveResult
                     .thenApply(objectId -> IdResponse.newBuilder()
@@ -47,7 +49,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
             var objectType = request.getObjectType();
             var tag = request.getTag();
 
-            var saveResult = writeLogic.saveNewVersion(tenant, objectType, tag);
+            var saveResult = writeLogic.saveNewVersion(tenant, objectType, tag, TRUSTED_API);
 
             var idResponse = saveResult
                     .thenApply(objectVersion -> IdResponse.newBuilder()
@@ -69,7 +71,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
             var objectType = request.getObjectType();
             var tag = request.getTag();
 
-            var saveResult = writeLogic.saveNewTag(tenant, objectType, tag);
+            var saveResult = writeLogic.saveNewTag(tenant, objectType, tag, TRUSTED_API);
 
             var idResponse = saveResult
                     .thenApply(tagVersion -> IdResponse.newBuilder()
