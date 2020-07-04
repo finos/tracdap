@@ -196,13 +196,15 @@ public class MetadataWriteApiTest implements IDalTestable {
     @Test
     void saveNewObject_wrongType() {
 
+        // Make sure both types are allowed on the public API, so we don't get permission denied
+
         var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM, TestData.NO_HEADER);
         var tagToSave = TestData.dummyTag(objToSave);
 
         // Request to save a MODEL, even though the definition is for DATA
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
+                .setObjectType(ObjectType.FLOW)
                 .setTag(tagToSave)
                 .build();
 
@@ -251,7 +253,33 @@ public class MetadataWriteApiTest implements IDalTestable {
     }
 
     @Test
-    void saveNewObject_controlledAttrs() {
+    void saveNewObject_invalidAttrs() {
+
+        var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM, TestData.NO_HEADER);
+        var validTag = TestData.dummyTag(objToSave);
+
+        var invalidTag = validTag.toBuilder()
+                .putAttr("${escape_key}", PrimitiveValue.newBuilder().setType(PrimitiveType.FLOAT).setFloatValue(1.0).build())
+                .build();
+
+        // Request to save a MODEL, even though the definition is for DATA
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.CUSTOM)
+                .setTag(invalidTag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
+    }
+
+    @Test
+    void saveNewObject_reservedAttrs() {
 
         var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM, TestData.NO_HEADER);
         var validTag = TestData.dummyTag(objToSave);
@@ -492,6 +520,8 @@ public class MetadataWriteApiTest implements IDalTestable {
     @Test
     void saveNewVersion_wrongType() {
 
+        // Make sure both types are allowed on the public API, so we don't get permission denied
+
         var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
 
         var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), TestData.KEEP_ORIGINAL_HEADER);
@@ -499,7 +529,7 @@ public class MetadataWriteApiTest implements IDalTestable {
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
+                .setObjectType(ObjectType.FLOW)
                 .setTag(v2Tag)
                 .build();
 
@@ -619,7 +649,7 @@ public class MetadataWriteApiTest implements IDalTestable {
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.CUSTOM)
+                .setObjectType(ObjectType.DATA)
                 .setTag(v2Tag)
                 .build();
 
@@ -633,7 +663,34 @@ public class MetadataWriteApiTest implements IDalTestable {
     }
 
     @Test
-    void saveNewVersion_controlledAttrs() {
+    void saveNewVersion_invalidAttrs() {
+
+        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
+
+        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), TestData.KEEP_ORIGINAL_HEADER);
+        var v2Tag = TestData.dummyTag(v2Obj);
+
+        var v2ControlledTag = v2Tag.toBuilder()
+                .putAttr("very\nbroken.attr", PrimitiveValue.newBuilder().setType(PrimitiveType.FLOAT).setFloatValue(1.0).build())
+                .build();
+
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.CUSTOM)
+                .setTag(v2ControlledTag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(v2WriteRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(v2WriteRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
+    }
+
+    @Test
+    void saveNewVersion_reservedAttrs() {
 
         var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
 
@@ -644,7 +701,7 @@ public class MetadataWriteApiTest implements IDalTestable {
                 .putAttr("trac_anything_reserved", PrimitiveValue.newBuilder().setType(PrimitiveType.FLOAT).setFloatValue(1.0).build())
                 .build();
 
-        var writeRequest = MetadataWriteRequest.newBuilder()
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
                 .setTag(v2ControlledTag)
@@ -653,10 +710,10 @@ public class MetadataWriteApiTest implements IDalTestable {
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(v2WriteRequest));
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
 
-        assertDoesNotThrow(() -> trustedApi.saveNewVersion(writeRequest));
+        assertDoesNotThrow(() -> trustedApi.saveNewVersion(v2WriteRequest));
     }
 
 
@@ -766,7 +823,7 @@ public class MetadataWriteApiTest implements IDalTestable {
                 .setTag(v1t2Tag)
                 .build();
 
-        var v1t2IdResponse = trustedApi.saveNewVersion(v1t2WriteRequest);
+        var v1t2IdResponse = trustedApi.saveNewTag(v1t2WriteRequest);
 
         assertEquals(v1Header.getObjectId(), v1t2IdResponse.getObjectId());
         assertEquals(1, v1t2IdResponse.getObjectVersion());
@@ -846,13 +903,15 @@ public class MetadataWriteApiTest implements IDalTestable {
     @Test
     void saveNewTag_wrongType() {
 
+        // Make sure both types are allowed on the public API, so we don't get permission denied
+
         var v1SavedTag = saveNewVersion_prepareV1(ObjectType.DATA);
 
         var t2Tag = TestData.nextTag(v1SavedTag, KEEP_ORIGINAL_TAG_VERSION);
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
+                .setObjectType(ObjectType.FLOW)
                 .setTag(t2Tag)
                 .build();
 
@@ -972,7 +1031,33 @@ public class MetadataWriteApiTest implements IDalTestable {
     }
 
     @Test
-    void saveNewTag_controlledAttrs() {
+    void saveNewTag_invalidAttrs() {
+
+        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
+
+        var t2Tag = TestData.nextTag(v1SavedTag, KEEP_ORIGINAL_TAG_VERSION);
+
+        var t2ControlledTag = t2Tag.toBuilder()
+                .putAttr("no-hyphens", PrimitiveValue.newBuilder().setType(PrimitiveType.FLOAT).setFloatValue(1.0).build())
+                .build();
+
+        var t2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.CUSTOM)
+                .setTag(t2ControlledTag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(t2WriteRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(t2WriteRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
+    }
+
+    @Test
+    void saveNewTag_reservedAttrs() {
 
         var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
 
