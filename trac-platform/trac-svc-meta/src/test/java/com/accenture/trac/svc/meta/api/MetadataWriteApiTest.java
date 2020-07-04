@@ -218,6 +218,7 @@ public class MetadataWriteApiTest implements IDalTestable {
     }
 
     @Test
+    @Disabled("Object definition content validation is not implemented yet")
     void saveNewObject_invalidContent() {
 
         var validFlow = TestData.dummyFlowDef(TestData.NO_HEADER);
@@ -624,6 +625,7 @@ public class MetadataWriteApiTest implements IDalTestable {
     }
 
     @Test
+    @Disabled("Object definition content validation is not implemented yet")
     void saveNewVersion_invalidContent() {
 
         // V1 object created and saved
