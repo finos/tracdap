@@ -22,9 +22,10 @@ import org.junit.Rule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
-import static com.accenture.trac.svc.meta.test.TestData.NO_HEADER;
-import static com.accenture.trac.svc.meta.test.TestData.TEST_TENANT;
+import static com.accenture.trac.svc.meta.test.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -72,15 +73,16 @@ class MetadataReadApiTest implements IDalTestable {
                 grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
     }
 
-    @Test
-    void loadTag_ok() {
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED"})
+    void loadTag_ok(ObjectType objectType) {
 
-        var origObj = TestData.dummyDefinitionForType(ObjectType.DATA, NO_HEADER);
+        var origObj = TestData.dummyDefinitionForType(objectType, NO_HEADER);
         var origTag = TestData.dummyTag(origObj);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
+                .setObjectType(objectType)
                 .setTag(origTag)
                 .build();
 
@@ -89,15 +91,132 @@ class MetadataReadApiTest implements IDalTestable {
 
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setObjectType(objectType)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(1)
+                .setTagVersion(1)
+                .build();
+
+        var savedTag = readApi.loadTag(readRequest);
+
+        var expectedTag = origTag.toBuilder()
+                .setDefinition(origObj.toBuilder()
+                .setHeader(ObjectHeader.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(1)))
+                .setTagVersion(1)
+                .build();
+
+        assertEquals(objectId, MetadataCodec.decode(savedTag.getDefinition().getHeader().getObjectId()));
+        assertEquals(expectedTag, savedTag);
+    }
+
+    @Test
+    void loadTag_versioningOk() {
+
+        var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA, NO_HEADER);
+        var v1Tag = TestData.dummyTag(v1Obj);
+
+        var v1WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(v1Tag)
+                .build();
+
+        var idResponse = writeApi.saveNewObject(v1WriteRequest);
+        var objectId = MetadataCodec.decode(idResponse.getObjectId());
+
+        var v1ObjWithHeader = v1Obj.toBuilder()
+                .setHeader(ObjectHeader.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(1))
+                .build();
+
+        var v1TagWithHeader = v1Tag.toBuilder()
+                .setTagVersion(1)
+                .setDefinition(v1ObjWithHeader)
+                .build();
+
+        var v2Obj = TestData.dummyVersionForType(v1ObjWithHeader, TestData.KEEP_ORIGINAL_HEADER);
+        var v2Tag = TestData.dummyTag(v2Obj);
+        var t2Tag = TestData.nextTag(v1TagWithHeader, KEEP_ORIGINAL_TAG_VERSION);
+
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(v2Tag)
+                .build();
+
+        var t2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(t2Tag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.saveNewVersion(v2WriteRequest);
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.saveNewTag(t2WriteRequest);
+
+        var v1ReadRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setObjectId(MetadataCodec.encode(objectId))
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
-        var tag = readApi.loadTag(readRequest);
+        var v2ReadRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(2)
+                .setTagVersion(1)
+                .build();
 
-        assertEquals(objectId, MetadataCodec.decode(tag.getDefinition().getHeader().getObjectId()));
+        var t2ReadRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(1)
+                .setTagVersion(2)
+                .build();
+
+        var v1TagSaved = readApi.loadTag(v1ReadRequest);
+        var v2TagSaved = readApi.loadTag(v2ReadRequest);
+        var t2TagSaved = readApi.loadTag(t2ReadRequest);
+
+        var expectedHeader = ObjectHeader.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(MetadataCodec.encode(objectId));
+
+        var v1TagExpected = v1Tag.toBuilder()
+                .setDefinition(v1Obj.toBuilder()
+                .setHeader(expectedHeader
+                .setObjectVersion(1)))
+                .setTagVersion(1)
+                .build();
+
+        var v2TagExpected = v2Tag.toBuilder()
+                .setDefinition(v2Obj.toBuilder()
+                .setHeader(expectedHeader
+                .setObjectVersion(2)))
+                .setTagVersion(1)
+                .build();
+
+        var t2TagExpected = t2Tag.toBuilder()
+                .setDefinition(v1Obj.toBuilder()
+                .setHeader(expectedHeader
+                .setObjectVersion(1)))
+                .setTagVersion(2)
+                .build();
+
+        assertEquals(v1TagExpected, v1TagSaved);
+        assertEquals(v2TagExpected, v2TagSaved);
+        assertEquals(t2TagExpected, t2TagSaved);
     }
 
     @Test
