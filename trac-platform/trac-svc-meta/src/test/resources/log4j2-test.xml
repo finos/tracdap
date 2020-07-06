@@ -6,7 +6,9 @@
 
         <Appender type="Console" name="STDOUT">
             <Layout type="PatternLayout">
-                <Pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%t] %c - %msg%n</Pattern>
+                <Pattern>
+                    %d{yyyy-MM-dd HH:mm:ss.SSS} %highlight{%-5level} [%-16t] %cyan{%c{1.}} - %msg%n
+                </Pattern>
             </Layout>
         </Appender>
 
