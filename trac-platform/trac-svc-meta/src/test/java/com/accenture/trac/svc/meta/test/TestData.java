@@ -24,17 +24,18 @@ public class TestData {
 
     public static ObjectDefinition dummyDefinitionForType(ObjectType objectType, boolean includeHeader) {
 
-        return switch (objectType) {
+        switch (objectType) {
 
-            case DATA -> dummyDataDef(includeHeader);
-            case MODEL -> dummyModelDef(includeHeader);
-            case FLOW -> dummyFlowDef(includeHeader);
-            case JOB -> dummyJobDef(includeHeader);
-            case FILE -> dummyFileDef(includeHeader);
-            case CUSTOM -> dummyCustomDef(includeHeader);
+            case DATA: return dummyDataDef(includeHeader);
+            case MODEL: return dummyModelDef(includeHeader);
+            case FLOW: return dummyFlowDef(includeHeader);
+            case JOB: return dummyJobDef(includeHeader);
+            case FILE: return dummyFileDef(includeHeader);
+            case CUSTOM: return dummyCustomDef(includeHeader);
 
-            default -> throw new RuntimeException("No dummy data available for object type " + objectType.name());
-        };
+            default:
+                throw new RuntimeException("No dummy data available for object type " + objectType.name());
+        }
     }
 
     public static Tag dummyTagForObjectType(ObjectType objectType) {
@@ -50,16 +51,20 @@ public class TestData {
 
         var objectType = definition.getHeader().getObjectType();
 
-        return switch (objectType) {
+        switch (objectType) {
 
-            case DATA -> nextDataDef(definition, updateHeader);
-            case MODEL -> nextModelDef(definition, updateHeader);
-            case CUSTOM -> nextCustomDef(definition, updateHeader);
+            case DATA: return nextDataDef(definition, updateHeader);
+            case MODEL: return nextModelDef(definition, updateHeader);
+            case CUSTOM: return nextCustomDef(definition, updateHeader);
 
-            case FLOW, JOB, FILE -> definition;
+            case FLOW:
+            case JOB:
+            case FILE:
+                return definition;
 
-            default -> throw new RuntimeException("No second version available in dummy data for object type " + objectType.name());
-        };
+            default:
+                throw new RuntimeException("No second version available in dummy data for object type " + objectType.name());
+        }
     }
 
     public static ObjectDefinition newObjectHeader(ObjectType objectType, ObjectDefinition.Builder def, boolean includeHeader) {
