@@ -35,23 +35,35 @@ public class MetadataReadApi extends MetadataReadApiGrpc.MetadataReadApiImplBase
             var objectVersion = request.getObjectVersion();
             var tagVersion = request.getTagVersion();
 
-            return logic.readTag(tenant, objectType, objectId, objectVersion, tagVersion);
+            return logic.loadTag(tenant, objectType, objectId, objectVersion, tagVersion);
         });
     }
 
     @Override
     public void loadLatestTag(MetadataReadRequest request, StreamObserver<Tag> responseObserver) {
 
-        log.warning(() -> String.format("API request: %s", request.getTenant()));
-        responseObserver.onError(new RuntimeException("Not implemented"));
+        ApiHelpers.wrapUnaryCall(responseObserver, () -> {
+
+            var tenant = request.getTenant();
+            var objectType = request.getObjectType();
+            var objectId = MetadataCodec.decode(request.getObjectId());
+            var objectVersion = request.getObjectVersion();
+
+            return logic.loadLatestTag(tenant, objectType, objectId, objectVersion);
+        });
     }
 
     @Override
     public void loadLatestObject(MetadataReadRequest request, StreamObserver<Tag> responseObserver) {
 
-        log.warning(() -> String.format("API request: %s", request.getTenant()));
-        responseObserver.onError(new RuntimeException("Not implemented"));
-    }
+        ApiHelpers.wrapUnaryCall(responseObserver, () -> {
 
+            var tenant = request.getTenant();
+            var objectType = request.getObjectType();
+            var objectId = MetadataCodec.decode(request.getObjectId());
+
+            return logic.loadLatestObject(tenant, objectType, objectId);
+        });
+    }
 
 }

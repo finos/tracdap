@@ -345,12 +345,8 @@ class MetadataReadApiTest implements IDalTestable {
 
         var t2SavedTag = readApi.loadLatestTag(readRequest);
 
-        var t2ExpectedTag = origTag.toBuilder()
-                .setDefinition(origObj.toBuilder()
-                .setHeader(ObjectHeader.newBuilder()
-                .setObjectType(objectType)
-                .setObjectId(MetadataCodec.encode(objectId))
-                .setObjectVersion(1)))
+        var t2ExpectedTag = t2Tag.toBuilder()
+                .setDefinition(savedTag.getDefinition())
                 .setTagVersion(2)
                 .build();
 
@@ -572,11 +568,11 @@ class MetadataReadApiTest implements IDalTestable {
         // noinspection ResultOfMethodCallIgnored
         writeApi.saveNewVersion(v2WriteRequest);
 
-        var v2SavedTag = readApi.loadLatestTag(readRequest);
+        var v2SavedTag = readApi.loadLatestObject(readRequest);
 
         var v2ExpectedTag = v2Tag.toBuilder()
                 .setDefinition(v2Obj.toBuilder()
-                .setHeader(ObjectHeader.newBuilder()
+                .setHeader(v2Obj.getHeader().toBuilder()
                 .setObjectVersion(2)))
                 .setTagVersion(1)
                 .build();
@@ -663,7 +659,7 @@ class MetadataReadApiTest implements IDalTestable {
 
         // Read second version of object, should be V2 T1
 
-        var v2TagSaved = readApi.loadLatestTag(readRequest);
+        var v2TagSaved = readApi.loadLatestObject(readRequest);
 
         var v2TagExpected = v2Tag.toBuilder()
                 .setDefinition(v2Obj.toBuilder()
@@ -687,7 +683,7 @@ class MetadataReadApiTest implements IDalTestable {
         // noinspection ResultOfMethodCallIgnored
         writeApi.saveNewTag(t3WriteRequest);
 
-        v2TagSaved = readApi.loadLatestTag(readRequest);
+        v2TagSaved = readApi.loadLatestObject(readRequest);
         assertEquals(v2TagExpected, v2TagSaved);
     }
 

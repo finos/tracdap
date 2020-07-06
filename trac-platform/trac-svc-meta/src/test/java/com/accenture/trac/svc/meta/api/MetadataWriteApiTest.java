@@ -473,7 +473,7 @@ public class MetadataWriteApiTest implements IDalTestable {
         trustedApi.saveNewVersion(v2WriteRequest);
 
         var v2Latest = readApi.loadLatestObject(readRequest);
-        assertEquals(2, v1Latest.getDefinition().getHeader().getObjectVersion());
+        assertEquals(2, v2Latest.getDefinition().getHeader().getObjectVersion());
 
         var v3Obj = TestData.dummyVersionForType(v2Latest.getDefinition(), TestData.KEEP_ORIGINAL_HEADER);
         var v3Tag = TestData.dummyTag(v3Obj);

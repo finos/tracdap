@@ -16,10 +16,24 @@ public class MetadataReadLogic {
         this.dal = dal;
     }
 
-    public CompletableFuture<Tag> readTag(
+    public CompletableFuture<Tag> loadTag(
             String tenant, ObjectType objectType,
             UUID objectId, int objectVersion, int tagVersion) {
 
         return dal.loadTag(tenant, objectType, objectId, objectVersion, tagVersion);
+    }
+
+    public CompletableFuture<Tag> loadLatestTag(
+            String tenant, ObjectType objectType,
+            UUID objectId, int objectVersion) {
+
+        return dal.loadLatestTag(tenant, objectType, objectId, objectVersion);
+    }
+
+    public CompletableFuture<Tag> loadLatestObject(
+            String tenant, ObjectType objectType,
+            UUID objectId) {
+
+        return dal.loadLatestVersion(tenant, objectType, objectId);
     }
 }
