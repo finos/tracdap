@@ -20,6 +20,7 @@ import io.grpc.testing.GrpcCleanupRule;
 
 import org.junit.Rule;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -307,52 +308,434 @@ class MetadataReadApiTest implements IDalTestable {
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
-    @Test
-    void loadLatestTag_ok() {
-        fail();
-    }
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED"})
+    void loadLatestTag_ok(ObjectType objectType) {
 
-    @Test
-    void loadLatestTag_linkedDefinitions() {
-        fail();
+        var origObj = TestData.dummyDefinitionForType(objectType, NO_HEADER);
+        var origTag = TestData.dummyTag(origObj);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(objectType)
+                .setTag(origTag)
+                .build();
+
+        var idResponse = writeApi.saveNewObject(writeRequest);
+        var objectId = MetadataCodec.decode(idResponse.getObjectId());
+
+        var readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(objectType)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(1)
+                .build();
+
+        var savedTag = readApi.loadLatestTag(readRequest);
+
+        var t2Tag = TestData.nextTag(savedTag, KEEP_ORIGINAL_TAG_VERSION);
+        var t2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(objectType)
+                .setTag(t2Tag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.saveNewTag(t2WriteRequest);
+
+        var t2SavedTag = readApi.loadLatestTag(readRequest);
+
+        var t2ExpectedTag = origTag.toBuilder()
+                .setDefinition(origObj.toBuilder()
+                .setHeader(ObjectHeader.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(1)))
+                .setTagVersion(2)
+                .build();
+
+        assertEquals(2, t2SavedTag.getTagVersion());
+        assertEquals(t2ExpectedTag, t2SavedTag);
     }
     
     @Test
-    void loadLatestTag_oldObject() {
-        fail();
+    void loadLatestTag_versioningOk() {
+
+        // Save first version
+
+        var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA, NO_HEADER);
+        var v1Tag = TestData.dummyTag(v1Obj);
+
+        var v1WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(v1Tag)
+                .build();
+
+        var idResponse = writeApi.saveNewObject(v1WriteRequest);
+        var objectId = MetadataCodec.decode(idResponse.getObjectId());
+
+        var v1ObjWithHeader = v1Obj.toBuilder()
+                .setHeader(ObjectHeader.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(1))
+                .build();
+
+        var v1TagWithHeader = v1Tag.toBuilder()
+                .setTagVersion(1)
+                .setDefinition(v1ObjWithHeader)
+                .build();
+
+        // Read first version back, should be T1
+
+        var v1ReadRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(1)
+                .build();
+
+        var v1TagSaved = readApi.loadLatestTag(v1ReadRequest);
+        assertEquals(v1TagWithHeader, v1TagSaved);
+
+        // Save second tag on first version
+
+        var t2Tag = TestData.nextTag(v1TagWithHeader, KEEP_ORIGINAL_TAG_VERSION);
+
+        var t2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(t2Tag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.saveNewTag(t2WriteRequest);
+
+        // Read first version back, should be T2
+
+        var t2TagExpected = t2Tag.toBuilder()
+                .setTagVersion(2)
+                .build();
+
+        var t2TagSaved = readApi.loadLatestTag(v1ReadRequest);
+        assertEquals(t2TagExpected, t2TagSaved);
+
+        // Save second version of object
+
+        var v2Obj = TestData.dummyVersionForType(v1ObjWithHeader, TestData.KEEP_ORIGINAL_HEADER);
+        var v2Tag = TestData.dummyTag(v2Obj);
+
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(v2Tag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.saveNewVersion(v2WriteRequest);
+
+        // Read second version of object, should be V2 T1
+
+        var v2ReadRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(2)
+                .build();
+
+        var v2TagSaved = readApi.loadLatestTag(v2ReadRequest);
+
+        var v2TagExpected = v2Tag.toBuilder()
+                .setDefinition(v2Obj.toBuilder()
+                .setHeader(v2Obj.getHeader().toBuilder()
+                .setObjectVersion(2)))
+                .setTagVersion(1)
+                .build();
+
+        assertEquals(v2TagExpected, v2TagSaved);
+
+        // Now load latest tag on V1 again, should still be V1 T2
+
+        t2TagSaved = readApi.loadLatestTag(v1ReadRequest);
+        assertEquals(t2TagExpected, t2TagSaved);
     }
 
     @Test
     void loadLatestTag_missingItems() {
-        fail();
+
+        // Random object ID, does not exist at all
+
+        var readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setObjectId(MetadataCodec.encode(java.util.UUID.randomUUID()))
+                .setObjectVersion(1)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestTag(readRequest));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
+
+        // Create an object to test with
+
+        var origObj = TestData.dummyDefinitionForType(ObjectType.MODEL, NO_HEADER);
+        var origTag = TestData.dummyTag(origObj);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setTag(origTag)
+                .build();
+
+        var idResponse = writeApi.saveNewObject(writeRequest);
+        var objectId = MetadataCodec.decode(idResponse.getObjectId());
+
+        // Try to read a non-existent version
+
+        var v2ReadRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(2)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestTag(v2ReadRequest));
+        assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
     }
 
     @Test
     void loadLatestTag_wrongType() {
-        fail();
+
+        var origObj = TestData.dummyDefinitionForType(ObjectType.DATA, NO_HEADER);
+        var origTag = TestData.dummyTag(origObj);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(origTag)
+                .build();
+
+        var idResponse = writeApi.saveNewObject(writeRequest);
+        var objectId = MetadataCodec.decode(idResponse.getObjectId());
+
+        var readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(1)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestTag(readRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
-    
-    @Test
-    void loadLatestObject_ok() {
-        fail();
+
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE, names = {
+            "DATA",
+            "CUSTOM"})
+    void loadLatestObject_ok(ObjectType objectType) {
+
+        // This test only applied for objects that support versioning
+
+        var origObj = TestData.dummyDefinitionForType(objectType, NO_HEADER);
+        var origTag = TestData.dummyTag(origObj);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(objectType)
+                .setTag(origTag)
+                .build();
+
+        var idResponse = writeApi.saveNewObject(writeRequest);
+        var objectId = MetadataCodec.decode(idResponse.getObjectId());
+
+        var readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(objectType)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(1)
+                .build();
+
+        var savedTag = readApi.loadLatestObject(readRequest);
+
+        var v2Obj = TestData.dummyVersionForType(savedTag.getDefinition(), KEEP_ORIGINAL_HEADER);
+        var v2Tag = TestData.dummyTag(v2Obj);
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(objectType)
+                .setTag(v2Tag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.saveNewVersion(v2WriteRequest);
+
+        var v2SavedTag = readApi.loadLatestTag(readRequest);
+
+        var v2ExpectedTag = v2Tag.toBuilder()
+                .setDefinition(v2Obj.toBuilder()
+                .setHeader(ObjectHeader.newBuilder()
+                .setObjectVersion(2)))
+                .setTagVersion(1)
+                .build();
+
+        assertEquals(2, v2SavedTag.getDefinition().getHeader().getObjectVersion());
+        assertEquals(v2ExpectedTag, v2SavedTag);
     }
 
     @Test
-    void loadLatestObject_linkedDefinitions() {
-        fail();
+    void loadLatestObject_versionsOk() {
+
+        // Save first version
+
+        var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA, NO_HEADER);
+        var v1Tag = TestData.dummyTag(v1Obj);
+
+        var v1WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(v1Tag)
+                .build();
+
+        var idResponse = writeApi.saveNewObject(v1WriteRequest);
+        var objectId = MetadataCodec.decode(idResponse.getObjectId());
+
+        var v1ObjWithHeader = v1Obj.toBuilder()
+                .setHeader(ObjectHeader.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(1))
+                .build();
+
+        var v1TagWithHeader = v1Tag.toBuilder()
+                .setTagVersion(1)
+                .setDefinition(v1ObjWithHeader)
+                .build();
+
+        // Read first version back, should be V1 T1
+
+        var readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .build();
+
+        var v1TagSaved = readApi.loadLatestObject(readRequest);
+        assertEquals(v1TagWithHeader, v1TagSaved);
+
+        // Save second tag on first version
+
+        var t2Tag = TestData.nextTag(v1TagWithHeader, KEEP_ORIGINAL_TAG_VERSION);
+
+        var t2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(t2Tag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.saveNewTag(t2WriteRequest);
+
+        // Read first version back, should be T2
+
+        var t2TagExpected = t2Tag.toBuilder()
+                .setTagVersion(2)
+                .build();
+
+        var t2TagSaved = readApi.loadLatestObject(readRequest);
+        assertEquals(t2TagExpected, t2TagSaved);
+
+        // Save second version of object
+
+        var v2Obj = TestData.dummyVersionForType(v1ObjWithHeader, TestData.KEEP_ORIGINAL_HEADER);
+        var v2Tag = TestData.dummyTag(v2Obj);
+
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(v2Tag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.saveNewVersion(v2WriteRequest);
+
+        // Read second version of object, should be V2 T1
+
+        var v2TagSaved = readApi.loadLatestTag(readRequest);
+
+        var v2TagExpected = v2Tag.toBuilder()
+                .setDefinition(v2Obj.toBuilder()
+                .setHeader(v2Obj.getHeader().toBuilder()
+                .setObjectVersion(2)))
+                .setTagVersion(1)
+                .build();
+
+        assertEquals(v2TagExpected, v2TagSaved);
+
+        // Now save V1 T3, latest object should still be V2 T1
+
+        var t3Tag = TestData.nextTag(t2TagExpected, KEEP_ORIGINAL_TAG_VERSION);
+
+        var t3WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(t3Tag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.saveNewTag(t3WriteRequest);
+
+        v2TagSaved = readApi.loadLatestTag(readRequest);
+        assertEquals(v2TagExpected, v2TagSaved);
     }
 
     @Test
     void loadLatestObject_missingItems() {
-        fail();
+
+        // Random object ID, does not exist at all
+
+        var readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setObjectId(MetadataCodec.encode(java.util.UUID.randomUUID()))
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestObject(readRequest));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
+
     }
 
     @Test
     void loadLatestObject_wrongType() {
-        fail();
+
+        var origObj = TestData.dummyDefinitionForType(ObjectType.DATA, NO_HEADER);
+        var origTag = TestData.dummyTag(origObj);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(origTag)
+                .build();
+
+        var idResponse = writeApi.saveNewObject(writeRequest);
+        var objectId = MetadataCodec.decode(idResponse.getObjectId());
+
+        var readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestObject(readRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
+    @Disabled("Preallocation not implemented yet")
     void loadPreallocatedButNotSaved() {
         fail();
     }
