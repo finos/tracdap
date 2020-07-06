@@ -283,6 +283,9 @@ class MetadataReadApiTest implements IDalTestable {
     @Test
     void loadTag_wrongType() {
 
+        // This should result in a failed pre-condition,
+        // because failure depends on the contents of the metadata store
+
         var origObj = TestData.dummyDefinitionForType(ObjectType.DATA, NO_HEADER);
         var origTag = TestData.dummyTag(origObj);
 
@@ -305,7 +308,7 @@ class MetadataReadApiTest implements IDalTestable {
 
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadTag(readRequest));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
     }
 
     @ParameterizedTest
@@ -504,6 +507,9 @@ class MetadataReadApiTest implements IDalTestable {
     @Test
     void loadLatestTag_wrongType() {
 
+        // This should result in a failed pre-condition,
+        // because failure depends on the contents of the metadata store
+
         var origObj = TestData.dummyDefinitionForType(ObjectType.DATA, NO_HEADER);
         var origTag = TestData.dummyTag(origObj);
 
@@ -525,7 +531,7 @@ class MetadataReadApiTest implements IDalTestable {
 
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestTag(readRequest));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
     }
 
     @ParameterizedTest
@@ -707,6 +713,9 @@ class MetadataReadApiTest implements IDalTestable {
     @Test
     void loadLatestObject_wrongType() {
 
+        // This should result in a failed pre-condition,
+        // because failure depends on the contents of the metadata store
+
         var origObj = TestData.dummyDefinitionForType(ObjectType.DATA, NO_HEADER);
         var origTag = TestData.dummyTag(origObj);
 
@@ -727,7 +736,7 @@ class MetadataReadApiTest implements IDalTestable {
 
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestObject(readRequest));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
     }
 
     @Test

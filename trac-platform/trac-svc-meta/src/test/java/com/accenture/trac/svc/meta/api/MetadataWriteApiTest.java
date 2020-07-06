@@ -194,7 +194,9 @@ public class MetadataWriteApiTest implements IDalTestable {
     }
 
     @Test
-    void saveNewObject_wrongType() {
+    void saveNewObject_inconsistentType() {
+
+        // This test is about sending an invalid request, i.e. the payload does not match the write request
 
         // Make sure both types are allowed on the public API, so we don't get permission denied
 
@@ -519,7 +521,9 @@ public class MetadataWriteApiTest implements IDalTestable {
     }
 
     @Test
-    void saveNewVersion_wrongType() {
+    void saveNewVersion_inconsistentType() {
+
+        // This test is about sending an invalid request, i.e. the payload does not match the write request
 
         // Make sure both types are allowed on the public API, so we don't get permission denied
 
@@ -541,6 +545,38 @@ public class MetadataWriteApiTest implements IDalTestable {
         // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
+    }
+
+    @Test
+    void saveNewVersion_wrongType() {
+
+        // This test is about mis-matched types between versions, e.g. V1 is CUSTOM, V2 is DATA
+        // This counts as a pre-condition failure rather than invalid input,
+        // because it depends on existing data in the metadata store
+
+        // Currently only testing the trusted API, as public does not support two types with versioning
+
+        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
+
+        var v2HeaderPreSave = v1SavedTag.getDefinition().getHeader()
+                .toBuilder()
+                .setObjectType(ObjectType.DATA);
+
+        var v2Obj = TestData.dummyDataDef(NO_HEADER).toBuilder()
+                .setHeader(v2HeaderPreSave)
+                .build();
+
+        var v2Tag = TestData.dummyTag(v2Obj);
+
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(v2Tag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(v2WriteRequest));
+        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
     }
 
     @Test
@@ -903,7 +939,9 @@ public class MetadataWriteApiTest implements IDalTestable {
     }
 
     @Test
-    void saveNewTag_wrongType() {
+    void saveNewTag_inconsistentType() {
+
+        // This test is about sending an invalid request, i.e. the payload does not match the write request
 
         // Make sure both types are allowed on the public API, so we don't get permission denied
 
@@ -924,6 +962,40 @@ public class MetadataWriteApiTest implements IDalTestable {
         // noinspection ResultOfMethodCallIgnored
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewTag(t2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
+    }
+
+
+
+    @Test
+    void saveNewTag_wrongType() {
+
+        // This test is about mis-matched types between versions, e.g. V1 is CUSTOM, V2 is DATA
+        // This counts as a pre-condition failure rather than invalid input,
+        // because it depends on existing data in the metadata store
+
+        // Currently only testing the trusted API, as public does not support two types with versioning
+
+        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
+
+        var t2HeaderPreSave = v1SavedTag.getDefinition().getHeader()
+                .toBuilder()
+                .setObjectType(ObjectType.DATA);
+
+        var t2Obj = TestData.dummyDataDef(NO_HEADER).toBuilder()
+                .setHeader(t2HeaderPreSave)
+                .build();
+
+        var t2Tag = TestData.dummyTag(t2Obj);
+
+        var t2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(t2Tag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewTag(t2WriteRequest));
+        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
     }
 
     @Test

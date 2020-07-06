@@ -84,8 +84,6 @@ public class ApiHelpers {
 
             MissingItemError.class, Status.Code.NOT_FOUND,
             DuplicateItemError.class, Status.Code.ALREADY_EXISTS,
-            WrongItemTypeError.class, Status.Code.INVALID_ARGUMENT  //,
-
-            // CorruptItemError.class, Status.Code.INVALID_ARGUMENT
+            WrongItemTypeError.class, Status.Code.FAILED_PRECONDITION
     );
 }
