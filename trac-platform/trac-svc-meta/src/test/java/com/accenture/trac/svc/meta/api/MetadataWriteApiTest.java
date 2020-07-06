@@ -149,6 +149,11 @@ public class MetadataWriteApiTest implements IDalTestable {
                 .setHeader(expectedHeader)
                 .build();
 
+        var expectedTag = tagToSave.toBuilder()
+                .setTagVersion(1)
+                .setDefinition(expectedObj)
+                .build();
+
         MetadataReadRequest readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
@@ -158,11 +163,8 @@ public class MetadataWriteApiTest implements IDalTestable {
                 .build();
 
         var tagFromStore = readApi.loadTag(readRequest);
-        var objFromStore = tagFromStore.getDefinition();
 
-        assertEquals(expectedObj, objFromStore);
-
-        // TODO: Tag comparison
+        assertEquals(expectedTag, tagFromStore);
     }
 
     @Test
@@ -399,6 +401,11 @@ public class MetadataWriteApiTest implements IDalTestable {
                 .setHeader(expectedHeader)
                 .build();
 
+        var expectedTag = v2Tag.toBuilder()
+                .setTagVersion(1)
+                .setDefinition(expectedObj)
+                .build();
+
         MetadataReadRequest readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
@@ -408,11 +415,8 @@ public class MetadataWriteApiTest implements IDalTestable {
                 .build();
 
         var tagFromStore = readApi.loadTag(readRequest);
-        var objFromStore = tagFromStore.getDefinition();
 
-        assertEquals(expectedObj, objFromStore);
-
-        // TODO: Tag comparison
+        assertEquals(expectedTag, tagFromStore);
     }
 
     Tag saveNewVersion_prepareV1(ObjectType objectType) {
