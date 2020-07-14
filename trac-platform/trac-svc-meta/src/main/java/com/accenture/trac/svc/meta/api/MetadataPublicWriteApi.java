@@ -5,9 +5,9 @@ import com.accenture.trac.common.api.meta.MetadataPublicWriteApiGrpc;
 import com.accenture.trac.common.api.meta.MetadataWriteRequest;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
+import com.accenture.trac.common.util.ApiWrapper;
 import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
 import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 
 import java.util.Arrays;
@@ -25,16 +25,18 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
             ObjectType.FLOW,
             ObjectType.CUSTOM);
 
+    private final ApiWrapper apiWrapper;
     private final MetadataWriteLogic writeLogic;
 
     public MetadataPublicWriteApi(MetadataWriteLogic writeLogic) {
+        this.apiWrapper = new ApiWrapper(getClass(), ApiErrorMapping.ERROR_MAPPING);
         this.writeLogic = writeLogic;
     }
 
     @Override
     public void saveNewObject(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
 
-        ApiHelpers.wrapUnaryCall(responseObserver, () -> {
+        apiWrapper.unaryCall(responseObserver, () -> {
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
@@ -62,7 +64,7 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
     @Override
     public void saveNewVersion(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
 
-        ApiHelpers.wrapUnaryCall(responseObserver, () -> {
+        apiWrapper.unaryCall(responseObserver, () -> {
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
@@ -90,7 +92,7 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
     @Override
     public void saveNewTag(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
 
-        ApiHelpers.wrapUnaryCall(responseObserver, () -> {
+        apiWrapper.unaryCall(responseObserver, () -> {
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();

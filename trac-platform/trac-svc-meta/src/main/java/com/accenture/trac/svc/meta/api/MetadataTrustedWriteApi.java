@@ -4,6 +4,7 @@ import com.accenture.trac.common.api.meta.IdResponse;
 import com.accenture.trac.common.api.meta.MetadataTrustedWriteApiGrpc;
 import com.accenture.trac.common.api.meta.MetadataWriteRequest;
 import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.util.ApiWrapper;
 import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
 import io.grpc.stub.StreamObserver;
 
@@ -12,16 +13,18 @@ import static com.accenture.trac.svc.meta.logic.MetadataConstants.TRUSTED_API;
 
 public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.MetadataTrustedWriteApiImplBase {
 
+    private final ApiWrapper apiWrapper;
     private final MetadataWriteLogic writeLogic;
 
     public MetadataTrustedWriteApi(MetadataWriteLogic writeLogic) {
+        this.apiWrapper = new ApiWrapper(getClass(), ApiErrorMapping.ERROR_MAPPING);
         this.writeLogic = writeLogic;
     }
 
     @Override
     public void saveNewObject(MetadataWriteRequest request, StreamObserver<IdResponse> response) {
 
-        ApiHelpers.wrapUnaryCall(response, () -> {
+        apiWrapper.unaryCall(response, () -> {
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
@@ -43,7 +46,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
     @Override
     public void saveNewVersion(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
 
-        ApiHelpers.wrapUnaryCall(responseObserver, () -> {
+        apiWrapper.unaryCall(responseObserver, () -> {
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
@@ -65,7 +68,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
     @Override
     public void saveNewTag(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
 
-        ApiHelpers.wrapUnaryCall(responseObserver, () -> {
+        apiWrapper.unaryCall(responseObserver, () -> {
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();

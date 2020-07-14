@@ -1,10 +1,11 @@
-package com.accenture.trac.svc.meta.api;
+package com.accenture.trac.common.util;
 
-import com.accenture.trac.svc.meta.exception.*;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -12,20 +13,39 @@ import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 
 
-public class ApiHelpers {
+public class ApiWrapper {
 
-    public static <T> void wrapUnaryCall(StreamObserver<T> response, Supplier<CompletableFuture<T>> futureFunc) {
+    private final Logger log;
+
+    private final Map<Class<? extends Throwable>, Status.Code> errorMapping;
+
+    public ApiWrapper(Class<?> apiClass, Map<Class<? extends Throwable>, Status.Code> errorMapping) {
+        this.log = LoggerFactory.getLogger(apiClass);
+        this.errorMapping = errorMapping;
+    }
+
+    public <T> void unaryCall(StreamObserver<T> response, Supplier<CompletableFuture<T>> futureFunc) {
+
+        var stack = StackWalker.getInstance();
+        var method = stack.walk(frames -> frames.skip(1).findFirst());
+        var methodName = method.isPresent() ? method.get().getMethodName() : "(unknown API method)";
 
         try {
+
+            log.info("API CALL START: {}", methodName);
 
             futureFunc.get().handle((result, error) -> {
 
                 if (result != null) {
 
+                    log.info("API CALL SUCCEEDED: {}", methodName);
+
                     response.onNext(result);
                     response.onCompleted();
                 }
                 else {
+
+                    log.error("API CALL FAILED: {}", methodName);
 
                     mapErrorResponse(response, error);
                 }
@@ -35,11 +55,13 @@ public class ApiHelpers {
         }
         catch (Exception error) {
 
+            log.error("API CALL FAILED: {}", methodName);
+
             mapErrorResponse(response, error);
         }
     }
 
-    public static <T> void mapErrorResponse(StreamObserver<T> response, Throwable error) {
+    private <T> void mapErrorResponse(StreamObserver<T> response, Throwable error) {
 
         // Error already as a GRPC status, top level API classes may do this
         if (error instanceof StatusRuntimeException || error instanceof StatusException) {
@@ -60,10 +82,10 @@ public class ApiHelpers {
         }
     }
 
-    public static <T> void mapUnwrappedErrorResponse(StreamObserver<T> response, Throwable error) {
+    private <T> void mapUnwrappedErrorResponse(StreamObserver<T> response, Throwable error) {
 
         var statusCode = error != null
-                ? ERROR_MAPPING.getOrDefault(error.getClass(), Status.Code.UNKNOWN)
+                ? errorMapping.getOrDefault(error.getClass(), Status.Code.UNKNOWN)
                 : Status.Code.UNKNOWN;
 
         var errorMessage = statusCode == Status.Code.UNKNOWN
@@ -76,14 +98,4 @@ public class ApiHelpers {
 
         response.onError(status.asRuntimeException());
     }
-
-    private static final Map<Class<?>, Status.Code> ERROR_MAPPING = Map.of(
-
-            AuthorisationError.class, Status.Code.PERMISSION_DENIED,
-            InputValidationError.class, Status.Code.INVALID_ARGUMENT,
-
-            MissingItemError.class, Status.Code.NOT_FOUND,
-            DuplicateItemError.class, Status.Code.ALREADY_EXISTS,
-            WrongItemTypeError.class, Status.Code.FAILED_PRECONDITION
-    );
 }
