@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 
@@ -88,14 +87,16 @@ public class InterfaceLogging implements InvocationHandler {
                 log.info("SUCCEEDED: {}", method.getName());
                 return x;
             })
-            .exceptionallyCompose(e -> {
+            .exceptionally(e -> {
 
-                if (e instanceof CompletionException)
+                if (e instanceof CompletionException) {
                     log.error("FAILED: {} {}", method.getName(), e.getCause().getMessage(), e.getCause());
-                else
+                    throw (CompletionException) e;
+                }
+                else {
                     log.error("FAILED: {} {}", method.getName(), e.getMessage(), e);
-
-                return CompletableFuture.failedFuture(e);
+                    throw new CompletionException(e);
+                }
             });
     }
 }
