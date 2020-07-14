@@ -3,6 +3,8 @@ package com.accenture.trac.svc.meta.test;
 import ch.vorburger.mariadb4j.DB;
 import ch.vorburger.mariadb4j.DBConfiguration;
 import ch.vorburger.mariadb4j.DBConfigurationBuilder;
+import com.accenture.trac.common.util.InterfaceLogging;
+import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
 import com.mysql.cj.jdbc.MysqlDataSource;
@@ -85,11 +87,12 @@ public class JdbcMysqlImpl implements BeforeAllCallback, BeforeEachCallback, Aft
 
         this.dal = dal;
 
-        var instance = context.getTestInstance();
+        var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
+        var testInstance = context.getTestInstance();
 
-        if (instance.isPresent()) {
-            var testCase = (IDalTestable) instance.get();
-            testCase.setDal(dal);
+        if (testInstance.isPresent()) {
+            var testCase = (IDalTestable) testInstance.get();
+            testCase.setDal(dalWithLogging);
         }
     }
 
