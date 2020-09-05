@@ -4,13 +4,13 @@ package trac.metadata;
 option java_package = "com.accenture.trac.common.metadata";
 option java_multiple_files = true;
 
-import "trac/metadata/primitive.proto";
+import "trac/metadata/type.proto";
 
 
 message FileDefinition {
 
   repeated string storage = 1;
-  map<string, PrimitiveValue> storageInfo = 2;
+  map<string, Value> storageInfo = 2;
   string storagePath = 3;
 
   string name = 4;

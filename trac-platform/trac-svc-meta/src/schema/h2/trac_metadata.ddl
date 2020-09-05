@@ -49,6 +49,9 @@ create table tag (
     definition_fk bigint not null,
     tag_version int not null,
 
+    -- Duplicate fields from object ID/definition tables so they are available for searching
+    object_type varchar(16) not null,
+
     constraint pk_tag primary key (tag_pk),
     constraint fk_tag_definition foreign key (definition_fk) references object_definition (definition_pk),
     constraint fk_tag_tenant foreign key (tenant_id) references tenant (tenant_id)
@@ -64,21 +67,21 @@ create table tag_attr (
 
     attr_name varchar(256) not null,
     attr_type varchar(16) not null,
+    attr_index int not null,
 
     attr_value_boolean boolean null,
     attr_value_integer bigint null,
     attr_value_float double null,
-    attr_value_decimal decimal null,
     attr_value_string varchar(4096) null,
+    attr_value_decimal decimal (31, 10) null,
     attr_value_date date null,
-    attr_value_datetime timestamp null,
-    attr_value_datetime_zone varchar(16) null,
+    attr_value_datetime timestamp (6) null,
 
     constraint fk_attr_tag foreign key (tag_fk) references tag (tag_pk),
     constraint fk_attr_tenant foreign key (tenant_id) references tenant (tenant_id)
 );
 
-create unique index idx_attr_unq on tag_attr (tenant_id, tag_fk, attr_name);
+create unique index idx_attr_unq on tag_attr (tenant_id, tag_fk, attr_name, attr_index);
 
 
 create table latest_version (

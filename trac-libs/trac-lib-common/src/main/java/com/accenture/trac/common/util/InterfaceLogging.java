@@ -4,6 +4,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.*;
+import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 
@@ -75,7 +77,11 @@ public class InterfaceLogging implements InvocationHandler {
 
         // Do not log full contents of generated protobuf classes, they can be big!
         if (arg instanceof com.google.protobuf.Message)
-            return String.format("(%s)", arg.getClass());
+            return String.format("(metadata %s)", arg.getClass().getSimpleName());
+
+        // Do not log the contents of collections either!
+        if (arg instanceof Collection)
+            return String.format("(collection %s, size=%d)", arg.getClass().getSimpleName(), ((Collection<?>) arg).size());
 
         return arg.toString();
     }

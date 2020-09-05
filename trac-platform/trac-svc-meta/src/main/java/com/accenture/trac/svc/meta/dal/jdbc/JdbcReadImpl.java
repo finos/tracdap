@@ -3,11 +3,11 @@ package com.accenture.trac.svc.meta.dal.jdbc;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcBaseDal.KeyedItem;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.MessageLite;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -40,7 +40,7 @@ class JdbcReadImpl {
                 var objectTypeCode = rs.getString(2);
                 var objectType = ObjectType.valueOf(objectTypeCode);
 
-                if (!rs.last())
+                if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
                 return new KeyedItem<>(objectPk, objectType);
@@ -113,7 +113,7 @@ class JdbcReadImpl {
 
             // TODO: Encode / decode helper, type = protobuf | json ?
 
-            if (!rs.last())
+            if (rs.next())
                 throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
             return new KeyedItem<>(defPk, version, defDecoded);
@@ -176,14 +176,14 @@ class JdbcReadImpl {
             var tagVersion = rs.getInt(2);
             var tagStub = Tag.newBuilder().setTagVersion(tagVersion);
 
-            if (!rs.last())
+            if (rs.next())
                 throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
             return new KeyedItem<>(tagPk, tagVersion, tagStub);
         }
     }
 
-    Map<String, PrimitiveValue>
+    Map<String, Value>
     readTagAttrs(Connection conn, short tenantId, long tagPk) throws SQLException {
 
         var query =
@@ -198,14 +198,41 @@ class JdbcReadImpl {
 
             try (var rs = stmt.executeQuery()) {
 
-                var attrs = new HashMap<String, PrimitiveValue>();
+                var attrs = new HashMap<String, Value>();
+
+                var currentAttrArray = new ArrayList<Value>();
+                var currentAttrName = "";
 
                 while (rs.next()) {
 
                     var attrName = rs.getString("attr_name");
-                    var attrValue = JdbcReadHelpers.readAttrValue(rs);
+                    var attrIndex = rs.getInt("attr_index");
+                    var attrValue = JdbcAttrHelpers.readAttrValue(rs);
 
-                    attrs.put(attrName, attrValue);
+                    // Check to see if we have finished processing a multi-valued attr
+                    // If so, record it against the last attr name before moving on
+                    if (!currentAttrArray.isEmpty() && !attrName.equals(currentAttrName)) {
+
+                        var arrayValue = JdbcAttrHelpers.assembleArrayValue(currentAttrArray);
+                        attrs.put(currentAttrName, arrayValue);
+
+                        currentAttrArray = new ArrayList<>();
+                    }
+
+                    // Update current attr name
+                    currentAttrName = attrName;
+
+                    // Accumulate the current attr record
+                    if (attrIndex < 0)
+                        attrs.put(attrName, attrValue);
+                    else
+                        currentAttrArray.add(attrValue);
+                }
+
+                // Check in case the last attr record was part of a multi-valued attr
+                if (!currentAttrArray.isEmpty()) {
+                    var arrayValue = JdbcAttrHelpers.assembleArrayValue(currentAttrArray);
+                    attrs.put(currentAttrName, arrayValue);
                 }
 
                 return attrs;

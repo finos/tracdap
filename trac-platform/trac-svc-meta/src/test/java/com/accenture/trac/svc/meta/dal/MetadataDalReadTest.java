@@ -5,14 +5,14 @@ import com.accenture.trac.svc.meta.exception.WrongItemTypeError;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
 
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.accenture.trac.svc.meta.test.IDalTestable;
 import com.accenture.trac.svc.meta.test.JdbcH2Impl;
-import com.accenture.trac.svc.meta.test.JdbcMysqlImpl;
+import com.accenture.trac.svc.meta.test.JdbcMariaDbImpl;
 import static com.accenture.trac.svc.meta.test.TestData.*;
 
 import org.junit.jupiter.api.Tag;
@@ -33,9 +33,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
     static class JdbcH2 extends MetadataDalReadTest {}
 
     @Tag("integration")
-    @Tag("int-mysql")
-    @ExtendWith(JdbcMysqlImpl.class)
-    static class JdbcMysql extends MetadataDalReadTest {}
+    @Tag("int-mariadb")
+    @ExtendWith(JdbcMariaDbImpl.class)
+    static class JdbcMariaDB extends MetadataDalReadTest {}
 
     @Test
     void testLoadOneExplicit_ok() throws Exception {
@@ -128,6 +128,24 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         assertEquals(origDefTag2, unwrap(v1t2));
     }
+    
+    @Test
+    void testLoadOne_multiValuedAttr() throws Exception {
+
+        var origDef = dummyDataDef(INCLUDE_HEADER);
+        var origTag = addMultiValuedAttr(dummyTag(origDef));
+        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
+
+        unwrap(dal.saveNewObject(TEST_TENANT, origTag));
+
+        var explicit = unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1));
+        var latestTag = unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 1));
+        var latestVersion = unwrap(dal.loadLatestVersion(TEST_TENANT, ObjectType.DATA, origId));
+
+        assertEquals(origTag, explicit);
+        assertEquals(origTag, latestTag);
+        assertEquals(origTag, latestVersion);
+    }
 
     @Test
     void testLoadOne_missingItems() throws Exception {
@@ -185,10 +203,10 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         unwrap(future);
 
-        var types = Arrays.asList(ObjectType.DATA, ObjectType.DATA, ObjectType.DATA, ObjectType.MODEL);
-        var ids = Arrays.asList(origId, origId, origId, modelId);
-        var versions = Arrays.asList(1, 2, 2, 1);
-        var tagVersions = Arrays.asList(1, 1, 2, 1);
+        var types = List.of(ObjectType.DATA, ObjectType.DATA, ObjectType.DATA, ObjectType.MODEL);
+        var ids = List.of(origId, origId, origId, modelId);
+        var versions = List.of(1, 2, 2, 1);
+        var tagVersions = List.of(1, 1, 2, 1);
 
         var result = unwrap(dal.loadTags(TEST_TENANT, types, ids, versions, tagVersions));
 
@@ -220,8 +238,8 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         unwrap(future);
 
-        var types = Arrays.asList(ObjectType.DATA, ObjectType.MODEL);
-        var ids = Arrays.asList(origId, modelId);
+        var types = List.of(ObjectType.DATA, ObjectType.MODEL);
+        var ids = List.of(origId, modelId);
 
         var result = unwrap(dal.loadLatestVersions(TEST_TENANT, types, ids));
 
@@ -251,15 +269,47 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         unwrap(future);
 
-        var types = Arrays.asList(ObjectType.DATA, ObjectType.DATA, ObjectType.MODEL);
-        var ids = Arrays.asList(origId, origId, modelId);
-        var versions = Arrays.asList(1, 2, 1);
+        var types = List.of(ObjectType.DATA, ObjectType.DATA, ObjectType.MODEL);
+        var ids = List.of(origId, origId, modelId);
+        var versions = List.of(1, 2, 1);
 
         var result = unwrap(dal.loadLatestTags(TEST_TENANT, types, ids, versions));
 
         assertEquals(origTag, result.get(0));
         assertEquals(nextDefTag2, result.get(1));
         assertEquals(modelTag, result.get(2));
+    }
+
+    @Test
+    void testLoadBatch_multiValuedAttr() throws Exception {
+
+        var origDef = dummyDataDef(INCLUDE_HEADER);
+        var origTag = addMultiValuedAttr(dummyTag(origDef));
+        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
+
+        var modelDef = dummyModelDef(INCLUDE_HEADER);
+        var modelTag = addMultiValuedAttr(dummyTag(modelDef));
+        var modelId = MetadataCodec.decode(modelDef.getHeader().getObjectId());
+
+        unwrap(dal.saveNewObject(TEST_TENANT, origTag));
+        unwrap(dal.saveNewObject(TEST_TENANT, modelTag));
+
+        var types = List.of(ObjectType.DATA, ObjectType.MODEL);
+        var ids = List.of(origId, modelId);
+        var versions = List.of(1, 1);
+        var tagVersions = List.of(1, 1);
+
+        var explicit = unwrap(dal.loadTags(TEST_TENANT, types, ids, versions, tagVersions));
+        var latestTag = unwrap(dal.loadLatestTags(TEST_TENANT, types, ids, versions));
+        var latestVersion = unwrap(dal.loadLatestVersions(TEST_TENANT, types, ids));
+
+        assertEquals(origTag, explicit.get(0));
+        assertEquals(origTag, latestTag.get(0));
+        assertEquals(origTag, latestVersion.get(0));
+
+        assertEquals(modelTag, explicit.get(1));
+        assertEquals(modelTag, latestTag.get(1));
+        assertEquals(modelTag, latestVersion.get(1));
     }
 
     @Test
@@ -325,22 +375,22 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origTag2 = dummyTag(origDef2);
         var origId2 = MetadataCodec.decode(origDef2.getHeader().getObjectId());
 
-        unwrap(dal.saveNewObjects(TEST_TENANT, Arrays.asList(origTag, origTag2)));
+        unwrap(dal.saveNewObjects(TEST_TENANT, List.of(origTag, origTag2)));
 
         var loadTags = dal.loadTags(TEST_TENANT,
-                Arrays.asList(ObjectType.DATA, ObjectType.DATA),
-                Arrays.asList(origId, origId2),
-                Arrays.asList(1, 1),
-                Arrays.asList(1, 1));
+                List.of(ObjectType.DATA, ObjectType.DATA),
+                List.of(origId, origId2),
+                List.of(1, 1),
+                List.of(1, 1));
 
         var loadLatestTags = dal.loadLatestTags(TEST_TENANT,
-                Arrays.asList(ObjectType.DATA, ObjectType.DATA),
-                Arrays.asList(origId, origId2),
-                Arrays.asList(1, 1));
+                List.of(ObjectType.DATA, ObjectType.DATA),
+                List.of(origId, origId2),
+                List.of(1, 1));
 
         var loadLatestVersions = dal.loadLatestVersions(TEST_TENANT,
-                Arrays.asList(ObjectType.DATA, ObjectType.DATA),
-                Arrays.asList(origId, origId2));
+                List.of(ObjectType.DATA, ObjectType.DATA),
+                List.of(origId, origId2));
 
         assertThrows(WrongItemTypeError.class, () -> unwrap(loadTags));
         assertThrows(WrongItemTypeError.class, () -> unwrap(loadLatestTags));

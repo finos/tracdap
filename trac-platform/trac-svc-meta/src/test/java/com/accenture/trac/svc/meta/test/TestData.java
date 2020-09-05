@@ -3,6 +3,7 @@ package com.accenture.trac.svc.meta.test;
 import com.accenture.trac.common.metadata.*;
 import com.google.protobuf.ByteString;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -105,22 +106,22 @@ public class TestData {
             .setSchema(TableDefinition.newBuilder()
                 .addField(FieldDefinition.newBuilder()
                         .setFieldName("transaction_id")
-                        .setFieldType(PrimitiveType.STRING)
+                        .setFieldType(BasicType.STRING)
                         .setFieldOrder(1)
                         .setBusinessKey(true))
                 .addField(FieldDefinition.newBuilder()
                         .setFieldName("customer_id")
-                        .setFieldType(PrimitiveType.STRING)
+                        .setFieldType(BasicType.STRING)
                         .setFieldOrder(2)
                         .setBusinessKey(true))
                 .addField(FieldDefinition.newBuilder()
                         .setFieldName("order_date")
-                        .setFieldType(PrimitiveType.DATE)
+                        .setFieldType(BasicType.DATE)
                         .setFieldOrder(3)
                         .setBusinessKey(true))
                 .addField(FieldDefinition.newBuilder()
                         .setFieldName("widgets_ordered")
-                        .setFieldType(PrimitiveType.INTEGER)
+                        .setFieldType(BasicType.INTEGER)
                         .setFieldOrder(4)
                         .setBusinessKey(true))));
 
@@ -139,7 +140,7 @@ public class TestData {
                     .addField(FieldDefinition.newBuilder()
                     .setFieldName("extra_field")
                     .setFieldOrder(origDef.getData().getSchema().getFieldCount())
-                    .setFieldType(PrimitiveType.FLOAT)
+                    .setFieldType(BasicType.FLOAT)
                     .setFieldLabel("We got an extra field!")
                     .setFormatCode("PERCENT")
                     .build()).build()));
@@ -156,16 +157,16 @@ public class TestData {
                 .setRepositoryVersion("trac-test-repo-1.2.3-RC4")
                 .setPath("src/main/python")
                 .setEntryPoint("trac_test.test1.SampleModel1")
-                .putParam("param1", ModelParameter.newBuilder().setParamType(PrimitiveType.STRING).build())
-                .putParam("param2", ModelParameter.newBuilder().setParamType(PrimitiveType.INTEGER).build())
+                .putParam("param1", ModelParameter.newBuilder().setParamType(BasicType.STRING).build())
+                .putParam("param2", ModelParameter.newBuilder().setParamType(BasicType.INTEGER).build())
                 .putInput("input1", TableDefinition.newBuilder()
                         .addField(FieldDefinition.newBuilder()
                                 .setFieldName("field1")
-                                .setFieldType(PrimitiveType.DATE))
+                                .setFieldType(BasicType.DATE))
                         .addField(FieldDefinition.newBuilder()
                                 .setFieldName("field2")
                                 .setBusinessKey(true)
-                                .setFieldType(PrimitiveType.DECIMAL)
+                                .setFieldType(BasicType.DECIMAL)
                                 .setFieldLabel("A display name")
                                 .setCategorical(true)
                                 .setFormatCode("GBP"))
@@ -173,7 +174,7 @@ public class TestData {
                 .putOutput("output1", TableDefinition.newBuilder()
                         .addField(FieldDefinition.newBuilder()
                                 .setFieldName("checksum_field")
-                                .setFieldType(PrimitiveType.DECIMAL))
+                                .setFieldType(BasicType.DECIMAL))
                         .build()));
 
         return newObjectHeader(ObjectType.MODEL, def, includeHeader);
@@ -187,7 +188,7 @@ public class TestData {
         var defUpdate = origDef.toBuilder()
                 .setModel(origDef.getModel()
                 .toBuilder()
-                .putParam("param3", ModelParameter.newBuilder().setParamType(PrimitiveType.DATE).build()));
+                .putParam("param3", ModelParameter.newBuilder().setParamType(BasicType.DATE).build()));
 
         return newVersionHeader(defUpdate, updateHeader);
     }
@@ -272,22 +273,16 @@ public class TestData {
         return Tag.newBuilder()
                 .setDefinition(definition)
                 .setTagVersion(1)
-                .putAttr("dataset_key", PrimitiveValue.newBuilder()
-                        .setType(PrimitiveType.STRING)
-                        .setStringValue("widget_orders")
-                        .build())
-                .putAttr("widget_type", PrimitiveValue.newBuilder()
-                        .setType(PrimitiveType.STRING)
-                        .setStringValue("non_standard_widget")
-                        .build())
+                .putAttr("dataset_key", MetadataCodec.encodeValue("widget_orders"))
+                .putAttr("widget_type", MetadataCodec.encodeValue("non_standard_widget"))
                 .build();
     }
 
     public static Tag nextTag(Tag previous, boolean updateTagVersion) {
 
         var updatedTag = previous.toBuilder()
-                .putAttr("extra_attr", PrimitiveValue.newBuilder()
-                        .setType(PrimitiveType.STRING)
+                .putAttr("extra_attr", Value.newBuilder()
+                        .setType(TypeSystem.descriptor(BasicType.STRING))
                         .setStringValue("A new descriptive value")
                         .build());
 
@@ -297,6 +292,17 @@ public class TestData {
         else
             return updatedTag
                 .setTagVersion(previous.getTagVersion() + 1)
+                .build();
+    }
+
+    public static Tag addMultiValuedAttr(Tag tag) {
+
+        var dataClassification = MetadataCodec.encodeArrayValue(
+                List.of("pii", "bcbs239", "confidential"),
+                TypeSystem.descriptor(BasicType.STRING));
+
+        return tag.toBuilder()
+                .putAttr("data_classification", dataClassification)
                 .build();
     }
 

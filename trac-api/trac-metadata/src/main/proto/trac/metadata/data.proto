@@ -4,7 +4,7 @@ package trac.metadata;
 option java_package = "com.accenture.trac.common.metadata";
 option java_multiple_files = true;
 
-import "trac/metadata/primitive.proto";
+import "trac/metadata/type.proto";
 
 
 enum DataFormat {
@@ -21,7 +21,7 @@ message FieldDefinition {
 
     string fieldName = 1;
     sint32 fieldOrder = 2;
-    PrimitiveType fieldType = 3;
+    BasicType fieldType = 3;
     string fieldLabel = 4;
 
     bool businessKey = 5;
@@ -41,7 +41,7 @@ message DataDefinition {
     TableDefinition schema = 1;
 
     repeated string storage = 2;
-    map<string, PrimitiveValue> storageInfo = 3;
+    map<string, Value> storageInfo = 3;
 
     string path = 4;
     DataFormat format = 5;

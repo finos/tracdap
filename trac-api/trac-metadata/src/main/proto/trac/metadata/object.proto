@@ -3,8 +3,9 @@ package trac.metadata;
 
 option java_package = "com.accenture.trac.common.metadata";
 option java_multiple_files = true;
+option java_outer_classname = "ObjectProtoWrapper";  // Do not create a Java class called "Object"!
 
-import "trac/metadata/primitive.proto";
+import "trac/metadata/type.proto";
 import "trac/metadata/data.proto";
 import "trac/metadata/model.proto";
 import "trac/metadata/flow.proto";

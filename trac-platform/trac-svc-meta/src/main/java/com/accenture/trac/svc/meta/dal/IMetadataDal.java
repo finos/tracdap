@@ -2,6 +2,7 @@ package com.accenture.trac.svc.meta.dal;
 
 import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.Tag;
+import com.accenture.trac.common.metadata.search.SearchParameters;
 
 import java.util.List;
 import java.util.UUID;
@@ -48,5 +49,9 @@ public interface IMetadataDal {
 
     CompletableFuture<List<Tag>>
     loadLatestVersions(String tenant, List<ObjectType> objectType, List<UUID> objectId);
+
+
+    CompletableFuture<List<Tag>>
+    search(String tenant, SearchParameters searchParameters);
 
 }

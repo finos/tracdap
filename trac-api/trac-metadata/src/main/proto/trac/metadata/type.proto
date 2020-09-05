@@ -1,0 +1,169 @@
+syntax = 'proto3';
+package trac.metadata;
+
+option java_package = "com.accenture.trac.common.metadata";
+option java_multiple_files = true;
+
+/*
+
+    Type system for TRAC metadata, APIs and data
+
+    The types described here can are used throughout the TRAC platform.
+    The protobuf (and equivalent JSON) encoding can be used in TRAC metadata and API calls.
+
+    For primary data stored and used in TRAC the same set of types is available.
+    Encoding of primary data is handled separately, for example, a tabular data set can use
+    the primitive types encoded as columns in AVRO or ORC format.
+
+    To create a consistent type system, there is no distinction between primitive and composite types.
+    Instead, the allowable set of types for a particular function is guarded by validation.
+    This provides an easier upgrade path for TRAC to support more complex types in future.
+    For example, tag attributes initially supported only single values and were updated to support arrays,
+    later it may be desirable to have tag attributes as structs. Similarly model parameters could be
+    upgraded to allow more complex types.
+
+ */
+
+
+/*
+    Basic types are the foundation of the type system for the TRAC platform
+
+    Basic types include both primitives and containers, that can be nested together
+    to form strongly-typed composite structures.
+ */
+enum BasicType {
+
+    // Boolean is a true/false value
+    BOOLEAN = 0;
+
+    // Integer is a 64 bit signed integer
+    INTEGER = 1;
+
+    // Float is a 64 bit signed floating point number (referred to as 'double' in some languages)
+    FLOAT = 2;
+
+    // Decimal - semantics TBC
+    DECIMAL = 3;
+
+    // String is a UTF encoded string value of arbitrary length
+    // The encoding used (e.g. UTF-8, UTF-16, UCS-16) may vary between languages / platforms
+    STRING = 4;
+
+    // Date - semantics TBC
+    DATE = 5;
+
+    // Date and time - semantics TBC
+    DATETIME = 6;
+
+    // Array is an array of TRAC values, which may be primitive or composite values
+    // All items in an array must have the same type (i.e. the same type descriptor)
+    ARRAY = 7;
+
+    // STRUCT type not implemented yet - see notes below
+    // STRUCT = x;
+}
+
+
+/*
+    A type descriptor describes a data type used in the TRAC platform
+
+    Type descriptors can be used independently of concrete values
+    For example, a type descriptor could describe the required type for a model parameter,
+    in which case there is no associated value in the model metadata
+    At runtime, a value would be supplied with the same type descriptor
+ */
+message TypeDescriptor {
+
+    BasicType basicType = 1;
+    TypeDescriptor arrayType = 2;
+
+    // STRUCT type not implemented yet - see notes below
+    // map<string, TypeDescriptor> structType = x;
+}
+
+
+message DecimalValue {
+
+    oneof representation {
+
+        // TODO: String representation - should this default to scientific?
+        string str = 1;
+
+        // TODO: Structured representation?
+    }
+}
+
+message DateValue {
+
+    oneof representation {
+        string isoDate = 1;
+        // TODO: Structured representation?
+    }
+}
+
+message DateTimeValue {
+
+    oneof representation {
+        string isoDateTime = 1;
+        // TODO: Structured representation?
+        // TODO: Explicit semantics for time zones
+    }
+}
+
+message UUID {
+
+    // TODO - UUID could be removed as a structured type
+    // Instead use strings with appropriate validation, for ease of interoperability
+
+    sint64 hi = 1;
+    sint64 lo = 2;
+}
+
+
+/*
+    A value can represent any value expressed in the TRAC type system
+
+    A value may be a primitive value, or a composite value such as an array or struct.
+    Every value must include a type descriptor and the value must match the type descriptor.
+    Values created by client code that do not match their type descriptor will fail validation.
+ */
+message Value {
+
+    TypeDescriptor type = 1;
+
+    oneof value {
+
+        bool booleanValue = 2;
+        sint64 integerValue = 3;
+        double floatValue = 4;
+        DecimalValue decimalValue = 5;
+        string stringValue = 6;
+        DateValue dateValue = 7;
+        DateTimeValue datetimeValue = 8;
+        ArrayValue arrayValue = 9;
+
+        // STRUCT type not implemented yet - see notes below
+        // StructValue structValue = x;
+    }
+}
+
+
+/*
+    An array value holds an array of other TRAC values
+
+    All items in an array must be of the same type (i.e. have the same type descriptor).
+ */
+message ArrayValue {
+
+    repeated Value item = 1;
+}
+
+
+// STRUCT type not implemented yet
+// STRUCT should be made available only when there is a real use case
+// to avoid polluting the metadata before having an understanding of how it will be used
+
+//message StructValue {
+//
+//    map<string, Value> member = 1;
+//}

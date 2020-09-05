@@ -4,7 +4,7 @@ package trac.metadata;
 option java_package = "com.accenture.trac.common.metadata";
 option java_multiple_files = true;
 
-import "trac/metadata/primitive.proto";
+import "trac/metadata/type.proto";
 import "trac/metadata/object.proto";
 
 
@@ -14,7 +14,18 @@ message Tag {
 
     int32 tagVersion = 2;
 
-    map<string, PrimitiveValue> attr = 3;
+    /*
+     * Tag attributes are a dictionary of attribute name (a string) to attribute value
+     * Attr values are of type Value and are restricted to primitive types
+     *
+     * Multi-valued attrs are supported, any attr value can be either single- or multi-valued
+     *   (the exception is BOOLEAN attrs, which are always single-valued)
+     * Multi-valued attrs are represented as basic type ARRAY, with array type always a primitive type
+     * Arrays containing a single item are treated as single-valued attrs and will be returned as a single value
+     * Search semantics are defined for both single- and multi-valued attrs
+     * See SearchParameters and SearchApi for details
+     */
+    map<string, Value> attr = 3;
 }
 
 message TagList {

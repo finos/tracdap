@@ -4,7 +4,7 @@ package trac.metadata;
 option java_package = "com.accenture.trac.common.metadata";
 option java_multiple_files = true;
 
-import "trac/metadata/primitive.proto";
+import "trac/metadata/type.proto";
 
 
 enum JobType {
@@ -21,7 +21,7 @@ message JobDefinition {
 
   UUID targetId = 2;
 
-  map<string, PrimitiveValue> param = 3;
+  map<string, Value> param = 3;
   map<string, UUID> input = 4;
   map<string, UUID> output = 5;
   map<string, UUID> model = 6;

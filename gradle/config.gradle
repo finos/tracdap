@@ -17,8 +17,7 @@ ext {
 
     junit_version = '5.5.2'
 
-    mysql_version = '8.0.18'
-    mariadb4j_version = '2.4.0'
-
     h2_version = '1.4.200'
+    mariadb_version = "2.6.2"
+    mariadb_embedded_version = '2.4.0'
 }

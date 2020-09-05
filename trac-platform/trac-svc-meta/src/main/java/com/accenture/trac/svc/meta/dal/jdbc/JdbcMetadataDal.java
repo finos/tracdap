@@ -1,9 +1,11 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.common.metadata.search.SearchParameters;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.common.metadata.*;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.UUID;
@@ -20,6 +22,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     private final JdbcReadImpl readSingle;
     private final JdbcReadBatchImpl readBatch;
     private final JdbcWriteBatchImpl writeBatch;
+    private final JdbcSearchImpl search;
 
 
     public JdbcMetadataDal(JdbcDialect dialect, DataSource dataSource, Executor executor) {
@@ -30,6 +33,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         readSingle = new JdbcReadImpl();
         readBatch = new JdbcReadBatchImpl();
         writeBatch = new JdbcWriteBatchImpl();
+        search = new JdbcSearchImpl();
     }
 
     public void startup() {
@@ -80,7 +84,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             long[] objectPk = writeBatch.writeObjectId(conn, tenantId, parts.objectType, parts.objectId);
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts.version, parts.definition);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
 
             writeBatch.writeLatestVersion(conn, tenantId, objectPk, defPk);
@@ -115,7 +119,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             checkObjectTypes(parts, objectType);
 
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts.version, parts.definition);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
 
             writeBatch.updateLatestVersion(conn, tenantId, objectType.keys, defPk);
@@ -152,7 +156,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             checkObjectTypes(parts, objectType);
 
             long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.version);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
 
             writeBatch.updateLatestTag(conn, tenantId, defPk, tagPk);
@@ -213,7 +217,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             checkObjectTypes(parts, objectType);
 
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts.version, parts.definition);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
 
             writeBatch.writeLatestVersion(conn, tenantId, objectType.keys, defPk);
@@ -307,7 +311,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     // LOAD METHODS (MULTIPLE ITEMS)
     // -----------------------------------------------------------------------------------------------------------------
 
-    // Load batch methods may be used e.g. to query all items needs for a job in a single query
+    // Load batch methods may be used e.g. to query all items related to a job in a single query
     // This can be used both by the platform (e.g. to set up a job) and applications / UI (e.g. to display a job)
     // Latency remains important, optimisations are in ReadBatchImpl
 
@@ -322,15 +326,11 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             prepareMappingTable(conn);
 
             var tenantId = tenants.getTenantId(tenant);
-            var storedType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+            var objPk = lookupObjectPks(conn, tenantId, parts);
+            var definition = readBatch.readDefinitionByVersion(conn, tenantId, parts.objectType, objPk, parts.version);
+            var tag = readBatch.readTagByVersion(conn, tenantId, definition.keys, parts.tagVersion);
 
-            checkObjectTypes(parts, storedType);
-
-            var definition = readBatch.readDefinitionByVersion(conn, tenantId, parts.objectType, storedType.keys, parts.version);
-            var tagStub = readBatch.readTagRecordByVersion(conn, tenantId, definition.keys, parts.tagVersion);
-            var tagAttrs = readBatch.readTagAttrs(conn, tenantId, tagStub.keys);
-
-            return buildTags(definition.items, tagStub.items, tagAttrs);
+            return buildTags(definition.items, tag.items);
         },
         (error, code) -> JdbcError.loadBatch_missingItem(error, code, parts),
         (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, parts));
@@ -347,15 +347,11 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             prepareMappingTable(conn);
 
             var tenantId = tenants.getTenantId(tenant);
-            var storedType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+            var objPk = lookupObjectPks(conn, tenantId, parts);
+            var definition = readBatch.readDefinitionByVersion(conn, tenantId, parts.objectType, objPk, parts.version);
+            var tag = readBatch.readTagByLatest(conn, tenantId, definition.keys);
 
-            checkObjectTypes(parts, storedType);
-
-            var definition = readBatch.readDefinitionByVersion(conn, tenantId, parts.objectType, storedType.keys, parts.version);
-            var tagStub = readBatch.readTagRecordByLatest(conn, tenantId, definition.keys);
-            var tagAttrs = readBatch.readTagAttrs(conn, tenantId, tagStub.keys);
-
-            return buildTags(definition.items, tagStub.items, tagAttrs);
+            return buildTags(definition.items, tag.items);
         },
         (error, code) -> JdbcError.loadBatch_missingItem(error, code, parts),
         (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, parts));
@@ -373,18 +369,46 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             prepareMappingTable(conn);
 
             var tenantId = tenants.getTenantId(tenant);
-            var storedType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+            var objPk = lookupObjectPks(conn, tenantId, parts);
+            var definition = readBatch.readDefinitionByLatest(conn, tenantId, parts.objectType, objPk);
+            var tag = readBatch.readTagByLatest(conn, tenantId, definition.keys);
 
-            checkObjectTypes(parts, storedType);
-
-            var definition = readBatch.readDefinitionByLatest(conn, tenantId, parts.objectType, storedType.keys);
-            var tagStub = readBatch.readTagRecordByLatest(conn, tenantId, definition.keys);
-            var tagAttrs = readBatch.readTagAttrs(conn, tenantId, tagStub.keys);
-
-            return buildTags(definition.items, tagStub.items, tagAttrs);
+            return buildTags(definition.items, tag.items);
         },
         (error, code) -> JdbcError.loadBatch_missingItem(error, code, parts),
         (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, parts));
+    }
+
+    private long[]
+    lookupObjectPks(Connection conn, short tenantId, ObjectParts parts) throws SQLException {
+
+        var storedType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+        checkObjectTypes(parts, storedType);
+
+        return storedType.keys;
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // SEARCH METHODS
+    // -----------------------------------------------------------------------------------------------------------------
+
+
+    @Override public CompletableFuture<List<Tag>>
+    search(String tenant, SearchParameters searchParameters) {
+
+        return wrapTransaction(conn -> {
+
+            prepareMappingTable(conn);
+
+            var tenantId = tenants.getTenantId(tenant);
+            long[] tagPk = search.search(conn, tenantId, searchParameters);
+
+            var header = readBatch.readHeaderByTagPk(conn, tenantId, tagPk);
+            var tag = readBatch.readTagByPk(conn, tenantId, tagPk);
+
+            return buildTags(header.items, tag.items);
+        });
     }
 
 
@@ -505,7 +529,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     private Tag buildTag(
             ObjectDefinition definition,
             Tag.Builder baseTag,
-            Map<String, PrimitiveValue> tagAttrs) {
+            Map<String, Value> tagAttrs) {
 
         return baseTag
                 .setDefinition(definition)
@@ -515,13 +539,26 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
     private List<Tag> buildTags(
             ObjectDefinition[] definition,
-            Tag.Builder[] baseTags,
-            Map<String, PrimitiveValue>[] tagAttrs) {
+            Tag.Builder[] tags) {
 
         var result = new ArrayList<Tag>(definition.length);
 
         for (int i = 0; i < definition.length; i++)
-            result.add(i, buildTag(definition[i], baseTags[i], tagAttrs[i]));
+            result.add(i, tags[i].setDefinition(definition[i]).build());
+
+        return result;
+    }
+
+    private List<Tag> buildTags(
+            ObjectHeader[] headers,
+            Tag.Builder[] tags) {
+
+        var result = new ArrayList<Tag>(headers.length);
+
+        for (int i = 0; i < headers.length; i++) {
+            var definition = ObjectDefinition.newBuilder().setHeader(headers[i]);
+            result.add(i, tags[i].setDefinition(definition).build());
+        }
 
         return result;
     }

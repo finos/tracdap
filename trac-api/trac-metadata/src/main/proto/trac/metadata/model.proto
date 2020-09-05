@@ -4,7 +4,7 @@ package trac.metadata;
 option java_package = "com.accenture.trac.common.metadata";
 option java_multiple_files = true;
 
-import "trac/metadata/primitive.proto";
+import "trac/metadata/type.proto";
 import "trac/metadata/data.proto";
 
 
@@ -12,8 +12,9 @@ message ModelParameter {
 
     string label = 1;
 
-    PrimitiveType paramType = 2;
-    PrimitiveValue defaultValue = 3;
+    BasicType paramType = 2;
+
+    Value defaultValue = 3;
 }
 
 message ModelDefinition {

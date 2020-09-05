@@ -46,7 +46,7 @@ class JdbcTenantImpl {
         var tenantId = currentTenantMap.getOrDefault(tenant, null);
 
         if (tenantId == null)
-            throw new RuntimeException();
+            throw new RuntimeException();  // TODO: error handling, reload, expiry
 
         return tenantId;
     }

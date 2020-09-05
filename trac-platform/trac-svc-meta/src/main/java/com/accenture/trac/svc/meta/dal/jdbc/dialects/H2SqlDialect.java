@@ -11,18 +11,16 @@ import java.util.Map;
 
 public class H2SqlDialect extends Dialect {
 
+    private static final Map<Integer, JdbcErrorCode> dialectErrorCodes = Map.ofEntries(
+            Map.entry(23505, JdbcErrorCode.INSERT_DUPLICATE),
+            Map.entry(1452, JdbcErrorCode.INSERT_MISSING_FK));
+
     private static final String DROP_KEY_MAPPING_DDL = "drop table if exists key_mapping;";
     private static final String CREATE_KEY_MAPPING_FILE = "jdbc/mysql/key_mapping.ddl";
-
-    private final Map<Integer, JdbcErrorCode> dialectErrorCodes;
 
     private final String createKeyMapping;
 
     H2SqlDialect() {
-
-        dialectErrorCodes = new HashMap<>();
-        dialectErrorCodes.put(23505, JdbcErrorCode.INSERT_DUPLICATE);
-        dialectErrorCodes.put(1452, JdbcErrorCode.INSERT_MISSING_FK);
 
         createKeyMapping = loadKeyMappingDdl(CREATE_KEY_MAPPING_FILE);
     }

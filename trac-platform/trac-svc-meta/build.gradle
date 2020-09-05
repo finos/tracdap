@@ -34,9 +34,10 @@ dependencies {
 
     testImplementation group: 'io.grpc', name: 'grpc-testing', version: "$grpc_version"
 
-    testImplementation group: 'mysql', name: 'mysql-connector-java', version: "$mysql_version"
-    testImplementation group: 'ch.vorburger.mariaDB4j', name: 'mariaDB4j', version: "$mariadb4j_version"
-
     testImplementation group: 'com.h2database', name: 'h2', version: "$h2_version"
+    testImplementation group: 'org.mariadb.jdbc', name: 'mariadb-java-client', version: "$mariadb_version"
+    testImplementation group: 'ch.vorburger.mariaDB4j', name: 'mariaDB4j', version: "$mariadb_embedded_version"
+
+
 
 }

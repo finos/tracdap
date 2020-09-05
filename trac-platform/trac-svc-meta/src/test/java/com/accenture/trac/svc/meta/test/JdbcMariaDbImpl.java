@@ -1,13 +1,14 @@
 package com.accenture.trac.svc.meta.test;
 
-import ch.vorburger.mariadb4j.DB;
-import ch.vorburger.mariadb4j.DBConfiguration;
-import ch.vorburger.mariadb4j.DBConfigurationBuilder;
 import com.accenture.trac.common.util.InterfaceLogging;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
-import com.mysql.cj.jdbc.MysqlDataSource;
+
+import org.mariadb.jdbc.MariaDbDataSource;
+import ch.vorburger.mariadb4j.DB;
+import ch.vorburger.mariadb4j.DBConfiguration;
+import ch.vorburger.mariadb4j.DBConfigurationBuilder;
 
 import static com.accenture.trac.svc.meta.test.TestData.*;
 
@@ -18,11 +19,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.util.Comparator;
 import java.util.Scanner;
 
 
-public class JdbcMysqlImpl implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback, AfterAllCallback {
+public class JdbcMariaDbImpl implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback, AfterAllCallback {
 
     private DBConfiguration dbConfig;
     private DB db = null;
@@ -35,7 +37,7 @@ public class JdbcMysqlImpl implements BeforeAllCallback, BeforeEachCallback, Aft
 
         tempDir = Files.createTempDirectory("");
 
-        var inputStream = JdbcMysqlImpl.class.getResourceAsStream("/mysql/trac_metadata.ddl");
+        var inputStream = JdbcMariaDbImpl.class.getResourceAsStream("/mysql/trac_metadata.ddl");
         var scanner = new Scanner(inputStream, StandardCharsets.UTF_8.name()).useDelimiter("\\A");
         var deployScript = scanner.next();
 
@@ -47,7 +49,7 @@ public class JdbcMysqlImpl implements BeforeAllCallback, BeforeEachCallback, Aft
         db = DB.newEmbeddedDB(dbConfig);
         db.start();
 
-        var source = new MysqlDataSource();
+        var source = new MariaDbDataSource();
         source.setServerName("localhost");
         source.setPort(dbConfig.getPort());
 
@@ -69,7 +71,7 @@ public class JdbcMysqlImpl implements BeforeAllCallback, BeforeEachCallback, Aft
     }
 
     @Override
-    public void beforeEach(ExtensionContext context) {
+    public void beforeEach(ExtensionContext context) throws SQLException {
 
         var testClass = context.getTestClass();
 
@@ -77,7 +79,7 @@ public class JdbcMysqlImpl implements BeforeAllCallback, BeforeEachCallback, Aft
             Assertions.fail("JUnit extension for DAL testing requires the test class to implement IDalTestable");
         }
 
-        var source = new MysqlDataSource();
+        var source = new MariaDbDataSource();
         source.setServerName("localhost");
         source.setPort(dbConfig.getPort());
         source.setDatabaseName("trac_test");

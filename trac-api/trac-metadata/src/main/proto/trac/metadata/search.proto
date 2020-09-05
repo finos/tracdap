@@ -1,0 +1,140 @@
+syntax = 'proto3';
+package trac.metadata.search;
+
+option java_package = "com.accenture.trac.common.metadata.search";
+option java_multiple_files = true;
+
+import "trac/metadata/type.proto";
+import "trac/metadata/object.proto";
+
+
+enum SearchOperator {
+
+  /**
+    EQUALS
+
+    The EQ operator matches a tag when the tag has an attribute that matches the
+    search term exactly, i.e. attribute name, type and value all match. For
+    multi-valued attributes, the EQ operator will match if any of the attribute
+    values match the search term. The search value for the EQ operator must be a
+    primitive value.
+
+    Exact matches may behave erratically for FLOAT values due to rounding errors,
+    for this reason it is not recommended to use the EQ operator with FLOAT values.
+   */
+  EQ = 0;
+
+  /**
+    DOES NOT EQUAL
+
+    The NE operator matches a tag precisely when the EQ operator does not match it.
+    This could be because the tag attribute does not match the search term, or because
+    the tag does not define the search attribute at all. For multi-valued attributes,
+    the NE operator will only match if none of the attribute values match the search term.
+    The search value for the NE operator must be a primitive value.
+
+    The following equivalences hold, for tag t, attribute A and search value x:
+
+    t.A ≠ x ⇔ ¬ (t.A = x)    (A is single-valued)
+    t.A ∌ x ⇔ ¬ (t.A ∋ x)    (A is multi-valued)
+
+    Exact matches may behave erratically for FLOAT values due to rounding errors,
+    for this reason it is not recommended to use the NE operator with FLOAT values.
+   */
+  NE = 1;
+
+  /**
+    LESS THAN
+
+    The LT operator matches a tag when the tag has an
+
+    The LT operator can only apply to ordered primitive values, it cannot be used with
+    string or boolean values. The LT operator will never match a multi-valued attribute,
+    even if one or more of the individual values matches the search term.
+   */
+  LT = 2;
+
+  /**
+    LESS THAN OR EQUAL TO
+
+    The LE operator matches a tag when the tag has an
+
+    The LE operator can only apply to ordered primitive values, it cannot be used with
+    string or boolean values. The LE operator will never match a multi-valued attribute,
+    even if one or more of the individual values matches the search term.
+   */
+  LE = 3;
+
+  /**
+    GREATER THAN
+
+    The GT operator matches a tag when the tag has an
+
+    The GT operator can only apply to ordered primitive values, it cannot be used with
+    string or boolean values. The GT operator will never match a multi-valued attribute,
+    even if one or more of the individual values matches the search term.
+   */
+  GT = 4;
+
+  /**
+    GREATER THAN OR EQUAL TO
+
+    The GE operator matches a tag when the tag has an
+
+    The GE operator can only apply to ordered primitive values, it cannot be used with
+    string or boolean values. The GE operator will never match a multi-valued attribute,
+    even if one or more of the individual values matches the search term.
+   */
+  GE = 5;
+
+  /**
+    IN
+
+    The IN operator matches a tag when the tag has an attribute whose value is matched
+    exactly by an item in the list of values provided. For multi-valued attributes, the
+    IN operator will match if any of the attribute values match the search term. The
+    search value for the INT operator must be an array value whose array items are a
+    primitive type. Arrays of BOOLEAN values are not supported, use EQ to match boolean
+    attributes.
+   */
+  IN = 6;
+}
+
+enum LogicalOperator {
+  AND = 0;
+  OR = 1;
+  NOT = 2;
+}
+
+message SearchTerm {
+
+  string attrName = 1;
+  trac.metadata.BasicType attrType = 2;
+
+  SearchOperator operator = 3;
+
+  trac.metadata.Value attrValue = 4;
+}
+
+message LogicalExpression {
+
+  LogicalOperator operator = 1;
+  repeated SearchExpression expr = 2;
+}
+
+message SearchExpression {
+
+  oneof expr {
+    SearchTerm term = 1;
+    LogicalExpression logical = 2;
+  }
+}
+
+message SearchParameters {
+
+  ObjectType objectType = 1;
+  SearchExpression search = 2;
+
+  bool previousVersions = 3;
+  bool previousTags = 4;
+}

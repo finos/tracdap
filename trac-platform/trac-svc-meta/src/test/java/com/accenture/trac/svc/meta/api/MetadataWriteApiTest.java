@@ -264,7 +264,7 @@ public class MetadataWriteApiTest implements IDalTestable {
         var validTag = TestData.dummyTag(objToSave);
 
         var invalidTag = validTag.toBuilder()
-                .putAttr("${escape_key}", PrimitiveValue.newBuilder().setType(PrimitiveType.FLOAT).setFloatValue(1.0).build())
+                .putAttr("${escape_key}", MetadataCodec.encodeValue(1.0))
                 .build();
 
         // Request to save a MODEL, even though the definition is for DATA
@@ -290,7 +290,7 @@ public class MetadataWriteApiTest implements IDalTestable {
         var validTag = TestData.dummyTag(objToSave);
 
         var invalidTag = validTag.toBuilder()
-                .putAttr("trac_anything_reserved", PrimitiveValue.newBuilder().setType(PrimitiveType.FLOAT).setFloatValue(1.0).build())
+                .putAttr("trac_anything_reserved", MetadataCodec.encodeValue(1.0))
                 .build();
 
         // Request to save a MODEL, even though the definition is for DATA
@@ -678,7 +678,7 @@ public class MetadataWriteApiTest implements IDalTestable {
                 .toBuilder()
                 .addField(FieldDefinition.newBuilder()
                         .setFieldName("some_new_field")
-                        .setFieldType(PrimitiveType.STRING)
+                        .setFieldType(BasicType.STRING)
                         .setFieldOrder(-1));
 
         var v2Obj = v1SavedTag.getDefinition().toBuilder()
@@ -713,7 +713,7 @@ public class MetadataWriteApiTest implements IDalTestable {
         var v2Tag = TestData.dummyTag(v2Obj);
 
         var v2ControlledTag = v2Tag.toBuilder()
-                .putAttr("very\nbroken.attr", PrimitiveValue.newBuilder().setType(PrimitiveType.FLOAT).setFloatValue(1.0).build())
+                .putAttr("very\nbroken.attr", MetadataCodec.encodeValue(1.0))
                 .build();
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
@@ -740,7 +740,7 @@ public class MetadataWriteApiTest implements IDalTestable {
         var v2Tag = TestData.dummyTag(v2Obj);
 
         var v2ControlledTag = v2Tag.toBuilder()
-                .putAttr("trac_anything_reserved", PrimitiveValue.newBuilder().setType(PrimitiveType.FLOAT).setFloatValue(1.0).build())
+                .putAttr("trac_anything_reserved", MetadataCodec.encodeValue(1.0))
                 .build();
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
@@ -772,10 +772,7 @@ public class MetadataWriteApiTest implements IDalTestable {
         var v1ObjectId = MetadataCodec.decode(v1SavedTag.getDefinition().getHeader().getObjectId());
 
         var t2Tag = v1SavedTag.toBuilder()
-                .putAttr("extra_attr_v2", PrimitiveValue.newBuilder()
-                .setType(PrimitiveType.STRING)
-                .setStringValue("First extra attr")
-                .build())
+                .putAttr("extra_attr_v2", MetadataCodec.encodeValue("First extra attr"))
                 .build();
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
@@ -804,10 +801,7 @@ public class MetadataWriteApiTest implements IDalTestable {
         assertEquals(t2ExpectedTag, t2SavedTag);
 
         var t3Tag = t2SavedTag.toBuilder()
-                .putAttr("extra_attr_v3", PrimitiveValue.newBuilder()
-                .setType(PrimitiveType.STRING)
-                .setStringValue("Second extra attr")
-                .build())
+                .putAttr("extra_attr_v3", MetadataCodec.encodeValue("Second extra attr"))
                 .build();
 
         var t3WriteRequest = MetadataWriteRequest.newBuilder()
@@ -1057,10 +1051,7 @@ public class MetadataWriteApiTest implements IDalTestable {
 
         var t2Tag = v1SavedTag.toBuilder()
                 .setTagVersion(v1SavedTag.getTagVersion() + 1)
-                .putAttr("extra_attr_v2", PrimitiveValue.newBuilder()
-                .setType(PrimitiveType.STRING)
-                .setStringValue("First extra attr")
-                .build())
+                .putAttr("extra_attr_v2", MetadataCodec.encodeValue("First extra attr"))
                 .build();
 
         var t3Tag = TestData.nextTag(t2Tag, KEEP_ORIGINAL_TAG_VERSION);
@@ -1116,7 +1107,7 @@ public class MetadataWriteApiTest implements IDalTestable {
         var t2Tag = TestData.nextTag(v1SavedTag, KEEP_ORIGINAL_TAG_VERSION);
 
         var t2ControlledTag = t2Tag.toBuilder()
-                .putAttr("no-hyphens", PrimitiveValue.newBuilder().setType(PrimitiveType.FLOAT).setFloatValue(1.0).build())
+                .putAttr("no-hyphens", MetadataCodec.encodeValue(1.0))
                 .build();
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
@@ -1142,7 +1133,7 @@ public class MetadataWriteApiTest implements IDalTestable {
         var t2Tag = TestData.nextTag(v1SavedTag, KEEP_ORIGINAL_TAG_VERSION);
 
         var t2ControlledTag = t2Tag.toBuilder()
-                .putAttr("trac_anything_reserved", PrimitiveValue.newBuilder().setType(PrimitiveType.FLOAT).setFloatValue(1.0).build())
+                .putAttr("trac_anything_reserved", MetadataCodec.encodeValue(1.0))
                 .build();
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
