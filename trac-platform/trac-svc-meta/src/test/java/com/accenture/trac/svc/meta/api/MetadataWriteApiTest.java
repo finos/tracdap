@@ -1172,58 +1172,380 @@ public class MetadataWriteApiTest implements IDalTestable {
     // PREALLOCATE OBJECTS
     // -----------------------------------------------------------------------------------------------------------------
 
-
     @Test
-    @Disabled("Preallocation not implemented yet")
     void preallocateObject_ok() {
-        fail();
+
+        // Simple round trip
+        // Preallocate an ID, save an object to that ID and read it back
+
+        var preallocateRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .build();
+
+        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+
+        // For preallocated objects, the header must be set with the preallocated ID and version = 1
+        var newObjectHeader = ObjectHeader.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(preallocateResponse.getObjectId())
+                .setObjectVersion(1);
+
+        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
+                .toBuilder()
+                .setHeader(newObjectHeader)
+                .build();
+
+        var newTag = TestData.dummyTag(newObject);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(newTag)
+                .build();
+
+        var writeResponse = trustedApi.savePreallocatedObject(writeRequest);
+
+        assertEquals(preallocateResponse.getObjectId(), writeResponse.getObjectId());
+
+        var readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(preallocateResponse.getObjectId())
+                .setObjectVersion(1)
+                .setTagVersion(1)
+                .build();
+
+        var savedTag = readApi.loadTag(readRequest);
+
+        assertEquals(newTag, savedTag);
     }
 
     @Test
-    @Disabled("Preallocation not implemented yet")
-    void preallocateObject_headerNotNull() {
-        fail();
+    void preallocateObject_headerMissing() {
+
+        // Saving a pre-allocated object with a null header is an invalid request
+        // For preallocation, the header has to be set and must match the preallocated ID
+
+        var preallocateRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        trustedApi.preallocateId(preallocateRequest);
+
+        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER);
+        var newTag = TestData.dummyTag(newObject);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(newTag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.savePreallocatedObject(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    @Disabled("Preallocation not implemented yet")
+    void preallocateObject_headerWrongVersion() {
+
+        // To save a preallocated object, the header must be set with object version = 1
+        // A request to save a preallocated object with version != 1 is considered invalid
+
+        var preallocateRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .build();
+
+        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+
+        // For preallocated objects, the header must be set with the preallocated ID and version = 1
+        var newObjectHeader = ObjectHeader.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(preallocateResponse.getObjectId())
+                .setObjectVersion(2);
+
+        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
+                .toBuilder()
+                .setHeader(newObjectHeader)
+                .build();
+
+        var newTag = TestData.dummyTag(newObject);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(newTag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.savePreallocatedObject(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+    }
+
+    @Test
+    void preallocateObject_idNotReserved() {
+
+        // To save a preallocated object, the ID must first be reserved
+        // If the ID is not reserved, that is an item not found error
+
+        var newObjectId = UUID.randomUUID();
+
+        var newObjectHeader = ObjectHeader.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(MetadataCodec.encode(newObjectId))
+                .setObjectVersion(1);
+
+        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
+                .toBuilder()
+                .setHeader(newObjectHeader)
+                .build();
+
+        var newTag = TestData.dummyTag(newObject);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(newTag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.savePreallocatedObject(writeRequest));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
+    }
+
+    @Test
     void preallocateObject_saveDuplicate() {
-        fail();
+
+        // A preallocated ID can only be saved once
+        // If the preallocated ID has already been used, that is a duplicate item error (already exists)
+
+        var preallocateRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .build();
+
+        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+
+        var newObjectHeader = ObjectHeader.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(preallocateResponse.getObjectId())
+                .setObjectVersion(1);
+
+        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
+                .toBuilder()
+                .setHeader(newObjectHeader)
+                .build();
+
+        var newTag = TestData.dummyTag(newObject);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(newTag)
+                .build();
+
+        // The first save request should succeed
+        var writeResponse = trustedApi.savePreallocatedObject(writeRequest);
+        assertEquals(preallocateResponse.getObjectId(), writeResponse.getObjectId());
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.savePreallocatedObject(writeRequest));
+        assertEquals(Status.Code.ALREADY_EXISTS, error.getStatus().getCode());
     }
 
     @Test
-    @Disabled("Preallocation not implemented yet")
     void preallocateObject_saveWrongType() {
-        fail();
+
+        // When a preallocated ID is reserved, the object type for that ID is set
+        // If the object type saved does not match the preallocated type, that is a failed precondition
+
+        var preallocateRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .build();
+
+        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+
+        var newObjectHeader = ObjectHeader.newBuilder()
+                .setObjectType(ObjectType.MODEL)
+                .setObjectId(preallocateResponse.getObjectId())
+                .setObjectVersion(1);
+
+        var newObject = TestData.dummyDefinitionForType(ObjectType.MODEL, TestData.NO_HEADER)
+                .toBuilder()
+                .setHeader(newObjectHeader)
+                .build();
+
+        var newTag = TestData.dummyTag(newObject);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setTag(newTag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.savePreallocatedObject(writeRequest));
+        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
     }
 
     @Test
-    @Disabled("Preallocation not implemented yet")
+    void preallocateObject_saveInconsistentType() {
+
+        // A save request where the object type does not match the write request type is considered invalid
+        // This is just as true for preallocation as it is for a regular save
+
+        // The difference between this and the previous test is
+        // In this case, the save request is inconsistent within itself, so the request is invalid
+        // In the prior case, the request could be valid depending on what is in the metadata store
+
+        var preallocateRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .build();
+
+        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+
+        var newObjectHeader = ObjectHeader.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(preallocateResponse.getObjectId())
+                .setObjectVersion(1);
+
+        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
+                .toBuilder()
+                .setHeader(newObjectHeader)
+                .build();
+
+        var newTag = TestData.dummyTag(newObject);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setTag(newTag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.savePreallocatedObject(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+    }
+
+    @Test
+    @Disabled("Content validation not implemented yet")
     void preallocateObject_saveInvalidContent() {
         fail();
     }
 
     @Test
-    @Disabled("Preallocation not implemented yet")
     void preallocateObject_newVersionBeforeSave() {
-        fail();
+
+        // In order to save a new object version, the first version must exist
+        // If the prior version does not exist, that is an item not found error
+        // If an ID has been preallocated but nothing saved to it, that does not change the behaviour
+
+        var preallocateRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .build();
+
+        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+
+        var v1Header = ObjectHeader.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(preallocateResponse.getObjectId())
+                .setObjectVersion(1);
+
+        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
+                .toBuilder()
+                .setHeader(v1Header)
+                .build();
+
+        var newTag = TestData.dummyTag(newObject);
+
+        var newVersionRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(newTag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(newVersionRequest));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
     @Test
-    @Disabled("Preallocation not implemented yet")
     void preallocateObject_newTagBeforeSave() {
-        fail();
+
+        // In order to save a new tag version, the object and tag must exist
+        // If the prior tag does not exist, that is an item not found error
+        // If an ID has been preallocated but nothing saved to it, that does not change the behaviour
+
+        var preallocateRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .build();
+
+        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+
+        var v1Header = ObjectHeader.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(preallocateResponse.getObjectId())
+                .setObjectVersion(1);
+
+        var v1Object = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
+                .toBuilder()
+                .setHeader(v1Header)
+                .build();
+
+        var newTag = TestData.dummyTag(v1Object);
+
+        var newTagRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setTag(newTag)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewTag(newTagRequest));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
     @Test
-    @Disabled("Preallocation not implemented yet")
     void preallocateObject_readBeforeSave() {
-        fail();
-    }
 
-    @Test
-    @Disabled("Preallocation not implemented yet")
-    void preallocateObject_readLatestBeforeSave() {
-        fail();
+        // An object cannot be read if it has not been saved, even if the ID is preallocated
+        // This should look like a regular item not found error
+
+        var preallocateRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .build();
+
+        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+
+        var readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(preallocateResponse.getObjectId())
+                .setObjectVersion(1)
+                .setTagVersion(1)
+                .build();
+
+        // Try reading with explicit version / tag, latest tag and latest version
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadTag(readRequest));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestTag(readRequest));
+        assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
+
+        // noinspection ResultOfMethodCallIgnored
+        var error3 = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestObject(readRequest));
+        assertEquals(Status.Code.NOT_FOUND, error3.getStatus().getCode());
     }
 }

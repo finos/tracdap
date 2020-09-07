@@ -161,6 +161,53 @@ public class MetadataWriteLogic {
                 .thenApply(_ok -> tagVersion.value);
     }
 
+    public CompletableFuture<ObjectHeader> preallocateId(String tenant, ObjectType objectType) {
+
+        // New random ID
+        var objectId = UUID.randomUUID();
+
+        // Save as a preallocated ID in the DAL
+        return dal.preallocateObjectId(tenant, objectType, objectId)
+
+                // Return an object header with the new ID
+                .thenApply(_ok -> ObjectHeader.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(OBJECT_FIRST_VERSION)
+                .build());
+    }
+
+    public CompletableFuture<ObjectHeader> savePreallocatedObject(String tenant, ObjectType objectType, Tag tag) {
+
+        var definition = tag.getDefinition();
+        var validator = new MetadataValidator();
+
+        return CompletableFuture.completedFuture(validator)
+
+                // Validation
+                .thenApply(v -> v.headerIsValid(definition))
+                .thenApply(v -> v.headerMatchesType(definition, objectType))
+                .thenApply(v -> v.headerIsOnFirstVersion(definition))
+                .thenApply(v -> v.definitionMatchesType(definition, objectType))
+                .thenApply(v -> v.tagVersionIsBlank(tag))
+                .thenApply(v -> v.tagAttributesAreValid(tag))
+                .thenApply(MetadataValidator::checkAndThrow)
+
+                // Preallocated objects are always on the trusted API
+                // So no need to check reserved tag attributes
+
+                // Set tag version if not already set
+                .thenApply(defToSave -> tag.toBuilder()
+                        .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
+                        .build())
+
+                // Save and return
+                .thenCompose(tagToSave -> dal.savePreallocatedObject(tenant, tagToSave))
+
+                // Return object header on success
+                .thenApply(_ok -> definition.getHeader());
+    }
+
     private MetadataValidator checkReservedTagAttributes(Tag tag, MetadataValidator validator, boolean apiTrust) {
 
         if (apiTrust == PUBLIC_API)

@@ -157,6 +157,20 @@ public class MetadataValidator {
         return this;
     }
 
+    public MetadataValidator headerIsOnFirstVersion(ObjectDefinition objectDefinition) {
+
+        if (objectDefinition.getHeader().getObjectVersion() != OBJECT_FIRST_VERSION) {
+
+            var message = String.format(
+                    "Object version must be set to %d",
+                    OBJECT_FIRST_VERSION);
+
+            validationErrors.add(message);
+        }
+
+        return this;
+    }
+
     public MetadataValidator tagVersionIsBlank(Tag tag) {
 
         // It is not actually possible to set an int value to null in protobuf

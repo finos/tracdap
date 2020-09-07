@@ -754,10 +754,4 @@ class MetadataReadApiTest implements IDalTestable {
         var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestObject(readRequest));
         assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
     }
-
-    @Test
-    @Disabled("Preallocation not implemented yet")
-    void loadPreallocatedButNotSaved() {
-        fail();
-    }
 }

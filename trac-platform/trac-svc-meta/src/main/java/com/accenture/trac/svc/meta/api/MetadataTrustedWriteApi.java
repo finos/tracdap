@@ -24,6 +24,7 @@ import com.accenture.trac.common.util.ApiWrapper;
 import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
 import io.grpc.stub.StreamObserver;
 
+import static com.accenture.trac.svc.meta.logic.MetadataConstants.TAG_FIRST_VERSION;
 import static com.accenture.trac.svc.meta.logic.MetadataConstants.TRUSTED_API;
 
 
@@ -105,11 +106,44 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
 
     @Override
     public void preallocateId(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
-        super.preallocateId(request, responseObserver);
+
+        apiWrapper.unaryCall(responseObserver, () -> {
+
+            var tenant = request.getTenant();
+            var objectType = request.getObjectType();
+
+            var saveResult = writeLogic.preallocateId(tenant, objectType);
+
+            var idResponse = saveResult
+                    .thenApply(header -> IdResponse.newBuilder()
+                    .setObjectId(header.getObjectId())
+                    .setObjectVersion(header.getObjectVersion())
+                    .setTagVersion(TAG_FIRST_VERSION)
+                    .build());
+
+            return idResponse;
+        });
     }
 
     @Override
     public void savePreallocatedObject(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
-        super.savePreallocatedObject(request, responseObserver);
+
+        apiWrapper.unaryCall(responseObserver, () -> {
+
+            var tenant = request.getTenant();
+            var objectType = request.getObjectType();
+            var tag = request.getTag();
+
+            var saveResult = writeLogic.savePreallocatedObject(tenant, objectType, tag);
+
+            var idResponse = saveResult
+                    .thenApply(header -> IdResponse.newBuilder()
+                    .setObjectId(header.getObjectId())
+                    .setObjectVersion(header.getObjectVersion())
+                    .setTagVersion(TAG_FIRST_VERSION)
+                    .build());
+
+            return idResponse;
+        });
     }
 }
