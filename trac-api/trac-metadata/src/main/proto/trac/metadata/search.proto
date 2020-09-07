@@ -151,6 +151,6 @@ message SearchParameters {
   ObjectType objectType = 1;
   SearchExpression search = 2;
 
-  bool previousVersions = 3;
-  bool previousTags = 4;
+  bool priorVersions = 3;
+  bool priorTags = 4;
 }

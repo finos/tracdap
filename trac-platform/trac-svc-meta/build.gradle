@@ -47,12 +47,16 @@ dependencies {
 
     // Test
 
-    testImplementation group: 'io.grpc', name: 'grpc-testing', version: "$grpc_version"
+    // Migration support for JUnit 4 Rules, provided by gRPC for managing test service instances
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-migrationsupport', version: "$junit_version"
 
+    testImplementation (group: 'io.grpc', name: 'grpc-testing', version: "$grpc_version") {
+        // Do not pull in JUnit 4, use migration support from JUnit 5 instead
+        exclude group: 'junit', module: 'junit'
+    }
+
+    // Database JDBC connectors and embedded instances to test backends for the DAL
     testImplementation group: 'com.h2database', name: 'h2', version: "$h2_version"
     testImplementation group: 'org.mariadb.jdbc', name: 'mariadb-java-client', version: "$mariadb_version"
     testImplementation group: 'ch.vorburger.mariaDB4j', name: 'mariaDB4j', version: "$mariadb_embedded_version"
-
-
-
 }

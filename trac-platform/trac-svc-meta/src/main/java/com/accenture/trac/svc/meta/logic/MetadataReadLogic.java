@@ -32,6 +32,9 @@ public class MetadataReadLogic {
         this.dal = dal;
     }
 
+    // Literally all of the read logic is in the DAL at present!
+    // Which is fine, keep a thin logic class here anyway to have a consistent pattern
+
     public CompletableFuture<Tag> loadTag(
             String tenant, ObjectType objectType,
             UUID objectId, int objectVersion, int tagVersion) {

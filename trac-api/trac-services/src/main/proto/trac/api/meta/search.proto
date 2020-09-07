@@ -19,3 +19,32 @@ package trac.api.meta;
 
 option java_package = "com.accenture.trac.common.api.meta";
 option java_multiple_files = true;
+
+import "trac/metadata/search.proto";
+import "trac/metadata/tag.proto";
+
+import "google/api/annotations.proto";
+
+
+service MetadataSearchApi {
+
+  rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
+    option (google.api.http) = {
+      get: "/{tenant}/{search.objectType}/search?{search.priorVersions}"
+    };
+  }
+
+};
+
+
+message MetadataSearchRequest {
+
+  string tenant = 1;
+
+  trac.metadata.search.SearchParameters searchParams = 2;
+};
+
+message MetadataSearchResponse {
+
+  repeated trac.metadata.Tag searchResult = 1;
+};

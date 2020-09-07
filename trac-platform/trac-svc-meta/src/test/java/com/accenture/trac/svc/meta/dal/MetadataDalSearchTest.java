@@ -40,8 +40,7 @@ import java.util.stream.Collectors;
 
 import static com.accenture.trac.common.metadata.MetadataCodec.encodeArrayValue;
 import static com.accenture.trac.common.metadata.MetadataCodec.encodeValue;
-import static com.accenture.trac.svc.meta.test.TestData.TEST_TENANT;
-import static com.accenture.trac.svc.meta.test.TestData.unwrap;
+import static com.accenture.trac.svc.meta.test.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -750,7 +749,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                     OffsetDateTime.now(ZoneOffset.UTC).plusWeeks(1))
 
                     // Metadata datetime attrs are at microsecond precision
-                    .stream().map(this::truncateMicrosecondPrecision)
+                    .stream().map(TestData::truncateMicrosecondPrecision)
                     .collect(Collectors.toList());
 
             default:
@@ -1320,62 +1319,6 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     // -----------------------------------------------------------------------------------------------------------------
     // HELPERS
     // -----------------------------------------------------------------------------------------------------------------
-
-    Object objectOfType(BasicType basicType) {
-
-        switch (basicType) {
-
-            case BOOLEAN: return true;
-            case INTEGER: return (long) 42;
-            case FLOAT: return Math.PI;
-            case DECIMAL: return new BigDecimal("1234.567");
-            case STRING: return "Slartibartfast";
-            case DATE: return LocalDate.now();
-
-            // Metadata datetime attrs have microsecond precision
-            case DATETIME:
-                var dateTime = OffsetDateTime.now(ZoneOffset.UTC);
-                return truncateMicrosecondPrecision(dateTime);
-
-            default:
-                throw new RuntimeException("Test object not available for basic type " + basicType.toString());
-        }
-    }
-
-    OffsetDateTime truncateMicrosecondPrecision(OffsetDateTime dateTime) {
-
-        int precision = 6;
-
-        var nanos = dateTime.getNano();
-        var nanoPrecision = (int) Math.pow(10, 9 - precision);
-        var truncatedNanos = (nanos / nanoPrecision) * nanoPrecision;
-        return dateTime.withNano(truncatedNanos);
-    }
-
-    Object objectOfDifferentType(BasicType basicType) {
-
-        if (basicType == BasicType.STRING)
-            return objectOfType(BasicType.INTEGER);
-        else
-            return objectOfType(BasicType.STRING);
-    }
-
-    Object differentObjectOfSameType(BasicType basicType, Object originalObject) {
-
-        switch (basicType) {
-
-            case BOOLEAN: return ! ((Boolean) originalObject);
-            case INTEGER: return ((Long) originalObject) + 1L;
-            case FLOAT: return ((Double) originalObject) * 2.0D;
-            case DECIMAL: return ((BigDecimal) originalObject).multiply(new BigDecimal(2));
-            case STRING: return originalObject.toString() + " and friends";
-            case DATE: return ((LocalDate) originalObject).plusDays(1);
-            case DATETIME: return ((OffsetDateTime) originalObject).plusHours(1);
-
-            default:
-                throw new RuntimeException("Test object not available for basic type " + basicType.toString());
-        }
-    }
 
     private Tag tagForDef(ObjectDefinition def, String attrName, Value attrValue) {
 
