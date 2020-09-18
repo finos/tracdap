@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.common.db.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.Dialect;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
 

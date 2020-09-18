@@ -14,20 +14,19 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.meta.dal.jdbc.dialects;
+package com.accenture.trac.common.db;
 
-import com.accenture.trac.common.db.JdbcDialect;
-import com.accenture.trac.svc.meta.dal.jdbc.JdbcErrorCode;
-
-import java.sql.Connection;
-import java.sql.SQLException;
+import javax.sql.DataSource;
+import java.util.concurrent.Executor;
 
 
-public interface IDialect {
+public class JdbcConnectionPool {
 
-    JdbcDialect dialectCode();
+    public DataSource getDataSource() {
+        return null;
+    }
 
-    JdbcErrorCode mapErrorCode(SQLException e);
-
-    void prepareMappingTable(Connection conn) throws SQLException;
+    public Executor getExecutor() {
+        return null;
+    }
 }

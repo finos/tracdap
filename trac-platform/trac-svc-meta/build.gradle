@@ -35,15 +35,16 @@ dependencies {
     implementation project(':trac-api-metadata')
     implementation project(':trac-api-services')
     implementation project(':trac-lib-common')
+    implementation project(':trac-lib-db')
 
-    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: "$apache_dbcp_version"
+    // CLI library for processing startup args (part of the .config package)
+    implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"
 
     // Logging
     implementation group: 'org.slf4j', name: 'slf4j-api', version: "$slf4j_version"
     implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: "$log4j_version"
     implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: "$log4j_version"
     implementation group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: "$log4j_version"
-
 
     // Test
 
@@ -55,8 +56,21 @@ dependencies {
         exclude group: 'junit', module: 'junit'
     }
 
-    // Database JDBC connectors and embedded instances to test backends for the DAL
-    testImplementation group: 'com.h2database', name: 'h2', version: "$h2_version"
-    testImplementation group: 'org.mariadb.jdbc', name: 'mariadb-java-client', version: "$mariadb_version"
+    testImplementation project(':sql-drivers')
+
+    // Embedded databases to test some dialects locally
     testImplementation group: 'ch.vorburger.mariaDB4j', name: 'mariaDB4j', version: "$mariadb_embedded_version"
+}
+
+
+// When running from an IDE, add plugin dependencies to the classpath
+// TODO: This will need updating so plugin projects don't need adding individually!
+
+gradle.startParameter.taskNames.forEach { task ->
+
+    if (task.endsWith("main()")) {
+        dependencies {
+            runtimeOnly project(':sql-drivers')
+        }
+    }
 }

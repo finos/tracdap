@@ -16,8 +16,8 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc.dialects;
 
+import com.accenture.trac.common.db.JdbcDialect;
 import com.accenture.trac.svc.meta.exception.TracInternalError;
-import com.accenture.trac.svc.meta.dal.jdbc.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcErrorCode;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcException;
 

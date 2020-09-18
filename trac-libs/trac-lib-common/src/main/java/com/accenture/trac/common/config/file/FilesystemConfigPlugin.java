@@ -14,20 +14,22 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.meta.dal.jdbc.dialects;
+package com.accenture.trac.common.config.file;
 
-import com.accenture.trac.common.db.JdbcDialect;
-import com.accenture.trac.svc.meta.dal.jdbc.JdbcErrorCode;
+import com.accenture.trac.common.config.IConfigLoader;
+import com.accenture.trac.common.config.IConfigPlugin;
+import com.accenture.trac.common.config.StandardArgs;
 
-import java.sql.Connection;
-import java.sql.SQLException;
+import java.net.URI;
 
 
-public interface IDialect {
+/**
+ * A config loader plugin for loading from the local filesystem.
+ */
+public class FilesystemConfigPlugin implements IConfigPlugin {
 
-    JdbcDialect dialectCode();
-
-    JdbcErrorCode mapErrorCode(SQLException e);
-
-    void prepareMappingTable(Connection conn) throws SQLException;
+    @Override
+    public IConfigLoader createConfigLoader(StandardArgs args) {
+        return new FilesystemConfigLoader();
+    }
 }

@@ -33,8 +33,10 @@ project(":trac-api-services").projectDir = file("trac-api/trac-services")
 
 
 include 'trac-lib-common'
+include 'trac-lib-db'
 
 project(":trac-lib-common").projectDir = file("trac-libs/trac-lib-common")
+project(":trac-lib-db").projectDir = file("trac-libs/trac-lib-db")
 
 
 // Java services
@@ -42,3 +44,11 @@ project(":trac-lib-common").projectDir = file("trac-libs/trac-lib-common")
 include 'trac-svc-meta'
 
 project(":trac-svc-meta").projectDir = file("trac-platform/trac-svc-meta")
+
+
+
+// Plugins
+
+include 'sql-drivers'
+
+project(":sql-drivers").projectDir = file("trac-plugins/sql-drivers")

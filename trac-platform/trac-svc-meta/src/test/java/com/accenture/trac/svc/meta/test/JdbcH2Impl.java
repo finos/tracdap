@@ -17,8 +17,8 @@
 package com.accenture.trac.svc.meta.test;
 
 import com.accenture.trac.common.util.InterfaceLogging;
+import com.accenture.trac.common.db.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
-import com.accenture.trac.svc.meta.dal.jdbc.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.Assertions;

@@ -17,8 +17,9 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
 import com.accenture.trac.common.metadata.search.SearchParameters;
-import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.common.metadata.*;
+import com.accenture.trac.common.db.JdbcDialect;
+import com.accenture.trac.svc.meta.dal.IMetadataDal;
 
 import javax.sql.DataSource;
 import java.sql.Connection;

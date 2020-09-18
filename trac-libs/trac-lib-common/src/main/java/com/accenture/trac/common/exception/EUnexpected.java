@@ -14,9 +14,18 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.meta.dal.jdbc;
+package com.accenture.trac.common.exception;
 
-public enum JdbcDialect {
-    MYSQL,
-    H2
+
+public class EUnexpected extends ETracInternal {
+
+    private static final String UNEXPECTED_MESSAGE = "Unexpected internal error (this is a bug)";
+
+    public EUnexpected() {
+        super(UNEXPECTED_MESSAGE);
+    }
+
+    public EUnexpected(Throwable cause) {
+        super(UNEXPECTED_MESSAGE, cause);
+    }
 }

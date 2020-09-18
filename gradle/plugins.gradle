@@ -14,20 +14,10 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.meta.dal.jdbc.dialects;
+ext {
 
-import com.accenture.trac.common.db.JdbcDialect;
-import com.accenture.trac.svc.meta.dal.jdbc.JdbcErrorCode;
+    BUILD_ALL_PLUGINS = false
 
-import java.sql.Connection;
-import java.sql.SQLException;
-
-
-public interface IDialect {
-
-    JdbcDialect dialectCode();
-
-    JdbcErrorCode mapErrorCode(SQLException e);
-
-    void prepareMappingTable(Connection conn) throws SQLException;
+    BUILD_sql_h2 = true
+    BUILD_sql_mariadb = true
 }
