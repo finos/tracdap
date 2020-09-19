@@ -62,6 +62,7 @@ public class ApiWrapper {
                 else {
 
                     log.error("API CALL FAILED: {}", methodName);
+                    log.error(methodName, error);
 
                     mapErrorResponse(response, error);
                 }
@@ -72,6 +73,7 @@ public class ApiWrapper {
         catch (Exception error) {
 
             log.error("API CALL FAILED: {}", methodName);
+            log.error(methodName, error);
 
             mapErrorResponse(response, error);
         }

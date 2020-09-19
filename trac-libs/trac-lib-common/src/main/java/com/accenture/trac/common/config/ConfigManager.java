@@ -162,10 +162,10 @@ public class ConfigManager {
      */
     public void initLogging() {
 
+        logInfo("Initialize logging...");
+
         var rootProps = loadRootProperties();
         var loggingConfigUrl = rootProps.getProperty(LOGGING_CONFIG_URL);
-
-        logInfo("Initialize logging...");
 
         if (loggingConfigUrl != null && !loggingConfigUrl.isBlank()) {
 

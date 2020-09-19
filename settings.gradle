@@ -43,8 +43,14 @@ project(":trac-lib-db").projectDir = file("trac-libs/trac-lib-db")
 
 include 'trac-svc-meta'
 
-project(":trac-svc-meta").projectDir = file("trac-platform/trac-svc-meta")
+project(":trac-svc-meta").projectDir = file("trac-services/trac-svc-meta")
 
+
+// Tools and utilities
+
+include 'deploy-metadb'
+
+project(":deploy-metadb").projectDir = file("trac-tools/deploy-metadb")
 
 
 // Plugins

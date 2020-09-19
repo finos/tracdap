@@ -19,6 +19,7 @@ package com.accenture.trac.common.db;
 import com.accenture.trac.common.exception.EStartup;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
@@ -46,12 +47,20 @@ public class JdbcSetup {
 
     public static DataSource createDatasource(Properties props, String configBase) {
 
+        // TODO: This is a rough implementation that needs cleaning up
+
         var dialect = getDialect(props, configBase);
         var url = props.getProperty(configBase + ".url");
         var jdbcUrl = String.format("jdbc:%s:%s", dialect.name().toLowerCase(), url);
 
         var hikariProps = new Properties();
         hikariProps.setProperty("jdbcUrl", jdbcUrl);
+        hikariProps.setProperty("poolName", "dal_worker_pool");
+
+        var poolSize = props.getProperty(configBase + ".pool.size");
+
+        if (poolSize != null && !poolSize.isBlank())
+            hikariProps.setProperty("maximumPoolSize", poolSize);
 
         var prefix = configBase + "." + dialect.name().toLowerCase() + ".";
 
@@ -69,14 +78,8 @@ public class JdbcSetup {
         var config = new HikariConfig(hikariProps);
         var source = new HikariDataSource(config);
 
-        try (var conn = source.getConnection()) {
-
-            var clientProps = conn.getClientInfo();
-        }
-        catch (SQLException e) {
-
-            throw new EStartup("");
-        }
+        var log = LoggerFactory.getLogger(JdbcSetup.class);
+        log.info("Database connection pool has " + source.getMaximumPoolSize() + " connections");
 
         return source;
     }
@@ -95,31 +98,5 @@ public class JdbcSetup {
         catch (IllegalArgumentException e) {
             throw new EStartup("Unsupported SQL dialect: " + dialect);
         }
-    }
-
-    private static String dataSourceClassName(JdbcDialect dialect) {
-
-        try {
-
-            var loader = JdbcSetup.class.getClassLoader();
-
-            var className = JDBC_CLASSES.getOrDefault(dialect, null);
-
-            if (className == null)
-                throw new EStartup("Unsupported SQL dialect " + dialect.name());
-
-            loader.loadClass(className);
-
-            return className;
-        }
-        catch (ClassNotFoundException e) {
-
-            throw new EStartup("No driver available for SQL dialect " + dialect.name());
-        }
-    }
-
-    public static Executor createExecutor() {
-
-        return null;
     }
 }
