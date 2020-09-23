@@ -19,6 +19,7 @@ package com.accenture.trac.gateway;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.config.StandardArgsProcessor;
 import com.accenture.trac.common.exception.EStartup;
+import com.accenture.trac.common.util.VersionInfo;
 import com.accenture.trac.gateway.routing.BasicRouteMatcher;
 import com.accenture.trac.gateway.routing.RoutingConfig;
 import com.accenture.trac.gateway.routing.RoutingHandler;
@@ -156,7 +157,10 @@ public class TracPlatformGateway {
 
         try {
 
-            System.out.println(">>> TRAC Platform Gateway " + "[DEVELOPMENT VERSION]");
+            var componentName = VersionInfo.getComponentName(TracPlatformGateway.class);
+            var componentVersion = VersionInfo.getComponentVersion(TracPlatformGateway.class);
+            var startupBanner = String.format(">>> %s %s", componentName, componentVersion);
+            System.out.println(startupBanner);
 
             var standardArgs = StandardArgsProcessor.processArgs(args);
 

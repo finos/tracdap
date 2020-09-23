@@ -20,7 +20,9 @@ plugins {
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
+apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
+ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Platform Gateway")
 
 dependencies {
 

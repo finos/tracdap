@@ -21,6 +21,7 @@ import com.accenture.trac.common.config.StandardArgsProcessor;
 import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.exception.*;
 import com.accenture.trac.common.util.InterfaceLogging;
+import com.accenture.trac.common.util.VersionInfo;
 import com.accenture.trac.svc.meta.api.MetadataPublicWriteApi;
 import com.accenture.trac.svc.meta.api.MetadataReadApi;
 import com.accenture.trac.svc.meta.api.MetadataSearchApi;
@@ -275,7 +276,10 @@ public class TracMetadataService {
 
         try {
 
-            System.out.println(">>> TRAC Metadata Service " + "[DEVELOPMENT VERSION]");
+            var componentName = VersionInfo.getComponentName(TracMetadataService.class);
+            var componentVersion = VersionInfo.getComponentVersion(TracMetadataService.class);
+            var startupBanner = String.format(">>> %s %s", componentName, componentVersion);
+            System.out.println(startupBanner);
 
             var standardArgs = StandardArgsProcessor.processArgs(args);
 

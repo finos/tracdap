@@ -1,3 +1,5 @@
+import java.nio.file.Files
+
 /*
  * Copyright 2020 Accenture Global Solutions Limited
  *
@@ -20,7 +22,9 @@ plugins {
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
+apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
+ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Metadata Service")
 
 dependencies {
 
@@ -37,8 +41,6 @@ dependencies {
     implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: "$log4j_version"
     implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: "$log4j_version"
     implementation group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: "$log4j_version"
-
-    // Test
 
     // Migration support for JUnit 4 Rules, provided by gRPC for managing test service instances
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-migrationsupport', version: "$junit_version"
