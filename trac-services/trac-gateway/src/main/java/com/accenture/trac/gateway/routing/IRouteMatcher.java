@@ -14,16 +14,18 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.exception;
+package com.accenture.trac.gateway.routing;
+
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpMethod;
+
+import java.net.URI;
 
 
-public class ETracPublic extends ETrac {
+/**
+ * Interface to match incoming requests for routing.
+ */
+public interface IRouteMatcher {
 
-    public ETracPublic(String message, Throwable cause) {
-        super(message, cause);
-    }
-
-    public ETracPublic(String message) {
-        super(message);
-    }
+    boolean matches(URI uri, HttpMethod method, HttpHeaders headers);
 }

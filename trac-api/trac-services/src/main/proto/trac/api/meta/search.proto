@@ -30,7 +30,8 @@ service MetadataSearchApi {
 
   rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
     option (google.api.http) = {
-      get: "/{tenant}/{search.objectType}/search?{search.priorVersions}"
+      post: "/{tenant}/{searchParams.objectType}/search?priorVersions={searchParams.priorVersions}"
+      body: "searchParams.search"
     };
   }
 

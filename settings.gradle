@@ -42,8 +42,10 @@ project(":trac-lib-db").projectDir = file("trac-libs/trac-lib-db")
 // Java services
 
 include 'trac-svc-meta'
+include 'trac-gateway'
 
 project(":trac-svc-meta").projectDir = file("trac-services/trac-svc-meta")
+project(":trac-gateway").projectDir = file("trac-services/trac-gateway")
 
 
 // Tools and utilities

@@ -17,13 +17,13 @@
 package com.accenture.trac.common.exception;
 
 
-public class ETracPublic extends ETrac {
+public class EInputValidation extends ETracPublic {
 
-    public ETracPublic(String message, Throwable cause) {
+    public EInputValidation(String message, Throwable cause) {
         super(message, cause);
     }
 
-    public ETracPublic(String message) {
+    public EInputValidation(String message) {
         super(message);
     }
 }
