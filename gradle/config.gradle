@@ -16,33 +16,36 @@
 
 ext {
 
-    javax_annotation_version = '1.3.2'
-
-    // Proto / gRPC
-    proto_version = '3.10.0'
-    grpc_version = '1.24.0'
+    // Proto / gRPC (use a consistent set of versions, as defined by gRPC)
+    proto_version = '3.12.0'
+    grpc_version = '1.32.1'
     gapi_version = '1.17.0'
 
     // Apache Commons Components
     commons_cli_version = "1.4"
-    commons_dbcp_version = '2.7.0'
 
     // JDBC Connection pool
     hikari_cp_version = '3.4.5'
 
     // Logging
-    slf4j_version = '1.7.29'
-    log4j_version = '2.12.1'
+    slf4j_version = '1.7.30'
+    log4j_version = '2.13.3'
 
+    // @Generated annotation is required by gRPC generated code
+    javax_annotation_version = '1.3.2'
 
     // SQL (JDBC) drivers
     h2_version = '1.4.200'
+    mysql_version = '8.0.21'
     mariadb_version = '2.6.2'
+    postgresql_version = '42.2.16'
+    sqlserver_version = '8.4.1.jre11'
+    oracle_version = '19.7.0.0'
 
 
     // Test dependencies
 
-    junit_version = '5.5.2'
+    junit_version = '5.7.0'
 
     // Embedded DB for local testing
     mariadb_embedded_version = '2.4.0'

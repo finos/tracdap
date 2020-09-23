@@ -16,8 +16,24 @@
 
 ext {
 
+    // Turn on every available plugin, useful for integration test builds
     BUILD_ALL_PLUGINS = false
 
+    /**
+     * Note on licensing of SQL JDBC Drivers
+     *
+     * SQL drivers are not a compile-time dependency of the TRAC services
+     * Instead, JDBC drivers can be added to the classpath at launch time
+     * This allows TRAC to be distributed independently of any SQL driver
+     *
+     * Drivers enabled here are used for testing and linked into development builds
+     * Such drivers may only be used in accordance with their respective licenses
+     */
+
     BUILD_sql_h2 = true
+    BUILD_sql_mysql = false
     BUILD_sql_mariadb = true
+    BUILD_sql_postgresql = false
+    BUILD_sql_sqlserver = false
+    BUILD_sql_oracle = false
 }
