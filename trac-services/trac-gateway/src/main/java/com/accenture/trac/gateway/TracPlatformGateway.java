@@ -53,20 +53,23 @@ public class TracPlatformGateway {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final Properties props;
+    private final ConfigManager configManager;
 
-    public TracPlatformGateway(Properties props) {
+    public TracPlatformGateway(ConfigManager configManager) {
 
-        this.props = props;
+        this.configManager = configManager;
     }
 
     public void run() throws Exception {
+        var componentName = VersionInfo.getComponentName(TracPlatformGateway.class);
+        var componentVersion = VersionInfo.getComponentVersion(TracPlatformGateway.class);
+        log.info("{} {}", componentName, componentVersion);
+        log.info("Gateway is starting...");
 
-        log.info("TRAC Platform Gateway is starting up...");
-
-        var gwPort = readConfigInt(props, GW_PORT_CONFIG_KEY, null);
-        var metaSvcHost = readConfigString(props, META_SVC_HOST_CONFIG_KEY, null);
-        var metaSvcPort = readConfigInt(props, META_SVC_PORT_CONFIG_KEY, null);
+        var properties = configManager.loadRootProperties();
+        var gwPort = readConfigInt(properties, GW_PORT_CONFIG_KEY, null);
+        var metaSvcHost = readConfigString(properties, META_SVC_HOST_CONFIG_KEY, null);
+        var metaSvcPort = readConfigInt(properties, META_SVC_PORT_CONFIG_KEY, null);
 
         log.info("Configuring API routes...");
 
@@ -172,9 +175,7 @@ public class TracPlatformGateway {
             configManager.initConfigPlugins();
             configManager.initLogging();
 
-            var properties = configManager.loadRootProperties();
-            var gateway = new TracPlatformGateway(properties);
-
+            var gateway = new TracPlatformGateway(configManager);
             gateway.run();
 
             System.exit(0);

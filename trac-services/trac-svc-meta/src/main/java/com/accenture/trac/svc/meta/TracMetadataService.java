@@ -69,25 +69,29 @@ public class TracMetadataService {
 
     private final Logger log;
 
-    private final Properties properties;
+    private final ConfigManager configManager;
 
     private JdbcMetadataDal dal;
     private ExecutorService executor;
     private Server server;
 
-    TracMetadataService(Properties properties) {
+    TracMetadataService(ConfigManager configManager) {
 
         this.log = LoggerFactory.getLogger(getClass());
 
-        this.properties = properties;
+        this.configManager = configManager;
     }
 
     void start() throws IOException {
 
-        log.info("TRAC metadata service is starting...");
+        var componentName = VersionInfo.getComponentName(TracMetadataService.class);
+        var componentVersion = VersionInfo.getComponentVersion(TracMetadataService.class);
+        log.info("{} {}", componentName, componentVersion);
+        log.info("Service is starting...");
 
         // Use the -db library to set up a datasource
         // Handles different SQL dialects and authentication mechanisms etc.
+        var properties = configManager.loadRootProperties();
         var dialect = JdbcSetup.selectDialect(properties, DB_CONFIG_ROOT);
         var dataSource = JdbcSetup.createDatasource(properties, DB_CONFIG_ROOT);
 
@@ -291,8 +295,7 @@ public class TracMetadataService {
             configManager.initConfigPlugins();
             configManager.initLogging();
 
-            var properties = configManager.loadRootProperties();
-            var service = new TracMetadataService(properties);
+            var service = new TracMetadataService(configManager);
             service.start();
             service.blockUntilShutdown();
 

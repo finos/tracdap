@@ -188,7 +188,6 @@ public class ConfigManager {
         }
 
         this.log = LoggerFactory.getLogger(getClass());
-        logInfo("Logging system initialized");
     }
 
 

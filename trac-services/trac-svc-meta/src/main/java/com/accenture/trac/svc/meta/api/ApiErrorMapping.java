@@ -24,13 +24,13 @@ import java.util.Map;
 
 public class ApiErrorMapping {
 
-    static final Map<Class<? extends Throwable>, Status.Code> ERROR_MAPPING = Map.of(
+    static final Map<Class<? extends Throwable>, Status.Code> ERROR_MAPPING = Map.ofEntries(
 
-            AuthorisationError.class, Status.Code.PERMISSION_DENIED,
-            InputValidationError.class, Status.Code.INVALID_ARGUMENT,
+            Map.entry(AuthorisationError.class, Status.Code.PERMISSION_DENIED),
+            Map.entry(InputValidationError.class, Status.Code.INVALID_ARGUMENT),
 
-            MissingItemError.class, Status.Code.NOT_FOUND,
-            DuplicateItemError.class, Status.Code.ALREADY_EXISTS,
-            WrongItemTypeError.class, Status.Code.FAILED_PRECONDITION
-    );
+            Map.entry(TenantError.class, Status.Code.NOT_FOUND),
+            Map.entry(MissingItemError.class, Status.Code.NOT_FOUND),
+            Map.entry(DuplicateItemError.class, Status.Code.ALREADY_EXISTS),
+            Map.entry(WrongItemTypeError.class, Status.Code.FAILED_PRECONDITION));
 }

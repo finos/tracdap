@@ -16,12 +16,18 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.svc.meta.exception.TenantError;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
 class JdbcTenantImpl {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private Map<String, Short> tenantMap;
     private final Object tenantLock;
@@ -61,8 +67,11 @@ class JdbcTenantImpl {
 
         var tenantId = currentTenantMap.getOrDefault(tenant, null);
 
-        if (tenantId == null)
-            throw new RuntimeException();  // TODO: error handling, reload, expiry
+        if (tenantId == null) {
+            var message = String.format("Unknown tenant [%s]", tenant);
+            log.error(message);
+            throw new TenantError(message);
+        }
 
         return tenantId;
     }
