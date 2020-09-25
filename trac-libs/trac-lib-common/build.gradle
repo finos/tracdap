@@ -27,7 +27,7 @@ dependencies {
     api project(':trac-api-metadata')
 
     // gRPC
-    compile group: 'io.grpc', name: 'grpc-stub', version: "$grpc_version"
+    api group: 'io.grpc', name: 'grpc-stub', version: "$grpc_version"
 
     // Apache Commons Components
     implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"

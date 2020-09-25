@@ -36,18 +36,17 @@ sourceSets {
 
 dependencies {
 
-    compile project(':trac-api-metadata')
+    api project(':trac-api-metadata')
 
     // Protoc generates code using the 'Generated' annotation from this package
-    compile group: 'javax.annotation', name: 'javax.annotation-api', version: "$javax_annotation_version"
+    api group: 'javax.annotation', name: 'javax.annotation-api', version: "$javax_annotation_version"
 
-    // GRPC for Protobuf / Netty
-    compile group: 'io.grpc', name: 'grpc-protobuf', version: "$grpc_version"
-    compile group: 'io.grpc', name: 'grpc-stub', version: "$grpc_version"
-    compile group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
+    // Core services API uses gRPC / Protobuf stubs
+    api group: 'io.grpc', name: 'grpc-stub', version: "$grpc_version"
+    api group: 'io.grpc', name: 'grpc-protobuf', version: "$grpc_version"
 
     // Google APIs framework for REST APIs
-    compile group: 'com.google.api.grpc', name: 'proto-google-common-protos', version: "$gapi_version"
+    implementation group: 'com.google.api.grpc', name: 'proto-google-common-protos', version: "$gapi_version"
 }
 
 

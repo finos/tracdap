@@ -17,41 +17,77 @@
 package com.accenture.trac.deploy.metadb;
 
 import com.accenture.trac.common.config.ConfigManager;
+import com.accenture.trac.common.config.StandardArgs;
 import com.accenture.trac.common.config.StandardArgsProcessor;
 import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.exception.EStartup;
 
+import com.accenture.trac.common.exception.ETrac;
+import com.accenture.trac.common.util.VersionInfo;
 import org.flywaydb.core.Flyway;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.sql.SQLException;
-import java.util.Properties;
+import java.util.List;
+
 
 public class DeployMetaDB {
 
     private final static String DB_CONFIG_ROOT = "trac.svc.meta.db.sql";
     private final static String SCHEMA_LOCATION = "classpath:%s";
 
-    private final Logger log;
-    private final Properties props;
+    private final static String DEPLOY_SCHEMA_TASK_NAME = "deploy_schema";
+    private final static String ADD_TENANT_TASK_NAME = "add_tenant";
 
-    public DeployMetaDB(Properties props) {
+    private final static List<StandardArgs.Task> METADB_TASKS = List.of(
+            StandardArgs.task(DEPLOY_SCHEMA_TASK_NAME, null, "Deploy/update metadata database with the latest physical schema"),
+            StandardArgs.task(ADD_TENANT_TASK_NAME, "TENANT_CODE", "Add a new tenant to the metadata database"));
+
+    private final Logger log;
+    private final ConfigManager configManager;
+
+    public DeployMetaDB(ConfigManager configManager) {
 
         this.log = LoggerFactory.getLogger(getClass());
-        this.props = props;
+        this.configManager = configManager;
     }
 
-    public void runDeployment() {
+    public void runDeployment(List<StandardArgs.Task> tasks) {
 
-        var dialect = JdbcSetup.selectDialect(props, DB_CONFIG_ROOT);
+        var componentName = VersionInfo.getComponentName(DeployMetaDB.class);
+        var componentVersion = VersionInfo.getComponentVersion(DeployMetaDB.class);
+        log.info("{} {}", componentName, componentVersion);
+
+        var properties = configManager.loadRootProperties();
+        var dialect = JdbcSetup.selectDialect(properties, DB_CONFIG_ROOT);
         var scriptsLocation = String.format(SCHEMA_LOCATION, dialect.name().toLowerCase());
 
         log.info("SQL Dialect: " + dialect);
         log.info("Scripts location: " + scriptsLocation);
 
-        var dataSource = JdbcSetup.createDatasource(props, DB_CONFIG_ROOT);
+        var dataSource = JdbcSetup.createDatasource(properties, DB_CONFIG_ROOT);
+
+        for (var task : tasks) {
+
+            if (DEPLOY_SCHEMA_TASK_NAME.equals(task.getTaskName()))
+                deploySchema(dataSource, scriptsLocation);
+
+            else if (ADD_TENANT_TASK_NAME.equals(task.getTaskName()))
+                addTenant(dataSource, task.getTaskArg());
+
+            else
+                throw new EStartup(String.format("Unknown task: [%s]", task.getTaskName()));
+        }
+
+        log.info("All tasks complete");
+    }
+
+    private void deploySchema(DataSource dataSource, String scriptsLocation) {
+
+        log.info("Running task: Deploy schema...");
 
         var flyway = Flyway.configure()
                 .dataSource(dataSource)
@@ -63,13 +99,52 @@ public class DeployMetaDB {
         flyway.migrate();
     }
 
+    private void addTenant(DataSource dataSource, String tenantCode) {
+
+        log.info("Running task: Add tenant...");
+        log.info("New tenant code: [{}]", tenantCode);
+
+        var maxSelect = "select max (tenant_id) from tenant";
+        var insertTenant = "insert into tenant (tenant_id, tenant_code) values (?, ?)";
+
+        short nextId;
+
+        try (var conn = dataSource.getConnection()) {
+
+            try (var stmt = conn.prepareStatement(maxSelect); var rs = stmt.executeQuery()) {
+
+                if (rs.next()) {
+                    nextId = rs.getShort(1);
+                    nextId++;
+                }
+                else
+                    nextId = 1;
+            }
+
+            try (var stmt = conn.prepareStatement(insertTenant)) {
+
+                stmt.setShort(1, nextId);
+                stmt.setString(2, tenantCode);
+                stmt.execute();
+            }
+        }
+        catch (SQLException e) {
+
+            throw new ETrac("Failed to create tenant: " + e.getMessage(), e);
+        }
+
+    }
+
     public static void main(String[] args) {
 
         try {
 
-            System.out.println(">>> TRAC Deploy Tool: Meta DB " + "[DEVELOPMENT VERSION]");
+            var componentName = VersionInfo.getComponentName(DeployMetaDB.class);
+            var componentVersion = VersionInfo.getComponentVersion(DeployMetaDB.class);
+            var startupBanner = String.format(">>> %s %s", componentName, componentVersion);
+            System.out.println(startupBanner);
 
-            var standardArgs = StandardArgsProcessor.processArgs(args);
+            var standardArgs = StandardArgsProcessor.processArgs(componentName, args, METADB_TASKS);
 
             System.out.println(">>> Working directory: " + standardArgs.getWorkingDir());
             System.out.println(">>> Config file: " + standardArgs.getConfigFile());
@@ -79,9 +154,8 @@ public class DeployMetaDB {
             configManager.initConfigPlugins();
             configManager.initLogging();
 
-            var properties = configManager.loadRootProperties();
-            var deploy = new DeployMetaDB(properties);
-            deploy.runDeployment();
+            var deploy = new DeployMetaDB(configManager);
+            deploy.runDeployment(standardArgs.getTasks());
 
             System.exit(0);
         }

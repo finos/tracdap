@@ -21,7 +21,6 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.*;
 import java.util.Collection;
-import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 
@@ -31,6 +30,7 @@ public class InterfaceLogging implements InvocationHandler {
     private final Object impl;
     private final Logger log;
 
+    @SuppressWarnings("unchecked")
     public static <I, T extends I>
     I wrap(T impl, Class<I> iface) {
 
@@ -38,7 +38,6 @@ public class InterfaceLogging implements InvocationHandler {
         var handler = new InterfaceLogging(impl, logger);
         var proxy = Proxy.newProxyInstance(impl.getClass().getClassLoader(), new Class[]{iface}, handler);
 
-        // noinspection unchecked
         return (I) proxy;
     }
 

@@ -1,5 +1,3 @@
-import java.nio.file.Files
-
 /*
  * Copyright 2020 Accenture Global Solutions Limited
  *
@@ -17,7 +15,7 @@ import java.nio.file.Files
  */
 
 plugins {
-    id "java"
+    id "application"
     id "idea"
 }
 
@@ -26,12 +24,21 @@ apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
 ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Metadata Service")
 
+
+application {
+    mainClassName = 'com.accenture.trac.svc.meta.TracMetadataService'
+    tasks.run.workingDir = rootProject.projectDir
+}
+
 dependencies {
 
     implementation project(':trac-api-metadata')
     implementation project(':trac-api-services')
     implementation project(':trac-lib-common')
     implementation project(':trac-lib-db')
+
+    // Core framework - gRPC on Netty
+    implementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
 
     // CLI library for processing startup args (part of the .config package)
     implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"
@@ -56,7 +63,6 @@ dependencies {
     testImplementation group: 'ch.vorburger.mariaDB4j', name: 'mariaDB4j', version: "$mariadb_embedded_version"
 }
 
-
 // Bring DDL files into test JAR as resources
 processTestResources {
 
@@ -69,7 +75,7 @@ processTestResources {
 
 gradle.startParameter.taskNames.forEach { task ->
 
-    if (task.endsWith("main()")) {
+    if (task.endsWith(":run") || task.endsWith("main()")) {
         dependencies {
             runtimeOnly project(':sql-drivers')
         }

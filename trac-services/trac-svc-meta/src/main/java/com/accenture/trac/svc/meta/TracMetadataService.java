@@ -285,7 +285,7 @@ public class TracMetadataService {
             var startupBanner = String.format(">>> %s %s", componentName, componentVersion);
             System.out.println(startupBanner);
 
-            var standardArgs = StandardArgsProcessor.processArgs(args);
+            var standardArgs = StandardArgsProcessor.processArgs(componentName, args);
 
             System.out.println(">>> Working directory: " + standardArgs.getWorkingDir());
             System.out.println(">>> Config file: " + standardArgs.getConfigFile());

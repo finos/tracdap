@@ -160,6 +160,7 @@ public class RestApiRequestBuilder<TRequest extends Message> {
     // Runtime methods
     // -----------------------------------------------------------------------------------------------------------------
 
+    @SuppressWarnings("unchecked")
     public TRequest build(String url, Message body) {
 
         // This should be set up correctly when the API route is created
@@ -179,6 +180,7 @@ public class RestApiRequestBuilder<TRequest extends Message> {
         return (TRequest) request.build();
     }
 
+    @SuppressWarnings("unchecked")
     public TRequest build(String url) {
 
         // This should be set up correctly when the API route is created

@@ -15,24 +15,31 @@
  */
 
 plugins {
-    id "java"
+    id "application"
     id "idea"
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
+apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
+ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Deploy Meta DB")
+
+
+application {
+    mainClassName = 'com.accenture.trac.deploy.metadb.DeployMetaDB'
+    tasks.run.workingDir = rootProject.projectDir
+}
 
 dependencies {
 
     implementation project(':trac-lib-common')
     implementation project(':trac-lib-db')
-
     implementation project(':sql-drivers')
 
     // CLI library for processing startup args (part of the .config package)
     implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"
 
-    implementation group: 'org.flywaydb', name: 'flyway-core', version: "6.5.6"
+    implementation group: 'org.flywaydb', name: 'flyway-core', version: "$flyway_version"
 
     // Logging
     implementation group: 'org.slf4j', name: 'slf4j-api', version: "$slf4j_version"
@@ -40,7 +47,6 @@ dependencies {
     implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: "$log4j_version"
     implementation group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: "$log4j_version"
 }
-
 
 // Bring DDL files into main JAR as resources
 processResources {

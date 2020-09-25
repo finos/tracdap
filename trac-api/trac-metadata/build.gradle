@@ -46,5 +46,5 @@ protobuf {
 dependencies {
 
     // Core protobuf for Java
-    compile group: 'com.google.protobuf', name: 'protobuf-java', version: "$proto_version"
+    api group: 'com.google.protobuf', name: 'protobuf-java', version: "$proto_version"
 }

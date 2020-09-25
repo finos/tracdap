@@ -15,7 +15,7 @@
  */
 
 plugins {
-    id "java"
+    id "application"
     id "idea"
 }
 
@@ -24,15 +24,24 @@ apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
 ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Platform Gateway")
 
+
+application {
+    mainClassName = 'com.accenture.trac.gateway.TracPlatformGateway'
+    tasks.run.workingDir = rootProject.projectDir
+}
+
 dependencies {
 
     implementation project(':trac-api-metadata')
     implementation project(':trac-api-services')
     implementation project(':trac-lib-common')
 
+    // Core framework - Netty + gRPC
+    implementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
+
     // Protobuf for Java
-    compile group: 'com.google.protobuf', name: 'protobuf-java', version: "$proto_version"
-    compile group: 'com.google.protobuf', name: 'protobuf-java-util', version: "$proto_version"
+    implementation group: 'com.google.protobuf', name: 'protobuf-java', version: "$proto_version"
+    implementation group: 'com.google.protobuf', name: 'protobuf-java-util', version: "$proto_version"
 
     // CLI library for processing startup args (part of the .config package)
     implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"

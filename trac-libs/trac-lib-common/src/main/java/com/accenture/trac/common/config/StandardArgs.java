@@ -17,6 +17,7 @@
 package com.accenture.trac.common.config;
 
 import java.nio.file.Path;
+import java.util.List;
 
 
 /**
@@ -30,11 +31,17 @@ public class StandardArgs {
     private final Path workingDir;
     private final String configFile;
     private final String keystoreKey;
+    private final List<Task> tasks;
 
-    public StandardArgs(Path workingDir, String configFile, String keystoreKey) {
+    public StandardArgs(Path workingDir, String configFile, String keystoreKey, List<Task> tasks) {
         this.workingDir = workingDir;
         this.configFile = configFile;
         this.keystoreKey = keystoreKey;
+        this.tasks = tasks;
+    }
+
+    public StandardArgs(Path workingDir, String configFile, String keystoreKey) {
+        this(workingDir, configFile, keystoreKey, List.of());
     }
 
     public Path getWorkingDir() {
@@ -47,5 +54,50 @@ public class StandardArgs {
 
     public String getKeystoreKey() {
         return keystoreKey;
+    }
+
+    public List<Task> getTasks() {
+        return tasks;
+    }
+
+    public static Task task(String taskName, String taskArg, String taskDescription) {
+        return new Task(taskName, taskArg, taskDescription);
+    }
+
+    public static class Task {
+
+        private final String taskName;
+        private final String taskArg;
+        private final String taskDescription;
+
+        public Task(String taskName, String taskArg, String taskDescription) {
+            this.taskName = taskName;
+            this.taskArg = taskArg;
+            this.taskDescription= taskDescription;
+        }
+
+        public Task(String taskName, String taskArg) {
+            this(taskName, taskArg, null);
+        }
+
+        public Task(String taskName) {
+            this(taskName, null);
+        }
+
+        public String getTaskName() {
+            return taskName;
+        }
+
+        public boolean hasArg() {
+            return taskArg != null;
+        }
+
+        public String getTaskArg() {
+            return taskArg;
+        }
+
+        public String getTaskDescription() {
+            return taskDescription;
+        }
     }
 }
