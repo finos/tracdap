@@ -99,7 +99,8 @@ public class MetadataWriteApiTest implements IDalTestable {
     }
 
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
     void saveNewObject_trustedTypesOk(ObjectType objectType) {
 
         saveNewObject_ok(objectType, request -> trustedApi.saveNewObject(request));
@@ -117,10 +118,8 @@ public class MetadataWriteApiTest implements IDalTestable {
     }
 
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE, names = {
-            "UNRECOGNIZED",
-            "FLOW",
-            "CUSTOM"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+            names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "FLOW", "CUSTOM"})
     void saveNewObject_publicTypesNotAllowed(ObjectType objectType) {
 
         var objToSave = TestData.dummyDefinitionForType(objectType, TestData.NO_HEADER);
@@ -346,8 +345,8 @@ public class MetadataWriteApiTest implements IDalTestable {
     }
 
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE, names = {
-            "UNRECOGNIZED", "FLOW", "CUSTOM"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+            names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "FLOW", "CUSTOM"})
     void saveNewVersion_publicTypesNotAllowed(ObjectType objectType) {
 
         var v1SavedTag = saveNewVersion_prepareV1(objectType);
@@ -367,8 +366,8 @@ public class MetadataWriteApiTest implements IDalTestable {
     }
 
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE, names = {
-            "UNRECOGNIZED", "DATA", "CUSTOM"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+            names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "DATA", "CUSTOM"})
     void saveNewVersion_versionsNotSupported(ObjectType objectType) {
 
         var v1SavedTag = saveNewVersion_prepareV1(objectType);
@@ -781,7 +780,8 @@ public class MetadataWriteApiTest implements IDalTestable {
 
 
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
     void saveNewTag_AllTypesOk(ObjectType objectType) {
 
         var v1SavedTag = saveNewVersion_prepareV1(objectType);

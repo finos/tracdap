@@ -25,10 +25,70 @@ import "trac/metadata/object.proto";
 import "trac/metadata/tag.proto";
 
 import "google/api/annotations.proto";
+import "google/protobuf/descriptor.proto";
 
 
+/**
+ * Public API for writing metadata objects into the TRAC metadata store.
+ *
+ * This API allows objects to be created directly, by supplying their metadata
+ * definition and a set of tags. These definitions and tags are validated,
+ * assigned an ID and version (in an object header) then saved as they are. Only
+ * certain types of objects can be created / updated directly via the public API
+ * (currently FLOW and CUSTOM objects). Other types of objects are created by TRAC
+ * as a result of operations on the platform, for example a model import job will
+ * create a model definition. To understand the TRAC metadata model, start by
+ * reading the documentation for ObjectDefinition and Tag.
+ *
+ * Creating a new version of an object is very similar to creating a new object,
+ * in that the entire metadata definition must be supplied. TRAC will perform
+ * validation to make sure the new definition is a valid version update from the
+ * previous version - the semantics of versioning depend on the particular object
+ * type.
+ *
+ * The metadata write API also provides a means for updating tags (i.e. creating
+ * a new tag version); tag updates are allowed for all object types via the public
+ * API. The current API requires a whole new tag to be supplied, this will be
+ * replaced in a future version with an API that supplies attributes changes as a
+ * set of add/modify/remove operations.
+ *
+ * This API is a multi-tenant API. For gRPC requests every request includes a
+ * tenant code, for REST requests the tenant code is the first element of every
+ * path.
+ *
+ * @see ObjectDefinition
+ * @see Tag
+ */
 service MetadataPublicWriteApi {
 
+    /**
+     * Save a new object into the TRAC metadata store.
+     *
+     * To save an object, supply a metadata write request with the tenant code,
+     * object type and a tag for the item you want to save. The tag should contain
+     * all the attributes you want to set and the object definition, without an
+     * object header. TRAC will create a header when it assigns and ID for the new
+     * object. Only FLOW and CUSTOM objects can be created by this API call.
+     *
+     * Validation is performed on new objects before they are saved. Objects can
+     * fail validation because they are semantically invalid (e.g. missing
+     * required fields or inconsistencies within the object definition) or due to
+     * consistency errors (referring to other metadata items that don't exist or
+     * don't meet certain requirements).
+     *
+     * NOTE: Validation is only partially implemented in the current release.
+     *
+     * The call returns an ID response to indicate the ID of the newly created
+     * object, as well as the object and tag version (which will always be 1).
+     *
+     * Error conditions include: Invalid request, unknown tenant, object type does
+     * not match the supplied definition, validation failure.
+     *
+     * @see MetadataWriteRequest
+     * @see ObjectDefinition
+     * @see Tag
+     * @see IdResponse
+     */
     rpc saveNewObject (MetadataWriteRequest) returns (IdResponse) {
         option (google.api.http) = {
             post: "/{tenant}/{objectType}/new-object"
@@ -36,6 +96,38 @@ service MetadataPublicWriteApi {
         };
     }
 
+    /**
+     * Save a new version of an existing object into the TRAC metadata store.
+     *
+     * To save a new version, supply a metadata write request with the tenant code,
+     * object type and a tag for the item you want to save. The tag should contain
+     * all the attributes you want to set and the updated object definition, which
+     * must be supplied with the header from the *previous* version of the object.
+     * TRAC will apply the new version number when it creates the new version of
+     * the object. Only the latest version of an object can be updated and only
+     * CUSTOM objects can be updated by this API call.
+     *
+     * Validation is performed on new objects before they are saved. Objects can
+     * fail validation because they are semantically invalid (e.g. missing
+     * required fields or inconsistencies within the object definition) or due to
+     * consistency errors (referring to other metadata items that don't exist or
+     * don't meet certain requirements). For new versions, validation also covers
+     * checking for compatibility with the previous version of the object.
+     *
+     * NOTE: Validation is only partially implemented in the current release.
+     *
+     * The call returns an ID response with the ID object and the newly assigned
+     * version number, as well as the tag version (which will always be 1).
+     *
+     * Error conditions include: Invalid request, unknown tenant, unknown object
+     * ID or version, wrong object type (not the same as the prior version), object
+     * version is superseded.
+     *
+     * @see MetadataWriteRequest
+     * @see ObjectDefinition
+     * @see Tag
+     * @see IdResponse
+     */
     rpc saveNewVersion (MetadataWriteRequest) returns (IdResponse) {
         option (google.api.http) = {
             post: "/{tenant}/{objectType}/new-version"
@@ -43,6 +135,31 @@ service MetadataPublicWriteApi {
         };
     }
 
+    /**
+     * Save a new tag into the TRAC metadata store for an existing object/version.
+     *
+     * NOTE: This will be replaced by updateTag() in the next version of TRAC.
+     *
+     * To save a new tag, supply a metadata write request with the tenant code,
+     * object type and a tag for the item you want to save. The tag should contain
+     * all the attributes you want to include in the new tag, even if they have
+     * not been changed. The object definition must be supplied with a header only,
+     * supplying an object body is an invalid request. Tags for any type of object
+     * can be updated by this API call. Only the latest version of a tag can be
+     * updated.
+     *
+     * The call returns an ID response with the ID and version of the object and
+     * the newly assigned tag number.
+     *
+     * Error conditions include: Invalid request, unknown tenant, unknown object
+     * ID, object version or tag version, wrong object type (does not match what
+     * is stored in TRAC), tag version is superseded.
+     *
+     * @see MetadataWriteRequest
+     * @see ObjectDefinition
+     * @see Tag
+     * @see IdResponse
+     */
     rpc saveNewTag (MetadataWriteRequest) returns (IdResponse) {
         option (google.api.http) = {
             post: "/{tenant}/{objectType}/new-tag"
@@ -52,8 +169,39 @@ service MetadataPublicWriteApi {
 }
 
 
+/**
+ * Trusted API for writing metadata objects into the TRAC metadata store.
+ *
+ * This API is only available other service components in the TRAC platform, it is
+ * not exposed directly to clients. It provides all the same functionality as the
+ * public write API, without the restrictions on which object types can be created.
+ * Validation is still performed, so that validation is guaranteed by the metadata
+ * service, although other TRAC components may still perform pre-validation before
+ * submitting items to be stored.
+ *
+ * As well as the calls provided by the public API, the trusted API provides a
+ * pre-allocation facility. This allows IDs to be "reserved" before definitions
+ * are created. For example, a job may need to reserved IDs for the datasets it is
+ * going to create. Currently pre-allocation is available for IDs only, not for
+ * versions.
+ *
+ * This API is a multi-tenant API. For gRPC requests every request includes a
+ * tenant code, for REST requests the tenant code is the first element of every
+ * path.
+ *
+ * @see MetadataPublicWriteApi
+ */
 service MetadataTrustedWriteApi {
 
+
+    /**
+     * Save a new object into the TRAC metadata store.
+     *
+     * This call behaves identically to the equivalent public API call, without the
+     * restriction on which types of object can be saved.
+     *
+     * @see MetadataPublicWriteApi
+     */
     rpc saveNewObject (MetadataWriteRequest) returns (IdResponse) {
         option (google.api.http) = {
             post: "/{tenant}/trusted/{objectType}/new-object"
@@ -61,6 +209,15 @@ service MetadataTrustedWriteApi {
         };
     }
 
+    /**
+     * Save a new version of an existing object into the TRAC metadata store.
+     *
+     * This call behaves identically to the equivalent public API call, however it
+     * can be used with any type of object that supports versioning (currently DATA
+     * and CUSTOM).
+     *
+     * @see MetadataPublicWriteApi
+     */
     rpc saveNewVersion (MetadataWriteRequest) returns (IdResponse) {
         option (google.api.http) = {
             post: "/{tenant}/trusted/{objectType}/new-version"
@@ -68,6 +225,13 @@ service MetadataTrustedWriteApi {
         };
     }
 
+    /**
+     * Save a new tag into the TRAC metadata store for an existing object/version.
+     *
+     * This call behaves identically to the equivalent public API call.
+     *
+     * @see MetadataPublicWriteApi
+     */
     rpc saveNewTag (MetadataWriteRequest) returns (IdResponse) {
         option (google.api.http) = {
             post: "/{tenant}/trusted/{objectType}/new-tag"
@@ -75,6 +239,19 @@ service MetadataTrustedWriteApi {
         };
     }
 
+    /**
+     * Preallocate an object ID for an object that will be saved later.
+     *
+     * This call is for use by TRAC components that need to reserve an ID before
+     * it is used, particularly if the object ID must be included in the definition
+     * of an object that has not been created yet. When creating an ID the tenant
+     * and object type must be specified, the object that is eventually saved must
+     * match these two conditions. Orphan IDs are expected - if a component request
+     * an ID and encounters an error before that ID is used, the orphan ID is just
+     * ignored.
+     *
+     * @see MetadataWriteRequest
+     */
     rpc preallocateId (MetadataWriteRequest) returns (IdResponse) {
         option (google.api.http) = {
             post: "/{tenant}/trusted/{objectType}/preallocate"
@@ -82,6 +259,20 @@ service MetadataTrustedWriteApi {
         };
     }
 
+    /**
+     * Save an object using an ID that was previous preallocated.
+     *
+     * This call behaves essentially the same as saveNewObject(), with all the
+     * same validation. The only difference is that the new definition must be
+     * supplied with an object header, including the object ID returned from a
+     * prior call to preallocateId().
+     *
+     * Error conditions include all the error conditions for saveNewObject().
+     * Using a preallocated ID twice, attempting to save to an unknown ID or the
+     * ID of another object that already exists are also errors.
+     *
+     * @see MetadataWriteRequest
+     */
     rpc savePreallocatedObject (MetadataWriteRequest) returns (IdResponse) {
         option (google.api.http) = {
             post: "/{tenant}/trusted/{objectType}/save-preallocated"
@@ -91,6 +282,12 @@ service MetadataTrustedWriteApi {
 }
 
 
+/**
+Request to create or update an object in the TRAC metadata store
+
+@see MetadataPublicWriteApi
+@see MetadataTrustedWriteApi
+*/
 message MetadataWriteRequest {
 
     string tenant = 1;
@@ -99,6 +296,13 @@ message MetadataWriteRequest {
     trac.metadata.Tag tag = 3;
 }
 
+
+/**
+Pass back the ID, object version and tag version of new/modified objects
+
+@see MetadataPublicWriteApi
+@see MetadataTrustedWriteApi
+*/
 message IdResponse {
 
     trac.metadata.UUID objectId = 1;

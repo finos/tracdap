@@ -24,7 +24,7 @@ import "trac/metadata/type.proto";
 
 
 enum JobType {
-  NOOP_JOB = 0;
+  JOB_TYPE_NOT_SET = 0;
   RUN_MODEL = 1;
   RUN_FLOW = 2;
   IMPORT_MODEL = 3;

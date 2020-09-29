@@ -247,7 +247,8 @@ class MetadataSearchApiTest implements IDalTestable {
     }
 
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
     void allObjectTypes(ObjectType objectType) {
 
         var searchAttr = "allObjectTypes_" + objectType.name();
@@ -312,7 +313,8 @@ class MetadataSearchApiTest implements IDalTestable {
     }
 
     @ParameterizedTest
-    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED", "ARRAY"})
+    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY"})
     void allAttrTypes(BasicType attrType) {
 
         var attrToLookFor = "allAttrTypes_" + attrType.name();

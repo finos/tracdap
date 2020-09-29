@@ -26,26 +26,67 @@ import "trac/metadata/tag.proto";
 import "google/api/annotations.proto";
 
 
+/**
+ *
+ * API for searching the TRAC metadata store.
+ *
+ * Metadata searches are performed using tag attributes, as well as an object type
+ * and a few top-level parameters to handle versioning and temporality. See the
+ * SearchParameters object for a more detailed description. The result of a search
+ * call is a list of matching tags, which are always arranged with the most recent
+ * tags first. A search that matches no results will return an empty list.
+ *
+ * This API is a multi-tenant API. For gRPC requests every request includes a
+ * tenant code, for REST requests the tenant code is the first element of every
+ * path.
+ *
+ * @see SearchParameters
+ */
 service MetadataSearchApi {
 
-  rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
-    option (google.api.http) = {
-      post: "/{tenant}/{searchParams.objectType}/search?priorVersions={searchParams.priorVersions}"
-      body: "searchParams.search"
-    };
-  }
+    /**
+     * Perform a search against the TRAC metadata store.
+     *
+     * Searches are always for a specific tenant and object type. For details of the
+     * available search parameters, see SearchParameters.
+     *
+     * In gRPC calls, a MetadataSearchRequest specifies the tenant and includes the
+     * SearchParameters, where object type and the search expression set. For REST
+     * calls, tenant, object type and other members of SearchParameters are passed
+     * in the URL, only the SearchExpression object is passed in the request body.
+     *
+     * @see MetadataSearchRequest
+     * @see MetadataSearchResponse
+     */
+    rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/{searchParams.objectType}/search?priorVersions={searchParams.priorVersions}"
+            body: "searchParams.search"
+        };
+    }
 
 };
 
 
+/**
+ * Request object for a search against the TRAC metadata store.
+ *
+ * @see MetadataSearchApi
+ */
 message MetadataSearchRequest {
 
-  string tenant = 1;
+    string tenant = 1;
 
-  trac.metadata.search.SearchParameters searchParams = 2;
+    trac.metadata.search.SearchParameters searchParams = 2;
 };
 
+
+/**
+ * Response object for a search against the TRAC metadata store.
+ *
+ * @see MetadataSearchApi
+ */
 message MetadataSearchResponse {
 
-  repeated trac.metadata.Tag searchResult = 1;
+    repeated trac.metadata.Tag searchResult = 1;
 };

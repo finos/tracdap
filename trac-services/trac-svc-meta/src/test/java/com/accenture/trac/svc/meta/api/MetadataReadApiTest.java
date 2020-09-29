@@ -91,7 +91,8 @@ class MetadataReadApiTest implements IDalTestable {
     }
 
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
     void loadTag_ok(ObjectType objectType) {
 
         var origObj = TestData.dummyDefinitionForType(objectType, NO_HEADER);
@@ -328,7 +329,8 @@ class MetadataReadApiTest implements IDalTestable {
     }
 
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
     void loadLatestTag_ok(ObjectType objectType) {
 
         var origObj = TestData.dummyDefinitionForType(objectType, NO_HEADER);

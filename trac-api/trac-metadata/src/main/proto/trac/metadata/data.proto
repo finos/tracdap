@@ -24,7 +24,7 @@ import "trac/metadata/type.proto";
 
 
 enum DataFormat {
-    UNKNOWN_FORMAT = 0;
+    DATA_FORMAT_NOT_SET = 0;
     CSV = 1;
     PARQUET = 2;
 }

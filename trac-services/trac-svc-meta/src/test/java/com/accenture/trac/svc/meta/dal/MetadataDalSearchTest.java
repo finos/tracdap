@@ -191,7 +191,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     // -----------------------------------------------------------------------------------------------------------------
 
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
     void objectType(ObjectType objectType) throws Exception {
 
         // Create two objects with the same tags but different object type
@@ -260,7 +261,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     // EQUALITY
 
     @ParameterizedTest
-    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED", "ARRAY"})
+    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY"})
     void searchTerm_eq(BasicType basicType) throws Exception {
 
         var attrToLookFor = "eq_search_test_" + basicType.name();
@@ -293,7 +295,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     }
 
     @ParameterizedTest
-    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED", "BOOLEAN", "ARRAY"})
+    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY"})
     void searchTerm_eqArray(BasicType basicType) throws Exception {
 
         // Note: Boolean array attrs are not allowed
@@ -328,7 +331,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     }
 
     @ParameterizedTest
-    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED", "ARRAY"})
+    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY"})
     void searchTerm_ne(BasicType basicType) throws Exception {
 
         var markerAttr = "ne_search_marker_" + basicType.name();
@@ -379,7 +383,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     }
 
     @ParameterizedTest
-    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED", "BOOLEAN", "ARRAY"})
+    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY"})
     void searchTerm_neArray(BasicType basicType) throws Exception {
 
         // Note: Boolean array attrs are not allowed
@@ -761,7 +766,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     // IN OPERATOR
 
     @ParameterizedTest
-    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED", "BOOLEAN", "ARRAY"})
+    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY"})
     void searchTerm_in(BasicType basicType) throws Exception {
 
         // Note: IN query for BOOLEAN attr is not allowed
@@ -812,7 +818,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     }
 
     @ParameterizedTest
-    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE, names = {"UNRECOGNIZED", "BOOLEAN", "ARRAY"})
+    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY"})
     void searchTerm_inArray(BasicType basicType) throws Exception {
 
         // Note: IN query for BOOLEAN attr is not allowed

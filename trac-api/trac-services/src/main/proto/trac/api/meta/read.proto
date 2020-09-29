@@ -27,20 +27,84 @@ import "trac/metadata/tag.proto";
 import "google/api/annotations.proto";
 
 
+/**
+ * API for reading metadata objects from the TRAC metadata store.
+ *
+ * This API is for reading metadata from the metadata store when the IDs of the
+ * metadata items are known; to search the metadata store, see MetadataSearchApi.
+ * To understand the TRAC metadata model, refer to the documentation for
+ * ObjectDefinition and Tag.
+ *
+ * This API is a multi-tenant API. For gRPC requests every request includes a
+ * tenant code, for REST requests the tenant code is the first element of every
+ * path.
+ *
+ * @see ObjectDefinition
+ * @see Tag
+ */
 service MetadataReadApi {
 
+    /**
+     * Load a single metadata object with a known object version and tag version.
+     *
+     * To use this call, supply a tenant code, object type, ID, object version and
+     * tag version. In the gRPC call these parameters are passed via a
+     * MetadataReadRequest, in the REST version they are supplied via the URL.
+     *
+     * The call will return exact object version and tag version specified in the
+     * request, the response includes the full object definition.
+     *
+     * Error conditions include: Invalid request, unknown tenant, unknown object
+     * ID, object type does not match ID, unknown object version, unknown tag
+     * version.
+     *
+     * @see MetadataReadRequest
+     * @see Tag
+     */
     rpc loadTag(MetadataReadRequest) returns (trac.metadata.Tag) {
         option (google.api.http) = {
             get: "/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/{tagVersion}"
         };
     }
 
+    /**
+     * Load the latest tag for a metadata object with a known object version.
+     *
+     * To use this call, supply a tenant code, object type, ID and version. In the
+     * gRPC call these parameters are passed via a MetadataReadRequest, in the
+     * REST version they are supplied via the URL.
+     *
+     * The call will return the latest tag for the specified version of the object,
+     * the response includes the full object definition.
+     *
+     * Error conditions include: Invalid request, unknown tenant, unknown object
+     * ID, object type does not match ID, unknown object version.
+     *
+     * @see MetadataReadRequest
+     * @see Tag
+     */
     rpc loadLatestTag(MetadataReadRequest) returns (trac.metadata.Tag) {
         option (google.api.http) = {
             get: "/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/latest"
         };
     }
 
+    /**
+     * Load the latest version of a metadata object.
+     *
+     * To use this call, supply a tenant code, object type and ID. In the gRPC call
+     * these parameters are passed via a MetadataReadRequest, in the REST version
+     * they are supplied via the URL.
+     *
+     * The call will return the latest version of the object with its latest tag,
+     * the response includes the full object definition.
+     *
+     * Error conditions include: Invalid request, unknown tenant, unknown object
+     * ID, object type does not match ID.
+     *
+     * @see MetadataReadRequest
+     * @see Tag
+     */
     rpc loadLatestObject(MetadataReadRequest) returns (trac.metadata.Tag) {
         option (google.api.http) = {
             get: "/{tenant}/{objectType}/{objectId}/versions/latest/tags/latest"
@@ -50,6 +114,11 @@ service MetadataReadApi {
 };
 
 
+/**
+ * Request to read an object from the metadata read API.
+ *
+ * @see MetadataReadApi
+ */
 message MetadataReadRequest {
 
     string tenant = 1;

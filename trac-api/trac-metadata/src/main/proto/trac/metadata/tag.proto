@@ -24,26 +24,95 @@ import "trac/metadata/type.proto";
 import "trac/metadata/object.proto";
 
 
+/**
+ *
+ * Tags are the core informational element of TRAC's metadata model.
+ *
+ * A tag is a set of attributes (key-value pairs) associated with an object
+ * definition, intended for storing descriptive and informational data as well
+ * as application-level metadata that is not part of the object definition model.
+ * Here is an example of a set of tag attributes to illustrate some ways they can
+ * be used:
+ *
+ *     // A descriptive field intended for human users.
+ *
+ *     display_name: "Customer accounts for March 2020, corrected April 6th"
+ *
+ *     // A classification that can be used for searching or indexing.
+ *     // Client applications can also use this to find datasets of a certain
+ *     // type; typically an application will define a set of attributes that are
+ *     // "structural", i.e. the application uses those attributes to decide which
+ *     // objects to present for certain purposes.
+ *
+ *     dataset_class: "customer_accounts"
+ *
+ *     // Properties of an item can be added as individual attributes so they can
+ *     // be searched and displayed individually. This avoids the anti-pattern of
+ *     // putting multiple attributes into a single name/label field:
+ *     //    customer_accounts_mar20_scotland_commercial_approved
+ *
+ *     accounting_date: (DATE) 2020-03-31
+ *     region: "Scotland"
+ *     book: "commercial_property"
+ *     figures_approved: (BOOLEAN) true
+ *
+ *     // Attributes can be multi-valued. This can be helpful for applying
+ *     // regulatory classifiers, where multiple classifiers may apply to a
+ *     // single item.
+ *
+ *     data_classification: ["confidential", "gdpr_pii", "audited"]
+ *
+ *     // TRAC records a number of "controlled" attributes, these are set by the
+ *     // platform and cannot be modified directly through the metadata API.
+ *     // Controlled attributes start with the prefix "trac_".
+ *
+ *     trac_create_time: (DATETIME) 2020-04-01 10:37:05
+ *     trac_create_user_id: "jane.doe"
+ *     trac_create_user_name: "Jane Doe"
+ *
+ * Tags use immutable versioning in the same way as objects - each version of a
+ * tag is immutable and "updating" a tag means creating a new version with one or
+ * more modified attributes. Each version of an object has its own series of tags
+ * starting at tag version 1.
+ *
+ * As an example of this versioning, consider a partitioned dataset with daily
+ * account records. Version X of the dataset contains data up to a certain date
+ * and might have a tag saying it is signed off. A user/process then adds a new
+ * partition with the next day's data, creating version X+1. In this case, object
+ * version X would still be signed off while version X+1 is awaiting approval.
+ * When version X+1 is approved, the tag for that version can be "updated". The
+ * application could decide whether to show the most recent version of the data,
+ * or an earlier version that has the sign-off attribute set.
+ *
+ * @see ObjectDefinition
+ */
 message Tag {
 
     ObjectDefinition definition = 1;
 
     int32 tagVersion = 2;
 
-    /*
-     * Tag attributes are a dictionary of attribute name (a string) to attribute value
-     * Attr values are of type Value and are restricted to primitive types
+    /**
      *
-     * Multi-valued attrs are supported, any attr value can be either single- or multi-valued
-     *   (the exception is BOOLEAN attrs, which are always single-valued)
-     * Multi-valued attrs are represented as basic type ARRAY, with array type always a primitive type
-     * Arrays containing a single item are treated as single-valued attrs and will be returned as a single value
-     * Search semantics are defined for both single- and multi-valued attrs
-     * See SearchParameters and SearchApi for details
+     * Tag attributes are key-value pairs where the value is a metadata Value.
+     *
+     * Attribute values are restricted to primitive types (which are interpreted
+     * as single-valued attributes) or arrays of primitive types (which are
+     * interpreted as multi-valued attributes). Any attribute may be single- or
+     * multi-valued, except BOOLEAN attributes which are always single-valued.
+     *
+     * An attribute may change from single- to multi-valued or vice versa when a
+     * tag is updated, e.g. is a classification is added or removed. An array
+     * containing a single item is treated as a single-valued attribute, i.e.
+     * there is no distinction between a single value and an array of one item.
+     * Single-valued attributes are always returned as primitive types when
+     * querying the metadata API.
+     *
+     * Single- and multi-valued attributes have different search semantics. For
+     * example, inequalities are not defined on multi-valued attributes. See
+     * SearchParameters for more details.
+     *
+     * @see SearchParameters
      */
     map<string, Value> attr = 3;
-}
-
-message TagList {
-    repeated Tag item = 1;
 }

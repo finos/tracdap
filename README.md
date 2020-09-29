@@ -75,13 +75,13 @@ Once you have a database prepared you can start the TRAC services.
 ## Using the TRAC APIs
 
 TRAC version 0.1 provides the TRAC web API, which can be used for developing
-user-facing applications on the TRAC platform. This API is available to be
-consumed in both gRPC / proto (via the metadata service) and REST / json (via
-the platform gateway).
+user-facing applications on the TRAC platform. Developer documentation on the
+TRAC metadata structures and available API calls is part included in the API
+.proto files:
 
-You can use a regular REST client such as [Postman](https://www.postman.com/)
-to experiment with the REST API.
+* [TRAC Metadata Definitions](./trac-api/trac-metadata/src/main/proto/trac/metadata)
+* [TRAC Service API Definitions](./trac-api/trac-services/src/main/proto/trac/api/meta)
 
-
-## Contributing
-
+The TRAC APIs are available in both gRPC / proto (via the metadata service) and
+REST / json (via the platform gateway). You can use a regular REST client such as 
+[Postman](https://www.postman.com/) to experiment with the REST API.

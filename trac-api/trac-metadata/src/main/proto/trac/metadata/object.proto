@@ -30,15 +30,27 @@ import "trac/metadata/file.proto";
 import "trac/metadata/custom.proto";
 
 
+/**
+ * Enumeration of TRAC's core object types.
+ *
+ * @see ObjectDefinition
+ */
 enum ObjectType {
-    DATA = 0;
-    MODEL = 1;
-    FLOW = 2;
-    JOB = 3;
-    FILE = 4;
-    CUSTOM = 5;
+    OBJECT_TYPE_NOT_SET = 0;
+    DATA = 1;
+    MODEL = 2;
+    FLOW = 3;
+    JOB = 4;
+    FILE = 5;
+    CUSTOM = 6;
 }
 
+
+/**
+ * Standard header for TRAC object definitions.
+ *
+ * @see ObjectDefinition
+ */
 message ObjectHeader {
 
     ObjectType objectType = 1;
@@ -46,6 +58,39 @@ message ObjectHeader {
     int32 objectVersion = 3;
 }
 
+
+/**
+ * Object definitions are the core structural element of TRAC's metadata model.
+ *
+ * Definitions describe every object that is stored in the TRAC platform and there
+ * is a one-to-one relation between definitions and objects. I.e. every dataset
+ * has its own data definition, every model has its own model definition and so
+ * on. Definitions also describe actions that take place on the platform by way of
+ * job definitions, so a "job" is just another type of object. Each type of object
+ * has its own definition and definitions can be added or extended as the platform
+ * evolves.
+ *
+ * The object definition container class allows different types of objects to be
+ * stored, indexed and accessed in the same way. Every object has a standard
+ * object header which contains enough information to identify the object.
+ *
+ * TRAC object definitions can be versioned. In order to use versioning the
+ * semantics of versioning must be defined and those vary depending on the object
+ * type. Currently these semantics are defined for DATA objects, see
+ * DataDefinition for details. Versioning is also allowed for CUSTOM objects, in
+ * this case it is the responsibility of the application to define versioning
+ * semantics. Versioning is not currently permitted for other object types.
+ *
+ * Object definitions are intended for storing structural data necessary to access
+ * data and run jobs on the TRAC platform. Informational data to catalogue and
+ * describe objects is stored in tags. Tags are a lot more flexible than object
+ * definitions, so applications built on the TRAC platform may choose to store
+ * structural information in tags where their required structure is not supported
+ * by TRAC's core object definitions.
+ *
+ * @see Tag
+ * @see ObjectHeader
+ */
 message ObjectDefinition {
 
     ObjectHeader header = 1;
