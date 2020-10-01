@@ -318,7 +318,7 @@ class JdbcSearchQueryBuilder {
         // Condition for attr value
         var paramValueSetter = wrapErrors((stmt, pIndex) ->
                 JdbcAttrHelpers.setAttrValue(
-                stmt, pIndex, searchTerm.getAttrType(), searchTerm.getAttrValue()));
+                stmt, pIndex, searchTerm.getAttrType(), searchTerm.getSearchValue()));
 
         return buildSearchTermFromTemplates(baseQuery, searchTerm, joinTemplate, whereTemplate,
                 Stream.of(paramNameSetter, paramValueSetter));
@@ -337,7 +337,7 @@ class JdbcSearchQueryBuilder {
                 .setAttrName(searchTerm.getAttrName())
                 .setAttrType(searchTerm.getAttrType())
                 .setOperator(SearchOperator.EQ)
-                .setAttrValue(searchTerm.getAttrValue()))))
+                .setSearchValue(searchTerm.getSearchValue()))))
                 .build();
 
         return buildSearchExpr(baseQuery, negativeExpr);
@@ -364,7 +364,7 @@ class JdbcSearchQueryBuilder {
         // Condition for attr value
         var paramValueSetter = wrapErrors((stmt, pIndex) ->
                 JdbcAttrHelpers.setAttrValue(
-                stmt, pIndex, searchTerm.getAttrType(), searchTerm.getAttrValue()));
+                stmt, pIndex, searchTerm.getAttrType(), searchTerm.getSearchValue()));
 
         return buildSearchTermFromTemplates(baseQuery, searchTerm, joinTemplate, whereTemplate,
                 Stream.of(paramNameSetter, paramIndexSetter, paramValueSetter));
@@ -372,7 +372,7 @@ class JdbcSearchQueryBuilder {
 
     JdbcSearchQuery buildInTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
 
-        var nItems = searchTerm.getAttrValue().getArrayValue().getItemCount();
+        var nItems = searchTerm.getSearchValue().getArrayValue().getItemCount();
         var itemPlaceholders = String.join(", ", Collections.nCopies(nItems, "?"));
 
         var joinTemplate = "join tag_attr ta%1$d\n" +
@@ -387,7 +387,7 @@ class JdbcSearchQueryBuilder {
                 stmt.setString(pIndex, searchTerm.getAttrName()));
 
         // Condition for attr value
-        var paramValueSetters = searchTerm.getAttrValue().getArrayValue()
+        var paramValueSetters = searchTerm.getSearchValue().getArrayValue()
                 .getItemList().stream().map(item -> wrapErrors((stmt, pIndex) ->
                 JdbcAttrHelpers.setAttrValue(stmt, pIndex, searchTerm.getAttrType(), item)));
 

@@ -150,7 +150,7 @@ class MetadataSearchApiTest implements IDalTestable {
                         .setAttrName(searchAttr)
                         .setAttrType(BasicType.STRING)
                         .setOperator(SearchOperator.EQ)
-                        .setAttrValue(encodeValue("the_droids_you_are_looking_for")))))
+                        .setSearchValue(encodeValue("the_droids_you_are_looking_for")))))
                 .build();
 
         var searchResult = searchApi.search(searchRequest);
@@ -220,13 +220,13 @@ class MetadataSearchApiTest implements IDalTestable {
                             .setAttrName(searchAttr)
                             .setAttrType(BasicType.STRING)
                             .setOperator(SearchOperator.EQ)
-                            .setAttrValue(encodeValue("the_droids_you_are_looking_for"))))
+                            .setSearchValue(encodeValue("the_droids_you_are_looking_for"))))
                     .addExpr(SearchExpression.newBuilder()
                     .setTerm(SearchTerm.newBuilder()
                             .setAttrName(searchAttr2)
                             .setAttrType(BasicType.STRING)
                             .setOperator(SearchOperator.EQ)
-                            .setAttrValue(encodeValue("a_galaxy_far_far_away")))))))
+                            .setSearchValue(encodeValue("a_galaxy_far_far_away")))))))
                 .build();
 
         var searchResult = searchApi.search(searchRequest);
@@ -292,7 +292,7 @@ class MetadataSearchApiTest implements IDalTestable {
                         .setAttrName(searchAttr)
                         .setAttrType(BasicType.STRING)
                         .setOperator(SearchOperator.EQ)
-                        .setAttrValue(encodeValue("the_droids_you_are_looking_for")))))
+                        .setSearchValue(encodeValue("the_droids_you_are_looking_for")))))
                 .build();
 
         var searchResult = searchApi.search(searchRequest);
@@ -360,7 +360,7 @@ class MetadataSearchApiTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setAttrType(attrType)
                         .setOperator(SearchOperator.EQ)
-                        .setAttrValue(encodeNativeObject(valueToLookFor)))))
+                        .setSearchValue(encodeNativeObject(valueToLookFor)))))
                 .build();
 
         var searchResult = searchApi.search(searchRequest);
@@ -400,7 +400,7 @@ class MetadataSearchApiTest implements IDalTestable {
                         .setAttrName(searchAttr)
                         .setAttrType(BasicType.STRING)
                         .setOperator(SearchOperator.EQ)
-                        .setAttrValue(encodeValue("the_droids_you_are_looking_for")))))
+                        .setSearchValue(encodeValue("the_droids_you_are_looking_for")))))
                 .build();
 
         var searchResult = searchApi.search(searchRequest);
@@ -453,13 +453,13 @@ class MetadataSearchApiTest implements IDalTestable {
                             .setAttrName("meaning_of_life")
                             .setAttrType(BasicType.INTEGER)
                             .setOperator(SearchOperator.EQ)
-                            .setAttrValue(encodeValue(42))))
+                            .setSearchValue(encodeValue(42))))
                     .addExpr(SearchExpression.newBuilder()
                     .setTerm(SearchTerm.newBuilder()
                             .setAttrName("what_is_the_question")
                             .setAttrType(BasicType.STRING)
                             .setOperator(SearchOperator.EQ)
-                            .setAttrValue(encodeValue("What do you get if you multiply six by nine?")))))))
+                            .setSearchValue(encodeValue("What do you get if you multiply six by nine?")))))))
                 .build();
 
         // noinspection ResultOfMethodCallIgnored

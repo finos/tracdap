@@ -177,8 +177,8 @@ public class TestData {
                 .setRepositoryVersion("trac-test-repo-1.2.3-RC4")
                 .setPath("src/main/python")
                 .setEntryPoint("trac_test.test1.SampleModel1")
-                .putParam("param1", ModelParameter.newBuilder().setParamType(BasicType.STRING).build())
-                .putParam("param2", ModelParameter.newBuilder().setParamType(BasicType.INTEGER).build())
+                .putParam("param1", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.STRING)).build())
+                .putParam("param2", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.INTEGER)).build())
                 .putInput("input1", TableDefinition.newBuilder()
                         .addField(FieldDefinition.newBuilder()
                                 .setFieldName("field1")
@@ -208,7 +208,7 @@ public class TestData {
         var defUpdate = origDef.toBuilder()
                 .setModel(origDef.getModel()
                 .toBuilder()
-                .putParam("param3", ModelParameter.newBuilder().setParamType(BasicType.DATE).build()));
+                .putParam("param3", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.DATE)).build()));
 
         return newVersionHeader(defUpdate, updateHeader);
     }
@@ -221,11 +221,11 @@ public class TestData {
                 .putNode("main_model", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE).build())
                 .putNode("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
                 .addEdge(FlowEdge.newBuilder()
-                        .setStart(FlowSocket.newBuilder().setNode("input_1"))
-                        .setEnd(FlowSocket.newBuilder().setNode("main_model").setSocket("input_1")))
+                        .setHead(FlowSocket.newBuilder().setNode("main_model").setSocket("input_1"))
+                        .setTail(FlowSocket.newBuilder().setNode("input_1")))
                 .addEdge(FlowEdge.newBuilder()
-                        .setStart(FlowSocket.newBuilder().setNode("main_model").setSocket("output_1"))
-                        .setEnd(FlowSocket.newBuilder().setNode("output_1"))));
+                        .setHead(FlowSocket.newBuilder().setNode("output_1"))
+                        .setTail(FlowSocket.newBuilder().setNode("main_model").setSocket("output_1"))));
 
         return newObjectHeader(ObjectType.FLOW, def, includeHeader);
     }

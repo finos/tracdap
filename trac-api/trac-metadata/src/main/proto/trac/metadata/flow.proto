@@ -20,6 +20,7 @@ package trac.metadata;
 option java_package = "com.accenture.trac.common.metadata";
 option java_multiple_files = true;
 
+import "trac/metadata/type.proto";
 import "trac/metadata/data.proto";
 import "trac/metadata/model.proto";
 
@@ -31,9 +32,17 @@ enum FlowNodeType {
   MODEL_NODE = 3;
 }
 
+message FlowModelStub {
+
+  repeated string input = 1;
+  repeated string output = 2;
+  map<string, TypeDescriptor> parameter = 3;
+}
+
 message FlowNode {
 
   FlowNodeType nodeType = 1;
+  FlowModelStub modelStub = 2;
 }
 
 
@@ -45,8 +54,8 @@ message FlowSocket {
 
 message FlowEdge {
 
-  FlowSocket start = 1;
-  FlowSocket end = 2;
+  FlowSocket head = 1;
+  FlowSocket tail = 2;
 }
 
 

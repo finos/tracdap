@@ -184,8 +184,8 @@ message SearchTerm {
   /// The search operator to apply
   SearchOperator operator = 3;
 
-  /// Attribute value to use with the search operator
-  trac.metadata.Value attrValue = 4;
+  /// The search value to look for
+  trac.metadata.Value searchValue = 4;
 }
 
 /**

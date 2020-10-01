@@ -78,26 +78,35 @@ public class MetadataCodec {
         if (OffsetDateTime.class.equals(clazz))
             return encodeValue((OffsetDateTime) value);
 
-        throw new RuntimeException("Unsupported object type");  // TODO: error message
+        var message = "Cannot encode value with Java class [%s]";
+        throw new IllegalArgumentException(String.format(message, clazz.getName()));
     }
 
-    public static Value encodeValue(Object value, TypeDescriptor typeDescriptor) {
+    public static Value encodeValue(Object value, TypeDescriptor descriptor) {
 
-        if (TypeSystem.isPrimitive(typeDescriptor))
-            return encodeValue(value, typeDescriptor.getBasicType());
+        var basicType = TypeSystem.basicType(descriptor);
 
-        if (typeDescriptor.getBasicType() == BasicType.ARRAY && value instanceof List)
-            return encodeArrayValue((List<?>) value, typeDescriptor.getArrayType());
+        if (TypeSystem.isPrimitive(basicType))
+            return encodeValue(value, basicType);
 
-        throw new RuntimeException("");  // TODO
+        if (basicType == BasicType.ARRAY) {
+
+            if (value instanceof List)
+                return encodeArrayValue((List<?>) value, descriptor.getArrayType());
+            else
+                throw new IllegalArgumentException("Object does not match type");
+        }
+
+        var message = "Cannot encode value with type [%s]";
+        throw new IllegalArgumentException(String.format(message, basicType.name()));
     }
 
     public static Value encodeValue(Object value, BasicType basicType) {
 
-        var typeCheck = TypeSystem.basicType(value.getClass());
+        var typeCheck = TypeSystem.basicType(value);
 
         if (typeCheck != basicType)
-            throw new RuntimeException(""); // TODO
+            throw new IllegalArgumentException("Object does not match type");
 
         switch (basicType) {
 
@@ -129,7 +138,8 @@ public class MetadataCodec {
                 return encodeValue((OffsetDateTime) value);
 
             default:
-                throw new RuntimeException("");  // TODO
+                var message = "Cannot encode value with type [%s]";
+                throw new IllegalArgumentException(String.format(message, basicType.name()));
         }
     }
 
@@ -173,17 +183,6 @@ public class MetadataCodec {
                 .build();
     }
 
-    public static Value encodeValue(BigDecimal decimalValue) {
-
-        var plainString = decimalValue.toPlainString();
-
-        return Value.newBuilder()
-                .setType(TypeSystem.descriptor(BasicType.DECIMAL))
-                .setDecimalValue(DecimalValue.newBuilder()
-                .setStr(plainString))
-                .build();
-    }
-
     public static Value encodeValue(String stringValue) {
 
         return Value.newBuilder()
@@ -192,25 +191,34 @@ public class MetadataCodec {
                 .build();
     }
 
+    public static Value encodeValue(BigDecimal decimalValue) {
+
+        var decimalString = decimalValue.toPlainString();
+
+        return Value.newBuilder()
+                .setType(TypeSystem.descriptor(BasicType.DECIMAL))
+                .setDecimalValue(DecimalValue.newBuilder()
+                .setStr(decimalString))
+                .build();
+    }
+
     public static Value encodeValue(LocalDate dateValue) {
 
-        var iso = ISO_DATE_FORMAT.format(dateValue);
+        var isoDate = ISO_DATE_FORMAT.format(dateValue);
 
         return Value.newBuilder()
                 .setType(TypeSystem.descriptor(BasicType.DATE))
-                .setDateValue(DateValue.newBuilder()
-                .setIsoDate(iso))
+                .setDateValue(isoDate)
                 .build();
     }
 
     public static Value encodeValue(OffsetDateTime dateTimeValue) {
 
-        var iso = ISO_DATE_TIME_FORMAT.format(dateTimeValue);
+        var isoDateTime = ISO_DATE_TIME_FORMAT.format(dateTimeValue);
 
         return Value.newBuilder()
                 .setType(TypeSystem.descriptor(BasicType.DATETIME))
-                .setDatetimeValue(DateTimeValue.newBuilder()
-                .setIsoDateTime(iso))
+                .setDatetimeValue(isoDateTime)
                 .build();
     }
 
@@ -240,7 +248,9 @@ public class MetadataCodec {
 
     public static Object decodeValue(Value value) {
 
-        switch(value.getType().getBasicType()) {
+        var basicType = TypeSystem.basicType(value);
+
+        switch(basicType) {
 
             case BOOLEAN:
                 return value.getBooleanValue();
@@ -264,64 +274,65 @@ public class MetadataCodec {
                 return decodeDateTimeValue(value);
 
             default:
-                throw new RuntimeException("Type not supported");  // TODO: Error
+                var message = "Cannot decode value of type [%s]";
+                throw new IllegalArgumentException(String.format(message, basicType.name()));
         }
     }
 
     public static boolean decodeBooleanValue(Value value) {
 
-        if (value.getType().getBasicType() != BasicType.BOOLEAN)
-            throw new RuntimeException("");  // TODO: Error
+        if (TypeSystem.basicType(value) != BasicType.BOOLEAN)
+            throw new IllegalArgumentException("Value is not a boolean");
 
         return value.getBooleanValue();
     }
 
     public static long decodeIntegerValue(Value value) {
 
-        if (value.getType().getBasicType() != BasicType.INTEGER)
-            throw new RuntimeException("");  // TODO: Error
+        if (TypeSystem.basicType(value) != BasicType.INTEGER)
+            throw new IllegalArgumentException("Value is not an integer");
 
         return value.getIntegerValue();
     }
 
     public static double decodeFloatValue(Value value) {
 
-        if (value.getType().getBasicType() != BasicType.FLOAT)
-            throw new RuntimeException("");  // TODO: Error
+        if (TypeSystem.basicType(value) != BasicType.FLOAT)
+            throw new IllegalArgumentException("Value is not a float");
 
         return value.getFloatValue();
     }
 
-    public static BigDecimal decodeDecimalValue(Value value) {
-
-        if (value.getType().getBasicType() != BasicType.DECIMAL)
-            throw new RuntimeException("");  // TODO: Error
-
-        return new BigDecimal(value.getDecimalValue().getStr());
-    }
-
     public static String decodeStringValue(Value value) {
 
-        if (value.getType().getBasicType() != BasicType.STRING)
-            throw new RuntimeException("");  // TODO: Error
+        if (TypeSystem.basicType(value) != BasicType.STRING)
+            throw new IllegalArgumentException("Value is not a string");
 
         return value.getStringValue();
     }
 
+    public static BigDecimal decodeDecimalValue(Value value) {
+
+        if (TypeSystem.basicType(value) != BasicType.DECIMAL)
+            throw new IllegalArgumentException("Value is not a decimal");
+
+        return new BigDecimal(value.getDecimalValue().getStr());
+    }
+
     public static LocalDate decodeDateValue(Value value) {
 
-        if (value.getType().getBasicType() != BasicType.DATE)
-            throw new RuntimeException("");  // TODO: Error
+        if (TypeSystem.basicType(value) != BasicType.DATE)
+            throw new IllegalArgumentException("Value is not a date");
 
-        return LocalDate.parse(value.getDateValue().getIsoDate(), ISO_DATE_FORMAT);
+        return LocalDate.parse(value.getDateValue(), ISO_DATE_FORMAT);
     }
 
     public static OffsetDateTime decodeDateTimeValue(Value value) {
 
-        if (value.getType().getBasicType() != BasicType.DATETIME)
-            throw new RuntimeException("");  // TODO: Error
+        if (TypeSystem.basicType(value) != BasicType.DATETIME)
+            throw new IllegalArgumentException("Value is not a date-time");
 
-        return OffsetDateTime.parse(value.getDatetimeValue().getIsoDateTime(), ISO_DATE_TIME_FORMAT);
+        return OffsetDateTime.parse(value.getDatetimeValue(), ISO_DATE_TIME_FORMAT);
     }
 
     private static final DateTimeFormatter ISO_DATE_FORMAT = DateTimeFormatter.ISO_DATE;

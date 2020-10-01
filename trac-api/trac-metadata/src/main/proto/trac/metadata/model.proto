@@ -28,7 +28,7 @@ message ModelParameter {
 
     string label = 1;
 
-    BasicType paramType = 2;
+    TypeDescriptor paramType = 2;
 
     Value defaultValue = 3;
 }

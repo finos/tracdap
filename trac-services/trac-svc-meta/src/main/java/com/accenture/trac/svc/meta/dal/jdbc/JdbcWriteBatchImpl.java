@@ -16,12 +16,11 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.metadata.*;
 
 import java.sql.*;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Map;
+import java.util.*;
 import java.util.UUID;
 
 
@@ -148,10 +147,10 @@ class JdbcWriteBatchImpl {
                 for (var attr : tag[i].getAttrMap().entrySet()) {
 
                     var attrRootValue = attr.getValue();
-                    var attrType = attrBasicType(attrRootValue.getType());
+                    var attrType = attrBasicType(attrRootValue);
 
                     // TODO: Constants for single / multi valued base index
-                    var attrIndex = TypeSystem.isPrimitive(attrRootValue.getType()) ? -1 : 0;
+                    var attrIndex = TypeSystem.isPrimitive(attrRootValue) ? -1 : 0;
 
                     for (var attrValue : attrValues(attrRootValue)) {
 
@@ -193,21 +192,35 @@ class JdbcWriteBatchImpl {
         }
     }
 
-    private BasicType attrBasicType(TypeDescriptor typeDescriptor) {
+    private BasicType attrBasicType(Value attrValue) {
 
-        if (TypeSystem.isPrimitive(typeDescriptor))
-            return typeDescriptor.getBasicType();
+        var basicType = TypeSystem.basicType(attrValue);
 
-        if (typeDescriptor.getBasicType() == BasicType.ARRAY && TypeSystem.isPrimitive(typeDescriptor.getArrayType()))
-            return typeDescriptor.getArrayType().getBasicType();
+        if (TypeSystem.isPrimitive(basicType))
+            return basicType;
 
-        throw new RuntimeException("");  // TODO: Error type and message
+        if (basicType == BasicType.ARRAY) {
+
+            var descriptor = TypeSystem.descriptor(attrValue);
+            var arrayType = descriptor.getArrayType();
+
+            if (TypeSystem.isPrimitive(arrayType))
+                return arrayType.getBasicType();
+
+            // Tag attributes should be validated higher up the stack
+            // If an attribute gets through that is not a supported type, that is an internal error
+
+            throw new ETracInternal("Tag attributes of type [ARRAY] must contain primitive types");
+        }
+
+        var message = "Tag attributes of type [%s] are not supported";
+        throw new ETracInternal(String.format(message, basicType.name()));
     }
 
     private Iterable<Value> attrValues(Value rootValue) {
 
-        if (TypeSystem.isPrimitive(rootValue.getType()))
-            return Collections.singletonList(rootValue);
+        if (TypeSystem.isPrimitive(rootValue))
+            return List.of(rootValue);
 
         return rootValue.getArrayValue().getItemList();
     }

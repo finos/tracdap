@@ -19,9 +19,9 @@ package com.accenture.trac.common.metadata;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.Set;
+
 
 public class TypeSystem {
 
@@ -45,61 +45,149 @@ public class TypeSystem {
             Map.entry(LocalDate.class, BasicType.DATE),
             Map.entry(OffsetDateTime.class, BasicType.DATETIME));
 
-    private static final Map<BasicType, Class<?>> NATIVE_TYPE_MAPPING = Map.ofEntries(
-            Map.entry(BasicType.BOOLEAN, Boolean.class),
-            Map.entry(BasicType.INTEGER, Long.class),
-            Map.entry(BasicType.FLOAT, Double.class),
-            Map.entry(BasicType.STRING, String.class),
-            Map.entry(BasicType.DECIMAL, BigDecimal.class),
-            Map.entry(BasicType.DATE, LocalDate.class),
-            Map.entry(BasicType.DATETIME, OffsetDateTime.class));
+    private static final Map<Value.ValueCase, BasicType> VALUE_CASE_MAPPING = Map.ofEntries(
+            Map.entry(Value.ValueCase.BOOLEANVALUE, BasicType.BOOLEAN),
+            Map.entry(Value.ValueCase.INTEGERVALUE, BasicType.INTEGER),
+            Map.entry(Value.ValueCase.FLOATVALUE, BasicType.FLOAT),
+            Map.entry(Value.ValueCase.STRINGVALUE, BasicType.STRING),
+            Map.entry(Value.ValueCase.DECIMALVALUE, BasicType.DECIMAL),
+            Map.entry(Value.ValueCase.DATEVALUE, BasicType.DATE),
+            Map.entry(Value.ValueCase.DATETIMEVALUE, BasicType.DATETIME),
+            Map.entry(Value.ValueCase.ARRAYVALUE, BasicType.ARRAY));
 
     public static BasicType basicType(Class<?> clazz) {
 
+        if (clazz == null)
+            throw new NullPointerException("Basic type requested for null class");
+
         var basicType = BASIC_TYPE_MAPPING.getOrDefault(clazz, BasicType.UNRECOGNIZED);
 
-        if (!PRIMITIVE_TYPES.contains(basicType))
-            ;  // TODO: Throw
+        if (basicType == BasicType.UNRECOGNIZED)
+            throw new IllegalArgumentException("No type mapping available for Java class " + clazz.getName());
+
+        return basicType;
+    }
+
+    public static BasicType basicType(Object object) {
+
+        if (object == null)
+            throw new NullPointerException("Basic type requested for null object");
+
+        return basicType(object.getClass());
+    }
+
+    public static BasicType basicType(TypeDescriptor descriptor) {
+
+        if (descriptor == null)
+            throw new NullPointerException("Basic type requested for null type descriptor");
+
+        var basicType = descriptor.getBasicType();
+
+        if (basicType == BasicType.BASIC_TYPE_NOT_SET || basicType == BasicType.UNRECOGNIZED)
+            throw new IllegalArgumentException("Invalid type descriptor: Basic type not set");
+
+        return basicType;
+    }
+
+    public static BasicType basicType(Value value) {
+
+        if (value == null)
+            throw new NullPointerException("Basic type requested for null value");
+
+        if (value.hasType())
+            return basicType(value.getType());
+
+        var valueCase = value.getValueCase();
+        var basicType = VALUE_CASE_MAPPING.getOrDefault(valueCase, BasicType.UNRECOGNIZED);
+
+        if (basicType == BasicType.UNRECOGNIZED)
+            throw new IllegalArgumentException("No type mapping available for value with value case " + valueCase);
 
         return basicType;
     }
 
     public static TypeDescriptor descriptor(Class<?> clazz) {
 
-        var basicType = BASIC_TYPE_MAPPING.getOrDefault(clazz, BasicType.UNRECOGNIZED);
+        if (clazz == null)
+            throw new NullPointerException("Descriptor requested for null class");
 
-        if (!PRIMITIVE_TYPES.contains(basicType))
-            ;  // TODO: Throw
+        var basicType = basicType(clazz);
+
+        if (!isPrimitive(basicType)) {
+            var message = "Cannot create type descriptor from Java class %s: Sub-type information is not available";
+            throw new IllegalArgumentException(String.format(message, clazz.getName()));
+        }
 
         return TypeDescriptor.newBuilder()
                 .setBasicType(basicType)
                 .build();
+    }
+
+    public static TypeDescriptor descriptor(Object object) {
+
+        if (object == null)
+            throw new NullPointerException("Descriptor requested for null object");
+
+        return descriptor(object.getClass());
     }
 
     public static TypeDescriptor descriptor(BasicType basicType) {
 
-        if (!PRIMITIVE_TYPES.contains(basicType))
-            ; // TODO: throw
+        if (basicType == null)
+            throw new NullPointerException("Descriptor requested for null type");
+
+        if (basicType == BasicType.BASIC_TYPE_NOT_SET || basicType == BasicType.UNRECOGNIZED) {
+            var message = "Descriptor requested for unknown basic type [%s]";
+            throw new IllegalArgumentException(String.format(message, basicType.name()));
+        }
+
+        if (!isPrimitive(basicType)) {
+            var message = "Cannot create type descriptor for basic type [%s]: Sub-type information is not available";
+            throw new IllegalArgumentException(String.format(message, basicType.name()));
+        }
 
         return TypeDescriptor.newBuilder()
                 .setBasicType(basicType)
                 .build();
     }
 
-    public static Class<?> nativeClass(BasicType basicType) {
+    public static TypeDescriptor descriptor(Value value) {
 
-        if (!PRIMITIVE_TYPES.contains(basicType))
-            ; // TODO: throw
+        if (value == null)
+            throw new NullPointerException("Descriptor requested for null value");
 
-        return NATIVE_TYPE_MAPPING.get(basicType);
+        // TODO: Apply validation here? Do not return an unchecked descriptor
+        if (value.hasType())
+            return value.getType();
+
+        var basicType = basicType(value);
+
+        if (!isPrimitive(basicType))
+            throw new IllegalArgumentException("Non-primitive values must provide a valid type descriptor");
+
+        return descriptor(basicType);
     }
 
-    public static boolean isPrimitive(TypeDescriptor typeDescriptor) {
+    public static boolean isPrimitive(Value value) {
 
-        return PRIMITIVE_TYPES.contains(typeDescriptor.getBasicType());
+        if (value == null)
+            throw new NullPointerException("Is-primitive check requested for null value");
+
+        return isPrimitive(basicType(value));
+    }
+
+    public static boolean isPrimitive(TypeDescriptor descriptor) {
+
+        if (descriptor == null)
+            throw new NullPointerException("Is-primitive check requested for null type descriptor");
+
+        return isPrimitive(basicType(descriptor));
     }
 
     public static boolean isPrimitive(BasicType basicType) {
+
+        if (basicType == null)
+            throw new NullPointerException("Is-primitive check requested for null type");
 
         return PRIMITIVE_TYPES.contains(basicType);
     }

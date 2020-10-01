@@ -98,7 +98,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                     .setAttrName("rodent_type")
                     .setAttrType(BasicType.STRING)
                     .setOperator(SearchOperator.EQ)
-                    .setAttrValue(encodeValue("bilge_rat"))))
+                    .setSearchValue(encodeValue("bilge_rat"))))
                 .build();
 
         var searchResult = unwrap(dal.search(TestData.TEST_TENANT, searchParams));
@@ -218,7 +218,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setOperator(SearchOperator.EQ)
                         .setAttrType(BasicType.STRING)
-                        .setAttrValue(MetadataCodec.encodeNativeObject("bilge_rat"))))
+                        .setSearchValue(MetadataCodec.encodeNativeObject("bilge_rat"))))
                 .build();
 
         var searchResult = unwrap(dal.search(TestData.TEST_TENANT, searchParams));
@@ -245,7 +245,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                                 .setAttrName(searchAttrName)
                                 .setOperator(SearchOperator.EQ)
                                 .setAttrType(BasicType.STRING)
-                                .setAttrValue(MetadataCodec.encodeNativeObject(searchAttrValue))))
+                                .setSearchValue(MetadataCodec.encodeNativeObject(searchAttrValue))))
                 .build();
 
         var searchResult = unwrap(dal.search(TestData.TEST_TENANT, searchParams));
@@ -279,7 +279,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setOperator(SearchOperator.EQ)
                         .setAttrType(basicType)
-                        .setAttrValue(MetadataCodec.encodeNativeObject(valueToLookFor))))
+                        .setSearchValue(MetadataCodec.encodeNativeObject(valueToLookFor))))
                 .build();
 
         // Equality should match only one of the four tags in the test set
@@ -315,7 +315,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setOperator(SearchOperator.EQ)
                         .setAttrType(basicType)
-                        .setAttrValue(MetadataCodec.encodeNativeObject(valueToLookFor))))
+                        .setSearchValue(MetadataCodec.encodeNativeObject(valueToLookFor))))
                 .build();
 
         // Equality should match only one of the four tags in the test set
@@ -361,7 +361,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setOperator(SearchOperator.NE)
                         .setAttrType(basicType)
-                        .setAttrValue(MetadataCodec.encodeNativeObject(valueToLookFor))))))
+                        .setSearchValue(MetadataCodec.encodeNativeObject(valueToLookFor))))))
                 .build();
 
         // The not-equals operator should match everything not matched by the equality operator
@@ -416,7 +416,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setOperator(SearchOperator.NE)
                         .setAttrType(basicType)
-                        .setAttrValue(MetadataCodec.encodeNativeObject(valueToLookFor))))))
+                        .setSearchValue(MetadataCodec.encodeNativeObject(valueToLookFor))))))
                 .build();
 
         // The not-equals operator should match everything not matched by the equality operator
@@ -515,7 +515,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setOperator(SearchOperator.GT)
                         .setAttrType(basicType)
-                        .setAttrValue(MetadataCodec.encodeNativeObject(valueToLookFor))))
+                        .setSearchValue(MetadataCodec.encodeNativeObject(valueToLookFor))))
                 .build();
 
         // GT operator should match values > middleValue, i.e. t2
@@ -549,7 +549,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setOperator(SearchOperator.GE)
                         .setAttrType(basicType)
-                        .setAttrValue(MetadataCodec.encodeNativeObject(valueToLookFor))))
+                        .setSearchValue(MetadataCodec.encodeNativeObject(valueToLookFor))))
                 .build();
 
         // G£ operator should match values >= middleValue, i.e. t1 and t2
@@ -584,7 +584,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setOperator(SearchOperator.LT)
                         .setAttrType(basicType)
-                        .setAttrValue(MetadataCodec.encodeNativeObject(valueToLookFor))))
+                        .setSearchValue(MetadataCodec.encodeNativeObject(valueToLookFor))))
                 .build();
 
         // LT operator should match values < middleValue, i.e. t0
@@ -618,7 +618,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setOperator(SearchOperator.LE)
                         .setAttrType(basicType)
-                        .setAttrValue(MetadataCodec.encodeNativeObject(valueToLookFor))))
+                        .setSearchValue(MetadataCodec.encodeNativeObject(valueToLookFor))))
                 .build();
 
         // LE operator should match values <= middleValue, i.e. t0 and t1
@@ -675,7 +675,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                             .setAttrName(attrToLookFor)
                             .setOperator(operator)
                             .setAttrType(basicType)
-                            .setAttrValue(MetadataCodec.encodeNativeObject(v1))))
+                            .setSearchValue(MetadataCodec.encodeNativeObject(v1))))
                     .build();
 
             var result = unwrap(dal.search(TestData.TEST_TENANT, searchParams));
@@ -805,7 +805,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setOperator(SearchOperator.IN)
                         .setAttrType(basicType)
-                        .setAttrValue(MetadataCodec.encodeArrayValue(searchValues, TypeSystem.descriptor(basicType)))))
+                        .setSearchValue(MetadataCodec.encodeArrayValue(searchValues, TypeSystem.descriptor(basicType)))))
                 .build();
 
         var searchResult = unwrap(dal.search(TestData.TEST_TENANT, searchParams));
@@ -868,7 +868,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setOperator(SearchOperator.IN)
                         .setAttrType(basicType)
-                        .setAttrValue(MetadataCodec.encodeArrayValue(searchValues, typeToLookFor))))
+                        .setSearchValue(MetadataCodec.encodeArrayValue(searchValues, typeToLookFor))))
                 .build();
 
         var searchResult = unwrap(dal.search(TestData.TEST_TENANT, searchParams));
@@ -1264,7 +1264,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setOperator(SearchOperator.EQ)
                         .setAttrType(BasicType.STRING)
-                        .setAttrValue(encodeValue(valueToLookFor))))
+                        .setSearchValue(encodeValue(valueToLookFor))))
                 .build();
 
         var searchResult = unwrap(dal.search(TestData.TEST_TENANT, searchParams));
@@ -1284,7 +1284,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrToLookFor)
                         .setOperator(SearchOperator.NE)
                         .setAttrType(BasicType.STRING)
-                        .setAttrValue(encodeValue("not_the_droids_you_are_looking_for"))))))
+                        .setSearchValue(encodeValue("not_the_droids_you_are_looking_for"))))))
                 .build();
 
         var searchResult2 = unwrap(dal.search(TestData.TEST_TENANT, searchParams2));
@@ -1369,6 +1369,6 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setAttrName(attrName)
                         .setAttrType(attrType)
                         .setOperator(operator)
-                        .setAttrValue(searchValue));
+                        .setSearchValue(searchValue));
     }
 }

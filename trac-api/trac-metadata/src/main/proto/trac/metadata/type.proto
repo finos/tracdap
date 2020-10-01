@@ -51,6 +51,15 @@ enum BasicType {
     FLOAT = 3;
 
     /**
+     * UTF encoded string value of arbitrary length.
+     *
+     * The encoding used (e.g. UTF-8, UTF-16, UCS-16) varies between languages / platforms,
+     * generally TRAC will present strings using the standard encoding for a given language or
+     * protocol.
+     */
+    STRING = 4;
+
+    /**
      * A fixed-point decimal value with known precision and scale.
      *
      * The available precision and scale may vary between languages / platforms.
@@ -58,18 +67,9 @@ enum BasicType {
      * For metadata attributes, TRAC provides the following guarantees on precision:
      *      precision >= 31
      *      scale >= 10
-     * precision - scale >= 21
+     *      precision - scale >= 21
      */
-    DECIMAL = 4;
-
-    /**
-     * UTF encoded string value of arbitrary length.
-     *
-     * The encoding used (e.g. UTF-8, UTF-16, UCS-16) varies between languages / platforms,
-     * generally TRAC will present strings using the standard encoding for a given language or
-     * protocol.
-     */
-    STRING = 5;
+    DECIMAL = 5;
 
     /**
      * A date value.
@@ -119,24 +119,10 @@ message TypeDescriptor {
 /// Represent a decimal value (this could be replaced by a string representation)
 message DecimalValue {
 
+    // TODO: Is a structured type needed for decimals or is string sufficient?
+
     oneof representation {
         string str = 1;
-    }
-}
-
-/// Represent a date value (this could be replaced by a string representation)
-message DateValue {
-
-    oneof representation {
-        string isoDate = 1;
-    }
-}
-
-/// Represent a date-time value (this could be replaced by a string representation)
-message DateTimeValue {
-
-    oneof representation {
-        string isoDateTime = 1;
     }
 }
 
@@ -146,43 +132,133 @@ message UUID {
     // TODO - UUID could be removed as a structured type
     // Instead use strings with appropriate validation, for ease of interoperability
 
-    sint64 hi = 1;
-    sint64 lo = 2;
+    sfixed64 hi = 1;
+    sfixed64 lo = 2;
 }
 
 
 /**
- * A value can represent any value expressed in the TRAC type system.
+ * A value expressed in the TRAC type system.
  *
- * A value may be a primitive value, or a composite value such as an array.
- * Every value must include a type descriptor and the value must match the type descriptor.
- * Composite types need only include a type descriptor in the root value, e.g. it is not
- * necessary to set a type descriptor for every item in an array, although it is allowed to
- * do so.
+ * A value can express a primitive value, or a composite value such as an array.
+ * Arbitrary nesting of composite types is permitted, although most functions
+ * will limit the set of acceptable types during validation.
+ *
+ * Values include a type descriptor field. For primitive values the type
+ * descriptor is optional. For composite types the root value must include a
+ * full valid type descriptor, i.e. a descriptor that goes down to the leaf
+ * types. Sub-values in a composite type are free to omit the type descriptor,
+ * even if there are multiple levels of nesting, however any extra descriptors
+ * that are provided must also be full and valid.
+ *
+ * TRAC will always provide values with the type descriptors "normalised". This
+ * means that a root value will always have a type descriptor (even if it is a
+ * primitive type) and sub-values will never have a type descriptor. It is not
+ * necessary or preferred for application code to send values to TRAC with
+ * normalised type descriptors, TRAC will always perform normalisation.
+ *
+ * @see TypeDescriptor
  */
 message Value {
 
-    /// Type descriptor for the current value
+    /**
+     * Type descriptor for the current value.
+     *
+     * A type descriptor is always required for values that are the root of a
+     * composite type, otherwise it is optional.
+     */
     TypeDescriptor type = 1;
 
     oneof value {
 
+        /**
+         * A boolean value.
+         *
+         * Represented natively in both protobuf and JSON.
+         */
         bool booleanValue = 2;
+
+        /**
+         * A 64-bit signed integer value.
+         *
+         * Represented natively in both protobuf and JSON.
+         *
+         * In JavaScript and JSON, native integers may be limited to less than
+         * full range of a 64 bit integer. This is because JavaScript has a
+         * single Number type that represents both integers and floats. The safe
+         * limit for integers that can be expressed without a risk of rounding
+         * in JavaScript is Number.MAX_SAFE_INTEGER.
+         */
         sint64 integerValue = 3 [jstype = JS_NUMBER];
+
+        /**
+         * A 64-bit signed floating point value.
+         *
+         * Represented natively in both protobuf and JSON.
+         */
         double floatValue = 4;
-        DecimalValue decimalValue = 5;
-        string stringValue = 6;
-        DateValue dateValue = 7;
-        DateTimeValue datetimeValue = 8;
+
+        /**
+         * A string value.
+         *
+         * Protobuf encodes strings as UTF-8 on the wire. String values in JSON
+         * requests are also be encoded as UTF-8 on the wire, as per RFC 8259.
+         * When reading or writing string values in application code, they will
+         * be presented in the normal encoding scheme of application's coding
+         * language.
+         */
+        string stringValue = 5;
+
+        /**
+         * A decimal value with fixed precision and scale.
+         *
+         * @see BasicType.DECIMAL
+         */
+        DecimalValue decimalValue = 6;
+
+        /**
+         * A date value.
+         *
+         * Dates are represented as strings in ISO 8601 format.
+         *
+         * @see BasicType.DATE
+         */
+        string dateValue = 7;
+
+        /**
+         * A date-time value.
+         *
+         * Date-times are represented as strings in ISO 8601 format.
+         *
+         * Date-time values support nanosecond precision, however in practice
+         * the available precision may be less than this. In particular,
+         * tag attributes are always stored at microsecond precision. Values
+         * passed into models or used in application code will be limited to the
+         * precision supported by date-time types in their own coding language.
+         *
+         * Time zone offsets are supported as described in ISO 8601. Date-time
+         * values should always include a zone offset to guarantee behaviour.
+         * If a zone offset is not supplied TRAC will normalized incoming values
+         * by applying a zone offset, currently the applied offset will be UTC.
+         *
+         * @see BasicType.DATETIME
+         */
+        string datetimeValue = 8;
+
+        /**
+         * An array of Values.
+         *
+         * All items in an array must have the same type.
+         */
         ArrayValue arrayValue = 9;
     }
 }
 
 
 /**
- * An array value holds an array of other TRAC values.
+ * An array value holds an array of other Values.
  *
- * All items in an array must be of the same type (i.e. have the same type descriptor).
+ * All items in an array must have the same type.
  */
 message ArrayValue {
 

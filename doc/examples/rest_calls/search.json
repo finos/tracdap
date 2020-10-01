@@ -1,0 +1,45 @@
+{
+    "logical": {
+        "operator": "AND",
+        "expr": [
+
+            { "term": {
+                "attrName": "flow_type",
+                "attrType": "STRING",
+                "operator": "EQ",
+                "searchValue": { "stringValue": "account_simulation" }
+            }},
+
+            { "term": {
+                "attrName": "brand",
+                "attrType": "STRING",
+                "operator": "IN",
+                "searchValue": { "arrayValue": { "item": [
+                    { "stringValue": "ACME Financial" },
+                    { "stringValue": "ACME SubCo" },
+                    { "stringValue": "ACME Legacy Brands" }
+                ]}}
+            }},
+
+            { "logical": {
+                "operator": "OR",
+                "expr": [
+
+                    { "term": {
+                        "attrName": "last_review_date",
+                        "attrType": "DATE",
+                        "operator": "GE",
+                        "searchValue": { "dateValue": "2019-10-01" }
+                    }},
+
+                    { "term": {
+                        "attrName": "review_exemption",
+                        "attrType": "BOOLEAN",
+                        "operator": "EQ",
+                        "searchValue": { "booleanValue": true }
+                    }}
+                ]
+            }}
+        ]
+    }
+}
