@@ -16,18 +16,18 @@
 
 
 /**
- * The sql-drivers project builds drivers as configured in gradle/plugins.gradle
+ * The sql-drivers project adds driver dependencies as configured in gradle/plugins.gradle
+ *
+ * Any enabled drivers may only be used in accordance with their respective licenses.
+ * Please see the NOTICE file for legal information on the use of these drivers
  *
  * SQL drivers are not a compile-time dependency of the TRAC services
  * Instead, JDBC drivers can be added to the classpath at launch time
  * This allows TRAC to be distributed independently of any SQL driver
  *
- * For development and testing, SQL drivers can be used immediately by linking
+ * For development and testing, SQL drivers can be used easily by linking
  * against the sql-drivers project as a runtime dependency. The build system will
- * try to turn this on automatically if it detects it is running from an IDE.
- *
- * See gradle/plugins.gradle for switched to enable/disable individual SQL drivers.
- * Any enabled drivers may only be used in accordance with their respective licenses.
+ * try to turn this on automatically if it detects TRAC is running from an IDE.
  */
 
 plugins {
@@ -94,14 +94,19 @@ sourceSets.each { dialect ->
 
     if (dialect.name != "main" && dialect.name != "test") {
 
-        // Only build drivers that are enabled in gradle/plugins.gradle
+        // Only build drivers that are enabled in gradle/plugins.gradle or using the matching env variable
 
+        def env = System.getenv()
+        def buildKey = (String) "BUILD_sql_${dialect.name}"
         def buildDriver = false
 
         if (project.hasProperty("BUILD_ALL_PLUGINS") && project.property("BUILD_ALL_PLUGINS"))
             buildDriver = true
 
-        if (project.hasProperty("BUILD_sql_${dialect.name}") && project.property("BUILD_sql_${dialect.name}"))
+        if (project.hasProperty(buildKey) && project.property(buildKey))
+            buildDriver = true
+
+        if (env.containsKey(buildKey) && Boolean.parseBoolean(env.get(buildKey)))
             buildDriver = true
 
         if (buildDriver) {

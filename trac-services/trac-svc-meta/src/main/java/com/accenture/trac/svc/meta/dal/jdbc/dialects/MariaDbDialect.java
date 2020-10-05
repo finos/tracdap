@@ -17,24 +17,19 @@
 package com.accenture.trac.svc.meta.dal.jdbc.dialects;
 
 import com.accenture.trac.common.db.JdbcDialect;
-import com.accenture.trac.svc.meta.dal.jdbc.JdbcErrorCode;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 
 
-public interface IDialect {
+public class MariaDbDialect extends MySqlDialect {
 
-    JdbcDialect dialectCode();
+    // Re-use the MySQL dialect since error codes, syntax is all the same
+    // Just return the MARIADB dialect code!
 
-    JdbcErrorCode mapErrorCode(SQLException e);
+    // It is important the dialects are treated separately however in terms of drivers
+    // MariaDB and MySQL have different implementations for sub-section precision in timestamps
+    // Neither DB can read the sub-second part from the other's protocol
 
-    void prepareMappingTable(Connection conn) throws SQLException;
-
-    String mappingTableName();
-
-    boolean supportsGeneratedKeys();
-
-    int booleanType();
+    @Override
+    public JdbcDialect dialectCode() {
+        return JdbcDialect.MARIADB;
+    }
 }

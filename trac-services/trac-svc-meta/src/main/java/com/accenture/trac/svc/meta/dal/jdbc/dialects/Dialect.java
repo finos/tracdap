@@ -17,6 +17,7 @@
 package com.accenture.trac.svc.meta.dal.jdbc.dialects;
 
 import com.accenture.trac.common.db.JdbcDialect;
+import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.svc.meta.exception.TracInternalError;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcErrorCode;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcException;
@@ -28,6 +29,7 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 public abstract class Dialect implements IDialect {
@@ -36,23 +38,23 @@ public abstract class Dialect implements IDialect {
 
         switch (dialect) {
 
-            case MYSQL: return new MySqlDialect();
             case H2: return new H2SqlDialect();
+            case MYSQL: return new MySqlDialect();
+            case MARIADB: return new MariaDbDialect();
+            case POSTGRESQL: return new PostgreSqlDialect();
+            case SQLSERVER: return new SqlServerDialect();
+            case ORACLE: return new OracleDialect();
 
-            default: throw new RuntimeException("Unsupported JDBC dialect: " + dialect.name());
+            default: throw new EStartup("Unsupported JDBC dialect: " + dialect.name());
         }
     }
 
 
-    private final Map<Integer, JdbcErrorCode> syntheticErrorCodes;
+    // Generate error mappings for all synthetic error codes
+    private static final Map<Integer, JdbcErrorCode> syntheticErrorCodes = Stream
+            .of(JdbcErrorCode.values())
+            .collect(Collectors.toMap(Enum::ordinal, error -> error));
 
-    protected Dialect() {
-
-        syntheticErrorCodes = new HashMap<>();
-
-        for (var error : JdbcErrorCode.values())
-            syntheticErrorCodes.put(error.ordinal(), error);
-    }
 
     @Override
     public final JdbcErrorCode mapErrorCode(SQLException error) {
@@ -64,6 +66,7 @@ public abstract class Dialect implements IDialect {
     }
 
     protected abstract JdbcErrorCode mapDialectErrorCode(SQLException error);
+
 
     protected String loadKeyMappingDdl(String keyMappingDdl) {
 

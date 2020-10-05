@@ -28,8 +28,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.accenture.trac.svc.meta.test.IDalTestable;
-import com.accenture.trac.svc.meta.test.JdbcH2Impl;
-import com.accenture.trac.svc.meta.test.JdbcMariaDbImpl;
+import com.accenture.trac.svc.meta.test.JdbcUnit;
+import com.accenture.trac.svc.meta.test.JdbcIntegration;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -47,13 +47,13 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         this.dal = dal;
     }
 
-    @ExtendWith(JdbcH2Impl.class)
-    static class JdbcH2 extends MetadataDalWriteTest {}
+    @ExtendWith(JdbcUnit.class)
+    static class Unit extends MetadataDalWriteTest {}
 
     @Tag("integration")
-    @Tag("int-mariadb")
-    @ExtendWith(JdbcMariaDbImpl.class)
-    static class JdbcMariaDB extends MetadataDalWriteTest {}
+    @Tag("int-metadb")
+    @ExtendWith(JdbcIntegration.class)
+    static class Integration extends MetadataDalWriteTest {}
 
     @Test
     void testSaveNewObject_ok() throws Exception {

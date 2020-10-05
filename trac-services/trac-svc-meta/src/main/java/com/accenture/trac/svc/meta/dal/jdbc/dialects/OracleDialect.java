@@ -24,27 +24,17 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Map;
 
-
-public class MySqlDialect extends Dialect {
+public class OracleDialect extends Dialect {
 
     private static final Map<Integer, JdbcErrorCode> dialectErrorCodes = Map.ofEntries(
-            Map.entry(1062, JdbcErrorCode.INSERT_DUPLICATE),
-            Map.entry(1452, JdbcErrorCode.INSERT_MISSING_FK));
+            Map.entry(1, JdbcErrorCode.INSERT_DUPLICATE),  // ORA-00001: unique constraint violated
+            Map.entry(2291, JdbcErrorCode.INSERT_MISSING_FK));  // ORA-02291: integrity constraint violated - parent key not found
 
-    private static final String DROP_KEY_MAPPING_DDL = "drop temporary table if exists key_mapping;";
-    private static final String CREATE_KEY_MAPPING_FILE = "jdbc/mysql/key_mapping.ddl";
     private static final String MAPPING_TABLE_NAME = "key_mapping";
-
-    private final String createKeyMapping;
-
-    MySqlDialect() {
-
-        createKeyMapping = loadKeyMappingDdl(CREATE_KEY_MAPPING_FILE);
-    }
 
     @Override
     public JdbcDialect dialectCode() {
-        return JdbcDialect.MYSQL;
+        return JdbcDialect.ORACLE;
     }
 
     @Override
@@ -53,12 +43,8 @@ public class MySqlDialect extends Dialect {
     }
 
     @Override
-    public void prepareMappingTable(Connection conn) throws SQLException {
-
-        try (var stmt = conn.createStatement()) {
-            stmt.execute(DROP_KEY_MAPPING_DDL);
-            stmt.execute(createKeyMapping);
-        }
+    public void prepareMappingTable(Connection conn) {
+        // NO-OP, global temporary table deployed as part of Oracle schema
     }
 
     @Override
@@ -73,6 +59,7 @@ public class MySqlDialect extends Dialect {
 
     @Override
     public int booleanType() {
-        return Types.BOOLEAN;
+        // Oracle does not have a BOOLEAN type, we use NUMBER(1) with true = 1, false = 0
+        return Types.NUMERIC;
     }
 }

@@ -57,10 +57,14 @@ dependencies {
         exclude group: 'junit', module: 'junit'
     }
 
-    testImplementation project(':sql-drivers')
+    // Always pull in the H2 JDBC driver as a test dependency, since it used for unit tests
+    testImplementation group: 'com.h2database', name: 'h2', version: "$h2_version"
 
-    // Embedded databases to test some dialects locally
-    testImplementation group: 'ch.vorburger.mariaDB4j', name: 'mariaDB4j', version: "$mariadb_embedded_version"
+    // Drivers needed for integration tests are configured by the :sql-drivers project
+    // See that project's build file and also gradle/plugins.gradle for more details
+    // There may be licensing implications to enabling certain JDBC drivers
+    // See the NOTICE file for more information on licensing restrictions
+    testImplementation project(':sql-drivers')
 }
 
 // Bring DDL files into test JAR as resources

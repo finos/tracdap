@@ -26,8 +26,8 @@ import java.time.*;
 import java.util.concurrent.CompletableFuture;
 
 import com.accenture.trac.svc.meta.test.IDalTestable;
-import com.accenture.trac.svc.meta.test.JdbcH2Impl;
-import com.accenture.trac.svc.meta.test.JdbcMariaDbImpl;
+import com.accenture.trac.svc.meta.test.JdbcUnit;
+import com.accenture.trac.svc.meta.test.JdbcIntegration;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
@@ -48,13 +48,13 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
         this.dal = dal;
     }
 
-    @ExtendWith(JdbcH2Impl.class)
-    static class JdbcH2 extends MetadataDalEncodingTest {}
+    @ExtendWith(JdbcUnit.class)
+    static class Unit extends MetadataDalEncodingTest {}
 
     @Tag("integration")
-    @Tag("int-mariadb")
-    @ExtendWith(JdbcMariaDbImpl.class)
-    static class JdbcMariaDB extends MetadataDalEncodingTest {}
+    @Tag("int-metadb")
+    @ExtendWith(JdbcIntegration.class)
+    static class Integration extends MetadataDalEncodingTest {}
 
     @Test
     void roundTrip_ok() throws Exception {

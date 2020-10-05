@@ -28,7 +28,7 @@ import java.text.MessageFormat;
 class JdbcError {
 
     static final String UNHANDLED_ERROR = "Unhandled SQL Error code: {0}";
-    static final String UNRECOGNISED_ERROR_CODE = "Unrecognised SQL Error code: {0} {1}";
+    static final String UNRECOGNISED_ERROR_CODE = "Unrecognised SQL Error code: {0}, sqlstate = {1}, error code = {2}";
 
     static final String DUPLICATE_OBJECT_ID = "Duplicate object id {0}";
     static final String MISSING_ITEM = "Metadata item does not exist {0}";
@@ -50,7 +50,7 @@ class JdbcError {
     static void handleUnknownError(SQLException error, JdbcErrorCode code, IDialect dialect) {
 
         if (code == JdbcErrorCode.UNKNOWN_ERROR_CODE) {
-            var message = MessageFormat.format(UNRECOGNISED_ERROR_CODE, dialect.dialectCode(), error.getErrorCode());
+            var message = MessageFormat.format(UNRECOGNISED_ERROR_CODE, dialect.dialectCode(), error.getSQLState(), error.getErrorCode());
             throw new TracInternalError(message, error);
         }
     }

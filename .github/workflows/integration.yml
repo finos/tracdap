@@ -1,0 +1,100 @@
+name: Integration Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+
+jobs:
+
+  int-metadb:
+
+    runs-on: ubuntu-latest
+
+    container:
+      image: ubuntu:latest
+
+    strategy:
+      matrix:
+
+        database:
+
+          - { DB_NAME: MySQL,
+              DB_IMAGE: 'mysql:8.0',
+              DB_PORT: 3306,
+              DB_OPTIONS: '--health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3',
+              BUILD_sql_mysql: true,
+              TRAC_CONFIG_FILE: '.github/config/trac-int-mysql.properties',
+              MYSQL_DATABASE: trac,
+              MYSQL_USER: trac_admin,
+              MYSQL_PASSWORD: trac_admin,
+              MYSQL_ALLOW_EMPTY_PASSWORD: yes }
+
+          - { DB_NAME: MariaDB,
+              DB_IMAGE: 'mariadb:10.5',
+              DB_PORT: 3306,
+              DB_OPTIONS: '--health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3',
+              BUILD_sql_mariadb: true,
+              TRAC_CONFIG_FILE: '.github/config/trac-int-mariadb.properties',
+              MYSQL_DATABASE: trac,
+              MYSQL_USER: trac_admin,
+              MYSQL_PASSWORD: trac_admin,
+              MYSQL_ALLOW_EMPTY_PASSWORD: yes }
+
+          - { DB_NAME: PostgreSQL,
+              DB_IMAGE: 'postgres:9.6-alpine',
+              DB_PORT: 5432,
+              DB_OPTIONS: '--health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5',
+              BUILD_sql_postgresql: true,
+              TRAC_CONFIG_FILE: '.github/config/trac-int-postgresql.properties',
+              POSTGRES_DB: trac,
+              POSTGRES_USER: trac_admin,
+              POSTGRES_PASSWORD: trac_admin }
+
+          - { DB_NAME: SQLServer,
+              DB_IMAGE: 'mcr.microsoft.com/mssql/server:2019-latest',
+              DB_PORT: 1433,
+              DB_OPTIONS: '-e "NO_DB_OPTIONS=not_used"',  # docker run -e flag sets an env variable, passing '' causes errors
+              BUILD_sql_sqlserver: true,
+              TRAC_CONFIG_FILE: '.github/config/trac-int-sqlserver.properties',
+              MSSQL_PID: Developer,
+              ACCEPT_EULA: Y,
+              SA_PASSWORD: "tR4c_aDm!n" }
+
+    env: ${{ matrix.database }}
+
+    services:
+
+      metadb:
+
+        image: ${{ matrix.database.DB_IMAGE }}
+        env: ${{ matrix.database }}
+        ports:
+          - ${{ matrix.database.DB_PORT }}:${{ matrix.database.DB_PORT }}
+        options: ${{ matrix.database.DB_OPTIONS }}
+
+    steps:
+
+      - name: Set up Java
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11.0.x
+
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Build
+        run: ./gradlew trac-svc-meta:build trac-svc-meta:testClasses deploy-metadb:build -x test
+
+      - name: Prepare database
+        run: |
+          ./gradlew deploy-metadb:run --args="\
+          --config ${{ matrix.database.TRAC_CONFIG_FILE }} \
+          --task deploy_schema \
+          --task add_tenant:ACME_CORP"
+
+      - name: Integration tests
+        run: ./gradlew integration -DintegrationTags="int-metadb"

@@ -22,6 +22,7 @@ import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.logic.MetadataReadLogic;
 import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
 
+import com.accenture.trac.svc.meta.test.JdbcIntegration;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
@@ -32,7 +33,7 @@ import java.util.UUID;
 import java.util.function.Function;
 
 import com.accenture.trac.svc.meta.test.IDalTestable;
-import com.accenture.trac.svc.meta.test.JdbcH2Impl;
+import com.accenture.trac.svc.meta.test.JdbcUnit;
 import com.accenture.trac.svc.meta.test.TestData;
 
 import org.junit.Rule;
@@ -47,14 +48,23 @@ import static com.accenture.trac.svc.meta.test.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 
-@ExtendWith(JdbcH2Impl.class)
-public class MetadataWriteApiTest implements IDalTestable {
+abstract class MetadataWriteApiTest implements IDalTestable {
 
     private IMetadataDal dal;
 
     public void setDal(IMetadataDal dal) {
         this.dal = dal;
     }
+
+    // Include this test case as a unit test
+    @ExtendWith(JdbcUnit.class)
+    static class Unit extends MetadataWriteApiTest {}
+
+    // Include this test case for integration against different database backends
+    @org.junit.jupiter.api.Tag("integration")
+    @org.junit.jupiter.api.Tag("int-metadb")
+    @ExtendWith(JdbcIntegration.class)
+    static class Integration extends MetadataWriteApiTest {}
 
     @Rule
     final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();

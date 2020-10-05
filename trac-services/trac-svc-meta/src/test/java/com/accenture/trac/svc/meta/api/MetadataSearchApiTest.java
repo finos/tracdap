@@ -30,7 +30,8 @@ import com.accenture.trac.svc.meta.logic.MetadataSearchLogic;
 import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
 import com.accenture.trac.svc.meta.test.IDalTestable;
 
-import com.accenture.trac.svc.meta.test.JdbcH2Impl;
+import com.accenture.trac.svc.meta.test.JdbcIntegration;
+import com.accenture.trac.svc.meta.test.JdbcUnit;
 import com.accenture.trac.svc.meta.test.TestData;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -54,8 +55,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 
-@ExtendWith(JdbcH2Impl.class)
-class MetadataSearchApiTest implements IDalTestable {
+abstract class MetadataSearchApiTest implements IDalTestable {
 
     // This test case is meant to test the search API, not the core search functionality
     // I.e. it is to make sure the API covers the common, corner and error cases
@@ -70,6 +70,16 @@ class MetadataSearchApiTest implements IDalTestable {
     public void setDal(IMetadataDal dal) {
         this.dal = dal;
     }
+
+    // Include this test case as a unit test
+    @ExtendWith(JdbcUnit.class)
+    static class Unit extends MetadataSearchApiTest {}
+
+    // Include this test case for integration against different database backends
+    @org.junit.jupiter.api.Tag("integration")
+    @org.junit.jupiter.api.Tag("int-metadb")
+    @ExtendWith(JdbcIntegration.class)
+    static class Integration extends MetadataSearchApiTest {}
 
     @Rule
     final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();

@@ -16,23 +16,30 @@
 
 ext {
 
-    // Turn on every available plugin, useful for integration test builds
+    // Turn on every available plugin, not normally used!
     BUILD_ALL_PLUGINS = false
 
     /**
      * Note on licensing of SQL JDBC Drivers
      *
-     * SQL drivers are not a compile-time dependency of the TRAC services
-     * Instead, JDBC drivers can be added to the classpath at launch time
-     * This allows TRAC to be distributed independently of any SQL driver
-     *
      * Drivers enabled here are used for testing and linked into development builds
      * Such drivers may only be used in accordance with their respective licenses
+     * If you plan to redistribute the TRAC platform there will be legal implications!
+     *
+     * It is not normally necessary to enable a driver here as a dependency to create
+     * a build of TRAC that will support that driver; instead, TRAC can be built without
+     * linking any drivers in which case drivers can be supplied at runtime. This will
+     * avoid combining TRAC with vendor-supplied drivers.
+     *
+     * Please see the NOTICE file for legal information on the use of these drivers
      */
+
+    // SQL drivers can be enabled using these flags, or by setting a corresponding
+    // environment variable before calling Gradle
 
     BUILD_sql_h2 = true
     BUILD_sql_mysql = false
-    BUILD_sql_mariadb = true
+    BUILD_sql_mariadb = false
     BUILD_sql_postgresql = false
     BUILD_sql_sqlserver = false
     BUILD_sql_oracle = false

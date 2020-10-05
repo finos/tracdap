@@ -39,6 +39,7 @@ import io.grpc.ServerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.*;
@@ -71,8 +72,9 @@ public class TracMetadataService {
 
     private final ConfigManager configManager;
 
-    private JdbcMetadataDal dal;
+    private DataSource dataSource;
     private ExecutorService executor;
+    private JdbcMetadataDal dal;
     private Server server;
 
     TracMetadataService(ConfigManager configManager) {
@@ -92,8 +94,8 @@ public class TracMetadataService {
         // Use the -db library to set up a datasource
         // Handles different SQL dialects and authentication mechanisms etc.
         var properties = configManager.loadRootProperties();
-        var dialect = JdbcSetup.selectDialect(properties, DB_CONFIG_ROOT);
-        var dataSource = JdbcSetup.createDatasource(properties, DB_CONFIG_ROOT);
+        var dialect = JdbcSetup.getSqlDialect(properties, DB_CONFIG_ROOT);
+        dataSource = JdbcSetup.createDatasource(properties, DB_CONFIG_ROOT);
 
         // Construct the DAL using a direct executor, as per the comments above
         dal = new JdbcMetadataDal(dialect, dataSource, Runnable::run);
@@ -240,8 +242,10 @@ public class TracMetadataService {
             server.shutdown();
             server.awaitTermination(30, TimeUnit.SECONDS);
 
-            dal.shutdown();
             executor.shutdown();
+            dal.shutdown();
+
+            JdbcSetup.destroyDatasource(dataSource);
 
             System.out.println("TRAC Metadata service will exit normally");
             log.info("TRAC Metadata service will exit normally");

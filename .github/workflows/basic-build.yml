@@ -1,8 +1,9 @@
-name: Trac Platform CI
+name: Basic Build
 
 on: [push]
 
 jobs:
+
   build:
 
     runs-on: ubuntu-latest
@@ -14,11 +15,11 @@ jobs:
       with:
         java-version: 11.0.x
     
-    - name: Check out
+    - name: Checkout
       uses: actions/checkout@v1
 
     - name: Build
       run: ./gradlew build -x test
 
-    - name: Test
+    - name: Unit tests
       run: ./gradlew test

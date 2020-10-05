@@ -29,7 +29,8 @@ import java.util.concurrent.Executor;
 
 class JdbcBaseDal {
 
-    private final IDialect dialect;
+    protected final IDialect dialect;
+
     private final DataSource source;
     private final Executor executor;
 
@@ -37,6 +38,10 @@ class JdbcBaseDal {
         this.dialect = Dialect.dialectFor(dialect);
         this.source = source;
         this.executor = executor;
+    }
+
+    IDialect getDialect() {
+        return dialect;
     }
 
     void prepareMappingTable(Connection conn) throws SQLException {

@@ -15,11 +15,11 @@
 
 create temporary table key_mapping (
 
-    pk long,
-    fk long,
+    pk bigint,
+    fk bigint,
     ver int,
-    id_hi long,
-    id_lo long,
+    id_hi bigint,
+    id_lo bigint,
 
     mapping_stage int,
     ordering int

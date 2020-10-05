@@ -21,6 +21,7 @@ import com.accenture.trac.svc.meta.dal.jdbc.JdbcErrorCode;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.Map;
 
 
@@ -32,6 +33,7 @@ public class H2SqlDialect extends Dialect {
 
     private static final String DROP_KEY_MAPPING_DDL = "drop table if exists key_mapping;";
     private static final String CREATE_KEY_MAPPING_FILE = "jdbc/mysql/key_mapping.ddl";
+    private static final String MAPPING_TABLE_NAME = "key_mapping";
 
     private final String createKeyMapping;
 
@@ -57,5 +59,20 @@ public class H2SqlDialect extends Dialect {
             stmt.execute(DROP_KEY_MAPPING_DDL);
             stmt.execute(createKeyMapping);
         }
+    }
+
+    @Override
+    public String mappingTableName() {
+        return MAPPING_TABLE_NAME;
+    }
+
+    @Override
+    public boolean supportsGeneratedKeys() {
+        return true;
+    }
+
+    @Override
+    public int booleanType() {
+        return Types.BOOLEAN;
     }
 }

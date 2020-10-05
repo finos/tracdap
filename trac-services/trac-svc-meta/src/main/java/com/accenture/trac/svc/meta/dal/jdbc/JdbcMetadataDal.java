@@ -21,6 +21,7 @@ import com.accenture.trac.common.metadata.search.SearchParameters;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.common.db.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
+import com.accenture.trac.svc.meta.dal.jdbc.dialects.Dialect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,8 +56,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         tenants = new JdbcTenantImpl();
         readSingle = new JdbcReadImpl();
-        readBatch = new JdbcReadBatchImpl();
-        writeBatch = new JdbcWriteBatchImpl();
+        readBatch = new JdbcReadBatchImpl(this.dialect);
+        writeBatch = new JdbcWriteBatchImpl(this.dialect, readBatch);
         search = new JdbcSearchImpl();
     }
 
@@ -107,6 +108,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     private CompletableFuture<Void> saveNewObjects(String tenant, ObjectParts parts) {
 
         return wrapTransaction(conn -> {
+
+            prepareMappingTable(conn);
 
             var tenantId = tenants.getTenantId(tenant);
 
@@ -211,6 +214,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     private CompletableFuture<Void> preallocateObjectIds(String tenant, ObjectParts parts) {
 
         return wrapTransaction(conn -> {
+
+            prepareMappingTable(conn);
 
             var tenantId = tenants.getTenantId(tenant);
 

@@ -25,26 +25,27 @@ import java.sql.Types;
 import java.util.Map;
 
 
-public class MySqlDialect extends Dialect {
+public class SqlServerDialect extends Dialect {
 
     private static final Map<Integer, JdbcErrorCode> dialectErrorCodes = Map.ofEntries(
-            Map.entry(1062, JdbcErrorCode.INSERT_DUPLICATE),
-            Map.entry(1452, JdbcErrorCode.INSERT_MISSING_FK));
+            Map.entry(2601, JdbcErrorCode.INSERT_DUPLICATE),
+            Map.entry(2627, JdbcErrorCode.INSERT_DUPLICATE),
+            Map.entry(547, JdbcErrorCode.INSERT_MISSING_FK));
 
-    private static final String DROP_KEY_MAPPING_DDL = "drop temporary table if exists key_mapping;";
-    private static final String CREATE_KEY_MAPPING_FILE = "jdbc/mysql/key_mapping.ddl";
-    private static final String MAPPING_TABLE_NAME = "key_mapping";
+    private static final String DROP_KEY_MAPPING_DDL = "drop table if exists #key_mapping;";
+    private static final String CREATE_KEY_MAPPING_FILE = "jdbc/sqlserver/key_mapping.ddl";
+    private static final String MAPPING_TABLE_NAME = "#key_mapping";
 
     private final String createKeyMapping;
 
-    MySqlDialect() {
+    SqlServerDialect() {
 
         createKeyMapping = loadKeyMappingDdl(CREATE_KEY_MAPPING_FILE);
     }
 
     @Override
     public JdbcDialect dialectCode() {
-        return JdbcDialect.MYSQL;
+        return JdbcDialect.SQLSERVER;
     }
 
     @Override
@@ -68,7 +69,7 @@ public class MySqlDialect extends Dialect {
 
     @Override
     public boolean supportsGeneratedKeys() {
-        return true;
+        return false;
     }
 
     @Override

@@ -27,8 +27,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.accenture.trac.svc.meta.test.IDalTestable;
-import com.accenture.trac.svc.meta.test.JdbcH2Impl;
-import com.accenture.trac.svc.meta.test.JdbcMariaDbImpl;
+import com.accenture.trac.svc.meta.test.JdbcUnit;
+import com.accenture.trac.svc.meta.test.JdbcIntegration;
 import static com.accenture.trac.svc.meta.test.TestData.*;
 
 import org.junit.jupiter.api.Tag;
@@ -45,13 +45,13 @@ abstract class MetadataDalReadTest implements IDalTestable {
         this.dal = dal;
     }
 
-    @ExtendWith(JdbcH2Impl.class)
-    static class JdbcH2 extends MetadataDalReadTest {}
+    @ExtendWith(JdbcUnit.class)
+    static class Unit extends MetadataDalReadTest {}
 
     @Tag("integration")
-    @Tag("int-mariadb")
-    @ExtendWith(JdbcMariaDbImpl.class)
-    static class JdbcMariaDB extends MetadataDalReadTest {}
+    @Tag("int-metadb")
+    @ExtendWith(JdbcIntegration.class)
+    static class Integration extends MetadataDalReadTest {}
 
     @Test
     void testLoadOneExplicit_ok() throws Exception {

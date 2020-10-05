@@ -19,5 +19,8 @@ package com.accenture.trac.common.db;
 public enum JdbcDialect {
     H2,
     MYSQL,
-    MARIADB
+    MARIADB,
+    POSTGRESQL,
+    SQLSERVER,
+    ORACLE
 }

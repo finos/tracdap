@@ -25,10 +25,33 @@ dependencies {
     testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: "$junit_version"
 }
 
-test {
-    useJUnitPlatform()
-}
-
 compileJava {
     options.compilerArgs << '-parameters'
+}
+
+test {
+
+    useJUnitPlatform {
+        excludeTags "integration"
+        excludeTags "slow"
+    }
+}
+
+task integration(type: Test) {
+
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    workingDir = rootProject.projectDir
+
+    def integrationTags = System.getProperty("integrationTags", "")
+
+    doFirst {
+        if (integrationTags.isBlank())
+            throw new Exception("Missing required property [integrationTags] (use -DintegrationTags=\"...\")")
+    }
+
+    useJUnitPlatform {
+        includeTags(integrationTags)
+    }
 }

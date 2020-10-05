@@ -18,6 +18,8 @@ package com.accenture.trac.svc.meta.dal.jdbc.dialects;
 
 import com.accenture.trac.common.db.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcErrorCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -25,38 +27,47 @@ import java.sql.Types;
 import java.util.Map;
 
 
-public class MySqlDialect extends Dialect {
+public class PostgreSqlDialect extends Dialect {
 
     private static final Map<Integer, JdbcErrorCode> dialectErrorCodes = Map.ofEntries(
-            Map.entry(1062, JdbcErrorCode.INSERT_DUPLICATE),
-            Map.entry(1452, JdbcErrorCode.INSERT_MISSING_FK));
+            Map.entry(23505, JdbcErrorCode.INSERT_DUPLICATE),
+            Map.entry(23503, JdbcErrorCode.INSERT_MISSING_FK));
 
-    private static final String DROP_KEY_MAPPING_DDL = "drop temporary table if exists key_mapping;";
-    private static final String CREATE_KEY_MAPPING_FILE = "jdbc/mysql/key_mapping.ddl";
+    private static final String CREATE_KEY_MAPPING_FILE = "jdbc/postgresql/key_mapping.ddl";
     private static final String MAPPING_TABLE_NAME = "key_mapping";
 
+    private final Logger log = LoggerFactory.getLogger(getClass());
     private final String createKeyMapping;
 
-    MySqlDialect() {
+    PostgreSqlDialect() {
 
         createKeyMapping = loadKeyMappingDdl(CREATE_KEY_MAPPING_FILE);
     }
 
     @Override
     public JdbcDialect dialectCode() {
-        return JdbcDialect.MYSQL;
+        return JdbcDialect.POSTGRESQL;
     }
 
     @Override
     public JdbcErrorCode mapDialectErrorCode(SQLException error) {
-        return dialectErrorCodes.getOrDefault(error.getErrorCode(), JdbcErrorCode.UNKNOWN_ERROR_CODE);
-    }
 
+        var errorCodeString = error.getSQLState();
+
+        try {
+            var errorCode = Integer.parseInt(errorCodeString);
+            return dialectErrorCodes.getOrDefault(errorCode, JdbcErrorCode.UNKNOWN_ERROR_CODE);
+        }
+        catch (NumberFormatException e) {
+            log.error("PostgreSQL error state is not an integer error code: [{}]", errorCodeString);
+            return JdbcErrorCode.UNKNOWN_ERROR_CODE;
+        }
+    }
     @Override
     public void prepareMappingTable(Connection conn) throws SQLException {
 
+        // Postgres temporary table uses "on commit drop" so no need to drop explicitly
         try (var stmt = conn.createStatement()) {
-            stmt.execute(DROP_KEY_MAPPING_DDL);
             stmt.execute(createKeyMapping);
         }
     }
@@ -75,4 +86,5 @@ public class MySqlDialect extends Dialect {
     public int booleanType() {
         return Types.BOOLEAN;
     }
+
 }

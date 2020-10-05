@@ -17,6 +17,7 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
 import com.accenture.trac.common.metadata.*;
+import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import java.sql.Connection;
@@ -29,10 +30,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 class JdbcReadBatchImpl {
 
+    private final IDialect dialect;
     private final AtomicInteger mappingStage;
 
-    JdbcReadBatchImpl() {
-        mappingStage = new AtomicInteger();
+    JdbcReadBatchImpl(IDialect dialect) {
+        this.dialect = dialect;
+        this.mappingStage = new AtomicInteger();
     }
 
     JdbcBaseDal.KeyedItems<ObjectType>
@@ -49,6 +52,8 @@ class JdbcReadBatchImpl {
                 "where oid.tenant_id = ?\n" +
                 "  and km.mapping_stage = ?\n" +
                 "order by km.ordering";
+
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -119,6 +124,8 @@ class JdbcReadBatchImpl {
                 "where def.tenant_id = ?\n" +
                 "  and km.mapping_stage = ?\n" +
                 "order by km.ordering";
+
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -210,6 +217,8 @@ class JdbcReadBatchImpl {
                 "  and km.mapping_stage = ?\n" +
                 "order by km.ordering";
 
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
@@ -258,6 +267,8 @@ class JdbcReadBatchImpl {
                 "where ta.tenant_id = ?\n" +
                 "  and km.mapping_stage = ?\n" +
                 "order by km.ordering, ta.attr_name, ta.attr_index";
+
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -362,6 +373,8 @@ class JdbcReadBatchImpl {
                 "  and km.mapping_stage = ?\n" +
                 "order by km.ordering";
 
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+
         var mappingStage = insertFkForMapping(conn, tagPk);
         mapDefinitionByTagPk(conn, tenantId, mappingStage);
 
@@ -412,6 +425,14 @@ class JdbcReadBatchImpl {
     // KEY LOOKUP FUNCTIONS
     // -----------------------------------------------------------------------------------------------------------------
 
+    public long[] lookupObjectPks(Connection conn, short tenantId, UUID[] objectIds) throws SQLException {
+
+        var mappingStage = insertIdForMapping(conn, objectIds);
+        mapObjectById(conn, tenantId, mappingStage);
+
+        return fetchMappedPk(conn, mappingStage, objectIds.length);
+    }
+
     long[] lookupDefinitionPk(Connection conn, short tenantId, long[] objectPk, int[] version) throws SQLException {
 
         var mappingStage = insertFkAndVersionForMapping(conn, objectPk, version);
@@ -420,12 +441,22 @@ class JdbcReadBatchImpl {
         return fetchMappedPk(conn, mappingStage, objectPk.length);
     }
 
+    long[] lookupTagPk(Connection conn, short tenantId, long[] definitionPk, int[] tagVersion) throws SQLException {
+
+        var mappingStage = insertFkAndVersionForMapping(conn, definitionPk, tagVersion);
+        mapTagByVersion(conn, tenantId, mappingStage);
+
+        return fetchMappedPk(conn, mappingStage, definitionPk.length);
+    }
+
     private long[] fetchMappedPk(Connection conn, int mappingStage, int length) throws SQLException {
 
         var query =
                 "select pk from key_mapping\n" +
                 "where mapping_stage = ?\n" +
                 "order by ordering";
+
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -461,11 +492,13 @@ class JdbcReadBatchImpl {
 
     private int insertIdForMapping(Connection conn, UUID[] ids) throws SQLException {
 
-        var insertQuery =
+        var query =
                 "insert into key_mapping (id_hi, id_lo, mapping_stage, ordering)\n" +
                 "values (?, ?, ?, ?)";
 
-        try (var stmt = conn.prepareStatement(insertQuery)) {
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query)) {
 
             var mappingStage = nextMappingStage();
 
@@ -493,6 +526,8 @@ class JdbcReadBatchImpl {
                 "insert into key_mapping (pk, mapping_stage, ordering)\n" +
                 "values (?, ?, ?)";
 
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+
         try (var stmt = conn.prepareStatement(query)) {
             return insertKeysForMapping(stmt, pks);
         }
@@ -503,6 +538,8 @@ class JdbcReadBatchImpl {
         var query =
                 "insert into key_mapping (fk, mapping_stage, ordering)\n" +
                 "values (?, ?, ?)";
+
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
 
         try (var stmt = conn.prepareStatement(query)) {
             return insertKeysForMapping(stmt, fks);
@@ -531,11 +568,13 @@ class JdbcReadBatchImpl {
 
     private int insertFkAndVersionForMapping(Connection conn, long[] fk, int[] version) throws SQLException {
 
-        var insertQuery =
+        var query =
                 "insert into key_mapping (fk, ver, mapping_stage, ordering)\n" +
                 "values (?, ?, ?, ?)";
 
-        try (var stmt = conn.prepareStatement(insertQuery)) {
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query)) {
 
             var mappingStage = nextMappingStage();
 
@@ -559,16 +598,18 @@ class JdbcReadBatchImpl {
 
     private void mapObjectById(Connection conn, short tenantId, int mappingStage) throws SQLException {
 
-        var mapQuery =
+        var query =
                 "update key_mapping\n" +
-                "set key_mapping.pk = (" +
+                "set pk = (" +
                 "  select object_pk from object_id oid\n" +
                 "  where oid.tenant_id = ?\n" +
                 "  and oid.object_id_hi = key_mapping.id_hi\n" +
                 "  and oid.object_id_lo = key_mapping.id_lo)\n" +
                 "where mapping_stage = ?";
 
-        try (var stmt = conn.prepareStatement(mapQuery))  {
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query))  {
 
             stmt.setShort(1, tenantId);
             stmt.setInt(2, mappingStage);
@@ -579,16 +620,18 @@ class JdbcReadBatchImpl {
 
     private void mapDefinitionByVersion(Connection conn, short tenantId, int mappingStage) throws SQLException {
 
-        var mapQuery =
+        var query =
                 "update key_mapping\n" +
-                "set key_mapping.pk = (" +
+                "set pk = (" +
                 "  select definition_pk from object_definition def\n" +
                 "  where def.tenant_id = ?\n" +
                 "  and def.object_fk = key_mapping.fk\n" +
                 "  and def.object_version = key_mapping.ver)\n" +
                 "where mapping_stage = ?";
 
-        try (var stmt = conn.prepareStatement(mapQuery))  {
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query))  {
 
             stmt.setShort(1, tenantId);
             stmt.setInt(2, mappingStage);
@@ -599,16 +642,18 @@ class JdbcReadBatchImpl {
 
     private void mapDefinitionByLatest(Connection conn, short tenantId, int mappingStage) throws SQLException {
 
-        var mappingQuery =
+        var query =
                 "update key_mapping\n" +
-                "set key_mapping.pk = (\n" +
+                "set pk = (\n" +
                 "  select lv.latest_definition_pk\n" +
                 "  from latest_version lv\n" +
                 "  where lv.tenant_id = ?\n" +
                 "  and lv.object_fk = key_mapping.fk)\n" +
                 "where mapping_stage = ?";
 
-        try (var stmt = conn.prepareStatement(mappingQuery))  {
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query))  {
 
             stmt.setShort(1, tenantId);
             stmt.setInt(2, mappingStage);
@@ -619,15 +664,17 @@ class JdbcReadBatchImpl {
 
     private void mapDefinitionByTagPk(Connection conn, short tenantId, int mappingStage) throws SQLException {
 
-        var mappingQuery =
+        var query =
                 "update key_mapping\n" +
-                "set key_mapping.pk = (\n" +
+                "set pk = (\n" +
                 "  select definition_fk from tag t\n" +
                 "  where t.tenant_id = ?\n" +
                 "  and t.tag_pk = key_mapping.fk)\n" +
                 "where mapping_stage = ?";
 
-        try (var stmt = conn.prepareStatement(mappingQuery)) {
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
             stmt.setInt(2, mappingStage);
@@ -638,16 +685,18 @@ class JdbcReadBatchImpl {
 
     private void mapTagByVersion(Connection conn, short tenantId, int mappingStage) throws SQLException {
 
-        var mappingQuery =
+        var query =
                 "update key_mapping\n" +
-                "set key_mapping.pk = (\n" +
+                "set pk = (\n" +
                 "  select tag_pk from tag\n" +
                 "  where tag.tenant_id = ?\n" +
                 "  and tag.definition_fk = key_mapping.fk\n" +
                 "  and tag.tag_version = key_mapping.ver)\n" +
                 "where mapping_stage = ?";
 
-        try (var stmt = conn.prepareStatement(mappingQuery))  {
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query))  {
 
             stmt.setShort(1, tenantId);
             stmt.setInt(2, mappingStage);
@@ -658,16 +707,18 @@ class JdbcReadBatchImpl {
 
     private void mapTagByLatest(Connection conn, short tenantId, int mappingStage) throws SQLException {
 
-        var mappingQuery =
+        var query =
                 "update key_mapping\n" +
-                "set key_mapping.pk = (\n" +
+                "set pk = (\n" +
                 "  select lt.latest_tag_pk\n" +
                 "  from latest_tag lt\n" +
                 "  where lt.tenant_id = ?\n" +
                 "  and lt.definition_fk = key_mapping.fk)\n" +
                 "where mapping_stage = ?";
 
-        try (var stmt = conn.prepareStatement(mappingQuery))  {
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query))  {
 
             stmt.setShort(1, tenantId);
             stmt.setInt(2, mappingStage);

@@ -19,6 +19,7 @@ package com.accenture.trac.deploy.metadb;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.config.StandardArgs;
 import com.accenture.trac.common.config.StandardArgsProcessor;
+import com.accenture.trac.common.db.JdbcDialect;
 import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.exception.EStartup;
 
@@ -62,27 +63,39 @@ public class DeployMetaDB {
         log.info("{} {}", componentName, componentVersion);
 
         var properties = configManager.loadRootProperties();
-        var dialect = JdbcSetup.selectDialect(properties, DB_CONFIG_ROOT);
-        var scriptsLocation = String.format(SCHEMA_LOCATION, dialect.name().toLowerCase());
+        var dialect = JdbcSetup.getSqlDialect(properties, DB_CONFIG_ROOT);
+
+        // Pick up DB deploy scripts depending on the SQL dialect
+        // For MariaDB use the MySQL deploy scripts, for now there are no compatibility issues
+        var scriptsLocation = dialect == JdbcDialect.MARIADB
+                ? String.format(SCHEMA_LOCATION, JdbcDialect.MYSQL.name().toLowerCase())
+                : String.format(SCHEMA_LOCATION, dialect.name().toLowerCase());
 
         log.info("SQL Dialect: " + dialect);
         log.info("Scripts location: " + scriptsLocation);
 
         var dataSource = JdbcSetup.createDatasource(properties, DB_CONFIG_ROOT);
 
-        for (var task : tasks) {
+        try {
 
-            if (DEPLOY_SCHEMA_TASK_NAME.equals(task.getTaskName()))
-                deploySchema(dataSource, scriptsLocation);
+            for (var task : tasks) {
 
-            else if (ADD_TENANT_TASK_NAME.equals(task.getTaskName()))
-                addTenant(dataSource, task.getTaskArg());
+                if (DEPLOY_SCHEMA_TASK_NAME.equals(task.getTaskName()))
+                    deploySchema(dataSource, scriptsLocation);
 
-            else
-                throw new EStartup(String.format("Unknown task: [%s]", task.getTaskName()));
+                else if (ADD_TENANT_TASK_NAME.equals(task.getTaskName()))
+                    addTenant(dataSource, task.getTaskArg());
+
+                else
+                    throw new EStartup(String.format("Unknown task: [%s]", task.getTaskName()));
+            }
+
+            log.info("All tasks complete");
         }
+        finally {
 
-        log.info("All tasks complete");
+            JdbcSetup.destroyDatasource(dataSource);
+        }
     }
 
     private void deploySchema(DataSource dataSource, String scriptsLocation) {
@@ -104,7 +117,7 @@ public class DeployMetaDB {
         log.info("Running task: Add tenant...");
         log.info("New tenant code: [{}]", tenantCode);
 
-        var maxSelect = "select max (tenant_id) from tenant";
+        var maxSelect = "select max(tenant_id) from tenant";
         var insertTenant = "insert into tenant (tenant_id, tenant_code) values (?, ?)";
 
         short nextId;
@@ -114,8 +127,13 @@ public class DeployMetaDB {
             try (var stmt = conn.prepareStatement(maxSelect); var rs = stmt.executeQuery()) {
 
                 if (rs.next()) {
+
                     nextId = rs.getShort(1);
-                    nextId++;
+
+                    if (rs.wasNull())
+                        nextId = 1;
+                    else
+                        nextId++;
                 }
                 else
                     nextId = 1;

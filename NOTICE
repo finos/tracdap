@@ -5,3 +5,26 @@ This product includes software developed at Accenture (http://www.accenture.com/
 
 TRAC is based on original work developed at Parker Fitzgerald Ltd from 2017 to 2019.
 Parker Fitzgerald was acquired by Accenture in August 2019.
+
+
+Third Party Components - SQL (JDBC) drivers
+
+The MySQL driver (MySQL Connector/J) is licensed under version 2 of the GNU General Public
+License (GPLv2) subject to the Universal FOSS Exception, version 1.0, as allowed by the
+Licensing Information User Manual for v 8.0.x of MySQL Connector/J:
+
+https://opensource.org/licenses/gpl-2.0.php
+https://oss.oracle.com/licenses/universal-foss-exception/
+https://downloads.mysql.com/docs/licenses/connector-j-8.0-gpl-en.pdf
+
+The MySQL driver is not enabled by default, you may enable it under these terms.
+
+SQL drivers can be enabled and disabled in the Gradle config file "gradle/plugins.gradle".
+Any drivers that are enabled may only be used under the terms of their respective licenses.
+If you are planning to redistribute TRAC you should be aware of the legal implications of
+adjusting these settings.
+
+TRAC may be built with support for all SQL drivers disabled, as SQL drivers can be supplied
+at run time. By building the platform this way, it is not combined with any driver code.
+The person or organisation deploying the platform will be able to supply SQL drivers under
+their own license terms.

@@ -13,7 +13,7 @@
 --  limitations under the License.
 
 
-create temporary table key_mapping (
+create table #key_mapping (
 
     pk bigint,
     fk bigint,

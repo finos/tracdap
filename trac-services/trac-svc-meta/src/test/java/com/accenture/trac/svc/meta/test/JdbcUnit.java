@@ -16,37 +16,47 @@
 
 package com.accenture.trac.svc.meta.test;
 
+import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.util.InterfaceLogging;
 import com.accenture.trac.common.db.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
-import org.h2.jdbcx.JdbcDataSource;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.*;
 
+import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
+import java.util.Properties;
 import java.util.Scanner;
 import java.util.UUID;
 
 import static com.accenture.trac.svc.meta.test.TestData.TEST_TENANT;
 
 
-public class JdbcH2Impl implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback, AfterAllCallback {
+public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback, AfterAllCallback {
 
-    private JdbcDataSource source;
+    private static final String JDBC_URL_TEMPLATE = "mem:%s;DB_CLOSE_DELAY=-1";
+
+    private DataSource source;
     private JdbcMetadataDal dal;
 
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
 
         var dbId = UUID.randomUUID();
+        var jdbcUrl = String.format(JDBC_URL_TEMPLATE, dbId);
 
-        source = new JdbcDataSource();
-        source.setURL("jdbc:h2:mem:" + dbId + ";DB_CLOSE_DELAY=-1");
-        source.setUser("sa");
-        source.setPassword("sa");
+        var props = new Properties();
+        props.setProperty("unit.jdbcUrl", jdbcUrl);
+        props.setProperty("unit.dialect", "H2");
+        props.setProperty("unit.h2.user", "trac");
+        props.setProperty("unit.h2.pass", "trac");
+        props.setProperty("unit.pool.size", "1");
 
-        var inputStream = JdbcH2Impl.class.getResourceAsStream("/h2/001__trac_metadata.ddl");
+        source = JdbcSetup.createDatasource(props, "unit");
+
+        var inputStream = JdbcUnit.class.getResourceAsStream("/h2/001__trac_metadata.ddl");
         var scanner = new Scanner(inputStream, StandardCharsets.UTF_8.name()).useDelimiter("\\A");
         var deployScript = scanner.next();
 
@@ -69,9 +79,8 @@ public class JdbcH2Impl implements BeforeAllCallback, BeforeEachCallback, AfterE
 
         var testClass = context.getTestClass();
 
-        if (testClass.isEmpty() || !IDalTestable.class.isAssignableFrom(testClass.get())) {
+        if (testClass.isEmpty() || !IDalTestable.class.isAssignableFrom(testClass.get()))
             Assertions.fail("JUnit extension for DAL testing requires the test class to implement IDalTestable");
-        }
 
         var dal = new JdbcMetadataDal(JdbcDialect.H2, source, Runnable::run);
         dal.startup();
@@ -97,5 +106,7 @@ public class JdbcH2Impl implements BeforeAllCallback, BeforeEachCallback, AfterE
     @Override
     public void afterAll(ExtensionContext context) {
 
+        JdbcSetup.destroyDatasource(source);
+        source = null;
     }
 }

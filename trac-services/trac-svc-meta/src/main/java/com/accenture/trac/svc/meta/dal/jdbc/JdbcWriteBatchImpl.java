@@ -18,6 +18,7 @@ package com.accenture.trac.svc.meta.dal.jdbc;
 
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.metadata.*;
+import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
 
 import java.sql.*;
 import java.util.*;
@@ -25,6 +26,14 @@ import java.util.UUID;
 
 
 class JdbcWriteBatchImpl {
+
+    private final IDialect dialect;
+    private final JdbcReadBatchImpl readBatch;
+
+    JdbcWriteBatchImpl(IDialect dialect, JdbcReadBatchImpl readBatch) {
+        this.dialect = dialect;
+        this.readBatch = readBatch;
+    }
 
     long[] writeObjectId(Connection conn, short tenantId, ObjectType[] objectType, UUID[] objectId) throws SQLException {
 
@@ -37,7 +46,11 @@ class JdbcWriteBatchImpl {
                 ")\n" +
                 "values (?, ?, ?, ?)";
 
-        try (var stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+        // Only request generated key columns if the driver supports it
+        var keySupport = dialect.supportsGeneratedKeys();
+        var keyColumns = new String[] { "object_pk" };
+
+        try (var stmt = keySupport ? conn.prepareStatement(query, keyColumns) : conn.prepareStatement(query)) {
 
             for (var i = 0; i < objectId.length; i++) {
 
@@ -51,7 +64,10 @@ class JdbcWriteBatchImpl {
 
             stmt.executeBatch();
 
-            return generatedKeys(stmt, objectId.length);
+            if (keySupport)
+                return generatedKeys(stmt, objectId.length);
+            else
+                return readBatch.lookupObjectPks(conn, tenantId, objectId);
         }
     }
 
@@ -69,7 +85,11 @@ class JdbcWriteBatchImpl {
                 ")\n" +
                 "values (?, ?, ?, ?)";
 
-        try (var stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+        // Only request generated key columns if the driver supports it
+        var keySupport = dialect.supportsGeneratedKeys();
+        var keyColumns = new String[] { "definition_pk" };
+
+        try (var stmt = keySupport ? conn.prepareStatement(query, keyColumns) : conn.prepareStatement(query)) {
 
             for (var i = 0; i < objectPk.length; i++) {
 
@@ -83,7 +103,10 @@ class JdbcWriteBatchImpl {
 
             stmt.executeBatch();
 
-            return generatedKeys(stmt, objectPk.length);
+            if (keySupport)
+                return generatedKeys(stmt, objectPk.length);
+            else
+                return readBatch.lookupDefinitionPk(conn, tenantId, objectPk, objectVersion);
         }
     }
 
@@ -101,7 +124,11 @@ class JdbcWriteBatchImpl {
                 ")\n" +
                 "values (?, ?, ?, ?)";
 
-        try (var stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+        // Only request generated key columns if the driver supports it
+        var keySupport = dialect.supportsGeneratedKeys();
+        var keyColumns = new String[] { "tag_pk" };
+
+        try (var stmt = keySupport ? conn.prepareStatement(query, keyColumns) : conn.prepareStatement(query)) {
 
             for (var i = 0; i < definitionPk.length; i++) {
 
@@ -115,7 +142,10 @@ class JdbcWriteBatchImpl {
 
             stmt.executeBatch();
 
-            return generatedKeys(stmt, definitionPk.length);
+            if (keySupport)
+                return generatedKeys(stmt, definitionPk.length);
+            else
+                return readBatch.lookupTagPk(conn, tenantId, definitionPk, tagVersion);
         }
     }
 
@@ -160,7 +190,7 @@ class JdbcWriteBatchImpl {
                         stmt.setString(4, attrType.name());
                         stmt.setInt(5, attrIndex);
 
-                        stmt.setNull(6, Types.BOOLEAN);
+                        stmt.setNull(6, dialect.booleanType());
                         stmt.setNull(7, Types.BIGINT);
                         stmt.setNull(8, Types.DOUBLE);
                         stmt.setNull(9, Types.VARCHAR);

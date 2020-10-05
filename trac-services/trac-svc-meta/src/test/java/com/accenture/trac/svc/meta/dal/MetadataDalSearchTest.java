@@ -19,8 +19,8 @@ package com.accenture.trac.svc.meta.dal;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.common.metadata.search.*;
 import com.accenture.trac.svc.meta.test.IDalTestable;
-import com.accenture.trac.svc.meta.test.JdbcH2Impl;
-import com.accenture.trac.svc.meta.test.JdbcMariaDbImpl;
+import com.accenture.trac.svc.meta.test.JdbcUnit;
+import com.accenture.trac.svc.meta.test.JdbcIntegration;
 
 import com.accenture.trac.svc.meta.test.TestData;
 import org.junit.jupiter.api.Disabled;
@@ -52,13 +52,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         this.dal = dal;
     }
 
-    @ExtendWith(JdbcH2Impl.class)
-    static class JdbcH2 extends MetadataDalSearchTest {}
+    @ExtendWith(JdbcUnit.class)
+    static class Unit extends MetadataDalSearchTest {}
 
     @org.junit.jupiter.api.Tag("integration")
-    @org.junit.jupiter.api.Tag("int-mariadb")
-    @ExtendWith(JdbcMariaDbImpl.class)
-    static class JdbcMariaDB extends MetadataDalSearchTest {}
+    @org.junit.jupiter.api.Tag("int-metadb")
+    @ExtendWith(JdbcIntegration.class)
+    static class Integration extends MetadataDalSearchTest {}
 
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -366,7 +366,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         // The not-equals operator should match everything not matched by the equality operator
         // It follows that missing attributes or attributes with a different type do match this operator
-        // Consistency can be expressed formally as {t : attr(t, A) ≠ X} = {t : ¬( attr(t, A) = X )}
+        // Consistency can be expressed formally as {t : attr(t, A) != X} = {t : !( attr(t, A) = X )}
 
         // In this case we should match all but the first tag in the test set
         // For a single search term we are not concerned about order, so test the result as a set
@@ -421,7 +421,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         // The not-equals operator should match everything not matched by the equality operator
         // This condition applies for multi-valued attrs the same as for regular attrs
-        // Consistency can be expressed formally as {t : attr(t, A) ∌ X} = {t : ¬( attr(t, A) ∋ X )}
+        // Consistency can be expressed formally as {t : attr(t, A) !in X} = {t : !( attr(t, A) in X )}
         // Single-value attrs are also covered by this general definition, just with |attr(t, A)| = 1
 
         var searchResult = unwrap(dal.search(TestData.TEST_TENANT, searchParams));
@@ -552,7 +552,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                         .setSearchValue(MetadataCodec.encodeNativeObject(valueToLookFor))))
                 .build();
 
-        // G£ operator should match values >= middleValue, i.e. t1 and t2
+        // GE operator should match values >= middleValue, i.e. t1 and t2
 
         var searchResult = unwrap(dal.search(TestData.TEST_TENANT, searchParams));
 

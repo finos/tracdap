@@ -17,76 +17,24 @@
 package com.accenture.trac.common.db;
 
 import com.accenture.trac.common.exception.EStartup;
+import com.accenture.trac.common.exception.ETracInternal;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
-import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.Executor;
 
 
 public class JdbcSetup {
 
-    private static final Map<JdbcDialect, String> JDBC_CLASSES = Map.ofEntries(
+    private static final String DIALECT_PROPERTY = ".dialect";
+    private static final String JDBC_URL_PROPERTY = ".jdbcUrl";
 
-            Map.entry(JdbcDialect.H2, "org.h2.jdbcx.JdbcDataSource"),
-            //Map.entry(JdbcDialect.MYSQL, "com.mysql.cj.jdbc.MysqlDataSource"),
-            Map.entry(JdbcDialect.MYSQL, "org.mariadb.jdbc.MariaDbDataSource"),
-            Map.entry(JdbcDialect.MARIADB, "org.mariadb.jdbc.MariaDbDataSource"));
-            //Map.entry(JdbcDialect.POSTGRESQL, "org.postgresql.ds.PGSimpleDataSource"),
-            //Map.entry(JdbcDialect.SQLSERVER, "com.microsoft.sqlserver.jdbc.SQLServerDataSource"),
-            //Map.entry(JdbcDialect.ORACLE, "oracle.jdbc.pool.OracleDataSource"));
+    public static JdbcDialect getSqlDialect(Properties props, String configBase) {
 
-    public static JdbcDialect selectDialect(Properties props, String configBase) {
-
-        return getDialect(props, configBase);
-    }
-
-    public static DataSource createDatasource(Properties props, String configBase) {
-
-        // TODO: This is a rough implementation that needs cleaning up
-
-        var dialect = getDialect(props, configBase);
-        var url = props.getProperty(configBase + ".url");
-        var jdbcUrl = String.format("jdbc:%s:%s", dialect.name().toLowerCase(), url);
-
-        var hikariProps = new Properties();
-        hikariProps.setProperty("jdbcUrl", jdbcUrl);
-        hikariProps.setProperty("poolName", "dal_worker_pool");
-
-        var poolSize = props.getProperty(configBase + ".pool.size");
-
-        if (poolSize != null && !poolSize.isBlank())
-            hikariProps.setProperty("maximumPoolSize", poolSize);
-
-        var prefix = configBase + "." + dialect.name().toLowerCase() + ".";
-
-        for (var propKey : props.stringPropertyNames()) {
-
-            if (propKey.startsWith(prefix)) {
-
-                var stem = propKey.substring(prefix.length());
-                var hikariPropKey = "dataSource." + stem;
-
-                hikariProps.setProperty(hikariPropKey, props.getProperty(propKey));
-            }
-        }
-
-        var config = new HikariConfig(hikariProps);
-        var source = new HikariDataSource(config);
-
-        var log = LoggerFactory.getLogger(JdbcSetup.class);
-        log.info("Database connection pool has " + source.getMaximumPoolSize() + " connections");
-
-        return source;
-    }
-
-    private static JdbcDialect getDialect(Properties props, String configBase) {
-
-        var dialectPropKey = configBase + ".dialect";
+        var dialectPropKey = configBase + DIALECT_PROPERTY;
         var dialect = props.getProperty(dialectPropKey, null);
 
         if (dialect == null || dialect.isBlank())
@@ -96,7 +44,99 @@ public class JdbcSetup {
             return Enum.valueOf(JdbcDialect.class, dialect);
         }
         catch (IllegalArgumentException e) {
-            throw new EStartup("Unsupported SQL dialect: " + dialect);
+            throw new EStartup(String.format("Unsupported SQL dialect: [%s]", dialect));
+        }
+    }
+
+    public static DataSource createDatasource(Properties props, String configBase) {
+
+        try {
+            var hikariProps = createHikariProperties(props, configBase);
+
+            var config = new HikariConfig(hikariProps);
+            var source = new HikariDataSource(config);
+
+            var log = LoggerFactory.getLogger(JdbcSetup.class);
+            log.info("Database connection pool has " + source.getMaximumPoolSize() + " connections");
+
+            return source;
+        }
+        catch (RuntimeException e) {
+
+            // For some error conditions, the original cause contains useful extra info
+            // Particularly in the case of missing JDBC drivers!
+            if (e.getCause() instanceof SQLException)
+                if (!e.getMessage().contains(e.getCause().getMessage())) {
+
+                var messageTemplate = "Could not connect to database: %s (%s)";
+                var message = String.format(messageTemplate, e.getMessage(), e.getCause().getMessage());
+
+                throw new EStartup(message, e);
+            }
+
+            var messageTemplate = "Could not connect to database: %s";
+            var message = String.format(messageTemplate, e.getMessage());
+
+            throw new EStartup(message, e);
+        }
+    }
+
+    public static void destroyDatasource(DataSource source) {
+
+        if (!(source instanceof HikariDataSource))
+            throw new ETracInternal("Datasource being destroyed was not created by JdbcSetup");
+
+        var hikariSource = (HikariDataSource) source;
+        hikariSource.close();
+    }
+
+    private static Properties createHikariProperties(Properties props, String configBase) {
+
+        var dialect = getSqlDialect(props, configBase);
+        var jdbcUrl = buildJdbcUrl(props, configBase, dialect);
+
+        var hikariProps = new Properties();
+        hikariProps.setProperty("jdbcUrl", jdbcUrl);
+
+        copyDialectProperties(props, hikariProps, configBase, dialect);
+
+        hikariProps.setProperty("poolName", "dal_worker_pool");
+
+        var poolSize = props.getProperty(configBase + ".pool.size");
+
+        if (poolSize != null && !poolSize.isBlank())
+            hikariProps.setProperty("maximumPoolSize", poolSize);
+
+        return hikariProps;
+    }
+
+    private static String buildJdbcUrl(Properties rootProps, String configBase, JdbcDialect dialect) {
+
+        var jdbcUrlProperty = configBase + JDBC_URL_PROPERTY;
+        var jdbcUrlFromConfig = rootProps.getProperty(jdbcUrlProperty);
+
+        return String.format("jdbc:%s:%s", dialect.name().toLowerCase(), jdbcUrlFromConfig);
+    }
+
+    private static void copyDialectProperties(
+            Properties rootProps, Properties hikariProps,
+            String configBase, JdbcDialect dialect) {
+
+        var dialectPrefixFormat = "%s.%s.";  // Trailing dot is required!
+        var dialectPrefix = String.format(
+                dialectPrefixFormat,
+                configBase, dialect.name().toLowerCase());
+
+        for (var propKey : rootProps.stringPropertyNames()) {
+
+            if (propKey.startsWith(dialectPrefix)) {
+
+                var dialectProperty = propKey.substring(dialectPrefix.length());
+                var hikariPropKey = "dataSource." + dialectProperty;
+                var propValue = rootProps.getProperty(propKey);
+
+                hikariProps.setProperty(hikariPropKey, propValue);
+            }
         }
     }
 }

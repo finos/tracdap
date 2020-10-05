@@ -23,4 +23,5 @@ create temporary table key_mapping (
 
     mapping_stage int,
     ordering int
-);
+)
+on commit drop;
