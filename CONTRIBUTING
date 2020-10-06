@@ -1,0 +1,14 @@
+
+So you'd like to contribute to TRAC, that's fantastic! Our medium-term goal is
+to open up development of the TRAC platform to a wider community of interested
+parties. We still have a way to go to reach this goal.
+
+The initial release of TRAC, version 0.1, is our first step in opening up the
+platform. The code is released under the Apache license, version 2.0, so you
+are free to examine the code and use it in accordance with that license. For
+the time being a legal assessment will be required before we can accept any
+contribution.
+
+If you are interested in contributing to the TRAC platform please contact:
+
+    Martin Traverse <martin.traverse@accenture.com>

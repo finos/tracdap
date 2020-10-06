@@ -24,7 +24,8 @@ ext {
      *
      * Drivers enabled here are used for testing and linked into development builds
      * Such drivers may only be used in accordance with their respective licenses
-     * If you plan to redistribute the TRAC platform there will be legal implications!
+     * If you plan to redistribute the TRAC platform it is your responsibility to
+     * investigate any legal implications.
      *
      * It is not normally necessary to enable a driver here as a dependency to create
      * a build of TRAC that will support that driver; instead, TRAC can be built without
