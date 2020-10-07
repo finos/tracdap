@@ -23,7 +23,7 @@ apply from: 'gradle/config.gradle'
 allprojects {
 
     group 'com.accenture.trac'
-    version '0.1'
+    version '0.1.0'
 }
 
 subprojects {
