@@ -34,6 +34,11 @@ dependencies {
 
     implementation project(':trac-lib-common')
     implementation project(':trac-lib-db')
+
+    // Add runtime dependencies for SQL drivers
+    // Individual drivers can be enabled/disabled via gradle/plugins.gradle
+    // There may be licensing implications to enabling certain JDBC drivers
+    // See the NOTICE file for more information on licensing restrictions
     implementation project(':sql-drivers')
 
     // CLI library for processing startup args (part of the .config package)
