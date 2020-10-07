@@ -2,19 +2,18 @@
 
 *A next-generation data and analytics platform for use in highly regulated environments*
 
+TRAC brings a step change in performance, insight, flexibility and control 
+compared to conventional analytics platforms. By redrawing the boundary
+between business and technology, modellers and business users are given easy
+access to modern, open source tools that can execute at scale, while technology
+integrations and operational concerns are cleanly separated and consolidated
+across use cases.
 
-The TRAC platform offers dramatic improvements in performance, insight,
-flexibility and control compared to conventional analytics platforms. By 
-redefining the boundary between business and technology, modellers and
-business users are given easy access to modern, open source tools that can
-execute at scale, while technology integrations and operational concerns are
-cleanly separated and consolidated across use cases.
-
-TRAC is designed to work in complex environments with ever-changing regulation.
 At the core of a platform, a flexible metadata model allows data and models to
-be catalogued, plugged together and shared across the business. Using a simple
-model of immutability it remembers every action that happens on the platform,
-guaranteeing total repeatability, audit and control (TRAC).
+be catalogued, plugged together and shared across the business. Using the
+principal of immutability, TRAC allows new data structures and model pipelines
+to be created, updated and executed at any time without change risk to production
+workflows, guaranteeing total repeatability, audit and control (TRAC).
 
 
 ## Development Status
