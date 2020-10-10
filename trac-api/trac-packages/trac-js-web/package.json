@@ -1,0 +1,32 @@
+{
+  "name": "trac",
+  "version": "0.1.0",
+  "description": "JavaScript API for building web applications on the TRAC platform",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/accenture/trac.git"
+  },
+  "license": "Apache-2.0",
+  "licenses": [
+    {
+      "type": "Apache-2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0"
+    }
+  ],
+  "files": [
+    "index.js",
+    "dist/**"
+  ],
+  "dependencies": {
+    "protobufjs": "~6.10.1"
+  },
+  "devDependencies": {
+    "terser-webpack-plugin": "^4.2.3",
+    "webpack": "^4.44.2",
+    "webpack-cli": "^3.3.12"
+  },
+  "scripts": {
+    "pbjs": "node call-pbjs.js",
+    "pbts": "pbts -o build/metadata.d.ts build/metadata.js"
+  }
+}
