@@ -18,30 +18,40 @@ const fs = require('fs');
 const path = require('path');
 const pbjs = require('protobufjs/cli/pbjs');
 
-const protoDir = '../..//trac-metadata/src/main/proto';
 
-const packages = [
-    'trac/metadata'
-];
+const packages = {
+    'trac/metadata': '../../trac-metadata/src/main/proto',
+    'trac/api/meta': '../../trac-services/src/main/proto'
+};
 
 const args = [
     "--target", "static-module",
     "--root", "trac.metadata",
     "--wrap", "commonjs",
     "--force-number",
-    "--path", protoDir,
+    "--path", './build',
     "--out", "trac.js"
 ];
 
-packages.forEach(pkg => {
+fs.mkdirSync('./build', {recursive: true});
 
-    const pkgDir = path.join(protoDir, pkg);
+for (const [pkg, pkgDir] of Object.entries(packages)) {
 
-    fs.readdirSync(pkgDir).forEach(file => {
+    const srcDir = path.join(pkgDir, pkg);
+    const dstDir = path.join('./build', pkg);
+
+    fs.mkdirSync(dstDir, {recursive: true});
+
+    fs.readdirSync(srcDir).forEach(file => {
+
+        const srcProto = path.join(srcDir, file);
+        const dstProto = path.join(dstDir, file);
+
+        fs.copyFileSync(srcProto, dstProto);
 
         args.push(pkg + '/' + file);
     })
 
-});
+}
 
 pbjs.main(args);
