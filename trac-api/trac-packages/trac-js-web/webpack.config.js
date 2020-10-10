@@ -17,7 +17,6 @@
 const path = require('path');
 
 const config = {};
-config.src_dir = path.resolve('./src')
 config.npm_dir = path.resolve('./node_modules')
 config.build_dir = path.resolve('./build');
 config.dist_dir = path.resolve('./dist')
@@ -33,12 +32,15 @@ module.exports = (env, argv) => {
 
         output: {
             path: config.dist_dir,
-            filename: PROD ? 'metadata.min.js' : 'metadata.js'
+            filename: PROD ? 'trac.min.js' : 'trac.js',
+            library: "trac",
+            libraryTarget: "umd",
+            umdNamedDefine: true,
+            globalObject: `(typeof self !== 'undefined' ? self : this)`
         },
 
         resolve: {
             modules: [
-                config.src_dir,
                 config.build_dir,
                 config.npm_dir
             ],

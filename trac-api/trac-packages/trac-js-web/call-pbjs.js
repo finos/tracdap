@@ -34,6 +34,7 @@ packages.forEach(pkg => {
     const args = [
         "--target", "static-module",
         "--root", "trac.metadata",
+        "--wrap", "commonjs",
         "--force-number",
         "--path", protoDir,
         "--out", pkgOutFile
