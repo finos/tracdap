@@ -27,6 +27,8 @@
   },
   "scripts": {
     "pbjs": "node call-pbjs.js",
-    "pbts": "pbts -o build/metadata.d.ts build/metadata.js"
+    "pbts": "pbts -o build/metadata.d.ts build/metadata.js",
+    "build:dev": "webpack --mode development",
+    "build:prod": "webpack --mode production"
   }
 }
