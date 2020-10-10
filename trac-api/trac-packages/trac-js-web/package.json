@@ -14,9 +14,10 @@
     }
   ],
   "files": [
-    "dist/**",
-    "index.js"
+    "trac.*",
+    "umd/**"
   ],
+  "main": "trac.js",
   "dependencies": {
     "protobufjs": "~6.10.1"
   },
@@ -27,7 +28,7 @@
   },
   "scripts": {
     "pbjs": "node call-pbjs.js",
-    "pbts": "pbts -o build/metadata.d.ts build/metadata.js",
+    "pbts": "pbts -o trac.d.ts trac.js",
     "build:dev": "webpack --mode development",
     "build:prod": "webpack --mode production"
   }

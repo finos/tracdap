@@ -18,8 +18,8 @@ const path = require('path');
 
 const config = {};
 config.npm_dir = path.resolve('./node_modules')
-config.build_dir = path.resolve('./build');
-config.dist_dir = path.resolve('./dist')
+config.src_dir = path.resolve('.');
+config.dist_dir = path.resolve('./umd')
 
 
 module.exports = (env, argv) => {
@@ -28,7 +28,7 @@ module.exports = (env, argv) => {
 
     return {
 
-        entry: config.build_dir + '/metadata.js',
+        entry: config.src_dir + '/trac.js',
 
         output: {
             path: config.dist_dir,
@@ -41,7 +41,7 @@ module.exports = (env, argv) => {
 
         resolve: {
             modules: [
-                config.build_dir,
+                config.src_dir,
                 config.npm_dir
             ],
             extensions: [

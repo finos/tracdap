@@ -24,26 +24,24 @@ const packages = [
     'trac/metadata'
 ];
 
-fs.mkdirSync('build', {recursive: true});
+const args = [
+    "--target", "static-module",
+    "--root", "trac.metadata",
+    "--wrap", "commonjs",
+    "--force-number",
+    "--path", protoDir,
+    "--out", "trac.js"
+];
 
 packages.forEach(pkg => {
 
-    const pkgInDir = path.join(protoDir, pkg);
-    const pkgOutFile = path.join('build', path.basename(pkg) + ".js");
+    const pkgDir = path.join(protoDir, pkg);
 
-    const args = [
-        "--target", "static-module",
-        "--root", "trac.metadata",
-        "--wrap", "commonjs",
-        "--force-number",
-        "--path", protoDir,
-        "--out", pkgOutFile
-    ];
-
-    fs.readdirSync(pkgInDir).forEach(file => {
+    fs.readdirSync(pkgDir).forEach(file => {
 
         args.push(pkg + '/' + file);
     })
 
-    pbjs.main(args);
 });
+
+pbjs.main(args);
