@@ -24,6 +24,15 @@ import "trac/metadata/type.proto";
 import "trac/metadata/object.proto";
 
 
+message TagHeader {
+
+    ObjectType objectType = 1;
+    UUID objectId = 2;
+    int32 objectVersion = 3;
+    int32 tagVersion = 4;
+}
+
+
 /**
  *
  * Tags are the core informational element of TRAC's metadata model.
@@ -88,9 +97,7 @@ import "trac/metadata/object.proto";
  */
 message Tag {
 
-    ObjectDefinition definition = 1;
-
-    int32 tagVersion = 2;
+    TagHeader header = 1;
 
     /**
      *
@@ -114,5 +121,7 @@ message Tag {
      *
      * @see SearchParameters
      */
-    map<string, Value> attr = 3;
+    map<string, Value> attr = 2;
+
+    ObjectDefinition definition = 3;
 }
