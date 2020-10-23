@@ -116,15 +116,42 @@ message TypeDescriptor {
 }
 
 
-/// Represent a decimal value (this could be replaced by a string representation)
+/**
+ * Represent a decimal value.
+ *
+ * @see BasicType.DECIMAL
+ */
 message DecimalValue {
 
-    // TODO: Is a structured type needed for decimals or is string sufficient?
-
-    oneof representation {
-        string str = 1;
-    }
+    string decimal = 1;
 }
+
+
+/**
+ * Represent a date value.
+ *
+ * Dates are represented as strings in ISO 8601 format.
+ *
+ * @see BasicType.DATE
+ */
+message DateValue {
+
+    string isoDate = 1;
+}
+
+
+/**
+ * Represent a date-time value.
+ *
+ * Date-times are represented as strings in ISO 8601 format.
+ *
+ * @see BasicType.DATETIME
+ */
+message DatetimeValue {
+
+    string isoDatetime = 1;
+}
+
 
 /// Represent an object ID (this could be replaced by a string representation)
 message UUID {
@@ -219,11 +246,10 @@ message Value {
         /**
          * A date value.
          *
-         * Dates are represented as strings in ISO 8601 format.
-         *
          * @see BasicType.DATE
+         * @see DateValue
          */
-        string dateValue = 7;
+        DateValue dateValue = 7;
 
         /**
          * A date-time value.
@@ -242,8 +268,9 @@ message Value {
          * by applying a zone offset, currently the applied offset will be UTC.
          *
          * @see BasicType.DATETIME
+         * @see DatetimeValue
          */
-        string datetimeValue = 8;
+        DatetimeValue datetimeValue = 8;
 
         /**
          * An array of Values.
