@@ -96,6 +96,19 @@ enum BasicType {
      * All items in an array must have the same type (i.e. the same type descriptor).
      */
     ARRAY = 8;
+
+    /**
+     * An key-value map with string keys, values may be primitive or composite values.
+     *
+     * Maps may be uniform, in which case all the values are of the same type, or non-
+     * uniform in which case values can be of any type. For uniform maps the type
+     * descriptor will specify the type contained in the map. For non-uniform maps the
+     * type descriptor can only specify that the map is non-uniform, values must be
+     * examined at run time to determine their type.
+     *
+     * @see TypeDescriptor
+     */
+    MAP = 9;
 }
 
 
@@ -108,11 +121,22 @@ enum BasicType {
  */
 message TypeDescriptor {
 
-    /// The basic type being described
+    /// The basic type being described.
     BasicType basicType = 1;
 
-    /// For array types only, describe the type contained in the array
+    /// For array types only, describe the type contained in the array.
     TypeDescriptor arrayType = 2;
+
+    /**
+     * For map types only, describe the type contained in the map.
+     *
+     * To describe a uniform map the mapType descriptor must be set to a valid
+     * type descriptor, in this case all values in the map must match the type
+     * of the descriptor. If mapType is not set or is present but has
+     * basicType = BASIC_TYPE_NOT_SET then the map is non-uniform, values must
+     * be inspected individually to determine their type.
+     */
+    TypeDescriptor mapType = 3;
 }
 
 
@@ -276,8 +300,22 @@ message Value {
          * An array of Values.
          *
          * All items in an array must have the same type.
+         *
+         * @see BasicType.ARRAY
          */
         ArrayValue arrayValue = 9;
+
+        /**
+         * A map of string keys to Values.
+         *
+         * Maps may be uniform (holding all the same value type) or non-uniform
+         * (holding mixed value types) depending on the type descriptor of this
+         * Value.
+         *
+         * @see BasicType.MAP
+         * @see TypeDescriptor
+         */
+        MapValue mapValue = 10;
     }
 }
 
@@ -286,8 +324,26 @@ message Value {
  * An array value holds an array of other Values.
  *
  * All items in an array must have the same type.
+ *
+ * @see BasicType.ARRAY
  */
 message ArrayValue {
 
     repeated Value item = 1;
+}
+
+
+/**
+ * A map value holds a map of string keys to other Values.
+ *
+ * Maps may be uniform (holding all the same value type) or non-uniform (holding
+ * mixed value types) depending on the type descriptor of the Value that
+ * contains them.
+ *
+ * @see BasicType.MAP
+ * @see TypeDescriptor
+ */
+message MapValue {
+
+    map<string, Value> entry = 1;
 }

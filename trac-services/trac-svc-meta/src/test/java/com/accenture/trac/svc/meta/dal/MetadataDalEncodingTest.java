@@ -87,7 +87,7 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
     void roundTrip_allAttrTypesOk(BasicType attrType) throws Exception {
 
         var origDef = dummyDataDef(INCLUDE_HEADER);
