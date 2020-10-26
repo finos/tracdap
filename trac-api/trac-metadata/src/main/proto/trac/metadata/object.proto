@@ -21,7 +21,6 @@ option java_package = "com.accenture.trac.common.metadata";
 option java_multiple_files = true;
 option java_outer_classname = "ObjectProtoWrapper";  // Do not create a Java class called "Object"!
 
-import "trac/metadata/type.proto";
 import "trac/metadata/data.proto";
 import "trac/metadata/model.proto";
 import "trac/metadata/flow.proto";
@@ -43,19 +42,6 @@ enum ObjectType {
     JOB = 4;
     FILE = 5;
     CUSTOM = 6;
-}
-
-
-/**
- * Standard header for TRAC object definitions.
- *
- * @see ObjectDefinition
- */
-message ObjectHeader {
-
-    ObjectType objectType = 1;
-    UUID objectId = 2;
-    int32 objectVersion = 3;
 }
 
 
@@ -89,12 +75,10 @@ message ObjectHeader {
  * by TRAC's core object definitions.
  *
  * @see Tag
- * @see ObjectHeader
  */
 message ObjectDefinition {
 
-    reserved 1;
-    // ObjectHeader header = 1;
+    ObjectType objectType = 1;
 
     oneof definition {
         DataDefinition data = 2;
