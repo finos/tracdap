@@ -28,8 +28,37 @@ message TagHeader {
 
     ObjectType objectType = 1;
     UUID objectId = 2;
+
     int32 objectVersion = 3;
     int32 tagVersion = 4;
+
+    // Core tag/object temporality coming in metadata temporality feature
+    // DatetimeValue objectTimestamp = 5;
+    // DatetimeValue tagTimestamp = 6;
+    // DatetimeValue originalObjectTimestamp = 7;
+}
+
+
+message TagSelector {
+
+    ObjectType objectType = 1;
+    UUID objectId = 2;
+
+    oneof objectSelector {
+        bool latestObject = 3;
+        int32 objectVersion = 4;
+
+        // select by as-of time coming in metadata temporality feature
+        // DatetimeValue objectTimestamp = 5;
+    }
+
+    oneof tagSelector {
+        bool latestTag = 6;
+        int32 tagVersion = 7;
+
+        // select by as-of time coming in metadata temporality feature
+        // DatetimeValue tagTimestamp = 8;
+    }
 }
 
 
