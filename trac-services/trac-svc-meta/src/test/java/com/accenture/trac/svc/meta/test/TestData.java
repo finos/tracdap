@@ -150,12 +150,14 @@ public class TestData {
 
     public static ObjectDefinition nextDataDef(ObjectDefinition origDef) {
 
+        var fieldName = "extra_field_" + (origDef.getData().getSchema().getFieldCount() + 1);
+
         return origDef.toBuilder()
                 .setData(origDef.getData()
                 .toBuilder()
                 .setSchema(origDef.getData().getSchema().toBuilder()
                     .addField(FieldDefinition.newBuilder()
-                    .setFieldName("extra_field")
+                    .setFieldName(fieldName)
                     .setFieldOrder(origDef.getData().getSchema().getFieldCount())
                     .setFieldType(BasicType.FLOAT)
                     .setFieldLabel("We got an extra field!")
@@ -286,6 +288,28 @@ public class TestData {
         }
         else
             return tag.build();
+    }
+
+    public static Tag tagForNextObject(Tag previous, ObjectDefinition obj, boolean includeHeader) {
+
+        var newTag = previous.toBuilder()
+                .setDefinition(obj)
+                .putAttr("extra_attr", Value.newBuilder()
+                        .setType(TypeSystem.descriptor(BasicType.STRING))
+                        .setStringValue("A new descriptive value")
+                        .build());
+
+        if (includeHeader) {
+
+            var header = previous.getHeader().toBuilder()
+                    .setObjectVersion(previous.getHeader().getObjectVersion() + 1)
+                    .setTagVersion(1)
+                    .build();
+
+            return newTag.setHeader(header).build();
+        }
+        else
+            return newTag.clearHeader().build();
     }
 
     public static Tag nextTag(Tag previous, boolean updateTagVersion) {
