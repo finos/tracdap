@@ -16,10 +16,10 @@
 
 package com.accenture.trac.svc.meta.api;
 
-import com.accenture.trac.common.api.meta.IdResponse;
 import com.accenture.trac.common.api.meta.MetadataTrustedWriteApiGrpc;
 import com.accenture.trac.common.api.meta.MetadataWriteRequest;
 import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.TagHeader;
 import com.accenture.trac.common.util.ApiWrapper;
 import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
 import io.grpc.stub.StreamObserver;
@@ -39,7 +39,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
     }
 
     @Override
-    public void saveNewObject(MetadataWriteRequest request, StreamObserver<IdResponse> response) {
+    public void createObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
         apiWrapper.unaryCall(response, () -> {
 
@@ -61,7 +61,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
     }
 
     @Override
-    public void saveNewVersion(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
+    public void updateObject(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
@@ -83,7 +83,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
     }
 
     @Override
-    public void saveNewTag(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
+    public void updateTag(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
@@ -105,7 +105,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
     }
 
     @Override
-    public void preallocateId(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
+    public void preallocateId(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
@@ -126,7 +126,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
     }
 
     @Override
-    public void savePreallocatedObject(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
+    public void createPreallocatedObject(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
