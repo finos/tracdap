@@ -87,9 +87,9 @@ service MetadataPublicWriteApi {
      * @see MetadataWriteRequest
      * @see ObjectDefinition
      * @see Tag
-     * @see IdResponse
+     * @see TagHeader
      */
-    rpc createObject (MetadataWriteRequest) returns (IdResponse) {
+    rpc createObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
             post: "/{tenant}/{objectType}/create-object"
             body: "tag"
@@ -126,9 +126,9 @@ service MetadataPublicWriteApi {
      * @see MetadataWriteRequest
      * @see ObjectDefinition
      * @see Tag
-     * @see IdResponse
+     * @see TagHeader
      */
-    rpc updateObject (MetadataWriteRequest) returns (IdResponse) {
+    rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
             post: "/{tenant}/{objectType}/update-object"
             body: "tag"
@@ -156,9 +156,9 @@ service MetadataPublicWriteApi {
      * @see MetadataWriteRequest
      * @see ObjectDefinition
      * @see Tag
-     * @see IdResponse
+     * @see TagHeader
      */
-    rpc updateTag (MetadataWriteRequest) returns (IdResponse) {
+    rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
             post: "/{tenant}/{objectType}/update-tag"
             body: "tag"
@@ -200,7 +200,7 @@ service MetadataTrustedWriteApi {
      *
      * @see MetadataPublicWriteApi
      */
-    rpc createObject (MetadataWriteRequest) returns (IdResponse) {
+    rpc createObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
             post: "/{tenant}/trusted/{objectType}/create-object"
             body: "tag"
@@ -216,7 +216,7 @@ service MetadataTrustedWriteApi {
      *
      * @see MetadataPublicWriteApi
      */
-    rpc updateObject (MetadataWriteRequest) returns (IdResponse) {
+    rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
             post: "/{tenant}/trusted/{objectType}/update-object"
             body: "tag"
@@ -230,7 +230,7 @@ service MetadataTrustedWriteApi {
      *
      * @see MetadataPublicWriteApi
      */
-    rpc updateTag (MetadataWriteRequest) returns (IdResponse) {
+    rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
             post: "/{tenant}/trusted/{objectType}/update-tag"
             body: "tag"
@@ -250,7 +250,7 @@ service MetadataTrustedWriteApi {
      *
      * @see MetadataWriteRequest
      */
-    rpc preallocateId (MetadataWriteRequest) returns (IdResponse) {
+    rpc preallocateId (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
             post: "/{tenant}/trusted/{objectType}/preallocate"
             body: "tag"
@@ -271,7 +271,7 @@ service MetadataTrustedWriteApi {
      *
      * @see MetadataWriteRequest
      */
-    rpc createPreallocatedObject (MetadataWriteRequest) returns (IdResponse) {
+    rpc createPreallocatedObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
             post: "/{tenant}/trusted/{objectType}/create-preallocated"
             body: "tag"
@@ -321,7 +321,7 @@ message MetadataWriteRequest {
      *
      * This field must be left blank for create operations.
      */
-    metadata.TagHeader priorVersion = 3;
+    metadata.TagSelector priorVersion = 3;
 
     /**
      * New object definition to save.
@@ -334,18 +334,4 @@ message MetadataWriteRequest {
     metadata.ObjectDefinition definition = 4;
 
     map<string, TagUpdate> attr = 5;
-}
-
-
-/**
-Pass back the ID, object version and tag version of new/modified objects
-
-@see MetadataPublicWriteApi
-@see MetadataTrustedWriteApi
-*/
-message IdResponse {
-
-    metadata.UUID objectId = 1;
-    int32 objectVersion = 2;
-    int32 tagVersion = 3;
 }
