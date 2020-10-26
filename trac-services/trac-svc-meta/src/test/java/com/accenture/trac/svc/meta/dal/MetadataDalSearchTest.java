@@ -262,7 +262,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
     void searchTerm_eq(BasicType basicType) throws Exception {
 
         var attrToLookFor = "eq_search_test_" + basicType.name();
@@ -296,7 +296,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY", "MAP"})
     void searchTerm_eqArray(BasicType basicType) throws Exception {
 
         // Note: Boolean array attrs are not allowed
@@ -332,7 +332,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
     void searchTerm_ne(BasicType basicType) throws Exception {
 
         var markerAttr = "ne_search_marker_" + basicType.name();
@@ -384,7 +384,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY", "MAP"})
     void searchTerm_neArray(BasicType basicType) throws Exception {
 
         // Note: Boolean array attrs are not allowed
@@ -767,7 +767,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY", "MAP"})
     void searchTerm_in(BasicType basicType) throws Exception {
 
         // Note: IN query for BOOLEAN attr is not allowed
@@ -819,7 +819,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "BOOLEAN", "ARRAY", "MAP"})
     void searchTerm_inArray(BasicType basicType) throws Exception {
 
         // Note: IN query for BOOLEAN attr is not allowed

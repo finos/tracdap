@@ -324,7 +324,7 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY"})
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
     void allAttrTypes(BasicType attrType) {
 
         var attrToLookFor = "allAttrTypes_" + attrType.name();

@@ -198,7 +198,7 @@ public class MetadataCodec {
         return Value.newBuilder()
                 .setType(TypeSystem.descriptor(BasicType.DECIMAL))
                 .setDecimalValue(DecimalValue.newBuilder()
-                .setStr(decimalString))
+                .setDecimal(decimalString))
                 .build();
     }
 
@@ -208,17 +208,19 @@ public class MetadataCodec {
 
         return Value.newBuilder()
                 .setType(TypeSystem.descriptor(BasicType.DATE))
-                .setDateValue(isoDate)
+                .setDateValue(DateValue.newBuilder()
+                .setIsoDate(isoDate))
                 .build();
     }
 
-    public static Value encodeValue(OffsetDateTime dateTimeValue) {
+    public static Value encodeValue(OffsetDateTime datetimeValue) {
 
-        var isoDateTime = ISO_DATE_TIME_FORMAT.format(dateTimeValue);
+        var isoDatetime = ISO_DATE_TIME_FORMAT.format(datetimeValue);
 
         return Value.newBuilder()
                 .setType(TypeSystem.descriptor(BasicType.DATETIME))
-                .setDatetimeValue(isoDateTime)
+                .setDatetimeValue(DatetimeValue.newBuilder()
+                .setIsoDatetime(isoDatetime))
                 .build();
     }
 
@@ -316,7 +318,7 @@ public class MetadataCodec {
         if (TypeSystem.basicType(value) != BasicType.DECIMAL)
             throw new IllegalArgumentException("Value is not a decimal");
 
-        return new BigDecimal(value.getDecimalValue().getStr());
+        return new BigDecimal(value.getDecimalValue().getDecimal());
     }
 
     public static LocalDate decodeDateValue(Value value) {
@@ -324,7 +326,7 @@ public class MetadataCodec {
         if (TypeSystem.basicType(value) != BasicType.DATE)
             throw new IllegalArgumentException("Value is not a date");
 
-        return LocalDate.parse(value.getDateValue(), ISO_DATE_FORMAT);
+        return LocalDate.parse(value.getDateValue().getIsoDate(), ISO_DATE_FORMAT);
     }
 
     public static OffsetDateTime decodeDateTimeValue(Value value) {
@@ -332,7 +334,7 @@ public class MetadataCodec {
         if (TypeSystem.basicType(value) != BasicType.DATETIME)
             throw new IllegalArgumentException("Value is not a date-time");
 
-        return OffsetDateTime.parse(value.getDatetimeValue(), ISO_DATE_TIME_FORMAT);
+        return OffsetDateTime.parse(value.getDatetimeValue().getIsoDatetime(), ISO_DATE_TIME_FORMAT);
     }
 
     private static final DateTimeFormatter ISO_DATE_FORMAT = DateTimeFormatter.ISO_DATE;
