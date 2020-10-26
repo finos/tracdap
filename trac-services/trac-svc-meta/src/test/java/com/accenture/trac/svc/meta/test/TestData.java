@@ -394,4 +394,19 @@ public class TestData {
                 Map.Entry::getKey,
                 entry -> TagUpdate.newBuilder().setValue(entry.getValue()).build()));
     }
+
+    public static TagSelector selectorForTag(TagHeader tagHeader) {
+
+        return TagSelector.newBuilder()
+                .setObjectType(tagHeader.getObjectType())
+                .setObjectId(tagHeader.getObjectId())
+                .setObjectVersion(tagHeader.getObjectVersion())
+                .setTagVersion(tagHeader.getTagVersion())
+                .build();
+    }
+
+    public static TagSelector selectorForTag(Tag tag) {
+
+        return selectorForTag(tag.getHeader());
+    }
 }
