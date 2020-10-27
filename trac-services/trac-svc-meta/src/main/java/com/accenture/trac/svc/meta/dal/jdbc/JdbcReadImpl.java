@@ -67,7 +67,7 @@ class JdbcReadImpl {
     KeyedItem<ObjectDefinition>
     readDefinitionByVersion(
             Connection conn, short tenantId,
-            ObjectType objectType, long objectPk, int objectVersion)
+            long objectPk, int objectVersion)
             throws SQLException {
 
         var query =
@@ -83,14 +83,13 @@ class JdbcReadImpl {
             stmt.setLong(2, objectPk);
             stmt.setInt(3, objectVersion);
 
-            return readDefinition(stmt, objectType);
+            return readDefinition(stmt);
         }
     }
 
     KeyedItem<ObjectDefinition>
     readDefinitionByLatest(
-            Connection conn, short tenantId,
-            ObjectType objectType, long objectPk)
+            Connection conn, short tenantId, long objectPk)
             throws SQLException {
 
         var query =
@@ -110,12 +109,12 @@ class JdbcReadImpl {
             stmt.setShort(2, tenantId);
             stmt.setLong(3, objectPk);
 
-            return readDefinition(stmt, objectType);
+            return readDefinition(stmt);
         }
     }
 
     private KeyedItem<ObjectDefinition>
-    readDefinition(PreparedStatement stmt, ObjectType objectType) throws SQLException {
+    readDefinition(PreparedStatement stmt) throws SQLException {
 
         try (var rs = stmt.executeQuery()) {
 
@@ -139,11 +138,15 @@ class JdbcReadImpl {
         }
     }
 
-    KeyedItem<Tag.Builder>
-    readTagRecordByVersion(Connection conn, short tenantId, long definitionPk, int tagVersion) throws SQLException {
+    KeyedItem<TagHeader>
+    readTagHeaderByVersion(Connection conn, short tenantId, long definitionPk, int tagVersion) throws SQLException {
 
         var query =
-                "select tag_pk, tag_version from tag\n" +
+                "select \n" +
+                "   tag_pk, object_type, \n" +
+                "   object_id_hi, object_id_lo, \n" +
+                "   object_version, tag_version \n" +
+                "from tag\n" +
                 "where tenant_id = ?\n" +
                 "and definition_fk = ?\n" +
                 "and tag_version = ?";
@@ -154,15 +157,19 @@ class JdbcReadImpl {
             stmt.setLong(2, definitionPk);
             stmt.setInt(3, tagVersion);
 
-            return readTagRecord(stmt);
+            return readTagHeader(stmt);
         }
     }
 
-    KeyedItem<Tag.Builder>
-    readTagRecordByLatest(Connection conn, short tenantId, long definitionPk) throws SQLException {
+    KeyedItem<TagHeader>
+    readTagHeaderByLatest(Connection conn, short tenantId, long definitionPk) throws SQLException {
 
         var query =
-                "select tag_pk, tag_version from tag\n" +
+                "select \n" +
+                "   tag_pk, object_type, \n" +
+                "   object_id_hi, object_id_lo, \n" +
+                "   object_version, tag_version \n" +
+                "from tag\n" +
                 "where tenant_id = ?\n" +
                 "and tag_pk = (\n" +
                 "  select lt.latest_tag_pk\n" +
@@ -176,12 +183,12 @@ class JdbcReadImpl {
             stmt.setShort(2, tenantId);
             stmt.setLong(3, definitionPk);
 
-            return readTagRecord(stmt);
+            return readTagHeader(stmt);
         }
     }
 
-    private KeyedItem<Tag.Builder>
-    readTagRecord(PreparedStatement stmt) throws SQLException {
+    private KeyedItem<TagHeader>
+    readTagHeader(PreparedStatement stmt) throws SQLException {
 
         try (var rs = stmt.executeQuery()) {
 
@@ -189,13 +196,23 @@ class JdbcReadImpl {
                 throw new JdbcException(JdbcErrorCode.NO_DATA);
 
             var tagPk = rs.getLong(1);
-            var tagVersion = rs.getInt(2);
-            var tagStub = Tag.newBuilder().setTagVersion(tagVersion);
+            var objectType = rs.getString(2);
+            var objectIdHi = rs.getLong(3);
+            var objectIdLo = rs.getLong(4);
+            var objectVersion = rs.getInt(5);
+            var tagVersion = rs.getInt(6);
+
+            var tagHeader = TagHeader.newBuilder()
+                    .setObjectType(ObjectType.valueOf(objectType))
+                    .setObjectId(MetadataCodec.encode(new UUID(objectIdHi, objectIdLo)))
+                    .setObjectVersion(objectVersion)
+                    .setTagVersion(tagVersion)
+                    .build();
 
             if (rs.next())
                 throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-            return new KeyedItem<>(tagPk, tagVersion, tagStub);
+            return new KeyedItem<>(tagPk, tagVersion, tagHeader);
         }
     }
 

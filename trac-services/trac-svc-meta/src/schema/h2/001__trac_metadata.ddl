@@ -60,12 +60,17 @@ create table tag (
 
     tenant_id smallint not null,
     tag_pk bigint not null auto_increment,
-
     definition_fk bigint not null,
-    tag_version int not null,
 
-    -- Duplicate fields from object ID/definition tables so they are available for searching
+    -- Duplicate all fields used in the tag header in the tag table
+    -- Makes header properties available for searching without joining the object_ tables
+    -- Also allows tags to be loaded without definitions (e.g. responding to searches)
+
     object_type varchar(16) not null,
+    object_id_hi bigint not null,
+    object_id_lo bigint not null,
+    object_version int not null,
+    tag_version int not null,
 
     constraint pk_tag primary key (tag_pk),
     constraint fk_tag_definition foreign key (definition_fk) references object_definition (definition_pk),
