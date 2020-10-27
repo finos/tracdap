@@ -17,6 +17,8 @@
 package com.accenture.trac.svc.meta.logic;
 
 import com.accenture.trac.common.api.meta.TagUpdate;
+import com.accenture.trac.common.exception.ETrac;
+import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.validation.MetadataValidator;
@@ -25,8 +27,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.OBJECT_FIRST_VERSION;
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.PUBLIC_API;
+import static com.accenture.trac.svc.meta.logic.MetadataConstants.*;
 
 
 public class MetadataWriteLogic {
@@ -43,34 +44,34 @@ public class MetadataWriteLogic {
             Map<String, TagUpdate> attrUpdates,
             boolean apiTrust) {
 
-        var validator = new MetadataValidator();
-        var objectId = new Wrapper<UUID>();
-
-        return CompletableFuture.completedFuture(validator)
-
-                // Validation
+        // Validation
 //                .thenApply(v -> v.headerIsNull(definition))
 //                .thenApply(v -> v.definitionMatchesType(definition, objectType))
 //                .thenApply(v -> v.tagVersionIsBlank(tag))
 //                .thenApply(v -> v.tagAttributesAreValid(tag))
-                .thenApply(MetadataValidator::checkAndThrow)
+//                .thenApply(MetadataValidator::checkAndThrow)
 
-                // Tag permissions
-                //.thenApply(v -> checkReservedTagAttributes(tag, v, apiTrust))
+        // Tag permissions
+        //.thenApply(v -> checkReservedTagAttributes(tag, v, apiTrust))
 
-                // Build object to save
-                .thenApply(_x -> objectId.value = UUID.randomUUID())
-                //.thenApply(_x -> setObjectHeader(definition, objectType, objectId.value, OBJECT_FIRST_VERSION))
+        var objectId = UUID.randomUUID();
 
-                .thenApply(_x -> TagHeader.newBuilder().build());
+        var newHeader = TagHeader.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(OBJECT_FIRST_VERSION)
+                .setTagVersion(TAG_FIRST_VERSION)
+                .build();
 
-//                .thenApply(defToSave -> tag.toBuilder()
-//                        .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
-//                        .setDefinition(defToSave).build())
-//
-//                // Save and return
-//                .thenCompose(tagToSave -> dal.saveNewObject(tenant, tagToSave))
-//                .thenApply(_ok -> objectId.value);
+        var newTag = Tag.newBuilder()
+                .setHeader(newHeader)
+                .setDefinition(definition)
+                .build();
+
+        newTag = applyTagUpdates(newTag, attrUpdates);
+
+        return dal.saveNewObject(tenant, newTag)
+                .thenApply(_ok -> newHeader);
     }
 
     public CompletableFuture<TagHeader> updateObject(
@@ -82,16 +83,10 @@ public class MetadataWriteLogic {
 
         var validator = new MetadataValidator();
 
-        var priorSelector = TagSelector.newBuilder().build();
-        var priorObjectId = MetadataCodec.decode(priorSelector.getObjectId());
-        var priorTag = new Wrapper<Tag>();
-
-        return CompletableFuture.completedFuture(validator)
-
-                // Check whether versioning is supported for this object type
-                // If not, we want to raise an error without reporting any other validation issues
-                .thenApply(v -> v.typeSupportsVersioning(objectType))
-                .thenApply(MetadataValidator::checkAndThrow)
+        // Check whether versioning is supported for this object type
+        // If not, we want to raise an error without reporting any other validation issues
+   //             .thenApply(v -> v.typeSupportsVersioning(objectType))
+//                .thenApply(MetadataValidator::checkAndThrow)
 
                 // Validate incoming object / tag
 //                .thenApply(v -> v.headerIsValid(definition))
@@ -99,91 +94,92 @@ public class MetadataWriteLogic {
 //                .thenApply(v -> v.definitionMatchesType(definition, objectType))
 //                .thenApply(v -> v.tagVersionIsBlank(tag))
 //                .thenApply(v -> v.tagAttributesAreValid(tag))
-                .thenApply(MetadataValidator::checkAndThrow)
+  //              .thenApply(MetadataValidator::checkAndThrow)
 
-                // Tag permissions
-                //.thenApply(v -> checkReservedTagAttributes(tag, v, apiTrust))
+        // Tag permissions
+        //.thenApply(v -> checkReservedTagAttributes(tag, v, apiTrust))
 
-                // Load prior object version
-                .thenCompose(prior -> dal.loadLatestTag(tenant,
-                        priorSelector.getObjectType(),
-                        priorObjectId,
-                        priorSelector.getObjectVersion()))
 
-                .thenAccept(pt -> priorTag.value = pt)
+        var objectId = MetadataCodec.decode(priorVersion.getObjectId());
+        var objectVersion = priorVersion.getObjectVersion();
 
-                // TODO: Validate version increment
-                .thenApply(pt -> validator)
-                .thenApply(MetadataValidator::checkAndThrow)
+        return dal.loadLatestTag(tenant, objectType, objectId, objectVersion)
 
-                .thenApply(x_ -> TagHeader.newBuilder().build());
+                .thenCompose(priorTag ->
+                updateObject(tenant, priorTag, definition, attrUpdates));
+    }
 
-//                // Build tag to save
-//                .thenApply(v -> objectVersion.value = priorTag.value.getDefinition().getHeader().getObjectVersion() + 1)
-//                .thenApply(v -> bumpObjectVersion(definition, priorTag.value.getDefinition()))
-//
-//                .thenApply(defToSave -> tag.toBuilder()
-//                        .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
-//                        .setDefinition(defToSave).build())
-//
-//                // Save and return
-//                .thenCompose(tagToSave -> dal.saveNewVersion(tenant, tagToSave))
-//                .thenApply(_ok -> objectVersion.value);
+    private CompletableFuture<TagHeader> updateObject(
+            String tenant, Tag priorTag,
+            ObjectDefinition definition,
+            Map<String, TagUpdate> attrUpdates) {
+
+        var oldHeader = priorTag.getHeader();
+
+        var newHeader = oldHeader.toBuilder()
+                .setObjectVersion(oldHeader.getObjectVersion() + 1)
+                .setTagVersion(TAG_FIRST_VERSION)
+                .build();
+
+        var newTag = priorTag.toBuilder()
+                .setHeader(newHeader)
+                .setDefinition(definition)
+                .build();
+
+        newTag = applyTagUpdates(newTag, attrUpdates);
+
+        return dal.saveNewVersion(tenant, newTag)
+                .thenApply(_ok -> newHeader);
     }
 
     public CompletableFuture<TagHeader> updateTag(
             String tenant, ObjectType objectType,
-            TagSelector priorVersion,
+            TagSelector priorSelector,
             Map<String, TagUpdate> attrUpdates,
             boolean apiTrust) {
 
         var validator = new MetadataValidator();
 
-        var priorSelector = TagSelector.newBuilder().build();
-        var priorObjectId = MetadataCodec.decode(priorSelector.getObjectId());
-        var priorTag = new Wrapper<Tag>();
-
-
-
-        return CompletableFuture.completedFuture(validator)
-
-                // Validate incoming object / tag
+        // Validate incoming object / tag
 //                .thenApply(v -> v.headerIsValid(definition))
 //                .thenApply(v -> v.headerMatchesType(definition, objectType))
 //                // TODO: Allow a null definition when creating a new tag
 //                .thenApply(v -> v.definitionMatchesType(definition, objectType))
 //                .thenApply(v -> v.tagVersionIsValid(tag))
 //                .thenApply(v -> v.tagAttributesAreValid(tag))
-                .thenApply(MetadataValidator::checkAndThrow)
+ //               .thenApply(MetadataValidator::checkAndThrow)
 
-                // Tag permissions
-                //.thenApply(v -> checkReservedTagAttributes(tag, v, apiTrust))
+        // Tag permissions
+        //.thenApply(v -> checkReservedTagAttributes(tag, v, apiTrust))
 
-                // Load prior tag version
-                //.thenApply(v -> specifierFromTag(tag))
-                .thenCompose(prior -> dal.loadTag(tenant,
-                        priorSelector.getObjectType(),
-                        priorObjectId,
-                        priorSelector.getObjectVersion(),
-                        priorSelector.getTagVersion()))
+        var objectId = MetadataCodec.decode(priorSelector.getObjectId());
+        var priorVersion = priorSelector.getObjectVersion();
+        var priorTagVersion = priorSelector.getTagVersion();
 
-                .thenAccept(pt -> priorTag.value = pt)
+        return dal.loadTag(tenant, objectType, objectId, priorVersion, priorTagVersion)
 
-                // TODO: Validate increment
+                .thenCompose(priorTag ->
+                updateTag(tenant, priorTag, attrUpdates));
+    }
 
-                .thenApply(x -> TagHeader.newBuilder().build());
+    private CompletableFuture<TagHeader> updateTag(
+            String tenant, Tag priorTag,
+            Map<String, TagUpdate> attrUpdates) {
 
-//                // Build tag to save
-//                .thenApply(pt -> tagVersion.value = priorTag.value.getTagVersion() + 1)
-//                .thenApply(tv -> definition.toBuilder().clearDefinition().build())
-//
-//                .thenApply(defToSave -> tag.toBuilder()
-//                        .setTagVersion(tagVersion.value)
-//                        .setDefinition(defToSave).build())
-//
-//                // Save and return
-//                .thenCompose(tagToSave -> dal.saveNewTag(tenant, tagToSave))
-//                .thenApply(_ok -> tagVersion.value);
+        var oldHeader = priorTag.getHeader();
+
+        var newHeader = oldHeader.toBuilder()
+                .setTagVersion(oldHeader.getTagVersion() + 1)
+                .build();
+
+        var newTag = priorTag.toBuilder()
+                .setHeader(newHeader)
+                .build();
+
+        newTag = applyTagUpdates(newTag, attrUpdates);
+
+        return dal.saveNewTag(tenant, newTag)
+                .thenApply(_ok -> newHeader);
     }
 
     public CompletableFuture<TagHeader> preallocateId(String tenant, ObjectType objectType) {
@@ -191,52 +187,56 @@ public class MetadataWriteLogic {
         // New random ID
         var objectId = UUID.randomUUID();
 
+        // Header for preallocated IDs does not include an object or tag version
+        var preallocatedHeader = TagHeader.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .build();
+
         // Save as a preallocated ID in the DAL
         return dal.preallocateObjectId(tenant, objectType, objectId)
-
-                .thenApply(x -> TagHeader.newBuilder().build());
-
-//                // Return an object header with the new ID
-//                .thenApply(_ok -> ObjectHeader.newBuilder()
-//                .setObjectType(objectType)
-//                .setObjectId(MetadataCodec.encode(objectId))
-//                .setObjectVersion(OBJECT_FIRST_VERSION)
-//                .build());
+                .thenApply(_ok -> preallocatedHeader);
     }
 
     public CompletableFuture<TagHeader> createPreallocatedObject(
             String tenant, ObjectType objectType,
+            TagSelector priorVersion,
             ObjectDefinition definition,
             Map<String, TagUpdate> attrUpdates) {
 
         var validator = new MetadataValidator();
 
-        return CompletableFuture.completedFuture(validator)
-
-                // Validation
+        // Validation
 //                .thenApply(v -> v.headerIsValid(definition))
 //                .thenApply(v -> v.headerMatchesType(definition, objectType))
 //                .thenApply(v -> v.headerIsOnFirstVersion(definition))
 //                .thenApply(v -> v.definitionMatchesType(definition, objectType))
 //                .thenApply(v -> v.tagVersionIsBlank(tag))
 //                .thenApply(v -> v.tagAttributesAreValid(tag))
-                .thenApply(MetadataValidator::checkAndThrow)
+//                .thenApply(MetadataValidator::checkAndThrow)
 
-                // Preallocated objects are always on the trusted API
-                // So no need to check reserved tag attributes
+        // Preallocated objects are always on the trusted API
+        // So no need to check reserved tag attributes
 
-                .thenApply(x -> TagHeader.newBuilder().build());
+        // In this case priorVersion refers to the preallocated ID
+        var objectId = MetadataCodec.decode(priorVersion.getObjectId());
 
-//                // Set tag version if not already set
-//                .thenApply(defToSave -> tag.toBuilder()
-//                        .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
-//                        .build())
-//
-//                // Save and return
-//                .thenCompose(tagToSave -> dal.savePreallocatedObject(tenant, tagToSave))
-//
-//                // Return object header on success
-//                .thenApply(_ok -> definition.getHeader());
+        var newHeader = TagHeader.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(OBJECT_FIRST_VERSION)
+                .setTagVersion(TAG_FIRST_VERSION)
+                .build();
+
+        var newTag = Tag.newBuilder()
+                .setHeader(newHeader)
+                .setDefinition(definition)
+                .build();
+
+        // newTag = applyTagUpdates(newTag, attrUpdates);
+
+        return dal.saveNewObject(tenant, newTag)
+                .thenApply(_ok -> newHeader);
     }
 
     private MetadataValidator checkReservedTagAttributes(Tag tag, MetadataValidator validator, boolean apiTrust) {
@@ -252,50 +252,66 @@ public class MetadataWriteLogic {
             return validator;
     }
 
-//    private ObjectDefinition setObjectHeader(ObjectDefinition definition, ObjectType objectType, UUID objectId, int objectVersion) {
-//
-//        var header = ObjectHeader.newBuilder()
-//                .setObjectType(objectType)
-//                .setObjectId(MetadataCodec.encode(objectId))
-//                .setObjectVersion(objectVersion);
-//
-//        return definition.toBuilder()
-//                .setHeader(header)
-//                .build();
-//    }
+    private Tag applyTagUpdates(Tag priorTag, Map<String, TagUpdate> updates) {
 
-//    private ObjectDefinition bumpObjectVersion(ObjectDefinition newDefinition, ObjectDefinition priorDefinition) {
-//
-//        var priorHeader = priorDefinition.getHeader();
-//
-//        return newDefinition.toBuilder()
-//                .setHeader(priorHeader.toBuilder()
-//                .setObjectVersion(priorHeader.getObjectVersion() + 1))
-//                .build();
-//    }
+        var tag = priorTag.toBuilder();
 
-//    private ObjectSpecifier specifierFromTag(Tag tag) {
-//
-//        var header = tag.getDefinition().getHeader();
-//
-//        var spec = new ObjectSpecifier();
-//        spec.objectType = header.getObjectType();
-//        spec.objectId = MetadataCodec.decode(header.getObjectId());
-//        spec.objectVersion = header.getObjectVersion();
-//        spec.tagVersion = tag.getTagVersion();
-//
-//        return spec;
-//    }
-//
-//    private static class ObjectSpecifier {
-//        ObjectType objectType;
-//        UUID objectId;
-//        int objectVersion;
-//        int tagVersion;
-//    }
+        for (var update : updates.entrySet())
+            tag = applyTagUpdate(tag, update.getKey(), update.getValue());
 
-    private static class Wrapper<T> {
-
-        public T value;
+        return tag.build();
     }
+
+    private Tag.Builder applyTagUpdate(Tag.Builder tag, String attrName, TagUpdate update) {
+
+        switch (update.getOperation()) {
+
+        case CREATE_OR_REPLACE_ATTR:
+
+            return tag.putAttr(attrName, update.getValue());
+
+        case CREATE_ATTR:
+
+            if (tag.containsAttr(attrName))
+                throw new ETrac("");  // attr already exists
+
+            return tag.putAttr(attrName, update.getValue());
+
+        case REPLACE_ATTR:
+
+            if (!tag.containsAttr(attrName))
+                throw new ETrac("");
+
+            var priorType = tag.getAttrOrDefault(attrName, update.getValue()).getType();
+            var newType = update.getValue().getType();
+
+            if (!attrTypesMatch(priorType, newType))
+                throw new ETrac("");
+
+            return tag.putAttr(attrName, update.getValue());
+
+        case APPEND_ATTR:
+
+            throw new ETrac("");  // TODO
+
+        case DELETE_ATTR:
+
+            if (!tag.containsAttr(attrName))
+                throw new ETrac("");
+
+            tag.removeAttr(attrName);
+
+        default:
+            // Should be picked up by validation
+            throw new EUnexpected();
+        }
+    }
+
+    private boolean attrTypesMatch(TypeDescriptor attr1, TypeDescriptor attr2) {
+
+        // TODO: Array types
+        return TypeSystem.isPrimitive(attr1) && attr1.getBasicType() == attr2.getBasicType();
+
+    }
+
 }

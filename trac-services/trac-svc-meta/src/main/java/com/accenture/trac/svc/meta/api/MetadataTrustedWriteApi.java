@@ -44,8 +44,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
 
-            return writeLogic.updateObject(tenant, objectType,
-                    request.getPriorVersion(),
+            return writeLogic.createObject(tenant, objectType,
                     request.getDefinition(),
                     request.getAttrMap(),
                     TRUSTED_API);
@@ -102,6 +101,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
             return writeLogic.createPreallocatedObject(
                     request.getTenant(),
                     request.getObjectType(),
+                    request.getPriorVersion(),
                     request.getDefinition(),
                     request.getAttrMap());
         });
