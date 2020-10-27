@@ -1341,10 +1341,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         return fullTag
                 .toBuilder()
-                .setDefinition(fullTag
-                    .getDefinition()
-                    .toBuilder()
-                    .clearDefinition())
+                .clearDefinition()
                 .build();
     }
 
