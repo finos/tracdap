@@ -43,23 +43,23 @@ public class TracApiConfig {
         var apiRoutes = new RoutingConfig();
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/{objectType}/new-object",
+                "/trac-meta/api/v1/{tenant}/{objectType}/create-object",
                 serviceHost, servicePort,
-                MetadataPublicWriteApiGrpc.getSaveNewObjectMethod(),
+                MetadataPublicWriteApiGrpc.getCreateObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(),
                 "tag", Tag.getDefaultInstance());
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/{objectType}/new-version",
+                "/trac-meta/api/v1/{tenant}/{objectType}/update-object",
                 serviceHost, servicePort,
-                MetadataPublicWriteApiGrpc.getSaveNewVersionMethod(),
+                MetadataPublicWriteApiGrpc.getUpdateObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(),
                 "tag", Tag.getDefaultInstance());
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/{objectType}/new-tag",
+                "/trac-meta/api/v1/{tenant}/{objectType}/update-tag",
                 serviceHost, servicePort,
-                MetadataPublicWriteApiGrpc.getSaveNewTagMethod(),
+                MetadataPublicWriteApiGrpc.getUpdateTagMethod(),
                 MetadataWriteRequest.getDefaultInstance(),
                 "tag", Tag.getDefaultInstance());
 
@@ -96,23 +96,23 @@ public class TracApiConfig {
         var apiRoutes = new RoutingConfig();
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/new-object",
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/create-object",
                 serviceHost, servicePort,
-                MetadataTrustedWriteApiGrpc.getSaveNewObjectMethod(),
+                MetadataTrustedWriteApiGrpc.getCreateObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(),
                 "tag", Tag.getDefaultInstance());
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/new-version",
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/update-object",
                 serviceHost, servicePort,
-                MetadataTrustedWriteApiGrpc.getSaveNewVersionMethod(),
+                MetadataTrustedWriteApiGrpc.getUpdateObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(),
                 "tag", Tag.getDefaultInstance());
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/new-tag",
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/update-tag",
                 serviceHost, servicePort,
-                MetadataTrustedWriteApiGrpc.getSaveNewTagMethod(),
+                MetadataTrustedWriteApiGrpc.getUpdateTagMethod(),
                 MetadataWriteRequest.getDefaultInstance(),
                 "tag", Tag.getDefaultInstance());
 
@@ -124,9 +124,9 @@ public class TracApiConfig {
                 "tag", Tag.getDefaultInstance());
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/save-preallocated",
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/create-preallocated",
                 serviceHost, servicePort,
-                MetadataTrustedWriteApiGrpc.getSavePreallocatedObjectMethod(),
+                MetadataTrustedWriteApiGrpc.getCreatePreallocatedObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(),
                 "tag", Tag.getDefaultInstance());
 
