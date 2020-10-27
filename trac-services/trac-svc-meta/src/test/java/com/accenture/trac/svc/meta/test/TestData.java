@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -36,9 +37,6 @@ public class TestData {
 
     public static final boolean INCLUDE_HEADER = true;
     public static final boolean NO_HEADER = false;
-
-    public static final boolean UPDATE_HEADER = true;
-    public static final boolean KEEP_ORIGINAL_HEADER = false;
 
     public static final boolean UPDATE_TAG_VERSION = true;
     public static final boolean KEEP_ORIGINAL_TAG_VERSION = false;
@@ -97,14 +95,6 @@ public class TestData {
                 .setObjectType(objectType)
                 .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
                 .setObjectVersion(1)
-                .setTagVersion(1)
-                .build();
-    }
-
-    public static TagHeader nextVersionHeader(TagHeader priorVersionHeader) {
-
-        return priorVersionHeader.toBuilder()
-                .setObjectVersion(priorVersionHeader.getObjectVersion() + 1)
                 .setTagVersion(1)
                 .build();
     }
@@ -288,6 +278,22 @@ public class TestData {
         }
         else
             return tag.build();
+    }
+
+    public static Map<String, Value> dummyAttrs() {
+
+        var attrs = new HashMap<String, Value>();
+        attrs.put("dataset_key", MetadataCodec.encodeValue("widget_orders"));
+        attrs.put("widget_type", MetadataCodec.encodeValue("non_standard_widget"));
+
+        return attrs;
+    }
+
+    public static Map<String, TagUpdate> attrOpsAddAll(Map<String, Value> attrs) {
+
+        return attrs.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                entry -> TagUpdate.newBuilder().setValue(entry.getValue()).build()));
     }
 
     public static Tag tagForNextObject(Tag previous, ObjectDefinition obj, boolean includeHeader) {
