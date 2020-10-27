@@ -270,14 +270,13 @@ abstract class MetadataDalWriteTest implements IDalTestable {
     void testSaveNewVersion_wrongObjectType() throws Exception {
 
         var dataTag = dummyTagForObjectType(ObjectType.DATA);
-        var dataTag2 = dummyTagForObjectType(ObjectType.DATA);
-        var nextDataTag = tagForNextObject(dataTag2, nextDataDef(dataTag2.getDefinition()), INCLUDE_HEADER);
+        var nextDataTag = tagForNextObject(dataTag, nextDataDef(dataTag.getDefinition()), INCLUDE_HEADER);
 
         // Create a model def with the same ID as the data def
         var modelDef = dummyModelDef();
         var rawModelTag = tagForNextObject(dataTag, modelDef, INCLUDE_HEADER);
         var nextModelTag = rawModelTag.toBuilder()
-                .setHeader(TagHeader.newBuilder()
+                .setHeader(rawModelTag.getHeader().toBuilder()
                 .setObjectType(ObjectType.MODEL))
                 .build();
 

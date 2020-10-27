@@ -105,8 +105,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         // Search results should come back with no definition body
         var expectedResult = tag1.toBuilder()
-                .setDefinition(tag1.getDefinition().toBuilder()
-                .clearDefinition())
+                .clearDefinition()
                 .build();
 
         assertEquals(expectedResult, searchResult.get(0));
@@ -1233,7 +1232,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var tagV1T1 = tagForDef(defV1, attrNames, attrValues);
         var tagV1T2 = TestData.nextTag(tagV1T1, UPDATE_TAG_VERSION);
-        var tagV2T1 = tagForDef(defV2, attrNames, attrValues);
+        var tagV2T1 = tagForNextObject(tagV1T2, defV2, INCLUDE_HEADER);
         var tagV2T2 = TestData.nextTag(tagV2T1, UPDATE_TAG_VERSION);
 
         unwrap(CompletableFuture.completedFuture(true)

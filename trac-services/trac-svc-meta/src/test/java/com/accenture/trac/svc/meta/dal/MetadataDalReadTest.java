@@ -118,7 +118,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
         var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
 
-        var nextDefTag1 = dummyTag(nextDataDef(origDef), INCLUDE_HEADER);
+        var nextDefTag1 = tagForNextObject(origTag, nextDataDef(origDef), INCLUDE_HEADER);
 
         // Save v1 t1, v2 t1
         var future = CompletableFuture.completedFuture(0)
