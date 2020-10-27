@@ -20,6 +20,7 @@ import com.accenture.trac.common.api.meta.MetadataPublicWriteApiGrpc;
 import com.accenture.trac.common.api.meta.MetadataWriteRequest;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
+import com.accenture.trac.common.metadata.Tag;
 import com.accenture.trac.common.metadata.TagHeader;
 import com.accenture.trac.common.util.ApiWrapper;
 import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
@@ -56,7 +57,6 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
-            var tag = request.getTag();
 
             if (!PUBLIC_TYPES.contains(objectType)) {
                 var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
@@ -64,16 +64,10 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
                 return CompletableFuture.failedFuture(status.asRuntimeException());
             }
 
-            var saveResult = writeLogic.saveNewObject(tenant, objectType, tag, PUBLIC_API);
-
-            var idResponse = saveResult
-                    .thenApply(objectId -> IdResponse.newBuilder()
-                    .setObjectId(MetadataCodec.encode(objectId))
-                    .setObjectVersion(1)
-                    .setTagVersion(1)
-                    .build());
-
-            return idResponse;
+            return writeLogic.createObject(tenant, objectType,
+                    request.getDefinition(),
+                    request.getAttrMap(),
+                    PUBLIC_API);
         });
     }
 
@@ -84,7 +78,6 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
-            var tag = request.getTag();
 
             if (!PUBLIC_TYPES.contains(objectType)) {
                 var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
@@ -92,16 +85,11 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
                 return CompletableFuture.failedFuture(status.asRuntimeException());
             }
 
-            var saveResult = writeLogic.saveNewVersion(tenant, objectType, tag, PUBLIC_API);
-
-            var idResponse = saveResult
-                    .thenApply(objectVersion -> IdResponse.newBuilder()
-                            .setObjectId(tag.getDefinition().getHeader().getObjectId())
-                            .setObjectVersion(objectVersion)
-                            .setTagVersion(1)
-                            .build());
-
-            return idResponse;
+            return writeLogic.updateObject(tenant, objectType,
+                    request.getPriorVersion(),
+                    request.getDefinition(),
+                    request.getAttrMap(),
+                    PUBLIC_API);
         });
     }
 
@@ -110,20 +98,12 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
-            var tenant = request.getTenant();
-            var objectType = request.getObjectType();
-            var tag = request.getTag();
-
-            var saveResult = writeLogic.saveNewTag(tenant, objectType, tag, PUBLIC_API);
-
-            var idResponse = saveResult
-                    .thenApply(tagVersion -> IdResponse.newBuilder()
-                            .setObjectId(tag.getDefinition().getHeader().getObjectId())
-                            .setObjectVersion(tag.getDefinition().getHeader().getObjectVersion())
-                            .setTagVersion(tagVersion)
-                            .build());
-
-            return idResponse;
+            return writeLogic.updateTag(
+                    request.getTenant(),
+                    request.getObjectType(),
+                    request.getPriorVersion(),
+                    request.getAttrMap(),
+                    PUBLIC_API);
         });
     }
 }

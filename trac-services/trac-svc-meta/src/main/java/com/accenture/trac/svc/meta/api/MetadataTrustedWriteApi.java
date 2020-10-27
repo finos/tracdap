@@ -18,14 +18,12 @@ package com.accenture.trac.svc.meta.api;
 
 import com.accenture.trac.common.api.meta.MetadataTrustedWriteApiGrpc;
 import com.accenture.trac.common.api.meta.MetadataWriteRequest;
-import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.TagHeader;
 import com.accenture.trac.common.util.ApiWrapper;
 import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
 import io.grpc.stub.StreamObserver;
 
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.TAG_FIRST_VERSION;
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.TRUSTED_API;
+import static com.accenture.trac.svc.meta.logic.MetadataConstants.*;
 
 
 public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.MetadataTrustedWriteApiImplBase {
@@ -45,18 +43,12 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
-            var tag = request.getTag();
 
-            var saveResult = writeLogic.saveNewObject(tenant, objectType, tag, TRUSTED_API);
-
-            var idResponse = saveResult
-                    .thenApply(objectId -> IdResponse.newBuilder()
-                    .setObjectId(MetadataCodec.encode(objectId))
-                    .setObjectVersion(1)
-                    .setTagVersion(1)
-                    .build());
-
-            return idResponse;
+            return writeLogic.updateObject(tenant, objectType,
+                    request.getPriorVersion(),
+                    request.getDefinition(),
+                    request.getAttrMap(),
+                    TRUSTED_API);
         });
     }
 
@@ -67,18 +59,12 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
-            var tag = request.getTag();
 
-            var saveResult = writeLogic.saveNewVersion(tenant, objectType, tag, TRUSTED_API);
-
-            var idResponse = saveResult
-                    .thenApply(objectVersion -> IdResponse.newBuilder()
-                    .setObjectId(tag.getDefinition().getHeader().getObjectId())
-                    .setObjectVersion(objectVersion)
-                    .setTagVersion(1)
-                    .build());
-
-            return idResponse;
+            return writeLogic.updateObject(tenant, objectType,
+                    request.getPriorVersion(),
+                    request.getDefinition(),
+                    request.getAttrMap(),
+                    TRUSTED_API);
         });
     }
 
@@ -87,20 +73,12 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
-            var tenant = request.getTenant();
-            var objectType = request.getObjectType();
-            var tag = request.getTag();
-
-            var saveResult = writeLogic.saveNewTag(tenant, objectType, tag, TRUSTED_API);
-
-            var idResponse = saveResult
-                    .thenApply(tagVersion -> IdResponse.newBuilder()
-                    .setObjectId(tag.getDefinition().getHeader().getObjectId())
-                    .setObjectVersion(tag.getDefinition().getHeader().getObjectVersion())
-                    .setTagVersion(tagVersion)
-                    .build());
-
-            return idResponse;
+            return writeLogic.updateTag(
+                    request.getTenant(),
+                    request.getObjectType(),
+                    request.getPriorVersion(),
+                    request.getAttrMap(),
+                    TRUSTED_API);
         });
     }
 
@@ -112,16 +90,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
 
-            var saveResult = writeLogic.preallocateId(tenant, objectType);
-
-            var idResponse = saveResult
-                    .thenApply(header -> IdResponse.newBuilder()
-                    .setObjectId(header.getObjectId())
-                    .setObjectVersion(header.getObjectVersion())
-                    .setTagVersion(TAG_FIRST_VERSION)
-                    .build());
-
-            return idResponse;
+            return writeLogic.preallocateId(tenant, objectType);
         });
     }
 
@@ -130,20 +99,11 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
-            var tenant = request.getTenant();
-            var objectType = request.getObjectType();
-            var tag = request.getTag();
-
-            var saveResult = writeLogic.savePreallocatedObject(tenant, objectType, tag);
-
-            var idResponse = saveResult
-                    .thenApply(header -> IdResponse.newBuilder()
-                    .setObjectId(header.getObjectId())
-                    .setObjectVersion(header.getObjectVersion())
-                    .setTagVersion(TAG_FIRST_VERSION)
-                    .build());
-
-            return idResponse;
+            return writeLogic.createPreallocatedObject(
+                    request.getTenant(),
+                    request.getObjectType(),
+                    request.getDefinition(),
+                    request.getAttrMap());
         });
     }
 }
