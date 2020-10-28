@@ -29,7 +29,7 @@
                         "attrName": "last_review_date",
                         "attrType": "DATE",
                         "operator": "GE",
-                        "searchValue": { "dateValue": "2019-10-01" }
+                        "searchValue": { "dateValue": { "isoDate": "2019-10-01" } }
                     }},
 
                     { "term": {
