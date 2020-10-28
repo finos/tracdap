@@ -163,10 +163,10 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
                 .build();
 
         var v2Header = writeApi.updateObject(v2WriteRequest);
-        var v2Selector = selectorForTag(v2Header);
 
         var t2Attrs = new HashMap<>(v1Attrs);
         t2Attrs.put("v3_attr", MetadataCodec.encodeValue("Use the force"));
@@ -179,7 +179,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setPriorVersion(v2Selector)
+                .setPriorVersion(v1Selector)
                 .addTagUpdate(t2TagUpdate)
                 .build();
 
@@ -227,7 +227,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var t2TagExpected = t2TagSaved.newBuilderForType()
                 .setHeader(t2Header)
-                .setDefinition(v2Obj)
+                .setDefinition(v1Obj)
                 .putAllAttr(t2Attrs)
                 .build();
 
@@ -336,7 +336,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
     void loadLatestTag_ok(ObjectType objectType) {
 
-        var origObj = TestData.dummyDefinitionForType(ObjectType.DATA);
+        var origObj = TestData.dummyDefinitionForType(objectType);
         var origAttrs = TestData.dummyAttrs();
         var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
 
@@ -481,6 +481,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(t2Selector)
+                .setDefinition(v2Obj)
                 .addTagUpdate(v2TagUpdate)
                 .build();
 
@@ -721,8 +722,8 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .clearAttr().putAllAttr(t2Attrs)
                 .build();
 
-        assertEquals(1, v1Saved.getHeader().getObjectVersion());
-        assertEquals(2, v1Saved.getHeader().getTagVersion());
+        assertEquals(1, t2Saved.getHeader().getObjectVersion());
+        assertEquals(2, t2Saved.getHeader().getTagVersion());
         assertEquals(t2Expected, t2Saved);
 
         // Save second version of object
@@ -757,8 +758,8 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .putAllAttr(v2Attrs)
                 .build();
 
-        assertEquals(2, v1Saved.getHeader().getObjectVersion());
-        assertEquals(1, v1Saved.getHeader().getTagVersion());
+        assertEquals(2, v2Saved.getHeader().getObjectVersion());
+        assertEquals(1, v2Saved.getHeader().getTagVersion());
         assertEquals(v2Expected, v2Saved);
 
         // Now save V1 T3, latest object should still be V2 T1
