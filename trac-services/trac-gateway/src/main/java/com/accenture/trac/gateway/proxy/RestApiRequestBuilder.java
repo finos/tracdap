@@ -59,13 +59,13 @@ public class RestApiRequestBuilder<TRequest extends Message> {
         this.fieldExtractors = prepareFieldExtractors(urlTemplate, blankRequest.getDescriptorForType());
     }
 
-    public RestApiRequestBuilder(String urlTemplate, TRequest blankRequest) {
+    public RestApiRequestBuilder(String urlTemplate, TRequest blankRequest, boolean hasBody) {
 
         this.blankRequest = blankRequest;
 
         this.bodySubFieldMapper = null;
         this.bodyFieldDescriptor = null;
-        this.hasBody = false;
+        this.hasBody = hasBody;
 
         this.fieldExtractors = prepareFieldExtractors(urlTemplate, blankRequest.getDescriptorForType());
     }
@@ -169,8 +169,15 @@ public class RestApiRequestBuilder<TRequest extends Message> {
 
         var request = blankRequest.newBuilderForType();
 
-        var bodySubField = bodySubFieldMapper.apply(request);
-        bodySubField.setField(bodyFieldDescriptor, body);
+        // If the body is a sub file, use the sub field mapper to add it to the request
+        if (bodySubFieldMapper != null) {
+
+            var bodySubField = bodySubFieldMapper.apply(request);
+            bodySubField.setField(bodyFieldDescriptor, body);
+        }
+        // Otherwise the body is the top level request, merge it before applying URL fields
+        else
+            request.mergeFrom(body);
 
         var requestUrl = URI.create(url);
 
