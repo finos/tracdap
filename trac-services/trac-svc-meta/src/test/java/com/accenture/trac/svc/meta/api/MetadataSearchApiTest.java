@@ -21,7 +21,6 @@ import com.accenture.trac.common.api.meta.MetadataSearchRequest;
 import com.accenture.trac.common.api.meta.MetadataTrustedWriteApiGrpc;
 import com.accenture.trac.common.api.meta.MetadataWriteRequest;
 import com.accenture.trac.common.metadata.BasicType;
-import com.accenture.trac.common.metadata.ObjectHeader;
 import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.Tag;
 import com.accenture.trac.common.metadata.search.*;
@@ -121,8 +120,8 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         var searchAttr = "basicSearch_WHICH_DROIDS";
 
-        var obj1 = TestData.dummyDataDef(false);
-        var obj2 = TestData.dummyDataDef(false);
+        var obj1 = TestData.dummyDataDef();
+        var obj2 = TestData.dummyDataDef();
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
@@ -137,19 +136,21 @@ abstract class MetadataSearchApiTest implements IDalTestable {
         var save1 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(tag1)
+                .setDefinition(obj1)
+                .addAllTagUpdate(tagUpdatesForAttrs(tag1.getAttrMap()))
                 .build();
 
         var save2 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(tag2)
+                .setDefinition(obj2)
+                .addAllTagUpdate(tagUpdatesForAttrs(tag2.getAttrMap()))
                 .build();
 
-        var id1 = writeApi.saveNewObject(save1);
+        var id1 = writeApi.createObject(save1);
 
         // noinspection ResultOfMethodCallIgnored
-        writeApi.saveNewObject(save2);
+        writeApi.createObject(save2);
 
         var searchRequest = MetadataSearchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -167,13 +168,8 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         // Search results do not include the definition body
         var t1 = tag1.toBuilder()
-                .setTagVersion(id1.getTagVersion())
-                .setDefinition(tag1.getDefinition().toBuilder()
-                .setHeader(ObjectHeader.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .setObjectId(id1.getObjectId())
-                .setObjectVersion(id1.getObjectVersion()))
-                .clearDefinition())
+                .setHeader(id1)
+                .clearDefinition()
                 .build();
 
         assertEquals(1, searchResult.getSearchResultCount());
@@ -186,8 +182,8 @@ abstract class MetadataSearchApiTest implements IDalTestable {
         var searchAttr = "compoundSearch_WHICH_DROIDS";
         var searchAttr2 = "compoundSearch_WHERE_ARE_THEY";
 
-        var obj1 = TestData.dummyDataDef(false);
-        var obj2 = TestData.dummyDataDef(false);
+        var obj1 = TestData.dummyDataDef();
+        var obj2 = TestData.dummyDataDef();
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
@@ -204,19 +200,21 @@ abstract class MetadataSearchApiTest implements IDalTestable {
         var save1 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(tag1)
+                .setDefinition(obj1)
+                .addAllTagUpdate(tagUpdatesForAttrs(tag1.getAttrMap()))
                 .build();
 
         var save2 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(tag2)
+                .setDefinition(obj2)
+                .addAllTagUpdate(tagUpdatesForAttrs(tag2.getAttrMap()))
                 .build();
 
-        var id1 = writeApi.saveNewObject(save1);
+        var id1 = writeApi.createObject(save1);
 
         // noinspection ResultOfMethodCallIgnored
-        writeApi.saveNewObject(save2);
+        writeApi.createObject(save2);
 
         var searchRequest = MetadataSearchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -243,13 +241,8 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         // Search results do not include the definition body
         var t1 = tag1.toBuilder()
-                .setTagVersion(id1.getTagVersion())
-                .setDefinition(tag1.getDefinition().toBuilder()
-                .setHeader(ObjectHeader.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .setObjectId(id1.getObjectId())
-                .setObjectVersion(id1.getObjectVersion()))
-                .clearDefinition())
+                .setHeader(id1)
+                .clearDefinition()
                 .build();
 
         assertEquals(1, searchResult.getSearchResultCount());
@@ -263,8 +256,8 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         var searchAttr = "allObjectTypes_" + objectType.name();
 
-        var obj1 = TestData.dummyDefinitionForType(objectType, false);
-        var obj2 = TestData.dummyDefinitionForType(objectType, false);
+        var obj1 = TestData.dummyDefinitionForType(objectType);
+        var obj2 = TestData.dummyDefinitionForType(objectType);
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
@@ -279,19 +272,21 @@ abstract class MetadataSearchApiTest implements IDalTestable {
         var save1 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setTag(tag1)
+                .setDefinition(obj1)
+                .addAllTagUpdate(tagUpdatesForAttrs(tag1.getAttrMap()))
                 .build();
 
         var save2 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setTag(tag2)
+                .setDefinition(obj2)
+                .addAllTagUpdate(tagUpdatesForAttrs(tag2.getAttrMap()))
                 .build();
 
-        var id1 = writeApi.saveNewObject(save1);
+        var id1 = writeApi.createObject(save1);
 
         // noinspection ResultOfMethodCallIgnored
-        writeApi.saveNewObject(save2);
+        writeApi.createObject(save2);
 
         var searchRequest = MetadataSearchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -309,13 +304,8 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         // Search results do not include the definition body
         var t1 = tag1.toBuilder()
-                .setTagVersion(id1.getTagVersion())
-                .setDefinition(tag1.getDefinition().toBuilder()
-                .setHeader(ObjectHeader.newBuilder()
-                        .setObjectType(objectType)
-                        .setObjectId(id1.getObjectId())
-                        .setObjectVersion(id1.getObjectVersion()))
-                .clearDefinition())
+                .setHeader(id1)
+                .clearDefinition()
                 .build();
 
         assertEquals(1, searchResult.getSearchResultCount());
@@ -331,8 +321,8 @@ abstract class MetadataSearchApiTest implements IDalTestable {
         var valueToLookFor = objectOfType(attrType);
         var valueNotToLookFor = differentObjectOfSameType(attrType, valueToLookFor);
 
-        var obj1 = TestData.dummyDataDef(false);
-        var obj2 = TestData.dummyDataDef(false);
+        var obj1 = TestData.dummyDataDef();
+        var obj2 = TestData.dummyDataDef();
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
@@ -347,19 +337,21 @@ abstract class MetadataSearchApiTest implements IDalTestable {
         var save1 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(tag1)
+                .setDefinition(obj1)
+                .addAllTagUpdate(tagUpdatesForAttrs(tag1.getAttrMap()))
                 .build();
 
         var save2 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(tag2)
+                .setDefinition(obj2)
+                .addAllTagUpdate(tagUpdatesForAttrs(tag2.getAttrMap()))
                 .build();
 
-        var id1 = writeApi.saveNewObject(save1);
+        var id1 = writeApi.createObject(save1);
 
         // noinspection ResultOfMethodCallIgnored
-        writeApi.saveNewObject(save2);
+        writeApi.createObject(save2);
 
         var searchRequest = MetadataSearchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -377,13 +369,8 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         // Search results do not include the definition body
         var t1 = tag1.toBuilder()
-                .setTagVersion(id1.getTagVersion())
-                .setDefinition(tag1.getDefinition().toBuilder()
-                .setHeader(ObjectHeader.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .setObjectId(id1.getObjectId())
-                .setObjectVersion(id1.getObjectVersion()))
-                .clearDefinition())
+                .setHeader(id1)
+                .clearDefinition()
                 .build();
 
         assertEquals(1, searchResult.getSearchResultCount());
