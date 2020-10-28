@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.meta.validation;
 
+import com.accenture.trac.common.api.meta.TagUpdate;
 import com.accenture.trac.common.metadata.ObjectDefinition;
 import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.Tag;
@@ -193,13 +194,13 @@ public class MetadataValidator {
 //        return this;
 //    }
 
-    public MetadataValidator tagAttributesAreValid(Tag tag) {
+    public MetadataValidator tagAttributesAreValid(List<TagUpdate> updates) {
 
-        for (String attrKey : tag.getAttrMap().keySet()) {
+        for (var update : updates) {
 
-            if (!VALID_IDENTIFIER.matcher(attrKey).matches()) {
+            if (!VALID_IDENTIFIER.matcher(update.getAttrName()).matches()) {
 
-                var message = String.format("Tag attribute is not a valid identifier: '%s'", attrKey);
+                var message = String.format("Tag attribute is not a valid identifier: '%s'", update.getAttrName());
                 validationErrors.add(message);
             }
         }
@@ -207,13 +208,13 @@ public class MetadataValidator {
         return this;
     }
 
-    public MetadataValidator tagAttributesAreNotReserved(Tag tag) {
+    public MetadataValidator tagAttributesAreNotReserved(List<TagUpdate> updates) {
 
-        for (String attrKey : tag.getAttrMap().keySet()) {
+        for (var update : updates) {
 
-            if (TRAC_RESERVED_IDENTIFIER.matcher(attrKey).matches()) {
+            if (TRAC_RESERVED_IDENTIFIER.matcher(update.getAttrName()).matches()) {
 
-                var message = String.format("Tag attribute is reserved for use by TRAC: '%s'", attrKey);
+                var message = String.format("Tag attribute is reserved for use by TRAC: '%s'", update.getAttrName());
                 validationErrors.add(message);
             }
         }
