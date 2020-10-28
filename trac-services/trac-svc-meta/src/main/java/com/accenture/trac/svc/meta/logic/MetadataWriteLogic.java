@@ -94,6 +94,7 @@ public class MetadataWriteLogic {
         validator.typeSupportsVersioning(objectType);
         validator.checkAndThrow();
 
+        validator.priorVersionMatchesType(priorVersion, objectType);
         validator.definitionMatchesType(definition, objectType);
         validator.tagAttributesAreValid(tagUpdates);
         validator.checkAndThrow();
@@ -142,12 +143,13 @@ public class MetadataWriteLogic {
 
     public CompletableFuture<TagHeader> updateTag(
             String tenant, ObjectType objectType,
-            TagSelector priorSelector,
+            TagSelector priorVersion,
             List<TagUpdate> tagUpdates,
             boolean apiTrust) {
 
         var validator = new MetadataValidator();
 
+        validator.priorVersionMatchesType(priorVersion, objectType);
         validator.tagAttributesAreValid(tagUpdates);
         validator.checkAndThrow();
 
@@ -159,11 +161,11 @@ public class MetadataWriteLogic {
         // Validation complete!
 
 
-        var objectId = MetadataCodec.decode(priorSelector.getObjectId());
-        var priorVersion = priorSelector.getObjectVersion();
-        var priorTagVersion = priorSelector.getTagVersion();
+        var objectId = MetadataCodec.decode(priorVersion.getObjectId());
+        var priorObjectVersion = priorVersion.getObjectVersion();
+        var priorTagVersion = priorVersion.getTagVersion();
 
-        return dal.loadTag(tenant, objectType, objectId, priorVersion, priorTagVersion)
+        return dal.loadTag(tenant, objectType, objectId, priorObjectVersion, priorTagVersion)
 
                 .thenCompose(priorTag ->
                 updateTag(tenant, priorTag, tagUpdates));
@@ -213,6 +215,7 @@ public class MetadataWriteLogic {
 
         var validator = new MetadataValidator();
 
+        validator.priorVersionMatchesType(priorVersion, objectType);
         validator.definitionMatchesType(definition, objectType);
         validator.tagAttributesAreValid(tagUpdates);
         validator.checkAndThrow();

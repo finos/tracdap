@@ -1318,7 +1318,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
+                .setObjectType(ObjectType.MODEL)
                 .setPriorVersion(preallocateSelector)
                 .setDefinition(newObject)
                 .addAllTagUpdate(tagUpdates)
@@ -1351,6 +1351,8 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
         var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrMap());
 
+        // Attempt one: object type matches definition, does not match selector
+
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
@@ -1362,6 +1364,38 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+
+        // Attempt two: object type matches selector, does not match definition
+
+        var writeRequest2 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(preallocateSelector)
+                .setDefinition(newObject)
+                .addAllTagUpdate(tagUpdates)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest2));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
+
+        // Attempt three: selector matches definition, does not match object type
+
+        var selector3 = preallocateSelector.toBuilder()
+                .setObjectType(ObjectType.MODEL)
+                .build();
+
+        var writeRequest3 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(selector3)
+                .setDefinition(newObject)
+                .addAllTagUpdate(tagUpdates)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error3 = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest3));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error3.getStatus().getCode());
     }
 
     @Test

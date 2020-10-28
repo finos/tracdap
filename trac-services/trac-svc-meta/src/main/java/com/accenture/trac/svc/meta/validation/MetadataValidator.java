@@ -20,6 +20,7 @@ import com.accenture.trac.common.api.meta.TagUpdate;
 import com.accenture.trac.common.metadata.ObjectDefinition;
 import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.Tag;
+import com.accenture.trac.common.metadata.TagSelector;
 import com.accenture.trac.svc.meta.exception.AuthorisationError;
 import com.accenture.trac.svc.meta.exception.InputValidationError;
 import com.accenture.trac.svc.meta.logic.MetadataConstants;
@@ -151,6 +152,21 @@ public class MetadataValidator {
                     "Object definition does not match the specified object type" +
                     " (type specified is %s, definition is %s)",
                     objectType, definitionType);
+
+            validationErrors.add(message);
+        }
+
+        return this;
+    }
+
+    public MetadataValidator priorVersionMatchesType(TagSelector priorVersion, ObjectType objectType) {
+
+        if (priorVersion.getObjectType() != objectType) {
+
+            var message = String.format(
+                    "Prior version does not match the specified object type" +
+                            " (type specified is %s, prior version type is %s)",
+                    objectType, priorVersion.getObjectType());
 
             validationErrors.add(message);
         }
