@@ -169,7 +169,7 @@ public class RestApiRequestBuilder<TRequest extends Message> {
 
         var request = blankRequest.newBuilderForType();
 
-        // If the body is a sub file, use the sub field mapper to add it to the request
+        // If the body is a sub field, use the sub field mapper to add it to the request
         if (bodySubFieldMapper != null) {
 
             var bodySubField = bodySubFieldMapper.apply(request);
