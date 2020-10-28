@@ -70,8 +70,8 @@ class TagUpdateServiceTest {
         assertEquals(1, updatedTag.getAttrCount());
         assertTrue(updatedTag.containsAttr("attr_1"));
 
-        var attrValue = MetadataCodec.decodeValue(updatedTag.getAttrOrThrow("attr_1"));
-        assertEquals(List.of(42, 43), attrValue);
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        assertEquals(List.of(42L, 43L), attrValue);
     }
 
     @Test
@@ -166,8 +166,8 @@ class TagUpdateServiceTest {
         assertEquals(1, updatedTag.getAttrCount());
         assertTrue(updatedTag.containsAttr("attr_1"));
 
-        var attrValue = MetadataCodec.decodeValue(updatedTag.getAttrOrThrow("attr_1"));
-        assertEquals(List.of(42, 43), attrValue);
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        assertEquals(List.of(42L, 43L), attrValue);
 
         var update2 = TagUpdate.newBuilder()
                 .setOperation(TagOperation.REPLACE_ATTR)
@@ -180,7 +180,7 @@ class TagUpdateServiceTest {
         assertEquals(1, updatedTag2.getAttrCount());
         assertTrue(updatedTag2.containsAttr("attr_1"));
 
-        var attrValue2 = MetadataCodec.decodeValue(updatedTag2.getAttrOrThrow("attr_1"));
+        var attrValue2 = MetadataCodec.decodeIntegerValue(updatedTag2.getAttrOrThrow("attr_1"));
         assertEquals(42, attrValue2);
     }
 
@@ -202,8 +202,8 @@ class TagUpdateServiceTest {
         assertEquals(1, updatedTag.getAttrCount());
         assertTrue(updatedTag.containsAttr("attr_1"));
 
-        var attrValue = MetadataCodec.decodeValue(updatedTag.getAttrOrThrow("attr_1"));
-        assertEquals(List.of(42, 43), attrValue);
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        assertEquals(List.of(42L, 43L), attrValue);
     }
 
     @Test
@@ -226,8 +226,8 @@ class TagUpdateServiceTest {
         assertEquals(1, updatedTag.getAttrCount());
         assertTrue(updatedTag.containsAttr("attr_1"));
 
-        var attrValue = MetadataCodec.decodeValue(updatedTag.getAttrOrThrow("attr_1"));
-        assertEquals(List.of(42, 43, 44), attrValue);
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        assertEquals(List.of(42L, 43L, 44L), attrValue);
     }
 
     @Test
@@ -420,8 +420,8 @@ class TagUpdateServiceTest {
         assertEquals(1, updatedTag.getAttrCount());
         assertTrue(updatedTag.containsAttr("attr_1"));
 
-        var attrValue = MetadataCodec.decodeValue(updatedTag.getAttrOrThrow("attr_1"));
-        assertEquals(List.of(42, 43), attrValue);
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        assertEquals(List.of(42L, 43L), attrValue);
     }
 
     @Test
@@ -568,8 +568,8 @@ class TagUpdateServiceTest {
         assertEquals(1, updatedTag.getAttrCount());
         assertTrue(updatedTag.containsAttr("attr_1"));
 
-        var attrValue = MetadataCodec.decodeValue(updatedTag.getAttrOrThrow("attr_1"));
-        assertEquals(List.of(42, 43), attrValue);
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        assertEquals(List.of(42L, 43L), attrValue);
     }
 
     @Test
@@ -579,10 +579,12 @@ class TagUpdateServiceTest {
                 .putAttr("attr_1", MetadataCodec.encodeValue(42))
                 .build();
 
+        var arrayValue = MetadataCodec.encodeArrayValue(List.of(43, 44), TypeSystem.descriptor(BasicType.INTEGER));
+
         var appendOp1 = TagUpdate.newBuilder()
                 .setOperation(TagOperation.APPEND_ATTR)
                 .setAttrName("attr_1")
-                .setValue(MetadataCodec.encodeArrayValue(List.of(43, 44), TypeSystem.descriptor(BasicType.INTEGER)))
+                .setValue(arrayValue)
                 .build();
 
         var appendOp2 = TagUpdate.newBuilder()
@@ -596,7 +598,7 @@ class TagUpdateServiceTest {
         assertEquals(1, updatedTag.getAttrCount());
         assertTrue(updatedTag.containsAttr("attr_1"));
 
-        var attrValue = MetadataCodec.decodeValue(updatedTag.getAttrOrThrow("attr_1"));
-        assertEquals(List.of(42, 43, 44, 45), attrValue);
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        assertEquals(List.of(42L, 43L, 44L, 45L), attrValue);
     }
 }
