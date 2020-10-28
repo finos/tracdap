@@ -24,12 +24,34 @@ import "trac/metadata/type.proto";
 import "trac/metadata/object.proto";
 
 
+/**
+ * A tag header describes the identity and version of an object.
+ *
+ * @see Tag
+ * @see ObjectDefinition
+ */
 message TagHeader {
 
+    /**
+     * Object type of the object this tag is associated with.
+     *
+     * @see ObjectType
+     */
     ObjectType objectType = 1;
+
+    /**
+     * Object ID of the object this tag is associated with.
+     */
     UUID objectId = 2;
 
+    /**
+     * Version of the object this tag is associated with.
+     */
     int32 objectVersion = 3;
+
+    /**
+     * Version of this tag.
+     */
     int32 tagVersion = 4;
 
     // Core tag/object temporality coming in metadata temporality feature
@@ -39,21 +61,78 @@ message TagHeader {
 }
 
 
+/**
+ * A tag selector describes the selection of a unique object at a point in time.
+ *
+ * A tag selector refers to a single object ID and provides criteria for
+ * selecting the object version and tag version. The available selection
+ * criteria are:
+ *
+ *  - Select an explicit version number
+ *  - Select the latest available version
+ *
+ * A selector for an explicit version number will always match that exact
+ * version number. These "fixed" types of selector can be used to refer to
+ * elements of a repeatable job, because the versions they refer to will never
+ * change.
+ *
+ * A selector for the latest version will select different versions over time,
+ * as they become available. These "variable" types of selector can be used by
+ * client applications that want to query the latest state of an object. If a
+ * job is set up using variable selectors, TRAC will convert them to fixed
+ * selectors for the particular versions that were selected before saving the
+ * job definition.
+ *
+ * Criteria for object versions and tag versions can be "mixed and matched", so
+ * e.g. latestObject = true with tagVersion = 1 is allowed.
+ *
+ * @see Tag
+ * @see TagHeader
+ */
 message TagSelector {
 
+    /**
+     * Object type of the tag being selected.
+     *
+     * @see ObjectType
+     */
     ObjectType objectType = 1;
+
+    /**
+     * Object ID of the tag being selected.
+     */
     UUID objectId = 2;
 
-    oneof objectSelector {
+    oneof objectVersionCriteria {
+
+        /**
+         * Select the latest version of the object.
+         *
+         * If this flag is specified, it must be set to true.
+         */
         bool latestObject = 3;
+
+        /**
+         * Select an explicit version of the object.
+         */
         int32 objectVersion = 4;
 
         // select by as-of time coming in metadata temporality feature
         // DatetimeValue objectTimestamp = 5;
     }
 
-    oneof tagSelector {
+    oneof tagVersionCriteria {
+
+        /**
+         * Select the latest version of the tag.
+         *
+         * If this flag is specified, it must be set to true.
+         */
         bool latestTag = 6;
+
+        /**
+         * Select an explicit version of the tag.
+         */
         int32 tagVersion = 7;
 
         // select by as-of time coming in metadata temporality feature
@@ -63,7 +142,6 @@ message TagSelector {
 
 
 /**
- *
  * Tags are the core informational element of TRAC's metadata model.
  *
  * A tag is a set of attributes (key-value pairs) associated with an object
@@ -126,10 +204,15 @@ message TagSelector {
  */
 message Tag {
 
+    /**
+     * The tag header uniquely identifies the current tag and the object it is
+     * associated with.
+     *
+     * @see TagHeader
+     */
     TagHeader header = 1;
 
     /**
-     *
      * Tag attributes are key-value pairs where the value is a metadata Value.
      *
      * Attribute values are restricted to primitive types (which are interpreted
@@ -152,5 +235,10 @@ message Tag {
      */
     map<string, Value> attr = 2;
 
+    /**
+     * The object definition that the tag is associate with.
+     *
+     * @see ObjectDefinition
+     */
     ObjectDefinition definition = 3;
 }
