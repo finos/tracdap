@@ -46,7 +46,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
 
             return writeLogic.createObject(tenant, objectType,
                     request.getDefinition(),
-                    request.getAttrMap(),
+                    request.getTagUpdateList(),
                     TRUSTED_API);
         });
     }
@@ -62,7 +62,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
             return writeLogic.updateObject(tenant, objectType,
                     request.getPriorVersion(),
                     request.getDefinition(),
-                    request.getAttrMap(),
+                    request.getTagUpdateList(),
                     TRUSTED_API);
         });
     }
@@ -76,7 +76,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
                     request.getTenant(),
                     request.getObjectType(),
                     request.getPriorVersion(),
-                    request.getAttrMap(),
+                    request.getTagUpdateList(),
                     TRUSTED_API);
         });
     }
@@ -103,7 +103,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
                     request.getObjectType(),
                     request.getPriorVersion(),
                     request.getDefinition(),
-                    request.getAttrMap());
+                    request.getTagUpdateList());
         });
     }
 }

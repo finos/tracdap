@@ -23,6 +23,7 @@ import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.validation.MetadataValidator;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -41,7 +42,7 @@ public class MetadataWriteLogic {
     public CompletableFuture<TagHeader> createObject(
             String tenant, ObjectType objectType,
             ObjectDefinition definition,
-            Map<String, TagUpdate> attrUpdates,
+            List<TagUpdate> tagUpdates,
             boolean apiTrust) {
 
 
@@ -75,7 +76,7 @@ public class MetadataWriteLogic {
                 .setDefinition(definition)
                 .build();
 
-        newTag = applyTagUpdates(newTag, attrUpdates);
+        newTag = applyTagUpdates(newTag, tagUpdates);
 
         return dal.saveNewObject(tenant, newTag)
                 .thenApply(_ok -> newHeader);
@@ -86,7 +87,7 @@ public class MetadataWriteLogic {
             String tenant, ObjectType objectType,
             TagSelector priorVersion,
             ObjectDefinition definition,
-            Map<String, TagUpdate> attrUpdates,
+            List<TagUpdate> tagUpdates,
             boolean apiTrust) {
 
 
@@ -117,13 +118,13 @@ public class MetadataWriteLogic {
         return dal.loadLatestTag(tenant, objectType, objectId, objectVersion)
 
                 .thenCompose(priorTag ->
-                updateObject(tenant, priorTag, definition, attrUpdates));
+                updateObject(tenant, priorTag, definition, tagUpdates));
     }
 
     private CompletableFuture<TagHeader> updateObject(
             String tenant, Tag priorTag,
             ObjectDefinition definition,
-            Map<String, TagUpdate> attrUpdates) {
+            List<TagUpdate> tagUpdates) {
 
         // TODO: Version increment validation
 
@@ -139,7 +140,7 @@ public class MetadataWriteLogic {
                 .setDefinition(definition)
                 .build();
 
-        newTag = applyTagUpdates(newTag, attrUpdates);
+        newTag = applyTagUpdates(newTag, tagUpdates);
 
         return dal.saveNewVersion(tenant, newTag)
                 .thenApply(_ok -> newHeader);
@@ -148,7 +149,7 @@ public class MetadataWriteLogic {
     public CompletableFuture<TagHeader> updateTag(
             String tenant, ObjectType objectType,
             TagSelector priorSelector,
-            Map<String, TagUpdate> attrUpdates,
+            List<TagUpdate> tagUpdates,
             boolean apiTrust) {
 
         // Validation no longer needed (after taking headers out of write requests)
@@ -174,12 +175,12 @@ public class MetadataWriteLogic {
         return dal.loadTag(tenant, objectType, objectId, priorVersion, priorTagVersion)
 
                 .thenCompose(priorTag ->
-                updateTag(tenant, priorTag, attrUpdates));
+                updateTag(tenant, priorTag, tagUpdates));
     }
 
     private CompletableFuture<TagHeader> updateTag(
             String tenant, Tag priorTag,
-            Map<String, TagUpdate> attrUpdates) {
+            List<TagUpdate> tagUpdates) {
 
         var oldHeader = priorTag.getHeader();
 
@@ -191,7 +192,7 @@ public class MetadataWriteLogic {
                 .setHeader(newHeader)
                 .build();
 
-        newTag = applyTagUpdates(newTag, attrUpdates);
+        newTag = applyTagUpdates(newTag, tagUpdates);
 
         return dal.saveNewTag(tenant, newTag)
                 .thenApply(_ok -> newHeader);
@@ -217,7 +218,7 @@ public class MetadataWriteLogic {
             String tenant, ObjectType objectType,
             TagSelector priorVersion,
             ObjectDefinition definition,
-            Map<String, TagUpdate> attrUpdates) {
+            List<TagUpdate> tagUpdates) {
 
         // Validation no longer needed (after taking headers out of write requests)
         // .thenApply(v -> v.headerIsValid(definition))
@@ -251,7 +252,7 @@ public class MetadataWriteLogic {
                 .setDefinition(definition)
                 .build();
 
-        newTag = applyTagUpdates(newTag, attrUpdates);
+        newTag = applyTagUpdates(newTag, tagUpdates);
 
         return dal.savePreallocatedObject(tenant, newTag)
                 .thenApply(_ok -> newHeader);
@@ -270,43 +271,42 @@ public class MetadataWriteLogic {
             return validator;
     }
 
-    private Tag applyTagUpdates(Tag priorTag, Map<String, TagUpdate> updates) {
+    private Tag applyTagUpdates(Tag priorTag, List<TagUpdate> updates) {
 
-        var tag = priorTag.toBuilder();
+        var newTag = updates.stream().reduce(
+                priorTag.toBuilder(),
+                this::applyTagUpdate, null);
 
-        for (var update : updates.entrySet())
-            tag = applyTagUpdate(tag, update.getKey(), update.getValue());
-
-        return tag.build();
+        return newTag.build();
     }
 
-    private Tag.Builder applyTagUpdate(Tag.Builder tag, String attrName, TagUpdate update) {
+    private Tag.Builder applyTagUpdate(Tag.Builder tag, TagUpdate update) {
 
         switch (update.getOperation()) {
 
         case CREATE_OR_REPLACE_ATTR:
 
-            return tag.putAttr(attrName, update.getValue());
+            return tag.putAttr(update.getAttrName(), update.getValue());
 
         case CREATE_ATTR:
 
-            if (tag.containsAttr(attrName))
+            if (tag.containsAttr(update.getAttrName()))
                 throw new ETrac("");  // attr already exists
 
-            return tag.putAttr(attrName, update.getValue());
+            return tag.putAttr(update.getAttrName(), update.getValue());
 
         case REPLACE_ATTR:
 
-            if (!tag.containsAttr(attrName))
+            if (!tag.containsAttr(update.getAttrName()))
                 throw new ETrac("");
 
-            var priorType = tag.getAttrOrDefault(attrName, update.getValue()).getType();
+            var priorType = tag.getAttrOrDefault(update.getAttrName(), update.getValue()).getType();
             var newType = update.getValue().getType();
 
             if (!attrTypesMatch(priorType, newType))
                 throw new ETrac("");
 
-            return tag.putAttr(attrName, update.getValue());
+            return tag.putAttr(update.getAttrName(), update.getValue());
 
         case APPEND_ATTR:
 
@@ -314,10 +314,10 @@ public class MetadataWriteLogic {
 
         case DELETE_ATTR:
 
-            if (!tag.containsAttr(attrName))
+            if (!tag.containsAttr(update.getAttrName()))
                 throw new ETrac("");
 
-            tag.removeAttr(attrName);
+            tag.removeAttr(update.getAttrName());
 
         default:
             // Should be picked up by validation

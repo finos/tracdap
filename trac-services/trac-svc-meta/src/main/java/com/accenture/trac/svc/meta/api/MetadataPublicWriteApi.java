@@ -66,7 +66,7 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
 
             return writeLogic.createObject(tenant, objectType,
                     request.getDefinition(),
-                    request.getAttrMap(),
+                    request.getTagUpdateList(),
                     PUBLIC_API);
         });
     }
@@ -88,7 +88,7 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
             return writeLogic.updateObject(tenant, objectType,
                     request.getPriorVersion(),
                     request.getDefinition(),
-                    request.getAttrMap(),
+                    request.getTagUpdateList(),
                     PUBLIC_API);
         });
     }
@@ -102,7 +102,7 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
                     request.getTenant(),
                     request.getObjectType(),
                     request.getPriorVersion(),
-                    request.getAttrMap(),
+                    request.getTagUpdateList(),
                     PUBLIC_API);
         });
     }
