@@ -44,15 +44,22 @@ public class MetadataWriteLogic {
             Map<String, TagUpdate> attrUpdates,
             boolean apiTrust) {
 
-        // Validation
-//                .thenApply(v -> v.headerIsNull(definition))
-//                .thenApply(v -> v.definitionMatchesType(definition, objectType))
-//                .thenApply(v -> v.tagVersionIsBlank(tag))
-//                .thenApply(v -> v.tagAttributesAreValid(tag))
-//                .thenApply(MetadataValidator::checkAndThrow)
 
-        // Tag permissions
-        //.thenApply(v -> checkReservedTagAttributes(tag, v, apiTrust))
+        // Validation no longer needed (after taking headers out of write requests)
+        // .thenApply(v -> v.headerIsNull(definition))
+        // .thenApply(v -> v.tagVersionIsBlank(tag))
+
+        var validator = new MetadataValidator();
+
+        validator.definitionMatchesType(definition, objectType);
+        // validator.tagAttributesAreValid(attrUpdates);  TODO
+        validator.checkAndThrow();
+
+        //if (apiTrust == PUBLIC_API) TODO
+        //    checkReservedTagAttributes(attrUpdates, validator, apiTrust);
+
+        // Validation complete!
+
 
         var objectId = UUID.randomUUID();
 
@@ -74,6 +81,7 @@ public class MetadataWriteLogic {
                 .thenApply(_ok -> newHeader);
     }
 
+
     public CompletableFuture<TagHeader> updateObject(
             String tenant, ObjectType objectType,
             TagSelector priorVersion,
@@ -81,23 +89,26 @@ public class MetadataWriteLogic {
             Map<String, TagUpdate> attrUpdates,
             boolean apiTrust) {
 
+
+        // Validation no longer needed (after taking headers out of write requests)
+        // .thenApply(v -> v.headerIsValid(definition))
+        // .thenApply(v -> v.headerMatchesType(definition, objectType))
+        // .thenApply(v -> v.tagVersionIsBlank(tag))
+
         var validator = new MetadataValidator();
 
         // Check whether versioning is supported for this object type
         // If not, we want to raise an error without reporting any other validation issues
-   //             .thenApply(v -> v.typeSupportsVersioning(objectType))
-//                .thenApply(MetadataValidator::checkAndThrow)
+        validator.typeSupportsVersioning(objectType);
+        validator.checkAndThrow();
+        validator.definitionMatchesType(definition, objectType);
+        // validator.tagAttributesAreValid(attrUpdates);  TODO
+        validator.checkAndThrow();
 
-                // Validate incoming object / tag
-//                .thenApply(v -> v.headerIsValid(definition))
-//                .thenApply(v -> v.headerMatchesType(definition, objectType))
-//                .thenApply(v -> v.definitionMatchesType(definition, objectType))
-//                .thenApply(v -> v.tagVersionIsBlank(tag))
-//                .thenApply(v -> v.tagAttributesAreValid(tag))
-  //              .thenApply(MetadataValidator::checkAndThrow)
+        //if (apiTrust == PUBLIC_API) TODO
+        //    checkReservedTagAttributes(attrUpdates, validator, apiTrust);
 
-        // Tag permissions
-        //.thenApply(v -> checkReservedTagAttributes(tag, v, apiTrust))
+        // Validation complete!
 
 
         var objectId = MetadataCodec.decode(priorVersion.getObjectId());
@@ -113,6 +124,8 @@ public class MetadataWriteLogic {
             String tenant, Tag priorTag,
             ObjectDefinition definition,
             Map<String, TagUpdate> attrUpdates) {
+
+        // TODO: Version increment validation
 
         var oldHeader = priorTag.getHeader();
 
@@ -138,19 +151,21 @@ public class MetadataWriteLogic {
             Map<String, TagUpdate> attrUpdates,
             boolean apiTrust) {
 
+        // Validation no longer needed (after taking headers out of write requests)
+        // .thenApply(v -> v.headerIsValid(definition))
+        // .thenApply(v -> v.headerMatchesType(definition, objectType))
+        // .thenApply(v -> v.definitionMatchesType(definition, objectType))
+        // .thenApply(v -> v.tagVersionIsValid(tag))
+
         var validator = new MetadataValidator();
+        // validator.tagAttributesAreValid(attrUpdates);  TODO
+        validator.checkAndThrow();
 
-        // Validate incoming object / tag
-//                .thenApply(v -> v.headerIsValid(definition))
-//                .thenApply(v -> v.headerMatchesType(definition, objectType))
-//                // TODO: Allow a null definition when creating a new tag
-//                .thenApply(v -> v.definitionMatchesType(definition, objectType))
-//                .thenApply(v -> v.tagVersionIsValid(tag))
-//                .thenApply(v -> v.tagAttributesAreValid(tag))
- //               .thenApply(MetadataValidator::checkAndThrow)
+        //if (apiTrust == PUBLIC_API) TODO
+        //    checkReservedTagAttributes(attrUpdates, validator, apiTrust);
 
-        // Tag permissions
-        //.thenApply(v -> checkReservedTagAttributes(tag, v, apiTrust))
+        // Validation complete!
+
 
         var objectId = MetadataCodec.decode(priorSelector.getObjectId());
         var priorVersion = priorSelector.getObjectVersion();
@@ -204,19 +219,22 @@ public class MetadataWriteLogic {
             ObjectDefinition definition,
             Map<String, TagUpdate> attrUpdates) {
 
-        var validator = new MetadataValidator();
+        // Validation no longer needed (after taking headers out of write requests)
+        // .thenApply(v -> v.headerIsValid(definition))
+        // .thenApply(v -> v.headerMatchesType(definition, objectType))
+        // .thenApply(v -> v.definitionMatchesType(definition, objectType))
+        // .thenApply(v -> v.tagVersionIsBlank(tag))
 
-        // Validation
-//                .thenApply(v -> v.headerIsValid(definition))
-//                .thenApply(v -> v.headerMatchesType(definition, objectType))
-//                .thenApply(v -> v.headerIsOnFirstVersion(definition))
-//                .thenApply(v -> v.definitionMatchesType(definition, objectType))
-//                .thenApply(v -> v.tagVersionIsBlank(tag))
-//                .thenApply(v -> v.tagAttributesAreValid(tag))
-//                .thenApply(MetadataValidator::checkAndThrow)
+        var validator = new MetadataValidator();
+        // .thenApply(v -> v.headerIsOnFirstVersion(definition))  TODO: Selector for preallocation (v = 0)
+        // validator.tagAttributesAreValid(attrUpdates);  TODO
+        validator.checkAndThrow();
 
         // Preallocated objects are always on the trusted API
         // So no need to check reserved tag attributes
+
+        // Validation complete!
+
 
         // In this case priorVersion refers to the preallocated ID
         var objectId = MetadataCodec.decode(priorVersion.getObjectId());
@@ -233,9 +251,9 @@ public class MetadataWriteLogic {
                 .setDefinition(definition)
                 .build();
 
-        // newTag = applyTagUpdates(newTag, attrUpdates);
+        newTag = applyTagUpdates(newTag, attrUpdates);
 
-        return dal.saveNewObject(tenant, newTag)
+        return dal.savePreallocatedObject(tenant, newTag)
                 .thenApply(_ok -> newHeader);
     }
 
