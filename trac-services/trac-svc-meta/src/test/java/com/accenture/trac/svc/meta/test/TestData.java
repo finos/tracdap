@@ -289,11 +289,13 @@ public class TestData {
         return attrs;
     }
 
-    public static Map<String, TagUpdate> attrOpsAddAll(Map<String, Value> attrs) {
+    public static List<TagUpdate> tagUpdatesForAttrs(Map<String, Value> attrs) {
 
         return attrs.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey,
-                entry -> TagUpdate.newBuilder().setValue(entry.getValue()).build()));
+                .map(entry -> TagUpdate.newBuilder()
+                .setAttrName(entry.getKey())
+                .setValue(entry.getValue()).build())
+                .collect(Collectors.toList());
     }
 
     public static Tag tagForNextObject(Tag previous, ObjectDefinition obj, boolean includeHeader) {
@@ -414,15 +416,6 @@ public class TestData {
         var nanoPrecision = (int) Math.pow(10, 9 - precision);
         var truncatedNanos = (nanos / nanoPrecision) * nanoPrecision;
         return dateTime.withNano(truncatedNanos);
-    }
-
-    public static Map<String, TagUpdate> generateAttrUpdates(Tag newTag) {
-
-        return newTag.getAttrMap()
-                .entrySet().stream()
-                .collect(Collectors.toMap(
-                Map.Entry::getKey,
-                entry -> TagUpdate.newBuilder().setValue(entry.getValue()).build()));
     }
 
     public static TagSelector selectorForTag(TagHeader tagHeader) {
