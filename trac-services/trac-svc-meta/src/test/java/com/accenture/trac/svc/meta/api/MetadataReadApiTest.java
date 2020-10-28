@@ -41,9 +41,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.HashMap;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static com.accenture.trac.svc.meta.test.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -109,13 +106,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var origObj = TestData.dummyDefinitionForType(objectType);
         var attrs = TestData.dummyAttrs();
-        var attrOps = TestData.attrOpsAddAll(attrs);
+        var tagUpdates = TestData.tagUpdatesForAttrs(attrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setDefinition(origObj)
-                .putAllAttr(attrOps)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
@@ -146,13 +143,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
         var v1Attrs = TestData.dummyAttrs();
-        var v1AttrOps = TestData.attrOpsAddAll(v1Attrs);
+        var v1TagUpdates = TestData.tagUpdatesForAttrs(v1Attrs);
 
         var v1WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(v1Obj)
-                .putAllAttr(v1AttrOps)
+                .addAllTagUpdate(v1TagUpdates)
                 .build();
 
         var v1Header = writeApi.createObject(v1WriteRequest);
@@ -174,15 +171,16 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var t2Attrs = new HashMap<>(v1Attrs);
         t2Attrs.put("v3_attr", MetadataCodec.encodeValue("Use the force"));
 
-        var t2AttrOps = Map.of("v3_attr", TagUpdate.newBuilder()
+        var t2TagUpdate = TagUpdate.newBuilder()
+                .setAttrName("v3_attr")
                 .setValue(MetadataCodec.encodeValue("Use the force"))
-                .build());
+                .build();
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v2Selector)
-                .putAllAttr(t2AttrOps)
+                .addTagUpdate(t2TagUpdate)
                 .build();
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
@@ -259,13 +257,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var origObj = TestData.dummyDefinitionForType(ObjectType.MODEL);
         var origAttrs = TestData.dummyAttrs();
-        var origAttrOps = TestData.attrOpsAddAll(origAttrs);
+        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
                 .setDefinition(origObj)
-                .putAllAttr(origAttrOps)
+                .addAllTagUpdate(origTagUpdates)
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
@@ -308,13 +306,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var origObj = TestData.dummyDefinitionForType(ObjectType.DATA);
         var origAttrs = TestData.dummyAttrs();
-        var origAttrOps = TestData.attrOpsAddAll(origAttrs);
+        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(origObj)
-                .putAllAttr(origAttrOps)
+                .addAllTagUpdate(origTagUpdates)
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
@@ -340,13 +338,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var origObj = TestData.dummyDefinitionForType(ObjectType.DATA);
         var origAttrs = TestData.dummyAttrs();
-        var origAttrOps = TestData.attrOpsAddAll(origAttrs);
+        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setDefinition(origObj)
-                .putAllAttr(origAttrOps)
+                .addAllTagUpdate(origTagUpdates)
                 .build();
 
         var t1Header = writeApi.createObject(writeRequest);
@@ -365,15 +363,16 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var t2Attrs = new HashMap<>(origAttrs);
         t2Attrs.put("v3_attr", MetadataCodec.encodeValue("Use the force"));
 
-        var t2AttrOps = Map.of("v3_attr", TagUpdate.newBuilder()
+        var t2TagUpdate = TagUpdate.newBuilder()
+                .setAttrName("v3_attr")
                 .setValue(MetadataCodec.encodeValue("Use the force"))
-                .build());
+                .build();
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setPriorVersion(t1Selector)
-                .putAllAttr(t2AttrOps)
+                .addTagUpdate(t2TagUpdate)
                 .build();
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
@@ -397,13 +396,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
         var v1Attrs = TestData.dummyAttrs();
-        var v1AttrOps = TestData.attrOpsAddAll(v1Attrs);
+        var v1TagUpdates = TestData.tagUpdatesForAttrs(v1Attrs);
 
         var v1WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(v1Obj)
-                .putAllAttr(v1AttrOps)
+                .addAllTagUpdate(v1TagUpdates)
                 .build();
 
         var v1Header = writeApi.createObject(v1WriteRequest);
@@ -436,15 +435,16 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var t2Attrs = new HashMap<>(v1Attrs);
         t2Attrs.put("v3_attr", MetadataCodec.encodeValue("Use the force"));
 
-        var t2AttrOps = Map.of("v3_attr", TagUpdate.newBuilder()
+        var t2TagUpdate = TagUpdate.newBuilder()
+                .setAttrName("v3_attr")
                 .setValue(MetadataCodec.encodeValue("Use the force"))
-                .build());
+                .build();
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
-                .putAllAttr(t2AttrOps)
+                .addTagUpdate(t2TagUpdate)
                 .build();
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
@@ -470,18 +470,18 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var v2Obj = TestData.dummyVersionForType(v1Obj);
 
         // V2 attrs are the same as v1 attrs
-        // Attr ops removes the additional attribute added for t2
+        // Tag update removes the additional attribute added for t2
         var v2Attrs = new HashMap<>(v1Attrs);
-        var v2AttrOps = t2AttrOps.keySet().stream()
-                .collect(Collectors.toMap(
-                Function.identity(),
-                attrName -> TagUpdate.newBuilder().setOperation(TagOperation.DELETE_ATTR).build()));
+        var v2TagUpdate = TagUpdate.newBuilder()
+                .setAttrName(t2TagUpdate.getAttrName())
+                .setOperation(TagOperation.DELETE_ATTR)
+                .build();
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(t2Selector)
-                .putAllAttr(v2AttrOps)
+                .addTagUpdate(v2TagUpdate)
                 .build();
 
         var v2Header = writeApi.updateObject(v2WriteRequest);
@@ -533,13 +533,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var origObj = TestData.dummyDefinitionForType(ObjectType.MODEL);
         var origAttrs = TestData.dummyAttrs();
-        var origAttrOps = TestData.attrOpsAddAll(origAttrs);
+        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
                 .setDefinition(origObj)
-                .putAllAttr(origAttrOps)
+                .addAllTagUpdate(origTagUpdates)
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
@@ -567,13 +567,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var origObj = TestData.dummyDefinitionForType(ObjectType.DATA);
         var origAttrs = TestData.dummyAttrs();
-        var origAttrOps = TestData.attrOpsAddAll(origAttrs);
+        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(origObj)
-                .putAllAttr(origAttrOps)
+                .addAllTagUpdate(origTagUpdates)
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
@@ -601,13 +601,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var origObj = TestData.dummyDefinitionForType(objectType);
         var origAttrs = TestData.dummyAttrs();
-        var origAttrOps = TestData.attrOpsAddAll(origAttrs);
+        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setDefinition(origObj)
-                .putAllAttr(origAttrOps)
+                .addAllTagUpdate(origTagUpdates)
                 .build();
 
         var v1Header = writeApi.createObject(writeRequest);
@@ -625,16 +625,17 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var v2Attrs = new HashMap<>(origAttrs);
         v2Attrs.put("v2_attr", MetadataCodec.encodeValue("Use the force"));
 
-        var v2AttrOps = Map.of("v2_attr", TagUpdate.newBuilder()
+        var v2TagUpdate = TagUpdate.newBuilder()
+                .setAttrName("v2_attr")
                 .setValue(MetadataCodec.encodeValue("Use the force"))
-                .build());
+                .build();
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setPriorVersion(v1Selector)
                 .setDefinition(v2Obj)
-                .putAllAttr(v2AttrOps)
+                .addTagUpdate(v2TagUpdate)
                 .build();
 
         var v2Header = writeApi.updateObject(v2WriteRequest);
@@ -657,13 +658,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
         var v1Attrs = TestData.dummyAttrs();
-        var v1AttrOps = TestData.attrOpsAddAll(v1Attrs);
+        var v1TagUpdates = TestData.tagUpdatesForAttrs(v1Attrs);
 
         var v1WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(v1Obj)
-                .putAllAttr(v1AttrOps)
+                .addAllTagUpdate(v1TagUpdates)
                 .build();
 
         var v1Header = writeApi.createObject(v1WriteRequest);
@@ -695,15 +696,16 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var t2Attrs = new HashMap<>(v1Attrs);
         t2Attrs.put("t2_attr", MetadataCodec.encodeValue("Use the force"));
 
-        var t2AttrOps = Map.of("t2_attr", TagUpdate.newBuilder()
+        var t2TagUpdate = TagUpdate.newBuilder()
+                .setAttrName("t2_attr")
                 .setValue(MetadataCodec.encodeValue("Use the force"))
-                .build());
+                .build();
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
-                .putAllAttr(t2AttrOps)
+                .addTagUpdate(t2TagUpdate)
                 .build();
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
@@ -728,19 +730,19 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var v2Obj = TestData.dummyVersionForType(v1Obj);
 
         // V2 attrs are the same as v1 attrs
-        // Attr ops removes the additional attribute added for t2
+        // Tag update removes the additional attribute added for t2
         var v2Attrs = new HashMap<>(v1Attrs);
-        var v2AttrOps = t2AttrOps.keySet().stream()
-                .collect(Collectors.toMap(
-                        Function.identity(),
-                        attrName -> TagUpdate.newBuilder().setOperation(TagOperation.DELETE_ATTR).build()));
+        var v2TagUpdate = TagUpdate.newBuilder()
+                .setAttrName(t2TagUpdate.getAttrName())
+                .setOperation(TagOperation.DELETE_ATTR)
+                .build();
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(t2Selector)
                 .setDefinition(v2Obj)
-                .putAllAttr(v2AttrOps)
+                .addTagUpdate(v2TagUpdate)
                 .build();
 
         var v2Header = writeApi.updateObject(v2WriteRequest);
@@ -761,15 +763,16 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         // Now save V1 T3, latest object should still be V2 T1
 
-        var t3AttrOps = Map.of("t3_attr", TagUpdate.newBuilder()
+        var t3TagUpdate = TagUpdate.newBuilder()
+                .setAttrName("t3_attr")
                 .setValue(MetadataCodec.encodeValue("The dark side"))
-                .build());
+                .build();
 
         var t3WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(t2Selector)
-                .putAllAttr(t3AttrOps)
+                .addTagUpdate(t3TagUpdate)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -804,13 +807,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var origObj = TestData.dummyDefinitionForType(ObjectType.DATA);
         var origAttrs = TestData.dummyAttrs();
-        var origAttrOps = TestData.attrOpsAddAll(origAttrs);
+        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(origObj)
-                .putAllAttr(origAttrOps)
+                .addAllTagUpdate(origTagUpdates)
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
