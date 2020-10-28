@@ -283,16 +283,19 @@ service MetadataTrustedWriteApi {
 
 enum TagOperation {
     CREATE_OR_REPLACE_ATTR = 0;  // Default behaviour
-    CREATE_ATTR = 1;
-    REPLACE_ATTR = 2;
-    APPEND_ATTR = 3;
-    DELETE_ATTR = 4;
+    CREATE_OR_APPEND_ATTR = 1;
+    CREATE_ATTR = 2;
+    REPLACE_ATTR = 3;
+    APPEND_ATTR = 4;
+    DELETE_ATTR = 5;
 }
 
 message TagUpdate {
 
     TagOperation operation = 1;
-    metadata.Value value = 2;
+
+    string attrName = 2;
+    metadata.Value value = 3;
 }
 
 
@@ -333,5 +336,5 @@ message MetadataWriteRequest {
      */
     metadata.ObjectDefinition definition = 4;
 
-    map<string, TagUpdate> attr = 5;
+    repeated TagUpdate tagUpdate = 5;
 }
