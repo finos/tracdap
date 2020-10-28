@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.meta.logic;
+package com.accenture.trac.svc.meta.services;
 
 import com.accenture.trac.common.metadata.Tag;
 import com.accenture.trac.common.metadata.search.SearchParameters;
@@ -24,11 +24,11 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 
-public class MetadataSearchLogic {
+public class MetadataSearchService {
 
     private final IMetadataDal dal;
 
-    public MetadataSearchLogic(IMetadataDal dal) {
+    public MetadataSearchService(IMetadataDal dal) {
         this.dal = dal;
     }
 

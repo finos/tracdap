@@ -19,8 +19,8 @@ package com.accenture.trac.svc.meta.api;
 import com.accenture.trac.common.api.meta.*;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
-import com.accenture.trac.svc.meta.logic.MetadataReadLogic;
-import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
+import com.accenture.trac.svc.meta.services.MetadataReadService;
+import com.accenture.trac.svc.meta.services.MetadataWriteService;
 
 import com.accenture.trac.svc.meta.test.JdbcIntegration;
 import io.grpc.Status;
@@ -78,12 +78,12 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var serverName = InProcessServerBuilder.generateName();
 
-        var writeLogic = new MetadataWriteLogic(dal);
-        var publicApiImpl = new MetadataPublicWriteApi(writeLogic);
-        var trustedApiImpl = new MetadataTrustedWriteApi(writeLogic);
+        var writeService = new MetadataWriteService(dal);
+        var publicApiImpl = new MetadataPublicWriteApi(writeService);
+        var trustedApiImpl = new MetadataTrustedWriteApi(writeService);
 
-        var readLogic = new MetadataReadLogic(dal);
-        var readApiImpl = new MetadataReadApi(readLogic);
+        var readService = new MetadataReadService(dal);
+        var readApiImpl = new MetadataReadApi(readService);
 
         // Create a server, add service, start, and register for automatic graceful shutdown.
         grpcCleanup.register(InProcessServerBuilder

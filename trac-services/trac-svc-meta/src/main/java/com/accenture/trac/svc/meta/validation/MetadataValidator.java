@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.*;
+import static com.accenture.trac.svc.meta.services.MetadataConstants.*;
 
 
 public class MetadataValidator {

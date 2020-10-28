@@ -18,7 +18,7 @@ package com.accenture.trac.svc.meta.api;
 
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.util.ApiWrapper;
-import com.accenture.trac.svc.meta.logic.MetadataReadLogic;
+import com.accenture.trac.svc.meta.services.MetadataReadService;
 import com.accenture.trac.common.metadata.Tag;
 import com.accenture.trac.common.api.meta.*;
 
@@ -28,11 +28,11 @@ import io.grpc.stub.StreamObserver;
 public class MetadataReadApi extends MetadataReadApiGrpc.MetadataReadApiImplBase {
 
     private final ApiWrapper apiWrapper;
-    private final MetadataReadLogic logic;
+    private final MetadataReadService readService;
 
-    public MetadataReadApi(MetadataReadLogic logic) {
+    public MetadataReadApi(MetadataReadService readService) {
         this.apiWrapper = new ApiWrapper(getClass(), ApiErrorMapping.ERROR_MAPPING);
-        this.logic = logic;
+        this.readService = readService;
     }
 
     @Override
@@ -46,7 +46,7 @@ public class MetadataReadApi extends MetadataReadApiGrpc.MetadataReadApiImplBase
             var objectVersion = request.getObjectVersion();
             var tagVersion = request.getTagVersion();
 
-            return logic.loadTag(tenant, objectType, objectId, objectVersion, tagVersion);
+            return readService.loadTag(tenant, objectType, objectId, objectVersion, tagVersion);
         });
     }
 
@@ -60,7 +60,7 @@ public class MetadataReadApi extends MetadataReadApiGrpc.MetadataReadApiImplBase
             var objectId = MetadataCodec.decode(request.getObjectId());
             var objectVersion = request.getObjectVersion();
 
-            return logic.loadLatestTag(tenant, objectType, objectId, objectVersion);
+            return readService.loadLatestTag(tenant, objectType, objectId, objectVersion);
         });
     }
 
@@ -73,7 +73,7 @@ public class MetadataReadApi extends MetadataReadApiGrpc.MetadataReadApiImplBase
             var objectType = request.getObjectType();
             var objectId = MetadataCodec.decode(request.getObjectId());
 
-            return logic.loadLatestObject(tenant, objectType, objectId);
+            return readService.loadLatestObject(tenant, objectType, objectId);
         });
     }
 

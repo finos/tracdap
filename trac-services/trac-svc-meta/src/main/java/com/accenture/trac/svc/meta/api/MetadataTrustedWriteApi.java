@@ -20,20 +20,20 @@ import com.accenture.trac.common.api.meta.MetadataTrustedWriteApiGrpc;
 import com.accenture.trac.common.api.meta.MetadataWriteRequest;
 import com.accenture.trac.common.metadata.TagHeader;
 import com.accenture.trac.common.util.ApiWrapper;
-import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
+import com.accenture.trac.svc.meta.services.MetadataWriteService;
 import io.grpc.stub.StreamObserver;
 
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.*;
+import static com.accenture.trac.svc.meta.services.MetadataConstants.*;
 
 
 public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.MetadataTrustedWriteApiImplBase {
 
     private final ApiWrapper apiWrapper;
-    private final MetadataWriteLogic writeLogic;
+    private final MetadataWriteService writeService;
 
-    public MetadataTrustedWriteApi(MetadataWriteLogic writeLogic) {
+    public MetadataTrustedWriteApi(MetadataWriteService writeService) {
         this.apiWrapper = new ApiWrapper(getClass(), ApiErrorMapping.ERROR_MAPPING);
-        this.writeLogic = writeLogic;
+        this.writeService = writeService;
     }
 
     @Override
@@ -44,7 +44,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
 
-            return writeLogic.createObject(tenant, objectType,
+            return writeService.createObject(tenant, objectType,
                     request.getDefinition(),
                     request.getTagUpdateList(),
                     TRUSTED_API);
@@ -59,7 +59,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
 
-            return writeLogic.updateObject(tenant, objectType,
+            return writeService.updateObject(tenant, objectType,
                     request.getPriorVersion(),
                     request.getDefinition(),
                     request.getTagUpdateList(),
@@ -72,7 +72,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
-            return writeLogic.updateTag(
+            return writeService.updateTag(
                     request.getTenant(),
                     request.getObjectType(),
                     request.getPriorVersion(),
@@ -89,7 +89,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
 
-            return writeLogic.preallocateId(tenant, objectType);
+            return writeService.preallocateId(tenant, objectType);
         });
     }
 
@@ -98,7 +98,7 @@ public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.Metadat
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
-            return writeLogic.createPreallocatedObject(
+            return writeService.createPreallocatedObject(
                     request.getTenant(),
                     request.getObjectType(),
                     request.getPriorVersion(),

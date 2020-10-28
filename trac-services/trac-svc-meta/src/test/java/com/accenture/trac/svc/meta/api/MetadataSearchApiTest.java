@@ -25,8 +25,8 @@ import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.Tag;
 import com.accenture.trac.common.metadata.search.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
-import com.accenture.trac.svc.meta.logic.MetadataSearchLogic;
-import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
+import com.accenture.trac.svc.meta.services.MetadataSearchService;
+import com.accenture.trac.svc.meta.services.MetadataWriteService;
 import com.accenture.trac.svc.meta.test.IDalTestable;
 
 import com.accenture.trac.svc.meta.test.JdbcIntegration;
@@ -91,11 +91,11 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         var serverName = InProcessServerBuilder.generateName();
 
-        var searchLogic = new MetadataSearchLogic(dal);
-        var searchApiImpl = new MetadataSearchApi(searchLogic);
+        var searchService = new MetadataSearchService(dal);
+        var searchApiImpl = new MetadataSearchApi(searchService);
 
-        var writeLogic = new MetadataWriteLogic(dal);
-        var writeApiImpl = new MetadataTrustedWriteApi(writeLogic);
+        var writeService = new MetadataWriteService(dal);
+        var writeApiImpl = new MetadataTrustedWriteApi(writeService);
 
         // Create a server, add service, start, and register for automatic graceful shutdown.
         grpcCleanup.register(InProcessServerBuilder

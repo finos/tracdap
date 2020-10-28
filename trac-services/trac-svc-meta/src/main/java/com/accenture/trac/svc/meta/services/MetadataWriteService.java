@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.meta.logic;
+package com.accenture.trac.svc.meta.services;
 
 import com.accenture.trac.common.api.meta.TagUpdate;
 import com.accenture.trac.common.exception.ETrac;
@@ -28,14 +28,14 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BinaryOperator;
 
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.*;
+import static com.accenture.trac.svc.meta.services.MetadataConstants.*;
 
 
-public class MetadataWriteLogic {
+public class MetadataWriteService {
 
     private final IMetadataDal dal;
 
-    public MetadataWriteLogic(IMetadataDal dal) {
+    public MetadataWriteService(IMetadataDal dal) {
         this.dal = dal;
     }
 

@@ -20,18 +20,18 @@ import com.accenture.trac.common.api.meta.MetadataSearchApiGrpc;
 import com.accenture.trac.common.api.meta.MetadataSearchRequest;
 import com.accenture.trac.common.api.meta.MetadataSearchResponse;
 import com.accenture.trac.common.util.ApiWrapper;
-import com.accenture.trac.svc.meta.logic.MetadataSearchLogic;
+import com.accenture.trac.svc.meta.services.MetadataSearchService;
 import io.grpc.stub.StreamObserver;
 
 
 public class MetadataSearchApi extends MetadataSearchApiGrpc.MetadataSearchApiImplBase {
 
     private final ApiWrapper apiWrapper;
-    private final MetadataSearchLogic logic;
+    private final MetadataSearchService searchService;
 
-    public MetadataSearchApi(MetadataSearchLogic logic) {
+    public MetadataSearchApi(MetadataSearchService searchService) {
         this.apiWrapper = new ApiWrapper(getClass(), ApiErrorMapping.ERROR_MAPPING);
-        this.logic = logic;
+        this.searchService = searchService;
     }
 
     @Override
@@ -42,7 +42,7 @@ public class MetadataSearchApi extends MetadataSearchApiGrpc.MetadataSearchApiIm
             var tenant = request.getTenant();
             var searchParams = request.getSearchParams();
 
-            var searchResult = logic.search(tenant, searchParams);
+            var searchResult = searchService.search(tenant, searchParams);
 
             return searchResult.thenApply(resultList -> MetadataSearchResponse.newBuilder()
                     .addAllSearchResult(resultList)

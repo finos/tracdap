@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.meta.logic;
+package com.accenture.trac.svc.meta.services;
 
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.common.metadata.ObjectType;
@@ -24,11 +24,11 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 
-public class MetadataReadLogic {
+public class MetadataReadService {
 
     private final IMetadataDal dal;
 
-    public MetadataReadLogic(IMetadataDal dal) {
+    public MetadataReadService(IMetadataDal dal) {
         this.dal = dal;
     }
 

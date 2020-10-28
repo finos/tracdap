@@ -18,12 +18,10 @@ package com.accenture.trac.svc.meta.api;
 
 import com.accenture.trac.common.api.meta.MetadataPublicWriteApiGrpc;
 import com.accenture.trac.common.api.meta.MetadataWriteRequest;
-import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
-import com.accenture.trac.common.metadata.Tag;
 import com.accenture.trac.common.metadata.TagHeader;
 import com.accenture.trac.common.util.ApiWrapper;
-import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
+import com.accenture.trac.svc.meta.services.MetadataWriteService;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 
@@ -31,7 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.PUBLIC_API;
+import static com.accenture.trac.svc.meta.services.MetadataConstants.PUBLIC_API;
 
 
 public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataPublicWriteApiImplBase {
@@ -43,11 +41,11 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
             ObjectType.CUSTOM);
 
     private final ApiWrapper apiWrapper;
-    private final MetadataWriteLogic writeLogic;
+    private final MetadataWriteService writeService;
 
-    public MetadataPublicWriteApi(MetadataWriteLogic writeLogic) {
+    public MetadataPublicWriteApi(MetadataWriteService writeService) {
         this.apiWrapper = new ApiWrapper(getClass(), ApiErrorMapping.ERROR_MAPPING);
-        this.writeLogic = writeLogic;
+        this.writeService = writeService;
     }
 
     @Override
@@ -64,7 +62,7 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
                 return CompletableFuture.failedFuture(status.asRuntimeException());
             }
 
-            return writeLogic.createObject(tenant, objectType,
+            return writeService.createObject(tenant, objectType,
                     request.getDefinition(),
                     request.getTagUpdateList(),
                     PUBLIC_API);
@@ -85,7 +83,7 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
                 return CompletableFuture.failedFuture(status.asRuntimeException());
             }
 
-            return writeLogic.updateObject(tenant, objectType,
+            return writeService.updateObject(tenant, objectType,
                     request.getPriorVersion(),
                     request.getDefinition(),
                     request.getTagUpdateList(),
@@ -98,7 +96,7 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
-            return writeLogic.updateTag(
+            return writeService.updateTag(
                     request.getTenant(),
                     request.getObjectType(),
                     request.getPriorVersion(),
