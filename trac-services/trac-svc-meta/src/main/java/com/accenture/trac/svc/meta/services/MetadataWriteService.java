@@ -17,8 +17,6 @@
 package com.accenture.trac.svc.meta.services;
 
 import com.accenture.trac.common.api.meta.TagUpdate;
-import com.accenture.trac.common.exception.ETrac;
-import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.validation.MetadataValidator;
@@ -26,7 +24,6 @@ import com.accenture.trac.svc.meta.validation.MetadataValidator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BinaryOperator;
 
 import static com.accenture.trac.svc.meta.services.MetadataConstants.*;
 
@@ -74,7 +71,7 @@ public class MetadataWriteService {
                 .setDefinition(normalDefinition)
                 .build();
 
-        newTag = applyTagUpdates(newTag, tagUpdates);
+        newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
 
         return dal.saveNewObject(tenant, newTag)
                 .thenApply(_ok -> newHeader);
@@ -137,7 +134,7 @@ public class MetadataWriteService {
                 .setDefinition(definition)
                 .build();
 
-        newTag = applyTagUpdates(newTag, tagUpdates);
+        newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
 
         return dal.saveNewVersion(tenant, newTag)
                 .thenApply(_ok -> newHeader);
@@ -187,7 +184,7 @@ public class MetadataWriteService {
                 .setHeader(newHeader)
                 .build();
 
-        newTag = applyTagUpdates(newTag, tagUpdates);
+        newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
 
         return dal.saveNewTag(tenant, newTag)
                 .thenApply(_ok -> newHeader);
@@ -244,75 +241,10 @@ public class MetadataWriteService {
                 .setDefinition(normalDefinition)
                 .build();
 
-        newTag = applyTagUpdates(newTag, tagUpdates);
+        newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
 
         return dal.savePreallocatedObject(tenant, newTag)
                 .thenApply(_ok -> newHeader);
-    }
-
-    private Tag applyTagUpdates(Tag priorTag, List<TagUpdate> updates) {
-
-        BinaryOperator<Tag.Builder> SEQUENTIAL_COMBINATION =
-                (t1, t2) -> { throw new EUnexpected(); };
-
-        var newTag = updates.stream().reduce(
-                priorTag.toBuilder(),
-                this::applyTagUpdate,
-                SEQUENTIAL_COMBINATION);
-
-        return newTag.build();
-    }
-
-    private Tag.Builder applyTagUpdate(Tag.Builder tag, TagUpdate update) {
-
-        switch (update.getOperation()) {
-
-        case CREATE_OR_REPLACE_ATTR:
-
-            return tag.putAttr(update.getAttrName(), update.getValue());
-
-        case CREATE_ATTR:
-
-            if (tag.containsAttr(update.getAttrName()))
-                throw new ETrac("");  // attr already exists
-
-            return tag.putAttr(update.getAttrName(), update.getValue());
-
-        case REPLACE_ATTR:
-
-            if (!tag.containsAttr(update.getAttrName()))
-                throw new ETrac("");
-
-            var priorType = tag.getAttrOrDefault(update.getAttrName(), update.getValue()).getType();
-            var newType = update.getValue().getType();
-
-            if (!attrTypesMatch(priorType, newType))
-                throw new ETrac("");
-
-            return tag.putAttr(update.getAttrName(), update.getValue());
-
-        case APPEND_ATTR:
-
-            throw new ETrac("");  // TODO
-
-        case DELETE_ATTR:
-
-            if (!tag.containsAttr(update.getAttrName()))
-                throw new ETrac("");
-
-            return tag.removeAttr(update.getAttrName());
-
-        default:
-            // Should be picked up by validation
-            throw new EUnexpected();
-        }
-    }
-
-    private boolean attrTypesMatch(TypeDescriptor attr1, TypeDescriptor attr2) {
-
-        // TODO: Array types
-        return TypeSystem.isPrimitive(attr1) && attr1.getBasicType() == attr2.getBasicType();
-
     }
 
 }
