@@ -47,7 +47,8 @@ public class MetadataWriteLogic {
 
         var validator = new MetadataValidator();
 
-        validator.definitionMatchesType(definition, objectType);
+        var normalDefinition = validator.normalizeObjectType(definition);
+        validator.definitionMatchesType(normalDefinition, objectType);
         validator.tagAttributesAreValid(tagUpdates);
         validator.checkAndThrow();
 
@@ -70,7 +71,7 @@ public class MetadataWriteLogic {
 
         var newTag = Tag.newBuilder()
                 .setHeader(newHeader)
-                .setDefinition(definition)
+                .setDefinition(normalDefinition)
                 .build();
 
         newTag = applyTagUpdates(newTag, tagUpdates);
@@ -94,8 +95,9 @@ public class MetadataWriteLogic {
         validator.typeSupportsVersioning(objectType);
         validator.checkAndThrow();
 
+        var normalDefinition = validator.normalizeObjectType(definition);
         validator.priorVersionMatchesType(priorVersion, objectType);
-        validator.definitionMatchesType(definition, objectType);
+        validator.definitionMatchesType(normalDefinition, objectType);
         validator.tagAttributesAreValid(tagUpdates);
         validator.checkAndThrow();
 
@@ -113,7 +115,7 @@ public class MetadataWriteLogic {
         return dal.loadLatestTag(tenant, objectType, objectId, objectVersion)
 
                 .thenCompose(priorTag ->
-                updateObject(tenant, priorTag, definition, tagUpdates));
+                updateObject(tenant, priorTag, normalDefinition, tagUpdates));
     }
 
     private CompletableFuture<TagHeader> updateObject(
@@ -215,8 +217,9 @@ public class MetadataWriteLogic {
 
         var validator = new MetadataValidator();
 
+        var normalDefinition = validator.normalizeObjectType(definition);
         validator.priorVersionMatchesType(priorVersion, objectType);
-        validator.definitionMatchesType(definition, objectType);
+        validator.definitionMatchesType(normalDefinition, objectType);
         validator.tagAttributesAreValid(tagUpdates);
         validator.checkAndThrow();
 
@@ -238,7 +241,7 @@ public class MetadataWriteLogic {
 
         var newTag = Tag.newBuilder()
                 .setHeader(newHeader)
-                .setDefinition(definition)
+                .setDefinition(normalDefinition)
                 .build();
 
         newTag = applyTagUpdates(newTag, tagUpdates);
@@ -297,7 +300,7 @@ public class MetadataWriteLogic {
             if (!tag.containsAttr(update.getAttrName()))
                 throw new ETrac("");
 
-            tag.removeAttr(update.getAttrName());
+            return tag.removeAttr(update.getAttrName());
 
         default:
             // Should be picked up by validation

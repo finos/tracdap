@@ -141,6 +141,36 @@ public class MetadataValidator {
 //        return this;
 //    }
 
+    public ObjectDefinition normalizeObjectType(ObjectDefinition rawDefinition) {
+
+        var definitionType = DEFINITION_TYPE_MAPPING.getOrDefault(
+                rawDefinition.getDefinitionCase(), ObjectType.UNRECOGNIZED);
+
+        if (definitionType == ObjectType.UNRECOGNIZED) {
+            validationErrors.add("Type could not be recognised for object definition");
+            return rawDefinition;
+        }
+
+        if (rawDefinition.getObjectType() != ObjectType.OBJECT_TYPE_NOT_SET) {
+
+            if (rawDefinition.getObjectType() != definitionType) {
+
+                var message = String.format(
+                        "Object definition does not match its own object type" +
+                                " (type specified is %s, definition is %s)",
+                        rawDefinition.getObjectType(), definitionType);
+
+                validationErrors.add(message);
+            }
+
+            return rawDefinition;
+        }
+
+        return rawDefinition.toBuilder()
+                .setObjectType(definitionType)
+                .build();
+    }
+
     public MetadataValidator definitionMatchesType(ObjectDefinition objectDefinition, ObjectType objectType) {
 
         var definitionType = DEFINITION_TYPE_MAPPING.getOrDefault(
