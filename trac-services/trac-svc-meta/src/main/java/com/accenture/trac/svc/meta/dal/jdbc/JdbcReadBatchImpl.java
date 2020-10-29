@@ -173,10 +173,10 @@ class JdbcReadBatchImpl {
         var mappingStage = insertFkAndVersionForMapping(conn, definitionFk, tagVersion);
         mapTagByVersion(conn, tenantId, mappingStage);
 
-        var headers = fetchTagHeader(conn, tenantId, definitionFk.length, mappingStage);
+        var tagRecords = fetchTagRecord(conn, tenantId, definitionFk.length, mappingStage);
         var attrs = fetchTagAttrs(conn, tenantId, definitionFk.length, mappingStage);
 
-        return applyTagAttrs(headers, attrs);
+        return applyTagRecordAttrs(tagRecords, attrs);
     }
 
     JdbcBaseDal.KeyedItems<Tag.Builder>
@@ -185,10 +185,10 @@ class JdbcReadBatchImpl {
         var mappingStage = insertFkForMapping(conn, definitionFk);
         mapTagByLatest(conn, tenantId, mappingStage);
 
-        var headers = fetchTagHeader(conn, tenantId, definitionFk.length, mappingStage);
+        var tagRecords = fetchTagRecord(conn, tenantId, definitionFk.length, mappingStage);
         var attrs = fetchTagAttrs(conn, tenantId, definitionFk.length, mappingStage);
 
-        return applyTagAttrs(headers, attrs);
+        return applyTagRecordAttrs(tagRecords, attrs);
     }
 
     JdbcBaseDal.KeyedItems<Tag.Builder>
@@ -200,6 +200,54 @@ class JdbcReadBatchImpl {
         var attrs = fetchTagAttrs(conn, tenantId, tagPk.length, mappingStage);
 
         return applyTagAttrs(headers, attrs);
+    }
+
+    private JdbcBaseDal.KeyedItems<Void>
+    fetchTagRecord(Connection conn, short tenantId, int length, int mappingStage) throws SQLException {
+
+        // Tag records contain no attributes, we only need pks and versions
+        // Note: Common attributes may be added to the tag table as search optimisations, but do not need to be read
+
+        var query =
+                "select tag.tag_pk, tag.tag_version \n" +
+                "from tag\n" +
+                "join key_mapping km\n" +
+                "  on tag.tag_pk = km.pk\n" +
+                "where tag.tenant_id = ?\n" +
+                "  and km.mapping_stage = ?\n" +
+                "order by km.ordering";
+
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setShort(1, tenantId);
+            stmt.setInt(2, mappingStage);
+
+            try (var rs = stmt.executeQuery()) {
+
+                long[] pks = new long[length];
+                int[] versions = new int[length];
+
+                for (var i = 0; i < length; i++) {
+
+                    if (!rs.next())
+                        throw new JdbcException(JdbcErrorCode.NO_DATA);
+
+                    var tagPk = rs.getLong(1);
+                    var tagVersion = rs.getInt(2);
+
+                    pks[i] = tagPk;
+                    versions[i] = tagVersion;
+                }
+
+                if (rs.next())
+                    throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
+
+                // Tag record requires only PK and version info
+                return new JdbcBaseDal.KeyedItems<>(pks, versions, null);
+            }
+        }
     }
 
     private JdbcBaseDal.KeyedItems<TagHeader>
@@ -357,6 +405,20 @@ class JdbcReadBatchImpl {
                 return result;
             }
         }
+    }
+
+    private JdbcBaseDal.KeyedItems<Tag.Builder>
+    applyTagRecordAttrs(JdbcBaseDal.KeyedItems<Void> tagRecords, Map<String, Value>[] attrs) {
+
+        var tags = new Tag.Builder[tagRecords.keys.length];
+
+        for (var i = 0; i < tagRecords.keys.length; i++) {
+
+            tags[i] = Tag.newBuilder()
+                    .putAllAttr(attrs[i]);
+        }
+
+        return new JdbcBaseDal.KeyedItems<>(tagRecords.keys, tagRecords.versions, tags);
     }
 
     private JdbcBaseDal.KeyedItems<Tag.Builder>

@@ -363,7 +363,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var definition = readBatch.readDefinitionByVersion(conn, tenantId, parts.objectType, objPk, parts.version);
             var tag = readBatch.readTagByVersion(conn, tenantId, definition.keys, parts.tagVersion);
 
-            return buildTags(definition.items, tag.items);
+            return buildTags(objectTypes, objectIds, definition, tag);
         },
         (error, code) -> JdbcError.loadBatch_missingItem(error, code, parts),
         (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, parts));
@@ -384,7 +384,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var definition = readBatch.readDefinitionByVersion(conn, tenantId, parts.objectType, objPk, parts.version);
             var tag = readBatch.readTagByLatest(conn, tenantId, definition.keys);
 
-            return buildTags(definition.items, tag.items);
+            return buildTags(objectTypes, objectIds, definition, tag);
         },
         (error, code) -> JdbcError.loadBatch_missingItem(error, code, parts),
         (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, parts));
@@ -406,7 +406,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var definition = readBatch.readDefinitionByLatest(conn, tenantId, parts.objectType, objPk);
             var tag = readBatch.readTagByLatest(conn, tenantId, definition.keys);
 
-            return buildTags(definition.items, tag.items);
+            return buildTags(objectTypes, objectIds, definition, tag);
         },
         (error, code) -> JdbcError.loadBatch_missingItem(error, code, parts),
         (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, parts));
@@ -582,15 +582,24 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     }
 
     private List<Tag> buildTags(
-            ObjectDefinition[] definitions,
-            Tag.Builder[] tags) {
+            List<ObjectType> objectType, List<UUID> objectId,
+            KeyedItems<ObjectDefinition> definitions,
+            KeyedItems<Tag.Builder> tags) {
 
-        var result = new ArrayList<Tag>(definitions.length);
+        var result = new ArrayList<Tag>(objectId.size());
 
-        for (int i = 0; i < definitions.length; i++) {
+        for (int i = 0; i < objectId.size(); i++) {
 
-            var definition = definitions[i];
-            var tag = tags[i].setDefinition(definition).build();
+            var header = TagHeader.newBuilder()
+                    .setObjectType(objectType.get(i))
+                    .setObjectId(MetadataCodec.encode(objectId.get(i)))
+                    .setObjectVersion(definitions.versions[i])
+                    .setTagVersion(tags.versions[i]);
+
+            var tag = tags.items[i]
+                    .setHeader(header)
+                    .setDefinition(definitions.items[i])
+                    .build();
 
             result.add(tag);
         }
