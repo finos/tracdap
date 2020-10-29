@@ -16,13 +16,12 @@
 
 package com.accenture.trac.svc.meta.api;
 
-import com.accenture.trac.common.api.meta.IdResponse;
 import com.accenture.trac.common.api.meta.MetadataPublicWriteApiGrpc;
 import com.accenture.trac.common.api.meta.MetadataWriteRequest;
-import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
+import com.accenture.trac.common.metadata.TagHeader;
 import com.accenture.trac.common.util.ApiWrapper;
-import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
+import com.accenture.trac.svc.meta.services.MetadataWriteService;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 
@@ -30,7 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.PUBLIC_API;
+import static com.accenture.trac.svc.meta.services.MetadataConstants.PUBLIC_API;
 
 
 public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataPublicWriteApiImplBase {
@@ -42,21 +41,20 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
             ObjectType.CUSTOM);
 
     private final ApiWrapper apiWrapper;
-    private final MetadataWriteLogic writeLogic;
+    private final MetadataWriteService writeService;
 
-    public MetadataPublicWriteApi(MetadataWriteLogic writeLogic) {
+    public MetadataPublicWriteApi(MetadataWriteService writeService) {
         this.apiWrapper = new ApiWrapper(getClass(), ApiErrorMapping.ERROR_MAPPING);
-        this.writeLogic = writeLogic;
+        this.writeService = writeService;
     }
 
     @Override
-    public void saveNewObject(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
+    public void createObject(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
-            var tag = request.getTag();
 
             if (!PUBLIC_TYPES.contains(objectType)) {
                 var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
@@ -64,27 +62,20 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
                 return CompletableFuture.failedFuture(status.asRuntimeException());
             }
 
-            var saveResult = writeLogic.saveNewObject(tenant, objectType, tag, PUBLIC_API);
-
-            var idResponse = saveResult
-                    .thenApply(objectId -> IdResponse.newBuilder()
-                    .setObjectId(MetadataCodec.encode(objectId))
-                    .setObjectVersion(1)
-                    .setTagVersion(1)
-                    .build());
-
-            return idResponse;
+            return writeService.createObject(tenant, objectType,
+                    request.getDefinition(),
+                    request.getTagUpdateList(),
+                    PUBLIC_API);
         });
     }
 
     @Override
-    public void saveNewVersion(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
+    public void updateObject(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
-            var tag = request.getTag();
 
             if (!PUBLIC_TYPES.contains(objectType)) {
                 var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
@@ -92,38 +83,25 @@ public class MetadataPublicWriteApi extends MetadataPublicWriteApiGrpc.MetadataP
                 return CompletableFuture.failedFuture(status.asRuntimeException());
             }
 
-            var saveResult = writeLogic.saveNewVersion(tenant, objectType, tag, PUBLIC_API);
-
-            var idResponse = saveResult
-                    .thenApply(objectVersion -> IdResponse.newBuilder()
-                            .setObjectId(tag.getDefinition().getHeader().getObjectId())
-                            .setObjectVersion(objectVersion)
-                            .setTagVersion(1)
-                            .build());
-
-            return idResponse;
+            return writeService.updateObject(tenant, objectType,
+                    request.getPriorVersion(),
+                    request.getDefinition(),
+                    request.getTagUpdateList(),
+                    PUBLIC_API);
         });
     }
 
     @Override
-    public void saveNewTag(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
+    public void updateTag(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
-            var tenant = request.getTenant();
-            var objectType = request.getObjectType();
-            var tag = request.getTag();
-
-            var saveResult = writeLogic.saveNewTag(tenant, objectType, tag, PUBLIC_API);
-
-            var idResponse = saveResult
-                    .thenApply(tagVersion -> IdResponse.newBuilder()
-                            .setObjectId(tag.getDefinition().getHeader().getObjectId())
-                            .setObjectVersion(tag.getDefinition().getHeader().getObjectVersion())
-                            .setTagVersion(tagVersion)
-                            .build());
-
-            return idResponse;
+            return writeService.updateTag(
+                    request.getTenant(),
+                    request.getObjectType(),
+                    request.getPriorVersion(),
+                    request.getTagUpdateList(),
+                    PUBLIC_API);
         });
     }
 }

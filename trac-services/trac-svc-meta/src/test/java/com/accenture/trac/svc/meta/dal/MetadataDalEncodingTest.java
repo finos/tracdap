@@ -59,9 +59,9 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
     @Test
     void roundTrip_ok() throws Exception {
 
-        var origDef = dummyDataDef(INCLUDE_HEADER);
-        var origTag = dummyTag(origDef);
-        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef, INCLUDE_HEADER);
+        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
 
         var future = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
@@ -76,7 +76,7 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
     void roundTrip_allObjectTypesOk(ObjectType objectType) throws Exception {
 
         var origTag = dummyTagForObjectType(objectType);
-        var origId = MetadataCodec.decode(origTag.getDefinition().getHeader().getObjectId());
+        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
 
         var future = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
@@ -90,9 +90,9 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
                 names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
     void roundTrip_allAttrTypesOk(BasicType attrType) throws Exception {
 
-        var origDef = dummyDataDef(INCLUDE_HEADER);
-        var origTag = dummyTag(origDef);
-        var origId = MetadataCodec.decode(origDef.getHeader().getObjectId());
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef, INCLUDE_HEADER);
+        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
 
         var attrName = "test_attr_" + attrType.name();
         var attrValue = objectOfType(attrType);

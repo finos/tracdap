@@ -43,25 +43,22 @@ public class TracApiConfig {
         var apiRoutes = new RoutingConfig();
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/{objectType}/new-object",
+                "/trac-meta/api/v1/{tenant}/{objectType}/create-object",
                 serviceHost, servicePort,
-                MetadataPublicWriteApiGrpc.getSaveNewObjectMethod(),
-                MetadataWriteRequest.getDefaultInstance(),
-                "tag", Tag.getDefaultInstance());
+                MetadataPublicWriteApiGrpc.getCreateObjectMethod(),
+                MetadataWriteRequest.getDefaultInstance(), true);
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/{objectType}/new-version",
+                "/trac-meta/api/v1/{tenant}/{objectType}/update-object",
                 serviceHost, servicePort,
-                MetadataPublicWriteApiGrpc.getSaveNewVersionMethod(),
-                MetadataWriteRequest.getDefaultInstance(),
-                "tag", Tag.getDefaultInstance());
+                MetadataPublicWriteApiGrpc.getUpdateObjectMethod(),
+                MetadataWriteRequest.getDefaultInstance(), true);
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/{objectType}/new-tag",
+                "/trac-meta/api/v1/{tenant}/{objectType}/update-tag",
                 serviceHost, servicePort,
-                MetadataPublicWriteApiGrpc.getSaveNewTagMethod(),
-                MetadataWriteRequest.getDefaultInstance(),
-                "tag", Tag.getDefaultInstance());
+                MetadataPublicWriteApiGrpc.getUpdateTagMethod(),
+                MetadataWriteRequest.getDefaultInstance(), true);
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.GET,
                 "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/{tagVersion}",
@@ -96,39 +93,34 @@ public class TracApiConfig {
         var apiRoutes = new RoutingConfig();
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/new-object",
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/create-object",
                 serviceHost, servicePort,
-                MetadataTrustedWriteApiGrpc.getSaveNewObjectMethod(),
-                MetadataWriteRequest.getDefaultInstance(),
-                "tag", Tag.getDefaultInstance());
+                MetadataTrustedWriteApiGrpc.getCreateObjectMethod(),
+                MetadataWriteRequest.getDefaultInstance(), true);
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/new-version",
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/update-object",
                 serviceHost, servicePort,
-                MetadataTrustedWriteApiGrpc.getSaveNewVersionMethod(),
-                MetadataWriteRequest.getDefaultInstance(),
-                "tag", Tag.getDefaultInstance());
+                MetadataTrustedWriteApiGrpc.getUpdateObjectMethod(),
+                MetadataWriteRequest.getDefaultInstance(), true);
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/new-tag",
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/update-tag",
                 serviceHost, servicePort,
-                MetadataTrustedWriteApiGrpc.getSaveNewTagMethod(),
-                MetadataWriteRequest.getDefaultInstance(),
-                "tag", Tag.getDefaultInstance());
+                MetadataTrustedWriteApiGrpc.getUpdateTagMethod(),
+                MetadataWriteRequest.getDefaultInstance(), true);
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
                 "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/preallocate",
                 serviceHost, servicePort,
                 MetadataTrustedWriteApiGrpc.getPreallocateIdMethod(),
-                MetadataWriteRequest.getDefaultInstance(),
-                "tag", Tag.getDefaultInstance());
+                MetadataWriteRequest.getDefaultInstance(), true);
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/save-preallocated",
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/create-preallocated",
                 serviceHost, servicePort,
-                MetadataTrustedWriteApiGrpc.getSavePreallocatedObjectMethod(),
-                MetadataWriteRequest.getDefaultInstance(),
-                "tag", Tag.getDefaultInstance());
+                MetadataTrustedWriteApiGrpc.getCreatePreallocatedObjectMethod(),
+                MetadataWriteRequest.getDefaultInstance(), true);
 
         return apiRoutes;
     }
@@ -153,19 +145,30 @@ public class TracApiConfig {
 
     public static <TRequest extends Message, TResponse extends Message>
     void addApiCall(
+                    RoutingConfig routes, HttpMethod method, String urlPattern,
+                    String serviceHost, int servicePort,
+                    MethodDescriptor<TRequest, TResponse> grpcMethod, TRequest blankRequest,
+                    boolean hasBody) {
+
+        // Matcher and builder created once and reused for all matching requests
+        var requestMatcher = new RestApiRouteMatcher(method, urlPattern, blankRequest);
+        var requestBuilder = new RestApiRequestBuilder<>(urlPattern, blankRequest, hasBody);
+
+        // Handler is supplied at runtime when there is a route match for the API call
+        var requestHandler = hasBody
+            ? wrapUnaryHandler(() -> new RestApiUnaryHandler<>(serviceHost, servicePort, grpcMethod, requestBuilder, blankRequest))
+            : wrapUnaryHandler(() -> new RestApiUnaryHandler<>(serviceHost, servicePort, grpcMethod, requestBuilder));
+
+        routes.addRoute(requestMatcher, requestHandler);
+    }
+
+    public static <TRequest extends Message, TResponse extends Message>
+    void addApiCall(
             RoutingConfig routes, HttpMethod method, String urlPattern,
             String serviceHost, int servicePort,
             MethodDescriptor<TRequest, TResponse> grpcMethod, TRequest blankRequest) {
 
-        // Matcher and builder created once and reused for all matching requests
-        var requestMatcher = new RestApiRouteMatcher(method, urlPattern, blankRequest);
-        var requestBuilder = new RestApiRequestBuilder<>(urlPattern, blankRequest);
-
-        // Handler is supplied at runtime when there is a route match for the API call
-        var requestHandler = wrapUnaryHandler(() ->
-                new RestApiUnaryHandler<>(serviceHost, servicePort, grpcMethod, requestBuilder));
-
-        routes.addRoute(requestMatcher, requestHandler);
+        addApiCall(routes, method, urlPattern, serviceHost, servicePort, grpcMethod, blankRequest, false);
     }
 
     private static Supplier<ChannelInboundHandler> wrapUnaryHandler(Supplier<ChannelInboundHandler> unaryHandler) {

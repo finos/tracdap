@@ -16,11 +16,11 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.common.exception.*;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
-import com.accenture.trac.svc.meta.exception.DuplicateItemError;
-import com.accenture.trac.svc.meta.exception.MissingItemError;
-import com.accenture.trac.svc.meta.exception.TracInternalError;
-import com.accenture.trac.svc.meta.exception.WrongItemTypeError;
+import com.accenture.trac.svc.meta.exception.EDuplicateItem;
+import com.accenture.trac.svc.meta.exception.EMissingItem;
+import com.accenture.trac.svc.meta.exception.EWrongItemType;
 
 import java.sql.SQLException;
 import java.text.MessageFormat;
@@ -41,17 +41,17 @@ class JdbcError {
     static final String LOAD_BATCH_WRONG_OBJECT_TYPE = "One or more metadata item has the wrong type";
 
 
-    static TracInternalError unhandledError(SQLException error, JdbcErrorCode code) {
+    static ETracInternal unhandledError(SQLException error, JdbcErrorCode code) {
 
         var message = MessageFormat.format(UNHANDLED_ERROR, code.name());
-        return new TracInternalError(message, error);
+        return new ETracInternal(message, error);
     }
 
     static void handleUnknownError(SQLException error, JdbcErrorCode code, IDialect dialect) {
 
         if (code == JdbcErrorCode.UNKNOWN_ERROR_CODE) {
             var message = MessageFormat.format(UNRECOGNISED_ERROR_CODE, dialect.dialectCode(), error.getSQLState(), error.getErrorCode());
-            throw new TracInternalError(message, error);
+            throw new ETracInternal(message, error);
         }
     }
 
@@ -60,7 +60,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.INSERT_DUPLICATE) {
             var message = MessageFormat.format(DUPLICATE_OBJECT_ID, parts.objectId[0]);
-            throw new DuplicateItemError(message, error);
+            throw new EDuplicateItem(message, error);
         }
     }
 
@@ -68,7 +68,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.NO_DATA) {
             var message = MessageFormat.format(MISSING_ITEM, "");
-            throw new MissingItemError(message, error);
+            throw new EMissingItem(message, error);
         }
     }
 
@@ -76,7 +76,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(WRONG_OBJECT_TYPE, "");
-            throw new WrongItemTypeError(message, error);
+            throw new EWrongItemType(message, error);
         }
     }
 
@@ -84,7 +84,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(WRONG_OBJECT_TYPE, "");
-            throw new WrongItemTypeError(message, error);
+            throw new EWrongItemType(message, error);
         }
     }
 
@@ -92,7 +92,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(WRONG_OBJECT_TYPE, "");
-            throw new WrongItemTypeError(message, error);
+            throw new EWrongItemType(message, error);
         }
     }
 
@@ -100,7 +100,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.NO_DATA) {
             var message = MessageFormat.format(LOAD_ONE_MISSING_ITEM, "");
-            throw new MissingItemError(message, error);
+            throw new EMissingItem(message, error);
         }
     }
 
@@ -108,7 +108,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(LOAD_ONE_WRONG_OBJECT_TYPE, "");
-            throw new WrongItemTypeError(message, error);
+            throw new EWrongItemType(message, error);
         }
     }
 
@@ -116,7 +116,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.NO_DATA) {
             var message = MessageFormat.format(LOAD_BATCH_MISSING_ITEM, "");
-            throw new MissingItemError(message, error);
+            throw new EMissingItem(message, error);
         }
     }
 
@@ -124,7 +124,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(LOAD_BATCH_WRONG_OBJECT_TYPE, "");
-            throw new WrongItemTypeError(message, error);
+            throw new EWrongItemType(message, error);
         }
     }
 }

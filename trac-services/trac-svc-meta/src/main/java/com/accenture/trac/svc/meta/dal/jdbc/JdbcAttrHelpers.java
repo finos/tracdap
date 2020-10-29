@@ -17,7 +17,7 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
 import com.accenture.trac.common.metadata.*;
-import com.accenture.trac.svc.meta.exception.TracInternalError;
+import com.accenture.trac.common.exception.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +84,7 @@ public class JdbcAttrHelpers {
 
                 log.error(message);
 
-                throw new TracInternalError(message);
+                throw new ETracInternal(message);
         }
     }
 
@@ -129,7 +129,7 @@ public class JdbcAttrHelpers {
 
                 log.error(message);
 
-                throw new TracInternalError(message);
+                throw new ETracInternal(message);
         }
     }
 
@@ -145,7 +145,7 @@ public class JdbcAttrHelpers {
             var message = "Failed to read attr value (attr type was not stored or could not be decoded)";
             log.error(message);
 
-            throw new TracInternalError(message, e);
+            throw new ETracInternal(message, e);
         }
     }
 
@@ -196,7 +196,7 @@ public class JdbcAttrHelpers {
             var message = "Failed to assemble multi-valued attr (some items do not match the specified array type)";
             log.error(message);
 
-            throw new TracInternalError(message);
+            throw new ETracInternal(message);
         }
 
         var typeDescriptor = TypeDescriptor.newBuilder()

@@ -19,8 +19,8 @@ package com.accenture.trac.svc.meta.api;
 import com.accenture.trac.common.api.meta.*;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
-import com.accenture.trac.svc.meta.logic.MetadataReadLogic;
-import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
+import com.accenture.trac.svc.meta.services.MetadataReadService;
+import com.accenture.trac.svc.meta.services.MetadataWriteService;
 
 import com.accenture.trac.svc.meta.test.JdbcIntegration;
 import io.grpc.Status;
@@ -78,12 +78,12 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var serverName = InProcessServerBuilder.generateName();
 
-        var writeLogic = new MetadataWriteLogic(dal);
-        var publicApiImpl = new MetadataPublicWriteApi(writeLogic);
-        var trustedApiImpl = new MetadataTrustedWriteApi(writeLogic);
+        var writeService = new MetadataWriteService(dal);
+        var publicApiImpl = new MetadataPublicWriteApi(writeService);
+        var trustedApiImpl = new MetadataTrustedWriteApi(writeService);
 
-        var readLogic = new MetadataReadLogic(dal);
-        var readApiImpl = new MetadataReadApi(readLogic);
+        var readService = new MetadataReadService(dal);
+        var readApiImpl = new MetadataReadApi(readService);
 
         // Create a server, add service, start, and register for automatic graceful shutdown.
         grpcCleanup.register(InProcessServerBuilder
@@ -108,75 +108,75 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
     }
 
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // CREATE OBJECT
+    // -----------------------------------------------------------------------------------------------------------------
+
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
                 names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
-    void saveNewObject_trustedTypesOk(ObjectType objectType) {
+    void createObject_trustedTypesOk(ObjectType objectType) {
 
-        saveNewObject_ok(objectType, request -> trustedApi.saveNewObject(request));
+        createObject_ok(objectType, request -> trustedApi.createObject(request));
     }
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE, names = {
             "FLOW",
             "CUSTOM"})
-    void saveNewObject_publicTypesOk(ObjectType objectType) {
+    void createObject_publicTypesOk(ObjectType objectType) {
 
         // All object types should be either in this test, or publicTypesNotAllowed
 
-        saveNewObject_ok(objectType, request -> publicApi.saveNewObject(request));
+        createObject_ok(objectType, request -> publicApi.createObject(request));
     }
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
             names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "FLOW", "CUSTOM"})
-    void saveNewObject_publicTypesNotAllowed(ObjectType objectType) {
+    void createObject_publicTypesNotAllowed(ObjectType objectType) {
 
-        var objToSave = TestData.dummyDefinitionForType(objectType, TestData.NO_HEADER);
-        var tagToSave = TestData.dummyTag(objToSave);
+        var objToSave = TestData.dummyDefinitionForType(objectType);
+        var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
+        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setTag(tagToSave)
+                .setDefinition(objToSave)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewObject(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObject(writeRequest));
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
     }
 
-    void saveNewObject_ok(ObjectType objectType, Function<MetadataWriteRequest, IdResponse> saveApiCall) {
+    void createObject_ok(ObjectType objectType, Function<MetadataWriteRequest, TagHeader> saveApiCall) {
 
-        var objToSave = TestData.dummyDefinitionForType(objectType, TestData.NO_HEADER);
-        var tagToSave = TestData.dummyTag(objToSave);
+        var objToSave = TestData.dummyDefinitionForType(objectType);
+        var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
+        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setTag(tagToSave)
+                .setDefinition(objToSave)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
-        var idResponse = saveApiCall.apply(writeRequest);
-        var objectId = MetadataCodec.decode(idResponse.getObjectId());
+        var tagHeader = saveApiCall.apply(writeRequest);
+        var objectId = MetadataCodec.decode(tagHeader.getObjectId());
 
+        assertEquals(objectType, tagHeader.getObjectType());
         assertNotNull(objectId);
         assertNotEquals(new UUID(0, 0), objectId);
-        assertEquals(1, idResponse.getObjectVersion());
-        assertEquals(1, idResponse.getTagVersion());
-
-        var expectedHeader = ObjectHeader.newBuilder()
-                .setObjectType(objectType)
-                .setObjectId(idResponse.getObjectId())
-                .setObjectVersion(1);
-
-        var expectedObj = objToSave.toBuilder()
-                .setHeader(expectedHeader)
-                .build();
+        assertEquals(1, tagHeader.getObjectVersion());
+        assertEquals(1, tagHeader.getTagVersion());
 
         var expectedTag = tagToSave.toBuilder()
-                .setTagVersion(1)
-                .setDefinition(expectedObj)
+                .setHeader(tagHeader)
                 .build();
 
         MetadataReadRequest readRequest = MetadataReadRequest.newBuilder()
@@ -193,64 +193,38 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     }
 
     @Test
-    void saveNewObject_headerNotNull() {
-
-        var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM, TestData.NO_HEADER);
-
-        // Saving object headers is not allowed, they will be generated by the metadata service
-        // Even if the header is empty it should be rejected
-        objToSave = objToSave.toBuilder()
-                .setHeader(ObjectHeader.newBuilder().build())
-                .build();
-
-        var tagToSave = TestData.dummyTag(objToSave);
-
-        var writeRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.CUSTOM)
-                .setTag(tagToSave)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewObject(writeRequest));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
-
-        // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewObject(writeRequest));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
-    }
-
-    @Test
-    void saveNewObject_inconsistentType() {
+    void createObject_inconsistentType() {
 
         // This test is about sending an invalid request, i.e. the payload does not match the write request
 
         // Make sure both types are allowed on the public API, so we don't get permission denied
 
-        var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM, TestData.NO_HEADER);
-        var tagToSave = TestData.dummyTag(objToSave);
+        var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
+        var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
+        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrMap());
 
         // Request to save a MODEL, even though the definition is for DATA
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.FLOW)
-                .setTag(tagToSave)
+                .setDefinition(objToSave)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewObject(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewObject(writeRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.createObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
     @Disabled("Object definition content validation is not implemented yet")
-    void saveNewObject_invalidContent() {
+    void createObject_invalidContent() {
 
-        var validFlow = TestData.dummyFlowDef(TestData.NO_HEADER);
+        var validFlow = TestData.dummyFlowDef();
 
         // Create a flow with an invalid node graph, this should get picked up by the validation layer
 
@@ -264,171 +238,190 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setFlow(brokenEdges)
                 .build();
 
-        var tagToSave = TestData.dummyTag(invalidFlow);
+        var tagToSave = TestData.dummyTag(invalidFlow, TestData.NO_HEADER);
+        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrMap());
 
         // Try to save the flow with a broken graph, should fail validation
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.FLOW)
-                .setTag(tagToSave)
+                .setDefinition(invalidFlow)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewObject(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewObject(writeRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.createObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewObject_invalidAttrs() {
+    void createObject_invalidAttrs() {
 
-        var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM, TestData.NO_HEADER);
-        var validTag = TestData.dummyTag(objToSave);
+        var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
+        var validTag = TestData.dummyTag(objToSave, TestData.NO_HEADER);
 
         var invalidTag = validTag.toBuilder()
                 .putAttr("${escape_key}", MetadataCodec.encodeValue(1.0))
                 .build();
 
+        var tagUpdates = TestData.tagUpdatesForAttrs(invalidTag.getAttrMap());
+
         // Request to save a MODEL, even though the definition is for DATA
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
-                .setTag(invalidTag)
+                .setDefinition(objToSave)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(writeRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.createObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewObject_reservedAttrs() {
+    void createObject_reservedAttrs() {
 
-        var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM, TestData.NO_HEADER);
-        var validTag = TestData.dummyTag(objToSave);
+        var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
+        var validTag = TestData.dummyTag(objToSave, TestData.NO_HEADER);
 
         var invalidTag = validTag.toBuilder()
                 .putAttr("trac_anything_reserved", MetadataCodec.encodeValue(1.0))
                 .build();
 
+        var tagUpdates = TestData.tagUpdatesForAttrs(invalidTag.getAttrMap());
+
         // Request to save a MODEL, even though the definition is for DATA
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
-                .setTag(invalidTag)
+                .setDefinition(objToSave)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewObject(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObject(writeRequest));
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
 
-        assertDoesNotThrow(() -> trustedApi.saveNewObject(writeRequest));
+        assertDoesNotThrow(() -> trustedApi.createObject(writeRequest));
     }
 
 
     // -----------------------------------------------------------------------------------------------------------------
-    // OBJECT VERSIONS
+    // UPDATE OBJECT
     // -----------------------------------------------------------------------------------------------------------------
-
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE, names = {"DATA", "CUSTOM"})
-    void saveNewVersion_trustedTypesOk(ObjectType objectType) {
+    void updateObject_trustedTypesOk(ObjectType objectType) {
 
-        saveNewVersion_ok(objectType, request -> trustedApi.saveNewVersion(request));
+        updateObject_ok(objectType, request -> trustedApi.updateObject(request));
     }
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE, names = {"CUSTOM"})
-    void saveNewVersion_publicTypesOk(ObjectType objectType) {
+    void updateObject_publicTypesOk(ObjectType objectType) {
 
-        saveNewVersion_ok(objectType, request -> publicApi.saveNewVersion(request));
+        updateObject_ok(objectType, request -> publicApi.updateObject(request));
     }
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
             names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "FLOW", "CUSTOM"})
-    void saveNewVersion_publicTypesNotAllowed(ObjectType objectType) {
+    void updateObject_publicTypesNotAllowed(ObjectType objectType) {
 
-        var v1SavedTag = saveNewVersion_prepareV1(objectType);
+        var v1SavedTag = updateObject_prepareV1(objectType);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), TestData.KEEP_ORIGINAL_HEADER);
-        var v2Tag = TestData.dummyTag(v2Obj);
+        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setTag(v2Tag)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(v2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
     }
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
             names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "DATA", "CUSTOM"})
-    void saveNewVersion_versionsNotSupported(ObjectType objectType) {
+    void updateObject_versionsNotSupported(ObjectType objectType) {
 
-        var v1SavedTag = saveNewVersion_prepareV1(objectType);
+        var v1SavedTag = updateObject_prepareV1(objectType);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), TestData.KEEP_ORIGINAL_HEADER);
-        var v2Tag = TestData.dummyTag(v2Obj);
+        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setTag(v2Tag)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(v2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+
+        // Also check the public API for object types where public write is allowed
+        if (objectType.equals(ObjectType.FLOW)) {
+
+            // noinspection ResultOfMethodCallIgnored
+            var publicError = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
+            assertEquals(Status.Code.INVALID_ARGUMENT, publicError.getStatus().getCode());
+        }
     }
 
-    void saveNewVersion_ok(ObjectType objectType, Function<MetadataWriteRequest, IdResponse> saveApiCall) {
+    void updateObject_ok(ObjectType objectType, Function<MetadataWriteRequest, TagHeader> saveApiCall) {
 
-        var v1SavedTag = saveNewVersion_prepareV1(objectType);
-        var v1ObjectId = MetadataCodec.decode(v1SavedTag.getDefinition().getHeader().getObjectId());
+        var v1SavedTag = updateObject_prepareV1(objectType);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1ObjectId = MetadataCodec.decode(v1SavedTag.getHeader().getObjectId());
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), TestData.KEEP_ORIGINAL_HEADER);
-        var v2Tag = TestData.dummyTag(v2Obj);
+        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+
+        var v2NewAttrName = "update_object_v2_attr_" + objectType.name();
+        var v2NewAttrValue = MetadataCodec.encodeValue(1.0);
+        var v2AttrUpdate = TagUpdate.newBuilder()
+                .setAttrName(v2NewAttrName)
+                .setValue(v2NewAttrValue)
+                .build();
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setTag(v2Tag)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
+                .addTagUpdate(v2AttrUpdate)
                 .build();
 
-        var v2IdResponse = saveApiCall.apply(v2WriteRequest);
-        var v2ObjectId = MetadataCodec.decode(v2IdResponse.getObjectId());
+        var v2TagHeader = saveApiCall.apply(v2WriteRequest);
+        var v2ObjectId = MetadataCodec.decode(v2TagHeader.getObjectId());
 
         assertEquals(v1ObjectId, v2ObjectId);
-        assertEquals(2, v2IdResponse.getObjectVersion());
-        assertEquals(1, v2IdResponse.getTagVersion());
+        assertEquals(2, v2TagHeader.getObjectVersion());
+        assertEquals(1, v2TagHeader.getTagVersion());
 
-        var expectedHeader = ObjectHeader.newBuilder()
-                .setObjectType(objectType)
-                .setObjectId(v2IdResponse.getObjectId())
-                .setObjectVersion(2);
-
-        var expectedObj = v2Obj.toBuilder()
-                .setHeader(expectedHeader)
-                .build();
-
-        var expectedTag = v2Tag.toBuilder()
-                .setTagVersion(1)
-                .setDefinition(expectedObj)
+        var expectedTag = Tag.newBuilder()
+                .setHeader(v2TagHeader)
+                .setDefinition(v2Obj)
+                .putAllAttr(v1SavedTag.getAttrMap())
+                .putAttr(v2NewAttrName, v2NewAttrValue)
                 .build();
 
         MetadataReadRequest readRequest = MetadataReadRequest.newBuilder()
@@ -444,20 +437,22 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         assertEquals(expectedTag, tagFromStore);
     }
 
-    Tag saveNewVersion_prepareV1(ObjectType objectType) {
+    Tag updateObject_prepareV1(ObjectType objectType) {
 
         // Save and retrieve version 1, the saved version will have an object header filled in
 
-        var v1Obj = TestData.dummyDefinitionForType(objectType, TestData.NO_HEADER);
-        var v1Tag = TestData.dummyTag(v1Obj);
+        var v1Obj = TestData.dummyDefinitionForType(objectType);
+        var v1Tag = TestData.dummyTag(v1Obj, TestData.NO_HEADER);
+        var tagUpdates = TestData.tagUpdatesForAttrs(v1Tag.getAttrMap());
 
         var v1WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setTag(v1Tag)
+                .setDefinition(v1Obj)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
-        var v1IdResponse = trustedApi.saveNewObject(v1WriteRequest);
+        var v1IdResponse = trustedApi.createObject(v1WriteRequest);
 
         var v1ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -474,13 +469,14 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     // This is because CUSTOM objects support versions and can be saved in both the public and trusted API
 
     @Test
-    void saveNewVersion_latestUpdated() {
+    void updateObject_latestUpdated() {
 
         // Make sure saving a new version updates the 'latest' flag for the object
         // Test both trusted and public APIs
 
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
-        var v1ObjectId = v1SavedTag.getDefinition().getHeader().getObjectId();
+        var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1ObjectId = v1SavedTag.getHeader().getObjectId();
 
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -489,95 +485,70 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .build();
 
         var v1Latest = readApi.loadLatestObject(readRequest);
-        assertEquals(1, v1Latest.getDefinition().getHeader().getObjectVersion());
+        assertEquals(1, v1Latest.getHeader().getObjectVersion());
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), TestData.KEEP_ORIGINAL_HEADER);
-        var v2Tag = TestData.dummyTag(v2Obj);
+        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
-                .setTag(v2Tag)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        trustedApi.saveNewVersion(v2WriteRequest);
+        trustedApi.updateObject(v2WriteRequest);
 
         var v2Latest = readApi.loadLatestObject(readRequest);
-        assertEquals(2, v2Latest.getDefinition().getHeader().getObjectVersion());
+        assertEquals(2, v2Latest.getHeader().getObjectVersion());
 
-        var v3Obj = TestData.dummyVersionForType(v2Latest.getDefinition(), TestData.KEEP_ORIGINAL_HEADER);
-        var v3Tag = TestData.dummyTag(v3Obj);
+        var v2Selector = selectorForTag(v2Latest);
+        var v3Obj = TestData.dummyVersionForType(v2Latest.getDefinition());
 
         var v3WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
-                .setTag(v3Tag)
+                .setPriorVersion(v2Selector)
+                .setDefinition(v3Obj)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        publicApi.saveNewVersion(v3WriteRequest);
+        publicApi.updateObject(v3WriteRequest);
 
         var v3Latest = readApi.loadLatestObject(readRequest);
-        assertEquals(3, v3Latest.getDefinition().getHeader().getObjectVersion());
+        assertEquals(3, v3Latest.getHeader().getObjectVersion());
     }
 
     @Test
-    void saveNewVersion_headerIsNull() {
-
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
-
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), TestData.KEEP_ORIGINAL_HEADER)
-                .toBuilder()
-                .clearHeader()
-                .build();
-
-        var v2Tag = TestData.dummyTag(v2Obj);
-
-        var v2WriteRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.CUSTOM)
-                .setTag(v2Tag)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(v2WriteRequest));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
-
-        // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(v2WriteRequest));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
-    }
-
-    @Test
-    void saveNewVersion_inconsistentType() {
+    void updateObject_inconsistentType() {
 
         // This test is about sending an invalid request, i.e. the payload does not match the write request
 
         // Make sure both types are allowed on the public API, so we don't get permission denied
 
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), TestData.KEEP_ORIGINAL_HEADER);
-        var v2Tag = TestData.dummyTag(v2Obj);
+        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.FLOW)
-                .setTag(v2Tag)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(v2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(v2WriteRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewVersion_wrongType() {
+    void updateObject_wrongType() {
 
         // This test is about mis-matched types between versions, e.g. V1 is CUSTOM, V2 is DATA
         // This counts as a pre-condition failure rather than invalid input,
@@ -585,116 +556,136 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         // Currently only testing the trusted API, as public does not support two types with versioning
 
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
+        var v2Obj = TestData.dummyDataDef();
 
-        var v2HeaderPreSave = v1SavedTag.getDefinition().getHeader()
-                .toBuilder()
-                .setObjectType(ObjectType.DATA);
+        // First attempt - use a prior version selector that does not match the new object
+        // This should be an invalid request (it is always invalid, regardless of what is in the DB)
 
-        var v2Obj = TestData.dummyDataDef(NO_HEADER).toBuilder()
-                .setHeader(v2HeaderPreSave)
-                .build();
-
-        var v2Tag = TestData.dummyTag(v2Obj);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(v2Tag)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(v2WriteRequest));
-        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+
+        // Second attempt - user a prior version selector that thinks the prior version is the right type
+        // This is an invalid pre-condition (it only fails because the request does not match what is in the DB)
+
+        var v1SelectorData = v1Selector.toBuilder()
+                .setObjectType(ObjectType.DATA)
+                .build();
+
+        var v2WriteRequestData = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(v1SelectorData)
+                .setDefinition(v2Obj)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequestData));
+        assertEquals(Status.Code.FAILED_PRECONDITION, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewVersion_missingObject() {
+    void updateObject_missingObject() {
 
         // V1 object is not saved
-        var v1Ojb = TestData.dummyCustomDef(TestData.INCLUDE_HEADER);
+        var v1Tag = TestData.dummyTagForObjectType(ObjectType.CUSTOM);
+        var v1Selector = TestData.selectorForTag(v1Tag);
 
-        var v2Obj = TestData.dummyVersionForType(v1Ojb, TestData.KEEP_ORIGINAL_HEADER);
-        var v2Tag = TestData.dummyTag(v2Obj);
+        var v2Obj = TestData.dummyVersionForType(v1Tag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
-                .setTag(v2Tag)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(v2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(v2WriteRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewVersion_missingObjectVersion() {
+    void updateObject_missingObjectVersion() {
 
         // V1 object created and saved
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
 
         // V2 object is not saved
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), TestData.UPDATE_HEADER);
+        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2Selector = v1Selector.toBuilder().setObjectVersion(2).build();
 
-        var v3Obj = TestData.dummyVersionForType(v2Obj, TestData.KEEP_ORIGINAL_HEADER);
-        var v3Tag = TestData.dummyTag(v3Obj);
+        var v3Obj = TestData.dummyVersionForType(v2Obj);
 
         var v3WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
-                .setTag(v3Tag)
+                .setPriorVersion(v2Selector)
+                .setDefinition(v3Obj)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(v3WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v3WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(v3WriteRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v3WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewVersion_superseded() {
+    void updateObject_superseded() {
 
         // V1 object created and saved
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), TestData.KEEP_ORIGINAL_HEADER);
-        var v2Tag = TestData.dummyTag(v2Obj);
+        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
-                .setTag(v2Tag)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
                 .build();
 
         // Save V2 once should be ok
 
-        assertDoesNotThrow(() -> trustedApi.saveNewVersion(v2WriteRequest));
+        assertDoesNotThrow(() -> trustedApi.updateObject(v2WriteRequest));
 
         // Trying to create V2 a second time is an error
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(v2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.ALREADY_EXISTS, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(v2WriteRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.ALREADY_EXISTS, error2.getStatus().getCode());
     }
 
     @Test
     @Disabled("Object definition content validation is not implemented yet")
-    void saveNewVersion_invalidContent() {
+    void updateObject_invalidContent() {
 
         // V1 object created and saved
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.DATA);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
         var v1Schema = v1SavedTag.getDefinition().getData().getSchema();
 
         // Create a V2 data definition that is invalid, use an explicit fieldOrder = -1
@@ -712,106 +703,122 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                     .setSchema(v2Schema))
                 .build();
 
-        var v2Tag = TestData.dummyTag(v2Obj);
-
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(v2Tag)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(v2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(v2WriteRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewVersion_invalidAttrs() {
+    void updateObject_invalidAttrs() {
 
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), TestData.KEEP_ORIGINAL_HEADER);
-        var v2Tag = TestData.dummyTag(v2Obj);
+        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
-        var v2ControlledTag = v2Tag.toBuilder()
-                .putAttr("very\nbroken.attr", MetadataCodec.encodeValue(1.0))
+        var tagUpdate = TagUpdate.newBuilder()
+                .setAttrName("very\nbroken.attr")
+                .setValue(MetadataCodec.encodeValue(1.0))
                 .build();
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
-                .setTag(v2ControlledTag)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
+                .addTagUpdate(tagUpdate)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(v2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(v2WriteRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewVersion_reservedAttrs() {
+    void updateObject_reservedAttrs() {
 
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), TestData.KEEP_ORIGINAL_HEADER);
-        var v2Tag = TestData.dummyTag(v2Obj);
+        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
-        var v2ControlledTag = v2Tag.toBuilder()
-                .putAttr("trac_anything_reserved", MetadataCodec.encodeValue(1.0))
+        var tagUpdate = TagUpdate.newBuilder()
+                .setAttrName("trac_anything_reserved")
+                .setValue(MetadataCodec.encodeValue(1.0))
                 .build();
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
-                .setTag(v2ControlledTag)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
+                .addTagUpdate(tagUpdate)
                 .build();
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(v2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
 
-        assertDoesNotThrow(() -> trustedApi.saveNewVersion(v2WriteRequest));
+        assertDoesNotThrow(() -> trustedApi.updateObject(v2WriteRequest));
     }
 
 
     // -----------------------------------------------------------------------------------------------------------------
-    // TAG VERSIONS
+    // UPDATE TAG
     // -----------------------------------------------------------------------------------------------------------------
-
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
                 names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
-    void saveNewTag_AllTypesOk(ObjectType objectType) {
+    void updateTag_AllTypesOk(ObjectType objectType) {
 
-        var v1SavedTag = saveNewVersion_prepareV1(objectType);
-        var v1ObjectId = MetadataCodec.decode(v1SavedTag.getDefinition().getHeader().getObjectId());
+        var v1SavedTag = updateObject_prepareV1(objectType);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1ObjectId = MetadataCodec.decode(v1SavedTag.getHeader().getObjectId());
 
-        var t2Tag = v1SavedTag.toBuilder()
-                .putAttr("extra_attr_v2", MetadataCodec.encodeValue("First extra attr"))
+        // Write tag update via the trusted API
+
+        var t2AttrName = "extra_attr_v2";
+        var t2Update = TagUpdate.newBuilder()
+                .setAttrName("extra_attr_v2")
+                .setValue(MetadataCodec.encodeValue("First extra attr"))
                 .build();
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setTag(t2Tag)
+                .setPriorVersion(v1Selector)
+                .addTagUpdate(t2Update)
                 .build();
 
-        var t2IdResponse = trustedApi.saveNewTag(t2WriteRequest);
+        var t2header = trustedApi.updateTag(t2WriteRequest);
 
-        assertEquals(v1ObjectId, MetadataCodec.decode(t2IdResponse.getObjectId()));
-        assertEquals(1, t2IdResponse.getObjectVersion());
-        assertEquals(2, t2IdResponse.getTagVersion());
+        assertEquals(objectType, t2header.getObjectType());
+        assertEquals(v1ObjectId, MetadataCodec.decode(t2header.getObjectId()));
+        assertEquals(1, t2header.getObjectVersion());
+        assertEquals(2, t2header.getTagVersion());
+
+        var t2ExpectedTag = v1SavedTag.toBuilder()
+                .setHeader(t2header)
+                .putAttr(t2AttrName, t2Update.getValue())
+                .build();
 
         var t2ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -821,26 +828,32 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTagVersion(2)
                 .build();
 
-        var t2ExpectedTag = t2Tag.toBuilder().setTagVersion(2).build();
         var t2SavedTag = readApi.loadTag(t2ReadRequest);
+        var t2Selector = TestData.selectorForTag(t2SavedTag);
 
         assertEquals(t2ExpectedTag, t2SavedTag);
 
-        var t3Tag = t2SavedTag.toBuilder()
-                .putAttr("extra_attr_v3", MetadataCodec.encodeValue("Second extra attr"))
+        // Write tag update via the public API
+
+        var t3AttrName = "extra_attr_v3";
+        var t3Update = TagUpdate.newBuilder()
+                .setAttrName("extra_attr_v3")
+                .setValue(MetadataCodec.encodeValue("Second extra attr"))
                 .build();
 
         var t3WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setTag(t3Tag)
+                .setPriorVersion(t2Selector)
+                .addTagUpdate(t3Update)
                 .build();
 
-        var t3IdResponse = publicApi.saveNewTag(t3WriteRequest);
+        var t3Header = publicApi.updateTag(t3WriteRequest);
 
-        assertEquals(v1ObjectId, MetadataCodec.decode(t3IdResponse.getObjectId()));
-        assertEquals(1, t3IdResponse.getObjectVersion());
-        assertEquals(3, t3IdResponse.getTagVersion());
+        assertEquals(objectType, t3Header.getObjectType());
+        assertEquals(v1ObjectId, MetadataCodec.decode(t3Header.getObjectId()));
+        assertEquals(1, t3Header.getObjectVersion());
+        assertEquals(3, t3Header.getTagVersion());
 
         var t3ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -850,46 +863,57 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTagVersion(3)
                 .build();
 
-        var t3ExpectedTag = t3Tag.toBuilder().setTagVersion(3).build();
+        var t3ExpectedTag = t2SavedTag.toBuilder()
+                .setHeader(t3Header)
+                .putAttr(t3AttrName, t3Update.getValue())
+                .build();
+
         var t3SavedTag = readApi.loadTag(t3ReadRequest);
 
         assertEquals(t3ExpectedTag, t3SavedTag);
     }
 
     @Test
-    void saveNewTag_latestUpdated() {
+    void updateTag_latestUpdated() {
 
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.DATA);
-        var v1Header = v1SavedTag.getDefinition().getHeader();
+        var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Header = v1SavedTag.getHeader();
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), TestData.KEEP_ORIGINAL_HEADER);
-        var v2Tag = TestData.dummyTag(v2Obj);
+        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(v2Tag)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
                 .build();
 
-        var v2IdResponse = trustedApi.saveNewVersion(v2WriteRequest);
+        var v2Header = trustedApi.updateObject(v2WriteRequest);
 
-        assertEquals(v1Header.getObjectId(), v2IdResponse.getObjectId());
-        assertEquals(2, v2IdResponse.getObjectVersion());
-        assertEquals(1, v2IdResponse.getTagVersion());
+        assertEquals(ObjectType.DATA, v2Header.getObjectType());
+        assertEquals(v1Header.getObjectId(), v2Header.getObjectId());
+        assertEquals(2, v2Header.getObjectVersion());
+        assertEquals(1, v2Header.getTagVersion());
 
-        var v1t2Tag = TestData.nextTag(v1SavedTag, KEEP_ORIGINAL_TAG_VERSION);
+        var t2Update = TagUpdate.newBuilder()
+                .setAttrName("extra_attr_v2")
+                .setValue(MetadataCodec.encodeValue("First extra attr"))
+                .build();
 
         var v1t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(v1t2Tag)
+                .setPriorVersion(v1Selector)
+                .addTagUpdate(t2Update)
                 .build();
 
-        var v1t2IdResponse = trustedApi.saveNewTag(v1t2WriteRequest);
+        var v1t2Header = trustedApi.updateTag(v1t2WriteRequest);
 
-        assertEquals(v1Header.getObjectId(), v1t2IdResponse.getObjectId());
-        assertEquals(1, v1t2IdResponse.getObjectVersion());
-        assertEquals(2, v1t2IdResponse.getTagVersion());
+        assertEquals(ObjectType.DATA, v1t2Header.getObjectType());
+        assertEquals(v1Header.getObjectId(), v1t2Header.getObjectId());
+        assertEquals(1, v1t2Header.getObjectVersion());
+        assertEquals(2, v1t2Header.getTagVersion());
 
         var v1ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -908,90 +932,45 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var v1LatestTag = readApi.loadLatestTag(v1ReadRequest);
         var v2latestTag = readApi.loadLatestTag(v2ReadRequest);
 
-        assertEquals(2, v1LatestTag.getTagVersion());
-        assertEquals(1, v2latestTag.getTagVersion());
+        assertEquals(2, v1LatestTag.getHeader().getTagVersion());
+        assertEquals(1, v2latestTag.getHeader().getTagVersion());
     }
 
     @Test
-    void saveNewTag_headerIsNull() {
-
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.DATA);
-
-        var t2Tag = TestData.nextTag(v1SavedTag, KEEP_ORIGINAL_TAG_VERSION)
-                .toBuilder()
-                .setDefinition(v1SavedTag.getDefinition().toBuilder().clearHeader())
-                .build();
-
-        var t2WriteRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
-                .setTag(t2Tag)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewTag(t2WriteRequest));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
-
-        // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewTag(t2WriteRequest));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
-    }
-
-    @Test
-    void saveNewTag_tagVersionIsNull() {
-
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.DATA);
-
-        var t2Tag = TestData.nextTag(v1SavedTag, KEEP_ORIGINAL_TAG_VERSION)
-                .toBuilder()
-                .clearTagVersion()
-                .build();
-
-        var t2WriteRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
-                .setTag(t2Tag)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewTag(t2WriteRequest));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
-
-        // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewTag(t2WriteRequest));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
-    }
-
-    @Test
-    void saveNewTag_inconsistentType() {
+    void updateTag_inconsistentType() {
 
         // This test is about sending an invalid request, i.e. the payload does not match the write request
 
         // Make sure both types are allowed on the public API, so we don't get permission denied
 
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.DATA);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
 
-        var t2Tag = TestData.nextTag(v1SavedTag, KEEP_ORIGINAL_TAG_VERSION);
+        var t2Update = TagUpdate.newBuilder()
+                .setAttrName("extra_attr_v2")
+                .setValue(MetadataCodec.encodeValue("First extra attr"))
+                .build();
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.FLOW)
-                .setTag(t2Tag)
+                .setPriorVersion(v1Selector)
+                .addTagUpdate(t2Update)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewTag(t2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewTag(t2WriteRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
 
 
     @Test
-    void saveNewTag_wrongType() {
+    void updateTag_wrongType() {
 
         // This test is about mis-matched types between versions, e.g. V1 is CUSTOM, V2 is DATA
         // This counts as a pre-condition failure rather than invalid input,
@@ -999,187 +978,211 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         // Currently only testing the trusted API, as public does not support two types with versioning
 
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
 
-        var t2HeaderPreSave = v1SavedTag.getDefinition().getHeader()
-                .toBuilder()
-                .setObjectType(ObjectType.DATA);
-
-        var t2Obj = TestData.dummyDataDef(NO_HEADER).toBuilder()
-                .setHeader(t2HeaderPreSave)
+        var v1Selector = TestData.selectorForTag(v1SavedTag).toBuilder()
+                .setObjectType(ObjectType.DATA)
                 .build();
 
-        var t2Tag = TestData.dummyTag(t2Obj);
+        var t2Update = TagUpdate.newBuilder()
+                .setAttrName("extra_attr_v2")
+                .setValue(MetadataCodec.encodeValue("First extra attr"))
+                .build();
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(t2Tag)
+                .setPriorVersion(v1Selector)
+                .addTagUpdate(t2Update)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewTag(t2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t2WriteRequest));
+        assertEquals(Status.Code.FAILED_PRECONDITION, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewTag_missingObject() {
+    void updateTag_missingObject() {
 
-        var v1Obj = TestData.dummyDataDef(INCLUDE_HEADER);
-        var v1Tag = TestData.dummyTag(v1Obj);
+        var v1Obj = TestData.dummyDataDef();
+        var v1Tag = TestData.dummyTag(v1Obj, INCLUDE_HEADER);
+        var v1Selector = TestData.selectorForTag(v1Tag);
 
-        var t2Tag = TestData.nextTag(v1Tag, KEEP_ORIGINAL_TAG_VERSION);
+        var t2Update = TagUpdate.newBuilder()
+                .setAttrName("extra_attr_v2")
+                .setValue(MetadataCodec.encodeValue("First extra attr"))
+                .build();
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(t2Tag)
+                .setPriorVersion(v1Selector)
+                .addTagUpdate(t2Update)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewTag(t2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewTag(t2WriteRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewTag_missingObjectVersion() {
+    void updateTag_missingObjectVersion() {
 
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.DATA);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
 
-        var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition(), UPDATE_HEADER);
-        var v2Tag = TestData.dummyTag(v2Obj);
+        var v2Selector = TestData.selectorForTag(v1SavedTag).toBuilder()
+                .setObjectVersion(2)
+                .build();
 
-        var v2t2Tag = TestData.nextTag(v2Tag, KEEP_ORIGINAL_TAG_VERSION);
+        var t2Update = TagUpdate.newBuilder()
+                .setAttrName("extra_attr_v2")
+                .setValue(MetadataCodec.encodeValue("First extra attr"))
+                .build();
 
         var v2t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(v2t2Tag)
+                .setPriorVersion(v2Selector)
+                .addTagUpdate(t2Update)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewTag(v2t2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(v2t2WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewTag(v2t2WriteRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(v2t2WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewTag_missingTagVersion() {
+    void updateTag_missingTagVersion() {
 
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.DATA);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
 
-        var t2Tag = v1SavedTag.toBuilder()
-                .setTagVersion(v1SavedTag.getTagVersion() + 1)
-                .putAttr("extra_attr_v2", MetadataCodec.encodeValue("First extra attr"))
+        var t2Selector = TestData.selectorForTag(v1SavedTag).toBuilder()
+                .setTagVersion(2)
                 .build();
 
-        var t3Tag = TestData.nextTag(t2Tag, KEEP_ORIGINAL_TAG_VERSION);
+        var t2Update = TagUpdate.newBuilder()
+                .setAttrName("extra_attr_v2")
+                .setValue(MetadataCodec.encodeValue("First extra attr"))
+                .build();
 
         var t3WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(t3Tag)
+                .setPriorVersion(t2Selector)
+                .addTagUpdate(t2Update)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewTag(t3WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(t3WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewTag(t3WriteRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t3WriteRequest));
         assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewTag_superseded() {
+    void updateTag_superseded() {
 
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.DATA);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
 
-        var t2Tag = TestData.nextTag(v1SavedTag, KEEP_ORIGINAL_TAG_VERSION);
+        var t2Update = TagUpdate.newBuilder()
+                .setAttrName("extra_attr_v2")
+                .setValue(MetadataCodec.encodeValue("First extra attr"))
+                .build();
 
         var v2t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(t2Tag)
+                .setPriorVersion(v1Selector)
+                .addTagUpdate(t2Update)
                 .build();
 
         // Saving tag version 2 should succeed the first time
 
-        assertDoesNotThrow(() -> trustedApi.saveNewTag(v2t2WriteRequest));
+        assertDoesNotThrow(() -> trustedApi.updateTag(v2t2WriteRequest));
 
         // Trying to save tag version 2 a second time is an error
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewTag(v2t2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(v2t2WriteRequest));
         assertEquals(Status.Code.ALREADY_EXISTS, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewTag(v2t2WriteRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(v2t2WriteRequest));
         assertEquals(Status.Code.ALREADY_EXISTS, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewTag_invalidAttrs() {
+    void updateTag_invalidAttrs() {
 
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
 
-        var t2Tag = TestData.nextTag(v1SavedTag, KEEP_ORIGINAL_TAG_VERSION);
-
-        var t2ControlledTag = t2Tag.toBuilder()
-                .putAttr("no-hyphens", MetadataCodec.encodeValue(1.0))
+        var t2Update = TagUpdate.newBuilder()
+                .setAttrName("no-hyphens")
+                .setValue(MetadataCodec.encodeValue("First extra attr"))
                 .build();
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
-                .setTag(t2ControlledTag)
+                .setPriorVersion(v1Selector)
+                .addTagUpdate(t2Update)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(t2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(t2WriteRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
-    void saveNewTag_reservedAttrs() {
+    void updateTag_reservedAttrs() {
 
-        var v1SavedTag = saveNewVersion_prepareV1(ObjectType.CUSTOM);
+        var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
+        var v1Selector = TestData.selectorForTag(v1SavedTag);
 
-        var t2Tag = TestData.nextTag(v1SavedTag, KEEP_ORIGINAL_TAG_VERSION);
-
-        var t2ControlledTag = t2Tag.toBuilder()
-                .putAttr("trac_anything_reserved", MetadataCodec.encodeValue(1.0))
+        var t2Update = TagUpdate.newBuilder()
+                .setAttrName("trac_anything_reserved")
+                .setValue(MetadataCodec.encodeValue("First extra attr"))
                 .build();
 
         var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
-                .setTag(t2ControlledTag)
+                .setPriorVersion(v1Selector)
+                .addTagUpdate(t2Update)
                 .build();
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.saveNewVersion(t2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t2WriteRequest));
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
 
-        assertDoesNotThrow(() -> trustedApi.saveNewVersion(t2WriteRequest));
+        assertDoesNotThrow(() -> trustedApi.updateTag(t2WriteRequest));
     }
 
 
     // -----------------------------------------------------------------------------------------------------------------
-    // PREALLOCATE OBJECTS
+    // PREALLOCATION
     // -----------------------------------------------------------------------------------------------------------------
 
     @Test
@@ -1193,107 +1196,40 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .build();
 
-        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+        var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
+        var preallocateSelector = TestData.selectorForTag(preallocateHeader);
 
-        // For preallocated objects, the header must be set with the preallocated ID and version = 1
-        var newObjectHeader = ObjectHeader.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .setObjectId(preallocateResponse.getObjectId())
-                .setObjectVersion(1);
-
-        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
-                .toBuilder()
-                .setHeader(newObjectHeader)
-                .build();
-
-        var newTag = TestData.dummyTag(newObject);
+        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
+        var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
+        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(newTag)
+                .setPriorVersion(preallocateSelector)
+                .setDefinition(newObject)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
-        var writeResponse = trustedApi.savePreallocatedObject(writeRequest);
+        var tagHeader = trustedApi.createPreallocatedObject(writeRequest);
 
-        assertEquals(preallocateResponse.getObjectId(), writeResponse.getObjectId());
+        assertEquals(preallocateHeader.getObjectId(), tagHeader.getObjectId());
+
+        var expectedTag = newTag.toBuilder()
+                .setHeader(tagHeader)
+                .build();
 
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(preallocateResponse.getObjectId())
+                .setObjectId(preallocateHeader.getObjectId())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
         var savedTag = readApi.loadTag(readRequest);
 
-        assertEquals(newTag, savedTag);
-    }
-
-    @Test
-    void preallocateObject_headerMissing() {
-
-        // Saving a pre-allocated object with a null header is an invalid request
-        // For preallocation, the header has to be set and must match the preallocated ID
-
-        var preallocateRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        trustedApi.preallocateId(preallocateRequest);
-
-        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER);
-        var newTag = TestData.dummyTag(newObject);
-
-        var writeRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
-                .setTag(newTag)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.savePreallocatedObject(writeRequest));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
-    }
-
-    @Test
-    void preallocateObject_headerWrongVersion() {
-
-        // To save a preallocated object, the header must be set with object version = 1
-        // A request to save a preallocated object with version != 1 is considered invalid
-
-        var preallocateRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
-                .build();
-
-        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
-
-        // For preallocated objects, the header must be set with the preallocated ID and version = 1
-        var newObjectHeader = ObjectHeader.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .setObjectId(preallocateResponse.getObjectId())
-                .setObjectVersion(2);
-
-        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
-                .toBuilder()
-                .setHeader(newObjectHeader)
-                .build();
-
-        var newTag = TestData.dummyTag(newObject);
-
-        var writeRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
-                .setTag(newTag)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.savePreallocatedObject(writeRequest));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+        assertEquals(expectedTag, savedTag);
     }
 
     @Test
@@ -1303,27 +1239,25 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         // If the ID is not reserved, that is an item not found error
 
         var newObjectId = UUID.randomUUID();
-
-        var newObjectHeader = ObjectHeader.newBuilder()
+        var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setObjectId(MetadataCodec.encode(newObjectId))
-                .setObjectVersion(1);
-
-        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
-                .toBuilder()
-                .setHeader(newObjectHeader)
                 .build();
 
-        var newTag = TestData.dummyTag(newObject);
+        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
+        var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
+        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(newTag)
+                .setPriorVersion(selector)
+                .setDefinition(newObject)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.savePreallocatedObject(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
@@ -1338,32 +1272,27 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .build();
 
-        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+        var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
+        var preallocateSelector = TestData.selectorForTag(preallocateHeader);
 
-        var newObjectHeader = ObjectHeader.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .setObjectId(preallocateResponse.getObjectId())
-                .setObjectVersion(1);
-
-        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
-                .toBuilder()
-                .setHeader(newObjectHeader)
-                .build();
-
-        var newTag = TestData.dummyTag(newObject);
+        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
+        var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
+        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(newTag)
+                .setPriorVersion(preallocateSelector)
+                .setDefinition(newObject)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
         // The first save request should succeed
-        var writeResponse = trustedApi.savePreallocatedObject(writeRequest);
-        assertEquals(preallocateResponse.getObjectId(), writeResponse.getObjectId());
+        var tagHeader = trustedApi.createPreallocatedObject(writeRequest);
+        assertEquals(preallocateHeader.getObjectId(), tagHeader.getObjectId());
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.savePreallocatedObject(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest));
         assertEquals(Status.Code.ALREADY_EXISTS, error.getStatus().getCode());
     }
 
@@ -1378,28 +1307,26 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .build();
 
-        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
-
-        var newObjectHeader = ObjectHeader.newBuilder()
+        var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
+        var preallocateSelector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(preallocateResponse.getObjectId())
-                .setObjectVersion(1);
-
-        var newObject = TestData.dummyDefinitionForType(ObjectType.MODEL, TestData.NO_HEADER)
-                .toBuilder()
-                .setHeader(newObjectHeader)
+                .setObjectId(preallocateHeader.getObjectId())
                 .build();
 
-        var newTag = TestData.dummyTag(newObject);
+        var newObject = TestData.dummyDefinitionForType(ObjectType.MODEL);
+        var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
+        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
-                .setTag(newTag)
+                .setPriorVersion(preallocateSelector)
+                .setDefinition(newObject)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.savePreallocatedObject(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest));
         assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
     }
 
@@ -1418,29 +1345,58 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .build();
 
-        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+        var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
+        var preallocateSelector = TestData.selectorForTag(preallocateHeader);
 
-        var newObjectHeader = ObjectHeader.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .setObjectId(preallocateResponse.getObjectId())
-                .setObjectVersion(1);
+        var newObject = TestData.dummyDefinitionForType(ObjectType.MODEL);
+        var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
+        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrMap());
 
-        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
-                .toBuilder()
-                .setHeader(newObjectHeader)
-                .build();
-
-        var newTag = TestData.dummyTag(newObject);
+        // Attempt one: object type matches definition, does not match selector
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
-                .setTag(newTag)
+                .setPriorVersion(preallocateSelector)
+                .setDefinition(newObject)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.savePreallocatedObject(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+
+        // Attempt two: object type matches selector, does not match definition
+
+        var writeRequest2 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(preallocateSelector)
+                .setDefinition(newObject)
+                .addAllTagUpdate(tagUpdates)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest2));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
+
+        // Attempt three: selector matches definition, does not match object type
+
+        var selector3 = preallocateSelector.toBuilder()
+                .setObjectType(ObjectType.MODEL)
+                .build();
+
+        var writeRequest3 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(selector3)
+                .setDefinition(newObject)
+                .addAllTagUpdate(tagUpdates)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error3 = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest3));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error3.getStatus().getCode());
     }
 
     @Test
@@ -1450,9 +1406,9 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     }
 
     @Test
-    void preallocateObject_newVersionBeforeSave() {
+    void preallocateObject_updateObjectBeforeSave() {
 
-        // In order to save a new object version, the first version must exist
+        // In order to update an object, the first version must exist
         // If the prior version does not exist, that is an item not found error
         // If an ID has been preallocated but nothing saved to it, that does not change the behaviour
 
@@ -1461,35 +1417,35 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .build();
 
-        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+        var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
 
-        var v1Header = ObjectHeader.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .setObjectId(preallocateResponse.getObjectId())
-                .setObjectVersion(1);
-
-        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
-                .toBuilder()
-                .setHeader(v1Header)
+        // Preallocate header does not set object/tag version (they will be zero)
+        var v1Selector = TestData.selectorForTag(preallocateHeader).toBuilder()
+                .setObjectVersion(1)
+                .setTagVersion(1)
                 .build();
 
-        var newTag = TestData.dummyTag(newObject);
+        var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
+        var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
+        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrMap());
 
         var newVersionRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(newTag)
+                .setPriorVersion(v1Selector)
+                .setDefinition(newObject)
+                .addAllTagUpdate(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewVersion(newVersionRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateObject(newVersionRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
     @Test
-    void preallocateObject_newTagBeforeSave() {
+    void preallocateObject_updateTagBeforeSave() {
 
-        // In order to save a new tag version, the object and tag must exist
+        // In order to update a tag, the object and tag must exist
         // If the prior tag does not exist, that is an item not found error
         // If an ID has been preallocated but nothing saved to it, that does not change the behaviour
 
@@ -1498,28 +1454,28 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .build();
 
-        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+        var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
 
-        var v1Header = ObjectHeader.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .setObjectId(preallocateResponse.getObjectId())
-                .setObjectVersion(1);
-
-        var v1Object = TestData.dummyDefinitionForType(ObjectType.DATA, TestData.NO_HEADER)
-                .toBuilder()
-                .setHeader(v1Header)
+        // Preallocate header does not set object/tag version (they will be zero)
+        var v1Selector = TestData.selectorForTag(preallocateHeader).toBuilder()
+                .setObjectVersion(1)
+                .setTagVersion(1)
                 .build();
 
-        var newTag = TestData.dummyTag(v1Object);
+        var t2TagUpdate = TagUpdate.newBuilder()
+                .setAttrName("some_new_attr")
+                .setValue(MetadataCodec.encodeValue(2.0))
+                .build();
 
         var newTagRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setTag(newTag)
+                .setPriorVersion(v1Selector)
+                .addTagUpdate(t2TagUpdate)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.saveNewTag(newTagRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.updateTag(newTagRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
@@ -1534,12 +1490,12 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .build();
 
-        var preallocateResponse = trustedApi.preallocateId(preallocateRequest);
+        var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
 
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(preallocateResponse.getObjectId())
+                .setObjectId(preallocateHeader.getObjectId())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();

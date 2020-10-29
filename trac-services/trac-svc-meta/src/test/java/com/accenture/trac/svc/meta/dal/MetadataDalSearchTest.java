@@ -68,19 +68,17 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     @Test
     void basicStringSearch() throws Exception {
 
-        var def1 = TestData.dummyDataDef(TestData.INCLUDE_HEADER);
-        var def2 = TestData.dummyDataDef(TestData.INCLUDE_HEADER);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.dummyDataDef();
 
-        var tag1 = Tag.newBuilder()
-                .setDefinition(def1)
-                .setTagVersion(1)
+        var tag1 = TestData.dummyTag(def1, INCLUDE_HEADER)
+                .toBuilder().clearAttr()
                 .putAttr("rodent_type", encodeValue("bilge_rat"))
                 .putAttr("rodent_name", encodeValue("Ricky the Rat"))
                 .build();
 
-        var tag2 = Tag.newBuilder()
-                .setDefinition(def2)
-                .setTagVersion(1)
+        var tag2 = TestData.dummyTag(def2, INCLUDE_HEADER)
+                .toBuilder().clearAttr()
                 .putAttr("rodent_type", encodeValue("house_mouse"))
                 .putAttr("rodent_name", encodeValue("Casandra McMouse"))
                 .build();
@@ -107,8 +105,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         // Search results should come back with no definition body
         var expectedResult = tag1.toBuilder()
-                .setDefinition(tag1.getDefinition().toBuilder()
-                .clearDefinition())
+                .clearDefinition()
                 .build();
 
         assertEquals(expectedResult, searchResult.get(0));
@@ -124,10 +121,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         //      NOT ( data_classification IN ["pii", "confidential"] )
         // )
 
-        var def1 = TestData.dummyDataDef(TestData.INCLUDE_HEADER);
-        var def2 = TestData.dummyDataDef(TestData.INCLUDE_HEADER);
-        var def3 = TestData.dummyDataDef(TestData.INCLUDE_HEADER);
-        var def4 = TestData.dummyDataDef(TestData.INCLUDE_HEADER);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.dummyDataDef();
+        var def3 = TestData.dummyDataDef();
+        var def4 = TestData.dummyDataDef();
 
         var attrNames = List.of("dataset_class", "record_date", "data_classification");
 
@@ -200,8 +197,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var otherType = objectType == ObjectType.DATA ? ObjectType.MODEL : ObjectType.DATA;
 
         var attrToLookFor = "object_type_test_for_" + objectType.name();
-        var def1 = TestData.dummyDefinitionForType(objectType, true);
-        var def2 = TestData.dummyDefinitionForType(otherType, true);
+        var def1 = TestData.dummyDefinitionForType(objectType);
+        var def2 = TestData.dummyDefinitionForType(otherType);
 
         var tag1 = tagForDef(def1, attrToLookFor, encodeValue("bilge_rat"));
         var tag2 = tagForDef(def2, attrToLookFor, encodeValue("bilge_rat"));
@@ -437,10 +434,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
     private List<Tag> equalityTestTags(BasicType basicType, String attrToLookFor, Object valueToLookFor) {
 
-        var def1 = TestData.dummyDataDef(TestData.INCLUDE_HEADER);
-        var def2 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
-        var def3 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
-        var def4 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
+        var def3 = TestData.nextDataDef(def2);
+        var def4 = TestData.nextDataDef(def3);
 
         var attr_value_2 = differentObjectOfSameType(basicType, valueToLookFor);
         var attr_value_3 = objectOfDifferentType(basicType);
@@ -463,10 +460,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var arrayType = TypeSystem.descriptor(basicType);
 
-        var def1 = TestData.dummyDataDef(TestData.INCLUDE_HEADER);
-        var def2 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
-        var def3 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
-        var def4 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
+        var def3 = TestData.nextDataDef(def2);
+        var def4 = TestData.nextDataDef(def3);
 
         var attr_value_2 = differentObjectOfSameType(basicType, valueYouAreLookingFor);
         var attr_value_3 = differentObjectOfSameType(basicType, attr_value_2);
@@ -647,10 +644,9 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrValues = orderedAttrValues(basicType);
 
         // Create a tag with a multi-valued attr
-        var def = TestData.dummyDataDef(TestData.INCLUDE_HEADER);
-        var tag = Tag.newBuilder()
-                .setDefinition(def)
-                .setTagVersion(1)
+        var def = TestData.dummyDataDef();
+        var tag = TestData.dummyTag(def, INCLUDE_HEADER)
+                .toBuilder().clearAttr()
                 .putAttr(attrToLookFor, MetadataCodec.encodeArrayValue(attrValues, TypeSystem.descriptor(basicType)))
                 .build();
 
@@ -689,28 +685,19 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
     private List<Tag> orderedTestTags(BasicType basicType, String attrToLookFor, List<Object> attrValues) {
 
-        var def1 = TestData.dummyDataDef(TestData.INCLUDE_HEADER);
-
-        var def2 = TestData.nextDataDef(
-                TestData.dummyDataDef(TestData.INCLUDE_HEADER),
-                TestData.KEEP_ORIGINAL_HEADER);
-
-        var def3 = TestData.nextDataDef(
-                TestData.nextDataDef(
-                TestData.dummyDataDef(TestData.INCLUDE_HEADER),
-                TestData.KEEP_ORIGINAL_HEADER),
-                TestData.KEEP_ORIGINAL_HEADER);
-
-        var def4 = TestData.dummyModelDef(TestData.INCLUDE_HEADER);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
+        var def3 = TestData.nextDataDef(def2);
+        var def4 = TestData.dummyModelDef();
 
         var defs = List.of(def1, def2, def3);
         var tags = new ArrayList<Tag>();
 
         for (var i = 0; i < defs.size(); i++) {
 
-            var tag = Tag.newBuilder()
-                    .setDefinition(defs.get(i))
-                    .setTagVersion(1)
+            var tag = TestData.dummyTag(defs.get(i), INCLUDE_HEADER)
+                    .toBuilder()
+                    .clearAttr()
                     .putAttr(attrToLookFor, MetadataCodec.encodeNativeObject(attrValues.get(i)))
                     .build();
 
@@ -720,9 +707,9 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Also add a tag with the wrong type
         // This should not get picked up by any of the inequality operators
         var attrValueWrongType = objectOfDifferentType(basicType);
-        var tagWrongType = Tag.newBuilder()
-                .setDefinition(def4)
-                .setTagVersion(1)
+        var tagWrongType = TestData.dummyTag(def4, INCLUDE_HEADER)
+                .toBuilder()
+                .clearAttr()
                 .putAttr(attrToLookFor, MetadataCodec.encodeNativeObject(attrValueWrongType))
                 .build();
 
@@ -773,11 +760,11 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Note: IN query for BOOLEAN attr is not allowed
         // This should be rejected as invalid at the API level
 
-        var def1 = TestData.dummyDataDef(TestData.INCLUDE_HEADER);
-        var def2 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
-        var def3 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
-        var def4 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
-        var def5 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
+        var def3 = TestData.nextDataDef(def2);
+        var def4 = TestData.nextDataDef(def3);
+        var def5 = TestData.nextDataDef(def4);
 
         var attrToLookFor = "attr_to_look_for_IN_" + basicType.name();
         var valueToLookFor = objectOfType(basicType);
@@ -826,11 +813,11 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Note: Also BOOLEAN array attrs are not allowed
         // This should be rejected as invalid at the API level
 
-        var def1 = TestData.dummyDataDef(TestData.INCLUDE_HEADER);
-        var def2 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
-        var def3 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
-        var def4 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
-        var def5 = TestData.nextDataDef(TestData.dummyDataDef(TestData.INCLUDE_HEADER), TestData.KEEP_ORIGINAL_HEADER);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
+        var def3 = TestData.nextDataDef(def2);
+        var def4 = TestData.nextDataDef(def3);
+        var def5 = TestData.nextDataDef(def4);
 
         var attrToLookFor = "attr_to_look_for_IN_ARRAY_" + basicType.name();
         var valueToLookFor = objectOfType(basicType);
@@ -892,10 +879,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrName2 = "search_attr_AND_SINGLE_2";
         var attrNames = List.of(attrName1, attrName2);
 
-        var def1 = TestData.dummyDataDef(true);
-        var def2 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
-        var def3 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
-        var def4 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
+        var def3 = TestData.nextDataDef(def2);
+        var def4 = TestData.nextDataDef(def3);
 
         var tag1 = tagForDef(def1, attrNames, List.of(encodeValue("match_1"), encodeValue("match_2")));
         var tag2 = tagForDef(def2, attrNames, List.of(encodeValue("match_1"), encodeValue("not_match_2")));
@@ -929,10 +916,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrName2 = "search_attr_AND_ARRAY_2";
         var attrNames = List.of(attrName1, attrName2);
 
-        var def1 = TestData.dummyDataDef(true);
-        var def2 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
-        var def3 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
-        var def4 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
+        var def3 = TestData.nextDataDef(def2);
+        var def4 = TestData.nextDataDef(def3);
 
         var match1List = List.of("match_1", "match_1a", "match_1b");
         var match2List = List.of("match_2", "match_2a", "match_2b");
@@ -972,10 +959,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrName2 = "search_attr_AND_MIXED_2";
         var attrNames = List.of(attrName1, attrName2);
 
-        var def1 = TestData.dummyDataDef(true);
-        var def2 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
-        var def3 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
-        var def4 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
+        var def3 = TestData.nextDataDef(def2);
+        var def4 = TestData.nextDataDef(def3);
 
         var match2List = List.of("match_2", "match_2a", "match_2b");
         var notMatch2List = List.of("match_2a", "match_2b");
@@ -1013,10 +1000,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrName2 = "search_attr_OR_SINGLE_2";
         var attrNames = List.of(attrName1, attrName2);
 
-        var def1 = TestData.dummyDataDef(true);
-        var def2 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
-        var def3 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
-        var def4 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
+        var def3 = TestData.nextDataDef(def2);
+        var def4 = TestData.nextDataDef(def3);
 
         var tag1 = tagForDef(def1, attrNames, List.of(encodeValue("match_1"), encodeValue("match_2")));
         var tag2 = tagForDef(def2, attrNames, List.of(encodeValue("match_1"), encodeValue("not_match_2")));
@@ -1052,10 +1039,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrName2 = "search_attr_OR_ARRAY_2";
         var attrNames = List.of(attrName1, attrName2);
 
-        var def1 = TestData.dummyDataDef(true);
-        var def2 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
-        var def3 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
-        var def4 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
+        var def3 = TestData.nextDataDef(def2);
+        var def4 = TestData.nextDataDef(def3);
 
         var match1List = List.of("match_1", "match_1a", "match_1b");
         var match2List = List.of("match_2", "match_2a", "match_2b");
@@ -1097,10 +1084,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrName2 = "search_attr_OR_MIXED_2";
         var attrNames = List.of(attrName1, attrName2);
 
-        var def1 = TestData.dummyDataDef(true);
-        var def2 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
-        var def3 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
-        var def4 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
+        var def3 = TestData.nextDataDef(def2);
+        var def4 = TestData.nextDataDef(def3);
 
         var match2List = List.of("match_2", "match_2a", "match_2b");
         var notMatch2List = List.of("match_2a", "match_2b");
@@ -1142,8 +1129,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var markerName = "search_attr_NOT_SINGLE_marker";
         var attrName = "search_attr_NOT_SINGLE";
 
-        var def1 = TestData.dummyDataDef(true);
-        var def2 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
 
         var tag1 = tagForDef(def1, List.of(attrName, markerName), List.of(
                 encodeValue("droids_you_are_looking_for"),
@@ -1185,8 +1172,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var markerName = "search_attr_NOT_ARRAY_marker";
         var attrName = "search_attr_NOT_ARRAY";
 
-        var def1 = TestData.dummyDataDef(true);
-        var def2 = TestData.nextDataDef(TestData.dummyDataDef(true), false);
+        var def1 = TestData.dummyDataDef();
+        var def2 = TestData.nextDataDef(def1);
 
         var matchList = List.of("match_1", "match_1a", "match_1b");
         var notMatchList = List.of("match_1a", "match_1b");
@@ -1240,13 +1227,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrNames = List.of(attrToLookFor, markerName);
         var attrValues = List.of(encodeValue(valueToLookFor), encodeValue(markerValue));
 
-        var defV1 = TestData.dummyDataDef(true);
-        var defV2 = TestData.nextDataDef(defV1, true);
+        var defV1 = TestData.dummyDataDef();
+        var defV2 = TestData.nextDataDef(defV1);
 
         var tagV1T1 = tagForDef(defV1, attrNames, attrValues);
-        var tagV1T2 = TestData.nextTag(tagV1T1, true);
-        var tagV2T1 = tagForDef(defV2, attrNames, attrValues);
-        var tagV2T2 = TestData.nextTag(tagV2T1, true);
+        var tagV1T2 = TestData.nextTag(tagV1T1, UPDATE_TAG_VERSION);
+        var tagV2T1 = tagForNextObject(tagV1T2, defV2, INCLUDE_HEADER);
+        var tagV2T2 = TestData.nextTag(tagV2T1, UPDATE_TAG_VERSION);
 
         unwrap(CompletableFuture.completedFuture(true)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, tagV1T1))
@@ -1330,8 +1317,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     private Tag tagForDef(ObjectDefinition def, String attrName, Value attrValue) {
 
         return Tag.newBuilder()
+                .setHeader(TestData.newHeader(def.getObjectType()))
                 .setDefinition(def)
-                .setTagVersion(1)
                 .putAttr(attrName, attrValue)
                 .putAttr("more_than_one_attr", encodeValue(true))
                 .build();
@@ -1340,8 +1327,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     private Tag tagForDef(ObjectDefinition def, List<String> attrNames, List<Value> attrValues) {
 
         var tag = Tag.newBuilder()
-                .setDefinition(def)
-                .setTagVersion(1);
+                .setHeader(TestData.newHeader(def.getObjectType()))
+                .setDefinition(def);
 
         for (var i = 0; i < attrNames.size(); i++)
             tag = tag.putAttr(attrNames.get(i), attrValues.get(i));
@@ -1353,10 +1340,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         return fullTag
                 .toBuilder()
-                .setDefinition(fullTag
-                    .getDefinition()
-                    .toBuilder()
-                    .clearDefinition())
+                .clearDefinition()
                 .build();
     }
 

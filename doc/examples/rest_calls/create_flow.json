@@ -1,10 +1,22 @@
 {
-    "attr": {
-        "flow_type": { "stringValue": "account_simulation" },
-        "portfolio": { "stringValue": "credit_cards" },
-        "brand": { "stringValue": "ACME Financial" },
-        "last_review_date": { "dateValue": "2020-06-04" }
-    },
+    "tagUpdate": [
+        {
+            "attrName": "flow_type",
+            "value": { "stringValue": "account_simulation" }
+        },
+        {
+            "attrName": "portfolio",
+            "value": { "stringValue": "credit_cards" }
+        },
+        {
+            "attrName": "brand",
+            "value": {"stringValue": "ACME Financial" }
+        },
+        {
+            "attrName": "last_review_date",
+            "value" : { "dateValue": { "isoDate": "2020-06-04" } }
+        }
+    ],
 
     "definition": {
     "flow": {

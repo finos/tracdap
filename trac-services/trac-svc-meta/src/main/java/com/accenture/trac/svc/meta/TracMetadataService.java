@@ -28,9 +28,9 @@ import com.accenture.trac.svc.meta.api.MetadataSearchApi;
 import com.accenture.trac.svc.meta.api.MetadataTrustedWriteApi;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
-import com.accenture.trac.svc.meta.logic.MetadataReadLogic;
-import com.accenture.trac.svc.meta.logic.MetadataSearchLogic;
-import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
+import com.accenture.trac.svc.meta.services.MetadataReadService;
+import com.accenture.trac.svc.meta.services.MetadataSearchService;
+import com.accenture.trac.svc.meta.services.MetadataWriteService;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.Server;
@@ -106,9 +106,9 @@ public class TracMetadataService {
         // Set up services and APIs
         var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
 
-        var readLogic = new MetadataReadLogic(dalWithLogging);
-        var writeLogic = new MetadataWriteLogic(dalWithLogging);
-        var searchLogic = new MetadataSearchLogic(dalWithLogging);
+        var readLogic = new MetadataReadService(dalWithLogging);
+        var writeLogic = new MetadataWriteService(dalWithLogging);
+        var searchLogic = new MetadataSearchService(dalWithLogging);
 
         var readApi = new MetadataReadApi(readLogic);
         var publicWriteApi = new MetadataPublicWriteApi(writeLogic);

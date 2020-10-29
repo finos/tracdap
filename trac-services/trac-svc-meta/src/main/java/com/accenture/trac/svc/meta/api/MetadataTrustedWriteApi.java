@@ -16,134 +16,94 @@
 
 package com.accenture.trac.svc.meta.api;
 
-import com.accenture.trac.common.api.meta.IdResponse;
 import com.accenture.trac.common.api.meta.MetadataTrustedWriteApiGrpc;
 import com.accenture.trac.common.api.meta.MetadataWriteRequest;
-import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.TagHeader;
 import com.accenture.trac.common.util.ApiWrapper;
-import com.accenture.trac.svc.meta.logic.MetadataWriteLogic;
+import com.accenture.trac.svc.meta.services.MetadataWriteService;
 import io.grpc.stub.StreamObserver;
 
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.TAG_FIRST_VERSION;
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.TRUSTED_API;
+import static com.accenture.trac.svc.meta.services.MetadataConstants.*;
 
 
 public class MetadataTrustedWriteApi extends MetadataTrustedWriteApiGrpc.MetadataTrustedWriteApiImplBase {
 
     private final ApiWrapper apiWrapper;
-    private final MetadataWriteLogic writeLogic;
+    private final MetadataWriteService writeService;
 
-    public MetadataTrustedWriteApi(MetadataWriteLogic writeLogic) {
+    public MetadataTrustedWriteApi(MetadataWriteService writeService) {
         this.apiWrapper = new ApiWrapper(getClass(), ApiErrorMapping.ERROR_MAPPING);
-        this.writeLogic = writeLogic;
+        this.writeService = writeService;
     }
 
     @Override
-    public void saveNewObject(MetadataWriteRequest request, StreamObserver<IdResponse> response) {
+    public void createObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
         apiWrapper.unaryCall(response, () -> {
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
-            var tag = request.getTag();
 
-            var saveResult = writeLogic.saveNewObject(tenant, objectType, tag, TRUSTED_API);
-
-            var idResponse = saveResult
-                    .thenApply(objectId -> IdResponse.newBuilder()
-                    .setObjectId(MetadataCodec.encode(objectId))
-                    .setObjectVersion(1)
-                    .setTagVersion(1)
-                    .build());
-
-            return idResponse;
+            return writeService.createObject(tenant, objectType,
+                    request.getDefinition(),
+                    request.getTagUpdateList(),
+                    TRUSTED_API);
         });
     }
 
     @Override
-    public void saveNewVersion(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
-
-        apiWrapper.unaryCall(responseObserver, () -> {
-
-            var tenant = request.getTenant();
-            var objectType = request.getObjectType();
-            var tag = request.getTag();
-
-            var saveResult = writeLogic.saveNewVersion(tenant, objectType, tag, TRUSTED_API);
-
-            var idResponse = saveResult
-                    .thenApply(objectVersion -> IdResponse.newBuilder()
-                    .setObjectId(tag.getDefinition().getHeader().getObjectId())
-                    .setObjectVersion(objectVersion)
-                    .setTagVersion(1)
-                    .build());
-
-            return idResponse;
-        });
-    }
-
-    @Override
-    public void saveNewTag(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
-
-        apiWrapper.unaryCall(responseObserver, () -> {
-
-            var tenant = request.getTenant();
-            var objectType = request.getObjectType();
-            var tag = request.getTag();
-
-            var saveResult = writeLogic.saveNewTag(tenant, objectType, tag, TRUSTED_API);
-
-            var idResponse = saveResult
-                    .thenApply(tagVersion -> IdResponse.newBuilder()
-                    .setObjectId(tag.getDefinition().getHeader().getObjectId())
-                    .setObjectVersion(tag.getDefinition().getHeader().getObjectVersion())
-                    .setTagVersion(tagVersion)
-                    .build());
-
-            return idResponse;
-        });
-    }
-
-    @Override
-    public void preallocateId(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
+    public void updateObject(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
 
-            var saveResult = writeLogic.preallocateId(tenant, objectType);
-
-            var idResponse = saveResult
-                    .thenApply(header -> IdResponse.newBuilder()
-                    .setObjectId(header.getObjectId())
-                    .setObjectVersion(header.getObjectVersion())
-                    .setTagVersion(TAG_FIRST_VERSION)
-                    .build());
-
-            return idResponse;
+            return writeService.updateObject(tenant, objectType,
+                    request.getPriorVersion(),
+                    request.getDefinition(),
+                    request.getTagUpdateList(),
+                    TRUSTED_API);
         });
     }
 
     @Override
-    public void savePreallocatedObject(MetadataWriteRequest request, StreamObserver<IdResponse> responseObserver) {
+    public void updateTag(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
+
+        apiWrapper.unaryCall(responseObserver, () -> {
+
+            return writeService.updateTag(
+                    request.getTenant(),
+                    request.getObjectType(),
+                    request.getPriorVersion(),
+                    request.getTagUpdateList(),
+                    TRUSTED_API);
+        });
+    }
+
+    @Override
+    public void preallocateId(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
         apiWrapper.unaryCall(responseObserver, () -> {
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
-            var tag = request.getTag();
 
-            var saveResult = writeLogic.savePreallocatedObject(tenant, objectType, tag);
+            return writeService.preallocateId(tenant, objectType);
+        });
+    }
 
-            var idResponse = saveResult
-                    .thenApply(header -> IdResponse.newBuilder()
-                    .setObjectId(header.getObjectId())
-                    .setObjectVersion(header.getObjectVersion())
-                    .setTagVersion(TAG_FIRST_VERSION)
-                    .build());
+    @Override
+    public void createPreallocatedObject(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-            return idResponse;
+        apiWrapper.unaryCall(responseObserver, () -> {
+
+            return writeService.createPreallocatedObject(
+                    request.getTenant(),
+                    request.getObjectType(),
+                    request.getPriorVersion(),
+                    request.getDefinition(),
+                    request.getTagUpdateList());
         });
     }
 }

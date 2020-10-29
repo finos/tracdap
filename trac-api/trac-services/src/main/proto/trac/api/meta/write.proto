@@ -62,10 +62,10 @@ import "google/protobuf/descriptor.proto";
 service MetadataPublicWriteApi {
 
     /**
-     * Save a new object into the TRAC metadata store.
+     * Create a new object in the TRAC metadata store.
      *
-     * To save an object, supply a metadata write request with the tenant code,
-     * object type and a tag for the item you want to save. The tag should contain
+     * To create an object, supply a metadata write request with the tenant code,
+     * object type and a definition for the item you want to save. The tag should contain
      * all the attributes you want to set and the object definition, without an
      * object header. TRAC will create a header when it assigns and ID for the new
      * object. Only FLOW and CUSTOM objects can be created by this API call.
@@ -87,17 +87,17 @@ service MetadataPublicWriteApi {
      * @see MetadataWriteRequest
      * @see ObjectDefinition
      * @see Tag
-     * @see IdResponse
+     * @see TagHeader
      */
-    rpc saveNewObject (MetadataWriteRequest) returns (IdResponse) {
+    rpc createObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/{objectType}/new-object"
-            body: "tag"
+            post: "/{tenant}/{objectType}/create-object"
+            body: "*"
         };
     }
 
     /**
-     * Save a new version of an existing object into the TRAC metadata store.
+     * Update an existing object in the TRAC metadata store.
      *
      * To save a new version, supply a metadata write request with the tenant code,
      * object type and a tag for the item you want to save. The tag should contain
@@ -126,19 +126,17 @@ service MetadataPublicWriteApi {
      * @see MetadataWriteRequest
      * @see ObjectDefinition
      * @see Tag
-     * @see IdResponse
+     * @see TagHeader
      */
-    rpc saveNewVersion (MetadataWriteRequest) returns (IdResponse) {
+    rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/{objectType}/new-version"
-            body: "tag"
+            post: "/{tenant}/{objectType}/update-object"
+            body: "*"
         };
     }
 
     /**
-     * Save a new tag into the TRAC metadata store for an existing object/version.
-     *
-     * NOTE: This will be replaced by updateTag() in the next version of TRAC.
+     * Update the tag for an existing object in the TRAC metadata store.
      *
      * To save a new tag, supply a metadata write request with the tenant code,
      * object type and a tag for the item you want to save. The tag should contain
@@ -158,12 +156,12 @@ service MetadataPublicWriteApi {
      * @see MetadataWriteRequest
      * @see ObjectDefinition
      * @see Tag
-     * @see IdResponse
+     * @see TagHeader
      */
-    rpc saveNewTag (MetadataWriteRequest) returns (IdResponse) {
+    rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/{objectType}/new-tag"
-            body: "tag"
+            post: "/{tenant}/{objectType}/update-tag"
+            body: "*"
         };
     }
 }
@@ -195,22 +193,22 @@ service MetadataTrustedWriteApi {
 
 
     /**
-     * Save a new object into the TRAC metadata store.
+     * Create a new object in the TRAC metadata store.
      *
      * This call behaves identically to the equivalent public API call, without the
      * restriction on which types of object can be saved.
      *
      * @see MetadataPublicWriteApi
      */
-    rpc saveNewObject (MetadataWriteRequest) returns (IdResponse) {
+    rpc createObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/{objectType}/new-object"
-            body: "tag"
+            post: "/{tenant}/trusted/{objectType}/create-object"
+            body: "*"
         };
     }
 
     /**
-     * Save a new version of an existing object into the TRAC metadata store.
+     * Update an existing object in the TRAC metadata store.
      *
      * This call behaves identically to the equivalent public API call, however it
      * can be used with any type of object that supports versioning (currently DATA
@@ -218,29 +216,29 @@ service MetadataTrustedWriteApi {
      *
      * @see MetadataPublicWriteApi
      */
-    rpc saveNewVersion (MetadataWriteRequest) returns (IdResponse) {
+    rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/{objectType}/new-version"
-            body: "tag"
+            post: "/{tenant}/trusted/{objectType}/update-object"
+            body: "*"
         };
     }
 
     /**
-     * Save a new tag into the TRAC metadata store for an existing object/version.
+     * Update the tag for an existing object in the TRAC metadata store.
      *
      * This call behaves identically to the equivalent public API call.
      *
      * @see MetadataPublicWriteApi
      */
-    rpc saveNewTag (MetadataWriteRequest) returns (IdResponse) {
+    rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/{objectType}/new-tag"
-            body: "tag"
+            post: "/{tenant}/trusted/{objectType}/update-tag"
+            body: "*"
         };
     }
 
     /**
-     * Preallocate an object ID for an object that will be saved later.
+     * Preallocate an object ID for an object that will be created later.
      *
      * This call is for use by TRAC components that need to reserve an ID before
      * it is used, particularly if the object ID must be included in the definition
@@ -252,15 +250,15 @@ service MetadataTrustedWriteApi {
      *
      * @see MetadataWriteRequest
      */
-    rpc preallocateId (MetadataWriteRequest) returns (IdResponse) {
+    rpc preallocateId (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
             post: "/{tenant}/trusted/{objectType}/preallocate"
-            body: "tag"
+            body: "*"
         };
     }
 
     /**
-     * Save an object using an ID that was previous preallocated.
+     * Create an object using an ID that was previously preallocated.
      *
      * This call behaves essentially the same as saveNewObject(), with all the
      * same validation. The only difference is that the new definition must be
@@ -273,39 +271,169 @@ service MetadataTrustedWriteApi {
      *
      * @see MetadataWriteRequest
      */
-    rpc savePreallocatedObject (MetadataWriteRequest) returns (IdResponse) {
+    rpc createPreallocatedObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/{objectType}/save-preallocated"
-            body: "tag"
+            post: "/{tenant}/trusted/{objectType}/create-preallocated"
+            body: "*"
         };
     }
 }
 
 
 /**
-Request to create or update an object in the TRAC metadata store
+ * Enumeration of available TagUpdate operations.
+ *
+ * @see TagUpdate
+ */
+enum TagOperation {
 
-@see MetadataPublicWriteApi
-@see MetadataTrustedWriteApi
-*/
-message MetadataWriteRequest {
+    /**
+     * Add an attribute to a tag or replace it if it already exists.
+     *
+     * This is the default operation if no operation is specified. If the
+     * attribute does not exist it will be created using CREATE_ATTR, otherwise
+     * it will replaced using REPLACE_ATTR.
+     *
+     * @see TagOperation.CREATE_ATTR
+     * @see TagOperation.REPLACE_ATTR
+     */
+    CREATE_OR_REPLACE_ATTR = 0;
 
-    string tenant = 1;
+    /**
+     * Add an attribute to a tag or append to it if it already exists.
+     *
+     * If the attribute does not exist it will be created using CREATE_ATTR,
+     * otherwise it will appended to using APPEND_ATTR.
+     *
+     * @see TagOperation.CREATE_ATTR
+     * @see TagOperation.APPEND_ATTR
+     */
+    CREATE_OR_APPEND_ATTR = 1;
 
-    trac.metadata.ObjectType objectType = 2;
-    trac.metadata.Tag tag = 3;
+    /**
+     * Add an attribute to a tag, fail if the attribute already exists.
+     */
+    CREATE_ATTR = 2;
+
+    /**
+     * Replace an attribute on a tag, fail if the attribute does not exist.
+     *
+     * When replacing an attribute, the new attribute must be of the same basic
+     * type as the old one. It is allowed to replace a single-valued attribute
+     * with a multi-valued one and vice-versa (this is not considered to be
+     * changing the basic type).
+     *
+     * Changing the type of attributes is not recommended because it is likely
+     * to confuse applications that refer to those attributes. If you really
+     * need to change the type of an attribute (e.g. to correct an error), use
+     * DELETE_ATTR followed by CREATE_ATTR.
+     */
+    REPLACE_ATTR = 3;
+
+    /**
+     * Append one or more values to an existing attribute, fail if the attribute
+     * does not exist.
+     *
+     * The existing attribute may be single- or multi-valued and the append
+     * operation may add one value or multiple values (i.e. all combinations are
+     * permitted). The appended value(s) must be of the same basic type as the
+     * existing value(s).
+     */
+    APPEND_ATTR = 4;
+
+    /**
+     * Remove an attribute from a tag, fail if the attribute does not exist.
+     */
+    DELETE_ATTR = 5;
+
+    /**
+     * Remove all the attributes from a tag.
+     *
+     * This operation does not affect controlled attributes, which are still
+     * managed by TRAC according to its normal rules.
+     */
+    CLEAR_ALL_ATTR = 6;
 }
 
 
 /**
-Pass back the ID, object version and tag version of new/modified objects
+ * A tag update is a request for a single update operation on a tag.
+ *
+ * Tag updates are supplied as a list in metadata write requests when creating
+ * or updating objects and tags. The updates are applied in order and must all
+ * succeeded in order for the API call to be successful. If the API call fails
+ * for any reason, none of the requested updates will be applied.
+ *
+ * @see MetadataWriteRequest
+ */
+message TagUpdate {
 
-@see MetadataPublicWriteApi
-@see MetadataTrustedWriteApi
-*/
-message IdResponse {
+    /**
+     * The operation requested in this update
+     *
+     * @see TagOperation
+     */
+    TagOperation operation = 1;
 
-    trac.metadata.UUID objectId = 1;
-    int32 objectVersion = 2;
-    int32 tagVersion = 3;
+    /**
+     * Name of the attribute this update refers to.
+     *
+     * This field must be supplied for operations that refer to a single
+     * attribute, otherwise it should be left blank.
+     */
+    string attrName = 2;
+
+    /**
+     * Attribute value to use for this update.
+     *
+     * This field must be supplied for operations that use a value, otherwise it
+     * should be left blank.
+     *
+     * @see metadata.Value
+     */
+    metadata.Value value = 3;
+}
+
+
+/**
+ * Request to create or update an object in the TRAC metadata store.
+ *
+ * @see MetadataPublicWriteApi
+ * @see MetadataTrustedWriteApi
+ */
+message MetadataWriteRequest {
+
+    /**
+     * Tenant code for the requested operation, always required.
+     */
+    string tenant = 1;
+
+    /**
+     * Object type for the requested operation, always required.
+     *
+     * @see ObjectType
+     */
+    metadata.ObjectType objectType = 2;
+
+    /**
+     * Prior object/tag version to use for update operations.
+     *
+     * This field must be left blank for create operations.
+     */
+    metadata.TagSelector priorVersion = 3;
+
+    /**
+     * New object definition to save.
+     *
+     * A definition is required to create or update an object, for tag updates
+     * the definition field should be left blank.
+     *
+     * This field must be left blank for tag update operations (saveNew.
+     */
+    metadata.ObjectDefinition definition = 4;
+
+    /**
+     * Tag update operations to be applied.
+     */
+    repeated TagUpdate tagUpdate = 5;
 }

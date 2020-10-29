@@ -16,13 +16,14 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-public class AuthorisationError extends TracError {
 
-    public AuthorisationError(String message) {
+public class ETagUpdate extends EMetadata {
+
+    public ETagUpdate(String message) {
         super(message);
     }
 
-    public AuthorisationError(String message, Throwable cause) {
+    public ETagUpdate(String message, Throwable cause) {
         super(message, cause);
     }
 }

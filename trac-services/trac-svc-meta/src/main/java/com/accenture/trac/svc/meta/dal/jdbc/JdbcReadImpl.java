@@ -67,7 +67,7 @@ class JdbcReadImpl {
     KeyedItem<ObjectDefinition>
     readDefinitionByVersion(
             Connection conn, short tenantId,
-            ObjectType objectType, long objectPk, int objectVersion)
+            long objectPk, int objectVersion)
             throws SQLException {
 
         var query =
@@ -83,14 +83,13 @@ class JdbcReadImpl {
             stmt.setLong(2, objectPk);
             stmt.setInt(3, objectVersion);
 
-            return readDefinition(stmt, objectType);
+            return readDefinition(stmt);
         }
     }
 
     KeyedItem<ObjectDefinition>
     readDefinitionByLatest(
-            Connection conn, short tenantId,
-            ObjectType objectType, long objectPk)
+            Connection conn, short tenantId, long objectPk)
             throws SQLException {
 
         var query =
@@ -110,12 +109,12 @@ class JdbcReadImpl {
             stmt.setShort(2, tenantId);
             stmt.setLong(3, objectPk);
 
-            return readDefinition(stmt, objectType);
+            return readDefinition(stmt);
         }
     }
 
     private KeyedItem<ObjectDefinition>
-    readDefinition(PreparedStatement stmt, ObjectType objectType) throws SQLException {
+    readDefinition(PreparedStatement stmt) throws SQLException {
 
         try (var rs = stmt.executeQuery()) {
 
@@ -139,11 +138,12 @@ class JdbcReadImpl {
         }
     }
 
-    KeyedItem<Tag.Builder>
+    KeyedItem<Void>
     readTagRecordByVersion(Connection conn, short tenantId, long definitionPk, int tagVersion) throws SQLException {
 
         var query =
-                "select tag_pk, tag_version from tag\n" +
+                "select tag_pk, tag_version \n" +
+                "from tag\n" +
                 "where tenant_id = ?\n" +
                 "and definition_fk = ?\n" +
                 "and tag_version = ?";
@@ -158,11 +158,12 @@ class JdbcReadImpl {
         }
     }
 
-    KeyedItem<Tag.Builder>
+    KeyedItem<Void>
     readTagRecordByLatest(Connection conn, short tenantId, long definitionPk) throws SQLException {
 
         var query =
-                "select tag_pk, tag_version from tag\n" +
+                "select tag_pk, tag_version \n" +
+                "from tag\n" +
                 "where tenant_id = ?\n" +
                 "and tag_pk = (\n" +
                 "  select lt.latest_tag_pk\n" +
@@ -180,7 +181,7 @@ class JdbcReadImpl {
         }
     }
 
-    private KeyedItem<Tag.Builder>
+    private KeyedItem<Void>
     readTagRecord(PreparedStatement stmt) throws SQLException {
 
         try (var rs = stmt.executeQuery()) {
@@ -190,12 +191,12 @@ class JdbcReadImpl {
 
             var tagPk = rs.getLong(1);
             var tagVersion = rs.getInt(2);
-            var tagStub = Tag.newBuilder().setTagVersion(tagVersion);
 
             if (rs.next())
                 throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-            return new KeyedItem<>(tagPk, tagVersion, tagStub);
+            // Tag record requires only PK and version info
+            return new KeyedItem<>(tagPk, tagVersion, null);
         }
     }
 

@@ -53,7 +53,8 @@ public class TypeSystem {
             Map.entry(Value.ValueCase.DECIMALVALUE, BasicType.DECIMAL),
             Map.entry(Value.ValueCase.DATEVALUE, BasicType.DATE),
             Map.entry(Value.ValueCase.DATETIMEVALUE, BasicType.DATETIME),
-            Map.entry(Value.ValueCase.ARRAYVALUE, BasicType.ARRAY));
+            Map.entry(Value.ValueCase.ARRAYVALUE, BasicType.ARRAY),
+            Map.entry(Value.ValueCase.MAPVALUE, BasicType.MAP));
 
     public static BasicType basicType(Class<?> clazz) {
 

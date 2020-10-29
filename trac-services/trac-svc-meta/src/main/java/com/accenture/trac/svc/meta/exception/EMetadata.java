@@ -16,13 +16,15 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-public class CorruptItemError extends MetadataError {
+import com.accenture.trac.common.exception.ETracPublic;
 
-    public CorruptItemError(String message) {
+public class EMetadata extends ETracPublic {
+
+    public EMetadata(String message) {
         super(message);
     }
 
-    public CorruptItemError(String message, Throwable cause) {
+    public EMetadata(String message, Throwable cause) {
         super(message, cause);
     }
 }

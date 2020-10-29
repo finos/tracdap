@@ -16,13 +16,13 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-public class InputValidationError extends TracError {
+public class EDuplicateItem extends EMetadata {
 
-    public InputValidationError(String message) {
+    public EDuplicateItem(String message) {
         super(message);
     }
 
-    public InputValidationError(String message, Throwable cause) {
+    public EDuplicateItem(String message, Throwable cause) {
         super(message, cause);
     }
 }

@@ -16,19 +16,18 @@
 
 package com.accenture.trac.svc.meta.validation;
 
+import com.accenture.trac.common.api.meta.TagUpdate;
 import com.accenture.trac.common.metadata.ObjectDefinition;
 import com.accenture.trac.common.metadata.ObjectType;
-import com.accenture.trac.common.metadata.Tag;
-import com.accenture.trac.svc.meta.exception.AuthorisationError;
-import com.accenture.trac.svc.meta.exception.InputValidationError;
-import com.accenture.trac.svc.meta.logic.MetadataConstants;
+import com.accenture.trac.common.metadata.TagSelector;
+import com.accenture.trac.common.exception.*;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static com.accenture.trac.svc.meta.logic.MetadataConstants.*;
+import static com.accenture.trac.svc.meta.services.MetadataConstants.*;
 
 
 public class MetadataValidator {
@@ -60,7 +59,7 @@ public class MetadataValidator {
                     ? "There were multiple validation errors:\n" + String.join("\n", validationErrors)
                     : validationErrors.get(0);
 
-            throw new InputValidationError(message);
+            throw new EInputValidation(message);
         }
 
         return this;
@@ -74,7 +73,7 @@ public class MetadataValidator {
                     ? "There were multiple authorisation errors:\n" + String.join("\n", validationErrors)
                     : validationErrors.get(0);
 
-            throw new AuthorisationError(message);
+            throw new EAuthorization(message);
         }
 
         return this;
@@ -90,53 +89,34 @@ public class MetadataValidator {
         return this;
     }
 
-    public MetadataValidator headerIsNull(ObjectDefinition objectDefinition) {
+    public ObjectDefinition normalizeObjectType(ObjectDefinition rawDefinition) {
 
-        if (objectDefinition.hasHeader()) {
-            validationErrors.add("Object header must be null");
+        var definitionType = DEFINITION_TYPE_MAPPING.getOrDefault(
+                rawDefinition.getDefinitionCase(), ObjectType.UNRECOGNIZED);
+
+        if (definitionType == ObjectType.UNRECOGNIZED) {
+            validationErrors.add("Type could not be recognised for object definition");
+            return rawDefinition;
         }
 
-        return this;
-    }
+        if (rawDefinition.getObjectType() != ObjectType.OBJECT_TYPE_NOT_SET) {
 
-    public MetadataValidator headerIsValid(ObjectDefinition objectDefinition) {
+            if (rawDefinition.getObjectType() != definitionType) {
 
-        if (!objectDefinition.hasHeader()) {
-            validationErrors.add("Object header is missing");
+                var message = String.format(
+                        "Object definition does not match its own object type" +
+                                " (type specified is %s, definition is %s)",
+                        rawDefinition.getObjectType(), definitionType);
+
+                validationErrors.add(message);
+            }
+
+            return rawDefinition;
         }
 
-        var header = objectDefinition.getHeader();
-
-        if (header.getObjectType() == ObjectType.UNRECOGNIZED){
-            validationErrors.add("Object header does not contain a valid object type");
-        }
-
-        if (!header.hasObjectId()){
-            validationErrors.add("Object header does not contain a valid ID");
-        }
-
-        if (header.getObjectVersion() < MetadataConstants.OBJECT_FIRST_VERSION) {
-            validationErrors.add("Object header does not contain a valid version number");
-        }
-
-        return this;
-    }
-
-    public MetadataValidator headerMatchesType(ObjectDefinition objectDefinition, ObjectType objectType) {
-
-        var header = objectDefinition.getHeader();
-
-        if (header.getObjectType() != objectType) {
-
-            var message = String.format(
-                    "Object header does not match the specified object type" +
-                    " (type specified is %s, header contains %s)",
-                    objectType, header.getObjectType());
-
-            validationErrors.add(message);
-        }
-
-        return this;
+        return rawDefinition.toBuilder()
+                .setObjectType(definitionType)
+                .build();
     }
 
     public MetadataValidator definitionMatchesType(ObjectDefinition objectDefinition, ObjectType objectType) {
@@ -157,13 +137,14 @@ public class MetadataValidator {
         return this;
     }
 
-    public MetadataValidator headerIsOnFirstVersion(ObjectDefinition objectDefinition) {
+    public MetadataValidator priorVersionMatchesType(TagSelector priorVersion, ObjectType objectType) {
 
-        if (objectDefinition.getHeader().getObjectVersion() != OBJECT_FIRST_VERSION) {
+        if (priorVersion.getObjectType() != objectType) {
 
             var message = String.format(
-                    "Object version must be set to %d",
-                    OBJECT_FIRST_VERSION);
+                    "Prior version does not match the specified object type" +
+                            " (type specified is %s, prior version type is %s)",
+                    objectType, priorVersion.getObjectType());
 
             validationErrors.add(message);
         }
@@ -171,35 +152,13 @@ public class MetadataValidator {
         return this;
     }
 
-    public MetadataValidator tagVersionIsBlank(Tag tag) {
+    public MetadataValidator tagAttributesAreValid(List<TagUpdate> updates) {
 
-        // It is not actually possible to set an int value to null in protobuf
-        // Instead we accept 0 or the TAG_FIRST_VERSION when a new tag is being created
-        // Leaving the value unset in client code will create a zero value, which is valid
+        for (var update : updates) {
 
-        if (tag.getTagVersion() != 0 && tag.getTagVersion() != TAG_FIRST_VERSION) {
-            validationErrors.add("Tag version must not be set (allowable values are null, 0 or 1)");
-        }
+            if (!VALID_IDENTIFIER.matcher(update.getAttrName()).matches()) {
 
-        return this;
-    }
-
-    public MetadataValidator tagVersionIsValid(Tag tag) {
-
-        if (tag.getTagVersion() < TAG_FIRST_VERSION) {
-            validationErrors.add("Tag does not contain a valid tag version number");
-        }
-
-        return this;
-    }
-
-    public MetadataValidator tagAttributesAreValid(Tag tag) {
-
-        for (String attrKey : tag.getAttrMap().keySet()) {
-
-            if (!VALID_IDENTIFIER.matcher(attrKey).matches()) {
-
-                var message = String.format("Tag attribute is not a valid identifier: '%s'", attrKey);
+                var message = String.format("Tag attribute is not a valid identifier: '%s'", update.getAttrName());
                 validationErrors.add(message);
             }
         }
@@ -207,13 +166,13 @@ public class MetadataValidator {
         return this;
     }
 
-    public MetadataValidator tagAttributesAreNotReserved(Tag tag) {
+    public MetadataValidator tagAttributesAreNotReserved(List<TagUpdate> updates) {
 
-        for (String attrKey : tag.getAttrMap().keySet()) {
+        for (var update : updates) {
 
-            if (TRAC_RESERVED_IDENTIFIER.matcher(attrKey).matches()) {
+            if (TRAC_RESERVED_IDENTIFIER.matcher(update.getAttrName()).matches()) {
 
-                var message = String.format("Tag attribute is reserved for use by TRAC: '%s'", attrKey);
+                var message = String.format("Tag attribute is reserved for use by TRAC: '%s'", update.getAttrName());
                 validationErrors.add(message);
             }
         }

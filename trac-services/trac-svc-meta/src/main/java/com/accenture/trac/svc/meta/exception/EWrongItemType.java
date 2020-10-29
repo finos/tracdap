@@ -16,13 +16,13 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-public class DuplicateItemError extends MetadataError {
+public class EWrongItemType extends EMetadata {
 
-    public DuplicateItemError(String message) {
+    public EWrongItemType(String message) {
         super(message);
     }
 
-    public DuplicateItemError(String message, Throwable cause) {
+    public EWrongItemType(String message, Throwable cause) {
         super(message, cause);
     }
 }

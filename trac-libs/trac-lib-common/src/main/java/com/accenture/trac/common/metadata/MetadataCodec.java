@@ -337,6 +337,17 @@ public class MetadataCodec {
         return OffsetDateTime.parse(value.getDatetimeValue().getIsoDatetime(), ISO_DATE_TIME_FORMAT);
     }
 
+    public static List<?> decodeArrayValue(Value value) {
+
+        if (TypeSystem.basicType(value) != BasicType.ARRAY)
+            throw new IllegalArgumentException("Value is not an array");
+
+        return value.getArrayValue().getItemList().stream()
+                .map(MetadataCodec::decodeValue)
+                .collect(Collectors.toList());
+
+    }
+
     private static final DateTimeFormatter ISO_DATE_FORMAT = DateTimeFormatter.ISO_DATE;
     private static final DateTimeFormatter ISO_DATE_TIME_FORMAT = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 }

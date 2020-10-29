@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.meta.test;
 
+import com.accenture.trac.common.api.meta.TagUpdate;
 import com.accenture.trac.common.metadata.*;
 import com.google.protobuf.ByteString;
 
@@ -23,10 +24,13 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 
 public class TestData {
@@ -34,25 +38,22 @@ public class TestData {
     public static final boolean INCLUDE_HEADER = true;
     public static final boolean NO_HEADER = false;
 
-    public static final boolean UPDATE_HEADER = true;
-    public static final boolean KEEP_ORIGINAL_HEADER = false;
-
     public static final boolean UPDATE_TAG_VERSION = true;
     public static final boolean KEEP_ORIGINAL_TAG_VERSION = false;
 
     public static final String TEST_TENANT = "ACME_CORP";
 
 
-    public static ObjectDefinition dummyDefinitionForType(ObjectType objectType, boolean includeHeader) {
+    public static ObjectDefinition dummyDefinitionForType(ObjectType objectType) {
 
         switch (objectType) {
 
-            case DATA: return dummyDataDef(includeHeader);
-            case MODEL: return dummyModelDef(includeHeader);
-            case FLOW: return dummyFlowDef(includeHeader);
-            case JOB: return dummyJobDef(includeHeader);
-            case FILE: return dummyFileDef(includeHeader);
-            case CUSTOM: return dummyCustomDef(includeHeader);
+            case DATA: return dummyDataDef();
+            case MODEL: return dummyModelDef();
+            case FLOW: return dummyFlowDef();
+            case JOB: return dummyJobDef();
+            case FILE: return dummyFileDef();
+            case CUSTOM: return dummyCustomDef();
 
             default:
                 throw new RuntimeException("No dummy data available for object type " + objectType.name());
@@ -61,22 +62,22 @@ public class TestData {
 
     public static Tag dummyTagForObjectType(ObjectType objectType) {
 
-        return dummyTag(dummyDefinitionForType(objectType, INCLUDE_HEADER));
+        return dummyTag(dummyDefinitionForType(objectType), INCLUDE_HEADER);
     }
 
-    public static ObjectDefinition dummyVersionForType(ObjectDefinition definition, boolean updateHeader) {
+    public static ObjectDefinition dummyVersionForType(ObjectDefinition definition) {
 
         // Not all object types have semantics defined for versioning
         // It is sometimes helpful to create versions anyway for testing
         // E.g. to test that version increments are rejected for objects that don't support versioning!
 
-        var objectType = definition.getHeader().getObjectType();
+        var objectType = definition.getObjectType();
 
         switch (objectType) {
 
-            case DATA: return nextDataDef(definition, updateHeader);
-            case MODEL: return nextModelDef(definition, updateHeader);
-            case CUSTOM: return nextCustomDef(definition, updateHeader);
+            case DATA: return nextDataDef(definition);
+            case MODEL: return nextModelDef(definition);
+            case CUSTOM: return nextCustomDef(definition);
 
             case FLOW:
             case JOB:
@@ -88,37 +89,27 @@ public class TestData {
         }
     }
 
-    public static ObjectDefinition newObjectHeader(ObjectType objectType, ObjectDefinition.Builder def, boolean includeHeader) {
+    public static TagHeader newHeader(ObjectType objectType) {
 
-        if (includeHeader == NO_HEADER)
-            return def.build();
-
-        else
-            return def
-                .setHeader(ObjectHeader.newBuilder()
+        return TagHeader.newBuilder()
                 .setObjectType(objectType)
                 .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
-                .setObjectVersion(1))
+                .setObjectVersion(1)
+                .setTagVersion(1)
                 .build();
     }
 
-    public static ObjectDefinition newVersionHeader(ObjectDefinition.Builder defUpdate, boolean updateHeader) {
+    public static TagHeader nextTagHeader(TagHeader priorTagHeader) {
 
-        if (updateHeader == KEEP_ORIGINAL_HEADER)
-            return defUpdate.build();
-
-        else
-            return defUpdate
-                .setHeader(defUpdate.getHeader()
-                .toBuilder()
-                .setObjectVersion(defUpdate.getHeader().getObjectVersion() + 1)
-                .build())
+        return priorTagHeader.toBuilder()
+                .setTagVersion(priorTagHeader.getTagVersion() + 1)
                 .build();
     }
 
-    public static ObjectDefinition dummyDataDef(boolean includeHeader) {
+    public static ObjectDefinition dummyDataDef() {
 
-        var def = ObjectDefinition.newBuilder()
+        return ObjectDefinition.newBuilder()
+            .setObjectType(ObjectType.DATA)
             .setData(DataDefinition.newBuilder()
             .addStorage("test-storage")
             .setPath("path/to/test/dataset")
@@ -143,34 +134,31 @@ public class TestData {
                         .setFieldName("widgets_ordered")
                         .setFieldType(BasicType.INTEGER)
                         .setFieldOrder(4)
-                        .setBusinessKey(true))));
-
-        return newObjectHeader(ObjectType.DATA, def, includeHeader);
+                        .setBusinessKey(true))))
+            .build();
     }
 
-    public static ObjectDefinition nextDataDef(ObjectDefinition origDef, boolean updateHeader) {
+    public static ObjectDefinition nextDataDef(ObjectDefinition origDef) {
 
-        if (origDef.getHeader().getObjectType() != ObjectType.DATA || !origDef.hasData())
-            throw new RuntimeException("Original object is not a valid data definition");
+        var fieldName = "extra_field_" + (origDef.getData().getSchema().getFieldCount() + 1);
 
-        var defUpdate = origDef.toBuilder()
+        return origDef.toBuilder()
                 .setData(origDef.getData()
                 .toBuilder()
                 .setSchema(origDef.getData().getSchema().toBuilder()
                     .addField(FieldDefinition.newBuilder()
-                    .setFieldName("extra_field")
+                    .setFieldName(fieldName)
                     .setFieldOrder(origDef.getData().getSchema().getFieldCount())
                     .setFieldType(BasicType.FLOAT)
                     .setFieldLabel("We got an extra field!")
-                    .setFormatCode("PERCENT")
-                    .build()).build()));
-
-        return newVersionHeader(defUpdate, updateHeader);
+                    .setFormatCode("PERCENT"))))
+                .build();
     }
 
-    public static ObjectDefinition dummyModelDef(boolean includeHeader) {
+    public static ObjectDefinition dummyModelDef() {
 
-        var def = ObjectDefinition.newBuilder()
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.MODEL)
                 .setModel(ModelDefinition.newBuilder()
                 .setLanguage("python")
                 .setRepository("trac-test-repo")
@@ -195,27 +183,23 @@ public class TestData {
                         .addField(FieldDefinition.newBuilder()
                                 .setFieldName("checksum_field")
                                 .setFieldType(BasicType.DECIMAL))
-                        .build()));
-
-        return newObjectHeader(ObjectType.MODEL, def, includeHeader);
+                        .build()))
+                .build();
     }
 
-    public static ObjectDefinition nextModelDef(ObjectDefinition origDef, boolean updateHeader) {
+    public static ObjectDefinition nextModelDef(ObjectDefinition origDef) {
 
-        if (origDef.getHeader().getObjectType() != ObjectType.MODEL || !origDef.hasModel())
-            throw new RuntimeException("Original object is not a valid model definition");
-
-        var defUpdate = origDef.toBuilder()
+        return origDef.toBuilder()
                 .setModel(origDef.getModel()
                 .toBuilder()
-                .putParam("param3", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.DATE)).build()));
-
-        return newVersionHeader(defUpdate, updateHeader);
+                .putParam("param3", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.DATE)).build()))
+                .build();
     }
 
-    public static ObjectDefinition dummyFlowDef(boolean includeHeader) {
+    public static ObjectDefinition dummyFlowDef() {
 
-        var def = ObjectDefinition.newBuilder()
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.FLOW)
                 .setFlow(FlowDefinition.newBuilder()
                 .putNode("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
                 .putNode("main_model", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE).build())
@@ -225,94 +209,130 @@ public class TestData {
                         .setTail(FlowSocket.newBuilder().setNode("input_1")))
                 .addEdge(FlowEdge.newBuilder()
                         .setHead(FlowSocket.newBuilder().setNode("output_1"))
-                        .setTail(FlowSocket.newBuilder().setNode("main_model").setSocket("output_1"))));
-
-        return newObjectHeader(ObjectType.FLOW, def, includeHeader);
+                        .setTail(FlowSocket.newBuilder().setNode("main_model").setSocket("output_1"))))
+                .build();
     }
 
-    public static ObjectDefinition dummyJobDef(boolean includeHeader) {
+    public static ObjectDefinition dummyJobDef() {
 
         // Job will be invalid because the model ID it points to does not exist!
         // Ok for e.g. DAL testing, but will fail metadata validation
 
-        var def = ObjectDefinition.newBuilder()
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.JOB)
                 .setJob(JobDefinition.newBuilder()
                 .setJobType(JobType.RUN_MODEL)
-                .setTargetId(MetadataCodec.encode(UUID.randomUUID())));
-
-        return newObjectHeader(ObjectType.JOB, def, includeHeader);
+                .setTargetId(MetadataCodec.encode(UUID.randomUUID())))
+                .build();
     }
 
-    public static ObjectDefinition dummyFileDef(boolean includeHeader) {
+    public static ObjectDefinition dummyFileDef() {
 
-        var def = ObjectDefinition.newBuilder()
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.FILE)
                 .setFile(FileDefinition.newBuilder()
                 .addStorage("test-storage")
                 .setStoragePath("<preallocated_id>/contents/magic_template.xlsx")
                 .setName("magic_template")
                 .setExtension("docx")
                 .setSize(45285)
-                .setMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                .build());
-
-        return newObjectHeader(ObjectType.FILE, def, includeHeader);
+                .setMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .build();
     }
 
-    public static ObjectDefinition dummyCustomDef(boolean includeHeader) {
+    public static ObjectDefinition dummyCustomDef() {
 
         var jsonReportDef = "{ reportType: 'magic', mainGraph: { content: 'more_magic' } }";
 
-        var def = ObjectDefinition.newBuilder()
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.CUSTOM)
                 .setCustom(CustomDefinition.newBuilder()
                 .setCustomType("REPORT")
                 .setCustomSchemaVersion(2)
-                .setCustomData(ByteString.copyFromUtf8(jsonReportDef))
-                .build());
-
-        return newObjectHeader(ObjectType.CUSTOM, def, includeHeader);
+                .setCustomData(ByteString.copyFromUtf8(jsonReportDef)))
+                .build();
     }
 
-    public static ObjectDefinition nextCustomDef(ObjectDefinition origDef, boolean updateHeader) {
+    public static ObjectDefinition nextCustomDef(ObjectDefinition origDef) {
 
-        if (origDef.getHeader().getObjectType() != ObjectType.CUSTOM || !origDef.hasCustom())
-            throw new RuntimeException("Original object is not a valid custom definition");
-
-        var ver = origDef.getHeader().getObjectVersion();
+        var ver = UUID.randomUUID();
         var jsonReportDef = "{ reportType: 'magic', mainGraph: { content: 'more_magic_" + ver + " ' } }";
 
-        var defUpdate = origDef.toBuilder()
+        return origDef.toBuilder()
                 .setCustom(origDef.getCustom()
                 .toBuilder()
-                .setCustomData(ByteString.copyFromUtf8(jsonReportDef)));
-
-        return newVersionHeader(defUpdate, updateHeader);
+                .setCustomData(ByteString.copyFromUtf8(jsonReportDef)))
+                .build();
     }
 
-    public static Tag dummyTag(ObjectDefinition definition) {
+    public static Tag dummyTag(ObjectDefinition definition, boolean includeHeader) {
 
-        return Tag.newBuilder()
+        var tag = Tag.newBuilder()
                 .setDefinition(definition)
-                .setTagVersion(1)
                 .putAttr("dataset_key", MetadataCodec.encodeValue("widget_orders"))
-                .putAttr("widget_type", MetadataCodec.encodeValue("non_standard_widget"))
-                .build();
+                .putAttr("widget_type", MetadataCodec.encodeValue("non_standard_widget"));
+
+        if (includeHeader) {
+            var header = newHeader(definition.getObjectType());
+            return tag.setHeader(header).build();
+        }
+        else
+            return tag.build();
+    }
+
+    public static Map<String, Value> dummyAttrs() {
+
+        var attrs = new HashMap<String, Value>();
+        attrs.put("dataset_key", MetadataCodec.encodeValue("widget_orders"));
+        attrs.put("widget_type", MetadataCodec.encodeValue("non_standard_widget"));
+
+        return attrs;
+    }
+
+    public static List<TagUpdate> tagUpdatesForAttrs(Map<String, Value> attrs) {
+
+        return attrs.entrySet().stream()
+                .map(entry -> TagUpdate.newBuilder()
+                .setAttrName(entry.getKey())
+                .setValue(entry.getValue()).build())
+                .collect(Collectors.toList());
+    }
+
+    public static Tag tagForNextObject(Tag previous, ObjectDefinition obj, boolean includeHeader) {
+
+        var newTag = previous.toBuilder()
+                .setDefinition(obj)
+                .putAttr("extra_attr", Value.newBuilder()
+                        .setType(TypeSystem.descriptor(BasicType.STRING))
+                        .setStringValue("A new descriptive value")
+                        .build());
+
+        if (includeHeader) {
+
+            var header = previous.getHeader().toBuilder()
+                    .setObjectVersion(previous.getHeader().getObjectVersion() + 1)
+                    .setTagVersion(1)
+                    .build();
+
+            return newTag.setHeader(header).build();
+        }
+        else
+            return newTag.clearHeader().build();
     }
 
     public static Tag nextTag(Tag previous, boolean updateTagVersion) {
 
         var updatedTag = previous.toBuilder()
                 .putAttr("extra_attr", Value.newBuilder()
-                        .setType(TypeSystem.descriptor(BasicType.STRING))
-                        .setStringValue("A new descriptive value")
-                        .build());
+                .setType(TypeSystem.descriptor(BasicType.STRING))
+                .setStringValue("A new descriptive value")
+                .build());
 
         if (updateTagVersion == KEEP_ORIGINAL_TAG_VERSION)
             return updatedTag.build();
 
-        else
-            return updatedTag
-                .setTagVersion(previous.getTagVersion() + 1)
-                .build();
+        var nextHeader = nextTagHeader(previous.getHeader());
+        return updatedTag.setHeader(nextHeader).build();
     }
 
     public static Tag addMultiValuedAttr(Tag tag) {
@@ -396,5 +416,20 @@ public class TestData {
         var nanoPrecision = (int) Math.pow(10, 9 - precision);
         var truncatedNanos = (nanos / nanoPrecision) * nanoPrecision;
         return dateTime.withNano(truncatedNanos);
+    }
+
+    public static TagSelector selectorForTag(TagHeader tagHeader) {
+
+        return TagSelector.newBuilder()
+                .setObjectType(tagHeader.getObjectType())
+                .setObjectId(tagHeader.getObjectId())
+                .setObjectVersion(tagHeader.getObjectVersion())
+                .setTagVersion(tagHeader.getTagVersion())
+                .build();
+    }
+
+    public static TagSelector selectorForTag(Tag tag) {
+
+        return selectorForTag(tag.getHeader());
     }
 }

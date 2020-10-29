@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.meta.logic;
+package com.accenture.trac.svc.meta.services;
 
 import java.util.regex.Pattern;
 

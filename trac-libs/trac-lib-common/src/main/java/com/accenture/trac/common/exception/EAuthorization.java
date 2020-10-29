@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.meta.exception;
+package com.accenture.trac.common.exception;
 
-public class TracInternalError extends RuntimeException {
 
-    public TracInternalError(String message) {
+public class EAuthorization extends ETracPublic {
+
+    public EAuthorization(String message) {
         super(message);
     }
 
-    public TracInternalError(String message, Throwable cause) {
+    public EAuthorization(String message, Throwable cause) {
         super(message, cause);
     }
 }
