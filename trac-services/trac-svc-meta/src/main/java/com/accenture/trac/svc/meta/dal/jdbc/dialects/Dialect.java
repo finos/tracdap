@@ -17,8 +17,7 @@
 package com.accenture.trac.svc.meta.dal.jdbc.dialects;
 
 import com.accenture.trac.common.db.JdbcDialect;
-import com.accenture.trac.common.exception.EStartup;
-import com.accenture.trac.svc.meta.exception.TracInternalError;
+import com.accenture.trac.common.exception.*;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcErrorCode;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcException;
 
@@ -26,7 +25,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.SQLException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -76,7 +74,7 @@ public abstract class Dialect implements IDialect {
 
             if (stream == null) {
                 var message = String.format("Internal startup error (DAL, JDBC, %s - missing DDL resource for key mapping", dialectCode());
-                throw new TracInternalError(message);
+                throw new ETracInternal(message);
             }
 
             try (var rawReader = new InputStreamReader(stream); var reader = new BufferedReader(rawReader)) {
@@ -85,7 +83,7 @@ public abstract class Dialect implements IDialect {
         }
         catch (IOException e) {
             var message = String.format("Internal startup error (DAL, JDBC, %s - error preparing DDL resource for key mapping", dialectCode());
-            throw new TracInternalError(message);
+            throw new ETracInternal(message);
         }
     }
 }

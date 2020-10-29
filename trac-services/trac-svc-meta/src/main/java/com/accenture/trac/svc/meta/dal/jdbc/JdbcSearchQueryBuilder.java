@@ -18,8 +18,7 @@ package com.accenture.trac.svc.meta.dal.jdbc;
 
 import com.accenture.trac.common.metadata.BasicType;
 import com.accenture.trac.common.metadata.search.*;
-import com.accenture.trac.svc.meta.exception.TracInternalError;
-import com.accenture.trac.svc.meta.exception.ValidationGapError;
+import com.accenture.trac.common.exception.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -129,7 +128,7 @@ class JdbcSearchQueryBuilder {
                 var message = "Invalid search expression (expression is missing or not recognised)";
                 log.error(message);
 
-                throw new ValidationGapError(message);
+                throw new EValidationGap(message);
         }
     }
 
@@ -152,7 +151,7 @@ class JdbcSearchQueryBuilder {
                 var message = "Invalid logical expression (operator is missing or not recognised)";
                 log.error(message);
 
-                throw new ValidationGapError(message);
+                throw new EValidationGap(message);
         }
     }
 
@@ -181,7 +180,7 @@ class JdbcSearchQueryBuilder {
                 var message = "Invalid search term (operator is missing or not recognised)";
                 log.error(message);
 
-                throw new ValidationGapError(message);
+                throw new EValidationGap(message);
         }
     }
 
@@ -261,7 +260,7 @@ class JdbcSearchQueryBuilder {
             var message = "Invalid logical expression (NOT operator requires exactly one sub-expression)";
             log.error(message);
 
-            throw new ValidationGapError(message);
+            throw new EValidationGap(message);
         }
 
         // Build the query parts for the sub expression
@@ -413,7 +412,7 @@ class JdbcSearchQueryBuilder {
             var message = "Invalid search term (attr type or search operator not recognised)";
             log.error(message);
 
-            throw new ValidationGapError(message);
+            throw new EValidationGap(message);
         }
 
         var joinClause = String.format(joinTemplate, attrNumber, queryNumber);
@@ -514,7 +513,7 @@ class JdbcSearchQueryBuilder {
                 var message = "Failed to set SQL query parameter: " + e.getMessage();
                 log.error(message);
 
-                throw new TracInternalError(message, e);
+                throw new ETracInternal(message, e);
             }
         };
     }

@@ -16,7 +16,9 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-public class MetadataError extends TracError {
+import com.accenture.trac.common.exception.ETracPublic;
+
+public class MetadataError extends ETracPublic {
 
     public MetadataError(String message) {
         super(message);

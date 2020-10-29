@@ -16,7 +16,9 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-public class TenantError extends TracError {
+import com.accenture.trac.common.exception.ETracPublic;
+
+public class TenantError extends ETracPublic {
 
     public TenantError(String message, Throwable cause) {
         super(message, cause);

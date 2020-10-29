@@ -20,8 +20,7 @@ import com.accenture.trac.common.api.meta.TagUpdate;
 import com.accenture.trac.common.metadata.ObjectDefinition;
 import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.TagSelector;
-import com.accenture.trac.svc.meta.exception.AuthorisationError;
-import com.accenture.trac.svc.meta.exception.InputValidationError;
+import com.accenture.trac.common.exception.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -60,7 +59,7 @@ public class MetadataValidator {
                     ? "There were multiple validation errors:\n" + String.join("\n", validationErrors)
                     : validationErrors.get(0);
 
-            throw new InputValidationError(message);
+            throw new EInputValidation(message);
         }
 
         return this;
@@ -74,7 +73,7 @@ public class MetadataValidator {
                     ? "There were multiple authorisation errors:\n" + String.join("\n", validationErrors)
                     : validationErrors.get(0);
 
-            throw new AuthorisationError(message);
+            throw new EAuthorisation(message);
         }
 
         return this;

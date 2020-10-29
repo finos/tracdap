@@ -16,7 +16,9 @@
 
 package com.accenture.trac.svc.meta.api;
 
+import com.accenture.trac.common.exception.*;
 import com.accenture.trac.svc.meta.exception.*;
+
 import io.grpc.Status;
 
 import java.util.Map;
@@ -26,8 +28,8 @@ public class ApiErrorMapping {
 
     static final Map<Class<? extends Throwable>, Status.Code> ERROR_MAPPING = Map.ofEntries(
 
-            Map.entry(AuthorisationError.class, Status.Code.PERMISSION_DENIED),
-            Map.entry(InputValidationError.class, Status.Code.INVALID_ARGUMENT),
+            Map.entry(EAuthorisation.class, Status.Code.PERMISSION_DENIED),
+            Map.entry(EInputValidation.class, Status.Code.INVALID_ARGUMENT),
 
             Map.entry(TenantError.class, Status.Code.NOT_FOUND),
             Map.entry(MissingItemError.class, Status.Code.NOT_FOUND),

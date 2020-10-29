@@ -16,10 +16,10 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.common.exception.*;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
 import com.accenture.trac.svc.meta.exception.DuplicateItemError;
 import com.accenture.trac.svc.meta.exception.MissingItemError;
-import com.accenture.trac.svc.meta.exception.TracInternalError;
 import com.accenture.trac.svc.meta.exception.WrongItemTypeError;
 
 import java.sql.SQLException;
@@ -41,17 +41,17 @@ class JdbcError {
     static final String LOAD_BATCH_WRONG_OBJECT_TYPE = "One or more metadata item has the wrong type";
 
 
-    static TracInternalError unhandledError(SQLException error, JdbcErrorCode code) {
+    static ETracInternal unhandledError(SQLException error, JdbcErrorCode code) {
 
         var message = MessageFormat.format(UNHANDLED_ERROR, code.name());
-        return new TracInternalError(message, error);
+        return new ETracInternal(message, error);
     }
 
     static void handleUnknownError(SQLException error, JdbcErrorCode code, IDialect dialect) {
 
         if (code == JdbcErrorCode.UNKNOWN_ERROR_CODE) {
             var message = MessageFormat.format(UNRECOGNISED_ERROR_CODE, dialect.dialectCode(), error.getSQLState(), error.getErrorCode());
-            throw new TracInternalError(message, error);
+            throw new ETracInternal(message, error);
         }
     }
 

@@ -21,8 +21,9 @@ import com.accenture.trac.common.api.meta.TagOperation;
 import com.accenture.trac.common.api.meta.TagUpdate;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.*;
+import com.accenture.trac.common.exception.*;
 import com.accenture.trac.svc.meta.exception.TagUpdateError;
-import com.accenture.trac.svc.meta.exception.ValidationGapError;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,12 +78,12 @@ public class TagUpdateService {
     private static Tag.Builder applyTagUpdate(Tag.Builder prior, TagUpdate update) {
 
         if (update.getOperation() == TagOperation.UNRECOGNIZED)
-            throw new ValidationGapError("Validation gap for TagUpdate (unrecognized operation)");  // TODO
+            throw new EValidationGap("Validation gap for TagUpdate (unrecognized operation)");  // TODO
 
         var func = TAG_OPERATION_MAP.getOrDefault(update.getOperation(), null);
 
         if (func == null)
-            throw new ValidationGapError(""); // TODO
+            throw new EValidationGap(""); // TODO
 
         return func.apply(prior, update);
     }
@@ -179,7 +180,7 @@ public class TagUpdateService {
 
         // Should never happen
         if (!attrValue.hasType())
-            throw new ValidationGapError("");
+            throw new EValidationGap("");
 
         if (TypeSystem.basicType(attrValue) == BasicType.ARRAY) {
 
@@ -190,7 +191,7 @@ public class TagUpdateService {
         }
 
         // Should never happen
-        throw new ValidationGapError("");  // TODO
+        throw new EValidationGap("");  // TODO
     }
 
     private static void requireAttrDoesNotExist(

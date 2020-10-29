@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.meta.exception;
+package com.accenture.trac.common.exception;
 
-public class AuthorisationError extends TracError {
 
-    public AuthorisationError(String message) {
+public class EAuthorisation extends ETracPublic {
+
+    public EAuthorisation(String message) {
         super(message);
     }
 
-    public AuthorisationError(String message, Throwable cause) {
+    public EAuthorisation(String message, Throwable cause) {
         super(message, cause);
     }
 }
