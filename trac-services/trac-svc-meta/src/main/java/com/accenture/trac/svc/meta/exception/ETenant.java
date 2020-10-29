@@ -18,13 +18,13 @@ package com.accenture.trac.svc.meta.exception;
 
 import com.accenture.trac.common.exception.ETracPublic;
 
-public class MetadataError extends ETracPublic {
+public class ETenant extends ETracPublic {
 
-    public MetadataError(String message) {
-        super(message);
+    public ETenant(String message, Throwable cause) {
+        super(message, cause);
     }
 
-    public MetadataError(String message, Throwable cause) {
-        super(message, cause);
+    public ETenant(String message) {
+        super(message);
     }
 }

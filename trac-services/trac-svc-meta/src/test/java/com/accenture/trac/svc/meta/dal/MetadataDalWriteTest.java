@@ -16,10 +16,9 @@
 
 package com.accenture.trac.svc.meta.dal;
 
-import com.accenture.trac.common.metadata.TagHeader;
-import com.accenture.trac.svc.meta.exception.DuplicateItemError;
-import com.accenture.trac.svc.meta.exception.MissingItemError;
-import com.accenture.trac.svc.meta.exception.WrongItemTypeError;
+import com.accenture.trac.svc.meta.exception.EDuplicateItem;
+import com.accenture.trac.svc.meta.exception.EMissingItem;
+import com.accenture.trac.svc.meta.exception.EWrongItemType;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
 import static com.accenture.trac.svc.meta.test.TestData.*;
@@ -124,8 +123,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var saveDup =  dal.saveNewObjects(TEST_TENANT, List.of(origTag, origTag));
         var loadDup = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
 
-        assertThrows(DuplicateItemError.class, () -> unwrap(saveDup));
-        assertThrows(MissingItemError.class, () -> unwrap(loadDup));
+        assertThrows(EDuplicateItem.class, () -> unwrap(saveDup));
+        assertThrows(EMissingItem.class, () -> unwrap(loadDup));
 
         var saveDup2 = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
@@ -134,7 +133,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var loadDup2 = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
 
         // First insert should succeed if they are run one by one
-        assertThrows(DuplicateItemError.class, () -> unwrap(saveDup2));
+        assertThrows(EDuplicateItem.class, () -> unwrap(saveDup2));
         assertDoesNotThrow(() -> unwrap(loadDup2));
     }
 
@@ -229,8 +228,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var loadDup = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1);
 
         unwrap(saveOrig);
-        assertThrows(DuplicateItemError.class, () -> unwrap(saveDup));
-        assertThrows(MissingItemError.class, () -> unwrap(loadDup));
+        assertThrows(EDuplicateItem.class, () -> unwrap(saveDup));
+        assertThrows(EMissingItem.class, () -> unwrap(loadDup));
 
         var saveDup2 = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextTag))
@@ -239,7 +238,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var loadDup2 = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1);
 
         // First insert should succeed if they are run one by one
-        assertThrows(DuplicateItemError.class, () -> unwrap(saveDup2));
+        assertThrows(EDuplicateItem.class, () -> unwrap(saveDup2));
         assertEquals(nextTag, unwrap(loadDup2));
     }
 
@@ -253,7 +252,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         // Save next version, single, without saving original
         var saveNext =  dal.saveNewVersion(TEST_TENANT, nextTag);
-        assertThrows(MissingItemError.class, () -> unwrap(saveNext));
+        assertThrows(EMissingItem.class, () -> unwrap(saveNext));
 
         var modelTag = dummyTagForObjectType(ObjectType.MODEL);
         var nextModelTag = tagForNextObject(modelTag, nextModelDef(modelTag.getDefinition()), INCLUDE_HEADER);
@@ -263,7 +262,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var saveNextMulti = dal.saveNewVersions(TEST_TENANT, List.of(nextTag, nextModelTag));
 
         unwrap(saveOrig);
-        assertThrows(MissingItemError.class, () -> unwrap(saveNextMulti));
+        assertThrows(EMissingItem.class, () -> unwrap(saveNextMulti));
     }
 
     @Test
@@ -286,8 +285,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var saveNextMulti =  dal.saveNewVersions(TEST_TENANT, List.of(nextDataTag, nextModelTag));
 
         unwrap(saveOrig);
-        assertThrows(WrongItemTypeError.class, () -> unwrap(saveNext));
-        assertThrows(WrongItemTypeError.class, () -> unwrap(saveNextMulti));
+        assertThrows(EWrongItemType.class, () -> unwrap(saveNext));
+        assertThrows(EWrongItemType.class, () -> unwrap(saveNextMulti));
     }
 
     @Test
@@ -379,8 +378,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var loadDup = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 2);
 
         unwrap(saveOrig);
-        assertThrows(DuplicateItemError.class, () -> unwrap(saveDup));
-        assertThrows(MissingItemError.class, () -> unwrap(loadDup));
+        assertThrows(EDuplicateItem.class, () -> unwrap(saveDup));
+        assertThrows(EMissingItem.class, () -> unwrap(loadDup));
 
         var saveDup2 = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewTag(TEST_TENANT, nextTag))
@@ -389,7 +388,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var loadDup2 = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 2);
 
         // First insert should succeed if they are run one by one
-        assertThrows(DuplicateItemError.class, () -> unwrap(saveDup2));
+        assertThrows(EDuplicateItem.class, () -> unwrap(saveDup2));
         assertEquals(nextTag, unwrap(loadDup2));
     }
 
@@ -402,7 +401,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         // Save next tag, single, without saving object
         var saveNext =  dal.saveNewTag(TEST_TENANT, nextTag);
-        assertThrows(MissingItemError.class, () -> unwrap(saveNext));
+        assertThrows(EMissingItem.class, () -> unwrap(saveNext));
 
         var modelTag = dummyTagForObjectType(ObjectType.MODEL);
         var nextModelTag = tagForNextObject(modelTag, nextModelDef(modelTag.getDefinition()), INCLUDE_HEADER);
@@ -412,7 +411,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var saveNextMulti = dal.saveNewTags(TEST_TENANT, List.of(nextTag, nextModelTag));
 
         unwrap(saveOrig);
-        assertThrows(MissingItemError.class, () -> unwrap(saveNextMulti));
+        assertThrows(EMissingItem.class, () -> unwrap(saveNextMulti));
     }
 
     @Test
@@ -432,8 +431,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var saveNext2 =  dal.saveNewTag(TEST_TENANT, nextDefTag2);
 
         unwrap(saveObj);
-        assertThrows(MissingItemError.class, () -> unwrap(saveNext1));
-        assertThrows(MissingItemError.class, () -> unwrap(saveNext2));
+        assertThrows(EMissingItem.class, () -> unwrap(saveNext1));
+        assertThrows(EMissingItem.class, () -> unwrap(saveNext2));
 
         var modelTag = dummyTagForObjectType(ObjectType.MODEL);
         var nextModelTag = tagForNextObject(modelTag, nextModelDef(modelTag.getDefinition()), INCLUDE_HEADER);
@@ -445,7 +444,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         // Save next tag (multiple), second item is missing the required object version
         var saveNextMulti = dal.saveNewTags(TEST_TENANT, List.of(nextDefTag2, nextModelTag2));
-        assertThrows(MissingItemError.class, () -> unwrap(saveNextMulti));
+        assertThrows(EMissingItem.class, () -> unwrap(saveNextMulti));
 
         // Saving the valid tag by itself should not throw
         Assertions.assertDoesNotThrow(() -> dal.saveNewTag(TEST_TENANT, nextDefTag2));
@@ -476,8 +475,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var loadWrongType = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 2);
 
         unwrap(saveOrig);
-        assertThrows(WrongItemTypeError.class, () -> unwrap(saveTag));
-        assertThrows(MissingItemError.class, () -> unwrap(loadWrongType));
+        assertThrows(EWrongItemType.class, () -> unwrap(saveTag));
+        assertThrows(EMissingItem.class, () -> unwrap(loadWrongType));
 
         var origDef2 = dummyModelDef();
         var origTag2 = dummyTag(origDef2, INCLUDE_HEADER);
@@ -494,8 +493,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
                 List.of(2, 2));
 
         unwrap(saveOrig2);
-        assertThrows(WrongItemTypeError.class, () -> unwrap(saveTag2));
-        assertThrows(MissingItemError.class, () -> unwrap(loadWrongType2));
+        assertThrows(EWrongItemType.class, () -> unwrap(saveTag2));
+        assertThrows(EMissingItem.class, () -> unwrap(loadWrongType2));
     }
 
     @Test
@@ -540,7 +539,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var id1 = UUID.randomUUID();
 
         unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1));
-        assertThrows(DuplicateItemError.class,
+        assertThrows(EDuplicateItem.class,
                 () -> unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.MODEL);
@@ -548,7 +547,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var id3 = UUID.randomUUID();
 
         unwrap(dal.saveNewObject(TEST_TENANT, obj2));
-        assertThrows(DuplicateItemError.class,
+        assertThrows(EDuplicateItem.class,
                 () -> unwrap(dal.preallocateObjectIds(TEST_TENANT,
                         List.of(ObjectType.MODEL, ObjectType.MODEL),
                         List.of(id2, id3))));
@@ -559,7 +558,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         var obj1 = dummyTagForObjectType(ObjectType.MODEL);
 
-        assertThrows(MissingItemError.class,
+        assertThrows(EMissingItem.class,
                 () -> unwrap(dal.savePreallocatedObject(TEST_TENANT, obj1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.DATA);
@@ -567,7 +566,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id2));
 
-        assertThrows(MissingItemError.class,
+        assertThrows(EMissingItem.class,
                 () -> unwrap(dal.savePreallocatedObjects(TEST_TENANT, List.of(obj1, obj2))));
     }
 
@@ -579,7 +578,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1));
 
-        assertThrows(WrongItemTypeError.class,
+        assertThrows(EWrongItemType.class,
                 () -> unwrap(dal.savePreallocatedObject(TEST_TENANT, obj1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.DATA);
@@ -587,7 +586,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id2));
 
-        assertThrows(WrongItemTypeError.class,
+        assertThrows(EWrongItemType.class,
                 () -> unwrap(dal.savePreallocatedObjects(TEST_TENANT, List.of(obj1, obj2))));
     }
 }

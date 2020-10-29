@@ -16,15 +16,14 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-import com.accenture.trac.common.exception.ETracPublic;
 
-public class TenantError extends ETracPublic {
+public class ETagUpdate extends EMetadata {
 
-    public TenantError(String message, Throwable cause) {
-        super(message, cause);
+    public ETagUpdate(String message) {
+        super(message);
     }
 
-    public TenantError(String message) {
-        super(message);
+    public ETagUpdate(String message, Throwable cause) {
+        super(message, cause);
     }
 }

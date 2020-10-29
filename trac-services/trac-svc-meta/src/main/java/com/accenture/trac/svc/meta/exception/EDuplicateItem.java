@@ -16,13 +16,13 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-public class WrongItemTypeError extends MetadataError {
+public class EDuplicateItem extends EMetadata {
 
-    public WrongItemTypeError(String message) {
+    public EDuplicateItem(String message) {
         super(message);
     }
 
-    public WrongItemTypeError(String message, Throwable cause) {
+    public EDuplicateItem(String message, Throwable cause) {
         super(message, cause);
     }
 }

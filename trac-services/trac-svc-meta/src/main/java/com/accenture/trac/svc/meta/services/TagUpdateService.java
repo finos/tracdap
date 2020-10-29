@@ -22,7 +22,7 @@ import com.accenture.trac.common.api.meta.TagUpdate;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.common.exception.*;
-import com.accenture.trac.svc.meta.exception.TagUpdateError;
+import com.accenture.trac.svc.meta.exception.ETagUpdate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -204,7 +204,7 @@ public class TagUpdateService {
                     operation.name(), update.getAttrName());
 
             log.error("{} ({})", message, logTagHeader(tag));
-            throw new TagUpdateError(message);
+            throw new ETagUpdate(message);
         }
     }
 
@@ -218,7 +218,7 @@ public class TagUpdateService {
                     operation.name(), update.getAttrName());
 
             log.error("{} ({})", message, logTagHeader(tag));
-            throw new TagUpdateError(message);
+            throw new ETagUpdate(message);
         }
     }
 
@@ -236,7 +236,7 @@ public class TagUpdateService {
                     originalType.name(), updateType.name());
 
             log.error("{} ({})", message, logTagHeader(tag));
-            throw new TagUpdateError(message);
+            throw new ETagUpdate(message);
         }
     }
 

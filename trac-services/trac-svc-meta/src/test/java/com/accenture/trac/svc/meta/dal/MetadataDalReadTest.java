@@ -16,8 +16,8 @@
 
 package com.accenture.trac.svc.meta.dal;
 
-import com.accenture.trac.svc.meta.exception.MissingItemError;
-import com.accenture.trac.svc.meta.exception.WrongItemTypeError;
+import com.accenture.trac.svc.meta.exception.EMissingItem;
+import com.accenture.trac.svc.meta.exception.EWrongItemType;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
 
@@ -166,9 +166,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
     @Test
     void testLoadOne_missingItems() throws Exception {
 
-        assertThrows(MissingItemError.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, UUID.randomUUID(), 1, 1)));
-        assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, UUID.randomUUID(), 1)));
-        assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestVersion(TEST_TENANT, ObjectType.DATA, UUID.randomUUID())));
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, UUID.randomUUID(), 1, 1)));
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, UUID.randomUUID(), 1)));
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadLatestVersion(TEST_TENANT, ObjectType.DATA, UUID.randomUUID())));
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
@@ -178,9 +178,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var future = dal.saveNewObject(TEST_TENANT, origTag);
         unwrap(future);
 
-        assertThrows(MissingItemError.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 2)));  // Missing tag
-        assertThrows(MissingItemError.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1)));  // Missing ver
-        assertThrows(MissingItemError.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 2)));  // Missing ver
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 2)));  // Missing tag
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1)));  // Missing ver
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 2)));  // Missing ver
     }
 
     @Test
@@ -192,9 +192,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         unwrap(dal.saveNewObject(TEST_TENANT, origTag));
 
-        assertThrows(WrongItemTypeError.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.MODEL, origId, 1, 1)));
-        assertThrows(WrongItemTypeError.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.MODEL, origId, 1)));
-        assertThrows(WrongItemTypeError.class, () -> unwrap(dal.loadLatestVersion(TEST_TENANT, ObjectType.MODEL, origId)));
+        assertThrows(EWrongItemType.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.MODEL, origId, 1, 1)));
+        assertThrows(EWrongItemType.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.MODEL, origId, 1)));
+        assertThrows(EWrongItemType.class, () -> unwrap(dal.loadLatestVersion(TEST_TENANT, ObjectType.MODEL, origId)));
     }
 
     @Test
@@ -346,9 +346,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
                 Collections.singletonList(ObjectType.DATA),
                 Collections.singletonList(UUID.randomUUID()));
 
-        assertThrows(MissingItemError.class, () -> unwrap(loadTags));
-        assertThrows(MissingItemError.class, () -> unwrap(loadLatestTags));
-        assertThrows(MissingItemError.class, () -> unwrap(loadLatestVersions));
+        assertThrows(EMissingItem.class, () -> unwrap(loadTags));
+        assertThrows(EMissingItem.class, () -> unwrap(loadLatestTags));
+        assertThrows(EMissingItem.class, () -> unwrap(loadLatestVersions));
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
@@ -375,9 +375,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
                 Collections.singletonList(UUID.randomUUID()),
                 Collections.singletonList(2));
 
-        assertThrows(MissingItemError.class, () -> unwrap(loadTags2));  // Missing tag
-        assertThrows(MissingItemError.class, () -> unwrap(loadTags3));  // Missing ver
-        assertThrows(MissingItemError.class, () -> unwrap(loadLatestTag2));  // Missing ver
+        assertThrows(EMissingItem.class, () -> unwrap(loadTags2));  // Missing tag
+        assertThrows(EMissingItem.class, () -> unwrap(loadTags3));  // Missing ver
+        assertThrows(EMissingItem.class, () -> unwrap(loadLatestTag2));  // Missing ver
     }
 
     @Test
@@ -408,8 +408,8 @@ abstract class MetadataDalReadTest implements IDalTestable {
                 List.of(ObjectType.DATA, ObjectType.DATA),
                 List.of(origId, origId2));
 
-        assertThrows(WrongItemTypeError.class, () -> unwrap(loadTags));
-        assertThrows(WrongItemTypeError.class, () -> unwrap(loadLatestTags));
-        assertThrows(WrongItemTypeError.class, () -> unwrap(loadLatestVersions));
+        assertThrows(EWrongItemType.class, () -> unwrap(loadTags));
+        assertThrows(EWrongItemType.class, () -> unwrap(loadLatestTags));
+        assertThrows(EWrongItemType.class, () -> unwrap(loadLatestVersions));
     }
 }

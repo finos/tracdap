@@ -31,8 +31,8 @@ public class ApiErrorMapping {
             Map.entry(EAuthorisation.class, Status.Code.PERMISSION_DENIED),
             Map.entry(EInputValidation.class, Status.Code.INVALID_ARGUMENT),
 
-            Map.entry(TenantError.class, Status.Code.NOT_FOUND),
-            Map.entry(MissingItemError.class, Status.Code.NOT_FOUND),
-            Map.entry(DuplicateItemError.class, Status.Code.ALREADY_EXISTS),
-            Map.entry(WrongItemTypeError.class, Status.Code.FAILED_PRECONDITION));
+            Map.entry(ETenant.class, Status.Code.NOT_FOUND),
+            Map.entry(EMissingItem.class, Status.Code.NOT_FOUND),
+            Map.entry(EDuplicateItem.class, Status.Code.ALREADY_EXISTS),
+            Map.entry(EWrongItemType.class, Status.Code.FAILED_PRECONDITION));
 }

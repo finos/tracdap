@@ -16,13 +16,13 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-public class MissingItemError extends MetadataError {
+public class ECorruptItem extends EMetadata {
 
-    public MissingItemError(String message) {
+    public ECorruptItem(String message) {
         super(message);
     }
 
-    public MissingItemError(String message, Throwable cause) {
+    public ECorruptItem(String message, Throwable cause) {
         super(message, cause);
     }
 }
