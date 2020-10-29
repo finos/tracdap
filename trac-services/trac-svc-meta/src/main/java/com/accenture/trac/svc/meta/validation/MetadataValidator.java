@@ -73,7 +73,7 @@ public class MetadataValidator {
                     ? "There were multiple authorisation errors:\n" + String.join("\n", validationErrors)
                     : validationErrors.get(0);
 
-            throw new EAuthorisation(message);
+            throw new EAuthorization(message);
         }
 
         return this;

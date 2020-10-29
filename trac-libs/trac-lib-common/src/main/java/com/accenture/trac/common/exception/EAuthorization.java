@@ -17,13 +17,13 @@
 package com.accenture.trac.common.exception;
 
 
-public class EAuthorisation extends ETracPublic {
+public class EAuthorization extends ETracPublic {
 
-    public EAuthorisation(String message) {
+    public EAuthorization(String message) {
         super(message);
     }
 
-    public EAuthorisation(String message, Throwable cause) {
+    public EAuthorization(String message, Throwable cause) {
         super(message, cause);
     }
 }

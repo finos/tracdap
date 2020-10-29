@@ -28,7 +28,7 @@ public class ApiErrorMapping {
 
     static final Map<Class<? extends Throwable>, Status.Code> ERROR_MAPPING = Map.ofEntries(
 
-            Map.entry(EAuthorisation.class, Status.Code.PERMISSION_DENIED),
+            Map.entry(EAuthorization.class, Status.Code.PERMISSION_DENIED),
             Map.entry(EInputValidation.class, Status.Code.INVALID_ARGUMENT),
 
             Map.entry(ETenant.class, Status.Code.NOT_FOUND),
