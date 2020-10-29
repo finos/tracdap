@@ -18,10 +18,7 @@ package com.accenture.trac.svc.meta.services;
 
 import com.accenture.trac.common.api.meta.TagOperation;
 import com.accenture.trac.common.api.meta.TagUpdate;
-import com.accenture.trac.common.metadata.BasicType;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.Tag;
-import com.accenture.trac.common.metadata.TypeSystem;
+import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.exception.ETagUpdate;
 
 import org.junit.jupiter.api.Test;
@@ -600,5 +597,52 @@ class TagUpdateServiceTest {
 
         var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
         assertEquals(List.of(42L, 43L, 44L, 45L), attrValue);
+    }
+
+    @Test
+    void normalization_ok() {
+
+        var baseTag = Tag.newBuilder().build();
+
+        var nonNormalValue = Value.newBuilder()
+                .setIntegerValue(42)
+                .build();
+
+        var update1 = TagUpdate.newBuilder()
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setAttrName("attr_1")
+                .setValue(nonNormalValue)
+                .build();
+
+        var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
+
+        var storedValue = updatedTag.getAttrOrThrow("attr_1");
+        assertTrue(storedValue.hasType());
+        assertEquals(BasicType.INTEGER, storedValue.getType().getBasicType());
+
+        var update2 = TagUpdate.newBuilder()
+                .setOperation(TagOperation.REPLACE_ATTR)
+                .setAttrName("attr_1")
+                .setValue(nonNormalValue)
+                .build();
+
+        var updatedTag2 = TagUpdateService.applyTagUpdates(updatedTag, List.of(update2));
+
+        var storedValue2 = updatedTag2.getAttrOrThrow("attr_1");
+        assertTrue(storedValue2.hasType());
+        assertEquals(BasicType.INTEGER, storedValue2.getType().getBasicType());
+
+        var update3 = TagUpdate.newBuilder()
+                .setOperation(TagOperation.APPEND_ATTR)
+                .setAttrName("attr_1")
+                .setValue(nonNormalValue)
+                .build();
+
+        var updatedTag3 = TagUpdateService.applyTagUpdates(updatedTag2, List.of(update3));
+
+        var storedValue3 = updatedTag3.getAttrOrThrow("attr_1");
+        assertTrue(storedValue3.hasType());
+        assertEquals(BasicType.ARRAY, storedValue3.getType().getBasicType());
+        assertEquals(BasicType.INTEGER, storedValue3.getType().getArrayType().getBasicType());
     }
 }

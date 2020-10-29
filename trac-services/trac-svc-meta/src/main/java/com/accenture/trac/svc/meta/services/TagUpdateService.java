@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 
+import static com.accenture.trac.svc.meta.services.MetadataConstants.PUBLIC_API;
 import static com.accenture.trac.svc.meta.services.MetadataConstants.TRAC_RESERVED_IDENTIFIER;
 
 
@@ -106,7 +107,7 @@ public class TagUpdateService {
 
         requireAttrDoesNotExist(prior, update, CREATE_ALREADY_EXISTS, TagOperation.CREATE_ATTR);
 
-        return prior.putAttr(update.getAttrName(), update.getValue());
+        return prior.putAttr(update.getAttrName(), normalizeValue(update.getValue()));
     }
 
     private static Tag.Builder replaceAttr(Tag.Builder prior, TagUpdate update) {
@@ -114,7 +115,7 @@ public class TagUpdateService {
         requireAttrExists(prior, update, REPLACE_DOES_NOT_EXIST, TagOperation.REPLACE_ATTR);
         requireTypeMatches(prior, update, REPLACE_WRONG_TYPE, TagOperation.REPLACE_ATTR);
 
-        return prior.putAttr(update.getAttrName(), update.getValue());
+        return prior.putAttr(update.getAttrName(), normalizeValue(update.getValue()));
     }
 
     private static Tag.Builder appendAttr(Tag.Builder prior, TagUpdate update) {
@@ -186,6 +187,43 @@ public class TagUpdateService {
 
             if (TypeSystem.isPrimitive(arrayType))
                 return arrayType.getBasicType();
+        }
+
+        // Should never happen
+        throw new EValidationGap("Tag update value must be a primitive or array of primitives");
+    }
+
+    private static Value normalizeValue(Value attrValue) {
+
+        if (TypeSystem.isPrimitive(attrValue)) {
+
+            var descriptor = TypeSystem.descriptor(attrValue);
+
+            return attrValue.toBuilder()
+                    .setType(descriptor)
+                    .build();
+        }
+
+        // Should never happen
+        if (!attrValue.hasType())
+            throw new EValidationGap("Non-primitive value with missing type descriptor");
+
+        if (TypeSystem.basicType(attrValue) == BasicType.ARRAY) {
+
+            var arrayType = attrValue.getType().getArrayType();
+
+            if (TypeSystem.isPrimitive(arrayType)) {
+
+                var descriptor = TypeDescriptor.newBuilder()
+                        .setBasicType(BasicType.ARRAY)
+                        .setArrayType(arrayType)
+                        .build();
+
+                return attrValue.toBuilder()
+                        .setType(descriptor)
+                        .build();
+
+            }
         }
 
         // Should never happen
