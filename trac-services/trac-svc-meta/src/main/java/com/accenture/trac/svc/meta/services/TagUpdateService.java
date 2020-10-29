@@ -77,13 +77,11 @@ public class TagUpdateService {
 
     private static Tag.Builder applyTagUpdate(Tag.Builder prior, TagUpdate update) {
 
-        if (update.getOperation() == TagOperation.UNRECOGNIZED)
-            throw new EValidationGap("Validation gap for TagUpdate (unrecognized operation)");  // TODO
-
         var func = TAG_OPERATION_MAP.getOrDefault(update.getOperation(), null);
 
+        // If the operation can't be mapped that is a validation gap
         if (func == null)
-            throw new EValidationGap(""); // TODO
+            throw new EValidationGap("Tag update operation is missing or unrecognized");
 
         return func.apply(prior, update);
     }
@@ -176,11 +174,11 @@ public class TagUpdateService {
     private static BasicType attrBasicType(Value attrValue) {
 
         if (TypeSystem.isPrimitive(attrValue))
-            return attrValue.getType().getBasicType();
+            return TypeSystem.basicType(attrValue);
 
         // Should never happen
         if (!attrValue.hasType())
-            throw new EValidationGap("");
+            throw new EValidationGap("Non-primitive value with missing type descriptor");
 
         if (TypeSystem.basicType(attrValue) == BasicType.ARRAY) {
 
@@ -191,7 +189,7 @@ public class TagUpdateService {
         }
 
         // Should never happen
-        throw new EValidationGap("");  // TODO
+        throw new EValidationGap("Tag update value must be a primitive or array of primitives");
     }
 
     private static void requireAttrDoesNotExist(
