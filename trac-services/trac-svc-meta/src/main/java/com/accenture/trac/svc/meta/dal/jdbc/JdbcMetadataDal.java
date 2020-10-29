@@ -115,7 +115,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             long[] objectPk = writeBatch.writeObjectId(conn, tenantId, parts.objectType, parts.objectId);
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts.version, parts.definition);
-            long[] tagPk = writeBatch.writeTagHeader(conn, tenantId, defPk, parts.header, parts.tagVersion);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
 
             writeBatch.writeLatestVersion(conn, tenantId, objectPk, defPk);
@@ -150,7 +150,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             checkObjectTypes(parts, objectType);
 
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts.version, parts.definition);
-            long[] tagPk = writeBatch.writeTagHeader(conn, tenantId, defPk, parts.header, parts.tagVersion);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
 
             writeBatch.updateLatestVersion(conn, tenantId, objectType.keys, defPk);
@@ -187,7 +187,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             checkObjectTypes(parts, objectType);
 
             long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.version);
-            long[] tagPk = writeBatch.writeTagHeader(conn, tenantId, defPk, parts.header, parts.tagVersion);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
 
             writeBatch.updateLatestTag(conn, tenantId, defPk, tagPk);
@@ -250,7 +250,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             checkObjectTypes(parts, objectType);
 
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts.version, parts.definition);
-            long[] tagPk = writeBatch.writeTagHeader(conn, tenantId, defPk, parts.header, parts.tagVersion);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
 
             writeBatch.writeLatestVersion(conn, tenantId, objectType.keys, defPk);
@@ -436,7 +436,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             var tenantId = tenants.getTenantId(tenant);
             long[] tagPk = search.search(conn, tenantId, searchParameters);
-            var tag = readBatch.readTagByPk(conn, tenantId, tagPk);
+
+            var tag = readBatch.readTagWithHeader(conn, tenantId, tagPk);
 
             return Arrays.stream(tag.items)
                     .map(Tag.Builder::build)

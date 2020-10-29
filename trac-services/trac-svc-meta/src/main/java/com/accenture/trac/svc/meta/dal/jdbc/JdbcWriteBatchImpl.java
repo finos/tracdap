@@ -110,22 +110,19 @@ class JdbcWriteBatchImpl {
         }
     }
 
-    long[] writeTagHeader(
+    long[] writeTagRecord(
             Connection conn, short tenantId,
-            long[] definitionPk, TagHeader[] tagHeader, int[] tagVersion)
+            long[] definitionPk, int[] tagVersion, ObjectType[] objectTypes)
             throws SQLException {
 
         var query =
                 "insert into tag (\n" +
                 "  tenant_id,\n" +
                 "  definition_fk,\n" +
-                "  object_type,\n" +
-                "  object_id_hi,\n" +
-                "  object_id_lo,\n" +
-                "  object_version,\n" +
-                "  tag_version" +
+                "  tag_version,\n" +
+                "  object_type" +
                 ")\n" +
-                "values (?, ?, ?, ?, ?, ?, ?)";
+                "values (?, ?, ?, ?)";
 
         // Only request generated key columns if the driver supports it
         var keySupport = dialect.supportsGeneratedKeys();
@@ -135,15 +132,10 @@ class JdbcWriteBatchImpl {
 
             for (var i = 0; i < definitionPk.length; i++) {
 
-                var objectId = MetadataCodec.decode(tagHeader[i].getObjectId());
-
                 stmt.setShort(1, tenantId);
                 stmt.setLong(2, definitionPk[i]);
-                stmt.setString(3, tagHeader[i].getObjectType().name());
-                stmt.setLong(4, objectId.getMostSignificantBits());
-                stmt.setLong(5, objectId.getLeastSignificantBits());
-                stmt.setInt(6, tagHeader[i].getObjectVersion());
-                stmt.setInt(7, tagHeader[i].getTagVersion());
+                stmt.setInt(3, tagVersion[i]);
+                stmt.setString(4, objectTypes[i].name());
 
                 stmt.addBatch();
             }

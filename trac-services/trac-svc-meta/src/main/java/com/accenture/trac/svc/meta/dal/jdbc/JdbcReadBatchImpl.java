@@ -192,9 +192,10 @@ class JdbcReadBatchImpl {
     }
 
     JdbcBaseDal.KeyedItems<Tag.Builder>
-    readTagByPk(Connection conn, short tenantId, long[] tagPk) throws SQLException {
+    readTagWithHeader(Connection conn, short tenantId, long[] tagPk) throws SQLException {
 
         var mappingStage = insertPk(conn, tagPk);
+        mapDefinitionByTagPk(conn, tenantId, mappingStage);
 
         var headers = fetchTagHeader(conn, tenantId, tagPk.length, mappingStage);
         var attrs = fetchTagAttrs(conn, tenantId, tagPk.length, mappingStage);
@@ -253,18 +254,28 @@ class JdbcReadBatchImpl {
     private JdbcBaseDal.KeyedItems<TagHeader>
     fetchTagHeader(Connection conn, short tenantId, int length, int mappingStage) throws SQLException {
 
-        // Tag records contain no attributes, we only need pks and versions
-        // Note: Common attributes may be added to the tag table as search optimisations, but do not need to be read
+        // Data to build the full header is in the object and definition tables
+        // Assume key_mapping has been populated with keys from the tag table:
+        //  - key_mapping.pk = tag_pk
+        //  - key_mapping.ver = tag_version
+        //  - key_mapping.fk = definition_fk
+        // Now we only need to join object_definition and object_id
+        // To set up this mapping, put tag PKs into key_mapping and call mapDefinitionByTagPk()
 
-        var query =
-                "select \n" +
-                "   tag.tag_pk, tag.object_type, \n" +
-                "   tag.object_id_hi, tag.object_id_lo, \n" +
-                "   tag.object_version, tag.tag_version \n" +
-                "from tag\n" +
-                "join key_mapping km\n" +
-                "  on tag.tag_pk = km.pk\n" +
-                "where tag.tenant_id = ?\n" +
+        var query = "select \n" +
+                "  km.pk as tag_pk\n," +
+                "  obj.object_type\n," +
+                "  obj.object_id_hi,\n" +
+                "  obj.object_id_lo,\n" +
+                "  def.object_version,\n" +
+                "  km.ver as tag_version\n" +
+                "from key_mapping km\n" +
+                "join object_definition def\n" +
+                "  on def.definition_pk = km.fk\n" +
+                "join object_id obj\n" +
+                "  on obj.tenant_id = def.tenant_id\n" +
+                "  and obj.object_pk = def.object_fk\n" +
+                "where def.tenant_id = ?\n" +
                 "  and km.mapping_stage = ?\n" +
                 "order by km.ordering";
 
@@ -277,38 +288,41 @@ class JdbcReadBatchImpl {
 
             try (var rs = stmt.executeQuery()) {
 
-                long[] pks = new long[length];
-                int[] versions = new int[length];
-                TagHeader[] tagHeaders = new TagHeader[length];
+                var pks = new long[length];
+                var versions = new int[length];
+                var headers = new TagHeader[length];
 
-                for (var i = 0; i < length; i++) {
+                for (int i = 0; i < length; i++) {
 
                     if (!rs.next())
                         throw new JdbcException(JdbcErrorCode.NO_DATA);
 
-                    var tagPk = rs.getLong(1);
-                    var objectType = rs.getString(2);
+                    var pk = rs.getLong(1);
+                    var objectTypeCode = rs.getString(2);
                     var objectIdHi = rs.getLong(3);
                     var objectIdLo = rs.getLong(4);
                     var objectVersion = rs.getInt(5);
                     var tagVersion = rs.getInt(6);
 
-                    var tagHeader = TagHeader.newBuilder()
-                            .setObjectType(ObjectType.valueOf(objectType))
-                            .setObjectId(MetadataCodec.encode(new UUID(objectIdHi, objectIdLo)))
+                    var objectId = new UUID(objectIdHi, objectIdLo);
+                    var objectType = ObjectType.valueOf(objectTypeCode);
+
+                    var header = TagHeader.newBuilder()
+                            .setObjectType(objectType)
+                            .setObjectId(MetadataCodec.encode(objectId))
                             .setObjectVersion(objectVersion)
                             .setTagVersion(tagVersion)
                             .build();
 
-                    pks[i] = tagPk;
+                    pks[i] = pk;
                     versions[i] = tagVersion;
-                    tagHeaders[i] = tagHeader;
+                    headers[i] = header;
                 }
 
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, tagHeaders);
+                return new JdbcBaseDal.KeyedItems<>(pks, versions, headers);
             }
         }
     }
@@ -424,16 +438,16 @@ class JdbcReadBatchImpl {
     private JdbcBaseDal.KeyedItems<Tag.Builder>
     applyTagAttrs(JdbcBaseDal.KeyedItems<TagHeader> headers, Map<String, Value>[] attrs) {
 
-        var tags = new Tag.Builder[headers.items.length];
+        var tags = new Tag.Builder[headers.keys.length];
 
-        for (var i = 0; i < headers.items.length; i++) {
+        for (var i = 0; i < headers.keys.length; i++) {
 
             tags[i] = Tag.newBuilder()
                     .setHeader(headers.items[i])
                     .putAllAttr(attrs[i]);
         }
 
-        return new JdbcBaseDal.KeyedItems<>(headers.keys, tags);
+        return new JdbcBaseDal.KeyedItems<>(headers.keys, headers.versions, tags);
     }
 
 
@@ -673,6 +687,38 @@ class JdbcReadBatchImpl {
 
             stmt.setShort(1, tenantId);
             stmt.setInt(2, mappingStage);
+
+            stmt.execute();
+        }
+    }
+
+    private void mapDefinitionByTagPk(Connection conn, short tenantId, int mappingStage) throws SQLException {
+
+        // Use this mapping to prepare for fetchTagHeaders()
+
+        // Tag key is already in key_mapping.pk
+        // Put definition key into key_mapping.fk
+        // Also put tag version into key_mapping.ver
+
+        var query =
+                "update key_mapping\n" +
+                "set fk = (\n" +
+                "  select definition_fk from tag t1\n" +
+                "  where t1.tenant_id = ?\n" +
+                "  and t1.tag_pk = key_mapping.pk),\n" +
+                "ver = (\n" +
+                "  select tag_version from tag t2\n" +
+                "  where t2.tenant_id = ?\n" +
+                "  and t2.tag_pk = key_mapping.pk)\n" +
+                "where mapping_stage = ?";
+
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setShort(1, tenantId);
+            stmt.setShort(2, tenantId);
+            stmt.setInt(3, mappingStage);
 
             stmt.execute();
         }
