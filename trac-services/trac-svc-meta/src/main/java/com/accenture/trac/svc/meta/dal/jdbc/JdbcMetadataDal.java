@@ -286,10 +286,10 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             checkObjectType(parts, storedType);
 
             var definition = readSingle.readDefinitionByVersion(conn, tenantId, storedType.key, objectVersion);
-            var tagHeader = readSingle.readTagHeaderByVersion(conn, tenantId, definition.key, tagVersion);
-            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagHeader.key);
+            var tagRecord = readSingle.readTagRecordByVersion(conn, tenantId, definition.key, tagVersion);
+            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagRecord.key);
 
-            return buildTag(definition.item, tagHeader.item, tagAttrs);
+            return buildTag(objectType, objectId, definition, tagRecord, tagAttrs);
         },
         (error, code) -> JdbcError.loadOne_missingItem(error, code, parts),
         (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, parts));
@@ -308,10 +308,10 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             checkObjectType(parts, storedType);
 
             var definition = readSingle.readDefinitionByVersion(conn, tenantId, storedType.key, objectVersion);
-            var tagHeader = readSingle.readTagHeaderByLatest(conn, tenantId, definition.key);
-            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagHeader.key);
+            var tagRecord = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
+            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagRecord.key);
 
-            return buildTag(definition.item, tagHeader.item, tagAttrs);
+            return buildTag(objectType, objectId, definition, tagRecord, tagAttrs);
         },
         (error, code) -> JdbcError.loadOne_missingItem(error, code, parts),
         (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, parts));
@@ -330,10 +330,10 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             checkObjectType(parts, storedType);
 
             var definition = readSingle.readDefinitionByLatest(conn, tenantId, storedType.key);
-            var tagHeader = readSingle.readTagHeaderByLatest(conn, tenantId, definition.key);
-            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagHeader.key);
+            var tagRecord = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
+            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagRecord.key);
 
-            return buildTag(definition.item, tagHeader.item, tagAttrs);
+            return buildTag(objectType, objectId, definition, tagRecord, tagAttrs);
         },
         (error, code) -> JdbcError.loadOne_missingItem(error, code, parts),
         (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, parts));
@@ -563,13 +563,20 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     // -----------------------------------------------------------------------------------------------------------------
 
     private Tag buildTag(
-            ObjectDefinition definition,
-            TagHeader tagHeader,
+            ObjectType objectType, UUID objectId,
+            KeyedItem<ObjectDefinition> definition,
+            KeyedItem<Void> tagRecord,
             Map<String, Value> tagAttrs) {
 
+        var header = TagHeader.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectVersion(definition.version)
+                .setTagVersion(tagRecord.version);
+
         return Tag.newBuilder()
-                .setHeader(tagHeader)
-                .setDefinition(definition)
+                .setHeader(header)
+                .setDefinition(definition.item)
                 .putAllAttr(tagAttrs)
                 .build();
     }

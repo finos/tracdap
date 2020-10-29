@@ -138,14 +138,11 @@ class JdbcReadImpl {
         }
     }
 
-    KeyedItem<TagHeader>
-    readTagHeaderByVersion(Connection conn, short tenantId, long definitionPk, int tagVersion) throws SQLException {
+    KeyedItem<Void>
+    readTagRecordByVersion(Connection conn, short tenantId, long definitionPk, int tagVersion) throws SQLException {
 
         var query =
-                "select \n" +
-                "   tag_pk, object_type, \n" +
-                "   object_id_hi, object_id_lo, \n" +
-                "   object_version, tag_version \n" +
+                "select tag_pk, tag_version \n" +
                 "from tag\n" +
                 "where tenant_id = ?\n" +
                 "and definition_fk = ?\n" +
@@ -157,18 +154,15 @@ class JdbcReadImpl {
             stmt.setLong(2, definitionPk);
             stmt.setInt(3, tagVersion);
 
-            return readTagHeader(stmt);
+            return readTagRecord(stmt);
         }
     }
 
-    KeyedItem<TagHeader>
-    readTagHeaderByLatest(Connection conn, short tenantId, long definitionPk) throws SQLException {
+    KeyedItem<Void>
+    readTagRecordByLatest(Connection conn, short tenantId, long definitionPk) throws SQLException {
 
         var query =
-                "select \n" +
-                "   tag_pk, object_type, \n" +
-                "   object_id_hi, object_id_lo, \n" +
-                "   object_version, tag_version \n" +
+                "select tag_pk, tag_version \n" +
                 "from tag\n" +
                 "where tenant_id = ?\n" +
                 "and tag_pk = (\n" +
@@ -183,12 +177,12 @@ class JdbcReadImpl {
             stmt.setShort(2, tenantId);
             stmt.setLong(3, definitionPk);
 
-            return readTagHeader(stmt);
+            return readTagRecord(stmt);
         }
     }
 
-    private KeyedItem<TagHeader>
-    readTagHeader(PreparedStatement stmt) throws SQLException {
+    private KeyedItem<Void>
+    readTagRecord(PreparedStatement stmt) throws SQLException {
 
         try (var rs = stmt.executeQuery()) {
 
@@ -196,23 +190,13 @@ class JdbcReadImpl {
                 throw new JdbcException(JdbcErrorCode.NO_DATA);
 
             var tagPk = rs.getLong(1);
-            var objectType = rs.getString(2);
-            var objectIdHi = rs.getLong(3);
-            var objectIdLo = rs.getLong(4);
-            var objectVersion = rs.getInt(5);
-            var tagVersion = rs.getInt(6);
-
-            var tagHeader = TagHeader.newBuilder()
-                    .setObjectType(ObjectType.valueOf(objectType))
-                    .setObjectId(MetadataCodec.encode(new UUID(objectIdHi, objectIdLo)))
-                    .setObjectVersion(objectVersion)
-                    .setTagVersion(tagVersion)
-                    .build();
+            var tagVersion = rs.getInt(2);
 
             if (rs.next())
                 throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-            return new KeyedItem<>(tagPk, tagVersion, tagHeader);
+            // Tag record requires only PK and version info
+            return new KeyedItem<>(tagPk, tagVersion, null);
         }
     }
 
