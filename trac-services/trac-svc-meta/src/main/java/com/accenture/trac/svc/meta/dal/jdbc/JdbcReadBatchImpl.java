@@ -24,6 +24,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -180,7 +181,7 @@ class JdbcReadBatchImpl {
         var tagRecords = fetchTagRecord(conn, tenantId, definitionFk.length, mappingStage);
         var attrs = fetchTagAttrs(conn, tenantId, definitionFk.length, mappingStage);
 
-        return applyTagRecordAttrs(tagRecords, attrs);
+        return applyTagAttrs(tagRecords, attrs);
     }
 
     JdbcBaseDal.KeyedItems<Tag.Builder>
@@ -192,7 +193,7 @@ class JdbcReadBatchImpl {
         var tagRecords = fetchTagRecord(conn, tenantId, definitionFk.length, mappingStage);
         var attrs = fetchTagAttrs(conn, tenantId, definitionFk.length, mappingStage);
 
-        return applyTagRecordAttrs(tagRecords, attrs);
+        return applyTagAttrs(tagRecords, attrs);
     }
 
     JdbcBaseDal.KeyedItems<Tag.Builder>
@@ -201,10 +202,11 @@ class JdbcReadBatchImpl {
         var mappingStage = insertPk(conn, tagPk);
         mapDefinitionByTagPk(conn, tenantId, mappingStage);
 
-        var headers = fetchTagHeader(conn, tenantId, tagPk.length, mappingStage);
+        var tagRecords = fetchTagRecord(conn, tenantId, tagPk.length, mappingStage);
+        var partialHeaders = fetchTagHeader(conn, tenantId, tagPk.length, mappingStage);
         var attrs = fetchTagAttrs(conn, tenantId, tagPk.length, mappingStage);
 
-        return applyTagAttrs(headers, attrs);
+        return applyTagAttrs(tagRecords, partialHeaders, attrs);
     }
 
     private JdbcBaseDal.KeyedItems<Void>
@@ -270,12 +272,12 @@ class JdbcReadBatchImpl {
         // To set up this mapping, put tag PKs into key_mapping and call mapDefinitionByTagPk()
 
         var query = "select \n" +
-                "  km.pk as tag_pk\n," +
+                "  km.fk as def_pk\n," +
                 "  obj.object_type\n," +
                 "  obj.object_id_hi,\n" +
                 "  obj.object_id_lo,\n" +
                 "  def.object_version,\n" +
-                "  km.ver as tag_version\n" +
+                "  def.object_timestamp\n" +
                 "from key_mapping km\n" +
                 "join object_definition def\n" +
                 "  on def.definition_pk = km.fk\n" +
@@ -296,7 +298,6 @@ class JdbcReadBatchImpl {
             try (var rs = stmt.executeQuery()) {
 
                 var pks = new long[length];
-                var versions = new int[length];
                 var headers = new TagHeader[length];
 
                 for (int i = 0; i < length; i++) {
@@ -304,12 +305,12 @@ class JdbcReadBatchImpl {
                     if (!rs.next())
                         throw new JdbcException(JdbcErrorCode.NO_DATA);
 
-                    var pk = rs.getLong(1);
+                    var definitionPk = rs.getLong(1);
                     var objectTypeCode = rs.getString(2);
                     var objectIdHi = rs.getLong(3);
                     var objectIdLo = rs.getLong(4);
                     var objectVersion = rs.getInt(5);
-                    var tagVersion = rs.getInt(6);
+                    var objectTimestamp = rs.getObject(6, Instant.class);
 
                     var objectId = new UUID(objectIdHi, objectIdLo);
                     var objectType = ObjectType.valueOf(objectTypeCode);
@@ -318,18 +319,17 @@ class JdbcReadBatchImpl {
                             .setObjectType(objectType)
                             .setObjectId(objectId.toString())
                             .setObjectVersion(objectVersion)
-                            .setTagVersion(tagVersion)
+                            .setObjectTimestamp(MetadataCodec.quoteDatetime(objectTimestamp.atOffset(ZoneOffset.UTC)))
                             .build();
 
-                    pks[i] = pk;
-                    versions[i] = tagVersion;
+                    pks[i] = definitionPk;
                     headers[i] = header;
                 }
 
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, headers);
+                return new JdbcBaseDal.KeyedItems<>(pks, headers);
             }
         }
     }
@@ -429,7 +429,7 @@ class JdbcReadBatchImpl {
     }
 
     private JdbcBaseDal.KeyedItems<Tag.Builder>
-    applyTagRecordAttrs(JdbcBaseDal.KeyedItems<Void> tagRecords, Map<String, Value>[] attrs) {
+    applyTagAttrs(JdbcBaseDal.KeyedItems<Void> tagRecords, Map<String, Value>[] attrs) {
 
         var tags = new Tag.Builder[tagRecords.keys.length];
 
@@ -443,18 +443,27 @@ class JdbcReadBatchImpl {
     }
 
     private JdbcBaseDal.KeyedItems<Tag.Builder>
-    applyTagAttrs(JdbcBaseDal.KeyedItems<TagHeader> headers, Map<String, Value>[] attrs) {
+    applyTagAttrs(JdbcBaseDal.KeyedItems<Void> tagRecords, JdbcBaseDal.KeyedItems<TagHeader> headers, Map<String, Value>[] attrs) {
 
         var tags = new Tag.Builder[headers.keys.length];
 
         for (var i = 0; i < headers.keys.length; i++) {
 
+            var tagTimestamp = MetadataCodec
+                    .quoteDatetime(tagRecords.timestamps[i]
+                    .atOffset(ZoneOffset.UTC));
+
+            var header = headers.items[i].toBuilder()
+                    .setTagVersion(tagRecords.versions[i])
+                    .setTagTimestamp(tagTimestamp)
+                    .build();
+
             tags[i] = Tag.newBuilder()
-                    .setHeader(headers.items[i])
+                    .setHeader(header)
                     .putAllAttr(attrs[i]);
         }
 
-        return new JdbcBaseDal.KeyedItems<>(headers.keys, headers.versions, tags);
+        return new JdbcBaseDal.KeyedItems<>(headers.keys, tagRecords.versions, tagRecords.timestamps, tags);
     }
 
 
