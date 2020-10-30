@@ -272,10 +272,10 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Override public CompletableFuture<Tag>
-    loadObject(String tenant, ObjectType objectType, TagSelector selector) {
+    loadObject(String tenant, TagSelector selector) {
 
         var objectId = UUID.fromString(selector.getObjectId());
-        var parts = assembleParts(objectType, objectId, LATEST_VERSION, LATEST_TAG);   // TODO: Version fields not used
+        var parts = assembleParts(selector.getObjectType(), objectId, LATEST_VERSION, LATEST_TAG);   // TODO: Version fields not used
 
         return wrapTransaction(conn -> {
 
@@ -288,7 +288,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             var tagRecord = readSingle.readTagRecord(conn, tenantId, definition.key, selector);
             var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagRecord.key);
 
-            return buildTag(objectType, objectId, definition, tagRecord, tagAttrs);
+            return buildTag(selector.getObjectType(), objectId, definition, tagRecord, tagAttrs);
         },
         (error, code) -> JdbcError.loadOne_missingItem(error, code, parts),
         (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, parts));

@@ -49,7 +49,7 @@ public interface IMetadataDal {
     CompletableFuture<Void> savePreallocatedObjects(String tenant, List<Tag> tags);
 
     CompletableFuture<Tag>
-    loadObject(String tenant, ObjectType objectType, TagSelector selector);
+    loadObject(String tenant, TagSelector selector);
 
     CompletableFuture<Tag>
     loadTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion);
