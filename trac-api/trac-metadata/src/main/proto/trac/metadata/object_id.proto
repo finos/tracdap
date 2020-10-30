@@ -67,14 +67,21 @@ message TagHeader {
   int32 objectVersion = 3;
 
   /**
+   * Timestamp for when this version of the object was created.
+   * Represented using ISO 8601.
+   */
+  string objectTimestamp = 5;
+
+  /**
    * Version of this tag.
    */
   int32 tagVersion = 4;
 
-  // Core tag/object temporality coming in metadata temporality feature
-  // DatetimeValue objectTimestamp = 5;
-  // DatetimeValue tagTimestamp = 6;
-  // DatetimeValue originalObjectTimestamp = 7;
+  /**
+   * Timestamp for when this version of the tag was created.
+   * Represented using ISO 8601.
+   */
+  string tagTimestamp = 6;
 }
 
 
@@ -125,7 +132,7 @@ message TagSelector {
   oneof objectVersionCriteria {
 
     /**
-     * Select the latest version of the object.
+     * Select the latest version of the object (the version that is live now).
      *
      * If this flag is specified, it must be set to true.
      */
@@ -136,14 +143,17 @@ message TagSelector {
      */
     int32 objectVersion = 4;
 
-    // select by as-of time coming in metadata temporality feature
-    // DatetimeValue objectTimestamp = 5;
+    /**
+     * Select the version of the object that was live as of a particular point
+     * in time. Represented using ISO 8601.
+     */
+    string objectAsOf = 5;
   }
 
   oneof tagVersionCriteria {
 
     /**
-     * Select the latest version of the tag.
+     * Select the latest version of the tag (the version that is live now).
      *
      * If this flag is specified, it must be set to true.
      */
@@ -154,7 +164,10 @@ message TagSelector {
      */
     int32 tagVersion = 7;
 
-    // select by as-of time coming in metadata temporality feature
-    // DatetimeValue tagTimestamp = 8;
+    /**
+     * Select the version of the tag that was live as of a particular point
+     * in time. Represented using ISO 8601.
+     */
+    string tagAsOf = 8;
   }
 }
