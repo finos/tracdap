@@ -26,19 +26,6 @@ import java.util.stream.Collectors;
 
 public class MetadataCodec {
 
-    public static com.accenture.trac.common.metadata.UUID encode(java.util.UUID uuid) {
-
-        return com.accenture.trac.common.metadata.UUID.newBuilder()
-                .setHi(uuid.getMostSignificantBits())
-                .setLo(uuid.getLeastSignificantBits())
-                .build();
-    }
-
-    public static java.util.UUID decode(com.accenture.trac.common.metadata.UUID uuid) {
-
-        return new UUID(uuid.getHi(), uuid.getLo());
-    }
-
     public static Value encodeNativeObject(Object value) {
 
         // We need to handle int/long and float/double separately
