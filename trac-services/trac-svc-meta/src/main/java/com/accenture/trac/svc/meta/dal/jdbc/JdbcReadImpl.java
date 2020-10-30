@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.common.exception.EValidationGap;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcBaseDal.KeyedItem;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -67,6 +68,26 @@ class JdbcReadImpl {
     }
 
     KeyedItem<ObjectDefinition>
+    readDefinition(
+            Connection conn, short tenantId,
+            long objectPk, TagSelector selector)
+            throws SQLException {
+
+        if (selector.getObjectVersionCriteriaCase() == TagSelector.ObjectVersionCriteriaCase.OBJECTVERSION)
+            return readDefinitionByVersion(conn, tenantId, objectPk, selector.getObjectVersion());
+
+        if (selector.getObjectVersionCriteriaCase() == TagSelector.ObjectVersionCriteriaCase.OBJECTASOF) {
+            var objectAsOf = MetadataCodec.parseDatetime(selector.getObjectAsOf()).toInstant();
+            return readDefinitionByAsOf(conn, tenantId, objectPk, objectAsOf);
+        }
+
+        if (selector.getObjectVersionCriteriaCase() == TagSelector.ObjectVersionCriteriaCase.LATESTOBJECT)
+            return readDefinitionByLatest(conn, tenantId, objectPk);
+
+        throw new EValidationGap("Object version criteria not set in selector");
+    }
+
+    KeyedItem<ObjectDefinition>
     readDefinitionByVersion(
             Connection conn, short tenantId,
             long objectPk, int objectVersion)
@@ -85,7 +106,7 @@ class JdbcReadImpl {
             stmt.setLong(2, objectPk);
             stmt.setInt(3, objectVersion);
 
-            return readDefinition(stmt);
+            return fetchDefinition(stmt);
         }
     }
 
@@ -110,7 +131,7 @@ class JdbcReadImpl {
             stmt.setObject(3, objectAsOf, Types.TIMESTAMP);
             stmt.setObject(4, objectAsOf, Types.TIMESTAMP);
 
-            return readDefinition(stmt);
+            return fetchDefinition(stmt);
         }
     }
 
@@ -131,12 +152,12 @@ class JdbcReadImpl {
             stmt.setShort(1, tenantId);
             stmt.setLong(2, objectPk);
 
-            return readDefinition(stmt);
+            return fetchDefinition(stmt);
         }
     }
 
     private KeyedItem<ObjectDefinition>
-    readDefinition(PreparedStatement stmt) throws SQLException {
+    fetchDefinition(PreparedStatement stmt) throws SQLException {
 
         try (var rs = stmt.executeQuery()) {
 
@@ -159,6 +180,26 @@ class JdbcReadImpl {
         catch (InvalidProtocolBufferException e) {
             throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION);
         }
+    }
+
+    KeyedItem<Void>
+    readTagRecord(
+            Connection conn, short tenantId,
+            long definitionPk, TagSelector selector)
+            throws SQLException {
+
+        if (selector.getTagVersionCriteriaCase() == TagSelector.TagVersionCriteriaCase.TAGVERSION)
+            return readTagRecordByVersion(conn, tenantId, definitionPk, selector.getTagVersion());
+
+        if (selector.getTagVersionCriteriaCase() == TagSelector.TagVersionCriteriaCase.TAGASOF) {
+            var tagAsOf = MetadataCodec.parseDatetime(selector.getTagAsOf()).toInstant();
+            return readTagRecordByAsOf(conn, tenantId, definitionPk, tagAsOf);
+        }
+
+        if (selector.getTagVersionCriteriaCase() == TagSelector.TagVersionCriteriaCase.LATESTTAG)
+            return readTagRecordByLatest(conn, tenantId, definitionPk);
+
+        throw new EValidationGap("Tag version criteria not set in selector");
     }
 
     KeyedItem<Void>

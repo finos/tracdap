@@ -268,6 +268,34 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
 
     // -----------------------------------------------------------------------------------------------------------------
+    // LOAD METHODS (USING TAG SELECTORS)
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @Override public CompletableFuture<Tag>
+    loadObject(String tenant, ObjectType objectType, TagSelector selector) {
+
+        var objectId = UUID.fromString(selector.getObjectId());
+        var parts = assembleParts(objectType, objectId, LATEST_VERSION, LATEST_TAG);   // TODO: Version fields not used
+
+        return wrapTransaction(conn -> {
+
+            var tenantId = tenants.getTenantId(tenant);
+            var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
+
+            checkObjectType(parts, storedType);
+
+            var definition = readSingle.readDefinition(conn, tenantId, storedType.key, selector);
+            var tagRecord = readSingle.readTagRecord(conn, tenantId, definition.key, selector);
+            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagRecord.key);
+
+            return buildTag(objectType, objectId, definition, tagRecord, tagAttrs);
+        },
+        (error, code) -> JdbcError.loadOne_missingItem(error, code, parts),
+        (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, parts));
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
     // LOAD METHODS (SINGLE ITEM)
     // -----------------------------------------------------------------------------------------------------------------
 
