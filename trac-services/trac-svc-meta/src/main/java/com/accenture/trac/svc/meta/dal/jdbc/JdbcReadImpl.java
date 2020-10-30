@@ -23,6 +23,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -83,6 +84,31 @@ class JdbcReadImpl {
             stmt.setShort(1, tenantId);
             stmt.setLong(2, objectPk);
             stmt.setInt(3, objectVersion);
+
+            return readDefinition(stmt);
+        }
+    }
+
+    KeyedItem<ObjectDefinition>
+    readDefinitionByAsOf(
+            Connection conn, short tenantId,
+            long objectPk, Instant objectAsOf)
+            throws SQLException {
+
+        var query =
+                "select definition_pk, object_version, object_timestamp, definition\n" +
+                "from object_definition\n" +
+                "where tenant_id = ?\n" +
+                "and object_fk = ?\n" +
+                "and object_timestamp >= ?\n" +
+                "and (object_superseded is null or object_superseded < ?)\n";
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setShort(1, tenantId);
+            stmt.setLong(2, objectPk);
+            stmt.setObject(3, objectAsOf, Types.TIMESTAMP);
+            stmt.setObject(4, objectAsOf, Types.TIMESTAMP);
 
             return readDefinition(stmt);
         }
@@ -156,14 +182,39 @@ class JdbcReadImpl {
     }
 
     KeyedItem<Void>
+    readTagRecordByAsOf(
+            Connection conn, short tenantId,
+            long definitionPk, Instant tagAsOf)
+            throws SQLException {
+
+        var query =
+                "select tag_pk, tag_version, tag_timestamp\n" +
+                "from tag\n" +
+                "where tenant_id = ?\n" +
+                "and definition_fk = ?\n" +
+                "and tag_timestamp >= ?\n" +
+                "and (tag_superseded is null or tag_superseded < ?)\n";
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setShort(1, tenantId);
+            stmt.setLong(2, definitionPk);
+            stmt.setObject(3, tagAsOf, Types.TIMESTAMP);
+            stmt.setObject(4, tagAsOf, Types.TIMESTAMP);
+
+            return readTagRecord(stmt);
+        }
+    }
+
+    KeyedItem<Void>
     readTagRecordByLatest(Connection conn, short tenantId, long definitionPk) throws SQLException {
 
         var query =
                 "select tag_pk, tag_version, tag_timestamp\n" +
                 "from tag\n" +
                 "where tenant_id = ?\n" +
-                "  and definition_fk = ?\n" +
-                "  and tag_is_latest = true";
+                "and definition_fk = ?\n" +
+                "and tag_is_latest = true";
 
         try (var stmt = conn.prepareStatement(query)) {
 
