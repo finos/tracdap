@@ -48,6 +48,9 @@ create table object_definition (
     object_version int not null,
     object_timestamp timestamp (6) not null,
 
+    object_superseded timestamp (6) null,
+    object_is_latest boolean not null,
+
     definition blob not null,
 
     constraint pk_definition primary key (definition_pk),
@@ -66,6 +69,9 @@ create table tag (
     definition_fk bigint not null,
     tag_version int not null,
     tag_timestamp timestamp (6) not null,
+
+    tag_superseded timestamp (6) null,
+    tag_is_latest boolean not null,
 
     -- Make object type available for searching without a join
     object_type varchar(16) not null,
