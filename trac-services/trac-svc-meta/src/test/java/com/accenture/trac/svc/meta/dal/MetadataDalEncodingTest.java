@@ -24,6 +24,7 @@ import static com.accenture.trac.svc.meta.test.TestData.*;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.UUID;
 
 import com.accenture.trac.svc.meta.test.IDalTestable;
 import com.accenture.trac.svc.meta.test.JdbcUnit;
@@ -61,7 +62,7 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         var future = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
@@ -76,7 +77,7 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
     void roundTrip_allObjectTypesOk(ObjectType objectType) throws Exception {
 
         var origTag = dummyTagForObjectType(objectType);
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         var future = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
@@ -92,7 +93,7 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         var attrName = "test_attr_" + attrType.name();
         var attrValue = objectOfType(attrType);

@@ -177,17 +177,6 @@ message DatetimeValue {
 }
 
 
-/// Represent an object ID (this could be replaced by a string representation)
-message UUID {
-
-    // TODO - UUID could be removed as a structured type
-    // Instead use strings with appropriate validation, for ease of interoperability
-
-    sfixed64 hi = 1;
-    sfixed64 lo = 2;
-}
-
-
 /**
  * A value expressed in the TRAC type system.
  *

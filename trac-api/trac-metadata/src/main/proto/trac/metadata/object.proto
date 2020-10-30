@@ -21,28 +21,13 @@ option java_package = "com.accenture.trac.common.metadata";
 option java_multiple_files = true;
 option java_outer_classname = "ObjectProtoWrapper";  // Do not create a Java class called "Object"!
 
+import "trac/metadata/object_id.proto";
 import "trac/metadata/data.proto";
 import "trac/metadata/model.proto";
 import "trac/metadata/flow.proto";
 import "trac/metadata/job.proto";
 import "trac/metadata/file.proto";
 import "trac/metadata/custom.proto";
-
-
-/**
- * Enumeration of TRAC's core object types.
- *
- * @see ObjectDefinition
- */
-enum ObjectType {
-    OBJECT_TYPE_NOT_SET = 0;
-    DATA = 1;
-    MODEL = 2;
-    FLOW = 3;
-    JOB = 4;
-    FILE = 5;
-    CUSTOM = 6;
-}
 
 
 /**

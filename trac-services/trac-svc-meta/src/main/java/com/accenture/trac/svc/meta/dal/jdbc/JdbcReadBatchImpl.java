@@ -309,7 +309,7 @@ class JdbcReadBatchImpl {
 
                     var header = TagHeader.newBuilder()
                             .setObjectType(objectType)
-                            .setObjectId(MetadataCodec.encode(objectId))
+                            .setObjectId(objectId.toString())
                             .setObjectVersion(objectVersion)
                             .setTagVersion(tagVersion)
                             .build();

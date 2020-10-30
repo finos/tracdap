@@ -22,10 +22,7 @@ import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.TagSelector;
 import com.accenture.trac.common.exception.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static com.accenture.trac.svc.meta.services.MetadataConstants.*;
 
@@ -117,6 +114,21 @@ public class MetadataValidator {
         return rawDefinition.toBuilder()
                 .setObjectType(definitionType)
                 .build();
+    }
+
+    public MetadataValidator validObjectID(TagSelector tagSelector) {
+
+        try {
+            // noinspection ResultOfMethodCallIgnored
+            UUID.fromString(tagSelector.getObjectId());
+        }
+        catch (IllegalArgumentException e) {
+
+            var message = "Tag selector does not contain a valid object ID (requires a standard format UUID)";
+            validationErrors.add(message);
+        }
+
+        return this;
     }
 
     public MetadataValidator definitionMatchesType(ObjectDefinition objectDefinition, ObjectType objectType) {
