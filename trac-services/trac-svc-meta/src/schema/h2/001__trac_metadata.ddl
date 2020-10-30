@@ -106,29 +106,3 @@ create table tag_attr (
 );
 
 create unique index idx_attr_unq on tag_attr (tenant_id, tag_fk, attr_name, attr_index);
-
-
-create table latest_version (
-
-    tenant_id smallint not null,
-    object_fk bigint not null,
-    latest_definition_pk bigint not null,
-
-    constraint pk_latest_ver primary key (object_fk),
-    constraint fk_latest_ver_object foreign key (object_fk) references object_id (object_pk),
-    constraint fk_latest_ver_definition foreign key (latest_definition_pk) references object_definition (definition_pk),
-    constraint fk_latest_ver_tenant foreign key (tenant_id) references tenant (tenant_id)
-);
-
-
-create table latest_tag (
-
-    tenant_id smallint not null,
-    definition_fk bigint not null,
-    latest_tag_pk bigint not null,
-
-    constraint pk_latest_tag primary key (definition_fk),
-    constraint fk_latest_tag_definition foreign key (definition_fk) references object_definition (definition_pk),
-    constraint fk_latest_tag_tag foreign key (latest_tag_pk) references tag (tag_pk),
-    constraint fk_latest_tag_tenant foreign key (tenant_id) references tenant (tenant_id)
-);

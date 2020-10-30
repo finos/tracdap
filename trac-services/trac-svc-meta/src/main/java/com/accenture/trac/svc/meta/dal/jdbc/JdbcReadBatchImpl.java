@@ -98,18 +98,6 @@ class JdbcReadBatchImpl {
         return fetchDefinition(conn, tenantId, objectFk.length, mappingStage);
     }
 
-    JdbcBaseDal.KeyedItems<ObjectDefinition>
-    readDefinitionByVersion(
-            Connection conn, short tenantId,
-            long[] objectFk, int[] objectVersion)
-            throws SQLException {
-
-        var mappingStage = insertFkAndVersionForMapping(conn, objectFk, objectVersion);
-        mapDefinitionByVersion(conn, tenantId, mappingStage);
-
-        return fetchDefinition(conn, tenantId, objectFk.length, mappingStage);
-    }
-
     private JdbcBaseDal.KeyedItems<ObjectDefinition>
     fetchDefinition(
             Connection conn, short tenantId,
@@ -175,18 +163,6 @@ class JdbcReadBatchImpl {
 
         var mappingStage = insertTagSelectors(conn, definitionFk, selector);
         mapTagSelectors(conn, tenantId, mappingStage);
-
-        var tagRecords = fetchTagRecord(conn, tenantId, definitionFk.length, mappingStage);
-        var attrs = fetchTagAttrs(conn, tenantId, definitionFk.length, mappingStage);
-
-        return applyTagAttrs(tagRecords, attrs);
-    }
-
-    JdbcBaseDal.KeyedItems<Tag.Builder>
-    readTagByVersion(Connection conn, short tenantId, long[] definitionFk, int[] tagVersion) throws SQLException {
-
-        var mappingStage = insertFkAndVersionForMapping(conn, definitionFk, tagVersion);
-        mapTagByVersion(conn, tenantId, mappingStage);
 
         var tagRecords = fetchTagRecord(conn, tenantId, definitionFk.length, mappingStage);
         var attrs = fetchTagAttrs(conn, tenantId, definitionFk.length, mappingStage);

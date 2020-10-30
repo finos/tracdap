@@ -444,29 +444,31 @@ class JdbcSearchQueryBuilder {
     JdbcSearchQuery buildNoPriorVersions(JdbcSearchQuery baseQuery) {
 
         var joinClauseTemplate =
-                "join latest_version lv%1$d\n" +
-                "  on lv%1$d.tenant_id = t%1$d.tenant_id\n" +
-                "  and lv%1$d.latest_definition_pk = t%1$d.definition_fk";
+                "join object_definition od%1$d\n" +
+                "  on od%1$d.tenant_id = t%1$d.tenant_id\n" +
+                "  and od%1$d.definition_pk = t%1$d.definition_fk";
 
-        return buildNoPriorFragment(baseQuery, joinClauseTemplate);
+        var whereClauseTemplate = "od%1d.object_is_latest = true";
+
+        var joinClause = String.format(joinClauseTemplate, baseQuery.getSubQueryNumber());
+        var whereClause = String.format(whereClauseTemplate, baseQuery.getSubQueryNumber());
+
+        var fragment = new JdbcSearchQuery.Fragment(joinClause, whereClause, List.of());
+
+        return buildNoPriorFragment(baseQuery, fragment);
     }
 
     JdbcSearchQuery buildNoPriorTags(JdbcSearchQuery baseQuery) {
 
-        var joinClauseTemplate =
-                "join latest_tag lt%1$d\n" +
-                "  on lt%1$d.tenant_id = t%1$d.tenant_id\n" +
-                "  and lt%1$d.latest_tag_pk = t%1$d.tag_pk";
+        var whereClauseTemplate = "t%1d.tag_is_latest = true";
+        var whereClause = String.format(whereClauseTemplate, baseQuery.getSubQueryNumber());
 
-        return buildNoPriorFragment(baseQuery, joinClauseTemplate);
+        var fragment = new JdbcSearchQuery.Fragment("", whereClause, List.of());
+
+        return buildNoPriorFragment(baseQuery, fragment);
     }
 
-    JdbcSearchQuery buildNoPriorFragment(JdbcSearchQuery baseQuery, String joinClauseTemplate) {
-
-        var joinClause = String.format(joinClauseTemplate, baseQuery.getSubQueryNumber());
-        var whereClause = "";
-
-        var fragment = new JdbcSearchQuery.Fragment(joinClause, whereClause, List.of());
+    JdbcSearchQuery buildNoPriorFragment(JdbcSearchQuery baseQuery, JdbcSearchQuery.Fragment fragment) {
 
         var allFragments = Stream.concat(
                 baseQuery.getFragments().stream(),

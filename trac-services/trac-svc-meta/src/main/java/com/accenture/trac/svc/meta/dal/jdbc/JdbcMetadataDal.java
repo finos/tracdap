@@ -116,9 +116,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts);
             long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
-
-            writeBatch.writeLatestVersion(conn, tenantId, objectPk, defPk);
-            writeBatch.writeLatestTag(conn, tenantId, defPk, tagPk);
         },
         (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));
     }
@@ -151,9 +148,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts);
             long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
-
-            writeBatch.updateLatestVersion(conn, tenantId, objectType.keys, defPk);
-            writeBatch.writeLatestTag(conn, tenantId, defPk, tagPk);
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts),
         (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),
@@ -188,8 +182,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             writeBatch.closeTagRecord(conn, tenantId, defPk, parts);
             long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
-
-            writeBatch.updateLatestTag(conn, tenantId, defPk, tagPk);
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts),
         (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),
@@ -250,9 +242,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts);
             long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
-
-            writeBatch.writeLatestVersion(conn, tenantId, objectType.keys, defPk);
-            writeBatch.writeLatestTag(conn, tenantId, defPk, tagPk);
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts),   // TODO: different errors
         (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),  // TODO: different errors
