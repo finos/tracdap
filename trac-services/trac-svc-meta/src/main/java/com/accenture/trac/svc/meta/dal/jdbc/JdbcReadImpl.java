@@ -97,18 +97,13 @@ class JdbcReadImpl {
                 "select definition_pk, object_version, object_timestamp, definition\n" +
                 "from object_definition\n" +
                 "where tenant_id = ?\n" +
-                "and definition_pk = (\n" +
-                "  select lv.latest_definition_pk\n" +
-                "  from latest_version lv\n" +
-                "  where lv.tenant_id = ?\n" +
-                "  and lv.object_fk = ?\n" +
-                ")";
+                "  and object_fk = ?\n" +
+                "  and object_is_latest = true";
 
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
-            stmt.setShort(2, tenantId);
-            stmt.setLong(3, objectPk);
+            stmt.setLong(2, objectPk);
 
             return readDefinition(stmt);
         }
@@ -167,17 +162,13 @@ class JdbcReadImpl {
                 "select tag_pk, tag_version, tag_timestamp\n" +
                 "from tag\n" +
                 "where tenant_id = ?\n" +
-                "and tag_pk = (\n" +
-                "  select lt.latest_tag_pk\n" +
-                "  from latest_tag lt\n" +
-                "  where lt.tenant_id = ?\n" +
-                "  and lt.definition_fk = ?)";
+                "  and definition_fk = ?\n" +
+                "  and tag_is_latest = true";
 
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
-            stmt.setShort(2, tenantId);
-            stmt.setLong(3, definitionPk);
+            stmt.setLong(2, definitionPk);
 
             return readTagRecord(stmt);
         }
