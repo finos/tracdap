@@ -19,12 +19,45 @@ package com.accenture.trac.common.metadata;
 import java.math.BigDecimal;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 
 public class MetadataCodec {
+
+    public static DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
+
+    // Using DateTimeFormatter.ISO_OFFSET_DATE_TIME results in > 6 decimal points.
+    // TRAC metadata tags are stored with timestamps at precision 6
+    // To avoid discrepancies, define a formatter that always uses 6 d.p.
+
+    public static DateTimeFormatter DATETIME_FORMAT = new DateTimeFormatterBuilder()
+            .appendPattern("uuuu-MM-dd'T'kk:mm:ss")
+            .appendFraction(ChronoField.MICRO_OF_SECOND, 6, 6, true)
+            .appendOffsetId()
+            .toFormatter();
+
+    public static OffsetDateTime parseDatetime(String isoDatetime) {
+
+        return OffsetDateTime.from(DATETIME_FORMAT.parse(isoDatetime));
+    }
+
+    public static LocalDate parseDate(String isoDate) {
+
+        return LocalDate.from(DATE_FORMAT.parse(isoDate));
+    }
+
+    public static String  quoteDatetime(OffsetDateTime datetime) {
+
+        return DATETIME_FORMAT.format(datetime);
+    }
+
+    public static String quoteDate(LocalDate date) {
+
+        return DATE_FORMAT.format(date);
+    }
 
     public static Value encodeNativeObject(Object value) {
 
