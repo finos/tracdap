@@ -16,9 +16,7 @@
 
 package com.accenture.trac.gateway.proxy;
 
-import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.common.metadata.MetadataCodec;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import org.slf4j.Logger;
@@ -127,28 +125,10 @@ public class RestApiRequestBuilder<TRequest extends Message> {
             case INT:
                 return (url, request) -> extractInt(rawValueExtractor, subFieldMapper, targetField, url, request);
 
-            case MESSAGE:
-                return prepareExtractorForObjectType(rawValueExtractor, subFieldMapper, targetField);
-
             default:
                 // TODO: Error
                 throw new EUnexpected();
         }
-    }
-
-    private BiFunction<URI, TRequest.Builder, TRequest.Builder>
-    prepareExtractorForObjectType(
-            Function<URI, String> rawValueExtractor,
-            Function<TRequest.Builder, Message.Builder> subFieldMapper,
-            Descriptors.FieldDescriptor targetField) {
-
-        var objectType = targetField.getMessageType();
-
-        if (objectType.equals(com.accenture.trac.common.metadata.UUID.getDescriptor()))
-            return (url, request) -> extractUuid(rawValueExtractor, subFieldMapper, targetField, url, request);
-
-        // TODO: Error
-        throw new EUnexpected();
     }
 
     private Function<URI, String> preparePathSegmentExtractor(int pathSegmentIndex) {
@@ -293,34 +273,6 @@ public class RestApiRequestBuilder<TRequest extends Message> {
         catch (NumberFormatException e) {
             // Invalid values should not make it past the router matcher
             throw new EUnexpected();
-        }
-    }
-
-    private TRequest.Builder extractUuid(
-            Function<URI, String> rawValueExtractor,
-            Function<TRequest.Builder, Message.Builder> subFieldMapper,
-            Descriptors.FieldDescriptor targetField,
-            URI uri, TRequest.Builder request) {
-
-        var rawValue = rawValueExtractor.apply(uri);
-        var stringValue = URLDecoder.decode(rawValue, StandardCharsets.US_ASCII);
-
-        try {
-
-            var nativeValue = java.util.UUID.fromString(stringValue);
-            var protoValue = MetadataCodec.encode(nativeValue);
-
-            var subField = subFieldMapper.apply(request);
-            subField.setField(targetField, protoValue);
-
-            return request;
-        }
-        catch (IllegalArgumentException e) {
-
-            var message = String.format("Invalid object ID in URL: [%s]", stringValue);
-            log.warn(message);
-
-            throw new EInputValidation(message, e);
         }
     }
 }

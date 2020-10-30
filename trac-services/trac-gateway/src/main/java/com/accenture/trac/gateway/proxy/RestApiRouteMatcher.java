@@ -92,27 +92,10 @@ public class RestApiRouteMatcher implements IRouteMatcher {
             case INT:
                 return RestApiRouteMatcher::matchIntSegment;
 
-            case MESSAGE:
-                var objectType = targetField.getMessageType();
-                return prepareMatcherForObjectType(objectType);
-
             default:
                 // TODO: Error message
                 throw new EStartup("Bad rest API template");
         }
-    }
-
-    private Function<String, Boolean>
-    prepareMatcherForObjectType(Descriptors.Descriptor objectType) {
-
-        // Allow Object IDs in URL parameters
-        // Match any string, so we always got the route for the API call
-        // Invalid IDs will fail extraction in the handler, resulting in errors about an invalid ID
-        if (objectType.equals(com.accenture.trac.common.metadata.UUID.getDescriptor()))
-            return RestApiRouteMatcher::matchStringSegment;
-
-        // TODO: Error message
-        throw new EStartup("Bad rest API template: Object type not supported: " + objectType.getName());
     }
 
 
