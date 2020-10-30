@@ -167,7 +167,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .build();
 
         var tagHeader = saveApiCall.apply(writeRequest);
-        var objectId = MetadataCodec.decode(tagHeader.getObjectId());
+        var objectId = UUID.fromString(tagHeader.getObjectId());
 
         assertEquals(objectType, tagHeader.getObjectType());
         assertNotNull(objectId);
@@ -182,7 +182,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         MetadataReadRequest readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -391,7 +391,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
         var v1Selector = TestData.selectorForTag(v1SavedTag);
-        var v1ObjectId = MetadataCodec.decode(v1SavedTag.getHeader().getObjectId());
+        var v1ObjectId = UUID.fromString(v1SavedTag.getHeader().getObjectId());
 
         var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
@@ -411,7 +411,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .build();
 
         var v2TagHeader = saveApiCall.apply(v2WriteRequest);
-        var v2ObjectId = MetadataCodec.decode(v2TagHeader.getObjectId());
+        var v2ObjectId = UUID.fromString(v2TagHeader.getObjectId());
 
         assertEquals(v1ObjectId, v2ObjectId);
         assertEquals(2, v2TagHeader.getObjectVersion());
@@ -427,7 +427,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         MetadataReadRequest readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setObjectId(MetadataCodec.encode(v2ObjectId))
+                .setObjectId(v2ObjectId.toString())
                 .setObjectVersion(2)
                 .setTagVersion(1)
                 .build();
@@ -791,7 +791,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
         var v1Selector = TestData.selectorForTag(v1SavedTag);
-        var v1ObjectId = MetadataCodec.decode(v1SavedTag.getHeader().getObjectId());
+        var v1ObjectId = UUID.fromString(v1SavedTag.getHeader().getObjectId());
 
         // Write tag update via the trusted API
 
@@ -811,7 +811,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var t2header = trustedApi.updateTag(t2WriteRequest);
 
         assertEquals(objectType, t2header.getObjectType());
-        assertEquals(v1ObjectId, MetadataCodec.decode(t2header.getObjectId()));
+        assertEquals(v1ObjectId, UUID.fromString(t2header.getObjectId()));
         assertEquals(1, t2header.getObjectVersion());
         assertEquals(2, t2header.getTagVersion());
 
@@ -823,7 +823,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var t2ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setObjectId(MetadataCodec.encode(v1ObjectId))
+                .setObjectId(v1ObjectId.toString())
                 .setObjectVersion(1)
                 .setTagVersion(2)
                 .build();
@@ -851,14 +851,14 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var t3Header = publicApi.updateTag(t3WriteRequest);
 
         assertEquals(objectType, t3Header.getObjectType());
-        assertEquals(v1ObjectId, MetadataCodec.decode(t3Header.getObjectId()));
+        assertEquals(v1ObjectId, UUID.fromString(t3Header.getObjectId()));
         assertEquals(1, t3Header.getObjectVersion());
         assertEquals(3, t3Header.getTagVersion());
 
         var t3ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setObjectId(MetadataCodec.encode(v1ObjectId))
+                .setObjectId(v1ObjectId.toString())
                 .setObjectVersion(1)
                 .setTagVersion(3)
                 .build();
@@ -1241,7 +1241,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var newObjectId = UUID.randomUUID();
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(MetadataCodec.encode(newObjectId))
+                .setObjectId(newObjectId.toString())
                 .build();
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);

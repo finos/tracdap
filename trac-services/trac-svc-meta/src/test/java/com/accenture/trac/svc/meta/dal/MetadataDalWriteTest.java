@@ -19,7 +19,6 @@ package com.accenture.trac.svc.meta.dal;
 import com.accenture.trac.svc.meta.exception.EDuplicateItem;
 import com.accenture.trac.svc.meta.exception.EMissingItem;
 import com.accenture.trac.svc.meta.exception.EWrongItemType;
-import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
 import static com.accenture.trac.svc.meta.test.TestData.*;
 
@@ -61,7 +60,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         // Save one
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         var future = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
@@ -77,8 +76,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
 
-        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, MetadataCodec.decode(multi1.getHeader().getObjectId()), 1, 1);
-        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, MetadataCodec.decode(multi2.getHeader().getObjectId()), 1, 1);
+        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, UUID.fromString(multi1.getHeader().getObjectId()), 1, 1);
+        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, UUID.fromString(multi2.getHeader().getObjectId()), 1, 1);
 
         assertEquals(multi1, unwrap(result1));
         assertEquals(multi2, unwrap(result2));
@@ -90,7 +89,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         // Save one
         var origDef = dummyDataDef();
         var origTag = addMultiValuedAttr(dummyTag(origDef, INCLUDE_HEADER));
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         var future = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
@@ -106,8 +105,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
 
-        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, MetadataCodec.decode(multi1.getHeader().getObjectId()), 1, 1);
-        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, MetadataCodec.decode(multi2.getHeader().getObjectId()), 1, 1);
+        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, UUID.fromString(multi1.getHeader().getObjectId()), 1, 1);
+        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, UUID.fromString(multi2.getHeader().getObjectId()), 1, 1);
 
         assertEquals(multi1, unwrap(result1));
         assertEquals(multi2, unwrap(result2));
@@ -118,7 +117,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         var saveDup =  dal.saveNewObjects(TEST_TENANT, List.of(origTag, origTag));
         var loadDup = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
@@ -143,7 +142,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         // Save one
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         var nextDef = nextDataDef(origDef);
         var nextTag = tagForNextObject(origTag, nextDef, INCLUDE_HEADER);
@@ -168,8 +167,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
 
-        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, MetadataCodec.decode(multi1.getHeader().getObjectId()), 2, 1);
-        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, MetadataCodec.decode(multi2.getHeader().getObjectId()), 2, 1);
+        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, UUID.fromString(multi1.getHeader().getObjectId()), 2, 1);
+        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, UUID.fromString(multi2.getHeader().getObjectId()), 2, 1);
 
         assertEquals(multi1v2, unwrap(result1));
         assertEquals(multi2v2, unwrap(result2));
@@ -181,7 +180,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         // Save one
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         var nextDef = nextDataDef(origDef);
         var nextTag = addMultiValuedAttr(tagForNextObject(origTag, nextDef, INCLUDE_HEADER));
@@ -206,8 +205,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
 
-        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, MetadataCodec.decode(multi1.getHeader().getObjectId()), 2, 1);
-        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, MetadataCodec.decode(multi2.getHeader().getObjectId()), 2, 1);
+        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, UUID.fromString(multi1.getHeader().getObjectId()), 2, 1);
+        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, UUID.fromString(multi2.getHeader().getObjectId()), 2, 1);
 
         assertEquals(multi1v2, unwrap(result1));
         assertEquals(multi2v2, unwrap(result2));
@@ -218,7 +217,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         var nextDef = nextDataDef(origDef);
         var nextTag = tagForNextObject(origTag, nextDef, INCLUDE_HEADER);
@@ -296,7 +295,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
         var nextDefTag1 = tagForNextObject(origTag, nextDataDef(origDef), INCLUDE_HEADER);
         var nextDefTag2 = nextTag(nextDefTag1, UPDATE_TAG_VERSION);
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         // Test saving tag v2 against object v2
         var future = CompletableFuture.completedFuture(0)
@@ -320,8 +319,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
 
-        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, MetadataCodec.decode(multi1.getHeader().getObjectId()), 1, 2);
-        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, MetadataCodec.decode(multi2.getHeader().getObjectId()), 1, 2);
+        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, UUID.fromString(multi1.getHeader().getObjectId()), 1, 2);
+        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, UUID.fromString(multi2.getHeader().getObjectId()), 1, 2);
 
         assertEquals(multi1v2, unwrap(result1));
         assertEquals(multi2v2, unwrap(result2));
@@ -334,7 +333,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
         var nextDefTag1 = tagForNextObject(origTag, nextDataDef(origDef), INCLUDE_HEADER);
         var nextDefTag2 = addMultiValuedAttr(nextTag(nextDefTag1, UPDATE_TAG_VERSION));
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         // Test saving tag v2 against object v2
         var future = CompletableFuture.completedFuture(0)
@@ -358,8 +357,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
 
-        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, MetadataCodec.decode(multi1.getHeader().getObjectId()), 1, 2);
-        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, MetadataCodec.decode(multi2.getHeader().getObjectId()), 1, 2);
+        var result1 = dal.loadTag(TEST_TENANT, ObjectType.DATA, UUID.fromString(multi1.getHeader().getObjectId()), 1, 2);
+        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, UUID.fromString(multi2.getHeader().getObjectId()), 1, 2);
 
         assertEquals(multi1v2, unwrap(result1));
         assertEquals(multi2v2, unwrap(result2));
@@ -371,7 +370,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
         var nextTag = nextTag(origTag, UPDATE_TAG_VERSION);
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         var saveOrig = dal.saveNewObject(TEST_TENANT, origTag);
         var saveDup =  dal.saveNewTags(TEST_TENANT, List.of(nextTag, nextTag));
@@ -455,7 +454,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         var nextHeader = origTag
                 .getHeader()
@@ -480,7 +479,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         var origDef2 = dummyModelDef();
         var origTag2 = dummyTag(origDef2, INCLUDE_HEADER);
-        var origId2 = MetadataCodec.decode(origTag2.getHeader().getObjectId());
+        var origId2 = UUID.fromString(origTag2.getHeader().getObjectId());
 
         var nextTag2 = nextTag(origTag2, UPDATE_TAG_VERSION);
 
@@ -503,7 +502,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         // Save one
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
-        var origId = MetadataCodec.decode(origTag.getHeader().getObjectId());
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         var future = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, origId))
@@ -515,8 +514,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         // Save multiple
         var multi1 = dummyTagForObjectType(ObjectType.MODEL);
         var multi2 = dummyTagForObjectType(ObjectType.MODEL);
-        var id1 = MetadataCodec.decode(multi1.getHeader().getObjectId());
-        var id2 = MetadataCodec.decode(multi2.getHeader().getObjectId());
+        var id1 = UUID.fromString(multi1.getHeader().getObjectId());
+        var id2 = UUID.fromString(multi2.getHeader().getObjectId());
 
         var future2 = CompletableFuture.completedFuture(0)
                 .thenCompose(x -> dal.preallocateObjectIds(TEST_TENANT,
@@ -526,8 +525,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         assertDoesNotThrow((ThrowingSupplier<Void>) future2::get);
 
-        var result1 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, MetadataCodec.decode(multi1.getHeader().getObjectId()), 1, 1);
-        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, MetadataCodec.decode(multi2.getHeader().getObjectId()), 1, 1);
+        var result1 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, UUID.fromString(multi1.getHeader().getObjectId()), 1, 1);
+        var result2 = dal.loadTag(TEST_TENANT, ObjectType.MODEL, UUID.fromString(multi2.getHeader().getObjectId()), 1, 1);
 
         assertEquals(multi1, unwrap(result1));
         assertEquals(multi2, unwrap(result2));
@@ -543,7 +542,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
                 () -> unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.MODEL);
-        var id2 = MetadataCodec.decode(obj2.getHeader().getObjectId());
+        var id2 = UUID.fromString(obj2.getHeader().getObjectId());
         var id3 = UUID.randomUUID();
 
         unwrap(dal.saveNewObject(TEST_TENANT, obj2));
@@ -562,7 +561,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
                 () -> unwrap(dal.savePreallocatedObject(TEST_TENANT, obj1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.DATA);
-        var id2 = MetadataCodec.decode(obj2.getHeader().getObjectId());
+        var id2 = UUID.fromString(obj2.getHeader().getObjectId());
 
         unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id2));
 
@@ -574,7 +573,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
     void testPreallocate_wrongObjectType() throws Exception {
 
         var obj1 = dummyTagForObjectType(ObjectType.MODEL);
-        var id1 = MetadataCodec.decode(obj1.getHeader().getObjectId());
+        var id1 = UUID.fromString(obj1.getHeader().getObjectId());
 
         unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id1));
 
@@ -582,7 +581,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
                 () -> unwrap(dal.savePreallocatedObject(TEST_TENANT, obj1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.DATA);
-        var id2 = MetadataCodec.decode(obj2.getHeader().getObjectId());
+        var id2 = UUID.fromString(obj2.getHeader().getObjectId());
 
         unwrap(dal.preallocateObjectId(TEST_TENANT, ObjectType.DATA, id2));
 

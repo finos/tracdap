@@ -93,7 +93,7 @@ public class TestData {
 
         return TagHeader.newBuilder()
                 .setObjectType(objectType)
-                .setObjectId(MetadataCodec.encode(UUID.randomUUID()))
+                .setObjectId(UUID.randomUUID().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -218,11 +218,16 @@ public class TestData {
         // Job will be invalid because the model ID it points to does not exist!
         // Ok for e.g. DAL testing, but will fail metadata validation
 
+        var targetSelector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.FLOW)
+                .setObjectId(UUID.randomUUID().toString())
+                .setObjectVersion(1);
+
         return ObjectDefinition.newBuilder()
                 .setObjectType(ObjectType.JOB)
                 .setJob(JobDefinition.newBuilder()
                 .setJobType(JobType.RUN_MODEL)
-                .setTargetId(MetadataCodec.encode(UUID.randomUUID())))
+                .setTarget(targetSelector))
                 .build();
     }
 

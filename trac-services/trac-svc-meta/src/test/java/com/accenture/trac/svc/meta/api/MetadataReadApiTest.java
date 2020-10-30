@@ -41,6 +41,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.HashMap;
+import java.util.UUID;
 
 import static com.accenture.trac.svc.meta.test.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -116,12 +117,12 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
-        var objectId = MetadataCodec.decode(tagHeader.getObjectId());
+        var objectId = UUID.fromString(tagHeader.getObjectId());
 
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -134,7 +135,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .putAllAttr(attrs)
                 .build();
 
-        assertEquals(objectId, MetadataCodec.decode(savedTag.getHeader().getObjectId()));
+        assertEquals(objectId, UUID.fromString(savedTag.getHeader().getObjectId()));
         assertEquals(expectedTag, savedTag);
     }
 
@@ -154,7 +155,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var v1Header = writeApi.createObject(v1WriteRequest);
         var v1Selector = selectorForTag(v1Header);
-        var objectId = MetadataCodec.decode(v1Header.getObjectId());
+        var objectId = UUID.fromString(v1Header.getObjectId());
 
         // No attr changes for v2
         var v2Obj = TestData.dummyVersionForType(v1Obj);
@@ -188,7 +189,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var v1ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -196,7 +197,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var v2ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(2)
                 .setTagVersion(1)
                 .build();
@@ -204,7 +205,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var t2ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(1)
                 .setTagVersion(2)
                 .build();
@@ -244,7 +245,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(MetadataCodec.encode(java.util.UUID.randomUUID()))
+                .setObjectId(UUID.randomUUID().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -267,14 +268,14 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
-        var objectId = MetadataCodec.decode(tagHeader.getObjectId());
+        var objectId = UUID.fromString(tagHeader.getObjectId());
 
         // Try to read a non-existent version
 
         var v2ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(2)
                 .setTagVersion(1)
                 .build();
@@ -288,7 +289,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var t2ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(1)
                 .setTagVersion(2)
                 .build();
@@ -316,12 +317,12 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
-        var objectId = MetadataCodec.decode(tagHeader.getObjectId());
+        var objectId = UUID.fromString(tagHeader.getObjectId());
 
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -349,12 +350,12 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var t1Header = writeApi.createObject(writeRequest);
         var t1Selector = TestData.selectorForTag(t1Header);
-        var objectId = MetadataCodec.decode(t1Header.getObjectId());
+        var objectId = UUID.fromString(t1Header.getObjectId());
 
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(1)
                 .build();
 
@@ -407,14 +408,14 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var v1Header = writeApi.createObject(v1WriteRequest);
         var v1Selector = TestData.selectorForTag(v1Header);
-        var objectId = MetadataCodec.decode(v1Header.getObjectId());
+        var objectId = UUID.fromString(v1Header.getObjectId());
 
         // Read first version back, should be T1
 
         var v1ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(1)
                 .build();
 
@@ -492,7 +493,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var v2ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(2)
                 .build();
 
@@ -522,7 +523,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(MetadataCodec.encode(java.util.UUID.randomUUID()))
+                .setObjectId(UUID.randomUUID().toString())
                 .setObjectVersion(1)
                 .build();
 
@@ -544,14 +545,14 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
-        var objectId = MetadataCodec.decode(tagHeader.getObjectId());
+        var objectId = UUID.fromString(tagHeader.getObjectId());
 
         // Try to read a non-existent version
 
         var v2ReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(2)
                 .build();
 
@@ -578,12 +579,12 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
-        var objectId = MetadataCodec.decode(tagHeader.getObjectId());
+        var objectId = UUID.fromString(tagHeader.getObjectId());
 
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(1)
                 .build();
 
@@ -613,12 +614,12 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var v1Header = writeApi.createObject(writeRequest);
         var v1Selector = selectorForTag(v1Header);
-        var objectId = MetadataCodec.decode(v1Header.getObjectId());
+        var objectId = UUID.fromString(v1Header.getObjectId());
 
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(1)
                 .build();
 
@@ -670,14 +671,14 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var v1Header = writeApi.createObject(v1WriteRequest);
         var v1Selector = selectorForTag(v1Header);
-        var objectId = MetadataCodec.decode(v1Header.getObjectId());
+        var objectId = UUID.fromString(v1Header.getObjectId());
 
         // Read first version back, should be V1 T1
 
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .build();
 
         var v1Saved = readApi.loadLatestObject(readRequest);
@@ -791,7 +792,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(MetadataCodec.encode(java.util.UUID.randomUUID()))
+                .setObjectId(UUID.randomUUID().toString())
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -818,12 +819,12 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
-        var objectId = MetadataCodec.decode(tagHeader.getObjectId());
+        var objectId = UUID.fromString(tagHeader.getObjectId());
 
         var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
