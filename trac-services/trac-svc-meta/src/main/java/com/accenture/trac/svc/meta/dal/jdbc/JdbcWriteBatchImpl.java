@@ -22,6 +22,7 @@ import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal.ObjectParts;
 
 import java.sql.*;
+import java.time.Instant;
 import java.util.*;
 
 
@@ -79,9 +80,10 @@ class JdbcWriteBatchImpl {
                 "  object_fk,\n" +
                 "  object_version,\n" +
                 "  object_timestamp,\n" +
+                "  object_is_latest,\n" +
                 "  definition" +
                 ")\n" +
-                "values (?, ?, ?, ?, ?)";
+                "values (?, ?, ?, ?, ?, ?)";
 
         // Only request generated key columns if the driver supports it
         var keySupport = dialect.supportsGeneratedKeys();
@@ -95,7 +97,8 @@ class JdbcWriteBatchImpl {
                 stmt.setLong(2, objectPk[i]);
                 stmt.setInt(3, parts.objectVersion[i]);
                 stmt.setObject(4, parts.objectTimestamp[i], Types.TIMESTAMP);
-                stmt.setBytes(5, parts.definition[i].toByteArray());
+                stmt.setBoolean(5, true);
+                stmt.setBytes(6, parts.definition[i].toByteArray());
 
                 stmt.addBatch();
             }
@@ -117,9 +120,10 @@ class JdbcWriteBatchImpl {
                 "  definition_fk,\n" +
                 "  tag_version,\n" +
                 "  tag_timestamp,\n" +
+                "  tag_is_latest,\n" +
                 "  object_type" +
                 ")\n" +
-                "values (?, ?, ?, ?, ?)";
+                "values (?, ?, ?, ?, ?, ?)";
 
         // Only request generated key columns if the driver supports it
         var keySupport = dialect.supportsGeneratedKeys();
@@ -133,7 +137,8 @@ class JdbcWriteBatchImpl {
                 stmt.setLong(2, definitionPk[i]);
                 stmt.setInt(3, parts.tagVersion[i]);
                 stmt.setObject(4, parts.tagTimestamp[i], Types.TIMESTAMP);
-                stmt.setString(5, parts.objectType[i].name());
+                stmt.setBoolean(5, true);
+                stmt.setString(6, parts.objectType[i].name());
 
                 stmt.addBatch();
             }
@@ -354,6 +359,52 @@ class JdbcWriteBatchImpl {
         // Updates fail silent if no records are matched, so make an explicit check
         if (Arrays.stream(updates).anyMatch(count -> count != 1))
             throw new JdbcException(JdbcErrorCode.INSERT_MISSING_FK);
+    }
+
+    void closeObjectDefinition(Connection conn, short tenantId, long[] objectPk, ObjectParts parts) throws SQLException {
+
+        var query =
+                "update object_definition \n" +
+                "set\n" +
+                "  object_superseded = ?,\n" +
+                "  object_is_latest = false\n" +
+                "where tenant_id = ?\n" +
+                "  and object_fk = ?\n" +
+                "  and object_is_latest = true";
+
+        try (var stmt = conn.prepareStatement(query)) {
+            closeRecord(stmt, tenantId, objectPk, parts.objectTimestamp);
+        }
+    }
+
+    void closeTagRecord(Connection conn, short tenantId, long[] definitionPk, ObjectParts parts) throws SQLException {
+
+        var query =
+                "update tag \n" +
+                "set\n" +
+                "  tag_superseded = ?,\n" +
+                "  tag_is_latest = false\n" +
+                "where tenant_id = ?\n" +
+                "  and definition_fk = ?\n" +
+                "  and tag_is_latest = true";
+
+        try (var stmt = conn.prepareStatement(query)) {
+            closeRecord(stmt, tenantId, definitionPk, parts.tagTimestamp);
+        }
+    }
+
+    private void closeRecord(PreparedStatement stmt, short tenantId, long[] keys, Instant[] timestamps) throws SQLException {
+
+
+        for (var i = 0; i < keys.length; i++) {
+
+            stmt.setObject(1, timestamps[i], Types.TIMESTAMP);
+            stmt.setShort(2, tenantId);
+            stmt.setLong(3, keys[i]);
+            stmt.addBatch();
+        }
+
+        stmt.executeBatch();
     }
 
     private long[] generatedKeys(Statement stmt, int rowCount) throws SQLException {

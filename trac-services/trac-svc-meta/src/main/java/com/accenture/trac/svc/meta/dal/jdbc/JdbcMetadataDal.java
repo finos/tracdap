@@ -152,6 +152,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             checkObjectTypes(parts, objectType);
 
+            writeBatch.closeObjectDefinition(conn, tenantId, objectType.keys, parts);
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts);
             long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
@@ -190,6 +191,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             checkObjectTypes(parts, objectType);
 
             long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.objectVersion);
+            writeBatch.closeTagRecord(conn, tenantId, defPk, parts);
             long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
 
