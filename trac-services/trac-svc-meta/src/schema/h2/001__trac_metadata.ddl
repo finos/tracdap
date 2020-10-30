@@ -46,6 +46,8 @@ create table object_definition (
 
     object_fk bigint not null,
     object_version int not null,
+    object_timestamp timestamp (6) not null,
+
     definition blob not null,
 
     constraint pk_definition primary key (definition_pk),
@@ -63,8 +65,9 @@ create table tag (
 
     definition_fk bigint not null,
     tag_version int not null,
+    tag_timestamp timestamp (6) not null,
 
-    -- Duplicate fields from object ID/definition tables so they are available for searching
+    -- Make object type available for searching without a join
     object_type varchar(16) not null,
 
     constraint pk_tag primary key (tag_pk),
@@ -78,12 +81,12 @@ create unique index idx_tag_unq on tag (tenant_id, definition_fk, tag_version);
 create table tag_attr (
 
     tenant_id smallint not null,
-    tag_fk bigint not null,
 
+    tag_fk bigint not null,
     attr_name varchar(256) not null,
-    attr_type varchar(16) not null,
     attr_index int not null,
 
+    attr_type varchar(16) not null,
     attr_value_boolean boolean null,
     attr_value_integer bigint null,
     attr_value_float double null,
