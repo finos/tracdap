@@ -51,6 +51,9 @@ public interface IMetadataDal {
     CompletableFuture<Tag>
     loadObject(String tenant, TagSelector selector);
 
+    CompletableFuture<List<Tag>>
+    loadObjects(String tenant, List<TagSelector> selector);
+
     CompletableFuture<Tag>
     loadTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion);
 

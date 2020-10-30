@@ -17,6 +17,7 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
 import com.accenture.trac.common.exception.*;
+import com.accenture.trac.common.metadata.TagSelector;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
 import com.accenture.trac.svc.meta.exception.EDuplicateItem;
 import com.accenture.trac.svc.meta.exception.EMissingItem;
@@ -24,6 +25,7 @@ import com.accenture.trac.svc.meta.exception.EWrongItemType;
 
 import java.sql.SQLException;
 import java.text.MessageFormat;
+import java.util.List;
 
 class JdbcError {
 
@@ -96,7 +98,7 @@ class JdbcError {
         }
     }
 
-    static void loadOne_missingItem(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
+    static void loadOne_missingItem(SQLException error, JdbcErrorCode code, TagSelector selector) {
 
         if (code == JdbcErrorCode.NO_DATA) {
             var message = MessageFormat.format(LOAD_ONE_MISSING_ITEM, "");
@@ -104,7 +106,7 @@ class JdbcError {
         }
     }
 
-    static void loadOne_WrongObjectType(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
+    static void loadOne_WrongObjectType(SQLException error, JdbcErrorCode code, TagSelector selector) {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(LOAD_ONE_WRONG_OBJECT_TYPE, "");
@@ -112,7 +114,7 @@ class JdbcError {
         }
     }
 
-    static void loadBatch_missingItem(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
+    static void loadBatch_missingItem(SQLException error, JdbcErrorCode code, List<TagSelector> selectors) {
 
         if (code == JdbcErrorCode.NO_DATA) {
             var message = MessageFormat.format(LOAD_BATCH_MISSING_ITEM, "");
@@ -120,7 +122,7 @@ class JdbcError {
         }
     }
 
-    static void loadBatch_WrongObjectType(SQLException error, JdbcErrorCode code, JdbcMetadataDal.ObjectParts parts) {
+    static void loadBatch_WrongObjectType(SQLException error, JdbcErrorCode code, List<TagSelector> selectors) {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(LOAD_BATCH_WRONG_OBJECT_TYPE, "");
