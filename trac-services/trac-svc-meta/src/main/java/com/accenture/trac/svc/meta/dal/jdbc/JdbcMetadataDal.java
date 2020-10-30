@@ -472,7 +472,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         var parts = new ObjectParts();
         parts.objectType = new ObjectType[] {header.getObjectType()};
-        parts.objectId = new UUID[] {MetadataCodec.decode(header.getObjectId())};
+        parts.objectId = new UUID[] {UUID.fromString(header.getObjectId())};
         parts.version = new int[] {header.getObjectVersion()};
         parts.tagVersion = new int[] {header.getTagVersion()};
 
@@ -489,7 +489,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         var parts = new ObjectParts();
         parts.objectType = Arrays.stream(headers).map(TagHeader::getObjectType).toArray(ObjectType[]::new);
-        parts.objectId = Arrays.stream(headers).map(TagHeader::getObjectId).map(MetadataCodec::decode).toArray(UUID[]::new);
+        parts.objectId = Arrays.stream(headers).map(TagHeader::getObjectId).map(UUID::fromString).toArray(UUID[]::new);
         parts.version = Arrays.stream(headers).mapToInt(TagHeader::getObjectVersion).toArray();
         parts.tagVersion = Arrays.stream(headers).mapToInt(TagHeader::getTagVersion).toArray();
 
@@ -571,7 +571,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         var header = TagHeader.newBuilder()
                 .setObjectType(objectType)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(definition.version)
                 .setTagVersion(tagRecord.version);
 
@@ -593,7 +593,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             var header = TagHeader.newBuilder()
                     .setObjectType(objectType.get(i))
-                    .setObjectId(MetadataCodec.encode(objectId.get(i)))
+                    .setObjectId(objectId.get(i).toString())
                     .setObjectVersion(definitions.versions[i])
                     .setTagVersion(tags.versions[i]);
 

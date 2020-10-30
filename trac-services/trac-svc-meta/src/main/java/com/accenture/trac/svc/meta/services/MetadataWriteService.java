@@ -61,7 +61,7 @@ public class MetadataWriteService {
 
         var newHeader = TagHeader.newBuilder()
                 .setObjectType(objectType)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(OBJECT_FIRST_VERSION)
                 .setTagVersion(TAG_FIRST_VERSION)
                 .build();
@@ -93,6 +93,7 @@ public class MetadataWriteService {
         validator.checkAndThrow();
 
         var normalDefinition = validator.normalizeObjectType(definition);
+        validator.validObjectID(priorVersion);
         validator.priorVersionMatchesType(priorVersion, objectType);
         validator.definitionMatchesType(normalDefinition, objectType);
         validator.tagAttributesAreValid(tagUpdates);
@@ -106,7 +107,7 @@ public class MetadataWriteService {
         // Validation complete!
 
 
-        var objectId = MetadataCodec.decode(priorVersion.getObjectId());
+        var objectId = UUID.fromString(priorVersion.getObjectId());
         var objectVersion = priorVersion.getObjectVersion();
 
         return dal.loadLatestTag(tenant, objectType, objectId, objectVersion)
@@ -148,6 +149,7 @@ public class MetadataWriteService {
 
         var validator = new MetadataValidator();
 
+        validator.validObjectID(priorVersion);
         validator.priorVersionMatchesType(priorVersion, objectType);
         validator.tagAttributesAreValid(tagUpdates);
         validator.checkAndThrow();
@@ -160,7 +162,7 @@ public class MetadataWriteService {
         // Validation complete!
 
 
-        var objectId = MetadataCodec.decode(priorVersion.getObjectId());
+        var objectId = UUID.fromString(priorVersion.getObjectId());
         var priorObjectVersion = priorVersion.getObjectVersion();
         var priorTagVersion = priorVersion.getTagVersion();
 
@@ -198,7 +200,7 @@ public class MetadataWriteService {
         // Header for preallocated IDs does not include an object or tag version
         var preallocatedHeader = TagHeader.newBuilder()
                 .setObjectType(objectType)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .build();
 
         // Save as a preallocated ID in the DAL
@@ -215,6 +217,7 @@ public class MetadataWriteService {
         var validator = new MetadataValidator();
 
         var normalDefinition = validator.normalizeObjectType(definition);
+        validator.validObjectID(priorVersion);
         validator.priorVersionMatchesType(priorVersion, objectType);
         validator.definitionMatchesType(normalDefinition, objectType);
         validator.tagAttributesAreValid(tagUpdates);
@@ -227,11 +230,11 @@ public class MetadataWriteService {
 
 
         // In this case priorVersion refers to the preallocated ID
-        var objectId = MetadataCodec.decode(priorVersion.getObjectId());
+        var objectId = UUID.fromString(priorVersion.getObjectId());
 
         var newHeader = TagHeader.newBuilder()
                 .setObjectType(objectType)
-                .setObjectId(MetadataCodec.encode(objectId))
+                .setObjectId(objectId.toString())
                 .setObjectVersion(OBJECT_FIRST_VERSION)
                 .setTagVersion(TAG_FIRST_VERSION)
                 .build();

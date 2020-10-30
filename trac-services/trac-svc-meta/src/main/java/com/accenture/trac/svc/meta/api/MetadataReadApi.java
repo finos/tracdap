@@ -24,6 +24,8 @@ import com.accenture.trac.common.api.meta.*;
 
 import io.grpc.stub.StreamObserver;
 
+import java.util.UUID;
+
 
 public class MetadataReadApi extends MetadataReadApiGrpc.MetadataReadApiImplBase {
 
@@ -42,7 +44,7 @@ public class MetadataReadApi extends MetadataReadApiGrpc.MetadataReadApiImplBase
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
-            var objectId = MetadataCodec.decode(request.getObjectId());
+            var objectId = UUID.fromString(request.getObjectId());
             var objectVersion = request.getObjectVersion();
             var tagVersion = request.getTagVersion();
 
@@ -57,7 +59,7 @@ public class MetadataReadApi extends MetadataReadApiGrpc.MetadataReadApiImplBase
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
-            var objectId = MetadataCodec.decode(request.getObjectId());
+            var objectId = UUID.fromString(request.getObjectId());
             var objectVersion = request.getObjectVersion();
 
             return readService.loadLatestTag(tenant, objectType, objectId, objectVersion);
@@ -71,7 +73,7 @@ public class MetadataReadApi extends MetadataReadApiGrpc.MetadataReadApiImplBase
 
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
-            var objectId = MetadataCodec.decode(request.getObjectId());
+            var objectId = UUID.fromString(request.getObjectId());
 
             return readService.loadLatestObject(tenant, objectType, objectId);
         });
