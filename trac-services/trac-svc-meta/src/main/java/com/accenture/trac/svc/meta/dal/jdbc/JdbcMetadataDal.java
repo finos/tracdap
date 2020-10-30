@@ -25,7 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -38,9 +37,6 @@ import java.util.stream.Collectors;
 
 
 public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
-
-    private static final int LATEST_TAG = -1;
-    private static final int LATEST_VERSION = -1;
 
     private final Logger log;
 
@@ -265,8 +261,14 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
 
     // -----------------------------------------------------------------------------------------------------------------
-    // LOAD METHODS (USING TAG SELECTORS)
+    // LOAD METHODS
     // -----------------------------------------------------------------------------------------------------------------
+
+    // Loading a single object is highly sensitive to latency
+    // This is because UI applications use metadata queries to decide what to display
+    // These queries may also be recursive, i.e. query a job, then related data/models or dependent jobs
+    // We want these multiple queries to complete in < 100 ms for a fluid user experience
+    // So, optimising the common case of loading a single item makes sense
 
     @Override public CompletableFuture<Tag>
     loadObject(String tenant, TagSelector selector) {
@@ -289,6 +291,11 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         (error, code) -> JdbcError.loadOne_missingItem(error, code, selector),
         (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, selector));
     }
+
+
+    // Batch loading may be used e.g. to query all items related to a job in a single query
+    // This can be used both by the platform (e.g. to set up a job) and applications / UI (e.g. to display a job)
+    // Latency remains important, optimisations are in ReadBatchImpl
 
     @Override public CompletableFuture<List<Tag>>
     loadObjects(String tenant, List<TagSelector> selectors) {
@@ -318,166 +325,109 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     // LOAD METHODS (LEGACY)
     // -----------------------------------------------------------------------------------------------------------------
 
-    // Load methods *are* highly sensitive to latency
-    // This is because UI applications use metadata queries to decide what to display
-    // These queries may also be recursive, i.e. query a job, then related data/models or dependent jobs
-    // We want these multiple queries to complete in < 100 ms for a fluid user experience
-    // So, optimising the common case of querying a single item makes sense
-
-
     @Override public CompletableFuture<Tag>
     loadTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion) {
 
-        var parts = assembleParts(objectType, objectId, objectVersion, tagVersion);
+        var selector = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .setObjectVersion(objectVersion)
+                .setTagVersion(tagVersion)
+                .build();
 
-        return wrapTransaction(conn -> {
-
-            var tenantId = tenants.getTenantId(tenant);
-            var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
-
-            checkObjectType(parts, storedType);
-
-            var definition = readSingle.readDefinitionByVersion(conn, tenantId, storedType.key, objectVersion);
-            var tagRecord = readSingle.readTagRecordByVersion(conn, tenantId, definition.key, tagVersion);
-            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagRecord.key);
-
-            return buildTag(objectType, objectId, definition, tagRecord, tagAttrs);
-        },
-        (error, code) -> JdbcError.loadOne_missingItem(error, code, null),
-        (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, null));
+        return loadObject(tenant, selector);
     }
 
     @Override public CompletableFuture<Tag>
     loadLatestTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion) {
 
-        var parts = assembleParts(objectType, objectId, objectVersion, LATEST_TAG);
+        var selector = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .setObjectVersion(objectVersion)
+                .setLatestTag(true)
+                .build();
 
-        return wrapTransaction(conn -> {
-
-            var tenantId = tenants.getTenantId(tenant);
-            var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
-
-            checkObjectType(parts, storedType);
-
-            var definition = readSingle.readDefinitionByVersion(conn, tenantId, storedType.key, objectVersion);
-            var tagRecord = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
-            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagRecord.key);
-
-            return buildTag(objectType, objectId, definition, tagRecord, tagAttrs);
-        },
-        (error, code) -> JdbcError.loadOne_missingItem(error, code, null),
-        (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, null));
+        return loadObject(tenant, selector);
     }
 
     @Override public CompletableFuture<Tag>
     loadLatestVersion(String tenant, ObjectType objectType, UUID objectId) {
 
-        var parts = assembleParts(objectType, objectId, LATEST_VERSION, LATEST_TAG);
+        var selector = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .setLatestObject(true)
+                .setLatestTag(true)
+                .build();
 
-        return wrapTransaction(conn -> {
-
-            var tenantId = tenants.getTenantId(tenant);
-            var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
-
-            checkObjectType(parts, storedType);
-
-            var definition = readSingle.readDefinitionByLatest(conn, tenantId, storedType.key);
-            var tagRecord = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
-            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagRecord.key);
-
-            return buildTag(objectType, objectId, definition, tagRecord, tagAttrs);
-        },
-        (error, code) -> JdbcError.loadOne_missingItem(error, code, null),
-        (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, null));
+        return loadObject(tenant, selector);
     }
-
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // LOAD METHODS (MULTIPLE ITEMS)
-    // -----------------------------------------------------------------------------------------------------------------
-
-    // Load batch methods may be used e.g. to query all items related to a job in a single query
-    // This can be used both by the platform (e.g. to set up a job) and applications / UI (e.g. to display a job)
-    // Latency remains important, optimisations are in ReadBatchImpl
-
 
     @Override public CompletableFuture<List<Tag>>
     loadTags(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds, List<Integer> objectVersions, List<Integer> tagVersions) {
 
-        var parts = assembleParts(objectTypes, objectIds, objectVersions, tagVersions);
+        var selectors = new ArrayList<TagSelector>(objectIds.size());
 
-        return wrapTransaction(conn -> {
+        for (int i = 0; i < objectIds.size(); i++) {
 
-            prepareMappingTable(conn);
+            var selector = TagSelector.newBuilder()
+                    .setObjectType(objectTypes.get(i))
+                    .setObjectId(objectIds.get(i).toString())
+                    .setObjectVersion(objectVersions.get(i))
+                    .setTagVersion(tagVersions.get(i))
+                    .build();
 
-            var tenantId = tenants.getTenantId(tenant);
-            var objPk = lookupObjectPks(conn, tenantId, parts);
-            var definition = readBatch.readDefinitionByVersion(conn, tenantId, objPk, parts.objectVersion);
-            var tag = readBatch.readTagByVersion(conn, tenantId, definition.keys, parts.tagVersion);
+            selectors.add(selector);
+        }
 
-            return buildTags(objectTypes.toArray(ObjectType[]::new), objectIds.toArray(UUID[]::new), definition, tag);
-        },
-        (error, code) -> JdbcError.loadBatch_missingItem(error, code, null),
-        (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, null));
+        return loadObjects(tenant, selectors);
     }
 
     @Override public CompletableFuture<List<Tag>>
     loadLatestTags(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds, List<Integer> objectVersions) {
 
-        var parts = assembleParts(objectTypes, objectIds, objectVersions,
-                Collections.nCopies(objectIds.size(), LATEST_TAG));
+        var selectors = new ArrayList<TagSelector>(objectIds.size());
 
-        return wrapTransaction(conn -> {
+        for (int i = 0; i < objectIds.size(); i++) {
 
-            prepareMappingTable(conn);
+            var selector = TagSelector.newBuilder()
+                    .setObjectType(objectTypes.get(i))
+                    .setObjectId(objectIds.get(i).toString())
+                    .setObjectVersion(objectVersions.get(i))
+                    .setLatestTag(true)
+                    .build();
 
-            var tenantId = tenants.getTenantId(tenant);
-            var objPk = lookupObjectPks(conn, tenantId, parts);
-            var definition = readBatch.readDefinitionByVersion(conn, tenantId, objPk, parts.objectVersion);
-            var tag = readBatch.readTagByLatest(conn, tenantId, definition.keys);
+            selectors.add(selector);
+        }
 
-            return buildTags(objectTypes.toArray(ObjectType[]::new), objectIds.toArray(UUID[]::new), definition, tag);
-        },
-        (error, code) -> JdbcError.loadBatch_missingItem(error, code, null),
-        (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, null));
+        return loadObjects(tenant, selectors);
     }
 
     @Override public CompletableFuture<List<Tag>>
     loadLatestVersions(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds) {
 
-        var parts = assembleParts(objectTypes, objectIds,
-                Collections.nCopies(objectIds.size(), LATEST_VERSION),
-                Collections.nCopies(objectIds.size(), LATEST_TAG));
+        var selectors = new ArrayList<TagSelector>(objectIds.size());
 
-        return wrapTransaction(conn -> {
+        for (int i = 0; i < objectIds.size(); i++) {
 
-            prepareMappingTable(conn);
+            var selector = TagSelector.newBuilder()
+                    .setObjectType(objectTypes.get(i))
+                    .setObjectId(objectIds.get(i).toString())
+                    .setLatestObject(true)
+                    .setLatestTag(true)
+                    .build();
 
-            var tenantId = tenants.getTenantId(tenant);
-            var objPk = lookupObjectPks(conn, tenantId, parts);
-            var definition = readBatch.readDefinitionByLatest(conn, tenantId, objPk);
-            var tag = readBatch.readTagByLatest(conn, tenantId, definition.keys);
+            selectors.add(selector);
+        }
 
-            return buildTags(objectTypes.toArray(ObjectType[]::new), objectIds.toArray(UUID[]::new), definition, tag);
-        },
-        (error, code) -> JdbcError.loadBatch_missingItem(error, code, null),
-        (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, null));
-    }
-
-    private long[]
-    lookupObjectPks(Connection conn, short tenantId, ObjectParts parts) throws SQLException {
-
-        var storedType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
-        checkObjectTypes(parts, storedType);
-
-        return storedType.keys;
+        return loadObjects(tenant, selectors);
     }
 
 
     // -----------------------------------------------------------------------------------------------------------------
     // SEARCH METHODS
     // -----------------------------------------------------------------------------------------------------------------
-
 
     @Override public CompletableFuture<List<Tag>>
     search(String tenant, SearchParameters searchParameters) {
@@ -504,7 +454,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
     // Break down requests / results into a standard set of parts
 
-
     static class ObjectParts {
 
         ObjectType[] objectType;
@@ -519,7 +468,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         TagSelector[] selector;
     }
-
 
     private ObjectParts separateParts(Tag tag) {
 
@@ -585,28 +533,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         var parts = new ObjectParts();
         parts.objectType = objectTypes.toArray(ObjectType[]::new);
         parts.objectId = objectIds.toArray(UUID[]::new);
-
-        return parts;
-    }
-
-    private ObjectParts assembleParts(ObjectType type, UUID id, int version, int tagVersion) {
-
-        var parts = new ObjectParts();
-        parts.objectType = new ObjectType[] {type};
-        parts.objectId = new UUID[] {id};
-        parts.objectVersion = new int[] {version};
-        parts.tagVersion = new int[] {tagVersion};
-
-        return parts;
-    }
-
-    private ObjectParts assembleParts(List<ObjectType> types, List<UUID> ids, List<Integer> versions, List<Integer> tagVersions) {
-
-        var parts = new ObjectParts();
-        parts.objectType = types.toArray(ObjectType[]::new);
-        parts.objectId = ids.toArray(UUID[]::new);
-        parts.objectVersion = versions.stream().mapToInt(x -> x).toArray();
-        parts.tagVersion = tagVersions.stream().mapToInt(x -> x).toArray();
 
         return parts;
     }
