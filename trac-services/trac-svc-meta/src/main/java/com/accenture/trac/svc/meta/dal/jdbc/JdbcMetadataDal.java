@@ -27,6 +27,9 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -113,10 +116,10 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             var tenantId = tenants.getTenantId(tenant);
 
-            long[] objectPk = writeBatch.writeObjectId(conn, tenantId, parts.objectType, parts.objectId);
-            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts.version, parts.definition);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
-            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
+            long[] objectPk = writeBatch.writeObjectId(conn, tenantId, parts);
+            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
+            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
 
             writeBatch.writeLatestVersion(conn, tenantId, objectPk, defPk);
             writeBatch.writeLatestTag(conn, tenantId, defPk, tagPk);
@@ -149,9 +152,9 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             checkObjectTypes(parts, objectType);
 
-            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts.version, parts.definition);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
-            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
+            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
+            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
 
             writeBatch.updateLatestVersion(conn, tenantId, objectType.keys, defPk);
             writeBatch.writeLatestTag(conn, tenantId, defPk, tagPk);
@@ -186,9 +189,9 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             checkObjectTypes(parts, objectType);
 
-            long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.version);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
-            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
+            long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.objectVersion);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
+            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
 
             writeBatch.updateLatestTag(conn, tenantId, defPk, tagPk);
         },
@@ -219,7 +222,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             var tenantId = tenants.getTenantId(tenant);
 
-            writeBatch.writeObjectId(conn, tenantId, parts.objectType, parts.objectId);
+            writeBatch.writeObjectId(conn, tenantId, parts);
         },
         (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));
     }
@@ -249,9 +252,9 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             checkObjectTypes(parts, objectType);
 
-            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts.version, parts.definition);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
-            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
+            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
+            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
 
             writeBatch.writeLatestVersion(conn, tenantId, objectType.keys, defPk);
             writeBatch.writeLatestTag(conn, tenantId, defPk, tagPk);
@@ -360,7 +363,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             var tenantId = tenants.getTenantId(tenant);
             var objPk = lookupObjectPks(conn, tenantId, parts);
-            var definition = readBatch.readDefinitionByVersion(conn, tenantId, parts.objectType, objPk, parts.version);
+            var definition = readBatch.readDefinitionByVersion(conn, tenantId, parts.objectType, objPk, parts.objectVersion);
             var tag = readBatch.readTagByVersion(conn, tenantId, definition.keys, parts.tagVersion);
 
             return buildTags(objectTypes, objectIds, definition, tag);
@@ -381,7 +384,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             var tenantId = tenants.getTenantId(tenant);
             var objPk = lookupObjectPks(conn, tenantId, parts);
-            var definition = readBatch.readDefinitionByVersion(conn, tenantId, parts.objectType, objPk, parts.version);
+            var definition = readBatch.readDefinitionByVersion(conn, tenantId, parts.objectType, objPk, parts.objectVersion);
             var tag = readBatch.readTagByLatest(conn, tenantId, definition.keys);
 
             return buildTags(objectTypes, objectIds, definition, tag);
@@ -457,11 +460,12 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         ObjectType[] objectType;
         UUID[] objectId;
-        int[] version;
+        int[] objectVersion;
         int[] tagVersion;
+        Instant[] objectTimestamp;
+        Instant[] tagTimestamp;
 
         Tag[] tag;
-        TagHeader[] header;
         ObjectDefinition[] definition;
     }
 
@@ -473,11 +477,16 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         var parts = new ObjectParts();
         parts.objectType = new ObjectType[] {header.getObjectType()};
         parts.objectId = new UUID[] {UUID.fromString(header.getObjectId())};
-        parts.version = new int[] {header.getObjectVersion()};
+        parts.objectVersion = new int[] {header.getObjectVersion()};
         parts.tagVersion = new int[] {header.getTagVersion()};
 
+        var objectTimestamp = MetadataCodec.parseDatetime(header.getObjectTimestamp()).toInstant();
+        var tagTimestamp = MetadataCodec.parseDatetime(header.getTagTimestamp()).toInstant();
+
+        parts.objectTimestamp = new Instant[] {objectTimestamp};
+        parts.tagTimestamp = new Instant[] {tagTimestamp};
+
         parts.tag = new Tag[] {tag};
-        parts.header = new TagHeader[] {tag.getHeader()};
         parts.definition = new ObjectDefinition[] {tag.getDefinition()};
 
         return parts;
@@ -490,11 +499,22 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         var parts = new ObjectParts();
         parts.objectType = Arrays.stream(headers).map(TagHeader::getObjectType).toArray(ObjectType[]::new);
         parts.objectId = Arrays.stream(headers).map(TagHeader::getObjectId).map(UUID::fromString).toArray(UUID[]::new);
-        parts.version = Arrays.stream(headers).mapToInt(TagHeader::getObjectVersion).toArray();
+        parts.objectVersion = Arrays.stream(headers).mapToInt(TagHeader::getObjectVersion).toArray();
         parts.tagVersion = Arrays.stream(headers).mapToInt(TagHeader::getTagVersion).toArray();
 
+        parts.objectTimestamp = Arrays.stream(headers)
+                .map(TagHeader::getObjectTimestamp)
+                .map(MetadataCodec::parseDatetime)
+                .map(OffsetDateTime::toInstant)
+                .toArray(Instant[]::new);
+
+        parts.tagTimestamp = Arrays.stream(headers)
+                .map(TagHeader::getTagTimestamp)
+                .map(MetadataCodec::parseDatetime)
+                .map(OffsetDateTime::toInstant)
+                .toArray(Instant[]::new);
+
         parts.tag = tags.toArray(Tag[]::new);
-        parts.header = tags.stream().map(Tag::getHeader).toArray(TagHeader[]::new);
         parts.definition = tags.stream().map(Tag::getDefinition).toArray(ObjectDefinition[]::new);
 
         return parts;
@@ -523,7 +543,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         var parts = new ObjectParts();
         parts.objectType = new ObjectType[] {type};
         parts.objectId = new UUID[] {id};
-        parts.version = new int[] {version};
+        parts.objectVersion = new int[] {version};
         parts.tagVersion = new int[] {tagVersion};
 
         return parts;
@@ -534,7 +554,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         var parts = new ObjectParts();
         parts.objectType = types.toArray(ObjectType[]::new);
         parts.objectId = ids.toArray(UUID[]::new);
-        parts.version = versions.stream().mapToInt(x -> x).toArray();
+        parts.objectVersion = versions.stream().mapToInt(x -> x).toArray();
         parts.tagVersion = tagVersions.stream().mapToInt(x -> x).toArray();
 
         return parts;
@@ -569,11 +589,16 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             KeyedItem<Void> tagRecord,
             Map<String, Value> tagAttrs) {
 
+        var objectTimestamp = definition.timestamp.atOffset(ZoneOffset.UTC);
+        var tagTimestamp = tagRecord.timestamp.atOffset(ZoneOffset.UTC);
+
         var header = TagHeader.newBuilder()
                 .setObjectType(objectType)
                 .setObjectId(objectId.toString())
                 .setObjectVersion(definition.version)
-                .setTagVersion(tagRecord.version);
+                .setTagVersion(tagRecord.version)
+                .setObjectTimestamp(MetadataCodec.quoteDatetime(objectTimestamp))
+                .setTagTimestamp(MetadataCodec.quoteDatetime(tagTimestamp));
 
         return Tag.newBuilder()
                 .setHeader(header)
@@ -591,11 +616,16 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         for (int i = 0; i < objectId.size(); i++) {
 
+            var objectTimestamp = definitions.timestamps[i].atOffset(ZoneOffset.UTC);
+            var tagTimestamp = tags.timestamps[i].atOffset(ZoneOffset.UTC);
+
             var header = TagHeader.newBuilder()
                     .setObjectType(objectType.get(i))
                     .setObjectId(objectId.get(i).toString())
                     .setObjectVersion(definitions.versions[i])
-                    .setTagVersion(tags.versions[i]);
+                    .setTagVersion(tags.versions[i])
+                    .setObjectTimestamp(MetadataCodec.quoteDatetime(objectTimestamp))
+                    .setTagTimestamp(MetadataCodec.quoteDatetime(tagTimestamp));
 
             var tag = tags.items[i]
                     .setHeader(header)
@@ -608,17 +638,4 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         return result;
     }
 
-//    private List<Tag> buildTags(
-//            ObjectHeader[] headers,
-//            Tag.Builder[] tags) {
-//
-//        var result = new ArrayList<Tag>(headers.length);
-//
-//        for (int i = 0; i < headers.length; i++) {
-//            var definition = ObjectDefinition.newBuilder().setHeader(headers[i]);
-//            result.add(i, tags[i].setDefinition(definition).build());
-//        }
-//
-//        return result;
-//    }
 }

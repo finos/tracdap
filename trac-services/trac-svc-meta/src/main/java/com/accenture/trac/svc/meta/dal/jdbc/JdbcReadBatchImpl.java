@@ -23,6 +23,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.*;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -117,7 +118,7 @@ class JdbcReadBatchImpl {
             throws SQLException {
 
         var query =
-                "select definition_pk, object_version, definition\n" +
+                "select definition_pk, object_version, object_timestamp, definition\n" +
                 "from object_definition def\n" +
                 "join key_mapping km\n" +
                 "  on def.definition_pk = km.pk\n" +
@@ -136,6 +137,7 @@ class JdbcReadBatchImpl {
 
                 long[] pks = new long[objectType.length];
                 int[] versions = new int[objectType.length];
+                Instant[] timestamps = new Instant[objectType.length];
                 ObjectDefinition[] defs = new ObjectDefinition[objectType.length];
 
                 for (var i = 0; i < objectType.length; i++) {
@@ -145,20 +147,22 @@ class JdbcReadBatchImpl {
 
                     var defPk = rs.getLong(1);
                     var defVersion = rs.getInt(2);
-                    var defEncoded = rs.getBytes(3);
+                    var defTimestamp = rs.getObject(3, Instant.class);
+                    var defEncoded = rs.getBytes(4);
                     var defDecoded = ObjectDefinition.parseFrom(defEncoded);
 
                     // TODO: Encode / decode helper, type = protobuf | json ?
 
                     pks[i] = defPk;
                     versions[i] = defVersion;
+                    timestamps[i] = defTimestamp;
                     defs[i] = defDecoded;
                 }
 
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, defs);
+                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, defs);
             }
             catch (InvalidProtocolBufferException e) {
                 throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION);
@@ -210,7 +214,7 @@ class JdbcReadBatchImpl {
         // Note: Common attributes may be added to the tag table as search optimisations, but do not need to be read
 
         var query =
-                "select tag.tag_pk, tag.tag_version \n" +
+                "select tag.tag_pk, tag.tag_version, tag.tag_timestamp\n" +
                 "from tag\n" +
                 "join key_mapping km\n" +
                 "  on tag.tag_pk = km.pk\n" +
@@ -229,6 +233,7 @@ class JdbcReadBatchImpl {
 
                 long[] pks = new long[length];
                 int[] versions = new int[length];
+                Instant[] timestamps = new Instant[length];
 
                 for (var i = 0; i < length; i++) {
 
@@ -237,16 +242,18 @@ class JdbcReadBatchImpl {
 
                     var tagPk = rs.getLong(1);
                     var tagVersion = rs.getInt(2);
+                    var tagTimestamp = rs.getObject(3, Instant.class);
 
                     pks[i] = tagPk;
                     versions[i] = tagVersion;
+                    timestamps[i] = tagTimestamp;
                 }
 
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
                 // Tag record requires only PK and version info
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, null);
+                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, null);
             }
         }
     }
@@ -432,7 +439,7 @@ class JdbcReadBatchImpl {
                     .putAllAttr(attrs[i]);
         }
 
-        return new JdbcBaseDal.KeyedItems<>(tagRecords.keys, tagRecords.versions, tags);
+        return new JdbcBaseDal.KeyedItems<>(tagRecords.keys, tagRecords.versions, tagRecords.timestamps, tags);
     }
 
     private JdbcBaseDal.KeyedItems<Tag.Builder>

@@ -23,6 +23,7 @@ import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
@@ -120,18 +121,18 @@ class JdbcBaseDal {
 
         final long key;
         final int version;
+        final Instant timestamp;
         final TItem item;
 
-        KeyedItem(long key, int version, TItem item) {
+        KeyedItem(long key, int version, Instant timestamp, TItem item) {
             this.key = key;
             this.version = version;
+            this.timestamp = timestamp;
             this.item = item;
         }
 
         KeyedItem(long key, TItem item) {
-            this.key = key;
-            this.version = 0;
-            this.item = item;
+            this(key, 0, null, item);
         }
     }
 
@@ -139,18 +140,22 @@ class JdbcBaseDal {
 
         final long[] keys;
         final int[] versions;
+        final Instant[] timestamps;
         final TItem[] items;
 
-        KeyedItems(long[] keys, int[] versions, TItem[] items) {
+        KeyedItems(long[] keys, int[] versions, Instant[] timestamps, TItem[] items) {
             this.keys = keys;
             this.versions = versions;
+            this.timestamps = timestamps;
             this.items = items;
         }
 
+        KeyedItems(long[] keys, int[] versions, TItem[] items) {
+            this(keys, versions, null, items);
+        }
+
         KeyedItems(long[] keys, TItem[] items) {
-            this.keys = keys;
-            this.versions = null;
-            this.items = items;
+            this(keys, null, null, items);
         }
     }
 }

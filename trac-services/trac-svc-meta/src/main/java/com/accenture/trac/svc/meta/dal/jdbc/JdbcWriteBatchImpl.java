@@ -19,10 +19,10 @@ package com.accenture.trac.svc.meta.dal.jdbc;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
+import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal.ObjectParts;
 
 import java.sql.*;
 import java.util.*;
-import java.util.UUID;
 
 
 class JdbcWriteBatchImpl {
@@ -35,7 +35,7 @@ class JdbcWriteBatchImpl {
         this.readBatch = readBatch;
     }
 
-    long[] writeObjectId(Connection conn, short tenantId, ObjectType[] objectType, UUID[] objectId) throws SQLException {
+    long[] writeObjectId(Connection conn, short tenantId, ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into object_id (\n" +
@@ -52,12 +52,12 @@ class JdbcWriteBatchImpl {
 
         try (var stmt = keySupport ? conn.prepareStatement(query, keyColumns) : conn.prepareStatement(query)) {
 
-            for (var i = 0; i < objectId.length; i++) {
+            for (var i = 0; i < parts.objectId.length; i++) {
 
                 stmt.setShort(1, tenantId);
-                stmt.setString(2, objectType[i].name());
-                stmt.setLong(3, objectId[i].getMostSignificantBits());
-                stmt.setLong(4, objectId[i].getLeastSignificantBits());
+                stmt.setString(2, parts.objectType[i].name());
+                stmt.setLong(3, parts.objectId[i].getMostSignificantBits());
+                stmt.setLong(4, parts.objectId[i].getLeastSignificantBits());
 
                 stmt.addBatch();
             }
@@ -65,25 +65,23 @@ class JdbcWriteBatchImpl {
             stmt.executeBatch();
 
             if (keySupport)
-                return generatedKeys(stmt, objectId.length);
+                return generatedKeys(stmt, parts.objectId.length);
             else
-                return readBatch.lookupObjectPks(conn, tenantId, objectId);
+                return readBatch.lookupObjectPks(conn, tenantId, parts.objectId);
         }
     }
 
-    long[] writeObjectDefinition(
-            Connection conn, short tenantId,
-            long[] objectPk, int[] objectVersion, ObjectDefinition[] definition)
-            throws SQLException {
+    long[] writeObjectDefinition(Connection conn, short tenantId, long[] objectPk, ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into object_definition (\n" +
                 "  tenant_id,\n" +
                 "  object_fk,\n" +
                 "  object_version,\n" +
+                "  object_timestamp,\n" +
                 "  definition" +
                 ")\n" +
-                "values (?, ?, ?, ?)";
+                "values (?, ?, ?, ?, ?)";
 
         // Only request generated key columns if the driver supports it
         var keySupport = dialect.supportsGeneratedKeys();
@@ -95,8 +93,9 @@ class JdbcWriteBatchImpl {
 
                 stmt.setShort(1, tenantId);
                 stmt.setLong(2, objectPk[i]);
-                stmt.setInt(3, objectVersion[i]);
-                stmt.setBytes(4, definition[i].toByteArray());
+                stmt.setInt(3, parts.objectVersion[i]);
+                stmt.setObject(4, parts.objectTimestamp[i], Types.TIMESTAMP);
+                stmt.setBytes(5, parts.definition[i].toByteArray());
 
                 stmt.addBatch();
             }
@@ -106,23 +105,21 @@ class JdbcWriteBatchImpl {
             if (keySupport)
                 return generatedKeys(stmt, objectPk.length);
             else
-                return readBatch.lookupDefinitionPk(conn, tenantId, objectPk, objectVersion);
+                return readBatch.lookupDefinitionPk(conn, tenantId, objectPk, parts.objectVersion);
         }
     }
 
-    long[] writeTagRecord(
-            Connection conn, short tenantId,
-            long[] definitionPk, int[] tagVersion, ObjectType[] objectTypes)
-            throws SQLException {
+    long[] writeTagRecord(Connection conn, short tenantId, long[] definitionPk, ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into tag (\n" +
                 "  tenant_id,\n" +
                 "  definition_fk,\n" +
                 "  tag_version,\n" +
+                "  tag_timestamp,\n" +
                 "  object_type" +
                 ")\n" +
-                "values (?, ?, ?, ?)";
+                "values (?, ?, ?, ?, ?)";
 
         // Only request generated key columns if the driver supports it
         var keySupport = dialect.supportsGeneratedKeys();
@@ -134,8 +131,9 @@ class JdbcWriteBatchImpl {
 
                 stmt.setShort(1, tenantId);
                 stmt.setLong(2, definitionPk[i]);
-                stmt.setInt(3, tagVersion[i]);
-                stmt.setString(4, objectTypes[i].name());
+                stmt.setInt(3, parts.tagVersion[i]);
+                stmt.setObject(4, parts.tagTimestamp[i], Types.TIMESTAMP);
+                stmt.setString(5, parts.objectType[i].name());
 
                 stmt.addBatch();
             }
@@ -145,14 +143,11 @@ class JdbcWriteBatchImpl {
             if (keySupport)
                 return generatedKeys(stmt, definitionPk.length);
             else
-                return readBatch.lookupTagPk(conn, tenantId, definitionPk, tagVersion);
+                return readBatch.lookupTagPk(conn, tenantId, definitionPk, parts.tagVersion);
         }
     }
 
-    void writeTagAttrs(
-            Connection conn, short tenantId,
-            long[] tagPk, Tag[] tag)
-            throws SQLException {
+    void writeTagAttrs(Connection conn, short tenantId, long[] tagPk, ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into tag_attr (\n" +
@@ -174,7 +169,7 @@ class JdbcWriteBatchImpl {
         try (var stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
 
             for (var i = 0; i < tagPk.length; i++) {
-                for (var attr : tag[i].getAttrMap().entrySet()) {
+                for (var attr : parts.tag[i].getAttrMap().entrySet()) {
 
                     var attrRootValue = attr.getValue();
                     var attrType = attrBasicType(attrRootValue);
