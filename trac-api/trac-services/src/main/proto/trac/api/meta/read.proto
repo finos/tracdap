@@ -20,8 +20,7 @@ package trac.api.meta;
 option java_package = "com.accenture.trac.common.api.meta";
 option java_multiple_files = true;
 
-import "trac/metadata/type.proto";
-import "trac/metadata/object.proto";
+import "trac/metadata/object_id.proto";
 import "trac/metadata/tag.proto";
 
 import "google/api/annotations.proto";
@@ -124,7 +123,7 @@ message MetadataReadRequest {
     string tenant = 1;
 
     trac.metadata.ObjectType objectType = 2;
-    trac.metadata.UUID objectId = 3;
+    string objectId = 3;
     int32 objectVersion = 4;
     int32 tagVersion = 5;
 };
