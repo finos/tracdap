@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.meta.services;
 
+import com.accenture.trac.common.metadata.TagSelector;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.Tag;
@@ -39,20 +40,41 @@ public class MetadataReadService {
             String tenant, ObjectType objectType,
             UUID objectId, int objectVersion, int tagVersion) {
 
-        return dal.loadTag(tenant, objectType, objectId, objectVersion, tagVersion);
+        var selector = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .setObjectVersion(objectVersion)
+                .setTagVersion(tagVersion)
+                .build();
+
+        return dal.loadObject(tenant, selector);
     }
 
     public CompletableFuture<Tag> loadLatestTag(
             String tenant, ObjectType objectType,
             UUID objectId, int objectVersion) {
 
-        return dal.loadLatestTag(tenant, objectType, objectId, objectVersion);
+        var selector = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .setObjectVersion(objectVersion)
+                .setLatestTag(true)
+                .build();
+
+        return dal.loadObject(tenant, selector);
     }
 
     public CompletableFuture<Tag> loadLatestObject(
             String tenant, ObjectType objectType,
             UUID objectId) {
 
-        return dal.loadLatestVersion(tenant, objectType, objectId);
+        var selector = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .setLatestObject(true)
+                .setLatestTag(true)
+                .build();
+
+        return dal.loadObject(tenant, selector);
     }
 }
