@@ -16,6 +16,8 @@
 
 package com.accenture.trac.svc.meta.dal;
 
+import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.TagSelector;
 import com.accenture.trac.svc.meta.exception.EMissingItem;
 import com.accenture.trac.svc.meta.exception.EWrongItemType;
 import com.accenture.trac.common.metadata.ObjectType;
@@ -53,7 +55,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
     static class Integration extends MetadataDalReadTest {}
 
     @Test
-    void testLoadOneExplicit_ok() throws Exception {
+    void testLoadOne_selectVersion() throws Exception {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
@@ -69,10 +71,18 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         unwrap(future);
 
+        var selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(origId.toString());
+
         // Load all three items by explicit version / tag number
-        var v1t1 = unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1));
-        var v2t1 = unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1));
-        var v2t2 = unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 2));
+        var selector1t1 = selector.setObjectVersion(1).setTagVersion(1).build();
+        var selector2t1 = selector.setObjectVersion(2).setTagVersion(1).build();
+        var selector2t2 = selector.setObjectVersion(2).setTagVersion(2).build();
+
+        var v1t1 = unwrap(dal.loadObject(TEST_TENANT, selector1t1));
+        var v2t1 = unwrap(dal.loadObject(TEST_TENANT, selector2t1));
+        var v2t2 = unwrap(dal.loadObject(TEST_TENANT, selector2t2));
 
         assertEquals(origTag, v1t1);
         assertEquals(nextDefTag1, v2t1);
@@ -80,7 +90,57 @@ abstract class MetadataDalReadTest implements IDalTestable {
     }
 
     @Test
-    void testLoadOneLatestVersion_ok() throws Exception {
+    void testLoadOne_selectAsOf() throws Exception {
+
+        var origDef = dummyDataDef();
+        var origTag = dummyTag(origDef, INCLUDE_HEADER);
+
+        Thread.sleep(1);
+        var nextDefTag1 = tagForNextObject(origTag, nextDataDef(origDef), INCLUDE_HEADER);
+
+        Thread.sleep(1);
+        var nextDefTag2 = nextTag(nextDefTag1, UPDATE_TAG_VERSION);
+
+        unwrap(dal.saveNewObject(TEST_TENANT, origTag));
+        unwrap(dal.saveNewVersion(TEST_TENANT, nextDefTag1));
+        unwrap(dal.saveNewTag(TEST_TENANT, nextDefTag2));
+
+        var origId = UUID.fromString(origTag.getHeader().getObjectId());
+        var v1t1AsOf = MetadataCodec.parseDatetime(origTag.getHeader().getTagTimestamp()).plusNanos(500000);
+        var v2t1AsOf = MetadataCodec.parseDatetime(nextDefTag1.getHeader().getTagTimestamp()).plusNanos(500000);
+        var v2t2AsOf = MetadataCodec.parseDatetime(nextDefTag2.getHeader().getTagTimestamp()).plusNanos(500000);
+
+        var selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(origId.toString());
+
+        // Load all three items by explicit version / tag number
+        var selector1t1 = selector
+                .setObjectAsOf(MetadataCodec.quoteDatetime(v1t1AsOf))
+                .setTagAsOf(MetadataCodec.quoteDatetime(v1t1AsOf))
+                .build();
+
+        var selector2t1 = selector
+                .setObjectAsOf(MetadataCodec.quoteDatetime(v2t1AsOf))
+                .setTagAsOf(MetadataCodec.quoteDatetime(v2t1AsOf))
+                .build();
+
+        var selector2t2 = selector
+                .setObjectAsOf(MetadataCodec.quoteDatetime(v2t2AsOf))
+                .setTagAsOf(MetadataCodec.quoteDatetime(v2t2AsOf))
+                .build();
+
+        var v1t1 = unwrap(dal.loadObject(TEST_TENANT, selector1t1));
+        var v2t1 = unwrap(dal.loadObject(TEST_TENANT, selector2t1));
+        var v2t2 = unwrap(dal.loadObject(TEST_TENANT, selector2t2));
+
+        assertEquals(origTag, v1t1);
+        assertEquals(nextDefTag1, v2t1);
+        assertEquals(nextDefTag2, v2t2);
+    }
+
+    @Test
+    void testLoadOne_selectLatest() throws Exception {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
@@ -88,60 +148,83 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var nextDefTag2 = nextTag(nextDefTag1, UPDATE_TAG_VERSION);
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
-        // After save v1t1, latest version = v1t1
-        var v1t1 = CompletableFuture.completedFuture(0)
-                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
-                .thenCompose(x -> dal.loadLatestVersion(TEST_TENANT, ObjectType.DATA, origId));
+        var selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(origId.toString())
+                .setLatestObject(true)
+                .setLatestTag(true)
+                .build();
 
-        assertEquals(origTag, unwrap(v1t1));
+        unwrap(dal.saveNewObject(TEST_TENANT, origTag));
+        var v1t1 = unwrap(dal.loadObject(TEST_TENANT, selector));
 
-        // After save v2t1, latest version = v2t1
-        var v2t1 = CompletableFuture.completedFuture(0)
-                .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextDefTag1))
-                .thenCompose(x -> dal.loadLatestVersion(TEST_TENANT, ObjectType.DATA, origId));
+        unwrap(dal.saveNewVersion(TEST_TENANT, nextDefTag1));
+        var v2t1 = unwrap(dal.loadObject(TEST_TENANT, selector));
 
-        assertEquals(nextDefTag1, unwrap(v2t1));
+        unwrap(dal.saveNewTag(TEST_TENANT, nextDefTag2));
+        var v2t2 = unwrap(dal.loadObject(TEST_TENANT, selector));
 
-        // After save v2t2, latest version = v2t2
-        var v2t2 = CompletableFuture.completedFuture(0)
-                .thenCompose(x -> dal.saveNewTag(TEST_TENANT, nextDefTag2))
-                .thenCompose(x -> dal.loadLatestVersion(TEST_TENANT, ObjectType.DATA, origId));
-
-        assertEquals(nextDefTag2, unwrap(v2t2));
+        assertEquals(origTag, v1t1);
+        assertEquals(nextDefTag1, v2t1);
+        assertEquals(nextDefTag2, v2t2);
     }
 
     @Test
-    void testLoadOneLatestTag_ok() throws Exception {
+    void testLoadOne_comboSelector() throws Exception {
 
-        var origDef = dummyDataDef();
-        var origTag = dummyTag(origDef, INCLUDE_HEADER);
-        var origId = UUID.fromString(origTag.getHeader().getObjectId());
+        var v1Def = dummyDataDef();
+        var v1Tag = dummyTag(v1Def, INCLUDE_HEADER);
 
-        var nextDefTag1 = tagForNextObject(origTag, nextDataDef(origDef), INCLUDE_HEADER);
+        Thread.sleep(1);
+        var v2t1Tag = tagForNextObject(v1Tag, nextDataDef(v1Def), INCLUDE_HEADER);
 
-        // Save v1 t1, v2 t1
-        var future = CompletableFuture.completedFuture(0)
-                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
-                .thenCompose(x -> dal.saveNewVersion(TEST_TENANT, nextDefTag1));
+        Thread.sleep(1);
+        var v2t2Tag = nextTag(v2t1Tag, UPDATE_TAG_VERSION);
 
-        unwrap(future);
+        Thread.sleep(1);
+        var v3t1Tag = tagForNextObject(v2t1Tag, nextDataDef(v2t1Tag.getDefinition()), INCLUDE_HEADER);
 
-        // Load latest tag for object versions 1 & 2
-        var v1 = unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 1));
-        var v2 = unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 2));
+        unwrap(dal.saveNewObject(TEST_TENANT, v1Tag));
+        unwrap(dal.saveNewVersion(TEST_TENANT, v2t1Tag));
+        unwrap(dal.saveNewTag(TEST_TENANT, v2t2Tag));
+        unwrap(dal.saveNewVersion(TEST_TENANT, v3t1Tag));
 
-        // Should get v1 = v1t1, v2 = v2t1
-        assertEquals(origTag, v1);
-        assertEquals(nextDefTag1, v2);
+        var origId = UUID.fromString(v1Tag.getHeader().getObjectId());
+        var v2t1AsOf = MetadataCodec.parseDatetime(v2t1Tag.getHeader().getTagTimestamp()).plusNanos(500000);
 
-        // Save a new tag for object version 1
-        var origDefTag2 = nextTag(origTag, UPDATE_TAG_VERSION);
+        var selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(origId.toString());
 
-        var v1t2 = CompletableFuture.completedFuture(0)
-                .thenCompose(x -> dal.saveNewTag(TEST_TENANT, origDefTag2))
-                .thenCompose(x -> dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 1));
+        // Explicit object version, latest tag
 
-        assertEquals(origDefTag2, unwrap(v1t2));
+        var selectCombo1 = selector
+                .setObjectVersion(2)
+                .setLatestTag(true)
+                .build();
+
+        var combo1 = unwrap(dal.loadObject(TEST_TENANT, selectCombo1));
+        assertEquals(v2t2Tag, combo1);
+
+        // Use object as-of for v2t1, but select latest tag, should give v1t2
+
+        var selectCombo2 = selector
+                .setObjectAsOf(MetadataCodec.quoteDatetime(v2t1AsOf))
+                .setLatestTag(true)
+                .build();
+
+        var combo2 = unwrap(dal.loadObject(TEST_TENANT, selectCombo2));
+        assertEquals(v2t2Tag, combo2);
+
+        // Latest object, tag version 1
+
+        var selectCombo3 = selector
+                .setLatestObject(true)
+                .setTagVersion(1)
+                .build();
+
+        var combo3 = unwrap(dal.loadObject(TEST_TENANT, selectCombo3));
+        assertEquals(v3t1Tag, combo3);
     }
     
     @Test
@@ -153,33 +236,51 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         unwrap(dal.saveNewObject(TEST_TENANT, origTag));
 
-        var explicit = unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1));
-        var latestTag = unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 1));
-        var latestVersion = unwrap(dal.loadLatestVersion(TEST_TENANT, ObjectType.DATA, origId));
+        var selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(origId.toString())
+                .setLatestObject(true)
+                .setLatestTag(true)
+                .build();
 
-        assertEquals(origTag, explicit);
-        assertEquals(origTag, latestTag);
-        assertEquals(origTag, latestVersion);
+        var loadedTag = unwrap(dal.loadObject(TEST_TENANT, selector));
+
+        assertEquals(origTag, loadedTag);
     }
 
     @Test
     void testLoadOne_missingItems() throws Exception {
 
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, UUID.randomUUID(), 1, 1)));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, UUID.randomUUID(), 1)));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadLatestVersion(TEST_TENANT, ObjectType.DATA, UUID.randomUUID())));
-
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
-        // Save an item
-        var future = dal.saveNewObject(TEST_TENANT, origTag);
-        unwrap(future);
+        Thread.sleep(1);
+        var asOfTime = MetadataCodec.parseDatetime(origTag.getHeader().getTagTimestamp()).minusNanos(500000);
 
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 2)));  // Missing tag
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1)));  // Missing ver
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.DATA, origId, 2)));  // Missing ver
+        var selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(origId.toString());
+
+        var missing1 = selector.setObjectVersion(1).setTagVersion(2).build(); // Missing tag
+        var missing2 = selector.setObjectVersion(2).setTagVersion(1).build(); // Missing ver
+        var missing3 = selector.setObjectVersion(2).setLatestTag(true).build(); // Missing ver
+        var missing4 = selector.setObjectAsOf(MetadataCodec.quoteDatetime(asOfTime)).setLatestTag(true).build(); // as-of before object creation
+
+        // Object should definitely be missing before it is saved!
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing1)));
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing2)));
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing3)));
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing4)));
+
+        // Save an item
+        unwrap(dal.saveNewObject(TEST_TENANT, origTag));
+
+        // No selectors should match
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing1)));
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing2)));
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing3)));
+        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing4)));
     }
 
     @Test
@@ -191,9 +292,14 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         unwrap(dal.saveNewObject(TEST_TENANT, origTag));
 
-        assertThrows(EWrongItemType.class, () -> unwrap(dal.loadTag(TEST_TENANT, ObjectType.MODEL, origId, 1, 1)));
-        assertThrows(EWrongItemType.class, () -> unwrap(dal.loadLatestTag(TEST_TENANT, ObjectType.MODEL, origId, 1)));
-        assertThrows(EWrongItemType.class, () -> unwrap(dal.loadLatestVersion(TEST_TENANT, ObjectType.MODEL, origId)));
+        var selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.MODEL)
+                .setObjectId(origId.toString())
+                .setLatestObject(true)
+                .setLatestTag(true)
+                .build();
+
+        assertThrows(EWrongItemType.class, () -> unwrap(dal.loadObject(TEST_TENANT, selector)));
     }
 
     @Test
