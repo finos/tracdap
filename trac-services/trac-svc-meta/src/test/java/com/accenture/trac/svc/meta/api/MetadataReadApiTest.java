@@ -455,7 +455,8 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var t2TagExpected = v1Expected.toBuilder()
                 .setHeader(v1Expected.getHeader().toBuilder()
-                .setTagVersion(2))
+                .setTagVersion(2)
+                .setTagTimestamp(t2Header.getTagTimestamp()))
                 .clearAttr()
                 .putAllAttr(t2Attrs)
                 .build();
@@ -719,7 +720,8 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var t2Expected = v1Expected.toBuilder()
                 .setHeader(v1Expected.getHeader().toBuilder()
-                .setTagVersion(2))
+                .setTagVersion(2)
+                .setTagTimestamp(t2Header.getTagTimestamp()))
                 .clearAttr().putAllAttr(t2Attrs)
                 .build();
 
