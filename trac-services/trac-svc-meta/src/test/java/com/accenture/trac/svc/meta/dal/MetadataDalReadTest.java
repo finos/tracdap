@@ -477,6 +477,97 @@ abstract class MetadataDalReadTest implements IDalTestable {
     }
 
     @Test
+    void timeWindowBoundary_single() throws Exception {
+
+        var v1Def = dummyDataDef();
+        var v1Tag = dummyTag(v1Def, INCLUDE_HEADER);
+
+        Thread.sleep(10);
+        var v2Tag = tagForNextObject(v1Tag, nextDataDef(v1Def), INCLUDE_HEADER);
+
+        Thread.sleep(10);
+        var t2Tag = nextTag(v2Tag, UPDATE_TAG_VERSION);
+
+        unwrap(dal.saveNewObject(TEST_TENANT, v1Tag));
+        unwrap(dal.saveNewVersion(TEST_TENANT, v2Tag));
+        unwrap(dal.saveNewTag(TEST_TENANT, t2Tag));
+
+        var origId = UUID.fromString(v1Tag.getHeader().getObjectId());
+
+        // Metadata timestamps use millisecond precision
+        var v2BoundaryTime = MetadataCodec.parseDatetime(v2Tag.getHeader().getTagTimestamp());
+        var v2PriorTime = v2BoundaryTime.minusNanos(1000);
+        var t2BoundaryTime = MetadataCodec.parseDatetime(t2Tag.getHeader().getTagTimestamp());
+        var t2PriorTime = t2BoundaryTime.minusNanos(1000);
+
+        var selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(origId.toString());
+
+        var v2BoundarySelector = selector.setObjectAsOf(MetadataCodec.quoteDatetime(v2BoundaryTime)).setTagVersion(1).build();
+        var v2PriorSelector = selector.setObjectAsOf(MetadataCodec.quoteDatetime(v2PriorTime)).setTagVersion(1).build();
+        var t2BoundarySelector = selector.setObjectVersion(2).setTagAsOf(MetadataCodec.quoteDatetime(t2BoundaryTime)).build();
+        var t2PriorSelector = selector.setObjectVersion(2).setTagAsOf(MetadataCodec.quoteDatetime(t2PriorTime)).build();
+
+        var v2BoundaryTag = unwrap(dal.loadObject(TEST_TENANT, v2BoundarySelector));
+        var v2PriorTag = unwrap(dal.loadObject(TEST_TENANT, v2PriorSelector));
+        var t2BoundaryTag = unwrap(dal.loadObject(TEST_TENANT, t2BoundarySelector));
+        var t2PriorTag = unwrap(dal.loadObject(TEST_TENANT, t2PriorSelector));
+
+        assertEquals(v2Tag, v2BoundaryTag);
+        assertEquals(v1Tag, v2PriorTag);
+        assertEquals(t2Tag, t2BoundaryTag);
+        assertEquals(v2Tag, t2PriorTag);
+    }
+
+    @Test
+    void timeWindowBoundary_batch() throws Exception {
+
+        var v1Def = dummyDataDef();
+        var v1Tag = dummyTag(v1Def, INCLUDE_HEADER);
+
+        Thread.sleep(10);
+        var v2Tag = tagForNextObject(v1Tag, nextDataDef(v1Def), INCLUDE_HEADER);
+
+        Thread.sleep(10);
+        var t2Tag = nextTag(v2Tag, UPDATE_TAG_VERSION);
+
+        unwrap(dal.saveNewObject(TEST_TENANT, v1Tag));
+        unwrap(dal.saveNewVersion(TEST_TENANT, v2Tag));
+        unwrap(dal.saveNewTag(TEST_TENANT, t2Tag));
+
+        var origId = UUID.fromString(v1Tag.getHeader().getObjectId());
+
+        // Metadata timestamps use millisecond precision
+        var v2BoundaryTime = MetadataCodec.parseDatetime(v2Tag.getHeader().getTagTimestamp());
+        var v2PriorTime = v2BoundaryTime.minusNanos(1000);
+        var t2BoundaryTime = MetadataCodec.parseDatetime(t2Tag.getHeader().getTagTimestamp());
+        var t2PriorTime = t2BoundaryTime.minusNanos(1000);
+
+        var selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(origId.toString());
+
+        var v2BoundarySelector = selector.setObjectAsOf(MetadataCodec.quoteDatetime(v2BoundaryTime)).setTagVersion(1).build();
+        var v2PriorSelector = selector.setObjectAsOf(MetadataCodec.quoteDatetime(v2PriorTime)).setTagVersion(1).build();
+        var t2BoundarySelector = selector.setObjectVersion(2).setTagAsOf(MetadataCodec.quoteDatetime(t2BoundaryTime)).build();
+        var t2PriorSelector = selector.setObjectVersion(2).setTagAsOf(MetadataCodec.quoteDatetime(t2PriorTime)).build();
+
+        var batch = unwrap(dal.loadObjects(TEST_TENANT, List.of(v2BoundarySelector, v2PriorSelector)));
+        var v2BoundaryTag = batch.get(0);
+        var v2PriorTag = batch.get(1);
+
+        var batch2 = unwrap(dal.loadObjects(TEST_TENANT, List.of(t2BoundarySelector, t2PriorSelector)));
+        var t2BoundaryTag = batch2.get(0);
+        var t2PriorTag = batch2.get(1);
+
+        assertEquals(v2Tag, v2BoundaryTag);
+        assertEquals(v1Tag, v2PriorTag);
+        assertEquals(t2Tag, t2BoundaryTag);
+        assertEquals(v2Tag, t2PriorTag);
+    }
+
+    @Test
     void missingItems_single() throws Exception {
 
         var origDef = dummyDataDef();
