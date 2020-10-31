@@ -121,8 +121,8 @@ class JdbcReadImpl {
                 "from object_definition\n" +
                 "where tenant_id = ?\n" +
                 "and object_fk = ?\n" +
-                "and object_timestamp >= ?\n" +
-                "and (object_superseded is null or object_superseded < ?)\n";
+                "and object_timestamp <= ?\n" +
+                "and (object_superseded is null or object_superseded > ?)\n";
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -233,8 +233,8 @@ class JdbcReadImpl {
                 "from tag\n" +
                 "where tenant_id = ?\n" +
                 "and definition_fk = ?\n" +
-                "and tag_timestamp >= ?\n" +
-                "and (tag_superseded is null or tag_superseded < ?)\n";
+                "and tag_timestamp <= ?\n" +
+                "and (tag_superseded is null or tag_superseded > ?)\n";
 
         try (var stmt = conn.prepareStatement(query)) {
 
