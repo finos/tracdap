@@ -589,7 +589,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origTag2 = dummyTag(origDef2, INCLUDE_HEADER);
         var origId2 = UUID.fromString(origTag2.getHeader().getObjectId());
 
-        unwrap(dal.saveNewObject(TEST_TENANT, origTag));
+        unwrap(dal.saveNewObjects(TEST_TENANT, List.of(origTag, origTag2)));
 
         // Two selectors in the batch
         // Only one has wrong type
