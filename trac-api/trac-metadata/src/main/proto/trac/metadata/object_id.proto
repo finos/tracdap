@@ -70,12 +70,12 @@ message TagHeader {
    * Timestamp for when this version of the object was created.
    * Represented using ISO 8601.
    */
-  string objectTimestamp = 5;
+  string objectTimestamp = 4;
 
   /**
    * Version of this tag.
    */
-  int32 tagVersion = 4;
+  int32 tagVersion = 5;
 
   /**
    * Timestamp for when this version of the tag was created.
