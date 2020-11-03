@@ -21,6 +21,7 @@ import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.Tag;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -35,6 +36,16 @@ public class MetadataReadService {
 
     // Literally all of the read logic is in the DAL at present!
     // Which is fine, keep a thin logic class here anyway to have a consistent pattern
+
+    public CompletableFuture<Tag> readObject(String tenant, TagSelector selector) {
+
+        return dal.loadObject(tenant, selector);
+    }
+
+    public CompletableFuture<List<Tag>> readObjects(String tenant, List<TagSelector> selectors) {
+
+        return dal.loadObjects(tenant, selectors);
+    }
 
     public CompletableFuture<Tag> loadTag(
             String tenant, ObjectType objectType,

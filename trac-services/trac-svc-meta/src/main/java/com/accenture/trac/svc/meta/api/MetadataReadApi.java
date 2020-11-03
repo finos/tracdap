@@ -16,7 +16,6 @@
 
 package com.accenture.trac.svc.meta.api;
 
-import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.util.ApiWrapper;
 import com.accenture.trac.svc.meta.services.MetadataReadService;
 import com.accenture.trac.common.metadata.Tag;
@@ -35,6 +34,19 @@ public class MetadataReadApi extends MetadataReadApiGrpc.MetadataReadApiImplBase
     public MetadataReadApi(MetadataReadService readService) {
         this.apiWrapper = new ApiWrapper(getClass(), ApiErrorMapping.ERROR_MAPPING);
         this.readService = readService;
+    }
+
+    @Override
+    public void readObject(ReadRequest request, StreamObserver<Tag> response) {
+
+        apiWrapper.unaryCall(response, () -> readService.readObject(request.getTenant(), request.getSelector()));
+    }
+
+    @Override
+    public void readBatch(ReadBatchRequest request, StreamObserver<ReadBatchResponse> response) {
+
+        apiWrapper.unaryCall(response, () -> readService.readObjects(request.getTenant(), request.getSelectorList())
+            .thenApply(tags -> ReadBatchResponse.newBuilder().addAllTag(tags).build()));
     }
 
     @Override
