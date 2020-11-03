@@ -44,6 +44,28 @@ import "google/api/annotations.proto";
 service MetadataReadApi {
 
     /**
+     * Read a single object from the TRAC metadata store using a tag selector.
+     */
+    rpc readObject(ReadRequest) returns (metadata.Tag) {
+        option (google.api.http) = {
+            post: "/{tenant}/read-object"
+            body: "selector"
+        };
+    }
+
+    /**
+     * Read multiple objects from the TRAC metadata store using tag selectors.
+     */
+    rpc readBatch(ReadBatchRequest) returns (ReadBatchResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/read-batch"
+            body: "selector"
+        };
+    }
+
+
+
+    /**
      * Load a single metadata object with a known object version and tag version.
      *
      * To use this call, supply a tenant code, object type, ID, object version and
@@ -111,6 +133,27 @@ service MetadataReadApi {
     }
 
 };
+
+
+message ReadRequest {
+
+    string tenant = 1;
+
+    metadata.TagSelector selector = 2;
+};
+
+message ReadBatchRequest {
+
+    string tenant = 1;
+
+    repeated metadata.TagSelector selector = 2;
+};
+
+message ReadBatchResponse {
+
+    repeated metadata.Tag tag = 1;
+};
+
 
 
 /**
