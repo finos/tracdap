@@ -239,9 +239,9 @@ message SearchParameters {
   /**
    * Perform the search as of a specific date/time.
    *
-   * No objects or tags created or updated after this time will be included in
-   * the search result. Objects and tags that were live before this time will
-   * only be included if the priorVersions or priorTags flags are set.
+   * Supplying this field will cause TRAC to ignore all metadata changes from
+   * the specified time onwards. The result will be the same as if a search was
+   * performed at the specified time with this field left blank.
    *
    * If supplied, this field must be a date-time value encoded using ISO 8601.
    * If a zone offset is supplied, TRAC will apply the offset to search across
@@ -250,37 +250,38 @@ message SearchParameters {
   string searchAsOf = 3;
 
   /**
-   * Look for objects that were live as of a specific date/time.
+   * Include prior versions of objects in the search.
    *
-   * No objects created or updated after this time will be included in the
-   * search result. Objects that were live before this time will only be
-   * included if the priorVersions flag is set. If this field is supplied as
-   * well as the searchAsOf parameter, the earlier of the two restrictions will
-   * be applied to objects.
+   * By default, only the latest version of each object is considered in a
+   * search. If the as-of parameter is specified, latest versions are
+   * considered as of that time.
    *
-   * If supplied, this field must be a date-time value encoded using ISO 8601.
-   * If a zone offset is supplied, TRAC will apply the offset to search across
-   * all metadata items in UTC.
+   * Setting this flag to true will cause TRAC to consider superseded object
+   * versions in the search. If the as-of parameter is specified as well then
+   * all object versions up to that time are considered. Only the latest
+   * matching version will be included in the search result.
+   *
+   * This flag can be combined with priorTags to search across all tags and
+   * object versions. If neither flag is specified, only the latest version and
+   * latest tag is considered for each object.
    */
-  string objectsAsOf = 4;
+   bool priorVersions = 4;
 
   /**
-   * Look for tags that were live as of a specific date/time.
+   * Include prior tags in the search.
    *
-   * No tags created or updated after this time will be included in the search
-   * result. Tags that were live before this time will only be included if the
-   * priorTags flag is set. If this field is supplied as well as the searchAsOf
-   * parameter, the earlier of the two restrictions will be applied to tags.
+   * By default, only the latest tag for each object version is considered in a
+   * search. If the as-of parameter is specified, latest tags are considered as
+   * of that time.
    *
-   * If supplied, this field must be a date-time value encoded using ISO 8601.
-   * If a zone offset is supplied, TRAC will apply the offset to search across
-   * all metadata items in UTC.
+   * Setting this flag to true will cause TRAC to consider superseded tags in
+   * the search. If the as-of parameter is specified as well then all tags up to
+   * that time are considered. Only the latest matching tag will be included in
+   * the search result.
+   *
+   * This flag can be combined with priorVersions to search across all tags and
+   * object versions. If neither flag is specified, only the latest version and
+   * latest tag is considered for each object.
    */
-  string tagsAsOf = 5;
-
-  /// Whether to include prior versions of objects in the search results
-  bool priorVersions = 6;
-
-  /// Whether to include prior tags in the search results
-  bool priorTags = 7;
+   bool priorTags = 5;
 }
