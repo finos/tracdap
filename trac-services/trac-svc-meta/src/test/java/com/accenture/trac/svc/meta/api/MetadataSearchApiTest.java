@@ -16,11 +16,10 @@
 
 package com.accenture.trac.svc.meta.api;
 
-import com.accenture.trac.common.api.meta.MetadataSearchApiGrpc;
-import com.accenture.trac.common.api.meta.MetadataSearchRequest;
-import com.accenture.trac.common.api.meta.MetadataTrustedWriteApiGrpc;
-import com.accenture.trac.common.api.meta.MetadataWriteRequest;
+import com.accenture.trac.common.api.meta.*;
+import com.accenture.trac.common.api.meta.Search;
 import com.accenture.trac.common.metadata.BasicType;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.Tag;
 import com.accenture.trac.common.metadata.search.*;
@@ -375,6 +374,94 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         assertEquals(1, searchResult.getSearchResultCount());
         assertEquals(t1, searchResult.getSearchResult(0));
+    }
+
+    @Test
+    void temporalSearch() throws Exception {
+
+        // Single test case to search as of a previous point in time
+
+        var obj1 = dummyDataDef();
+
+        var create1 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(obj1)
+                .addTagUpdate(TagUpdate.newBuilder()
+                        .setAttrName("as_of_attr_1")
+                        .setValue(MetadataCodec.encodeValue("initial_value")))
+                .build();
+
+        var header1 = writeApi.createObject(create1);
+        var header2 = writeApi.createObject(create1);
+
+        // Use a search timestamp after both objects have been created, but before either is updated
+        var v1SearchTime = MetadataCodec.parseDatetime(header2.getTagTimestamp()).plusNanos(5000);
+
+        Thread.sleep(10);
+
+        // Update only one of the two objects
+
+        var update1 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(selectorForTag(header2))
+                .addTagUpdate(TagUpdate.newBuilder()
+                        .setAttrName("as_of_attr_1")
+                        .setOperation(TagOperation.REPLACE_ATTR)
+                        .setValue(MetadataCodec.encodeValue("updated_value")))
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.updateTag(update1);
+
+        // Search without specifying as-of, should return only the object that has the original tag
+
+        var searchRequest = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(SearchExpression.newBuilder()
+                        .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("as_of_attr_1")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(encodeValue("initial_value")))))
+                .build();
+
+        var result = searchApi.search(searchRequest);
+        var resultHeader = result.getSearchResult(0).getHeader();
+
+        Assertions.assertEquals(1, result.getSearchResultCount());
+        Assertions.assertEquals(header1, resultHeader);
+
+        // Now search with an as-of time before the update was applied, both objects should come back
+        // The object created last should be top of the list
+
+        var asOfSearch = searchRequest.toBuilder()
+                .setSearchParams(searchRequest.getSearchParams().toBuilder()
+                .setSearchAsOf(MetadataCodec.quoteDatetime(v1SearchTime)))
+                .build();
+
+        var asOfResult = searchApi.search(asOfSearch);
+        var resultHeader2 = result.getSearchResult(0).getHeader();
+        var resultHeader1 = result.getSearchResult(1).getHeader();
+
+        Assertions.assertEquals(2, asOfResult.getSearchResultCount());
+        Assertions.assertEquals(header1, resultHeader1);
+        Assertions.assertEquals(header2, resultHeader2);
+    }
+
+    @Test
+    @Disabled("Prior versions search not implemented yet")
+    void priorVersions() {
+        Assertions.fail();
+    }
+
+    @Test
+    @Disabled("Prior versions temporal search not implemented yet")
+    void priorVersionsTemporalSearch() {
+        Assertions.fail();
     }
 
     @Test
