@@ -179,15 +179,16 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setHeader(tagHeader)
                 .build();
 
-        MetadataReadRequest readRequest = MetadataReadRequest.newBuilder()
+        var readRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
                 .setObjectType(objectType)
                 .setObjectId(objectId.toString())
                 .setObjectVersion(1)
-                .setTagVersion(1)
+                .setTagVersion(1))
                 .build();
 
-        var tagFromStore = readApi.loadTag(readRequest);
+        var tagFromStore = readApi.readObject(readRequest);
 
         assertEquals(expectedTag, tagFromStore);
     }
@@ -424,15 +425,16 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .putAttr(v2NewAttrName, v2NewAttrValue)
                 .build();
 
-        MetadataReadRequest readRequest = MetadataReadRequest.newBuilder()
+        var readRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
                 .setObjectType(objectType)
                 .setObjectId(v2ObjectId.toString())
                 .setObjectVersion(2)
-                .setTagVersion(1)
+                .setTagVersion(1))
                 .build();
 
-        var tagFromStore = readApi.loadTag(readRequest);
+        var tagFromStore = readApi.readObject(readRequest);
 
         assertEquals(expectedTag, tagFromStore);
     }
@@ -454,15 +456,16 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var v1IdResponse = trustedApi.createObject(v1WriteRequest);
 
-        var v1ReadRequest = MetadataReadRequest.newBuilder()
+        var v1ReadRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
                 .setObjectType(objectType)
                 .setObjectId(v1IdResponse.getObjectId())
                 .setObjectVersion(v1IdResponse.getObjectVersion())
-                .setTagVersion(v1IdResponse.getTagVersion())
+                .setTagVersion(v1IdResponse.getTagVersion()))
                 .build();
 
-        return readApi.loadTag(v1ReadRequest);
+        return readApi.readObject(v1ReadRequest);
     }
 
     // For the remaining corner and error cases around versions, we use the CUSTOM object type
@@ -478,13 +481,16 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var v1Selector = TestData.selectorForTag(v1SavedTag);
         var v1ObjectId = v1SavedTag.getHeader().getObjectId();
 
-        var readRequest = MetadataReadRequest.newBuilder()
+        var readRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
                 .setObjectId(v1ObjectId)
+                .setLatestObject(true)
+                .setLatestTag(true))
                 .build();
 
-        var v1Latest = readApi.loadLatestObject(readRequest);
+        var v1Latest = readApi.readObject(readRequest);
         assertEquals(1, v1Latest.getHeader().getObjectVersion());
 
         var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
@@ -499,7 +505,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         // noinspection ResultOfMethodCallIgnored
         trustedApi.updateObject(v2WriteRequest);
 
-        var v2Latest = readApi.loadLatestObject(readRequest);
+        var v2Latest = readApi.readObject(readRequest);
         assertEquals(2, v2Latest.getHeader().getObjectVersion());
 
         var v2Selector = selectorForTag(v2Latest);
@@ -515,7 +521,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         // noinspection ResultOfMethodCallIgnored
         publicApi.updateObject(v3WriteRequest);
 
-        var v3Latest = readApi.loadLatestObject(readRequest);
+        var v3Latest = readApi.readObject(readRequest);
         assertEquals(3, v3Latest.getHeader().getObjectVersion());
     }
 
@@ -820,15 +826,16 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .putAttr(t2AttrName, t2Update.getValue())
                 .build();
 
-        var t2ReadRequest = MetadataReadRequest.newBuilder()
+        var t2ReadRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
                 .setObjectType(objectType)
                 .setObjectId(v1ObjectId.toString())
                 .setObjectVersion(1)
-                .setTagVersion(2)
+                .setTagVersion(2))
                 .build();
 
-        var t2SavedTag = readApi.loadTag(t2ReadRequest);
+        var t2SavedTag = readApi.readObject(t2ReadRequest);
         var t2Selector = TestData.selectorForTag(t2SavedTag);
 
         assertEquals(t2ExpectedTag, t2SavedTag);
@@ -855,12 +862,13 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         assertEquals(1, t3Header.getObjectVersion());
         assertEquals(3, t3Header.getTagVersion());
 
-        var t3ReadRequest = MetadataReadRequest.newBuilder()
+        var t3ReadRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
                 .setObjectType(objectType)
                 .setObjectId(v1ObjectId.toString())
                 .setObjectVersion(1)
-                .setTagVersion(3)
+                .setTagVersion(3))
                 .build();
 
         var t3ExpectedTag = t2SavedTag.toBuilder()
@@ -868,7 +876,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .putAttr(t3AttrName, t3Update.getValue())
                 .build();
 
-        var t3SavedTag = readApi.loadTag(t3ReadRequest);
+        var t3SavedTag = readApi.readObject(t3ReadRequest);
 
         assertEquals(t3ExpectedTag, t3SavedTag);
     }
@@ -915,22 +923,26 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         assertEquals(1, v1t2Header.getObjectVersion());
         assertEquals(2, v1t2Header.getTagVersion());
 
-        var v1ReadRequest = MetadataReadRequest.newBuilder()
+        var v1ReadRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setObjectId(v1Header.getObjectId())
                 .setObjectVersion(1)
+                .setLatestTag(true))
                 .build();
 
-        var v2ReadRequest = MetadataReadRequest.newBuilder()
+        var v2ReadRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setObjectId(v1Header.getObjectId())
                 .setObjectVersion(2)
+                .setLatestTag(true))
                 .build();
 
-        var v1LatestTag = readApi.loadLatestTag(v1ReadRequest);
-        var v2latestTag = readApi.loadLatestTag(v2ReadRequest);
+        var v1LatestTag = readApi.readObject(v1ReadRequest);
+        var v2latestTag = readApi.readObject(v2ReadRequest);
 
         assertEquals(2, v1LatestTag.getHeader().getTagVersion());
         assertEquals(1, v2latestTag.getHeader().getTagVersion());
@@ -1219,15 +1231,16 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setHeader(tagHeader)
                 .build();
 
-        var readRequest = MetadataReadRequest.newBuilder()
+        var readRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setObjectId(preallocateHeader.getObjectId())
                 .setObjectVersion(1)
-                .setTagVersion(1)
+                .setTagVersion(1))
                 .build();
 
-        var savedTag = readApi.loadTag(readRequest);
+        var savedTag = readApi.readObject(readRequest);
 
         assertEquals(expectedTag, savedTag);
     }
@@ -1492,26 +1505,19 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
 
-        var readRequest = MetadataReadRequest.newBuilder()
+        var readRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setObjectId(preallocateHeader.getObjectId())
                 .setObjectVersion(1)
-                .setTagVersion(1)
+                .setTagVersion(1))
                 .build();
 
         // Try reading with explicit version / tag, latest tag and latest version
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadTag(readRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> readApi.readObject(readRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
-
-        // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestTag(readRequest));
-        assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
-
-        // noinspection ResultOfMethodCallIgnored
-        var error3 = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestObject(readRequest));
-        assertEquals(Status.Code.NOT_FOUND, error3.getStatus().getCode());
     }
 }
