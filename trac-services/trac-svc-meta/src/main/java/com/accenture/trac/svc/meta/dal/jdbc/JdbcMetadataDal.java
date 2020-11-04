@@ -57,7 +57,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         readSingle = new JdbcReadImpl();
         readBatch = new JdbcReadBatchImpl(this.dialect);
         writeBatch = new JdbcWriteBatchImpl(this.dialect, readBatch);
-        search = new JdbcSearchImpl();
+        search = new JdbcSearchImpl(readBatch);
     }
 
     public void startup() {

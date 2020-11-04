@@ -41,6 +41,45 @@ class JdbcSearchQueryBuilder {
         log = LoggerFactory.getLogger(getClass());
     }
 
+    JdbcSearchQuery buildPriorSearchQuery(short tenantId, SearchParameters searchParameters) {
+
+        // Base query template selects for tenant and object type
+
+        var baseQueryTemplate = "select od%1$d.object_fk, max(od%1d.object_version) as object_version, max(t%1$d.tag_version) as tag_version\n" +
+                "from tag t%1$d\n" +
+                // Join clause
+                "%3$s" +
+                "where t%1$d.tenant_id = ?\n" +
+                "  and t%1$d.object_type = ?\n" +
+                "  and %4$s\n" +
+                "group by od%1$d.object_fk";
+
+        // Stream of params for the base query
+
+        var baseParams = Stream.of(
+                wrapErrors((stmt, pIndex) -> stmt.setShort(pIndex, tenantId)),
+                wrapErrors((stmt, pIndex) -> stmt.setString(pIndex, searchParameters.getObjectType().name())));
+
+        // Build query parts for the main search expression and version / temporal handling
+
+        var queryParts = new JdbcSearchQuery(0, 0, List.of());
+        queryParts = buildSearchExpr(queryParts, searchParameters.getSearch());
+        queryParts = buildAsOfCondition(queryParts, searchParameters);
+        queryParts = buildNoPriorVersions(queryParts, searchParameters);
+        queryParts = buildNoPriorTags(queryParts, searchParameters);
+
+        // Stream of params assembled from the query parts
+
+        var partsParams =  queryParts.getFragments().stream().flatMap(
+                frag -> frag.getParams().stream());
+
+        // Combine base and sub parts to make the final query
+
+        var allParams = Stream.concat(baseParams, partsParams);
+
+        return buildSearchQueryFromTemplate(baseQueryTemplate, 0, queryParts, allParams);
+    }
+
     JdbcSearchQuery buildSearchQuery(short tenantId, SearchParameters searchParameters) {
 
         // Base query template selects for tenant and object type
@@ -476,18 +515,21 @@ class JdbcSearchQueryBuilder {
 
     JdbcSearchQuery buildNoPriorVersions(JdbcSearchQuery baseQuery, SearchParameters searchParams) {
 
-        if (searchParams.getPriorVersions())
-            return baseQuery;
-
         var joinClauseTemplate =
                 "join object_definition od%1$d\n" +
                 "  on od%1$d.tenant_id = t%1$d.tenant_id\n" +
                 "  and od%1$d.definition_pk = t%1$d.definition_fk";
 
+        var joinClause = String.format(joinClauseTemplate, baseQuery.getSubQueryNumber());
+
+        if (searchParams.getPriorVersions()) {
+
+            var fragment = new JdbcSearchQuery.Fragment(joinClause, "", List.of());
+            return buildNoPriorFragment(baseQuery, fragment);
+        }
+
         var whereClauseLatestTemplate = "od%1$d.object_is_latest = true";
         var whereClauseAsOfTemplate = "(od%1$d.object_superseded is null or od%1$d.object_superseded > ?)";
-
-        var joinClause = String.format(joinClauseTemplate, baseQuery.getSubQueryNumber());
 
         if (searchParams.getSearchAsOf().isEmpty()) {
 
