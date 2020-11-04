@@ -443,8 +443,8 @@ abstract class MetadataSearchApiTest implements IDalTestable {
                 .build();
 
         var asOfResult = searchApi.search(asOfSearch);
-        var resultHeader2 = result.getSearchResult(0).getHeader();
-        var resultHeader1 = result.getSearchResult(1).getHeader();
+        var resultHeader2 = asOfResult.getSearchResult(0).getHeader();
+        var resultHeader1 = asOfResult.getSearchResult(1).getHeader();
 
         Assertions.assertEquals(2, asOfResult.getSearchResultCount());
         Assertions.assertEquals(header1, resultHeader1);

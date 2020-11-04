@@ -17,6 +17,7 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
 import com.accenture.trac.common.metadata.BasicType;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.search.*;
 import com.accenture.trac.common.exception.*;
 import org.slf4j.Logger;
@@ -44,17 +45,15 @@ class JdbcSearchQueryBuilder {
 
         // Base query template selects for tenant and object type
 
-        // TODO: Order using temporal fields when they are available
-        // For now tag_pk is a reasonable proxy
-
-        var baseQueryTemplate = "select distinct t%1$d.tag_pk\n" +
+        var baseQueryTemplate = "select t%1$d.tag_pk\n" +
                 "from tag t%1$d\n" +
                 // Join clause
                 "%3$s" +
                 "where t%1$d.tenant_id = ?\n" +
                 "  and t%1$d.object_type = ?\n" +
                 "  and %4$s\n" +
-                "order by t%1$d.tag_pk desc";
+                "group by t%1$d.tag_pk\n" +
+                "order by t%1$d.tag_timestamp desc";
 
         // Stream of params for the base query
 
@@ -66,8 +65,9 @@ class JdbcSearchQueryBuilder {
 
         var queryParts = new JdbcSearchQuery(0, 0, List.of());
         queryParts = buildSearchExpr(queryParts, searchParameters.getSearch());
-        queryParts = buildNoPriorVersions(queryParts);
-        queryParts = buildNoPriorTags(queryParts);
+        queryParts = buildAsOfCondition(queryParts, searchParameters);
+        queryParts = buildNoPriorVersions(queryParts, searchParameters);
+        queryParts = buildNoPriorTags(queryParts, searchParameters);
 
         // Stream of params assembled from the query parts
 
@@ -441,31 +441,98 @@ class JdbcSearchQueryBuilder {
     // TEMPORAL QUERIES AND VERSIONING
     // -----------------------------------------------------------------------------------------------------------------
 
-    JdbcSearchQuery buildNoPriorVersions(JdbcSearchQuery baseQuery) {
+    JdbcSearchQuery buildAsOfCondition(JdbcSearchQuery baseQuery, SearchParameters searchParams) {
+
+        // If there is no as-of condition, do not add any conditions to the base query
+
+        if (searchParams.getSearchAsOf() == null || searchParams.getSearchAsOf().isEmpty())
+            return baseQuery;
+
+        // The as-of condition only sets an upper bound on timestamps that are considered
+        // The lower bound may or may not be set, depending on the prior version/tag flags
+
+        // To create the upper bound, we need only look at the tag timestamp
+        // Any objects or object versions created after this time have all their tags with a later timestamp
+
+        var whereClauseTemplate = "t%1$d.tag_timestamp <= ?";
+        var whereClause = String.format(whereClauseTemplate, baseQuery.getSubQueryNumber());
+
+        var asOfTime = MetadataCodec.parseDatetime(searchParams.getSearchAsOf());
+
+        var fragment = new JdbcSearchQuery.Fragment("", whereClause, List.of(
+                (stmt, pIndex) -> stmt.setObject(pIndex, asOfTime, Types.TIMESTAMP)));
+
+        var allFragments = Stream.concat(
+                baseQuery.getFragments().stream(),
+                Stream.of(fragment))
+                .collect(Collectors.toList());
+
+        return new JdbcSearchQuery(
+                baseQuery.getSubQueryNumber(),
+                baseQuery.getNextAttrNumber() + 1,
+                allFragments);
+    }
+
+
+    JdbcSearchQuery buildNoPriorVersions(JdbcSearchQuery baseQuery, SearchParameters searchParams) {
+
+        if (searchParams.getPriorVersions())
+            return baseQuery;
 
         var joinClauseTemplate =
                 "join object_definition od%1$d\n" +
                 "  on od%1$d.tenant_id = t%1$d.tenant_id\n" +
                 "  and od%1$d.definition_pk = t%1$d.definition_fk";
 
-        var whereClauseTemplate = "od%1d.object_is_latest = true";
+        var whereClauseLatestTemplate = "od%1$d.object_is_latest = true";
+        var whereClauseAsOfTemplate = "(od%1$d.object_superseded is null or od%1$d.object_superseded > ?)";
 
         var joinClause = String.format(joinClauseTemplate, baseQuery.getSubQueryNumber());
-        var whereClause = String.format(whereClauseTemplate, baseQuery.getSubQueryNumber());
 
-        var fragment = new JdbcSearchQuery.Fragment(joinClause, whereClause, List.of());
+        if (searchParams.getSearchAsOf().isEmpty()) {
 
-        return buildNoPriorFragment(baseQuery, fragment);
+            var whereClause = String.format(whereClauseLatestTemplate, baseQuery.getSubQueryNumber());
+            var fragment = new JdbcSearchQuery.Fragment(joinClause, whereClause, List.of());
+
+            return buildNoPriorFragment(baseQuery, fragment);
+        }
+        else {
+
+            var asOfTime = MetadataCodec.parseDatetime(searchParams.getSearchAsOf());
+
+            var whereClause = String.format(whereClauseAsOfTemplate, baseQuery.getSubQueryNumber());
+            var fragment = new JdbcSearchQuery.Fragment(joinClause, whereClause, List.of(
+                    (stmt, pIndex) -> stmt.setObject(pIndex, asOfTime, Types.TIMESTAMP)));
+
+            return buildNoPriorFragment(baseQuery, fragment);
+        }
     }
 
-    JdbcSearchQuery buildNoPriorTags(JdbcSearchQuery baseQuery) {
+    JdbcSearchQuery buildNoPriorTags(JdbcSearchQuery baseQuery, SearchParameters searchParams) {
 
-        var whereClauseTemplate = "t%1d.tag_is_latest = true";
-        var whereClause = String.format(whereClauseTemplate, baseQuery.getSubQueryNumber());
+        if (searchParams.getPriorTags())
+            return baseQuery;
 
-        var fragment = new JdbcSearchQuery.Fragment("", whereClause, List.of());
+        var whereClauseLatestTemplate = "t%1d.tag_is_latest = true";
+        var whereClauseAsOfTemplate = "(t%1$d.tag_superseded is null or t%1$d.tag_superseded > ?)";
 
-        return buildNoPriorFragment(baseQuery, fragment);
+        if (searchParams.getSearchAsOf().isEmpty()) {
+
+            var whereClause = String.format(whereClauseLatestTemplate, baseQuery.getSubQueryNumber());
+            var fragment = new JdbcSearchQuery.Fragment("", whereClause, List.of());
+
+            return buildNoPriorFragment(baseQuery, fragment);
+        }
+        else {
+
+            var asOfTime = MetadataCodec.parseDatetime(searchParams.getSearchAsOf());
+
+            var whereClause = String.format(whereClauseAsOfTemplate, baseQuery.getSubQueryNumber());
+            var fragment = new JdbcSearchQuery.Fragment("", whereClause, List.of(
+                    (stmt, pIndex) -> stmt.setObject(pIndex, asOfTime, Types.TIMESTAMP)));
+
+            return buildNoPriorFragment(baseQuery, fragment);
+        }
     }
 
     JdbcSearchQuery buildNoPriorFragment(JdbcSearchQuery baseQuery, JdbcSearchQuery.Fragment fragment) {

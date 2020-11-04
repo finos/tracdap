@@ -1285,7 +1285,6 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         assertEquals(v2t2, searchResult2.get(0));
     }
 
-
     @Test
     void priorVersionsFlag() throws Exception {
 
@@ -1334,7 +1333,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var resultPriorVersions = unwrap(dal.search(TEST_TENANT, searchPriorVersions));
 
-        Assertions.assertEquals(1, result.size());
+        Assertions.assertEquals(1, resultPriorVersions.size());
         Assertions.assertEquals(v2Tag.getHeader(), resultPriorVersions.get(0).getHeader());
     }
 
@@ -1364,7 +1363,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .setAttrName("dal_prior_tag_attr")
                 .setAttrType(BasicType.STRING)
                 .setOperator(SearchOperator.EQ)
-                .setSearchValue(MetadataCodec.encodeValue("the_droids_you_are_looking_for")));
+                .setSearchValue(MetadataCodec.encodeValue("the_droids_you_are_looking_for")))
+                .build();
 
         var searchWithoutFlag = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -1378,20 +1378,31 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Set the prior tags flag
         // Latest matching tag should be returned, in this case t2
 
-        var searchPriorVersions = searchWithoutFlag.toBuilder()
+        var searchPriorTags = searchWithoutFlag.toBuilder()
                 .setPriorTags(true)
                 .build();
 
-        var resultPriorVersions = unwrap(dal.search(TEST_TENANT, searchPriorVersions));
+        var resultPriorTags = unwrap(dal.search(TEST_TENANT, searchPriorTags));
 
-        Assertions.assertEquals(1, result.size());
-        Assertions.assertEquals(t2Tag.getHeader(), resultPriorVersions.get(0).getHeader());
+        Assertions.assertEquals(1, resultPriorTags.size());
+        Assertions.assertEquals(t2Tag.getHeader(), resultPriorTags.get(0).getHeader());
     }
 
     @Test
     void temporalSearch_basic() throws Exception {
 
         // Single test case to search as of a previous point in time
+
+        // Extra object so that will still match after V1 is updated
+
+        var extraObj = nextDataDef(dummyDataDef());
+        var extraTag = TestData.dummyTag(extraObj, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_as_of_attr_1", MetadataCodec.encodeValue("initial_value"))
+                .build();
+
+        dal.saveNewObject(TEST_TENANT, extraTag);
+
+        // Now create the object that will be versioned
 
         var obj1 = dummyDataDef();
 
@@ -1401,21 +1412,12 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         dal.saveNewObject(TEST_TENANT, v1Tag);
 
-        // Extra object so that will still match after V1 is updated
-
-        var obj2 = nextDataDef(obj1);
-        var obj2Tag = TestData.dummyTag(obj2, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_as_of_attr_1", MetadataCodec.encodeValue("initial_value"))
-                .build();
-
-        dal.saveNewObject(TEST_TENANT, obj2Tag);
-
         // Use a search timestamp after both objects have been created, but before either is updated
-        var v1SearchTime = MetadataCodec.parseDatetime(obj2Tag.getHeader().getTagTimestamp()).plusNanos(5000);
+        var v1SearchTime = MetadataCodec.parseDatetime(v1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
 
         Thread.sleep(10);
-
         var v2Timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+
         var v2Tag = v1Tag.toBuilder()
                 .setHeader(v1Tag.getHeader().toBuilder()
                 .setObjectVersion(2)
@@ -1427,7 +1429,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         dal.saveNewVersion(TEST_TENANT, v2Tag);
 
-        // Search without specifying as-of, should return only the object that has the original tag
+        // Search without specifying as-of, should return only the extra object that has the original tag
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -1443,7 +1445,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var resultHeader = result.get(0).getHeader();
 
         Assertions.assertEquals(1, result.size());
-        Assertions.assertEquals(v2Tag.getHeader(), resultHeader);
+        Assertions.assertEquals(extraTag.getHeader(), resultHeader);
 
         // Now search with an as-of time before the update was applied, both objects should come back
         // The object created last should be top of the list
@@ -1453,12 +1455,12 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .build();
 
         var asOfResult = unwrap(dal.search(TEST_TENANT, asOfSearch));
-        var resultHeader2 = result.get(0).getHeader();
-        var resultHeader1 = result.get(1).getHeader();
+        var resultHeader2 = asOfResult.get(0).getHeader();
+        var resultHeader1 = asOfResult.get(1).getHeader();
 
         Assertions.assertEquals(2, asOfResult.size());
-        Assertions.assertEquals(v1Tag.getHeader(), resultHeader1);
-        Assertions.assertEquals(v2Tag.getHeader(), resultHeader2);
+        Assertions.assertEquals(extraTag.getHeader(), resultHeader1);
+        Assertions.assertEquals(v1Tag.getHeader(), resultHeader2);
     }
 
     @Test
@@ -1549,7 +1551,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var result4 = unwrap(dal.search(TEST_TENANT, search4));
 
         Assertions.assertEquals(1, result4.size());
-        Assertions.assertEquals(v1t2Tag.getHeader(), result4.get(0).getHeader());
+        Assertions.assertEquals(v1t1Tag.getHeader(), result4.get(0).getHeader());
 
         // Stepping back before the object was created should give an empty search result
 
@@ -1605,6 +1607,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var searchExpr = SearchExpression.newBuilder()
                 .setLogical(LogicalExpression.newBuilder()
+                .setOperator(LogicalOperator.AND)
                 .addExpr(SearchExpression.newBuilder()
                 .setTerm(SearchTerm.newBuilder()
                     .setAttrName("dal_as_of_attr_3")
@@ -1713,6 +1716,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var searchExpr = SearchExpression.newBuilder()
                 .setLogical(LogicalExpression.newBuilder()
+                .setOperator(LogicalOperator.AND)
                 .addExpr(SearchExpression.newBuilder()
                 .setTerm(SearchTerm.newBuilder()
                         .setAttrName("dal_as_of_attr_3")
