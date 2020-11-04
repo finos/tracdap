@@ -52,7 +52,8 @@ class JdbcSearchQueryBuilder {
                 "where t%1$d.tenant_id = ?\n" +
                 "  and t%1$d.object_type = ?\n" +
                 "  and %4$s\n" +
-                "group by od%1$d.object_fk";
+                "group by od%1$d.object_fk\n" +
+                "order by max(t%1$d.tag_timestamp) desc";
 
         // Stream of params for the base query
 
