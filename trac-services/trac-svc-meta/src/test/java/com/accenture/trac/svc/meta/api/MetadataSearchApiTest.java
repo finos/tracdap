@@ -17,7 +17,6 @@
 package com.accenture.trac.svc.meta.api;
 
 import com.accenture.trac.common.api.meta.*;
-import com.accenture.trac.common.api.meta.Search;
 import com.accenture.trac.common.metadata.BasicType;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
@@ -453,15 +452,64 @@ abstract class MetadataSearchApiTest implements IDalTestable {
     }
 
     @Test
-    @Disabled("Prior versions search not implemented yet")
-    void priorVersions() {
-        Assertions.fail();
-    }
+    void priorVersionsAndTags() {
 
-    @Test
-    @Disabled("Prior versions temporal search not implemented yet")
-    void priorVersionsTemporalSearch() {
-        Assertions.fail();
+        var v1Obj = dummyDataDef();
+        var v2Obj = nextDataDef(v1Obj);
+
+        var create1 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(v1Obj)
+                .addTagUpdate(TagUpdate.newBuilder()
+                        .setAttrName("api_prior_search_attr")
+                        .setValue(MetadataCodec.encodeValue("initial_value")))
+                .build();
+
+        var v1t1Header = writeApi.createObject(create1);
+
+        var create2 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(selectorForTag(v1t1Header))
+                .addTagUpdate(TagUpdate.newBuilder()
+                        .setAttrName("api_prior_search_attr")
+                        .setValue(MetadataCodec.encodeValue("modified_value")))
+                .build();
+
+        var v1t2Header = writeApi.updateTag(create2);
+
+        var create3 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(selectorForTag(v1t2Header))
+                .setDefinition(v2Obj)
+                .addTagUpdate(TagUpdate.newBuilder()
+                        .setAttrName("api_prior_search_attr")
+                        .setValue(MetadataCodec.encodeValue("modified_value")))
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.updateObject(create3);
+
+        var searchRequest = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("api_prior_search_attr")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(encodeValue("initial_value"))))
+                .setPriorVersions(true)
+                .setPriorTags(true))
+                .build();
+
+        var result = searchApi.search(searchRequest);
+
+        Assertions.assertEquals(1, result.getSearchResultCount());
+        Assertions.assertEquals(v1t1Header, result.getSearchResult(0).getHeader());
     }
 
     @Test

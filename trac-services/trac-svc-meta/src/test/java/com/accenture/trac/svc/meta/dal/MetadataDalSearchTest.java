@@ -24,7 +24,6 @@ import com.accenture.trac.svc.meta.test.JdbcIntegration;
 
 import com.accenture.trac.svc.meta.test.TestData;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -1286,45 +1285,107 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         assertEquals(v2t2, searchResult2.get(0));
     }
 
+
     @Test
-    @Disabled
-    void searchResultOrdering() throws Exception {
+    void priorVersionsFlag() throws Exception {
 
-        var obj1 = dummyDataDef();
+        var v1Obj = dummyDataDef();
+        var v2Obj = nextDataDef(v1Obj);
+        var v3Obj = nextDataDef(v2Obj);
 
-        var obj1Tag = TestData.dummyTag(obj1, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_search_ordering_test", MetadataCodec.encodeValue("some_value"))
+        var v1Tag= dummyTag(v1Obj, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_prior_version_attr", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
-        Thread.sleep(10);
-
-        var obj2 = nextDataDef(obj1);
-        var obj2Tag = TestData.dummyTag(obj2, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_search_ordering_test", MetadataCodec.encodeValue("some_value"))
+        var v2Tag = tagForNextObject(v1Tag, v2Obj, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_prior_version_attr", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
-        // Save objects in the wrong order to try to confuse the DAL
+        var v3Tag = tagForNextObject(v2Tag, v3Obj, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_prior_version_attr", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .build();
 
-        dal.saveNewObject(TEST_TENANT, obj2Tag);
-        dal.saveNewObject(TEST_TENANT, obj1Tag);
+        unwrap(dal.saveNewObject(TEST_TENANT, v1Tag));
+        unwrap(dal.saveNewVersion(TEST_TENANT, v2Tag));
+        unwrap(dal.saveNewVersion(TEST_TENANT, v3Tag));
 
-        var searchParams = SearchParameters.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .setSearch(SearchExpression.newBuilder()
+        var searchExpr = SearchExpression.newBuilder()
                 .setTerm(SearchTerm.newBuilder()
-                        .setAttrName("dal_search_ordering_test")
-                        .setAttrType(BasicType.STRING)
-                        .setOperator(SearchOperator.EQ)
-                        .setSearchValue(encodeValue("some_value"))))
+                .setAttrName("dal_prior_version_attr")
+                .setAttrType(BasicType.STRING)
+                .setOperator(SearchOperator.EQ)
+                .setSearchValue(MetadataCodec.encodeValue("the_droids_you_are_looking_for")));
+
+        var searchWithoutFlag = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(searchExpr)
                 .build();
 
-        var result = unwrap(dal.search(TEST_TENANT, searchParams));
+        var result = unwrap(dal.search(TEST_TENANT, searchWithoutFlag));
 
-        // Results should come back with obj2 at the top, since it has the most recent timestamp
+        Assertions.assertEquals(0, result.size());
 
-        assertEquals(2, result.size());
-        assertEquals(obj2Tag.getHeader(), result.get(0).getHeader());
-        assertEquals(obj1Tag.getHeader(), result.get(1).getHeader());
+        // Set the prior versions flag
+        // Latest matching version should be returned, in this case v2
+
+        var searchPriorVersions = searchWithoutFlag.toBuilder()
+                .setPriorVersions(true)
+                .build();
+
+        var resultPriorVersions = unwrap(dal.search(TEST_TENANT, searchPriorVersions));
+
+        Assertions.assertEquals(1, result.size());
+        Assertions.assertEquals(v2Tag.getHeader(), resultPriorVersions.get(0).getHeader());
+    }
+
+    @Test
+    void priorTagsFlag() throws Exception {
+
+        var v1Obj = dummyDataDef();
+
+        var t1Tag= dummyTag(v1Obj, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_prior_tag_attr", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .build();
+
+        var t2Tag = nextTag(t1Tag, UPDATE_TAG_VERSION).toBuilder()
+                .putAttr("dal_prior_tag_attr", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .build();
+
+        var t3Tag = nextTag(t2Tag, UPDATE_TAG_VERSION).toBuilder()
+                .putAttr("dal_prior_tag_attr", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .build();
+
+        unwrap(dal.saveNewObject(TEST_TENANT, t1Tag));
+        unwrap(dal.saveNewTag(TEST_TENANT, t2Tag));
+        unwrap(dal.saveNewTag(TEST_TENANT, t3Tag));
+
+        var searchExpr = SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                .setAttrName("dal_prior_tag_attr")
+                .setAttrType(BasicType.STRING)
+                .setOperator(SearchOperator.EQ)
+                .setSearchValue(MetadataCodec.encodeValue("the_droids_you_are_looking_for")));
+
+        var searchWithoutFlag = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(searchExpr)
+                .build();
+
+        var result = unwrap(dal.search(TEST_TENANT, searchWithoutFlag));
+
+        Assertions.assertEquals(0, result.size());
+
+        // Set the prior tags flag
+        // Latest matching tag should be returned, in this case t2
+
+        var searchPriorVersions = searchWithoutFlag.toBuilder()
+                .setPriorTags(true)
+                .build();
+
+        var resultPriorVersions = unwrap(dal.search(TEST_TENANT, searchPriorVersions));
+
+        Assertions.assertEquals(1, result.size());
+        Assertions.assertEquals(t2Tag.getHeader(), resultPriorVersions.get(0).getHeader());
     }
 
     @Test
@@ -1588,15 +1649,141 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     }
 
     @Test
-    @Disabled
-    void priorObjectsFlag() {
-        fail();
+    void temporalSearch_negativeConditions_priorVersionsAndTags() throws Exception {
+
+        // Combine prior versions and tags in a temporal search
+        // Also include a negative search condition
+
+        var v1Obj = dummyDataDef();
+        var v2Obj = nextDataDef(v1Obj);
+        var v3Obj = nextDataDef(v2Obj);
+
+        var v1t1 = dummyTag(v1Obj, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
+                .putAttr("dal_combined_test_attr_2", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .build();
+
+        Thread.sleep(10);
+
+        // This version / tag will match all attrs
+
+        var v1t2 = nextTag(v1t1, UPDATE_TAG_VERSION).toBuilder()
+                .putAttr("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
+                .putAttr("dal_combined_test_attr_2", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .build();
+
+        // This version / tag will also match all attrs and supersedes v1t2
+
+        var v1t3 = nextTag(v1t2, UPDATE_TAG_VERSION).toBuilder()
+                .putAttr("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
+                .putAttr("dal_combined_test_attr_2", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .build();
+
+        Thread.sleep(10);
+
+        var v2t1 = tagForNextObject(v1t2, v2Obj, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
+                .putAttr("dal_combined_test_attr_2", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .build();
+
+        Thread.sleep(10);
+
+        var v1t4 = nextTag(v1t3, UPDATE_TAG_VERSION).toBuilder()
+                .putAttr("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
+                .putAttr("dal_combined_test_attr_2", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .build();
+
+        Thread.sleep(10);
+
+        // This version / tag will match all attrs but will be filtered out by as-of time
+
+        var v3t1 = tagForNextObject(v2t1, v3Obj, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
+                .putAttr("dal_combined_test_attr_2", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .build();
+
+        // Save everything
+
+        unwrap(dal.saveNewObject(TEST_TENANT, v1t1));
+        unwrap(dal.saveNewTag(TEST_TENANT, v1t2));
+        unwrap(dal.saveNewTag(TEST_TENANT, v1t3));
+        unwrap(dal.saveNewVersion(TEST_TENANT, v2t1));
+        unwrap(dal.saveNewTag(TEST_TENANT, v1t4));
+        unwrap(dal.saveNewVersion(TEST_TENANT, v3t1));
+
+        var searchExpr = SearchExpression.newBuilder()
+                .setLogical(LogicalExpression.newBuilder()
+                .addExpr(SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("dal_as_of_attr_3")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(MetadataCodec.encodeValue("as_of_search_test"))))
+                .addExpr(SearchExpression.newBuilder()
+                        .setLogical(LogicalExpression.newBuilder()
+                        .setOperator(LogicalOperator.NOT)
+                        .addExpr(SearchExpression.newBuilder()
+                        .setTerm(SearchTerm.newBuilder()
+                                .setAttrName("dal_as_of_attr_4")
+                                .setAttrType(BasicType.STRING)
+                                .setOperator(SearchOperator.EQ)
+                                .setSearchValue(MetadataCodec.encodeValue("not_the_droids_you_are_looking_for")))))))
+                .build();
+
+        var searchTime = MetadataCodec.parseDatetime(v3t1.getHeader().getTagTimestamp()).minusNanos(5000);
+
+        var searchParams = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(searchExpr)
+                .setSearchAsOf(MetadataCodec.quoteDatetime(searchTime))
+                .setPriorVersions(true)
+                .setPriorTags(true)
+                .build();
+
+        var result = unwrap(dal.search(TEST_TENANT, searchParams));
+
+        assertEquals(1, result.size());
+        assertEquals(v1t3.getHeader(), result.get(0).getHeader());
     }
 
     @Test
-    @Disabled
-    void priorTagsFlag() {
-        fail();
+    void resultOrdering() throws Exception {
+
+        var obj1 = dummyDataDef();
+
+        var obj1Tag = TestData.dummyTag(obj1, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_search_ordering_test", MetadataCodec.encodeValue("some_value"))
+                .build();
+
+        Thread.sleep(10);
+
+        var obj2 = nextDataDef(obj1);
+        var obj2Tag = TestData.dummyTag(obj2, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_search_ordering_test", MetadataCodec.encodeValue("some_value"))
+                .build();
+
+        // Save objects in the wrong order to try to confuse the DAL
+
+        dal.saveNewObject(TEST_TENANT, obj2Tag);
+        dal.saveNewObject(TEST_TENANT, obj1Tag);
+
+        var searchParams = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("dal_search_ordering_test")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(encodeValue("some_value"))))
+                .build();
+
+        var result = unwrap(dal.search(TEST_TENANT, searchParams));
+
+        // Results should come back with obj2 at the top, since it has the most recent timestamp
+
+        assertEquals(2, result.size());
+        assertEquals(obj2Tag.getHeader(), result.get(0).getHeader());
+        assertEquals(obj1Tag.getHeader(), result.get(1).getHeader());
     }
 
 
