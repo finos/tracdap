@@ -23,6 +23,7 @@ import com.accenture.trac.svc.meta.test.JdbcUnit;
 import com.accenture.trac.svc.meta.test.JdbcIntegration;
 
 import com.accenture.trac.svc.meta.test.TestData;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -1287,25 +1288,314 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
     @Test
     @Disabled
-    void priorVersionsFlag() {
+    void searchResultOrdering() throws Exception {
+
+        var obj1 = dummyDataDef();
+
+        var obj1Tag = TestData.dummyTag(obj1, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_search_ordering_test", MetadataCodec.encodeValue("some_value"))
+                .build();
+
+        Thread.sleep(10);
+
+        var obj2 = nextDataDef(obj1);
+        var obj2Tag = TestData.dummyTag(obj2, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_search_ordering_test", MetadataCodec.encodeValue("some_value"))
+                .build();
+
+        // Save objects in the wrong order to try to confuse the DAL
+
+        dal.saveNewObject(TEST_TENANT, obj2Tag);
+        dal.saveNewObject(TEST_TENANT, obj1Tag);
+
+        var searchParams = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("dal_search_ordering_test")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(encodeValue("some_value"))))
+                .build();
+
+        var result = unwrap(dal.search(TEST_TENANT, searchParams));
+
+        // Results should come back with obj2 at the top, since it has the most recent timestamp
+
+        assertEquals(2, result.size());
+        assertEquals(obj2Tag.getHeader(), result.get(0).getHeader());
+        assertEquals(obj1Tag.getHeader(), result.get(1).getHeader());
+    }
+
+    @Test
+    void temporalSearch_basic() throws Exception {
+
+        // Single test case to search as of a previous point in time
+
+        var obj1 = dummyDataDef();
+
+        var v1Tag = TestData.dummyTag(obj1, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_as_of_attr_1", MetadataCodec.encodeValue("initial_value"))
+                .build();
+
+        dal.saveNewObject(TEST_TENANT, v1Tag);
+
+        // Extra object so that will still match after V1 is updated
+
+        var obj2 = nextDataDef(obj1);
+        var obj2Tag = TestData.dummyTag(obj2, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_as_of_attr_1", MetadataCodec.encodeValue("initial_value"))
+                .build();
+
+        dal.saveNewObject(TEST_TENANT, obj2Tag);
+
+        // Use a search timestamp after both objects have been created, but before either is updated
+        var v1SearchTime = MetadataCodec.parseDatetime(obj2Tag.getHeader().getTagTimestamp()).plusNanos(5000);
+
+        Thread.sleep(10);
+
+        var v2Timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+        var v2Tag = v1Tag.toBuilder()
+                .setHeader(v1Tag.getHeader().toBuilder()
+                .setObjectVersion(2)
+                .setObjectTimestamp(MetadataCodec.quoteDatetime(v2Timestamp))
+                .setTagVersion(1)
+                .setTagTimestamp(MetadataCodec.quoteDatetime(v2Timestamp)))
+                .putAttr("dal_as_of_attr_1", MetadataCodec.encodeValue("updated_value"))
+                .build();
+
+        dal.saveNewVersion(TEST_TENANT, v2Tag);
+
+        // Search without specifying as-of, should return only the object that has the original tag
+
+        var searchParams = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("dal_as_of_attr_1")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(encodeValue("initial_value"))))
+                .build();
+
+        var result = unwrap(dal.search(TEST_TENANT, searchParams));
+        var resultHeader = result.get(0).getHeader();
+
+        Assertions.assertEquals(1, result.size());
+        Assertions.assertEquals(v2Tag.getHeader(), resultHeader);
+
+        // Now search with an as-of time before the update was applied, both objects should come back
+        // The object created last should be top of the list
+
+        var asOfSearch = searchParams.toBuilder()
+                .setSearchAsOf(MetadataCodec.quoteDatetime(v1SearchTime))
+                .build();
+
+        var asOfResult = unwrap(dal.search(TEST_TENANT, asOfSearch));
+        var resultHeader2 = result.get(0).getHeader();
+        var resultHeader1 = result.get(1).getHeader();
+
+        Assertions.assertEquals(2, asOfResult.size());
+        Assertions.assertEquals(v1Tag.getHeader(), resultHeader1);
+        Assertions.assertEquals(v2Tag.getHeader(), resultHeader2);
+    }
+
+    @Test
+    void temporalSearch_fullHistory() throws Exception {
+
+        // Search back through every point in the history of an object
+
+        var v1Obj = dummyDataDef();
+        var v2Obj = nextDataDef(v1Obj);
+
+        var v1t1Tag = dummyTag(v1Obj, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_as_of_attr_2", MetadataCodec.encodeValue("as_of_search_test"))
+                .build();
+
+        Thread.sleep(10);
+        var v1t2Tag = nextTag(v1t1Tag, UPDATE_TAG_VERSION);
+
+        Thread.sleep(10);
+        var v2t1Tag = tagForNextObject(v1t2Tag, v2Obj, INCLUDE_HEADER);
+
+        Thread.sleep(10);
+        var v2t2Tag = nextTag(v2t1Tag, UPDATE_TAG_VERSION);
+
+        var saveAll = CompletableFuture.completedFuture(0)
+                .thenCompose(x_ -> dal.saveNewObject(TEST_TENANT, v1t1Tag))
+                .thenCompose(x_ -> dal.saveNewTag(TEST_TENANT, v1t2Tag))
+                .thenCompose(x_ -> dal.saveNewVersion(TEST_TENANT, v2t1Tag))
+                .thenCompose(x_ -> dal.saveNewTag(TEST_TENANT, v2t2Tag));
+
+        unwrap(saveAll);
+
+        var preCreateTime = MetadataCodec.parseDatetime(v1t1Tag.getHeader().getTagTimestamp()).minusNanos(5000);
+        var v1t1Time = MetadataCodec.parseDatetime(v1t1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
+        var v1t2Time = MetadataCodec.parseDatetime(v1t2Tag.getHeader().getTagTimestamp()).plusNanos(5000);
+        var v2t1Time = MetadataCodec.parseDatetime(v2t1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
+        var v2t2Time = MetadataCodec.parseDatetime(v2t2Tag.getHeader().getTagTimestamp()).plusNanos(5000);
+
+        var searchExpr = SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                .setAttrName("dal_as_of_attr_2")
+                .setAttrType(BasicType.STRING)
+                .setOperator(SearchOperator.EQ)
+                .setSearchValue(MetadataCodec.encodeValue("as_of_search_test")))
+                .build();
+
+        // Series of searches stepping back through time
+        // Should always return one object, which is the latest before the search time
+
+        var search1 = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(searchExpr)
+                .setSearchAsOf(MetadataCodec.quoteDatetime(v2t2Time))
+                .build();
+
+        var result1 = unwrap(dal.search(TEST_TENANT, search1));
+
+        Assertions.assertEquals(1, result1.size());
+        Assertions.assertEquals(v2t2Tag.getHeader(), result1.get(0).getHeader());
+
+        var search2 = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(searchExpr)
+                .setSearchAsOf(MetadataCodec.quoteDatetime(v2t1Time))
+                .build();
+
+        var result2 = unwrap(dal.search(TEST_TENANT, search2));
+
+        Assertions.assertEquals(1, result2.size());
+        Assertions.assertEquals(v2t1Tag.getHeader(), result2.get(0).getHeader());
+
+        var search3 = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(searchExpr)
+                .setSearchAsOf(MetadataCodec.quoteDatetime(v1t2Time))
+                .build();
+
+        var result3 = unwrap(dal.search(TEST_TENANT, search3));
+
+        Assertions.assertEquals(1, result3.size());
+        Assertions.assertEquals(v1t2Tag.getHeader(), result3.get(0).getHeader());
+
+        var search4 = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(searchExpr)
+                .setSearchAsOf(MetadataCodec.quoteDatetime(v1t1Time))
+                .build();
+
+        var result4 = unwrap(dal.search(TEST_TENANT, search4));
+
+        Assertions.assertEquals(1, result4.size());
+        Assertions.assertEquals(v1t2Tag.getHeader(), result4.get(0).getHeader());
+
+        // Stepping back before the object was created should give an empty search result
+
+        var search5 = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(searchExpr)
+                .setSearchAsOf(MetadataCodec.quoteDatetime(preCreateTime))
+                .build();
+
+        var result5 = unwrap(dal.search(TEST_TENANT, search5));
+
+        Assertions.assertEquals(0, result5.size());
+    }
+
+    @Test
+    void temporalSearch_negativeConditions() throws Exception {
+
+        // Use the NOT operator in a temporal search
+        // To check for bugs applying the temporal conditions to negative search criteria
+
+        var obj1 = dummyDataDef();
+        var obj2 = nextDataDef(obj1);
+
+        var obj1t1Tag = dummyTag(obj1, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
+                .putAttr("dal_as_of_attr_4", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .build();
+
+        var obj2t1Tag = dummyTag(obj2, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
+                .putAttr("dal_as_of_attr_4", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .build();
+
+        unwrap(dal.saveNewObject(TEST_TENANT, obj1t1Tag));
+        unwrap(dal.saveNewObject(TEST_TENANT, obj2t1Tag));
+
+        var t1Time = MetadataCodec.parseDatetime(obj2t1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
+
+        Thread.sleep(10);
+
+        var obj1t2Tag = dummyTag(obj1, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
+                .putAttr("dal_as_of_attr_4", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .build();
+
+        var obj2t2Tag = dummyTag(obj2, INCLUDE_HEADER).toBuilder()
+                .putAttr("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
+                .putAttr("dal_as_of_attr_4", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .build();
+
+        unwrap(dal.saveNewObject(TEST_TENANT, obj1t2Tag));
+        unwrap(dal.saveNewObject(TEST_TENANT, obj2t2Tag));
+
+        var searchExpr = SearchExpression.newBuilder()
+                .setLogical(LogicalExpression.newBuilder()
+                .addExpr(SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                    .setAttrName("dal_as_of_attr_3")
+                    .setAttrType(BasicType.STRING)
+                    .setOperator(SearchOperator.EQ)
+                    .setSearchValue(MetadataCodec.encodeValue("as_of_search_test"))))
+                .addExpr(SearchExpression.newBuilder()
+                .setLogical(LogicalExpression.newBuilder()
+                    .setOperator(LogicalOperator.NOT)
+                    .addExpr(SearchExpression.newBuilder()
+                    .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("dal_as_of_attr_4")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(MetadataCodec.encodeValue("not_the_droids_you_are_looking_for")))))))
+                .build();
+
+        // First search without as-of time, should match obj1, t2
+
+        var search1 = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(searchExpr)
+                .build();
+
+        var result1 = unwrap(dal.search(TEST_TENANT, search1));
+
+        Assertions.assertEquals(1, result1.size());
+        Assertions.assertEquals(obj1t2Tag.getHeader(), result1.get(0).getHeader());
+
+        // Searching as-of a time before the tag updates, should match obj2, t1
+
+        var search2 = SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(searchExpr)
+                .setSearchAsOf(MetadataCodec.quoteDatetime(t1Time))
+                .build();
+
+        var result2 = unwrap(dal.search(TEST_TENANT, search2));
+
+        Assertions.assertEquals(1, result2.size());
+        Assertions.assertEquals(obj2t1Tag.getHeader(), result2.get(0).getHeader());
+    }
+
+    @Test
+    @Disabled
+    void priorObjectsFlag() {
         fail();
     }
 
     @Test
     @Disabled
-    void priorTagVersionsFlag() {
-        fail();
-    }
-
-    @Test
-    @Disabled
-    void asOfTimeHandling() {
-        fail();
-    }
-
-    @Test
-    @Disabled
-    void searchResultOrdering() {
+    void priorTagsFlag() {
         fail();
     }
 
