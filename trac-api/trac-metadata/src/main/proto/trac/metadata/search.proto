@@ -236,9 +236,51 @@ message SearchParameters {
   /// A search expression based on tag attributes
   SearchExpression search = 2;
 
+  /**
+   * Perform the search as of a specific date/time.
+   *
+   * No objects or tags created or updated after this time will be included in
+   * the search result. Objects and tags that were live before this time will
+   * only be included if the priorVersions or priorTags flags are set.
+   *
+   * If supplied, this field must be a date-time value encoded using ISO 8601.
+   * If a zone offset is supplied, TRAC will apply the offset to search across
+   * all metadata items in UTC.
+   */
+  string searchAsOf = 3;
+
+  /**
+   * Look for objects that were live as of a specific date/time.
+   *
+   * No objects created or updated after this time will be included in the
+   * search result. Objects that were live before this time will only be
+   * included if the priorVersions flag is set. If this field is supplied as
+   * well as the searchAsOf parameter, the earlier of the two restrictions will
+   * be applied to objects.
+   *
+   * If supplied, this field must be a date-time value encoded using ISO 8601.
+   * If a zone offset is supplied, TRAC will apply the offset to search across
+   * all metadata items in UTC.
+   */
+  string objectsAsOf = 4;
+
+  /**
+   * Look for tags that were live as of a specific date/time.
+   *
+   * No tags created or updated after this time will be included in the search
+   * result. Tags that were live before this time will only be included if the
+   * priorTags flag is set. If this field is supplied as well as the searchAsOf
+   * parameter, the earlier of the two restrictions will be applied to tags.
+   *
+   * If supplied, this field must be a date-time value encoded using ISO 8601.
+   * If a zone offset is supplied, TRAC will apply the offset to search across
+   * all metadata items in UTC.
+   */
+  string tagsAsOf = 5;
+
   /// Whether to include prior versions of objects in the search results
-  bool priorVersions = 3;
+  bool priorVersions = 6;
 
   /// Whether to include prior tags in the search results
-  bool priorTags = 4;
+  bool priorTags = 7;
 }
