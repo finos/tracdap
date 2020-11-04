@@ -1592,18 +1592,18 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         Thread.sleep(10);
 
-        var obj1t2Tag = dummyTag(obj1, INCLUDE_HEADER).toBuilder()
+        var obj1t2Tag = nextTag(obj1t1Tag, UPDATE_TAG_VERSION).toBuilder()
                 .putAttr("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
                 .putAttr("dal_as_of_attr_4", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
-        var obj2t2Tag = dummyTag(obj2, INCLUDE_HEADER).toBuilder()
+        var obj2t2Tag = nextTag(obj2t1Tag, UPDATE_TAG_VERSION).toBuilder()
                 .putAttr("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
                 .putAttr("dal_as_of_attr_4", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
-        unwrap(dal.saveNewObject(TEST_TENANT, obj1t2Tag));
-        unwrap(dal.saveNewObject(TEST_TENANT, obj2t2Tag));
+        unwrap(dal.saveNewTag(TEST_TENANT, obj1t2Tag));
+        unwrap(dal.saveNewTag(TEST_TENANT, obj2t2Tag));
 
         var searchExpr = SearchExpression.newBuilder()
                 .setLogical(LogicalExpression.newBuilder()
