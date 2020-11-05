@@ -666,7 +666,7 @@ class JdbcReadBatchImpl {
                 "    (key_mapping.ver is not null and def.object_version = key_mapping.ver) or\n" +
                 "    (key_mapping.as_of is not null and def.object_timestamp <= key_mapping.as_of and\n" +
                 "    (def.object_superseded is null or def.object_superseded > key_mapping.as_of)) or\n" +
-                "    (key_mapping.is_latest is not null and def.object_is_latest = true)))\n" +
+                "    (key_mapping.is_latest is not null and def.object_is_latest = key_mapping.is_latest)))\n" +
                 "where mapping_stage = ?";
 
         try (var stmt = conn.prepareStatement(query)) {
@@ -746,7 +746,7 @@ class JdbcReadBatchImpl {
                 "    (key_mapping.ver is not null and tag.tag_version = key_mapping.ver) or\n" +
                 "    (key_mapping.as_of is not null and tag.tag_timestamp <= key_mapping.as_of and\n" +
                 "    (tag.tag_superseded is null or tag.tag_superseded > key_mapping.as_of)) or\n" +
-                "    (key_mapping.is_latest is not null and tag.tag_is_latest = true)))\n" +
+                "    (key_mapping.is_latest is not null and tag.tag_is_latest = key_mapping.is_latest)))\n" +
                 "where mapping_stage = ?";
 
         try (var stmt = conn.prepareStatement(query)) {

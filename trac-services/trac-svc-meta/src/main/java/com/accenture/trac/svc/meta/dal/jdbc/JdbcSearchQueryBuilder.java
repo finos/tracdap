@@ -530,13 +530,14 @@ class JdbcSearchQueryBuilder {
             return buildNoPriorFragment(baseQuery, fragment);
         }
 
-        var whereClauseLatestTemplate = "od%1$d.object_is_latest = true";
+        var whereClauseLatestTemplate = "od%1$d.object_is_latest = ?";
         var whereClauseAsOfTemplate = "(od%1$d.object_superseded is null or od%1$d.object_superseded > ?)";
 
         if (searchParams.getSearchAsOf().isEmpty()) {
 
             var whereClause = String.format(whereClauseLatestTemplate, baseQuery.getSubQueryNumber());
-            var fragment = new JdbcSearchQuery.Fragment(joinClause, whereClause, List.of());
+            var fragment = new JdbcSearchQuery.Fragment(joinClause, whereClause, List.of(
+                    (stmt, pIndex) -> stmt.setBoolean(pIndex, true)));
 
             return buildNoPriorFragment(baseQuery, fragment);
         }
@@ -558,13 +559,14 @@ class JdbcSearchQueryBuilder {
         if (searchParams.getPriorTags())
             return baseQuery;
 
-        var whereClauseLatestTemplate = "t%1$d.tag_is_latest = true";
+        var whereClauseLatestTemplate = "t%1$d.tag_is_latest = ?";
         var whereClauseAsOfTemplate = "(t%1$d.tag_superseded is null or t%1$d.tag_superseded > ?)";
 
         if (searchParams.getSearchAsOf().isEmpty()) {
 
             var whereClause = String.format(whereClauseLatestTemplate, baseQuery.getSubQueryNumber());
-            var fragment = new JdbcSearchQuery.Fragment("", whereClause, List.of());
+            var fragment = new JdbcSearchQuery.Fragment("", whereClause, List.of(
+                    (stmt, pIndex) -> stmt.setBoolean(pIndex, true)));
 
             return buildNoPriorFragment(baseQuery, fragment);
         }

@@ -147,12 +147,13 @@ class JdbcReadImpl {
                 "from object_definition\n" +
                 "where tenant_id = ?\n" +
                 "  and object_fk = ?\n" +
-                "  and object_is_latest = true";
+                "  and object_is_latest = ?";
 
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
             stmt.setLong(2, objectPk);
+            stmt.setBoolean(3, true);
 
             return fetchDefinition(stmt);
         }
@@ -260,12 +261,13 @@ class JdbcReadImpl {
                 "from tag\n" +
                 "where tenant_id = ?\n" +
                 "and definition_fk = ?\n" +
-                "and tag_is_latest = true";
+                "and tag_is_latest = ?";
 
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
             stmt.setLong(2, definitionPk);
+            stmt.setBoolean(3, true);
 
             return readTagRecord(stmt);
         }
