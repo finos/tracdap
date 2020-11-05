@@ -623,7 +623,7 @@ class JdbcReadBatchImpl {
                 stmt.setLong(1, objectFk[i]);
                 stmt.setNull(2, Types.INTEGER);
                 stmt.setNull(3, Types.TIMESTAMP);
-                stmt.setNull(4, Types.BOOLEAN);
+                stmt.setNull(4, dialect.booleanType());
 
                 switch (criteria) {
 
@@ -707,7 +707,7 @@ class JdbcReadBatchImpl {
                 stmt.setLong(1, definitionFk[i]);
                 stmt.setNull(2, Types.INTEGER);
                 stmt.setNull(3, Types.TIMESTAMP);
-                stmt.setNull(4, Types.BOOLEAN);
+                stmt.setNull(4, dialect.booleanType());
 
                 switch (criteria) {
 
