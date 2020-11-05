@@ -85,14 +85,15 @@ class JdbcSearchQueryBuilder {
 
         // Base query template selects for tenant and object type
 
-        var baseQueryTemplate = "select distinct t%1$d.tag_pk\n" +
+        var baseQueryTemplate = "select t%1$d.tag_pk\n" +
                 "from tag t%1$d\n" +
                 // Join clause
                 "%3$s" +
                 "where t%1$d.tenant_id = ?\n" +
                 "  and t%1$d.object_type = ?\n" +
                 "  and %4$s\n" +
-                "order by t%1$d.tag_timestamp desc";
+                "group by t%1$d.tag_pk\n" +
+                "order by max(t%1$d.tag_timestamp) desc";
 
         // Stream of params for the base query
 
