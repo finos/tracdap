@@ -570,11 +570,12 @@ class JdbcSearchQueryBuilder {
         }
         else {
 
-            var asOfTime = MetadataCodec.parseDatetime(searchParams.getSearchAsOf());
+            var asOfTime = MetadataCodec.parseDatetime(searchParams.getSearchAsOf()).toInstant();
+            var asOfSql = java.sql.Timestamp.from(asOfTime);
 
             var whereClause = String.format(whereClauseAsOfTemplate, baseQuery.getSubQueryNumber());
             var fragment = new JdbcSearchQuery.Fragment("", whereClause, List.of(
-                    (stmt, pIndex) -> stmt.setObject(pIndex, asOfTime, Types.TIMESTAMP)));
+                    (stmt, pIndex) -> stmt.setTimestamp(pIndex, asOfSql)));
 
             return buildNoPriorFragment(baseQuery, fragment);
         }
