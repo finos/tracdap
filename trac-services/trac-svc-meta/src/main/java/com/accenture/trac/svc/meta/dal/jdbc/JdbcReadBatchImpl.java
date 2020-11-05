@@ -622,10 +622,21 @@ class JdbcReadBatchImpl {
 
                 switch (criteria) {
 
-                    case OBJECTVERSION: stmt.setInt(2, selector[i].getObjectVersion()); break;
-                    case OBJECTASOF: stmt.setObject(3, selector[i].getObjectAsOf(), Types.TIMESTAMP); break;
-                    case LATESTOBJECT: stmt.setBoolean(4, true); break;
-                    default: throw new EValidationGap("Object criteria not set in selector");
+                    case OBJECTVERSION:
+                        stmt.setInt(2, selector[i].getObjectVersion());
+                        break;
+
+                    case OBJECTASOF:
+                        var objectAsOf = MetadataCodec.parseDatetime(selector[i].getObjectAsOf()).toInstant();
+                        stmt.setObject(3, objectAsOf, Types.TIMESTAMP);
+                        break;
+
+                    case LATESTOBJECT:
+                        stmt.setBoolean(4, true);
+                        break;
+
+                    default:
+                        throw new EValidationGap("Object criteria not set in selector");
                 }
 
                 stmt.setInt(5, mappingStage);
@@ -690,10 +701,21 @@ class JdbcReadBatchImpl {
 
                 switch (criteria) {
 
-                    case TAGVERSION: stmt.setInt(2, selector[i].getTagVersion()); break;
-                    case TAGASOF: stmt.setObject(3, selector[i].getTagAsOf(), Types.TIMESTAMP); break;
-                    case LATESTTAG: stmt.setBoolean(4, true); break;
-                    default: throw new EValidationGap("Tag criteria not set in selector");
+                    case TAGVERSION:
+                        stmt.setInt(2, selector[i].getTagVersion());
+                        break;
+
+                    case TAGASOF:
+                        var tagAsOf = MetadataCodec.parseDatetime(selector[i].getTagAsOf()).toInstant();
+                        stmt.setObject(3, tagAsOf, Types.TIMESTAMP);
+                        break;
+
+                    case LATESTTAG:
+                        stmt.setBoolean(4, true);
+                        break;
+
+                    default:
+                        throw new EValidationGap("Tag criteria not set in selector");
                 }
 
                 stmt.setInt(5, mappingStage);
