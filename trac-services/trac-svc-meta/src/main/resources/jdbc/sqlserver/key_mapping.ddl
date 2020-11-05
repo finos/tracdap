@@ -16,10 +16,14 @@
 create table #key_mapping (
 
     pk bigint,
-    fk bigint,
-    ver int,
+
     id_hi bigint,
     id_lo bigint,
+
+    fk bigint,
+    ver int,
+    as_of datetime2,
+    is_latest bit,
 
     mapping_stage int,
     ordering int

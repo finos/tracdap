@@ -47,7 +47,6 @@ create table object_definition (
     object_fk bigint not null,
     object_version int not null,
     object_timestamp timestamp (6) not null,
-
     object_superseded timestamp (6) null,
     object_is_latest boolean not null,
 
@@ -69,7 +68,6 @@ create table tag (
     definition_fk bigint not null,
     tag_version int not null,
     tag_timestamp timestamp (6) not null,
-
     tag_superseded timestamp (6) null,
     tag_is_latest boolean not null,
 

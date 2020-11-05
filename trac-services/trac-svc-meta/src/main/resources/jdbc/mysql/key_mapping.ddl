@@ -16,10 +16,14 @@
 create temporary table key_mapping (
 
     pk bigint,
-    fk bigint,
-    ver int,
+
     id_hi bigint,
     id_lo bigint,
+
+    fk bigint,
+    ver int,
+    as_of timestamp (6),
+    is_latest boolean,
 
     mapping_stage int,
     ordering int
