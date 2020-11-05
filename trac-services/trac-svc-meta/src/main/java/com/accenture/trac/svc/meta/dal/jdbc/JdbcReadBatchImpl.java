@@ -610,6 +610,8 @@ class JdbcReadBatchImpl {
                 "  mapping_stage, ordering)\n" +
                 "values (?, ?, ?, ?, ?, ?)";
 
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+
         try (var stmt = conn.prepareStatement(query)) {
 
             for (var i = 0; i < objectFk.length; i++) {
@@ -669,6 +671,8 @@ class JdbcReadBatchImpl {
                 "    (key_mapping.is_latest is not null and def.object_is_latest = key_mapping.is_latest)))\n" +
                 "where mapping_stage = ?";
 
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
@@ -689,6 +693,8 @@ class JdbcReadBatchImpl {
                 "  fk, ver, as_of, is_latest,\n" +
                 "  mapping_stage, ordering)\n" +
                 "values (?, ?, ?, ?, ?, ?)";
+
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
 
         try (var stmt = conn.prepareStatement(query)) {
 
@@ -748,6 +754,8 @@ class JdbcReadBatchImpl {
                 "    (tag.tag_superseded is null or tag.tag_superseded > key_mapping.as_of)) or\n" +
                 "    (key_mapping.is_latest is not null and tag.tag_is_latest = key_mapping.is_latest)))\n" +
                 "where mapping_stage = ?";
+
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
 
         try (var stmt = conn.prepareStatement(query)) {
 
