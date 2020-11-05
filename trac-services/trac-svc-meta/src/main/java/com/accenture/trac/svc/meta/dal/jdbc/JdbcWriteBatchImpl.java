@@ -296,9 +296,12 @@ class JdbcWriteBatchImpl {
 
         for (var i = 0; i < keys.length; i++) {
 
-            stmt.setObject(1, timestamps[i], Types.TIMESTAMP);
+            var sqlTimestamp = java.sql.Timestamp.from(timestamps[i]);
+
+            stmt.setTimestamp(1, sqlTimestamp);
             stmt.setShort(2, tenantId);
             stmt.setLong(3, keys[i]);
+
             stmt.addBatch();
         }
 
