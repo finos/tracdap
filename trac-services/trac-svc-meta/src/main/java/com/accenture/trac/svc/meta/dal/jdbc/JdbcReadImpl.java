@@ -25,6 +25,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -167,7 +168,8 @@ class JdbcReadImpl {
 
             var defPk = rs.getLong(1);
             var objectVersion = rs.getInt(2);
-            var objectTimestamp = rs.getObject(3, Instant.class);
+            var sqlTimestamp = rs.getTimestamp(3);
+            var objectTimestamp = sqlTimestamp.toInstant();
             var defEncoded = rs.getBytes(4);
             var defDecoded = ObjectDefinition.parseFrom(defEncoded);
 
@@ -279,7 +281,8 @@ class JdbcReadImpl {
 
             var tagPk = rs.getLong(1);
             var tagVersion = rs.getInt(2);
-            var tagTimestamp = rs.getObject(3, Instant.class);
+            var sqlTimestamp = rs.getTimestamp(3);
+            var tagTimestamp = sqlTimestamp.toInstant();
 
             if (rs.next())
                 throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);

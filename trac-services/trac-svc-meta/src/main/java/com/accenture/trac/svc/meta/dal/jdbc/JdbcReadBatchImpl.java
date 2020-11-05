@@ -134,7 +134,8 @@ class JdbcReadBatchImpl {
 
                     var defPk = rs.getLong(1);
                     var defVersion = rs.getInt(2);
-                    var defTimestamp = rs.getObject(3, Instant.class);
+                    var sqlTimestamp = rs.getTimestamp(3);
+                    var defTimestamp = sqlTimestamp.toInstant();
                     var defEncoded = rs.getBytes(4);
                     var defDecoded = ObjectDefinition.parseFrom(defEncoded);
 
@@ -218,7 +219,8 @@ class JdbcReadBatchImpl {
 
                     var tagPk = rs.getLong(1);
                     var tagVersion = rs.getInt(2);
-                    var tagTimestamp = rs.getObject(3, Instant.class);
+                    var sqlTimestamp = rs.getTimestamp(3);
+                    var tagTimestamp = sqlTimestamp.toInstant();
 
                     pks[i] = tagPk;
                     versions[i] = tagVersion;
@@ -284,7 +286,8 @@ class JdbcReadBatchImpl {
                     var objectIdHi = rs.getLong(3);
                     var objectIdLo = rs.getLong(4);
                     var objectVersion = rs.getInt(5);
-                    var objectTimestamp = rs.getObject(6, Instant.class);
+                    var sqlTimestamp = rs.getTimestamp(6);
+                    var objectTimestamp = sqlTimestamp.toInstant();
 
                     var objectId = new UUID(objectIdHi, objectIdLo);
                     var objectType = ObjectType.valueOf(objectTypeCode);
