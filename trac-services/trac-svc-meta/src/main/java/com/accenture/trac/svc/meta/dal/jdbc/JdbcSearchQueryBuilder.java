@@ -558,7 +558,7 @@ class JdbcSearchQueryBuilder {
         if (searchParams.getPriorTags())
             return baseQuery;
 
-        var whereClauseLatestTemplate = "t%1d.tag_is_latest = true";
+        var whereClauseLatestTemplate = "t%1$d.tag_is_latest = true";
         var whereClauseAsOfTemplate = "(t%1$d.tag_superseded is null or t%1$d.tag_superseded > ?)";
 
         if (searchParams.getSearchAsOf().isEmpty()) {
