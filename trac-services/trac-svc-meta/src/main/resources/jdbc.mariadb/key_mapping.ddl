@@ -20,9 +20,19 @@ create temporary table key_mapping (
     id_hi bigint,
     id_lo bigint,
 
+    -- MariaDB has some very strange default behaviour for timestamp fields!
+    -- Unless a timestamp is explicitly declared as null-able, it is populated
+    -- with the current time by default if no value is specified on insert.
+    -- Even more strange, if no value is specified on update the value is updated
+    -- to the current time, even if the field doesn't appear in the update statement
+    -- at all! This behaviour can be disabled by either (1) explicitly declaring the
+    -- field as null-able or (2) setting a default value without an "on update" clause.
+
+    -- https://mariadb.com/kb/en/timestamp/
+
     fk bigint,
     ver int,
-    as_of timestamp (6),
+    as_of timestamp (6) null,
     is_latest boolean,
 
     mapping_stage int,

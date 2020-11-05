@@ -39,7 +39,12 @@ public class MySqlDialect extends Dialect {
 
     MySqlDialect() {
 
-        createKeyMapping = loadKeyMappingDdl(CREATE_KEY_MAPPING_FILE);
+        this(CREATE_KEY_MAPPING_FILE);
+    }
+
+    protected MySqlDialect(String keyMappingDdl) {
+
+        createKeyMapping = loadKeyMappingDdl(keyMappingDdl);
     }
 
     @Override

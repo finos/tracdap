@@ -21,12 +21,22 @@ import com.accenture.trac.common.db.JdbcDialect;
 
 public class MariaDbDialect extends MySqlDialect {
 
-    // Re-use the MySQL dialect since error codes, syntax is all the same
-    // Just return the MARIADB dialect code!
+    // MariaDB dialect is based on the MySQL dialect.
 
-    // It is important the dialects are treated separately however in terms of drivers
-    // MariaDB and MySQL have different implementations for sub-section precision in timestamps
-    // Neither DB can read the sub-second part from the other's protocol
+    // MariaDB has a few differences that necessitate having separate DDL files.
+    // This includes a separate DDL for the key mapping table. Error codes are
+    // the same as MySQL so those can be reused.
+
+    // It is also important to use the correct connectors for MySQL / MariaDB as
+    // there are differences in the binary protocol. E.g. sub-second precision in
+    // timestamps is implemented differently, using the wrong driver will truncate
+    // fractional parts of a second.
+
+    private static final String CREATE_KEY_MAPPING_FILE = "jdbc/mariadb/key_mapping.ddl";
+
+    MariaDbDialect() {
+        super(CREATE_KEY_MAPPING_FILE);
+    }
 
     @Override
     public JdbcDialect dialectCode() {
