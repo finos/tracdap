@@ -93,10 +93,12 @@ class JdbcWriteBatchImpl {
 
             for (var i = 0; i < objectPk.length; i++) {
 
+                var sqlTimestamp = java.sql.Timestamp.from(parts.objectTimestamp[i]);
+
                 stmt.setShort(1, tenantId);
                 stmt.setLong(2, objectPk[i]);
                 stmt.setInt(3, parts.objectVersion[i]);
-                stmt.setObject(4, parts.objectTimestamp[i], Types.TIMESTAMP);
+                stmt.setTimestamp(4, sqlTimestamp);
                 stmt.setBoolean(5, true);
                 stmt.setBytes(6, parts.definition[i].toByteArray());
 
@@ -133,10 +135,12 @@ class JdbcWriteBatchImpl {
 
             for (var i = 0; i < definitionPk.length; i++) {
 
+                var sqlTimestamp = java.sql.Timestamp.from(parts.tagTimestamp[i]);
+
                 stmt.setShort(1, tenantId);
                 stmt.setLong(2, definitionPk[i]);
                 stmt.setInt(3, parts.tagVersion[i]);
-                stmt.setObject(4, parts.tagTimestamp[i], Types.TIMESTAMP);
+                stmt.setTimestamp(4, sqlTimestamp);
                 stmt.setBoolean(5, true);
                 stmt.setString(6, parts.objectType[i].name());
 

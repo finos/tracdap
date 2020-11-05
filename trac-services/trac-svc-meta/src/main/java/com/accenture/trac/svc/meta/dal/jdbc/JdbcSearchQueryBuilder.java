@@ -497,10 +497,11 @@ class JdbcSearchQueryBuilder {
         var whereClauseTemplate = "t%1$d.tag_timestamp <= ?";
         var whereClause = String.format(whereClauseTemplate, baseQuery.getSubQueryNumber());
 
-        var asOfTime = MetadataCodec.parseDatetime(searchParams.getSearchAsOf());
+        var asOfTime = MetadataCodec.parseDatetime(searchParams.getSearchAsOf()).toInstant();
+        var asOfSql = java.sql.Timestamp.from(asOfTime);
 
         var fragment = new JdbcSearchQuery.Fragment("", whereClause, List.of(
-                (stmt, pIndex) -> stmt.setObject(pIndex, asOfTime, Types.TIMESTAMP)));
+                (stmt, pIndex) -> stmt.setTimestamp(pIndex, asOfSql)));
 
         var allFragments = Stream.concat(
                 baseQuery.getFragments().stream(),
@@ -541,11 +542,12 @@ class JdbcSearchQueryBuilder {
         }
         else {
 
-            var asOfTime = MetadataCodec.parseDatetime(searchParams.getSearchAsOf());
+            var asOfTime = MetadataCodec.parseDatetime(searchParams.getSearchAsOf()).toInstant();
+            var asOfSql = java.sql.Timestamp.from(asOfTime);
 
             var whereClause = String.format(whereClauseAsOfTemplate, baseQuery.getSubQueryNumber());
             var fragment = new JdbcSearchQuery.Fragment(joinClause, whereClause, List.of(
-                    (stmt, pIndex) -> stmt.setObject(pIndex, asOfTime, Types.TIMESTAMP)));
+                    (stmt, pIndex) -> stmt.setTimestamp(pIndex, asOfSql)));
 
             return buildNoPriorFragment(baseQuery, fragment);
         }

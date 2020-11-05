@@ -24,7 +24,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Types;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -126,10 +125,12 @@ class JdbcReadImpl {
 
         try (var stmt = conn.prepareStatement(query)) {
 
+            var sqlAsOf = java.sql.Timestamp.from(objectAsOf);
+
             stmt.setShort(1, tenantId);
             stmt.setLong(2, objectPk);
-            stmt.setObject(3, objectAsOf, Types.TIMESTAMP);
-            stmt.setObject(4, objectAsOf, Types.TIMESTAMP);
+            stmt.setTimestamp(3, sqlAsOf);
+            stmt.setTimestamp(4, sqlAsOf);
 
             return fetchDefinition(stmt);
         }
@@ -238,10 +239,12 @@ class JdbcReadImpl {
 
         try (var stmt = conn.prepareStatement(query)) {
 
+            var sqlAsOf = java.sql.Timestamp.from(tagAsOf);
+
             stmt.setShort(1, tenantId);
             stmt.setLong(2, definitionPk);
-            stmt.setObject(3, tagAsOf, Types.TIMESTAMP);
-            stmt.setObject(4, tagAsOf, Types.TIMESTAMP);
+            stmt.setTimestamp(3, sqlAsOf);
+            stmt.setTimestamp(4, sqlAsOf);
 
             return readTagRecord(stmt);
         }

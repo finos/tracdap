@@ -628,7 +628,8 @@ class JdbcReadBatchImpl {
 
                     case OBJECTASOF:
                         var objectAsOf = MetadataCodec.parseDatetime(selector[i].getObjectAsOf()).toInstant();
-                        stmt.setObject(3, objectAsOf, Types.TIMESTAMP);
+                        var sqlAsOf = java.sql.Timestamp.from(objectAsOf);
+                        stmt.setTimestamp(3, sqlAsOf);
                         break;
 
                     case LATESTOBJECT:
@@ -707,7 +708,8 @@ class JdbcReadBatchImpl {
 
                     case TAGASOF:
                         var tagAsOf = MetadataCodec.parseDatetime(selector[i].getTagAsOf()).toInstant();
-                        stmt.setObject(3, tagAsOf, Types.TIMESTAMP);
+                        var sqlAsOf = java.sql.Timestamp.from(tagAsOf);
+                        stmt.setTimestamp(3, sqlAsOf);
                         break;
 
                     case LATESTTAG:
