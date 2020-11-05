@@ -66,10 +66,7 @@ public class DeployMetaDB {
         var dialect = JdbcSetup.getSqlDialect(properties, DB_CONFIG_ROOT);
 
         // Pick up DB deploy scripts depending on the SQL dialect
-        // For MariaDB use the MySQL deploy scripts, for now there are no compatibility issues
-        var scriptsLocation = dialect == JdbcDialect.MARIADB
-                ? String.format(SCHEMA_LOCATION, JdbcDialect.MYSQL.name().toLowerCase())
-                : String.format(SCHEMA_LOCATION, dialect.name().toLowerCase());
+        var scriptsLocation = String.format(SCHEMA_LOCATION, dialect.name().toLowerCase());
 
         log.info("SQL Dialect: " + dialect);
         log.info("Scripts location: " + scriptsLocation);
