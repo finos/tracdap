@@ -265,10 +265,10 @@ class JdbcWriteBatchImpl {
                 "update object_definition \n" +
                 "set\n" +
                 "  object_superseded = ?,\n" +
-                "  object_is_latest = false\n" +
+                "  object_is_latest = ?\n" +
                 "where tenant_id = ?\n" +
                 "  and object_fk = ?\n" +
-                "  and object_is_latest = true";
+                "  and object_is_latest = ?";
 
         try (var stmt = conn.prepareStatement(query)) {
             closeRecord(stmt, tenantId, objectPk, parts.objectTimestamp);
@@ -281,10 +281,10 @@ class JdbcWriteBatchImpl {
                 "update tag \n" +
                 "set\n" +
                 "  tag_superseded = ?,\n" +
-                "  tag_is_latest = false\n" +
+                "  tag_is_latest = ?\n" +
                 "where tenant_id = ?\n" +
                 "  and definition_fk = ?\n" +
-                "  and tag_is_latest = true";
+                "  and tag_is_latest = ?";
 
         try (var stmt = conn.prepareStatement(query)) {
             closeRecord(stmt, tenantId, definitionPk, parts.tagTimestamp);
@@ -299,8 +299,10 @@ class JdbcWriteBatchImpl {
             var sqlTimestamp = java.sql.Timestamp.from(timestamps[i]);
 
             stmt.setTimestamp(1, sqlTimestamp);
-            stmt.setShort(2, tenantId);
-            stmt.setLong(3, keys[i]);
+            stmt.setBoolean(2, false);
+            stmt.setShort(3, tenantId);
+            stmt.setLong(4, keys[i]);
+            stmt.setBoolean(5, true);
 
             stmt.addBatch();
         }
