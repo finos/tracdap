@@ -58,6 +58,10 @@ create table object_definition (
 
     object_fk number(19) not null,
     object_version int not null,
+    object_timestamp timestamp(6) not null,
+    object_superseded timestamp(6) null,
+    object_is_latest number(1) not null,
+
     definition blob not null,
 
     constraint pk_definition primary key (definition_pk),
@@ -87,6 +91,9 @@ create table tag (
 
     definition_fk number(19) not null,
     tag_version int not null,
+    tag_timestamp timestamp(6) not null,
+    tag_superseded timestamp(6) null,
+    tag_is_latest number(1) not null,
 
     -- Duplicate fields from object ID/definition tables so they are available for searching
     object_type varchar(16) not null,
@@ -136,42 +143,18 @@ create unique index idx_attr_unq on tag_attr (tenant_id, tag_fk, attr_name, attr
 /
 
 
-create table latest_version (
-
-    tenant_id smallint not null,
-    object_fk number(19) not null,
-    latest_definition_pk number(19) not null,
-
-    constraint pk_latest_ver primary key (object_fk),
-    constraint fk_latest_ver_object foreign key (object_fk) references object_id (object_pk),
-    constraint fk_latest_ver_definition foreign key (latest_definition_pk) references object_definition (definition_pk),
-    constraint fk_latest_ver_tenant foreign key (tenant_id) references tenant (tenant_id)
-);
-/
-
-
-create table latest_tag (
-
-    tenant_id smallint not null,
-    definition_fk number(19) not null,
-    latest_tag_pk number(19) not null,
-
-    constraint pk_latest_tag primary key (definition_fk),
-    constraint fk_latest_tag_definition foreign key (definition_fk) references object_definition (definition_pk),
-    constraint fk_latest_tag_tag foreign key (latest_tag_pk) references tag (tag_pk),
-    constraint fk_latest_tag_tenant foreign key (tenant_id) references tenant (tenant_id)
-);
-/
-
-
 -- For Oracle, create the key mapping table at deploy time as a global temp table
 create global temporary table key_mapping (
 
     pk number(19),
-    fk number(19),
-    ver int,
+
     id_hi number(19),
     id_lo number(19),
+
+    fk number(19),
+    ver int,
+    as_of timestamp (6),
+    is_latest number(1),
 
     mapping_stage int,
     ordering int

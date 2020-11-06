@@ -236,9 +236,52 @@ message SearchParameters {
   /// A search expression based on tag attributes
   SearchExpression search = 2;
 
-  /// Whether to include prior versions of objects in the search results
-  bool priorVersions = 3;
+  /**
+   * Perform the search as of a specific date/time.
+   *
+   * Supplying this field will cause TRAC to ignore all metadata changes from
+   * the specified time onwards. The result will be the same as if a search was
+   * performed at the specified time with this field left blank.
+   *
+   * If supplied, this field must be a date-time value encoded using ISO 8601.
+   * If a zone offset is supplied, TRAC will apply the offset to search across
+   * all metadata items in UTC.
+   */
+  string searchAsOf = 3;
 
-  /// Whether to include prior tags in the search results
-  bool priorTags = 4;
+  /**
+   * Include prior versions of objects in the search.
+   *
+   * By default, only the latest version of each object is considered in a
+   * search. If the as-of parameter is specified, latest versions are
+   * considered as of that time.
+   *
+   * Setting this flag to true will cause TRAC to consider superseded object
+   * versions in the search. If the as-of parameter is specified as well then
+   * all object versions up to that time are considered. Only the latest
+   * matching version will be included in the search result.
+   *
+   * This flag can be combined with priorTags to search across all tags and
+   * object versions. If neither flag is specified, only the latest version and
+   * latest tag is considered for each object.
+   */
+   bool priorVersions = 4;
+
+  /**
+   * Include prior tags in the search.
+   *
+   * By default, only the latest tag for each object version is considered in a
+   * search. If the as-of parameter is specified, latest tags are considered as
+   * of that time.
+   *
+   * Setting this flag to true will cause TRAC to consider superseded tags in
+   * the search. If the as-of parameter is specified as well then all tags up to
+   * that time are considered. Only the latest matching tag will be included in
+   * the search result.
+   *
+   * This flag can be combined with priorVersions to search across all tags and
+   * object versions. If neither flag is specified, only the latest version and
+   * latest tag is considered for each object.
+   */
+   bool priorTags = 5;
 }

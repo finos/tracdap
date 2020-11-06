@@ -19,10 +19,11 @@ package com.accenture.trac.svc.meta.dal.jdbc;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
+import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal.ObjectParts;
 
 import java.sql.*;
+import java.time.Instant;
 import java.util.*;
-import java.util.UUID;
 
 
 class JdbcWriteBatchImpl {
@@ -35,7 +36,7 @@ class JdbcWriteBatchImpl {
         this.readBatch = readBatch;
     }
 
-    long[] writeObjectId(Connection conn, short tenantId, ObjectType[] objectType, UUID[] objectId) throws SQLException {
+    long[] writeObjectId(Connection conn, short tenantId, ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into object_id (\n" +
@@ -52,12 +53,12 @@ class JdbcWriteBatchImpl {
 
         try (var stmt = keySupport ? conn.prepareStatement(query, keyColumns) : conn.prepareStatement(query)) {
 
-            for (var i = 0; i < objectId.length; i++) {
+            for (var i = 0; i < parts.objectId.length; i++) {
 
                 stmt.setShort(1, tenantId);
-                stmt.setString(2, objectType[i].name());
-                stmt.setLong(3, objectId[i].getMostSignificantBits());
-                stmt.setLong(4, objectId[i].getLeastSignificantBits());
+                stmt.setString(2, parts.objectType[i].name());
+                stmt.setLong(3, parts.objectId[i].getMostSignificantBits());
+                stmt.setLong(4, parts.objectId[i].getLeastSignificantBits());
 
                 stmt.addBatch();
             }
@@ -65,25 +66,24 @@ class JdbcWriteBatchImpl {
             stmt.executeBatch();
 
             if (keySupport)
-                return generatedKeys(stmt, objectId.length);
+                return generatedKeys(stmt, parts.objectId.length);
             else
-                return readBatch.lookupObjectPks(conn, tenantId, objectId);
+                return readBatch.lookupObjectPks(conn, tenantId, parts.objectId);
         }
     }
 
-    long[] writeObjectDefinition(
-            Connection conn, short tenantId,
-            long[] objectPk, int[] objectVersion, ObjectDefinition[] definition)
-            throws SQLException {
+    long[] writeObjectDefinition(Connection conn, short tenantId, long[] objectPk, ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into object_definition (\n" +
                 "  tenant_id,\n" +
                 "  object_fk,\n" +
                 "  object_version,\n" +
+                "  object_timestamp,\n" +
+                "  object_is_latest,\n" +
                 "  definition" +
                 ")\n" +
-                "values (?, ?, ?, ?)";
+                "values (?, ?, ?, ?, ?, ?)";
 
         // Only request generated key columns if the driver supports it
         var keySupport = dialect.supportsGeneratedKeys();
@@ -93,10 +93,14 @@ class JdbcWriteBatchImpl {
 
             for (var i = 0; i < objectPk.length; i++) {
 
+                var sqlTimestamp = java.sql.Timestamp.from(parts.objectTimestamp[i]);
+
                 stmt.setShort(1, tenantId);
                 stmt.setLong(2, objectPk[i]);
-                stmt.setInt(3, objectVersion[i]);
-                stmt.setBytes(4, definition[i].toByteArray());
+                stmt.setInt(3, parts.objectVersion[i]);
+                stmt.setTimestamp(4, sqlTimestamp);
+                stmt.setBoolean(5, true);
+                stmt.setBytes(6, parts.definition[i].toByteArray());
 
                 stmt.addBatch();
             }
@@ -106,23 +110,22 @@ class JdbcWriteBatchImpl {
             if (keySupport)
                 return generatedKeys(stmt, objectPk.length);
             else
-                return readBatch.lookupDefinitionPk(conn, tenantId, objectPk, objectVersion);
+                return readBatch.lookupDefinitionPk(conn, tenantId, objectPk, parts.objectVersion);
         }
     }
 
-    long[] writeTagRecord(
-            Connection conn, short tenantId,
-            long[] definitionPk, int[] tagVersion, ObjectType[] objectTypes)
-            throws SQLException {
+    long[] writeTagRecord(Connection conn, short tenantId, long[] definitionPk, ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into tag (\n" +
                 "  tenant_id,\n" +
                 "  definition_fk,\n" +
                 "  tag_version,\n" +
+                "  tag_timestamp,\n" +
+                "  tag_is_latest,\n" +
                 "  object_type" +
                 ")\n" +
-                "values (?, ?, ?, ?)";
+                "values (?, ?, ?, ?, ?, ?)";
 
         // Only request generated key columns if the driver supports it
         var keySupport = dialect.supportsGeneratedKeys();
@@ -132,10 +135,14 @@ class JdbcWriteBatchImpl {
 
             for (var i = 0; i < definitionPk.length; i++) {
 
+                var sqlTimestamp = java.sql.Timestamp.from(parts.tagTimestamp[i]);
+
                 stmt.setShort(1, tenantId);
                 stmt.setLong(2, definitionPk[i]);
-                stmt.setInt(3, tagVersion[i]);
-                stmt.setString(4, objectTypes[i].name());
+                stmt.setInt(3, parts.tagVersion[i]);
+                stmt.setTimestamp(4, sqlTimestamp);
+                stmt.setBoolean(5, true);
+                stmt.setString(6, parts.objectType[i].name());
 
                 stmt.addBatch();
             }
@@ -145,14 +152,11 @@ class JdbcWriteBatchImpl {
             if (keySupport)
                 return generatedKeys(stmt, definitionPk.length);
             else
-                return readBatch.lookupTagPk(conn, tenantId, definitionPk, tagVersion);
+                return readBatch.lookupTagPk(conn, tenantId, definitionPk, parts.tagVersion);
         }
     }
 
-    void writeTagAttrs(
-            Connection conn, short tenantId,
-            long[] tagPk, Tag[] tag)
-            throws SQLException {
+    void writeTagAttrs(Connection conn, short tenantId, long[] tagPk, ObjectParts parts) throws SQLException {
 
         var query =
                 "insert into tag_attr (\n" +
@@ -174,7 +178,7 @@ class JdbcWriteBatchImpl {
         try (var stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
 
             for (var i = 0; i < tagPk.length; i++) {
-                for (var attr : tag[i].getAttrMap().entrySet()) {
+                for (var attr : parts.tag[i].getAttrMap().entrySet()) {
 
                     var attrRootValue = attr.getValue();
                     var attrType = attrBasicType(attrRootValue);
@@ -255,110 +259,55 @@ class JdbcWriteBatchImpl {
         return rootValue.getArrayValue().getItemList();
     }
 
-    void writeLatestVersion(
-            Connection conn, short tenantId,
-            long[] objectFk, long[] definitionPk)
-            throws SQLException {
+    void closeObjectDefinition(Connection conn, short tenantId, long[] objectPk, ObjectParts parts) throws SQLException {
 
         var query =
-                "insert into latest_version (\n" +
-                "  tenant_id,\n" +
-                "  object_fk,\n" +
-                "  latest_definition_pk\n" +
-                ")\n" +
-                "values (?, ?, ?)";
+                "update object_definition \n" +
+                "set\n" +
+                "  object_superseded = ?,\n" +
+                "  object_is_latest = ?\n" +
+                "where tenant_id = ?\n" +
+                "  and object_fk = ?\n" +
+                "  and object_is_latest = ?";
 
         try (var stmt = conn.prepareStatement(query)) {
-            writeLatest(stmt, tenantId, objectFk, definitionPk);
+            closeRecord(stmt, tenantId, objectPk, parts.objectTimestamp);
         }
     }
 
-    void writeLatestTag(
-            Connection conn, short tenantId,
-            long[] definitionFk, long[] tagPk)
-            throws SQLException {
+    void closeTagRecord(Connection conn, short tenantId, long[] definitionPk, ObjectParts parts) throws SQLException {
 
         var query =
-                "insert into latest_tag (\n" +
-                "  tenant_id,\n" +
-                "  definition_fk,\n" +
-                "  latest_tag_pk\n" +
-                ")\n" +
-                "values (?, ?, ?)";
+                "update tag \n" +
+                "set\n" +
+                "  tag_superseded = ?,\n" +
+                "  tag_is_latest = ?\n" +
+                "where tenant_id = ?\n" +
+                "  and definition_fk = ?\n" +
+                "  and tag_is_latest = ?";
 
         try (var stmt = conn.prepareStatement(query)) {
-            writeLatest(stmt, tenantId, definitionFk, tagPk);
+            closeRecord(stmt, tenantId, definitionPk, parts.tagTimestamp);
         }
     }
 
-    private void writeLatest(
-            PreparedStatement stmt, short tenantId,
-            long[] fk, long[] pk)
-            throws SQLException {
+    private void closeRecord(PreparedStatement stmt, short tenantId, long[] keys, Instant[] timestamps) throws SQLException {
 
-        for (int i = 0; i < pk.length; i++) {
 
-            stmt.setShort(1, tenantId);
-            stmt.setLong(2, fk[i]);
-            stmt.setLong(3, pk[i]);
+        for (var i = 0; i < keys.length; i++) {
+
+            var sqlTimestamp = java.sql.Timestamp.from(timestamps[i]);
+
+            stmt.setTimestamp(1, sqlTimestamp);
+            stmt.setBoolean(2, false);
+            stmt.setShort(3, tenantId);
+            stmt.setLong(4, keys[i]);
+            stmt.setBoolean(5, true);
 
             stmt.addBatch();
         }
 
         stmt.executeBatch();
-    }
-
-    void updateLatestVersion(
-            Connection conn, short tenantId,
-            long[] objectFk, long[] definitionPk)
-            throws SQLException {
-
-        var query =
-                "update latest_version set \n" +
-                "  latest_definition_pk = ?\n" +
-                "where tenant_id = ?\n" +
-                "  and object_fk = ?";
-
-        try (var stmt = conn.prepareStatement(query)) {
-            updateLatest(stmt, tenantId, objectFk, definitionPk);
-        }
-    }
-
-    void updateLatestTag(
-            Connection conn, short tenantId,
-            long[] definitionFk, long[] tagPk)
-            throws SQLException {
-
-        var query =
-                "update latest_tag set \n" +
-                "  latest_tag_pk = ?\n" +
-                "where tenant_id = ?\n" +
-                "  and definition_fk = ?";
-
-        try (var stmt = conn.prepareStatement(query)) {
-            updateLatest(stmt, tenantId, definitionFk, tagPk);
-        }
-    }
-
-    private void updateLatest(
-            PreparedStatement stmt, short tenantId,
-            long[] fk, long[] pk)
-            throws SQLException {
-
-        for (int i = 0; i < fk.length; i++) {
-
-            stmt.setLong(1, pk[i]);
-            stmt.setShort(2, tenantId);
-            stmt.setLong(3, fk[i]);
-
-            stmt.addBatch();
-        }
-
-        int[] updates = stmt.executeBatch();
-
-        // Updates fail silent if no records are matched, so make an explicit check
-        if (Arrays.stream(updates).anyMatch(count -> count != 1))
-            throw new JdbcException(JdbcErrorCode.INSERT_MISSING_FK);
     }
 
     private long[] generatedKeys(Statement stmt, int rowCount) throws SQLException {

@@ -16,10 +16,12 @@
 
 package com.accenture.trac.svc.meta.services;
 
+import com.accenture.trac.common.metadata.TagSelector;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.Tag;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -35,24 +37,55 @@ public class MetadataReadService {
     // Literally all of the read logic is in the DAL at present!
     // Which is fine, keep a thin logic class here anyway to have a consistent pattern
 
+    public CompletableFuture<Tag> readObject(String tenant, TagSelector selector) {
+
+        return dal.loadObject(tenant, selector);
+    }
+
+    public CompletableFuture<List<Tag>> readObjects(String tenant, List<TagSelector> selectors) {
+
+        return dal.loadObjects(tenant, selectors);
+    }
+
     public CompletableFuture<Tag> loadTag(
             String tenant, ObjectType objectType,
             UUID objectId, int objectVersion, int tagVersion) {
 
-        return dal.loadTag(tenant, objectType, objectId, objectVersion, tagVersion);
+        var selector = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .setObjectVersion(objectVersion)
+                .setTagVersion(tagVersion)
+                .build();
+
+        return dal.loadObject(tenant, selector);
     }
 
     public CompletableFuture<Tag> loadLatestTag(
             String tenant, ObjectType objectType,
             UUID objectId, int objectVersion) {
 
-        return dal.loadLatestTag(tenant, objectType, objectId, objectVersion);
+        var selector = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .setObjectVersion(objectVersion)
+                .setLatestTag(true)
+                .build();
+
+        return dal.loadObject(tenant, selector);
     }
 
     public CompletableFuture<Tag> loadLatestObject(
             String tenant, ObjectType objectType,
             UUID objectId) {
 
-        return dal.loadLatestVersion(tenant, objectType, objectId);
+        var selector = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .setLatestObject(true)
+                .setLatestTag(true)
+                .build();
+
+        return dal.loadObject(tenant, selector);
     }
 }

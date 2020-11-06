@@ -18,6 +18,7 @@ package com.accenture.trac.svc.meta.dal;
 
 import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.Tag;
+import com.accenture.trac.common.metadata.TagSelector;
 import com.accenture.trac.common.metadata.search.SearchParameters;
 
 import java.util.List;
@@ -47,6 +48,11 @@ public interface IMetadataDal {
 
     CompletableFuture<Void> savePreallocatedObjects(String tenant, List<Tag> tags);
 
+    CompletableFuture<Tag>
+    loadObject(String tenant, TagSelector selector);
+
+    CompletableFuture<List<Tag>>
+    loadObjects(String tenant, List<TagSelector> selector);
 
     CompletableFuture<Tag>
     loadTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion);

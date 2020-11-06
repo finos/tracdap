@@ -44,6 +44,65 @@ import "google/api/annotations.proto";
 service MetadataReadApi {
 
     /**
+     * Read a single object from the TRAC metadata store using a tag selector.
+     *
+     * Tag selectors are used throughout the TRAC metadata structures and API
+     * calls to refer to objects. For example, a job definition includes
+     * selectors to define the data sets and models that were selected for the
+     * job. Those selectors can be passed directly into this call.
+     *
+     * Tag selectors can refer to object and tag versions either using explicit
+     * version numbers, with as-of times or by referring to the current latest
+     * version. Combinations are also possible (e.g. object version x, latest
+     * tag).
+     *
+     * This call takes a single selector and returns a single Tag, including the
+     * object definition. Error conditions include: Invalid request, unknown
+     * tenant, unknown object ID, object type does not match ID, unknown object
+     * version, unknown tag version.
+     *
+     * @see TagSelector
+     * @see Tag
+     */
+    rpc readObject(ReadRequest) returns (metadata.Tag) {
+        option (google.api.http) = {
+            post: "/{tenant}/read-object"
+            body: "selector"
+        };
+    }
+
+    /**
+     * Read multiple objects from the TRAC metadata store using tag selectors.
+     *
+     * Tag selectors are used throughout the TRAC metadata structures and API
+     * calls to refer to objects. For example, a job definition includes
+     * selectors to define the data sets and models that were selected for the
+     * job. Those selectors can be passed directly into this call.
+     *
+     * Tag selectors can refer to object and tag versions either using explicit
+     * version numbers, with as-of times or by referring to the current latest
+     * version. Combinations are also possible (e.g. object version x, latest
+     * tag).
+     *
+     * This call takes multiple selectors and returns multiple Tags in the same
+     * order, including their object definitions. Selectors for different object
+     * types and with different criteria for selecting versions can be mixed
+     * freely in a single request. Error conditions include: Invalid request,
+     * unknown tenant, unknown object ID, object type does not match ID, unknown
+     * object version, unknown tag version. If there is an error for any of the
+     * selectors the whole request will fail.
+     *
+     * @see TagSelector
+     * @see Tag
+     */
+    rpc readBatch(ReadBatchRequest) returns (ReadBatchResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/read-batch"
+            body: "selector"
+        };
+    }
+
+    /**
      * Load a single metadata object with a known object version and tag version.
      *
      * To use this call, supply a tenant code, object type, ID, object version and
@@ -111,6 +170,27 @@ service MetadataReadApi {
     }
 
 };
+
+
+message ReadRequest {
+
+    string tenant = 1;
+
+    metadata.TagSelector selector = 2;
+};
+
+message ReadBatchRequest {
+
+    string tenant = 1;
+
+    repeated metadata.TagSelector selector = 2;
+};
+
+message ReadBatchResponse {
+
+    repeated metadata.Tag tag = 1;
+};
+
 
 
 /**

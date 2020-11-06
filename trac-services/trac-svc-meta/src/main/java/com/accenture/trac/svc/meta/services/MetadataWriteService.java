@@ -21,6 +21,8 @@ import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.validation.MetadataValidator;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -58,12 +60,15 @@ public class MetadataWriteService {
 
 
         var objectId = UUID.randomUUID();
+        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var newHeader = TagHeader.newBuilder()
                 .setObjectType(objectType)
                 .setObjectId(objectId.toString())
                 .setObjectVersion(OBJECT_FIRST_VERSION)
+                .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
                 .setTagVersion(TAG_FIRST_VERSION)
+                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
                 .build();
 
         var newTag = Tag.newBuilder()
@@ -107,10 +112,7 @@ public class MetadataWriteService {
         // Validation complete!
 
 
-        var objectId = UUID.fromString(priorVersion.getObjectId());
-        var objectVersion = priorVersion.getObjectVersion();
-
-        return dal.loadLatestTag(tenant, objectType, objectId, objectVersion)
+        return dal.loadObject(tenant, priorVersion)
 
                 .thenCompose(priorTag ->
                 updateObject(tenant, priorTag, normalDefinition, tagUpdates));
@@ -123,11 +125,15 @@ public class MetadataWriteService {
 
         // TODO: Version increment validation
 
+        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+
         var oldHeader = priorTag.getHeader();
 
         var newHeader = oldHeader.toBuilder()
                 .setObjectVersion(oldHeader.getObjectVersion() + 1)
+                .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
                 .setTagVersion(TAG_FIRST_VERSION)
+                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
                 .build();
 
         var newTag = priorTag.toBuilder()
@@ -162,11 +168,7 @@ public class MetadataWriteService {
         // Validation complete!
 
 
-        var objectId = UUID.fromString(priorVersion.getObjectId());
-        var priorObjectVersion = priorVersion.getObjectVersion();
-        var priorTagVersion = priorVersion.getTagVersion();
-
-        return dal.loadTag(tenant, objectType, objectId, priorObjectVersion, priorTagVersion)
+        return dal.loadObject(tenant, priorVersion)
 
                 .thenCompose(priorTag ->
                 updateTag(tenant, priorTag, tagUpdates));
@@ -176,10 +178,13 @@ public class MetadataWriteService {
             String tenant, Tag priorTag,
             List<TagUpdate> tagUpdates) {
 
+        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+
         var oldHeader = priorTag.getHeader();
 
         var newHeader = oldHeader.toBuilder()
                 .setTagVersion(oldHeader.getTagVersion() + 1)
+                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
                 .build();
 
         var newTag = priorTag.toBuilder()
@@ -231,12 +236,15 @@ public class MetadataWriteService {
 
         // In this case priorVersion refers to the preallocated ID
         var objectId = UUID.fromString(priorVersion.getObjectId());
+        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var newHeader = TagHeader.newBuilder()
                 .setObjectType(objectType)
                 .setObjectId(objectId.toString())
                 .setObjectVersion(OBJECT_FIRST_VERSION)
+                .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
                 .setTagVersion(TAG_FIRST_VERSION)
+                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
                 .build();
 
         var newTag = Tag.newBuilder()

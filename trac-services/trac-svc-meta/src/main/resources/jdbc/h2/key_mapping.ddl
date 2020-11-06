@@ -15,12 +15,24 @@
 
 create temporary table key_mapping (
 
+    -- Primary key, this is the target key being looked up
+    -- It will be used for loading records
     pk bigint,
-    fk bigint,
-    ver int,
+
+    -- ID fields used to look up object PKs by object ID
     id_hi bigint,
     id_lo bigint,
 
+    -- FK, version, as-of and latest for mapping definitions and tags
+    -- This is the FK of the parent object, plus criteria from a selector
+    fk bigint,
+    ver int,
+    as_of timestamp (6),
+    is_latest boolean,
+
+    -- Mapping stage separates mapping operations within a transaction
     mapping_stage int,
+
+    -- Ordering to ensure all stages of a load read object parts in the same order
     ordering int
 );

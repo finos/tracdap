@@ -103,7 +103,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
                 names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
-    void loadTag_ok(ObjectType objectType) {
+    void readObject_ok(ObjectType objectType) {
 
         var origObj = TestData.dummyDefinitionForType(objectType);
         var attrs = TestData.dummyAttrs();
@@ -118,16 +118,14 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var tagHeader = writeApi.createObject(writeRequest);
         var objectId = UUID.fromString(tagHeader.getObjectId());
+        var selector = selectorForTag(tagHeader);
 
-        var readRequest = MetadataReadRequest.newBuilder()
+        var readRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(objectType)
-                .setObjectId(objectId.toString())
-                .setObjectVersion(1)
-                .setTagVersion(1)
+                .setSelector(selector)
                 .build();
 
-        var savedTag = readApi.loadTag(readRequest);
+        var savedTag = readApi.readObject(readRequest);
 
         var expectedTag = savedTag.newBuilderForType()
                 .setHeader(tagHeader)
@@ -139,8 +137,60 @@ abstract class MetadataReadApiTest implements IDalTestable {
         assertEquals(expectedTag, savedTag);
     }
 
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+            names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
+    void readBatch_ok(ObjectType objectType) {
+
+        var origObj = TestData.dummyDefinitionForType(objectType);
+        var attrs = TestData.dummyAttrs();
+        var tagUpdates = TestData.tagUpdatesForAttrs(attrs);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(objectType)
+                .setDefinition(origObj)
+                .addAllTagUpdate(tagUpdates)
+                .build();
+
+        var tagHeader = writeApi.createObject(writeRequest);
+        var objectId = UUID.fromString(tagHeader.getObjectId());
+        var selector = selectorForTag(tagHeader);
+
+        // Create a second object with the same def/attrs, will have a new ID
+        var tagHeader2 = writeApi.createObject(writeRequest);
+        var objectId2 = UUID.fromString(tagHeader2.getObjectId());
+        var selector2 = selectorForTag(tagHeader2);
+
+        var readRequest = ReadBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addSelector(selector)
+                .addSelector(selector2)
+                .build();
+
+        var savedTags = readApi.readBatch(readRequest);
+
+        var expectedTag = savedTags.getTag(0).newBuilderForType()
+                .setHeader(tagHeader)
+                .setDefinition(origObj)
+                .putAllAttr(attrs)
+                .build();
+
+        var expectedTag2 = savedTags.getTag(1).newBuilderForType()
+                .setHeader(tagHeader2)
+                .setDefinition(origObj)
+                .putAllAttr(attrs)
+                .build();
+
+        assertEquals(2, savedTags.getTagCount());
+        assertEquals(objectId, UUID.fromString(savedTags.getTag(0).getHeader().getObjectId()));
+        assertEquals(objectId2, UUID.fromString(savedTags.getTag(1).getHeader().getObjectId()));
+        assertEquals(expectedTag, savedTags.getTag(0));
+        assertEquals(expectedTag2, savedTags.getTag(1));
+    }
+
     @Test
-    void loadTag_versioningOk() {
+    void readObject_versions() {
 
         var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
         var v1Attrs = TestData.dummyAttrs();
@@ -155,7 +205,6 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var v1Header = writeApi.createObject(v1WriteRequest);
         var v1Selector = selectorForTag(v1Header);
-        var objectId = UUID.fromString(v1Header.getObjectId());
 
         // No attr changes for v2
         var v2Obj = TestData.dummyVersionForType(v1Obj);
@@ -186,33 +235,24 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
 
-        var v1ReadRequest = MetadataReadRequest.newBuilder()
+        var v1ReadRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
-                .setObjectId(objectId.toString())
-                .setObjectVersion(1)
-                .setTagVersion(1)
+                .setSelector(selectorForTag(v1Header))
                 .build();
 
-        var v2ReadRequest = MetadataReadRequest.newBuilder()
+        var v2ReadRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
-                .setObjectId(objectId.toString())
-                .setObjectVersion(2)
-                .setTagVersion(1)
+                .setSelector(selectorForTag(v2Header))
                 .build();
 
-        var t2ReadRequest = MetadataReadRequest.newBuilder()
+        var t2ReadRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
-                .setObjectId(objectId.toString())
-                .setObjectVersion(1)
-                .setTagVersion(2)
+                .setSelector(selectorForTag(t2Header))
                 .build();
 
-        var v1TagSaved = readApi.loadTag(v1ReadRequest);
-        var v2TagSaved = readApi.loadTag(v2ReadRequest);
-        var t2TagSaved = readApi.loadTag(t2ReadRequest);
+        var v1TagSaved = readApi.readObject(v1ReadRequest);
+        var v2TagSaved = readApi.readObject(v2ReadRequest);
+        var t2TagSaved = readApi.readObject(t2ReadRequest);
 
         var v1TagExpected = v1TagSaved.newBuilderForType()
                 .setHeader(v1Header)
@@ -238,162 +278,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
     }
 
     @Test
-    void loadTag_missingItems() {
-
-        // Random object ID, does not exist at all
-
-        var readRequest = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
-                .setObjectVersion(1)
-                .setTagVersion(1)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadTag(readRequest));
-        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
-
-        // Create an object to test with
-
-        var origObj = TestData.dummyDefinitionForType(ObjectType.MODEL);
-        var origAttrs = TestData.dummyAttrs();
-        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
-
-        var writeRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
-                .setDefinition(origObj)
-                .addAllTagUpdate(origTagUpdates)
-                .build();
-
-        var tagHeader = writeApi.createObject(writeRequest);
-        var objectId = UUID.fromString(tagHeader.getObjectId());
-
-        // Try to read a non-existent version
-
-        var v2ReadRequest = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
-                .setObjectId(objectId.toString())
-                .setObjectVersion(2)
-                .setTagVersion(1)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> readApi.loadTag(v2ReadRequest));
-        assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
-
-        // Try to read a non-existent tag
-
-        var t2ReadRequest = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
-                .setObjectId(objectId.toString())
-                .setObjectVersion(1)
-                .setTagVersion(2)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error3 = assertThrows(StatusRuntimeException.class, () -> readApi.loadTag(t2ReadRequest));
-        assertEquals(Status.Code.NOT_FOUND, error3.getStatus().getCode());
-    }
-
-    @Test
-    void loadTag_wrongType() {
-
-        // This should result in a failed pre-condition,
-        // because failure depends on the contents of the metadata store
-
-        var origObj = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var origAttrs = TestData.dummyAttrs();
-        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
-
-        var writeRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
-                .setDefinition(origObj)
-                .addAllTagUpdate(origTagUpdates)
-                .build();
-
-        var tagHeader = writeApi.createObject(writeRequest);
-        var objectId = UUID.fromString(tagHeader.getObjectId());
-
-        var readRequest = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
-                .setObjectId(objectId.toString())
-                .setObjectVersion(1)
-                .setTagVersion(1)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadTag(readRequest));
-        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
-    }
-
-    @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
-    void loadLatestTag_ok(ObjectType objectType) {
-
-        var origObj = TestData.dummyDefinitionForType(objectType);
-        var origAttrs = TestData.dummyAttrs();
-        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
-
-        var writeRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(objectType)
-                .setDefinition(origObj)
-                .addAllTagUpdate(origTagUpdates)
-                .build();
-
-        var t1Header = writeApi.createObject(writeRequest);
-        var t1Selector = TestData.selectorForTag(t1Header);
-        var objectId = UUID.fromString(t1Header.getObjectId());
-
-        var readRequest = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(objectType)
-                .setObjectId(objectId.toString())
-                .setObjectVersion(1)
-                .build();
-
-        var t1SavedTag = readApi.loadLatestTag(readRequest);
-
-        var t2Attrs = new HashMap<>(origAttrs);
-        t2Attrs.put("v3_attr", MetadataCodec.encodeValue("Use the force"));
-
-        var t2TagUpdate = TagUpdate.newBuilder()
-                .setAttrName("v3_attr")
-                .setValue(MetadataCodec.encodeValue("Use the force"))
-                .build();
-
-        var t2WriteRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(objectType)
-                .setPriorVersion(t1Selector)
-                .addTagUpdate(t2TagUpdate)
-                .build();
-
-        var t2Header = writeApi.updateTag(t2WriteRequest);
-        var t2SavedTag = readApi.loadLatestTag(readRequest);
-
-        var t2ExpectedTag = t2SavedTag.newBuilderForType()
-                .setHeader(t2Header)
-                .setDefinition(origObj)
-                .putAllAttr(t2Attrs)
-                .build();
-
-        assertEquals(1, t1SavedTag.getHeader().getTagVersion());
-        assertEquals(2, t2SavedTag.getHeader().getTagVersion());
-        assertEquals(t2ExpectedTag, t2SavedTag);
-    }
-    
-    @Test
-    void loadLatestTag_versioningOk() {
-
-        // Save first version
+    void readBatch_versions() {
 
         var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
         var v1Attrs = TestData.dummyAttrs();
@@ -407,31 +292,19 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .build();
 
         var v1Header = writeApi.createObject(v1WriteRequest);
-        var v1Selector = TestData.selectorForTag(v1Header);
-        var objectId = UUID.fromString(v1Header.getObjectId());
+        var v1Selector = selectorForTag(v1Header);
 
-        // Read first version back, should be T1
+        // No attr changes for v2
+        var v2Obj = TestData.dummyVersionForType(v1Obj);
 
-        var v1ReadRequest = MetadataReadRequest.newBuilder()
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(objectId.toString())
-                .setObjectVersion(1)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
                 .build();
 
-        var v1TagSaved = readApi.loadLatestTag(v1ReadRequest);
-
-        var v1Expected = v1TagSaved.newBuilderForType()
-                .setHeader(v1Header)
-                .setDefinition(v1Obj)
-                .putAllAttr(v1Attrs)
-                .build();
-
-        assertEquals(1, v1Header.getObjectVersion());
-        assertEquals(1, v1Header.getTagVersion());
-        assertEquals(v1Expected, v1TagSaved);
-
-        // Save second tag on first version
+        var v2Header = writeApi.updateObject(v2WriteRequest);
 
         var t2Attrs = new HashMap<>(v1Attrs);
         t2Attrs.put("v3_attr", MetadataCodec.encodeValue("Use the force"));
@@ -449,214 +322,44 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .build();
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
-        var t2Selector = selectorForTag(t2Header);
 
-        // Read first version back, should be T2
-
-        var t2TagExpected = v1Expected.toBuilder()
-                .setHeader(v1Expected.getHeader().toBuilder()
-                .setTagVersion(2))
-                .clearAttr()
-                .putAllAttr(t2Attrs)
-                .build();
-
-        var t2TagSaved = readApi.loadLatestTag(v1ReadRequest);
-
-        assertEquals(1, t2TagSaved.getHeader().getObjectVersion());
-        assertEquals(2, t2TagSaved.getHeader().getTagVersion());
-        assertEquals(t2TagExpected, t2TagSaved);
-
-        // Save second version of object
-
-        var v2Obj = TestData.dummyVersionForType(v1Obj);
-
-        // V2 attrs are the same as v1 attrs
-        // Tag update removes the additional attribute added for t2
-        var v2Attrs = new HashMap<>(v1Attrs);
-        var v2TagUpdate = TagUpdate.newBuilder()
-                .setAttrName(t2TagUpdate.getAttrName())
-                .setOperation(TagOperation.DELETE_ATTR)
-                .build();
-
-        var v2WriteRequest = MetadataWriteRequest.newBuilder()
+        var readRequest = ReadBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
-                .setPriorVersion(t2Selector)
-                .setDefinition(v2Obj)
-                .addTagUpdate(v2TagUpdate)
+                .addSelector(selectorForTag(v1Header))
+                .addSelector(selectorForTag(v2Header))
+                .addSelector(selectorForTag(t2Header))
                 .build();
 
-        var v2Header = writeApi.updateObject(v2WriteRequest);
+        var savedTags = readApi.readBatch(readRequest);
+        var v1TagSaved = savedTags.getTag(0);
+        var v2TagSaved = savedTags.getTag(1);
+        var t2TagSaved = savedTags.getTag(2);
 
-        // Read second version of object, should be V2 T1
-
-        var v2ReadRequest = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
-                .setObjectId(objectId.toString())
-                .setObjectVersion(2)
+        var v1TagExpected = v1TagSaved.newBuilderForType()
+                .setHeader(v1Header)
+                .setDefinition(v1Obj)
+                .putAllAttr(v1Attrs)
                 .build();
-
-        var v2TagSaved = readApi.loadLatestTag(v2ReadRequest);
 
         var v2TagExpected = v2TagSaved.newBuilderForType()
                 .setHeader(v2Header)
                 .setDefinition(v2Obj)
-                .putAllAttr(v2Attrs)
+                .putAllAttr(v1Attrs)
                 .build();
 
-        assertEquals(2, v2TagSaved.getHeader().getObjectVersion());
-        assertEquals(1, v2TagSaved.getHeader().getTagVersion());
+        var t2TagExpected = t2TagSaved.newBuilderForType()
+                .setHeader(t2Header)
+                .setDefinition(v1Obj)
+                .putAllAttr(t2Attrs)
+                .build();
+
+        assertEquals(v1TagExpected, v1TagSaved);
         assertEquals(v2TagExpected, v2TagSaved);
-
-        // Now load latest tag on V1 again, should still be V1 T2
-
-        t2TagSaved = readApi.loadLatestTag(v1ReadRequest);
         assertEquals(t2TagExpected, t2TagSaved);
     }
 
     @Test
-    void loadLatestTag_missingItems() {
-
-        // Random object ID, does not exist at all
-
-        var readRequest = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
-                .setObjectVersion(1)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestTag(readRequest));
-        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
-
-        // Create an object to test with
-
-        var origObj = TestData.dummyDefinitionForType(ObjectType.MODEL);
-        var origAttrs = TestData.dummyAttrs();
-        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
-
-        var writeRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
-                .setDefinition(origObj)
-                .addAllTagUpdate(origTagUpdates)
-                .build();
-
-        var tagHeader = writeApi.createObject(writeRequest);
-        var objectId = UUID.fromString(tagHeader.getObjectId());
-
-        // Try to read a non-existent version
-
-        var v2ReadRequest = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
-                .setObjectId(objectId.toString())
-                .setObjectVersion(2)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestTag(v2ReadRequest));
-        assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
-    }
-
-    @Test
-    void loadLatestTag_wrongType() {
-
-        // This should result in a failed pre-condition,
-        // because failure depends on the contents of the metadata store
-
-        var origObj = TestData.dummyDefinitionForType(ObjectType.DATA);
-        var origAttrs = TestData.dummyAttrs();
-        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
-
-        var writeRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.DATA)
-                .setDefinition(origObj)
-                .addAllTagUpdate(origTagUpdates)
-                .build();
-
-        var tagHeader = writeApi.createObject(writeRequest);
-        var objectId = UUID.fromString(tagHeader.getObjectId());
-
-        var readRequest = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
-                .setObjectId(objectId.toString())
-                .setObjectVersion(1)
-                .build();
-
-        // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestTag(readRequest));
-        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
-    }
-
-    @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE, names = {
-            "DATA",
-            "CUSTOM"})
-    void loadLatestObject_ok(ObjectType objectType) {
-
-        // This test only applied for objects that support versioning
-
-        var origObj = TestData.dummyDefinitionForType(objectType);
-        var origAttrs = TestData.dummyAttrs();
-        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
-
-        var writeRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(objectType)
-                .setDefinition(origObj)
-                .addAllTagUpdate(origTagUpdates)
-                .build();
-
-        var v1Header = writeApi.createObject(writeRequest);
-        var v1Selector = selectorForTag(v1Header);
-        var objectId = UUID.fromString(v1Header.getObjectId());
-
-        var readRequest = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(objectType)
-                .setObjectId(objectId.toString())
-                .setObjectVersion(1)
-                .build();
-
-        var v2Obj = TestData.dummyVersionForType(origObj);
-        var v2Attrs = new HashMap<>(origAttrs);
-        v2Attrs.put("v2_attr", MetadataCodec.encodeValue("Use the force"));
-
-        var v2TagUpdate = TagUpdate.newBuilder()
-                .setAttrName("v2_attr")
-                .setValue(MetadataCodec.encodeValue("Use the force"))
-                .build();
-
-        var v2WriteRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(objectType)
-                .setPriorVersion(v1Selector)
-                .setDefinition(v2Obj)
-                .addTagUpdate(v2TagUpdate)
-                .build();
-
-        var v2Header = writeApi.updateObject(v2WriteRequest);
-        var v2SavedTag = readApi.loadLatestObject(readRequest);
-
-        var v2ExpectedTag = v2SavedTag.newBuilderForType()
-                .setHeader(v2Header)
-                .setDefinition(v2Obj)
-                .putAllAttr(v2Attrs)
-                .build();
-
-        assertEquals(2, v2SavedTag.getHeader().getObjectVersion());
-        assertEquals(v2ExpectedTag, v2SavedTag);
-    }
-
-    @Test
-    void loadLatestObject_versionsOk() {
-
-        // Save first version
+    void readObject_asOf() throws Exception {
 
         var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
         var v1Attrs = TestData.dummyAttrs();
@@ -673,33 +376,27 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var v1Selector = selectorForTag(v1Header);
         var objectId = UUID.fromString(v1Header.getObjectId());
 
-        // Read first version back, should be V1 T1
+        Thread.sleep(10);
 
-        var readRequest = MetadataReadRequest.newBuilder()
+        // No attr changes for v2
+        var v2Obj = TestData.dummyVersionForType(v1Obj);
+
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(objectId.toString())
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
                 .build();
 
-        var v1Saved = readApi.loadLatestObject(readRequest);
+        var v2Header = writeApi.updateObject(v2WriteRequest);
 
-        var v1Expected = v1Saved.newBuilderForType()
-                .setHeader(v1Header)
-                .setDefinition(v1Obj)
-                .putAllAttr(v1Attrs)
-                .build();
-
-        assertEquals(1, v1Saved.getHeader().getObjectVersion());
-        assertEquals(1, v1Saved.getHeader().getTagVersion());
-        assertEquals(v1Expected, v1Saved);
-
-        // Save second tag on first version
+        Thread.sleep(10);
 
         var t2Attrs = new HashMap<>(v1Attrs);
-        t2Attrs.put("t2_attr", MetadataCodec.encodeValue("Use the force"));
+        t2Attrs.put("v3_attr", MetadataCodec.encodeValue("Use the force"));
 
         var t2TagUpdate = TagUpdate.newBuilder()
-                .setAttrName("t2_attr")
+                .setAttrName("v3_attr")
                 .setValue(MetadataCodec.encodeValue("Use the force"))
                 .build();
 
@@ -711,98 +408,558 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .build();
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
-        var t2Selector = selectorForTag(t2Header);
 
-        // Read first version back, should be T2
+        // Build selectors using object and tag as-of times
 
-        var t2Saved = readApi.loadLatestObject(readRequest);
-
-        var t2Expected = v1Expected.toBuilder()
-                .setHeader(v1Expected.getHeader().toBuilder()
-                .setTagVersion(2))
-                .clearAttr().putAllAttr(t2Attrs)
+        var baseSelector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(objectId.toString())
                 .build();
 
-        assertEquals(1, t2Saved.getHeader().getObjectVersion());
-        assertEquals(2, t2Saved.getHeader().getTagVersion());
-        assertEquals(t2Expected, t2Saved);
+        var v1Time = MetadataCodec.parseDatetime(v1Header.getTagTimestamp()).plusNanos(5000);
+        var v2Time = MetadataCodec.parseDatetime(v2Header.getTagTimestamp()).plusNanos(5000);
+        var t2Time = MetadataCodec.parseDatetime(t2Header.getTagTimestamp()).plusNanos(5000);
 
-        // Save second version of object
+        var v1ReadRequest = ReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(baseSelector.toBuilder()
+                .setObjectAsOf(MetadataCodec.quoteDatetime(v1Time))
+                .setTagAsOf(MetadataCodec.quoteDatetime(v1Time)))
+                .build();
 
+        var v2ReadRequest = ReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(baseSelector.toBuilder()
+                .setObjectAsOf(MetadataCodec.quoteDatetime(v2Time))
+                .setTagAsOf(MetadataCodec.quoteDatetime(v2Time)))
+                .build();
+
+        var t2ReadRequest = ReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(baseSelector.toBuilder()
+                .setObjectAsOf(MetadataCodec.quoteDatetime(v1Time))
+                .setTagAsOf(MetadataCodec.quoteDatetime(t2Time)))
+                .build();
+
+        var v1TagSaved = readApi.readObject(v1ReadRequest);
+        var v2TagSaved = readApi.readObject(v2ReadRequest);
+        var t2TagSaved = readApi.readObject(t2ReadRequest);
+
+        var v1TagExpected = v1TagSaved.newBuilderForType()
+                .setHeader(v1Header)
+                .setDefinition(v1Obj)
+                .putAllAttr(v1Attrs)
+                .build();
+
+        var v2TagExpected = v2TagSaved.newBuilderForType()
+                .setHeader(v2Header)
+                .setDefinition(v2Obj)
+                .putAllAttr(v1Attrs)
+                .build();
+
+        var t2TagExpected = t2TagSaved.newBuilderForType()
+                .setHeader(t2Header)
+                .setDefinition(v1Obj)
+                .putAllAttr(t2Attrs)
+                .build();
+
+        assertEquals(v1TagExpected, v1TagSaved);
+        assertEquals(v2TagExpected, v2TagSaved);
+        assertEquals(t2TagExpected, t2TagSaved);
+    }
+
+    @Test
+    void readBatch_asOf() throws Exception {
+
+        var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
+        var v1Attrs = TestData.dummyAttrs();
+        var v1TagUpdates = TestData.tagUpdatesForAttrs(v1Attrs);
+
+        var v1WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(v1Obj)
+                .addAllTagUpdate(v1TagUpdates)
+                .build();
+
+        var v1Header = writeApi.createObject(v1WriteRequest);
+        var v1Selector = selectorForTag(v1Header);
+        var objectId = UUID.fromString(v1Header.getObjectId());
+
+        Thread.sleep(10);
+
+        // No attr changes for v2
         var v2Obj = TestData.dummyVersionForType(v1Obj);
-
-        // V2 attrs are the same as v1 attrs
-        // Tag update removes the additional attribute added for t2
-        var v2Attrs = new HashMap<>(v1Attrs);
-        var v2TagUpdate = TagUpdate.newBuilder()
-                .setAttrName(t2TagUpdate.getAttrName())
-                .setOperation(TagOperation.DELETE_ATTR)
-                .build();
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setPriorVersion(t2Selector)
+                .setPriorVersion(v1Selector)
                 .setDefinition(v2Obj)
-                .addTagUpdate(v2TagUpdate)
                 .build();
 
         var v2Header = writeApi.updateObject(v2WriteRequest);
 
-        // Read second version of object, should be V2 T1
+        Thread.sleep(10);
 
-        var v2Saved = readApi.loadLatestObject(readRequest);
+        var t2Attrs = new HashMap<>(v1Attrs);
+        t2Attrs.put("v3_attr", MetadataCodec.encodeValue("Use the force"));
 
-        var v2Expected = v2Saved.newBuilderForType()
-                .setHeader(v2Header)
-                .setDefinition(v2Obj)
-                .putAllAttr(v2Attrs)
+        var t2TagUpdate = TagUpdate.newBuilder()
+                .setAttrName("v3_attr")
+                .setValue(MetadataCodec.encodeValue("Use the force"))
                 .build();
 
-        assertEquals(2, v2Saved.getHeader().getObjectVersion());
-        assertEquals(1, v2Saved.getHeader().getTagVersion());
-        assertEquals(v2Expected, v2Saved);
-
-        // Now save V1 T3, latest object should still be V2 T1
-
-        var t3TagUpdate = TagUpdate.newBuilder()
-                .setAttrName("t3_attr")
-                .setValue(MetadataCodec.encodeValue("The dark side"))
-                .build();
-
-        var t3WriteRequest = MetadataWriteRequest.newBuilder()
+        var t2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
-                .setPriorVersion(t2Selector)
-                .addTagUpdate(t3TagUpdate)
+                .setPriorVersion(v1Selector)
+                .addTagUpdate(t2TagUpdate)
                 .build();
 
-        // noinspection ResultOfMethodCallIgnored
-        writeApi.updateTag(t3WriteRequest);
+        var t2Header = writeApi.updateTag(t2WriteRequest);
 
-        v2Saved = readApi.loadLatestObject(readRequest);
-        assertEquals(v2Expected, v2Saved);
+        // Build selectors using object and tag as-of times
+
+        var baseSelector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(objectId.toString())
+                .build();
+
+        var v1Time = MetadataCodec.parseDatetime(v1Header.getTagTimestamp()).plusNanos(5000);
+        var v2Time = MetadataCodec.parseDatetime(v2Header.getTagTimestamp()).plusNanos(5000);
+        var t2Time = MetadataCodec.parseDatetime(t2Header.getTagTimestamp()).plusNanos(5000);
+
+        var v1SelectorAsOf = baseSelector.toBuilder()
+                .setObjectAsOf(MetadataCodec.quoteDatetime(v1Time))
+                .setTagAsOf(MetadataCodec.quoteDatetime(v1Time));
+
+        var v2SelectorAsOf = baseSelector.toBuilder()
+                .setObjectAsOf(MetadataCodec.quoteDatetime(v2Time))
+                .setTagAsOf(MetadataCodec.quoteDatetime(v2Time));
+
+        var t2SelectorAsOf = baseSelector.toBuilder()
+                .setObjectAsOf(MetadataCodec.quoteDatetime(v1Time))
+                .setTagAsOf(MetadataCodec.quoteDatetime(t2Time));
+
+        var readRequest = ReadBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addSelector(v1SelectorAsOf)
+                .addSelector(v2SelectorAsOf)
+                .addSelector(t2SelectorAsOf)
+                .build();
+
+        var savedTags = readApi.readBatch(readRequest);
+        var v1TagSaved = savedTags.getTag(0);
+        var v2TagSaved = savedTags.getTag(1);
+        var t2TagSaved = savedTags.getTag(2);
+
+        var v1TagExpected = v1TagSaved.newBuilderForType()
+                .setHeader(v1Header)
+                .setDefinition(v1Obj)
+                .putAllAttr(v1Attrs)
+                .build();
+
+        var v2TagExpected = v2TagSaved.newBuilderForType()
+                .setHeader(v2Header)
+                .setDefinition(v2Obj)
+                .putAllAttr(v1Attrs)
+                .build();
+
+        var t2TagExpected = t2TagSaved.newBuilderForType()
+                .setHeader(t2Header)
+                .setDefinition(v1Obj)
+                .putAllAttr(t2Attrs)
+                .build();
+
+        assertEquals(v1TagExpected, v1TagSaved);
+        assertEquals(v2TagExpected, v2TagSaved);
+        assertEquals(t2TagExpected, t2TagSaved);
     }
 
     @Test
-    void loadLatestObject_missingItems() {
+    void readObject_latest() {
+
+        // Save v1 object
+
+        var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
+        var v1Attrs = TestData.dummyAttrs();
+        var v1TagUpdates = TestData.tagUpdatesForAttrs(v1Attrs);
+
+        var v1WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(v1Obj)
+                .addAllTagUpdate(v1TagUpdates)
+                .build();
+
+        var v1Header = writeApi.createObject(v1WriteRequest);
+        var v1Selector = selectorForTag(v1Header);
+
+        // Read V1 using latest / latest selector
+
+        var baseSelector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(v1Header.getObjectId())
+                .build();
+
+        var latestSelector = baseSelector.toBuilder()
+                .setLatestObject(true)
+                .setLatestTag(true)
+                .build();
+
+        var latestReadRequest = ReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(latestSelector)
+                .build();
+
+        var v1TagSaved = readApi.readObject(latestReadRequest);
+
+        var v1TagExpected = v1TagSaved.newBuilderForType()
+                .setHeader(v1Header)
+                .setDefinition(v1Obj)
+                .putAllAttr(v1Attrs)
+                .build();
+
+        assertEquals(v1TagExpected, v1TagSaved);
+
+        // Save V2 object
+
+        var v2Obj = TestData.dummyVersionForType(v1Obj);
+
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
+                .build();
+
+        var v2Header = writeApi.updateObject(v2WriteRequest);
+
+        // Read v2 object using latest / latest selector
+
+        var v2TagSaved = readApi.readObject(latestReadRequest);
+
+        var v2TagExpected = v2TagSaved.newBuilderForType()
+                .setHeader(v2Header)
+                .setDefinition(v2Obj)
+                .putAllAttr(v1Attrs)
+                .build();
+
+        assertEquals(v2TagExpected, v2TagSaved);
+
+        // Save T2 tag on V1 object
+
+
+        var t2Attrs = new HashMap<>(v1Attrs);
+        t2Attrs.put("v3_attr", MetadataCodec.encodeValue("Use the force"));
+
+        var t2TagUpdate = TagUpdate.newBuilder()
+                .setAttrName("v3_attr")
+                .setValue(MetadataCodec.encodeValue("Use the force"))
+                .build();
+
+        var t2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(v1Selector)
+                .addTagUpdate(t2TagUpdate)
+                .build();
+
+        var t2Header = writeApi.updateTag(t2WriteRequest);
+
+        // Read request using latest / latest - should still return V2 object
+
+        v2TagSaved = readApi.readObject(latestReadRequest);
+        assertEquals(v2TagExpected, v2TagSaved);
+
+        // Read request for object V1 / latest tag
+
+        var t2Selector = baseSelector.toBuilder()
+                .setObjectVersion(1)
+                .setLatestTag(true);
+
+        var t2ReadRequest = ReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(t2Selector)
+                .build();
+
+        var t2TagSaved = readApi.readObject(t2ReadRequest);
+
+        var t2TagExpected = t2TagSaved.newBuilderForType()
+                .setHeader(t2Header)
+                .setDefinition(v1Obj)
+                .putAllAttr(t2Attrs)
+                .build();
+
+        assertEquals(t2TagExpected, t2TagSaved);
+    }
+
+    @Test
+    void readBatch_latest() {
+
+        // Create a second object to put in batch read requests next to the selectors being tested
+
+        var extraObj = TestData.dummyCustomDef();
+        var extraAttrs = TestData.dummyAttrs();
+        var extraTagUpdates = TestData.tagUpdatesForAttrs(extraAttrs);
+
+        var extraWriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.CUSTOM)
+                .setDefinition(extraObj)
+                .addAllTagUpdate(extraTagUpdates)
+                .build();
+
+        var extraHeader = writeApi.createObject(extraWriteRequest);
+        var extraSelector = selectorForTag(extraHeader);
+
+        // Save v1 object
+
+        var v1Obj = TestData.dummyDefinitionForType(ObjectType.DATA);
+        var v1Attrs = TestData.dummyAttrs();
+        var v1TagUpdates = TestData.tagUpdatesForAttrs(v1Attrs);
+
+        var v1WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(v1Obj)
+                .addAllTagUpdate(v1TagUpdates)
+                .build();
+
+        var v1Header = writeApi.createObject(v1WriteRequest);
+        var v1Selector = selectorForTag(v1Header);
+
+        // Read V1 using latest / latest selector
+
+        var baseSelector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(v1Header.getObjectId())
+                .build();
+
+        var latestSelector = baseSelector.toBuilder()
+                .setLatestObject(true)
+                .setLatestTag(true)
+                .build();
+
+        var latestReadRequest = ReadBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addSelector(latestSelector)
+                .addSelector(extraSelector)
+                .build();
+
+        var batch = readApi.readBatch(latestReadRequest);
+        var v1TagSaved = batch.getTag(0);
+
+        var v1TagExpected = v1TagSaved.newBuilderForType()
+                .setHeader(v1Header)
+                .setDefinition(v1Obj)
+                .putAllAttr(v1Attrs)
+                .build();
+
+        assertEquals(v1TagExpected, v1TagSaved);
+
+        // Save V2 object
+
+        var v2Obj = TestData.dummyVersionForType(v1Obj);
+
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
+                .build();
+
+        var v2Header = writeApi.updateObject(v2WriteRequest);
+
+        // Read v2 object using latest / latest selector
+
+        batch = readApi.readBatch(latestReadRequest);
+        var v2TagSaved = batch.getTag(0);
+
+        var v2TagExpected = v2TagSaved.newBuilderForType()
+                .setHeader(v2Header)
+                .setDefinition(v2Obj)
+                .putAllAttr(v1Attrs)
+                .build();
+
+        assertEquals(v2TagExpected, v2TagSaved);
+
+        // Save T2 tag on V1 object
+
+
+        var t2Attrs = new HashMap<>(v1Attrs);
+        t2Attrs.put("v3_attr", MetadataCodec.encodeValue("Use the force"));
+
+        var t2TagUpdate = TagUpdate.newBuilder()
+                .setAttrName("v3_attr")
+                .setValue(MetadataCodec.encodeValue("Use the force"))
+                .build();
+
+        var t2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(v1Selector)
+                .addTagUpdate(t2TagUpdate)
+                .build();
+
+        var t2Header = writeApi.updateTag(t2WriteRequest);
+
+        // Read request using latest / latest - should still return V2 object
+
+        batch = readApi.readBatch(latestReadRequest);
+        v2TagSaved = batch.getTag(0);
+        assertEquals(v2TagExpected, v2TagSaved);
+
+        // Read request for object V1 / latest tag
+
+        var t2Selector = baseSelector.toBuilder()
+                .setObjectVersion(1)
+                .setLatestTag(true);
+
+        var t2ReadRequest = ReadBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addSelector(t2Selector)
+                .addSelector(extraSelector)
+                .build();
+
+        batch = readApi.readBatch(t2ReadRequest);
+        var t2TagSaved = batch.getTag(0);
+
+        var t2TagExpected = t2TagSaved.newBuilderForType()
+                .setHeader(t2Header)
+                .setDefinition(v1Obj)
+                .putAllAttr(t2Attrs)
+                .build();
+
+        assertEquals(t2TagExpected, t2TagSaved);
+    }
+
+    @Test
+    void readObject_missingItems() {
+
+        // Create an object to test with
+
+        var origObj = TestData.dummyDefinitionForType(ObjectType.MODEL);
+        var origAttrs = TestData.dummyAttrs();
+        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setDefinition(origObj)
+                .addAllTagUpdate(origTagUpdates)
+                .build();
+
+        var tagHeader = writeApi.createObject(writeRequest);
 
         // Random object ID, does not exist at all
 
-        var readRequest = MetadataReadRequest.newBuilder()
+        var readRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
                 .setObjectType(ObjectType.MODEL)
                 .setObjectId(UUID.randomUUID().toString())
+                .setObjectVersion(1)
+                .setTagVersion(1))
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestObject(readRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> readApi.readObject(readRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
 
+        // Try to read a non-existent version
+
+        var v2ReadRequest = ReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(selectorForTag(tagHeader).toBuilder()
+                .setObjectVersion(2))
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> readApi.readObject(v2ReadRequest));
+        assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
+
+        // Try to read a non-existent tag
+
+        var t2ReadRequest = ReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(selectorForTag(tagHeader).toBuilder()
+                .setTagVersion(2))
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error3 = assertThrows(StatusRuntimeException.class, () -> readApi.readObject(t2ReadRequest));
+        assertEquals(Status.Code.NOT_FOUND, error3.getStatus().getCode());
     }
 
     @Test
-    void loadLatestObject_wrongType() {
+    void readBatch_missingItems() {
+
+        // Create an object to test with
+
+        var origObj = TestData.dummyDefinitionForType(ObjectType.MODEL);
+        var origAttrs = TestData.dummyAttrs();
+        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setDefinition(origObj)
+                .addAllTagUpdate(origTagUpdates)
+                .build();
+
+        var tagHeader = writeApi.createObject(writeRequest);
+
+        // Include one valid selector in the read batch request
+        var tagHeader2 = writeApi.createObject(writeRequest);
+        var validSelector = selectorForTag(tagHeader2);
+
+        // Random object ID, does not exist at all
+
+        var readRequest = ReadBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addSelector(validSelector)
+                .addSelector(TagSelector.newBuilder()
+                .setObjectType(ObjectType.MODEL)
+                .setObjectId(UUID.randomUUID().toString())
+                .setObjectVersion(1)
+                .setTagVersion(1))
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> readApi.readBatch(readRequest));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
+
+        // Try to read a non-existent version
+
+        var v2ReadRequest = ReadBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addSelector(validSelector)
+                .addSelector(selectorForTag(tagHeader).toBuilder()
+                .setObjectVersion(2))
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> readApi.readBatch(v2ReadRequest));
+        assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
+
+        // Try to read a non-existent tag
+
+        var t2ReadRequest = ReadBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addSelector(validSelector)
+                .addSelector(selectorForTag(tagHeader).toBuilder()
+                .setTagVersion(2))
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error3 = assertThrows(StatusRuntimeException.class, () -> readApi.readBatch(t2ReadRequest));
+        assertEquals(Status.Code.NOT_FOUND, error3.getStatus().getCode());
+    }
+
+    @Test
+    void readObject_wrongType() {
 
         // This should result in a failed pre-condition,
         // because failure depends on the contents of the metadata store
@@ -819,16 +976,50 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
-        var objectId = UUID.fromString(tagHeader.getObjectId());
 
-        var readRequest = MetadataReadRequest.newBuilder()
+        var readRequest = ReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
-                .setObjectId(objectId.toString())
+                .setSelector(selectorForTag(tagHeader).toBuilder()
+                .setObjectType(ObjectType.MODEL))
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> readApi.loadLatestObject(readRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> readApi.readObject(readRequest));
+        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
+    }
+
+    @Test
+    void readBatch_wrongType() {
+
+        // This should result in a failed pre-condition,
+        // because failure depends on the contents of the metadata store
+
+        var origObj = TestData.dummyDefinitionForType(ObjectType.DATA);
+        var origAttrs = TestData.dummyAttrs();
+        var origTagUpdates = TestData.tagUpdatesForAttrs(origAttrs);
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(origObj)
+                .addAllTagUpdate(origTagUpdates)
+                .build();
+
+        var tagHeader = writeApi.createObject(writeRequest);
+
+        // Include a valid selector in the read batch request
+        var tagHeader2 = writeApi.createObject(writeRequest);
+        var validSelector = selectorForTag(tagHeader2);
+
+        var readRequest = ReadBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addSelector(validSelector)
+                .addSelector(selectorForTag(tagHeader).toBuilder()
+                .setObjectType(ObjectType.MODEL))
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> readApi.readBatch(readRequest));
         assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
     }
 }

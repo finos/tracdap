@@ -25,8 +25,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -35,9 +37,6 @@ import java.util.stream.Collectors;
 
 
 public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
-
-    private static final int LATEST_TAG = -1;
-    private static final int LATEST_VERSION = -1;
 
     private final Logger log;
 
@@ -113,13 +112,10 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             var tenantId = tenants.getTenantId(tenant);
 
-            long[] objectPk = writeBatch.writeObjectId(conn, tenantId, parts.objectType, parts.objectId);
-            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts.version, parts.definition);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
-            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
-
-            writeBatch.writeLatestVersion(conn, tenantId, objectPk, defPk);
-            writeBatch.writeLatestTag(conn, tenantId, defPk, tagPk);
+            long[] objectPk = writeBatch.writeObjectId(conn, tenantId, parts);
+            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
+            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
         },
         (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));
     }
@@ -146,15 +142,12 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             var tenantId = tenants.getTenantId(tenant);
             var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
-
             checkObjectTypes(parts, objectType);
 
-            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts.version, parts.definition);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
-            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
-
-            writeBatch.updateLatestVersion(conn, tenantId, objectType.keys, defPk);
-            writeBatch.writeLatestTag(conn, tenantId, defPk, tagPk);
+            writeBatch.closeObjectDefinition(conn, tenantId, objectType.keys, parts);
+            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
+            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts),
         (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),
@@ -183,14 +176,12 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             var tenantId = tenants.getTenantId(tenant);
             var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
-
             checkObjectTypes(parts, objectType);
 
-            long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.version);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
-            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
-
-            writeBatch.updateLatestTag(conn, tenantId, defPk, tagPk);
+            long[] defPk = readBatch.lookupDefinitionPk(conn, tenantId, objectType.keys, parts.objectVersion);
+            writeBatch.closeTagRecord(conn, tenantId, defPk, parts);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
+            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts),
         (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),
@@ -219,7 +210,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             var tenantId = tenants.getTenantId(tenant);
 
-            writeBatch.writeObjectId(conn, tenantId, parts.objectType, parts.objectId);
+            writeBatch.writeObjectId(conn, tenantId, parts);
         },
         (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));
     }
@@ -246,15 +237,11 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             var tenantId = tenants.getTenantId(tenant);
             var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
-
             checkObjectTypes(parts, objectType);
 
-            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts.version, parts.definition);
-            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts.tagVersion, parts.objectType);
-            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts.tag);
-
-            writeBatch.writeLatestVersion(conn, tenantId, objectType.keys, defPk);
-            writeBatch.writeLatestTag(conn, tenantId, defPk, tagPk);
+            long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectType.keys, parts);
+            long[] tagPk = writeBatch.writeTagRecord(conn, tenantId, defPk, parts);
+            writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
         },
         (error, code) -> JdbcError.handleMissingItem(error, code, parts),   // TODO: different errors
         (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),  // TODO: different errors
@@ -263,169 +250,173 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
 
     // -----------------------------------------------------------------------------------------------------------------
-    // LOAD METHODS (SINGLE ITEM)
+    // LOAD METHODS
     // -----------------------------------------------------------------------------------------------------------------
 
-    // Load methods *are* highly sensitive to latency
+    // Loading a single object is highly sensitive to latency
     // This is because UI applications use metadata queries to decide what to display
     // These queries may also be recursive, i.e. query a job, then related data/models or dependent jobs
     // We want these multiple queries to complete in < 100 ms for a fluid user experience
-    // So, optimising the common case of querying a single item makes sense
-
+    // So, optimising the common case of loading a single item makes sense
 
     @Override public CompletableFuture<Tag>
-    loadTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion) {
+    loadObject(String tenant, TagSelector selector) {
 
-        var parts = assembleParts(objectType, objectId, objectVersion, tagVersion);
+        var parts = selectorParts(selector);
 
         return wrapTransaction(conn -> {
 
             var tenantId = tenants.getTenantId(tenant);
-            var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
+            var objectType = readSingle.readObjectTypeById(conn, tenantId, parts.objectId[0]);
 
-            checkObjectType(parts, storedType);
+            checkObjectType(parts, objectType);
 
-            var definition = readSingle.readDefinitionByVersion(conn, tenantId, storedType.key, objectVersion);
-            var tagRecord = readSingle.readTagRecordByVersion(conn, tenantId, definition.key, tagVersion);
+            var definition = readSingle.readDefinition(conn, tenantId, objectType.key, parts.selector[0]);
+            var tagRecord = readSingle.readTagRecord(conn, tenantId, definition.key, parts.selector[0]);
             var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagRecord.key);
 
-            return buildTag(objectType, objectId, definition, tagRecord, tagAttrs);
+            return buildTag(objectType.item, parts.objectId[0], definition, tagRecord, tagAttrs);
         },
-        (error, code) -> JdbcError.loadOne_missingItem(error, code, parts),
-        (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, parts));
+        (error, code) -> JdbcError.loadOne_missingItem(error, code, selector),
+        (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, selector));
+    }
+
+
+    // Batch loading may be used e.g. to query all items related to a job in a single query
+    // This can be used both by the platform (e.g. to set up a job) and applications / UI (e.g. to display a job)
+    // Latency remains important, optimisations are in ReadBatchImpl
+
+    @Override public CompletableFuture<List<Tag>>
+    loadObjects(String tenant, List<TagSelector> selectors) {
+
+        var parts = selectorParts(selectors);
+
+        return wrapTransaction(conn -> {
+
+            prepareMappingTable(conn);
+
+            var tenantId = tenants.getTenantId(tenant);
+            var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
+
+            checkObjectTypes(parts, objectType);
+
+            var definition = readBatch.readDefinition(conn, tenantId, objectType.keys, parts.selector);
+            var tag = readBatch.readTag(conn, tenantId, definition.keys, parts.selector);
+
+            return buildTags(objectType.items, parts.objectId, definition, tag);
+        },
+        (error, code) -> JdbcError.loadBatch_missingItem(error, code, selectors),
+        (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, selectors));
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // LOAD METHODS (LEGACY)
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @Override public CompletableFuture<Tag>
+    loadTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion) {
+
+        var selector = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .setObjectVersion(objectVersion)
+                .setTagVersion(tagVersion)
+                .build();
+
+        return loadObject(tenant, selector);
     }
 
     @Override public CompletableFuture<Tag>
     loadLatestTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion) {
 
-        var parts = assembleParts(objectType, objectId, objectVersion, LATEST_TAG);
+        var selector = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .setObjectVersion(objectVersion)
+                .setLatestTag(true)
+                .build();
 
-        return wrapTransaction(conn -> {
-
-            var tenantId = tenants.getTenantId(tenant);
-            var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
-
-            checkObjectType(parts, storedType);
-
-            var definition = readSingle.readDefinitionByVersion(conn, tenantId, storedType.key, objectVersion);
-            var tagRecord = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
-            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagRecord.key);
-
-            return buildTag(objectType, objectId, definition, tagRecord, tagAttrs);
-        },
-        (error, code) -> JdbcError.loadOne_missingItem(error, code, parts),
-        (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, parts));
+        return loadObject(tenant, selector);
     }
 
     @Override public CompletableFuture<Tag>
     loadLatestVersion(String tenant, ObjectType objectType, UUID objectId) {
 
-        var parts = assembleParts(objectType, objectId, LATEST_VERSION, LATEST_TAG);
+        var selector = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectId.toString())
+                .setLatestObject(true)
+                .setLatestTag(true)
+                .build();
 
-        return wrapTransaction(conn -> {
-
-            var tenantId = tenants.getTenantId(tenant);
-            var storedType = readSingle.readObjectTypeById(conn, tenantId, objectId);
-
-            checkObjectType(parts, storedType);
-
-            var definition = readSingle.readDefinitionByLatest(conn, tenantId, storedType.key);
-            var tagRecord = readSingle.readTagRecordByLatest(conn, tenantId, definition.key);
-            var tagAttrs = readSingle.readTagAttrs(conn, tenantId, tagRecord.key);
-
-            return buildTag(objectType, objectId, definition, tagRecord, tagAttrs);
-        },
-        (error, code) -> JdbcError.loadOne_missingItem(error, code, parts),
-        (error, code) -> JdbcError.loadOne_WrongObjectType(error, code, parts));
+        return loadObject(tenant, selector);
     }
-
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // LOAD METHODS (MULTIPLE ITEMS)
-    // -----------------------------------------------------------------------------------------------------------------
-
-    // Load batch methods may be used e.g. to query all items related to a job in a single query
-    // This can be used both by the platform (e.g. to set up a job) and applications / UI (e.g. to display a job)
-    // Latency remains important, optimisations are in ReadBatchImpl
-
 
     @Override public CompletableFuture<List<Tag>>
     loadTags(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds, List<Integer> objectVersions, List<Integer> tagVersions) {
 
-        var parts = assembleParts(objectTypes, objectIds, objectVersions, tagVersions);
+        var selectors = new ArrayList<TagSelector>(objectIds.size());
 
-        return wrapTransaction(conn -> {
+        for (int i = 0; i < objectIds.size(); i++) {
 
-            prepareMappingTable(conn);
+            var selector = TagSelector.newBuilder()
+                    .setObjectType(objectTypes.get(i))
+                    .setObjectId(objectIds.get(i).toString())
+                    .setObjectVersion(objectVersions.get(i))
+                    .setTagVersion(tagVersions.get(i))
+                    .build();
 
-            var tenantId = tenants.getTenantId(tenant);
-            var objPk = lookupObjectPks(conn, tenantId, parts);
-            var definition = readBatch.readDefinitionByVersion(conn, tenantId, parts.objectType, objPk, parts.version);
-            var tag = readBatch.readTagByVersion(conn, tenantId, definition.keys, parts.tagVersion);
+            selectors.add(selector);
+        }
 
-            return buildTags(objectTypes, objectIds, definition, tag);
-        },
-        (error, code) -> JdbcError.loadBatch_missingItem(error, code, parts),
-        (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, parts));
+        return loadObjects(tenant, selectors);
     }
 
     @Override public CompletableFuture<List<Tag>>
     loadLatestTags(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds, List<Integer> objectVersions) {
 
-        var parts = assembleParts(objectTypes, objectIds, objectVersions,
-                Collections.nCopies(objectIds.size(), LATEST_TAG));
+        var selectors = new ArrayList<TagSelector>(objectIds.size());
 
-        return wrapTransaction(conn -> {
+        for (int i = 0; i < objectIds.size(); i++) {
 
-            prepareMappingTable(conn);
+            var selector = TagSelector.newBuilder()
+                    .setObjectType(objectTypes.get(i))
+                    .setObjectId(objectIds.get(i).toString())
+                    .setObjectVersion(objectVersions.get(i))
+                    .setLatestTag(true)
+                    .build();
 
-            var tenantId = tenants.getTenantId(tenant);
-            var objPk = lookupObjectPks(conn, tenantId, parts);
-            var definition = readBatch.readDefinitionByVersion(conn, tenantId, parts.objectType, objPk, parts.version);
-            var tag = readBatch.readTagByLatest(conn, tenantId, definition.keys);
+            selectors.add(selector);
+        }
 
-            return buildTags(objectTypes, objectIds, definition, tag);
-        },
-        (error, code) -> JdbcError.loadBatch_missingItem(error, code, parts),
-        (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, parts));
+        return loadObjects(tenant, selectors);
     }
 
     @Override public CompletableFuture<List<Tag>>
     loadLatestVersions(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds) {
 
-        var parts = assembleParts(objectTypes, objectIds,
-                Collections.nCopies(objectIds.size(), LATEST_VERSION),
-                Collections.nCopies(objectIds.size(), LATEST_TAG));
+        var selectors = new ArrayList<TagSelector>(objectIds.size());
 
-        return wrapTransaction(conn -> {
+        for (int i = 0; i < objectIds.size(); i++) {
 
-            prepareMappingTable(conn);
+            var selector = TagSelector.newBuilder()
+                    .setObjectType(objectTypes.get(i))
+                    .setObjectId(objectIds.get(i).toString())
+                    .setLatestObject(true)
+                    .setLatestTag(true)
+                    .build();
 
-            var tenantId = tenants.getTenantId(tenant);
-            var objPk = lookupObjectPks(conn, tenantId, parts);
-            var definition = readBatch.readDefinitionByLatest(conn, tenantId, parts.objectType, objPk);
-            var tag = readBatch.readTagByLatest(conn, tenantId, definition.keys);
+            selectors.add(selector);
+        }
 
-            return buildTags(objectTypes, objectIds, definition, tag);
-        },
-        (error, code) -> JdbcError.loadBatch_missingItem(error, code, parts),
-        (error, code) -> JdbcError.loadBatch_WrongObjectType(error, code, parts));
-    }
-
-    private long[]
-    lookupObjectPks(Connection conn, short tenantId, ObjectParts parts) throws SQLException {
-
-        var storedType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
-        checkObjectTypes(parts, storedType);
-
-        return storedType.keys;
+        return loadObjects(tenant, selectors);
     }
 
 
     // -----------------------------------------------------------------------------------------------------------------
     // SEARCH METHODS
     // -----------------------------------------------------------------------------------------------------------------
-
 
     @Override public CompletableFuture<List<Tag>>
     search(String tenant, SearchParameters searchParameters) {
@@ -452,19 +443,20 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
     // Break down requests / results into a standard set of parts
 
-
     static class ObjectParts {
 
         ObjectType[] objectType;
         UUID[] objectId;
-        int[] version;
+        int[] objectVersion;
         int[] tagVersion;
+        Instant[] objectTimestamp;
+        Instant[] tagTimestamp;
 
         Tag[] tag;
-        TagHeader[] header;
         ObjectDefinition[] definition;
-    }
 
+        TagSelector[] selector;
+    }
 
     private ObjectParts separateParts(Tag tag) {
 
@@ -473,11 +465,16 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         var parts = new ObjectParts();
         parts.objectType = new ObjectType[] {header.getObjectType()};
         parts.objectId = new UUID[] {UUID.fromString(header.getObjectId())};
-        parts.version = new int[] {header.getObjectVersion()};
+        parts.objectVersion = new int[] {header.getObjectVersion()};
         parts.tagVersion = new int[] {header.getTagVersion()};
 
+        var objectTimestamp = MetadataCodec.parseDatetime(header.getObjectTimestamp()).toInstant();
+        var tagTimestamp = MetadataCodec.parseDatetime(header.getTagTimestamp()).toInstant();
+
+        parts.objectTimestamp = new Instant[] {objectTimestamp};
+        parts.tagTimestamp = new Instant[] {tagTimestamp};
+
         parts.tag = new Tag[] {tag};
-        parts.header = new TagHeader[] {tag.getHeader()};
         parts.definition = new ObjectDefinition[] {tag.getDefinition()};
 
         return parts;
@@ -490,11 +487,22 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         var parts = new ObjectParts();
         parts.objectType = Arrays.stream(headers).map(TagHeader::getObjectType).toArray(ObjectType[]::new);
         parts.objectId = Arrays.stream(headers).map(TagHeader::getObjectId).map(UUID::fromString).toArray(UUID[]::new);
-        parts.version = Arrays.stream(headers).mapToInt(TagHeader::getObjectVersion).toArray();
+        parts.objectVersion = Arrays.stream(headers).mapToInt(TagHeader::getObjectVersion).toArray();
         parts.tagVersion = Arrays.stream(headers).mapToInt(TagHeader::getTagVersion).toArray();
 
+        parts.objectTimestamp = Arrays.stream(headers)
+                .map(TagHeader::getObjectTimestamp)
+                .map(MetadataCodec::parseDatetime)
+                .map(OffsetDateTime::toInstant)
+                .toArray(Instant[]::new);
+
+        parts.tagTimestamp = Arrays.stream(headers)
+                .map(TagHeader::getTagTimestamp)
+                .map(MetadataCodec::parseDatetime)
+                .map(OffsetDateTime::toInstant)
+                .toArray(Instant[]::new);
+
         parts.tag = tags.toArray(Tag[]::new);
-        parts.header = tags.stream().map(Tag::getHeader).toArray(TagHeader[]::new);
         parts.definition = tags.stream().map(Tag::getDefinition).toArray(ObjectDefinition[]::new);
 
         return parts;
@@ -518,24 +526,30 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         return parts;
     }
 
-    private ObjectParts assembleParts(ObjectType type, UUID id, int version, int tagVersion) {
+    private ObjectParts selectorParts(TagSelector selector) {
 
         var parts = new ObjectParts();
-        parts.objectType = new ObjectType[] {type};
-        parts.objectId = new UUID[] {id};
-        parts.version = new int[] {version};
-        parts.tagVersion = new int[] {tagVersion};
+        parts.objectType = new ObjectType[] {selector.getObjectType()};
+        parts.objectId = new UUID[] {UUID.fromString(selector.getObjectId())};
+        parts.selector = new TagSelector[] {selector};
 
         return parts;
     }
 
-    private ObjectParts assembleParts(List<ObjectType> types, List<UUID> ids, List<Integer> versions, List<Integer> tagVersions) {
+    private ObjectParts selectorParts(List<TagSelector> selector) {
 
         var parts = new ObjectParts();
-        parts.objectType = types.toArray(ObjectType[]::new);
-        parts.objectId = ids.toArray(UUID[]::new);
-        parts.version = versions.stream().mapToInt(x -> x).toArray();
-        parts.tagVersion = tagVersions.stream().mapToInt(x -> x).toArray();
+
+        parts.objectType = selector.stream()
+                .map(TagSelector::getObjectType)
+                .toArray(ObjectType[]::new);
+
+        parts.objectId = selector.stream()
+                .map(TagSelector::getObjectId)
+                .map(UUID::fromString)
+                .toArray(UUID[]::new);
+
+        parts.selector = selector.toArray(TagSelector[]::new);
 
         return parts;
     }
@@ -569,11 +583,16 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             KeyedItem<Void> tagRecord,
             Map<String, Value> tagAttrs) {
 
+        var objectTimestamp = definition.timestamp.atOffset(ZoneOffset.UTC);
+        var tagTimestamp = tagRecord.timestamp.atOffset(ZoneOffset.UTC);
+
         var header = TagHeader.newBuilder()
                 .setObjectType(objectType)
                 .setObjectId(objectId.toString())
                 .setObjectVersion(definition.version)
-                .setTagVersion(tagRecord.version);
+                .setTagVersion(tagRecord.version)
+                .setObjectTimestamp(MetadataCodec.quoteDatetime(objectTimestamp))
+                .setTagTimestamp(MetadataCodec.quoteDatetime(tagTimestamp));
 
         return Tag.newBuilder()
                 .setHeader(header)
@@ -583,19 +602,24 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     }
 
     private List<Tag> buildTags(
-            List<ObjectType> objectType, List<UUID> objectId,
+            ObjectType[] objectType, UUID[] objectId,
             KeyedItems<ObjectDefinition> definitions,
             KeyedItems<Tag.Builder> tags) {
 
-        var result = new ArrayList<Tag>(objectId.size());
+        var result = new ArrayList<Tag>(objectId.length);
 
-        for (int i = 0; i < objectId.size(); i++) {
+        for (int i = 0; i < objectId.length; i++) {
+
+            var objectTimestamp = definitions.timestamps[i].atOffset(ZoneOffset.UTC);
+            var tagTimestamp = tags.timestamps[i].atOffset(ZoneOffset.UTC);
 
             var header = TagHeader.newBuilder()
-                    .setObjectType(objectType.get(i))
-                    .setObjectId(objectId.get(i).toString())
+                    .setObjectType(objectType[i])
+                    .setObjectId(objectId[i].toString())
                     .setObjectVersion(definitions.versions[i])
-                    .setTagVersion(tags.versions[i]);
+                    .setTagVersion(tags.versions[i])
+                    .setObjectTimestamp(MetadataCodec.quoteDatetime(objectTimestamp))
+                    .setTagTimestamp(MetadataCodec.quoteDatetime(tagTimestamp));
 
             var tag = tags.items[i]
                     .setHeader(header)
@@ -608,17 +632,4 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         return result;
     }
 
-//    private List<Tag> buildTags(
-//            ObjectHeader[] headers,
-//            Tag.Builder[] tags) {
-//
-//        var result = new ArrayList<Tag>(headers.length);
-//
-//        for (int i = 0; i < headers.length; i++) {
-//            var definition = ObjectDefinition.newBuilder().setHeader(headers[i]);
-//            result.add(i, tags[i].setDefinition(definition).build());
-//        }
-//
-//        return result;
-//    }
 }

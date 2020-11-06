@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.common.exception.EValidationGap;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcBaseDal.KeyedItem;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -23,6 +24,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -65,13 +68,33 @@ class JdbcReadImpl {
     }
 
     KeyedItem<ObjectDefinition>
+    readDefinition(
+            Connection conn, short tenantId,
+            long objectPk, TagSelector selector)
+            throws SQLException {
+
+        if (selector.getObjectVersionCriteriaCase() == TagSelector.ObjectVersionCriteriaCase.OBJECTVERSION)
+            return readDefinitionByVersion(conn, tenantId, objectPk, selector.getObjectVersion());
+
+        if (selector.getObjectVersionCriteriaCase() == TagSelector.ObjectVersionCriteriaCase.OBJECTASOF) {
+            var objectAsOf = MetadataCodec.parseDatetime(selector.getObjectAsOf()).toInstant();
+            return readDefinitionByAsOf(conn, tenantId, objectPk, objectAsOf);
+        }
+
+        if (selector.getObjectVersionCriteriaCase() == TagSelector.ObjectVersionCriteriaCase.LATESTOBJECT)
+            return readDefinitionByLatest(conn, tenantId, objectPk);
+
+        throw new EValidationGap("Object version criteria not set in selector");
+    }
+
+    KeyedItem<ObjectDefinition>
     readDefinitionByVersion(
             Connection conn, short tenantId,
             long objectPk, int objectVersion)
             throws SQLException {
 
         var query =
-                "select definition_pk, object_version, definition\n" +
+                "select definition_pk, object_version, object_timestamp, definition\n" +
                 "from object_definition\n" +
                 "where tenant_id = ?\n" +
                 "and object_fk = ?\n" +
@@ -83,7 +106,34 @@ class JdbcReadImpl {
             stmt.setLong(2, objectPk);
             stmt.setInt(3, objectVersion);
 
-            return readDefinition(stmt);
+            return fetchDefinition(stmt);
+        }
+    }
+
+    KeyedItem<ObjectDefinition>
+    readDefinitionByAsOf(
+            Connection conn, short tenantId,
+            long objectPk, Instant objectAsOf)
+            throws SQLException {
+
+        var query =
+                "select definition_pk, object_version, object_timestamp, definition\n" +
+                "from object_definition\n" +
+                "where tenant_id = ?\n" +
+                "and object_fk = ?\n" +
+                "and object_timestamp <= ?\n" +
+                "and (object_superseded is null or object_superseded > ?)\n";
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            var sqlAsOf = java.sql.Timestamp.from(objectAsOf);
+
+            stmt.setShort(1, tenantId);
+            stmt.setLong(2, objectPk);
+            stmt.setTimestamp(3, sqlAsOf);
+            stmt.setTimestamp(4, sqlAsOf);
+
+            return fetchDefinition(stmt);
         }
     }
 
@@ -93,28 +143,24 @@ class JdbcReadImpl {
             throws SQLException {
 
         var query =
-                "select definition_pk, object_version, definition\n" +
+                "select definition_pk, object_version, object_timestamp, definition\n" +
                 "from object_definition\n" +
                 "where tenant_id = ?\n" +
-                "and definition_pk = (\n" +
-                "  select lv.latest_definition_pk\n" +
-                "  from latest_version lv\n" +
-                "  where lv.tenant_id = ?\n" +
-                "  and lv.object_fk = ?\n" +
-                ")";
+                "  and object_fk = ?\n" +
+                "  and object_is_latest = ?";
 
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
-            stmt.setShort(2, tenantId);
-            stmt.setLong(3, objectPk);
+            stmt.setLong(2, objectPk);
+            stmt.setBoolean(3, true);
 
-            return readDefinition(stmt);
+            return fetchDefinition(stmt);
         }
     }
 
     private KeyedItem<ObjectDefinition>
-    readDefinition(PreparedStatement stmt) throws SQLException {
+    fetchDefinition(PreparedStatement stmt) throws SQLException {
 
         try (var rs = stmt.executeQuery()) {
 
@@ -122,8 +168,10 @@ class JdbcReadImpl {
                 throw new JdbcException(JdbcErrorCode.NO_DATA);
 
             var defPk = rs.getLong(1);
-            var version = rs.getInt(2);
-            var defEncoded = rs.getBytes(3);
+            var objectVersion = rs.getInt(2);
+            var sqlTimestamp = rs.getTimestamp(3);
+            var objectTimestamp = sqlTimestamp.toInstant();
+            var defEncoded = rs.getBytes(4);
             var defDecoded = ObjectDefinition.parseFrom(defEncoded);
 
             // TODO: Encode / decode helper, type = protobuf | json ?
@@ -131,7 +179,7 @@ class JdbcReadImpl {
             if (rs.next())
                 throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-            return new KeyedItem<>(defPk, version, defDecoded);
+            return new KeyedItem<>(defPk, objectVersion, objectTimestamp, defDecoded);
         }
         catch (InvalidProtocolBufferException e) {
             throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION);
@@ -139,10 +187,30 @@ class JdbcReadImpl {
     }
 
     KeyedItem<Void>
+    readTagRecord(
+            Connection conn, short tenantId,
+            long definitionPk, TagSelector selector)
+            throws SQLException {
+
+        if (selector.getTagVersionCriteriaCase() == TagSelector.TagVersionCriteriaCase.TAGVERSION)
+            return readTagRecordByVersion(conn, tenantId, definitionPk, selector.getTagVersion());
+
+        if (selector.getTagVersionCriteriaCase() == TagSelector.TagVersionCriteriaCase.TAGASOF) {
+            var tagAsOf = MetadataCodec.parseDatetime(selector.getTagAsOf()).toInstant();
+            return readTagRecordByAsOf(conn, tenantId, definitionPk, tagAsOf);
+        }
+
+        if (selector.getTagVersionCriteriaCase() == TagSelector.TagVersionCriteriaCase.LATESTTAG)
+            return readTagRecordByLatest(conn, tenantId, definitionPk);
+
+        throw new EValidationGap("Tag version criteria not set in selector");
+    }
+
+    KeyedItem<Void>
     readTagRecordByVersion(Connection conn, short tenantId, long definitionPk, int tagVersion) throws SQLException {
 
         var query =
-                "select tag_pk, tag_version \n" +
+                "select tag_pk, tag_version, tag_timestamp\n" +
                 "from tag\n" +
                 "where tenant_id = ?\n" +
                 "and definition_fk = ?\n" +
@@ -159,23 +227,47 @@ class JdbcReadImpl {
     }
 
     KeyedItem<Void>
+    readTagRecordByAsOf(
+            Connection conn, short tenantId,
+            long definitionPk, Instant tagAsOf)
+            throws SQLException {
+
+        var query =
+                "select tag_pk, tag_version, tag_timestamp\n" +
+                "from tag\n" +
+                "where tenant_id = ?\n" +
+                "and definition_fk = ?\n" +
+                "and tag_timestamp <= ?\n" +
+                "and (tag_superseded is null or tag_superseded > ?)\n";
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            var sqlAsOf = java.sql.Timestamp.from(tagAsOf);
+
+            stmt.setShort(1, tenantId);
+            stmt.setLong(2, definitionPk);
+            stmt.setTimestamp(3, sqlAsOf);
+            stmt.setTimestamp(4, sqlAsOf);
+
+            return readTagRecord(stmt);
+        }
+    }
+
+    KeyedItem<Void>
     readTagRecordByLatest(Connection conn, short tenantId, long definitionPk) throws SQLException {
 
         var query =
-                "select tag_pk, tag_version \n" +
+                "select tag_pk, tag_version, tag_timestamp\n" +
                 "from tag\n" +
                 "where tenant_id = ?\n" +
-                "and tag_pk = (\n" +
-                "  select lt.latest_tag_pk\n" +
-                "  from latest_tag lt\n" +
-                "  where lt.tenant_id = ?\n" +
-                "  and lt.definition_fk = ?)";
+                "and definition_fk = ?\n" +
+                "and tag_is_latest = ?";
 
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setShort(1, tenantId);
-            stmt.setShort(2, tenantId);
-            stmt.setLong(3, definitionPk);
+            stmt.setLong(2, definitionPk);
+            stmt.setBoolean(3, true);
 
             return readTagRecord(stmt);
         }
@@ -191,12 +283,14 @@ class JdbcReadImpl {
 
             var tagPk = rs.getLong(1);
             var tagVersion = rs.getInt(2);
+            var sqlTimestamp = rs.getTimestamp(3);
+            var tagTimestamp = sqlTimestamp.toInstant();
 
             if (rs.next())
                 throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
             // Tag record requires only PK and version info
-            return new KeyedItem<>(tagPk, tagVersion, null);
+            return new KeyedItem<>(tagPk, tagVersion, tagTimestamp, null);
         }
     }
 

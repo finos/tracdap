@@ -21,6 +21,7 @@ import com.accenture.trac.common.metadata.*;
 import com.google.protobuf.ByteString;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -91,18 +92,25 @@ public class TestData {
 
     public static TagHeader newHeader(ObjectType objectType) {
 
+        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+
         return TagHeader.newBuilder()
                 .setObjectType(objectType)
                 .setObjectId(UUID.randomUUID().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
+                .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
                 .build();
     }
 
     public static TagHeader nextTagHeader(TagHeader priorTagHeader) {
 
+        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+
         return priorTagHeader.toBuilder()
                 .setTagVersion(priorTagHeader.getTagVersion() + 1)
+                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
                 .build();
     }
 
@@ -305,6 +313,8 @@ public class TestData {
 
     public static Tag tagForNextObject(Tag previous, ObjectDefinition obj, boolean includeHeader) {
 
+        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+
         var newTag = previous.toBuilder()
                 .setDefinition(obj)
                 .putAttr("extra_attr", Value.newBuilder()
@@ -317,6 +327,8 @@ public class TestData {
             var header = previous.getHeader().toBuilder()
                     .setObjectVersion(previous.getHeader().getObjectVersion() + 1)
                     .setTagVersion(1)
+                    .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                    .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
                     .build();
 
             return newTag.setHeader(header).build();

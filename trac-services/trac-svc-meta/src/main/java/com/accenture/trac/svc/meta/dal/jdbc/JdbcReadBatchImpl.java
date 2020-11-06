@@ -16,13 +16,16 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.common.exception.EValidationGap;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Types;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -87,37 +90,22 @@ class JdbcReadBatchImpl {
     }
 
     JdbcBaseDal.KeyedItems<ObjectDefinition>
-    readDefinitionByVersion(
-            Connection conn, short tenantId,
-            ObjectType[] objectType, long[] objectFk, int[] objectVersion)
-            throws SQLException {
+    readDefinition(Connection conn, short tenantId, long[] objectFk, TagSelector[] selector) throws SQLException {
 
-        var mappingStage = insertFkAndVersionForMapping(conn, objectFk, objectVersion);
-        mapDefinitionByVersion(conn, tenantId, mappingStage);
+        var mappingStage = insertObjectSelectors(conn, objectFk, selector);
+        mapObjectSelectors(conn, tenantId, mappingStage);
 
-        return fetchDefinition(conn, tenantId, objectType, mappingStage);
-    }
-
-    JdbcBaseDal.KeyedItems<ObjectDefinition>
-    readDefinitionByLatest(
-            Connection conn, short tenantId,
-            ObjectType[] objectType, long[] objectFk)
-            throws SQLException {
-
-        var mappingStage = insertFkForMapping(conn, objectFk);
-        mapDefinitionByLatest(conn, tenantId, mappingStage);
-
-        return fetchDefinition(conn, tenantId, objectType, mappingStage);
+        return fetchDefinition(conn, tenantId, objectFk.length, mappingStage);
     }
 
     private JdbcBaseDal.KeyedItems<ObjectDefinition>
     fetchDefinition(
             Connection conn, short tenantId,
-            ObjectType[] objectType, int mappingStage)
+            int length, int mappingStage)
             throws SQLException {
 
         var query =
-                "select definition_pk, object_version, definition\n" +
+                "select definition_pk, object_version, object_timestamp, definition\n" +
                 "from object_definition def\n" +
                 "join key_mapping km\n" +
                 "  on def.definition_pk = km.pk\n" +
@@ -134,31 +122,35 @@ class JdbcReadBatchImpl {
 
             try (var rs = stmt.executeQuery()) {
 
-                long[] pks = new long[objectType.length];
-                int[] versions = new int[objectType.length];
-                ObjectDefinition[] defs = new ObjectDefinition[objectType.length];
+                long[] pks = new long[length];
+                int[] versions = new int[length];
+                Instant[] timestamps = new Instant[length];
+                ObjectDefinition[] defs = new ObjectDefinition[length];
 
-                for (var i = 0; i < objectType.length; i++) {
+                for (var i = 0; i < length; i++) {
 
                     if (!rs.next())
                         throw new JdbcException(JdbcErrorCode.NO_DATA);
 
                     var defPk = rs.getLong(1);
                     var defVersion = rs.getInt(2);
-                    var defEncoded = rs.getBytes(3);
+                    var sqlTimestamp = rs.getTimestamp(3);
+                    var defTimestamp = sqlTimestamp.toInstant();
+                    var defEncoded = rs.getBytes(4);
                     var defDecoded = ObjectDefinition.parseFrom(defEncoded);
 
                     // TODO: Encode / decode helper, type = protobuf | json ?
 
                     pks[i] = defPk;
                     versions[i] = defVersion;
+                    timestamps[i] = defTimestamp;
                     defs[i] = defDecoded;
                 }
 
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, defs);
+                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, defs);
             }
             catch (InvalidProtocolBufferException e) {
                 throw new JdbcException(JdbcErrorCode.INVALID_OBJECT_DEFINITION);
@@ -168,27 +160,15 @@ class JdbcReadBatchImpl {
     }
 
     JdbcBaseDal.KeyedItems<Tag.Builder>
-    readTagByVersion(Connection conn, short tenantId, long[] definitionFk, int[] tagVersion) throws SQLException {
+    readTag(Connection conn, short tenantId, long[] definitionFk, TagSelector[] selector) throws SQLException {
 
-        var mappingStage = insertFkAndVersionForMapping(conn, definitionFk, tagVersion);
-        mapTagByVersion(conn, tenantId, mappingStage);
-
-        var tagRecords = fetchTagRecord(conn, tenantId, definitionFk.length, mappingStage);
-        var attrs = fetchTagAttrs(conn, tenantId, definitionFk.length, mappingStage);
-
-        return applyTagRecordAttrs(tagRecords, attrs);
-    }
-
-    JdbcBaseDal.KeyedItems<Tag.Builder>
-    readTagByLatest(Connection conn, short tenantId, long[] definitionFk) throws SQLException {
-
-        var mappingStage = insertFkForMapping(conn, definitionFk);
-        mapTagByLatest(conn, tenantId, mappingStage);
+        var mappingStage = insertTagSelectors(conn, definitionFk, selector);
+        mapTagSelectors(conn, tenantId, mappingStage);
 
         var tagRecords = fetchTagRecord(conn, tenantId, definitionFk.length, mappingStage);
         var attrs = fetchTagAttrs(conn, tenantId, definitionFk.length, mappingStage);
 
-        return applyTagRecordAttrs(tagRecords, attrs);
+        return applyTagAttrs(tagRecords, attrs);
     }
 
     JdbcBaseDal.KeyedItems<Tag.Builder>
@@ -197,10 +177,11 @@ class JdbcReadBatchImpl {
         var mappingStage = insertPk(conn, tagPk);
         mapDefinitionByTagPk(conn, tenantId, mappingStage);
 
-        var headers = fetchTagHeader(conn, tenantId, tagPk.length, mappingStage);
+        var tagRecords = fetchTagRecord(conn, tenantId, tagPk.length, mappingStage);
+        var partialHeaders = fetchTagHeader(conn, tenantId, tagPk.length, mappingStage);
         var attrs = fetchTagAttrs(conn, tenantId, tagPk.length, mappingStage);
 
-        return applyTagAttrs(headers, attrs);
+        return applyTagAttrs(tagRecords, partialHeaders, attrs);
     }
 
     private JdbcBaseDal.KeyedItems<Void>
@@ -210,7 +191,7 @@ class JdbcReadBatchImpl {
         // Note: Common attributes may be added to the tag table as search optimisations, but do not need to be read
 
         var query =
-                "select tag.tag_pk, tag.tag_version \n" +
+                "select tag.tag_pk, tag.tag_version, tag.tag_timestamp\n" +
                 "from tag\n" +
                 "join key_mapping km\n" +
                 "  on tag.tag_pk = km.pk\n" +
@@ -229,6 +210,7 @@ class JdbcReadBatchImpl {
 
                 long[] pks = new long[length];
                 int[] versions = new int[length];
+                Instant[] timestamps = new Instant[length];
 
                 for (var i = 0; i < length; i++) {
 
@@ -237,16 +219,19 @@ class JdbcReadBatchImpl {
 
                     var tagPk = rs.getLong(1);
                     var tagVersion = rs.getInt(2);
+                    var sqlTimestamp = rs.getTimestamp(3);
+                    var tagTimestamp = sqlTimestamp.toInstant();
 
                     pks[i] = tagPk;
                     versions[i] = tagVersion;
+                    timestamps[i] = tagTimestamp;
                 }
 
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
                 // Tag record requires only PK and version info
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, null);
+                return new JdbcBaseDal.KeyedItems<>(pks, versions, timestamps, null);
             }
         }
     }
@@ -263,12 +248,12 @@ class JdbcReadBatchImpl {
         // To set up this mapping, put tag PKs into key_mapping and call mapDefinitionByTagPk()
 
         var query = "select \n" +
-                "  km.pk as tag_pk\n," +
+                "  km.fk as def_pk\n," +
                 "  obj.object_type\n," +
                 "  obj.object_id_hi,\n" +
                 "  obj.object_id_lo,\n" +
                 "  def.object_version,\n" +
-                "  km.ver as tag_version\n" +
+                "  def.object_timestamp\n" +
                 "from key_mapping km\n" +
                 "join object_definition def\n" +
                 "  on def.definition_pk = km.fk\n" +
@@ -289,7 +274,6 @@ class JdbcReadBatchImpl {
             try (var rs = stmt.executeQuery()) {
 
                 var pks = new long[length];
-                var versions = new int[length];
                 var headers = new TagHeader[length];
 
                 for (int i = 0; i < length; i++) {
@@ -297,12 +281,13 @@ class JdbcReadBatchImpl {
                     if (!rs.next())
                         throw new JdbcException(JdbcErrorCode.NO_DATA);
 
-                    var pk = rs.getLong(1);
+                    var definitionPk = rs.getLong(1);
                     var objectTypeCode = rs.getString(2);
                     var objectIdHi = rs.getLong(3);
                     var objectIdLo = rs.getLong(4);
                     var objectVersion = rs.getInt(5);
-                    var tagVersion = rs.getInt(6);
+                    var sqlTimestamp = rs.getTimestamp(6);
+                    var objectTimestamp = sqlTimestamp.toInstant();
 
                     var objectId = new UUID(objectIdHi, objectIdLo);
                     var objectType = ObjectType.valueOf(objectTypeCode);
@@ -311,18 +296,17 @@ class JdbcReadBatchImpl {
                             .setObjectType(objectType)
                             .setObjectId(objectId.toString())
                             .setObjectVersion(objectVersion)
-                            .setTagVersion(tagVersion)
+                            .setObjectTimestamp(MetadataCodec.quoteDatetime(objectTimestamp.atOffset(ZoneOffset.UTC)))
                             .build();
 
-                    pks[i] = pk;
-                    versions[i] = tagVersion;
+                    pks[i] = definitionPk;
                     headers[i] = header;
                 }
 
                 if (rs.next())
                     throw new JdbcException(JdbcErrorCode.TOO_MANY_ROWS);
 
-                return new JdbcBaseDal.KeyedItems<>(pks, versions, headers);
+                return new JdbcBaseDal.KeyedItems<>(pks, headers);
             }
         }
     }
@@ -422,7 +406,7 @@ class JdbcReadBatchImpl {
     }
 
     private JdbcBaseDal.KeyedItems<Tag.Builder>
-    applyTagRecordAttrs(JdbcBaseDal.KeyedItems<Void> tagRecords, Map<String, Value>[] attrs) {
+    applyTagAttrs(JdbcBaseDal.KeyedItems<Void> tagRecords, Map<String, Value>[] attrs) {
 
         var tags = new Tag.Builder[tagRecords.keys.length];
 
@@ -432,22 +416,31 @@ class JdbcReadBatchImpl {
                     .putAllAttr(attrs[i]);
         }
 
-        return new JdbcBaseDal.KeyedItems<>(tagRecords.keys, tagRecords.versions, tags);
+        return new JdbcBaseDal.KeyedItems<>(tagRecords.keys, tagRecords.versions, tagRecords.timestamps, tags);
     }
 
     private JdbcBaseDal.KeyedItems<Tag.Builder>
-    applyTagAttrs(JdbcBaseDal.KeyedItems<TagHeader> headers, Map<String, Value>[] attrs) {
+    applyTagAttrs(JdbcBaseDal.KeyedItems<Void> tagRecords, JdbcBaseDal.KeyedItems<TagHeader> headers, Map<String, Value>[] attrs) {
 
         var tags = new Tag.Builder[headers.keys.length];
 
         for (var i = 0; i < headers.keys.length; i++) {
 
+            var tagTimestamp = MetadataCodec
+                    .quoteDatetime(tagRecords.timestamps[i]
+                    .atOffset(ZoneOffset.UTC));
+
+            var header = headers.items[i].toBuilder()
+                    .setTagVersion(tagRecords.versions[i])
+                    .setTagTimestamp(tagTimestamp)
+                    .build();
+
             tags[i] = Tag.newBuilder()
-                    .setHeader(headers.items[i])
+                    .setHeader(header)
                     .putAllAttr(attrs[i]);
         }
 
-        return new JdbcBaseDal.KeyedItems<>(headers.keys, headers.versions, tags);
+        return new JdbcBaseDal.KeyedItems<>(headers.keys, tagRecords.versions, tagRecords.timestamps, tags);
     }
 
 
@@ -520,6 +513,40 @@ class JdbcReadBatchImpl {
     // KEY MAPPING FUNCTIONS
     // -----------------------------------------------------------------------------------------------------------------
 
+    // Directly insert the PKs that will be read
+
+    private int insertPk(Connection conn, long[] pks) throws SQLException {
+
+        var query =
+                "insert into key_mapping (pk, mapping_stage, ordering)\n" +
+                "values (?, ?, ?)";
+
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            var mappingStage = nextMappingStage();
+
+            for (var i = 0; i < pks.length; i++) {
+
+                stmt.clearParameters();
+
+                stmt.setLong(1, pks[i]);
+                stmt.setInt(2, mappingStage);
+                stmt.setInt(3, i);
+
+                stmt.addBatch();
+            }
+
+            stmt.executeBatch();
+
+            return mappingStage;
+        }
+    }
+
+
+    // Insert object ID, map to object PK
+
     private int insertIdForMapping(Connection conn, UUID[] ids) throws SQLException {
 
         var query =
@@ -550,56 +577,201 @@ class JdbcReadBatchImpl {
         }
     }
 
-    private int insertPk(Connection conn, long[] pks) throws SQLException {
+    private void mapObjectById(Connection conn, short tenantId, int mappingStage) throws SQLException {
 
-        var query =
-                "insert into key_mapping (pk, mapping_stage, ordering)\n" +
-                "values (?, ?, ?)";
+        var query = "update key_mapping\n" +
+                "set pk = (" +
+                "  select object_pk from object_id oid\n" +
+                "  where oid.tenant_id = ?\n" +
+                "  and oid.object_id_hi = key_mapping.id_hi\n" +
+                "  and oid.object_id_lo = key_mapping.id_lo)\n" +
+                "where mapping_stage = ?";
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
 
-        try (var stmt = conn.prepareStatement(query)) {
-            return insertKeysForMapping(stmt, pks);
+        try (var stmt = conn.prepareStatement(query))  {
+
+            stmt.setShort(1, tenantId);
+            stmt.setInt(2, mappingStage);
+
+            stmt.execute();
         }
     }
 
-    private int insertFkForMapping(Connection conn, long[] fks) throws SQLException {
 
-        var query =
-                "insert into key_mapping (fk, mapping_stage, ordering)\n" +
-                "values (?, ?, ?)";
+    // Insert selectors for objects, map to definition pk
 
-        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
-
-        try (var stmt = conn.prepareStatement(query)) {
-            return insertKeysForMapping(stmt, fks);
-        }
-    }
-
-    private int insertKeysForMapping(PreparedStatement stmt, long[] keys) throws SQLException {
+    private int insertObjectSelectors(Connection conn, long[] objectFk, TagSelector[] selector) throws SQLException {
 
         var mappingStage = nextMappingStage();
 
-        for (var i = 0; i < keys.length; i++) {
+        var query = "insert into key_mapping (\n" +
+                "  fk, ver, as_of, is_latest,\n" +
+                "  mapping_stage, ordering)\n" +
+                "values (?, ?, ?, ?, ?, ?)";
 
-            stmt.clearParameters();
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
 
-            stmt.setLong(1, keys[i]);
-            stmt.setInt(2, mappingStage);
-            stmt.setInt(3, i);
+        try (var stmt = conn.prepareStatement(query)) {
 
-            stmt.addBatch();
+            for (var i = 0; i < objectFk.length; i++) {
+
+                var criteria = selector[i].getObjectVersionCriteriaCase();
+
+                stmt.clearParameters();
+
+                stmt.setLong(1, objectFk[i]);
+                stmt.setNull(2, Types.INTEGER);
+                stmt.setNull(3, Types.TIMESTAMP);
+                stmt.setNull(4, Types.BOOLEAN);
+
+                switch (criteria) {
+
+                    case OBJECTVERSION:
+                        stmt.setInt(2, selector[i].getObjectVersion());
+                        break;
+
+                    case OBJECTASOF:
+                        var objectAsOf = MetadataCodec.parseDatetime(selector[i].getObjectAsOf()).toInstant();
+                        var sqlAsOf = java.sql.Timestamp.from(objectAsOf);
+                        stmt.setTimestamp(3, sqlAsOf);
+                        break;
+
+                    case LATESTOBJECT:
+                        stmt.setBoolean(4, true);
+                        break;
+
+                    default:
+                        throw new EValidationGap("Object criteria not set in selector");
+                }
+
+                stmt.setInt(5, mappingStage);
+                stmt.setInt(6, i);
+
+                stmt.addBatch();
+            }
+
+            stmt.executeBatch();
         }
-
-        stmt.executeBatch();
 
         return mappingStage;
     }
 
+    private void mapObjectSelectors(Connection conn, short tenantId, int mappingStage) throws SQLException {
+
+        var query = "update key_mapping\n" +
+                "set pk = (" +
+                "  select definition_pk from object_definition def\n" +
+                "  where def.tenant_id = ?\n" +
+                "  and def.object_fk = key_mapping.fk\n" +
+                "  and (" +
+                "    (key_mapping.ver is not null and def.object_version = key_mapping.ver) or\n" +
+                "    (key_mapping.as_of is not null and def.object_timestamp <= key_mapping.as_of and\n" +
+                "    (def.object_superseded is null or def.object_superseded > key_mapping.as_of)) or\n" +
+                "    (key_mapping.is_latest is not null and def.object_is_latest = key_mapping.is_latest)))\n" +
+                "where mapping_stage = ?";
+
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setShort(1, tenantId);
+            stmt.setInt(2, mappingStage);
+
+            stmt.executeUpdate();
+        }
+    }
+
+
+    // Insert selectors for tags, map to tag pk
+
+    private int insertTagSelectors(Connection conn, long[] definitionFk, TagSelector[] selector) throws SQLException {
+
+        var mappingStage = nextMappingStage();
+
+        var query = "insert into key_mapping (\n" +
+                "  fk, ver, as_of, is_latest,\n" +
+                "  mapping_stage, ordering)\n" +
+                "values (?, ?, ?, ?, ?, ?)";
+
+        query = query.replaceFirst("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            for (var i = 0; i < definitionFk.length; i++) {
+
+                var criteria = selector[i].getTagVersionCriteriaCase();
+
+                stmt.clearParameters();
+
+                stmt.setLong(1, definitionFk[i]);
+                stmt.setNull(2, Types.INTEGER);
+                stmt.setNull(3, Types.TIMESTAMP);
+                stmt.setNull(4, Types.BOOLEAN);
+
+                switch (criteria) {
+
+                    case TAGVERSION:
+                        stmt.setInt(2, selector[i].getTagVersion());
+                        break;
+
+                    case TAGASOF:
+                        var tagAsOf = MetadataCodec.parseDatetime(selector[i].getTagAsOf()).toInstant();
+                        var sqlAsOf = java.sql.Timestamp.from(tagAsOf);
+                        stmt.setTimestamp(3, sqlAsOf);
+                        break;
+
+                    case LATESTTAG:
+                        stmt.setBoolean(4, true);
+                        break;
+
+                    default:
+                        throw new EValidationGap("Tag criteria not set in selector");
+                }
+
+                stmt.setInt(5, mappingStage);
+                stmt.setInt(6, i);
+
+                stmt.addBatch();
+            }
+
+            stmt.executeBatch();
+        }
+
+        return mappingStage;
+    }
+
+    private void mapTagSelectors(Connection conn, short tenantId, int mappingStage) throws SQLException {
+
+        var query = "update key_mapping\n" +
+                "set pk = (" +
+                "  select tag_pk from tag\n" +
+                "  where tag.tenant_id = ?\n" +
+                "  and tag.definition_fk = key_mapping.fk\n" +
+                "  and (" +
+                "    (key_mapping.ver is not null and tag.tag_version = key_mapping.ver) or\n" +
+                "    (key_mapping.as_of is not null and tag.tag_timestamp <= key_mapping.as_of and\n" +
+                "    (tag.tag_superseded is null or tag.tag_superseded > key_mapping.as_of)) or\n" +
+                "    (key_mapping.is_latest is not null and tag.tag_is_latest = key_mapping.is_latest)))\n" +
+                "where mapping_stage = ?";
+
+        query = query.replaceAll("key_mapping", dialect.mappingTableName());
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setShort(1, tenantId);
+            stmt.setInt(2, mappingStage);
+
+            stmt.executeUpdate();
+        }
+    }
+
+
+    // Insert FK + version, can map to definition or tag PK more directly than using selectors
+
     private int insertFkAndVersionForMapping(Connection conn, long[] fk, int[] version) throws SQLException {
 
-        var query =
-                "insert into key_mapping (fk, ver, mapping_stage, ordering)\n" +
+        var query = "insert into key_mapping (fk, ver, mapping_stage, ordering)\n" +
                 "values (?, ?, ?, ?)";
 
         query = query.replaceFirst("key_mapping", dialect.mappingTableName());
@@ -626,28 +798,6 @@ class JdbcReadBatchImpl {
         }
     }
 
-    private void mapObjectById(Connection conn, short tenantId, int mappingStage) throws SQLException {
-
-        var query =
-                "update key_mapping\n" +
-                "set pk = (" +
-                "  select object_pk from object_id oid\n" +
-                "  where oid.tenant_id = ?\n" +
-                "  and oid.object_id_hi = key_mapping.id_hi\n" +
-                "  and oid.object_id_lo = key_mapping.id_lo)\n" +
-                "where mapping_stage = ?";
-
-        query = query.replaceAll("key_mapping", dialect.mappingTableName());
-
-        try (var stmt = conn.prepareStatement(query))  {
-
-            stmt.setShort(1, tenantId);
-            stmt.setInt(2, mappingStage);
-
-            stmt.execute();
-        }
-    }
-
     private void mapDefinitionByVersion(Connection conn, short tenantId, int mappingStage) throws SQLException {
 
         var query =
@@ -670,15 +820,14 @@ class JdbcReadBatchImpl {
         }
     }
 
-    private void mapDefinitionByLatest(Connection conn, short tenantId, int mappingStage) throws SQLException {
+    private void mapTagByVersion(Connection conn, short tenantId, int mappingStage) throws SQLException {
 
-        var query =
-                "update key_mapping\n" +
+        var query = "update key_mapping\n" +
                 "set pk = (\n" +
-                "  select lv.latest_definition_pk\n" +
-                "  from latest_version lv\n" +
-                "  where lv.tenant_id = ?\n" +
-                "  and lv.object_fk = key_mapping.fk)\n" +
+                "  select tag_pk from tag\n" +
+                "  where tag.tenant_id = ?\n" +
+                "  and tag.definition_fk = key_mapping.fk\n" +
+                "  and tag.tag_version = key_mapping.ver)\n" +
                 "where mapping_stage = ?";
 
         query = query.replaceAll("key_mapping", dialect.mappingTableName());
@@ -692,6 +841,9 @@ class JdbcReadBatchImpl {
         }
     }
 
+
+    // Map definition keys from tag PKs, used during a search operation
+
     private void mapDefinitionByTagPk(Connection conn, short tenantId, int mappingStage) throws SQLException {
 
         // Use this mapping to prepare for fetchTagHeaders()
@@ -700,8 +852,7 @@ class JdbcReadBatchImpl {
         // Put definition key into key_mapping.fk
         // Also put tag version into key_mapping.ver
 
-        var query =
-                "update key_mapping\n" +
+        var query = "update key_mapping\n" +
                 "set fk = (\n" +
                 "  select definition_fk from tag t1\n" +
                 "  where t1.tenant_id = ?\n" +
@@ -724,49 +875,6 @@ class JdbcReadBatchImpl {
         }
     }
 
-    private void mapTagByVersion(Connection conn, short tenantId, int mappingStage) throws SQLException {
-
-        var query =
-                "update key_mapping\n" +
-                "set pk = (\n" +
-                "  select tag_pk from tag\n" +
-                "  where tag.tenant_id = ?\n" +
-                "  and tag.definition_fk = key_mapping.fk\n" +
-                "  and tag.tag_version = key_mapping.ver)\n" +
-                "where mapping_stage = ?";
-
-        query = query.replaceAll("key_mapping", dialect.mappingTableName());
-
-        try (var stmt = conn.prepareStatement(query))  {
-
-            stmt.setShort(1, tenantId);
-            stmt.setInt(2, mappingStage);
-
-            stmt.execute();
-        }
-    }
-
-    private void mapTagByLatest(Connection conn, short tenantId, int mappingStage) throws SQLException {
-
-        var query =
-                "update key_mapping\n" +
-                "set pk = (\n" +
-                "  select lt.latest_tag_pk\n" +
-                "  from latest_tag lt\n" +
-                "  where lt.tenant_id = ?\n" +
-                "  and lt.definition_fk = key_mapping.fk)\n" +
-                "where mapping_stage = ?";
-
-        query = query.replaceAll("key_mapping", dialect.mappingTableName());
-
-        try (var stmt = conn.prepareStatement(query))  {
-
-            stmt.setShort(1, tenantId);
-            stmt.setInt(2, mappingStage);
-
-            stmt.execute();
-        }
-    }
 
     private int nextMappingStage() {
 

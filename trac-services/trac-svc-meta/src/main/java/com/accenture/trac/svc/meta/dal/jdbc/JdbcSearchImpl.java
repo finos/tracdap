@@ -35,7 +35,9 @@ class JdbcSearchImpl {
 
     long[] search(Connection conn, short tenantId, SearchParameters searchParameters) throws SQLException {
 
-        var query = queryBuilder.buildSearchQuery(tenantId, searchParameters);
+        var query = (searchParameters.getPriorVersions() || searchParameters.getPriorTags())
+                ? queryBuilder.buildPriorSearchQuery(tenantId, searchParameters)
+                : queryBuilder.buildSearchQuery(tenantId, searchParameters);
 
         log.info("Running search query: \n{}", query.getQuery());
 

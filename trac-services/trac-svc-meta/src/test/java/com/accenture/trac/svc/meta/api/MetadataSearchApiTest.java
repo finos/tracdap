@@ -16,11 +16,9 @@
 
 package com.accenture.trac.svc.meta.api;
 
-import com.accenture.trac.common.api.meta.MetadataSearchApiGrpc;
-import com.accenture.trac.common.api.meta.MetadataSearchRequest;
-import com.accenture.trac.common.api.meta.MetadataTrustedWriteApiGrpc;
-import com.accenture.trac.common.api.meta.MetadataWriteRequest;
+import com.accenture.trac.common.api.meta.*;
 import com.accenture.trac.common.metadata.BasicType;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.ObjectType;
 import com.accenture.trac.common.metadata.Tag;
 import com.accenture.trac.common.metadata.search.*;
@@ -375,6 +373,143 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         assertEquals(1, searchResult.getSearchResultCount());
         assertEquals(t1, searchResult.getSearchResult(0));
+    }
+
+    @Test
+    void temporalSearch() throws Exception {
+
+        // Single test case to search as of a previous point in time
+
+        var obj1 = dummyDataDef();
+
+        var create1 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(obj1)
+                .addTagUpdate(TagUpdate.newBuilder()
+                        .setAttrName("as_of_attr_1")
+                        .setValue(MetadataCodec.encodeValue("initial_value")))
+                .build();
+
+        var header1 = writeApi.createObject(create1);
+        var header2 = writeApi.createObject(create1);
+
+        // Use a search timestamp after both objects have been created, but before either is updated
+        var v1SearchTime = MetadataCodec.parseDatetime(header2.getTagTimestamp()).plusNanos(5000);
+
+        Thread.sleep(10);
+
+        // Update only one of the two objects
+
+        var update1 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(selectorForTag(header2))
+                .addTagUpdate(TagUpdate.newBuilder()
+                        .setAttrName("as_of_attr_1")
+                        .setOperation(TagOperation.REPLACE_ATTR)
+                        .setValue(MetadataCodec.encodeValue("updated_value")))
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.updateTag(update1);
+
+        // Search without specifying as-of, should return only the object that has the original tag
+
+        var searchRequest = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(SearchExpression.newBuilder()
+                        .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("as_of_attr_1")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(encodeValue("initial_value")))))
+                .build();
+
+        var result = searchApi.search(searchRequest);
+        var resultHeader = result.getSearchResult(0).getHeader();
+
+        Assertions.assertEquals(1, result.getSearchResultCount());
+        Assertions.assertEquals(header1, resultHeader);
+
+        // Now search with an as-of time before the update was applied, both objects should come back
+        // The object created last should be top of the list
+
+        var asOfSearch = searchRequest.toBuilder()
+                .setSearchParams(searchRequest.getSearchParams().toBuilder()
+                .setSearchAsOf(MetadataCodec.quoteDatetime(v1SearchTime)))
+                .build();
+
+        var asOfResult = searchApi.search(asOfSearch);
+        var resultHeader2 = asOfResult.getSearchResult(0).getHeader();
+        var resultHeader1 = asOfResult.getSearchResult(1).getHeader();
+
+        Assertions.assertEquals(2, asOfResult.getSearchResultCount());
+        Assertions.assertEquals(header1, resultHeader1);
+        Assertions.assertEquals(header2, resultHeader2);
+    }
+
+    @Test
+    void priorVersionsAndTags() {
+
+        var v1Obj = dummyDataDef();
+        var v2Obj = nextDataDef(v1Obj);
+
+        var create1 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(v1Obj)
+                .addTagUpdate(TagUpdate.newBuilder()
+                        .setAttrName("api_prior_search_attr")
+                        .setValue(MetadataCodec.encodeValue("initial_value")))
+                .build();
+
+        var v1t1Header = writeApi.createObject(create1);
+
+        var create2 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(selectorForTag(v1t1Header))
+                .addTagUpdate(TagUpdate.newBuilder()
+                        .setAttrName("api_prior_search_attr")
+                        .setValue(MetadataCodec.encodeValue("modified_value")))
+                .build();
+
+        var v1t2Header = writeApi.updateTag(create2);
+
+        var create3 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setPriorVersion(selectorForTag(v1t2Header))
+                .setDefinition(v2Obj)
+                .addTagUpdate(TagUpdate.newBuilder()
+                        .setAttrName("api_prior_search_attr")
+                        .setValue(MetadataCodec.encodeValue("modified_value")))
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.updateObject(create3);
+
+        var searchRequest = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("api_prior_search_attr")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(encodeValue("initial_value"))))
+                .setPriorVersions(true)
+                .setPriorTags(true))
+                .build();
+
+        var result = searchApi.search(searchRequest);
+
+        Assertions.assertEquals(1, result.getSearchResultCount());
+        Assertions.assertEquals(v1t1Header, result.getSearchResult(0).getHeader());
     }
 
     @Test
