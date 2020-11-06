@@ -32,18 +32,12 @@ class JdbcSearchImpl {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final JdbcSearchQueryBuilder queryBuilder = new JdbcSearchQueryBuilder();
-    private final JdbcReadBatchImpl readBatch;
-
-    JdbcSearchImpl(JdbcReadBatchImpl readBatch) {
-        this.readBatch = readBatch;
-    }
 
     long[] search(Connection conn, short tenantId, SearchParameters searchParameters) throws SQLException {
 
-        if (searchParameters.getPriorVersions() || searchParameters.getPriorTags())
-            return searchPrior(conn, tenantId, searchParameters);
-
-        var query = queryBuilder.buildSearchQuery(tenantId, searchParameters);
+        var query = (searchParameters.getPriorVersions() || searchParameters.getPriorTags())
+                ? queryBuilder.buildPriorSearchQuery(tenantId, searchParameters)
+                : queryBuilder.buildSearchQuery(tenantId, searchParameters);
 
         log.info("Running search query: \n{}", query.getQuery());
 
@@ -70,43 +64,5 @@ class JdbcSearchImpl {
                     return pks;
             }
         }
-    }
-
-    long[] searchPrior(Connection conn, short tenantId, SearchParameters searchParameters) throws SQLException {
-
-        var query = queryBuilder.buildPriorSearchQuery(tenantId, searchParameters);
-
-        log.info("Running search query: \n{}", query.getQuery());
-
-        var oPks = new long[MAX_SEARCH_RESULT];
-        var oVers = new int[MAX_SEARCH_RESULT];
-        var tVers = new int[MAX_SEARCH_RESULT];
-
-        try (var stmt = conn.prepareStatement(query.getQuery())) {
-
-            for (int pIndex = 0; pIndex < query.getParams().size(); pIndex++)
-                query.getParams().get(pIndex).accept(stmt, pIndex + 1);
-
-            int i = 0;
-
-            try (var rs = stmt.executeQuery()) {
-
-                while (rs.next() && i < MAX_SEARCH_RESULT) {
-                    oPks[i] = rs.getLong("object_fk");
-                    oVers[i] = rs.getInt("object_version");
-                    tVers[i] = rs.getInt("tag_version");
-                    i++;
-                }
-            }
-
-            if (i < MAX_SEARCH_RESULT) {
-                oPks = Arrays.copyOfRange(oPks, 0, i);
-                oVers = Arrays.copyOfRange(oVers, 0, i);
-                tVers = Arrays.copyOfRange(tVers, 0, i);
-            }
-        }
-
-        var defPks = readBatch.lookupDefinitionPk(conn, tenantId, oPks, oVers);
-        return readBatch.lookupTagPk(conn, tenantId, defPks, tVers);
     }
 }

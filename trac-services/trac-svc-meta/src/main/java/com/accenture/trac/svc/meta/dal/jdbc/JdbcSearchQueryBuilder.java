@@ -41,59 +41,55 @@ class JdbcSearchQueryBuilder {
         log = LoggerFactory.getLogger(getClass());
     }
 
-    JdbcSearchQuery buildPriorSearchQuery(short tenantId, SearchParameters searchParameters) {
-
-        // Base query template selects for tenant and object type
-
-        var baseQueryTemplate = "select od%1$d.object_fk, max(od%1d.object_version) as object_version, max(t%1$d.tag_version) as tag_version\n" +
-                "from tag t%1$d\n" +
-                // Join clause
-                "%3$s" +
-                "where t%1$d.tenant_id = ?\n" +
-                "  and t%1$d.object_type = ?\n" +
-                "  and %4$s\n" +
-                "group by od%1$d.object_fk\n" +
-                "order by max(t%1$d.tag_timestamp) desc";
-
-        // Stream of params for the base query
-
-        var baseParams = Stream.of(
-                wrapErrors((stmt, pIndex) -> stmt.setShort(pIndex, tenantId)),
-                wrapErrors((stmt, pIndex) -> stmt.setString(pIndex, searchParameters.getObjectType().name())));
-
-        // Build query parts for the main search expression and version / temporal handling
-
-        var queryParts = new JdbcSearchQuery(0, 0, List.of());
-        queryParts = buildSearchExpr(queryParts, searchParameters.getSearch());
-        queryParts = buildAsOfCondition(queryParts, searchParameters);
-        queryParts = buildNoPriorVersions(queryParts, searchParameters);
-        queryParts = buildNoPriorTags(queryParts, searchParameters);
-
-        // Stream of params assembled from the query parts
-
-        var partsParams =  queryParts.getFragments().stream().flatMap(
-                frag -> frag.getParams().stream());
-
-        // Combine base and sub parts to make the final query
-
-        var allParams = Stream.concat(baseParams, partsParams);
-
-        return buildSearchQueryFromTemplate(baseQueryTemplate, 0, queryParts, allParams);
-    }
-
     JdbcSearchQuery buildSearchQuery(short tenantId, SearchParameters searchParameters) {
 
+        // For latest of as-of searches with no prior versions/tags considered,
+        // there will only be a single result per object. So it is fine to group
+        // by tag pk and return individual tag pks directly
+
+        var selectFields = "t%1$d.tag_pk";
+        var groupByFields = "t%1$d.tag_pk";
+
+        return buildCommonSearchQuery(tenantId, searchParameters, selectFields, groupByFields);
+    }
+
+    JdbcSearchQuery buildPriorSearchQuery(short tenantId, SearchParameters searchParameters) {
+
+        // When prior versions/tags are considered, there can be multiple hits per object.
+        // In this case we group by object FK to limit results to a single entry per object.
+        // We want to get the latest tag, e.g. if v4 is created, then v3 is updated with a new
+        // tag we should return the latest tag for v3.
+
+        // This solution uses tag PK as a proxy for time and just returns the highest tag PK
+        // that matches the search criteria for each object. A solution to order by timestamp
+        // for each object grouping would require per-dialect SQL. In practice, tag PK is likely
+        // to be a good approximation for time and prior-version searches may not be common.
+        // Re-visit if this ever becomes an issue!
+
+        var selectFields = "max(t%1$d.tag_pk) as tag_pk";
+        var groupByFields = "od%1$d.object_fk";
+
+        return buildCommonSearchQuery(tenantId, searchParameters, selectFields, groupByFields);
+    }
+
+    JdbcSearchQuery buildCommonSearchQuery(
+            short tenantId, SearchParameters searchParameters,
+            String selectFields, String groupByFields) {
+
         // Base query template selects for tenant and object type
 
-        var baseQueryTemplate = "select t%1$d.tag_pk\n" +
+        var baseQueryTemplate = "select SELECT_FIELDS\n" +
                 "from tag t%1$d\n" +
                 // Join clause
                 "%3$s" +
                 "where t%1$d.tenant_id = ?\n" +
                 "  and t%1$d.object_type = ?\n" +
                 "  and %4$s\n" +
-                "group by t%1$d.tag_pk\n" +
+                "group by GROUP_BY_FIELDS\n" +
                 "order by max(t%1$d.tag_timestamp) desc";
+
+        baseQueryTemplate = baseQueryTemplate.replace("SELECT_FIELDS", selectFields);
+        baseQueryTemplate = baseQueryTemplate.replace("GROUP_BY_FIELDS", groupByFields);
 
         // Stream of params for the base query
 
@@ -106,8 +102,8 @@ class JdbcSearchQueryBuilder {
         var queryParts = new JdbcSearchQuery(0, 0, List.of());
         queryParts = buildSearchExpr(queryParts, searchParameters.getSearch());
         queryParts = buildAsOfCondition(queryParts, searchParameters);
-        queryParts = buildNoPriorVersions(queryParts, searchParameters);
-        queryParts = buildNoPriorTags(queryParts, searchParameters);
+        queryParts = buildPriorVersions(queryParts, searchParameters);
+        queryParts = buildPriorTags(queryParts, searchParameters);
 
         // Stream of params assembled from the query parts
 
@@ -274,12 +270,6 @@ class JdbcSearchQueryBuilder {
     }
 
     JdbcSearchQuery buildLogicalNot(JdbcSearchQuery baseQuery, LogicalExpression logicalExpr) {
-
-        // TODO: IMPORTANT: Are latest version / tag and as-of joins needed on negative sub-queries?
-        // I.e. should each negative sub-query have the same version/as-of selectors as the base query?
-        // Current test cases are passing without this constraint
-        // Revisit this when implementing full solution for metadata temporality and as-of searching
-        // If the criteria need to match, maybe refactor to re-use code from main build search function
 
         var subQueryTemplate =
                 "select t%1$d.tag_pk\n" +
@@ -515,7 +505,7 @@ class JdbcSearchQueryBuilder {
     }
 
 
-    JdbcSearchQuery buildNoPriorVersions(JdbcSearchQuery baseQuery, SearchParameters searchParams) {
+    JdbcSearchQuery buildPriorVersions(JdbcSearchQuery baseQuery, SearchParameters searchParams) {
 
         var joinClauseTemplate =
                 "join object_definition od%1$d\n" +
@@ -527,7 +517,7 @@ class JdbcSearchQueryBuilder {
         if (searchParams.getPriorVersions()) {
 
             var fragment = new JdbcSearchQuery.Fragment(joinClause, "", List.of());
-            return buildNoPriorFragment(baseQuery, fragment);
+            return buildPriorFragment(baseQuery, fragment);
         }
 
         var whereClauseLatestTemplate = "od%1$d.object_is_latest = ?";
@@ -539,7 +529,7 @@ class JdbcSearchQueryBuilder {
             var fragment = new JdbcSearchQuery.Fragment(joinClause, whereClause, List.of(
                     (stmt, pIndex) -> stmt.setBoolean(pIndex, true)));
 
-            return buildNoPriorFragment(baseQuery, fragment);
+            return buildPriorFragment(baseQuery, fragment);
         }
         else {
 
@@ -550,11 +540,11 @@ class JdbcSearchQueryBuilder {
             var fragment = new JdbcSearchQuery.Fragment(joinClause, whereClause, List.of(
                     (stmt, pIndex) -> stmt.setTimestamp(pIndex, asOfSql)));
 
-            return buildNoPriorFragment(baseQuery, fragment);
+            return buildPriorFragment(baseQuery, fragment);
         }
     }
 
-    JdbcSearchQuery buildNoPriorTags(JdbcSearchQuery baseQuery, SearchParameters searchParams) {
+    JdbcSearchQuery buildPriorTags(JdbcSearchQuery baseQuery, SearchParameters searchParams) {
 
         if (searchParams.getPriorTags())
             return baseQuery;
@@ -568,7 +558,7 @@ class JdbcSearchQueryBuilder {
             var fragment = new JdbcSearchQuery.Fragment("", whereClause, List.of(
                     (stmt, pIndex) -> stmt.setBoolean(pIndex, true)));
 
-            return buildNoPriorFragment(baseQuery, fragment);
+            return buildPriorFragment(baseQuery, fragment);
         }
         else {
 
@@ -579,11 +569,11 @@ class JdbcSearchQueryBuilder {
             var fragment = new JdbcSearchQuery.Fragment("", whereClause, List.of(
                     (stmt, pIndex) -> stmt.setTimestamp(pIndex, asOfSql)));
 
-            return buildNoPriorFragment(baseQuery, fragment);
+            return buildPriorFragment(baseQuery, fragment);
         }
     }
 
-    JdbcSearchQuery buildNoPriorFragment(JdbcSearchQuery baseQuery, JdbcSearchQuery.Fragment fragment) {
+    JdbcSearchQuery buildPriorFragment(JdbcSearchQuery baseQuery, JdbcSearchQuery.Fragment fragment) {
 
         var allFragments = Stream.concat(
                 baseQuery.getFragments().stream(),
