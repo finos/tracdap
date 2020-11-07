@@ -16,10 +16,11 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
-import com.accenture.trac.common.metadata.BasicType;
+import com.accenture.trac.metadata.BasicType;
+import com.accenture.trac.metadata.search.*;
 import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.search.*;
 import com.accenture.trac.common.exception.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

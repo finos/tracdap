@@ -16,9 +16,11 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.metadata.*;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.exception.EValidationGap;
-import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
+
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import java.sql.Connection;

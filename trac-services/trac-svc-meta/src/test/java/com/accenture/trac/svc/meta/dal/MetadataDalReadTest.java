@@ -16,11 +16,11 @@
 
 package com.accenture.trac.svc.meta.dal;
 
+import com.accenture.trac.metadata.TagSelector;
+import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.TagSelector;
 import com.accenture.trac.svc.meta.exception.EMissingItem;
 import com.accenture.trac.svc.meta.exception.EWrongItemType;
-import com.accenture.trac.common.metadata.ObjectType;
 
 import java.util.List;
 import java.util.UUID;

@@ -16,6 +16,8 @@
 
 package com.accenture.trac.common.metadata;
 
+import com.accenture.trac.metadata.*;
+
 import java.math.BigDecimal;
 import java.time.*;
 import java.time.format.DateTimeFormatter;

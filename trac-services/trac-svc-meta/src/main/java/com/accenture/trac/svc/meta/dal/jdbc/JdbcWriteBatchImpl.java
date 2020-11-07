@@ -16,8 +16,9 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.metadata.*;
+import com.accenture.trac.common.metadata.TypeSystem;
 import com.accenture.trac.common.exception.ETracInternal;
-import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal.ObjectParts;
 

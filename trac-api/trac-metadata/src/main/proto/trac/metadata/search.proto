@@ -17,7 +17,7 @@
 syntax = 'proto3';
 package trac.metadata.search;
 
-option java_package = "com.accenture.trac.common.metadata.search";
+option java_package = "com.accenture.trac.metadata.search";
 option java_multiple_files = true;
 
 import "trac/metadata/type.proto";

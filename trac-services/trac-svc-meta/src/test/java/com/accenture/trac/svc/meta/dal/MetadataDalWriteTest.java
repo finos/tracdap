@@ -16,10 +16,10 @@
 
 package com.accenture.trac.svc.meta.dal;
 
+import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.svc.meta.exception.EDuplicateItem;
 import com.accenture.trac.svc.meta.exception.EMissingItem;
 import com.accenture.trac.svc.meta.exception.EWrongItemType;
-import com.accenture.trac.common.metadata.ObjectType;
 import static com.accenture.trac.svc.meta.test.TestData.*;
 
 import java.util.List;

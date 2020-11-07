@@ -17,9 +17,8 @@
 package com.accenture.trac.gateway;
 
 import com.accenture.trac.common.api.*;
-import com.accenture.trac.common.metadata.TagSelector;
-import com.accenture.trac.common.metadata.search.SearchExpression;
-import com.accenture.trac.common.metadata.search.SearchParameters;
+import com.accenture.trac.metadata.TagSelector;
+import com.accenture.trac.metadata.search.SearchParameters;
 import com.accenture.trac.gateway.proxy.RestApiRequestBuilder;
 import com.accenture.trac.gateway.proxy.RestApiRouteMatcher;
 import com.accenture.trac.gateway.proxy.RestApiUnaryHandler;

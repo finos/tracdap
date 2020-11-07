@@ -16,7 +16,9 @@
 
 package com.accenture.trac.svc.meta.test;
 
-import com.accenture.trac.common.metadata.*;
+import com.accenture.trac.metadata.*;
+import com.accenture.trac.common.metadata.TypeSystem;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.google.protobuf.ByteString;
 
 import java.math.BigDecimal;

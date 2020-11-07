@@ -16,10 +16,10 @@
 
 package com.accenture.trac.svc.meta.services;
 
-import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.common.metadata.*;
+import com.accenture.trac.metadata.*;
+import com.accenture.trac.common.metadata.TypeSystem;
 import com.accenture.trac.common.exception.*;
-import com.accenture.trac.svc.meta.exception.ETagUpdate;
+import com.accenture.trac.svc.meta.exception.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

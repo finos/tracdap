@@ -16,11 +16,13 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.metadata.*;
+import com.accenture.trac.metadata.search.*;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.exception.EStartup;
-import com.accenture.trac.common.metadata.search.SearchParameters;
-import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.common.db.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
