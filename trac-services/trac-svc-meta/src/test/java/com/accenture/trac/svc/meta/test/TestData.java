@@ -16,7 +16,6 @@
 
 package com.accenture.trac.svc.meta.test;
 
-import com.accenture.trac.common.api.meta.TagUpdate;
 import com.accenture.trac.common.metadata.*;
 import com.google.protobuf.ByteString;
 

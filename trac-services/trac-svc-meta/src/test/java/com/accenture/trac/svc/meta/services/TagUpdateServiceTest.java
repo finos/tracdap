@@ -16,8 +16,6 @@
 
 package com.accenture.trac.svc.meta.services;
 
-import com.accenture.trac.common.api.meta.TagOperation;
-import com.accenture.trac.common.api.meta.TagUpdate;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.exception.ETagUpdate;
 

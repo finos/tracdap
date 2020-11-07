@@ -16,13 +16,12 @@
 
 package com.accenture.trac.svc.meta.api;
 
-import com.accenture.trac.common.api.meta.*;
-import com.accenture.trac.common.metadata.BasicType;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.ObjectType;
-import com.accenture.trac.common.metadata.Tag;
+import com.accenture.trac.common.api.*;
+import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.common.metadata.search.*;
+
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
+import com.accenture.trac.svc.meta.services.MetadataReadService;
 import com.accenture.trac.svc.meta.services.MetadataSearchService;
 import com.accenture.trac.svc.meta.services.MetadataWriteService;
 import com.accenture.trac.svc.meta.test.IDalTestable;
@@ -30,6 +29,7 @@ import com.accenture.trac.svc.meta.test.IDalTestable;
 import com.accenture.trac.svc.meta.test.JdbcIntegration;
 import com.accenture.trac.svc.meta.test.JdbcUnit;
 import com.accenture.trac.svc.meta.test.TestData;
+
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
@@ -81,34 +81,35 @@ abstract class MetadataSearchApiTest implements IDalTestable {
     @Rule
     final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
 
-    private MetadataSearchApiGrpc.MetadataSearchApiBlockingStub searchApi;
-    private MetadataTrustedWriteApiGrpc.MetadataTrustedWriteApiBlockingStub writeApi;
+    private TracMetadataApiGrpc.TracMetadataApiBlockingStub searchApi;
+    private TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub writeApi;
 
     @BeforeEach
     void setup() throws Exception {
 
         var serverName = InProcessServerBuilder.generateName();
 
-        var searchService = new MetadataSearchService(dal);
-        var searchApiImpl = new MetadataSearchApi(searchService);
-
+        var readService = new MetadataReadService(dal);
         var writeService = new MetadataWriteService(dal);
-        var writeApiImpl = new MetadataTrustedWriteApi(writeService);
+        var searchService = new MetadataSearchService(dal);
+
+        var publicApiImpl = new TracMetadataApi(readService, writeService, searchService);
+        var trustedApiImpl = new TrustedMetadataApi(readService, writeService, searchService);
 
         // Create a server, add service, start, and register for automatic graceful shutdown.
         grpcCleanup.register(InProcessServerBuilder
                 .forName(serverName)
                 .directExecutor()
-                .addService(searchApiImpl)
-                .addService(writeApiImpl)
+                .addService(publicApiImpl)
+                .addService(trustedApiImpl)
                 .build()
                 .start());
 
-        searchApi = MetadataSearchApiGrpc.newBlockingStub(
+        searchApi = TracMetadataApiGrpc.newBlockingStub(
                 // Create a client channel and register for automatic graceful shutdown.
                 grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
 
-        writeApi = MetadataTrustedWriteApiGrpc.newBlockingStub(
+        writeApi = TrustedMetadataApiGrpc.newBlockingStub(
                 // Create a client channel and register for automatic graceful shutdown.
                 grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
     }
