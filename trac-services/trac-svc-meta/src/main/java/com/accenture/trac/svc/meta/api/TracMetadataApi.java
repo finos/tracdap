@@ -16,7 +16,7 @@
 
 package com.accenture.trac.svc.meta.api;
 
-import com.accenture.trac.common.api.*;
+import com.accenture.trac.api.*;
 import com.accenture.trac.metadata.Tag;
 import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.svc.meta.services.MetadataReadService;

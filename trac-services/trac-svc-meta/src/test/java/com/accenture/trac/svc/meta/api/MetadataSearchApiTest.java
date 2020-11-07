@@ -16,7 +16,7 @@
 
 package com.accenture.trac.svc.meta.api;
 
-import com.accenture.trac.common.api.*;
+import com.accenture.trac.api.*;
 import com.accenture.trac.metadata.*;
 import com.accenture.trac.metadata.search.*;
 import com.accenture.trac.common.metadata.MetadataCodec;
