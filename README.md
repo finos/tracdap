@@ -79,7 +79,7 @@ TRAC metadata structures and available API calls is part included in the API
 .proto files:
 
 * [TRAC Metadata Definitions](./trac-api/trac-metadata/src/main/proto/trac/metadata)
-* [TRAC Service API Definitions](./trac-api/trac-services/src/main/proto/trac/api/meta)
+* [TRAC Service API Definitions](./trac-api/trac-services/src/main/proto/trac/api)
 
 The TRAC APIs are available in both gRPC / proto (via the metadata service) and
 REST / json (via the platform gateway). You can use a regular REST client such
