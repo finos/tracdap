@@ -116,7 +116,7 @@ service TracMetadataApi {
      */
     rpc createObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/{objectType}/create-object"
+            post: "/{tenant}/create-object"
             body: "*"
         };
     }
@@ -155,7 +155,7 @@ service TracMetadataApi {
      */
     rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/{objectType}/update-object"
+            post: "/{tenant}/update-object"
             body: "*"
         };
     }
@@ -185,7 +185,7 @@ service TracMetadataApi {
      */
     rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/{objectType}/update-tag"
+            post: "/{tenant}/update-tag"
             body: "*"
         };
     }
@@ -270,7 +270,7 @@ service TracMetadataApi {
      */
     rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
         option (google.api.http) = {
-            post: "/{tenant}/{searchParams.objectType}/search?priorVersions={searchParams.priorVersions}"
+            post: "/{tenant}/search?objectType={searchParams.objectType}&searchAsOf={searchParams.searchAsOf}&priorVersions={searchParams.priorVersions}&priorTags={searchParams.priorTags}"
             body: "searchParams.search"
         };
     }
@@ -373,7 +373,7 @@ service TrustedMetadataApi {
      */
     rpc createObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/{objectType}/create-object"
+            post: "/{tenant}/trusted/create-object"
             body: "*"
         };
     }
@@ -389,7 +389,7 @@ service TrustedMetadataApi {
      */
     rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/{objectType}/update-object"
+            post: "/{tenant}/trusted/update-object"
             body: "*"
         };
     }
@@ -403,7 +403,7 @@ service TrustedMetadataApi {
      */
     rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/{objectType}/update-tag"
+            post: "/{tenant}/trusted/update-tag"
             body: "*"
         };
     }
@@ -424,7 +424,7 @@ service TrustedMetadataApi {
      */
     rpc preallocateId (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/{objectType}/preallocate"
+            post: "/{tenant}/trusted/preallocate"
             body: "*"
         };
     }
@@ -445,7 +445,7 @@ service TrustedMetadataApi {
      */
     rpc createPreallocatedObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/{objectType}/create-preallocated"
+            post: "/{tenant}/trusted/create-preallocated"
             body: "*"
         };
     }
@@ -487,7 +487,7 @@ service TrustedMetadataApi {
      */
     rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/{searchParams.objectType}/search?priorVersions={searchParams.priorVersions}"
+            post: "/{tenant}/trusted/search?objectType={searchParams.objectType}&searchAsOf={searchParams.searchAsOf}&priorVersions={searchParams.priorVersions}&priorTags={searchParams.priorTags}"
             body: "searchParams.search"
         };
     }

@@ -16,8 +16,8 @@
 
 package com.accenture.trac.gateway;
 
-import com.accenture.trac.common.api.meta.*;
-import com.accenture.trac.common.metadata.Tag;
+import com.accenture.trac.common.api.*;
+import com.accenture.trac.common.metadata.TagSelector;
 import com.accenture.trac.common.metadata.search.SearchExpression;
 import com.accenture.trac.gateway.proxy.RestApiRequestBuilder;
 import com.accenture.trac.gateway.proxy.RestApiRouteMatcher;
@@ -43,47 +43,66 @@ public class TracApiConfig {
         var apiRoutes = new RoutingConfig();
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/{objectType}/create-object",
+                "/trac-meta/api/v1/{tenant}/create-object",
                 serviceHost, servicePort,
-                MetadataPublicWriteApiGrpc.getCreateObjectMethod(),
+                TracMetadataApiGrpc.getCreateObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true);
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/{objectType}/update-object",
+                "/trac-meta/api/v1/{tenant}/update-object",
                 serviceHost, servicePort,
-                MetadataPublicWriteApiGrpc.getUpdateObjectMethod(),
+                TracMetadataApiGrpc.getUpdateObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true);
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/{objectType}/update-tag",
+                "/trac-meta/api/v1/{tenant}/update-tag",
                 serviceHost, servicePort,
-                MetadataPublicWriteApiGrpc.getUpdateTagMethod(),
+                TracMetadataApiGrpc.getUpdateTagMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true);
+
+        TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
+                "/trac-meta/api/v1/{tenant}/read-object",
+                serviceHost, servicePort,
+                TracMetadataApiGrpc.getReadObjectMethod(),
+                MetadataReadRequest.getDefaultInstance(),
+                "selector", TagSelector.getDefaultInstance());
+
+        TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
+                "/trac-meta/api/v1/{tenant}/read-batch",
+                serviceHost, servicePort,
+                TracMetadataApiGrpc.getReadBatchMethod(),
+                MetadataBatchRequest.getDefaultInstance(),
+                "selector", TagSelector.getDefaultInstance());
+
+        var searchQueryParams = "objectType={searchParams.objectType}&" +
+                "searchAsOf={searchParams.searchAsOf}&" +
+                "priorVersions={searchParams.priorVersions}&" +
+                "priorTags={searchParams.priorTags}";
+
+        TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
+                "/trac-meta/api/v1/{tenant}/search?" + searchQueryParams,
+                serviceHost, servicePort,
+                TracMetadataApiGrpc.getSearchMethod(),
+                MetadataSearchRequest.getDefaultInstance(),
+                "searchParams.search", SearchExpression.getDefaultInstance());
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.GET,
                 "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/{tagVersion}",
                 serviceHost, servicePort,
-                MetadataReadApiGrpc.getLoadTagMethod(),
-                MetadataReadRequest.getDefaultInstance());
-
-        TracApiConfig.addApiCall(apiRoutes, HttpMethod.GET,
-                "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/latest",
-                serviceHost, servicePort,
-                MetadataReadApiGrpc.getLoadLatestTagMethod(),
-                MetadataReadRequest.getDefaultInstance());
+                TracMetadataApiGrpc.getGetObjectMethod(),
+                MetadataGetRequest.getDefaultInstance());
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.GET,
                 "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/latest/tags/latest",
                 serviceHost, servicePort,
-                MetadataReadApiGrpc.getLoadLatestObjectMethod(),
-                MetadataReadRequest.getDefaultInstance());
+                TracMetadataApiGrpc.getGetLatestObjectMethod(),
+                MetadataGetRequest.getDefaultInstance());
 
-        TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/{searchParams.objectType}/search?priorVersions={searchParams.priorVersions}",
+        TracApiConfig.addApiCall(apiRoutes, HttpMethod.GET,
+                "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/latest",
                 serviceHost, servicePort,
-                MetadataSearchApiGrpc.getSearchMethod(),
-                MetadataSearchRequest.getDefaultInstance(),
-                "searchParams.search", SearchExpression.getDefaultInstance());
+                TracMetadataApiGrpc.getGetLatestTagMethod(),
+                MetadataGetRequest.getDefaultInstance());
 
         return apiRoutes;
     }
@@ -93,34 +112,58 @@ public class TracApiConfig {
         var apiRoutes = new RoutingConfig();
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/create-object",
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/create-object",
                 serviceHost, servicePort,
-                MetadataTrustedWriteApiGrpc.getCreateObjectMethod(),
+                TrustedMetadataApiGrpc.getCreateObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true);
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/update-object",
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/update-object",
                 serviceHost, servicePort,
-                MetadataTrustedWriteApiGrpc.getUpdateObjectMethod(),
+                TrustedMetadataApiGrpc.getUpdateObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true);
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/update-tag",
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/update-tag",
                 serviceHost, servicePort,
-                MetadataTrustedWriteApiGrpc.getUpdateTagMethod(),
+                TrustedMetadataApiGrpc.getUpdateTagMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true);
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/preallocate",
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/preallocate",
                 serviceHost, servicePort,
-                MetadataTrustedWriteApiGrpc.getPreallocateIdMethod(),
+                TrustedMetadataApiGrpc.getPreallocateIdMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true);
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/{objectType}/create-preallocated",
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/create-preallocated",
                 serviceHost, servicePort,
-                MetadataTrustedWriteApiGrpc.getCreatePreallocatedObjectMethod(),
+                TrustedMetadataApiGrpc.getCreatePreallocatedObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true);
+
+        TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/read-object",
+                serviceHost, servicePort,
+                TracMetadataApiGrpc.getReadObjectMethod(),
+                MetadataReadRequest.getDefaultInstance(), true);
+
+        TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/read-batch",
+                serviceHost, servicePort,
+                TracMetadataApiGrpc.getReadBatchMethod(),
+                MetadataBatchRequest.getDefaultInstance(), true);
+
+        var searchQueryParams = "objectType={searchParams.objectType}&" +
+                "searchAsOf={searchParams.searchAsOf}&" +
+                "priorVersions={searchParams.priorVersions}&" +
+                "priorTags={searchParams.priorTags}";
+
+        TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/search?" + searchQueryParams,
+                serviceHost, servicePort,
+                TracMetadataApiGrpc.getSearchMethod(),
+                MetadataSearchRequest.getDefaultInstance(),
+                "searchParams.search", SearchExpression.getDefaultInstance());
 
         return apiRoutes;
     }
