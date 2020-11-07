@@ -17,7 +17,7 @@
 syntax = "proto3";
 package trac.metadata;
 
-option java_package = "com.accenture.trac.common.metadata";
+option java_package = "com.accenture.trac.metadata";
 option java_multiple_files = true;
 
 import "trac/metadata/type.proto";
@@ -68,9 +68,8 @@ message TagHeader {
 
   /**
    * Timestamp for when this version of the object was created.
-   * Represented using ISO 8601.
    */
-  string objectTimestamp = 4;
+  DatetimeValue objectTimestamp = 4;
 
   /**
    * Version of this tag.
@@ -79,9 +78,8 @@ message TagHeader {
 
   /**
    * Timestamp for when this version of the tag was created.
-   * Represented using ISO 8601.
    */
-  string tagTimestamp = 6;
+  DatetimeValue tagTimestamp = 6;
 }
 
 
@@ -147,7 +145,7 @@ message TagSelector {
      * Select the version of the object that was live as of a particular point
      * in time. Represented using ISO 8601.
      */
-    string objectAsOf = 5;
+    DatetimeValue objectAsOf = 5;
   }
 
   oneof tagVersionCriteria {
@@ -168,6 +166,6 @@ message TagSelector {
      * Select the version of the tag that was live as of a particular point
      * in time. Represented using ISO 8601.
      */
-    string tagAsOf = 8;
+    DatetimeValue tagAsOf = 8;
   }
 }

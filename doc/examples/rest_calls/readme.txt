@@ -5,12 +5,12 @@ localhost:8080. You should also have a test tenant created, called ACME_CORP.
 
 To load the sample flow into TRAC, you can use this API call:
 
-POST http://localhost:8080/trac-meta/api/v1/ACME_CORP/flow/new-object
+POST http://localhost:8080/trac-meta/api/v1/ACME_CORP/create-object
 
 You should get a response with the object ID of the new object. To run the
 example search, you can use this call:
 
-POST http://localhost:8080/trac-meta/api/v1/ACME_CORP/FLOW/search
+POST http://localhost:8080/trac-meta/api/v1/ACME_CORP/search
 
 If you create objects and versions of objects with different tag attributes
 you will be able to experiment with search parameters.

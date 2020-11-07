@@ -16,10 +16,11 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
-import com.accenture.trac.common.metadata.BasicType;
+import com.accenture.trac.metadata.BasicType;
+import com.accenture.trac.metadata.search.*;
 import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.search.*;
 import com.accenture.trac.common.exception.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -475,7 +476,7 @@ class JdbcSearchQueryBuilder {
 
         // If there is no as-of condition, do not add any conditions to the base query
 
-        if (searchParams.getSearchAsOf() == null || searchParams.getSearchAsOf().isEmpty())
+        if (!searchParams.hasSearchAsOf())
             return baseQuery;
 
         // The as-of condition only sets an upper bound on timestamps that are considered
@@ -487,7 +488,7 @@ class JdbcSearchQueryBuilder {
         var whereClauseTemplate = "t%1$d.tag_timestamp <= ?";
         var whereClause = String.format(whereClauseTemplate, baseQuery.getSubQueryNumber());
 
-        var asOfTime = MetadataCodec.parseDatetime(searchParams.getSearchAsOf()).toInstant();
+        var asOfTime = MetadataCodec.decodeDatetime(searchParams.getSearchAsOf()).toInstant();
         var asOfSql = java.sql.Timestamp.from(asOfTime);
 
         var fragment = new JdbcSearchQuery.Fragment("", whereClause, List.of(
@@ -523,7 +524,7 @@ class JdbcSearchQueryBuilder {
         var whereClauseLatestTemplate = "od%1$d.object_is_latest = ?";
         var whereClauseAsOfTemplate = "(od%1$d.object_superseded is null or od%1$d.object_superseded > ?)";
 
-        if (searchParams.getSearchAsOf().isEmpty()) {
+        if (!searchParams.hasSearchAsOf()) {
 
             var whereClause = String.format(whereClauseLatestTemplate, baseQuery.getSubQueryNumber());
             var fragment = new JdbcSearchQuery.Fragment(joinClause, whereClause, List.of(
@@ -533,7 +534,7 @@ class JdbcSearchQueryBuilder {
         }
         else {
 
-            var asOfTime = MetadataCodec.parseDatetime(searchParams.getSearchAsOf()).toInstant();
+            var asOfTime = MetadataCodec.decodeDatetime(searchParams.getSearchAsOf()).toInstant();
             var asOfSql = java.sql.Timestamp.from(asOfTime);
 
             var whereClause = String.format(whereClauseAsOfTemplate, baseQuery.getSubQueryNumber());
@@ -552,7 +553,7 @@ class JdbcSearchQueryBuilder {
         var whereClauseLatestTemplate = "t%1$d.tag_is_latest = ?";
         var whereClauseAsOfTemplate = "(t%1$d.tag_superseded is null or t%1$d.tag_superseded > ?)";
 
-        if (searchParams.getSearchAsOf().isEmpty()) {
+        if (!searchParams.hasSearchAsOf()) {
 
             var whereClause = String.format(whereClauseLatestTemplate, baseQuery.getSubQueryNumber());
             var fragment = new JdbcSearchQuery.Fragment("", whereClause, List.of(
@@ -562,7 +563,7 @@ class JdbcSearchQueryBuilder {
         }
         else {
 
-            var asOfTime = MetadataCodec.parseDatetime(searchParams.getSearchAsOf()).toInstant();
+            var asOfTime = MetadataCodec.decodeDatetime(searchParams.getSearchAsOf()).toInstant();
             var asOfSql = java.sql.Timestamp.from(asOfTime);
 
             var whereClause = String.format(whereClauseAsOfTemplate, baseQuery.getSubQueryNumber());

@@ -16,11 +16,13 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.metadata.*;
+import com.accenture.trac.metadata.search.*;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.exception.EStartup;
-import com.accenture.trac.common.metadata.search.SearchParameters;
-import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.common.db.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -468,8 +470,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         parts.objectVersion = new int[] {header.getObjectVersion()};
         parts.tagVersion = new int[] {header.getTagVersion()};
 
-        var objectTimestamp = MetadataCodec.parseDatetime(header.getObjectTimestamp()).toInstant();
-        var tagTimestamp = MetadataCodec.parseDatetime(header.getTagTimestamp()).toInstant();
+        var objectTimestamp = MetadataCodec.decodeDatetime(header.getObjectTimestamp()).toInstant();
+        var tagTimestamp = MetadataCodec.decodeDatetime(header.getTagTimestamp()).toInstant();
 
         parts.objectTimestamp = new Instant[] {objectTimestamp};
         parts.tagTimestamp = new Instant[] {tagTimestamp};
@@ -492,13 +494,13 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         parts.objectTimestamp = Arrays.stream(headers)
                 .map(TagHeader::getObjectTimestamp)
-                .map(MetadataCodec::parseDatetime)
+                .map(MetadataCodec::decodeDatetime)
                 .map(OffsetDateTime::toInstant)
                 .toArray(Instant[]::new);
 
         parts.tagTimestamp = Arrays.stream(headers)
                 .map(TagHeader::getTagTimestamp)
-                .map(MetadataCodec::parseDatetime)
+                .map(MetadataCodec::decodeDatetime)
                 .map(OffsetDateTime::toInstant)
                 .toArray(Instant[]::new);
 
@@ -591,8 +593,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
                 .setObjectId(objectId.toString())
                 .setObjectVersion(definition.version)
                 .setTagVersion(tagRecord.version)
-                .setObjectTimestamp(MetadataCodec.quoteDatetime(objectTimestamp))
-                .setTagTimestamp(MetadataCodec.quoteDatetime(tagTimestamp));
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(objectTimestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(tagTimestamp));
 
         return Tag.newBuilder()
                 .setHeader(header)
@@ -618,8 +620,8 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
                     .setObjectId(objectId[i].toString())
                     .setObjectVersion(definitions.versions[i])
                     .setTagVersion(tags.versions[i])
-                    .setObjectTimestamp(MetadataCodec.quoteDatetime(objectTimestamp))
-                    .setTagTimestamp(MetadataCodec.quoteDatetime(tagTimestamp));
+                    .setObjectTimestamp(MetadataCodec.encodeDatetime(objectTimestamp))
+                    .setTagTimestamp(MetadataCodec.encodeDatetime(tagTimestamp));
 
             var tag = tags.items[i]
                     .setHeader(header)

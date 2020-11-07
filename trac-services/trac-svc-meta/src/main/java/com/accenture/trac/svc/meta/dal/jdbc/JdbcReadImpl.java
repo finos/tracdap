@@ -16,8 +16,9 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import com.accenture.trac.metadata.*;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.exception.EValidationGap;
-import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcBaseDal.KeyedItem;
 import com.google.protobuf.InvalidProtocolBufferException;
 
@@ -25,7 +26,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -77,7 +77,7 @@ class JdbcReadImpl {
             return readDefinitionByVersion(conn, tenantId, objectPk, selector.getObjectVersion());
 
         if (selector.getObjectVersionCriteriaCase() == TagSelector.ObjectVersionCriteriaCase.OBJECTASOF) {
-            var objectAsOf = MetadataCodec.parseDatetime(selector.getObjectAsOf()).toInstant();
+            var objectAsOf = MetadataCodec.decodeDatetime(selector.getObjectAsOf()).toInstant();
             return readDefinitionByAsOf(conn, tenantId, objectPk, objectAsOf);
         }
 
@@ -196,7 +196,7 @@ class JdbcReadImpl {
             return readTagRecordByVersion(conn, tenantId, definitionPk, selector.getTagVersion());
 
         if (selector.getTagVersionCriteriaCase() == TagSelector.TagVersionCriteriaCase.TAGASOF) {
-            var tagAsOf = MetadataCodec.parseDatetime(selector.getTagAsOf()).toInstant();
+            var tagAsOf = MetadataCodec.decodeDatetime(selector.getTagAsOf()).toInstant();
             return readTagRecordByAsOf(conn, tenantId, definitionPk, tagAsOf);
         }
 

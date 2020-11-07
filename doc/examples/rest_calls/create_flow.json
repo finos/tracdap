@@ -1,4 +1,6 @@
 {
+    "objectType": "FLOW",
+
     "tagUpdate": [
         {
             "attrName": "flow_type",

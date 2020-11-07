@@ -16,16 +16,20 @@
 
 package com.accenture.trac.svc.meta.api;
 
-import com.accenture.trac.common.api.meta.*;
-import com.accenture.trac.common.metadata.*;
+import com.accenture.trac.api.*;
+import com.accenture.trac.metadata.*;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
+import com.accenture.trac.svc.meta.services.MetadataReadService;
+import com.accenture.trac.svc.meta.services.MetadataSearchService;
 import com.accenture.trac.svc.meta.services.MetadataWriteService;
+
 import com.accenture.trac.svc.meta.test.IDalTestable;
 import com.accenture.trac.svc.meta.test.JdbcIntegration;
 import com.accenture.trac.svc.meta.test.JdbcUnit;
-import com.accenture.trac.svc.meta.services.MetadataReadService;
 
 import com.accenture.trac.svc.meta.test.TestData;
+
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
@@ -68,8 +72,8 @@ abstract class MetadataReadApiTest implements IDalTestable {
     @Rule
     final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
 
-    private MetadataReadApiGrpc.MetadataReadApiBlockingStub readApi;
-    private MetadataTrustedWriteApiGrpc.MetadataTrustedWriteApiBlockingStub writeApi;
+    private TracMetadataApiGrpc.TracMetadataApiBlockingStub readApi;
+    private TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub writeApi;
 
     @BeforeEach
     void setup() throws Exception {
@@ -77,25 +81,26 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var serverName = InProcessServerBuilder.generateName();
 
         var readService = new MetadataReadService(dal);
-        var readApiImpl = new MetadataReadApi(readService);
-
         var writeService = new MetadataWriteService(dal);
-        var writeApiImpl = new MetadataTrustedWriteApi(writeService);
+        var searchService = new MetadataSearchService(dal);
+
+        var publicApiImpl = new TracMetadataApi(readService, writeService, searchService);
+        var trustedApiImpl = new TrustedMetadataApi(readService, writeService, searchService);
 
         // Create a server, add service, start, and register for automatic graceful shutdown.
         grpcCleanup.register(InProcessServerBuilder
                  .forName(serverName)
                 .directExecutor()
-                .addService(readApiImpl)
-                .addService(writeApiImpl)
+                .addService(publicApiImpl)
+                .addService(trustedApiImpl)
                 .build()
                 .start());
 
-        readApi = MetadataReadApiGrpc.newBlockingStub(
+        readApi = TracMetadataApiGrpc.newBlockingStub(
                 // Create a client channel and register for automatic graceful shutdown.
                 grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
 
-        writeApi = MetadataTrustedWriteApiGrpc.newBlockingStub(
+        writeApi = TrustedMetadataApiGrpc.newBlockingStub(
                 // Create a client channel and register for automatic graceful shutdown.
                 grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
     }
@@ -120,7 +125,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var objectId = UUID.fromString(tagHeader.getObjectId());
         var selector = selectorForTag(tagHeader);
 
-        var readRequest = ReadRequest.newBuilder()
+        var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(selector)
                 .build();
@@ -162,7 +167,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var objectId2 = UUID.fromString(tagHeader2.getObjectId());
         var selector2 = selectorForTag(tagHeader2);
 
-        var readRequest = ReadBatchRequest.newBuilder()
+        var readRequest = MetadataBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .addSelector(selector)
                 .addSelector(selector2)
@@ -235,24 +240,24 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
 
-        var v1ReadRequest = ReadRequest.newBuilder()
+        var v1MetadataReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(selectorForTag(v1Header))
                 .build();
 
-        var v2ReadRequest = ReadRequest.newBuilder()
+        var v2MetadataReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(selectorForTag(v2Header))
                 .build();
 
-        var t2ReadRequest = ReadRequest.newBuilder()
+        var t2MetadataReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(selectorForTag(t2Header))
                 .build();
 
-        var v1TagSaved = readApi.readObject(v1ReadRequest);
-        var v2TagSaved = readApi.readObject(v2ReadRequest);
-        var t2TagSaved = readApi.readObject(t2ReadRequest);
+        var v1TagSaved = readApi.readObject(v1MetadataReadRequest);
+        var v2TagSaved = readApi.readObject(v2MetadataReadRequest);
+        var t2TagSaved = readApi.readObject(t2MetadataReadRequest);
 
         var v1TagExpected = v1TagSaved.newBuilderForType()
                 .setHeader(v1Header)
@@ -323,7 +328,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
 
-        var readRequest = ReadBatchRequest.newBuilder()
+        var readRequest = MetadataBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .addSelector(selectorForTag(v1Header))
                 .addSelector(selectorForTag(v2Header))
@@ -416,34 +421,34 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setObjectId(objectId.toString())
                 .build();
 
-        var v1Time = MetadataCodec.parseDatetime(v1Header.getTagTimestamp()).plusNanos(5000);
-        var v2Time = MetadataCodec.parseDatetime(v2Header.getTagTimestamp()).plusNanos(5000);
-        var t2Time = MetadataCodec.parseDatetime(t2Header.getTagTimestamp()).plusNanos(5000);
+        var v1Time = MetadataCodec.decodeDatetime(v1Header.getTagTimestamp()).plusNanos(5000);
+        var v2Time = MetadataCodec.decodeDatetime(v2Header.getTagTimestamp()).plusNanos(5000);
+        var t2Time = MetadataCodec.decodeDatetime(t2Header.getTagTimestamp()).plusNanos(5000);
 
-        var v1ReadRequest = ReadRequest.newBuilder()
+        var v1MetadataReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(baseSelector.toBuilder()
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v1Time))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v1Time)))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v1Time))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v1Time)))
                 .build();
 
-        var v2ReadRequest = ReadRequest.newBuilder()
+        var v2MetadataReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(baseSelector.toBuilder()
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v2Time))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v2Time)))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v2Time))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v2Time)))
                 .build();
 
-        var t2ReadRequest = ReadRequest.newBuilder()
+        var t2MetadataReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(baseSelector.toBuilder()
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v1Time))
-                .setTagAsOf(MetadataCodec.quoteDatetime(t2Time)))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v1Time))
+                .setTagAsOf(MetadataCodec.encodeDatetime(t2Time)))
                 .build();
 
-        var v1TagSaved = readApi.readObject(v1ReadRequest);
-        var v2TagSaved = readApi.readObject(v2ReadRequest);
-        var t2TagSaved = readApi.readObject(t2ReadRequest);
+        var v1TagSaved = readApi.readObject(v1MetadataReadRequest);
+        var v2TagSaved = readApi.readObject(v2MetadataReadRequest);
+        var t2TagSaved = readApi.readObject(t2MetadataReadRequest);
 
         var v1TagExpected = v1TagSaved.newBuilderForType()
                 .setHeader(v1Header)
@@ -526,23 +531,23 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setObjectId(objectId.toString())
                 .build();
 
-        var v1Time = MetadataCodec.parseDatetime(v1Header.getTagTimestamp()).plusNanos(5000);
-        var v2Time = MetadataCodec.parseDatetime(v2Header.getTagTimestamp()).plusNanos(5000);
-        var t2Time = MetadataCodec.parseDatetime(t2Header.getTagTimestamp()).plusNanos(5000);
+        var v1Time = MetadataCodec.decodeDatetime(v1Header.getTagTimestamp()).plusNanos(5000);
+        var v2Time = MetadataCodec.decodeDatetime(v2Header.getTagTimestamp()).plusNanos(5000);
+        var t2Time = MetadataCodec.decodeDatetime(t2Header.getTagTimestamp()).plusNanos(5000);
 
         var v1SelectorAsOf = baseSelector.toBuilder()
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v1Time))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v1Time));
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v1Time))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v1Time));
 
         var v2SelectorAsOf = baseSelector.toBuilder()
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v2Time))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v2Time));
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v2Time))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v2Time));
 
         var t2SelectorAsOf = baseSelector.toBuilder()
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v1Time))
-                .setTagAsOf(MetadataCodec.quoteDatetime(t2Time));
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v1Time))
+                .setTagAsOf(MetadataCodec.encodeDatetime(t2Time));
 
-        var readRequest = ReadBatchRequest.newBuilder()
+        var readRequest = MetadataBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .addSelector(v1SelectorAsOf)
                 .addSelector(v2SelectorAsOf)
@@ -608,12 +613,12 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setLatestTag(true)
                 .build();
 
-        var latestReadRequest = ReadRequest.newBuilder()
+        var latestMetadataReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(latestSelector)
                 .build();
 
-        var v1TagSaved = readApi.readObject(latestReadRequest);
+        var v1TagSaved = readApi.readObject(latestMetadataReadRequest);
 
         var v1TagExpected = v1TagSaved.newBuilderForType()
                 .setHeader(v1Header)
@@ -638,7 +643,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         // Read v2 object using latest / latest selector
 
-        var v2TagSaved = readApi.readObject(latestReadRequest);
+        var v2TagSaved = readApi.readObject(latestMetadataReadRequest);
 
         var v2TagExpected = v2TagSaved.newBuilderForType()
                 .setHeader(v2Header)
@@ -670,7 +675,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         // Read request using latest / latest - should still return V2 object
 
-        v2TagSaved = readApi.readObject(latestReadRequest);
+        v2TagSaved = readApi.readObject(latestMetadataReadRequest);
         assertEquals(v2TagExpected, v2TagSaved);
 
         // Read request for object V1 / latest tag
@@ -679,12 +684,12 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setObjectVersion(1)
                 .setLatestTag(true);
 
-        var t2ReadRequest = ReadRequest.newBuilder()
+        var t2MetadataReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(t2Selector)
                 .build();
 
-        var t2TagSaved = readApi.readObject(t2ReadRequest);
+        var t2TagSaved = readApi.readObject(t2MetadataReadRequest);
 
         var t2TagExpected = t2TagSaved.newBuilderForType()
                 .setHeader(t2Header)
@@ -742,13 +747,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setLatestTag(true)
                 .build();
 
-        var latestReadRequest = ReadBatchRequest.newBuilder()
+        var latestMetadataReadRequest = MetadataBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .addSelector(latestSelector)
                 .addSelector(extraSelector)
                 .build();
 
-        var batch = readApi.readBatch(latestReadRequest);
+        var batch = readApi.readBatch(latestMetadataReadRequest);
         var v1TagSaved = batch.getTag(0);
 
         var v1TagExpected = v1TagSaved.newBuilderForType()
@@ -774,7 +779,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         // Read v2 object using latest / latest selector
 
-        batch = readApi.readBatch(latestReadRequest);
+        batch = readApi.readBatch(latestMetadataReadRequest);
         var v2TagSaved = batch.getTag(0);
 
         var v2TagExpected = v2TagSaved.newBuilderForType()
@@ -807,7 +812,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         // Read request using latest / latest - should still return V2 object
 
-        batch = readApi.readBatch(latestReadRequest);
+        batch = readApi.readBatch(latestMetadataReadRequest);
         v2TagSaved = batch.getTag(0);
         assertEquals(v2TagExpected, v2TagSaved);
 
@@ -817,13 +822,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setObjectVersion(1)
                 .setLatestTag(true);
 
-        var t2ReadRequest = ReadBatchRequest.newBuilder()
+        var t2MetadataReadRequest = MetadataBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .addSelector(t2Selector)
                 .addSelector(extraSelector)
                 .build();
 
-        batch = readApi.readBatch(t2ReadRequest);
+        batch = readApi.readBatch(t2MetadataReadRequest);
         var t2TagSaved = batch.getTag(0);
 
         var t2TagExpected = t2TagSaved.newBuilderForType()
@@ -855,7 +860,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         // Random object ID, does not exist at all
 
-        var readRequest = ReadRequest.newBuilder()
+        var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(TagSelector.newBuilder()
                 .setObjectType(ObjectType.MODEL)
@@ -870,26 +875,26 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         // Try to read a non-existent version
 
-        var v2ReadRequest = ReadRequest.newBuilder()
+        var v2MetadataReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(selectorForTag(tagHeader).toBuilder()
                 .setObjectVersion(2))
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> readApi.readObject(v2ReadRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> readApi.readObject(v2MetadataReadRequest));
         assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
 
         // Try to read a non-existent tag
 
-        var t2ReadRequest = ReadRequest.newBuilder()
+        var t2MetadataReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(selectorForTag(tagHeader).toBuilder()
                 .setTagVersion(2))
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error3 = assertThrows(StatusRuntimeException.class, () -> readApi.readObject(t2ReadRequest));
+        var error3 = assertThrows(StatusRuntimeException.class, () -> readApi.readObject(t2MetadataReadRequest));
         assertEquals(Status.Code.NOT_FOUND, error3.getStatus().getCode());
     }
 
@@ -917,7 +922,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         // Random object ID, does not exist at all
 
-        var readRequest = ReadBatchRequest.newBuilder()
+        var readRequest = MetadataBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .addSelector(validSelector)
                 .addSelector(TagSelector.newBuilder()
@@ -933,7 +938,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         // Try to read a non-existent version
 
-        var v2ReadRequest = ReadBatchRequest.newBuilder()
+        var v2MetadataReadRequest = MetadataBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .addSelector(validSelector)
                 .addSelector(selectorForTag(tagHeader).toBuilder()
@@ -941,12 +946,12 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> readApi.readBatch(v2ReadRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> readApi.readBatch(v2MetadataReadRequest));
         assertEquals(Status.Code.NOT_FOUND, error2.getStatus().getCode());
 
         // Try to read a non-existent tag
 
-        var t2ReadRequest = ReadBatchRequest.newBuilder()
+        var t2MetadataReadRequest = MetadataBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .addSelector(validSelector)
                 .addSelector(selectorForTag(tagHeader).toBuilder()
@@ -954,7 +959,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error3 = assertThrows(StatusRuntimeException.class, () -> readApi.readBatch(t2ReadRequest));
+        var error3 = assertThrows(StatusRuntimeException.class, () -> readApi.readBatch(t2MetadataReadRequest));
         assertEquals(Status.Code.NOT_FOUND, error3.getStatus().getCode());
     }
 
@@ -977,7 +982,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
         var tagHeader = writeApi.createObject(writeRequest);
 
-        var readRequest = ReadRequest.newBuilder()
+        var readRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(selectorForTag(tagHeader).toBuilder()
                 .setObjectType(ObjectType.MODEL))
@@ -1011,7 +1016,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
         var tagHeader2 = writeApi.createObject(writeRequest);
         var validSelector = selectorForTag(tagHeader2);
 
-        var readRequest = ReadBatchRequest.newBuilder()
+        var readRequest = MetadataBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .addSelector(validSelector)
                 .addSelector(selectorForTag(tagHeader).toBuilder()

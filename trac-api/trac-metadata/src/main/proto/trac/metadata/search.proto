@@ -17,7 +17,7 @@
 syntax = 'proto3';
 package trac.metadata.search;
 
-option java_package = "com.accenture.trac.common.metadata.search";
+option java_package = "com.accenture.trac.metadata.search";
 option java_multiple_files = true;
 
 import "trac/metadata/type.proto";
@@ -243,11 +243,10 @@ message SearchParameters {
    * the specified time onwards. The result will be the same as if a search was
    * performed at the specified time with this field left blank.
    *
-   * If supplied, this field must be a date-time value encoded using ISO 8601.
-   * If a zone offset is supplied, TRAC will apply the offset to search across
-   * all metadata items in UTC.
+   * If a zone offset is supplied as part of the timestamp, TRAC will apply the
+   * offset to search across all metadata items in UTC.
    */
-  string searchAsOf = 3;
+  DatetimeValue searchAsOf = 3;
 
   /**
    * Include prior versions of objects in the search.

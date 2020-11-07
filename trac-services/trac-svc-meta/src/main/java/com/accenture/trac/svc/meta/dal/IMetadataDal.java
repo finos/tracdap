@@ -16,10 +16,10 @@
 
 package com.accenture.trac.svc.meta.dal;
 
-import com.accenture.trac.common.metadata.ObjectType;
-import com.accenture.trac.common.metadata.Tag;
-import com.accenture.trac.common.metadata.TagSelector;
-import com.accenture.trac.common.metadata.search.SearchParameters;
+import com.accenture.trac.metadata.ObjectType;
+import com.accenture.trac.metadata.Tag;
+import com.accenture.trac.metadata.TagSelector;
+import com.accenture.trac.metadata.search.SearchParameters;
 
 import java.util.List;
 import java.util.UUID;

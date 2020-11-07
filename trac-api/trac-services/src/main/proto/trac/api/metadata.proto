@@ -1,0 +1,619 @@
+/*
+ * Copyright 2020 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+package trac.api;
+
+option java_package = "com.accenture.trac.api";
+option java_multiple_files = true;
+
+import "trac/metadata/object_id.proto";
+import "trac/metadata/object.proto";
+import "trac/metadata/tag.proto";
+import "trac/metadata/search.proto";
+
+import "google/api/annotations.proto";
+
+
+/**
+ * Public API reading, writing and searching for objects in the TRAC metadata store.
+ *
+ * The TRAC metadata API is expressed in terms of Objects and Tags. Objects are
+ * structural items (nouns and verbs) such as data, models and jobs that describe
+ * resources and operations on the TRAC platform. Tags contain descriptive and
+ * informational data and provide a means to classify, catalogue and control objects.
+ * Tags can also be used to describe the structure of applications built on the TRAC
+ * platform. For more information on the TRAC metadata model, refer to the
+ * documentation for ObjectDefinition and Tag.
+ *
+ * The write API allows objects to be created directly, by supplying an object
+ * definition and a set of tags. These definitions and tags are validated,
+ * assigned an ID and version (in a tag header) then saved as they are. Only
+ * certain types of objects can be created / updated directly via the public API
+ * (currently FLOW and CUSTOM objects). Other types of objects are created by TRAC
+ * as a result of operations on the platform, for example a model import job will
+ * create a model definition.
+ *
+ * Creating a new version of an object is very similar to creating a new object,
+ * in that the entire metadata definition must be supplied. TRAC will perform
+ * validation to make sure the new definition is a valid version update from the
+ * previous version - the semantics of versioning depend on the particular object
+ * type.
+ *
+ * The metadata write API also provides a means for updating tags (i.e. creating
+ * a new tag version); tag updates are allowed for all object types via the public
+ * API. The current API requires a whole new tag to be supplied, this will be
+ * replaced in a future version with an API that supplies attributes changes as a
+ * set of add/modify/remove operations.
+ *
+ * The read API is for reading metadata from the metadata store when the IDs of the
+ * metadata items are known. The easiest way to read metadata is using TagSelectors,
+ * which may be present in other metadata items (e.g. job definitions record tag
+ * selectors to indicate which versions of resources were used in a job) or can be
+ * easily constructed from an object ID or tag header. HTTP GET calls are also
+ * available for REST clients (REST clients can still use selectors with POST
+ * requests).
+ *
+ * Metadata searches are performed using tag attributes, as well as an object type
+ * and a few top-level parameters to handle versioning and temporality. See the
+ * SearchParameters object for a more detailed description. The result of a search
+ * call is a list of matching tags, which are always arranged with the most recent
+ * tags first. A search that matches no results will return an empty list.
+ *
+ * This API is a multi-tenant API. For gRPC requests every request includes a
+ * tenant code, for REST requests the tenant code is the first element of every
+ * path.
+ *
+ * @see ObjectDefinition
+ * @see Tag
+ * @see TagHeader
+ * @see TagSelector
+ * @see TagUpdate
+ * @see SearchParameters
+ */
+service TracMetadataApi {
+
+    /**
+     * Create a new object in the TRAC metadata store.
+     *
+     * To create an object, supply a metadata write request with the tenant code,
+     * object type and a definition for the item you want to save. The tag should contain
+     * all the attributes you want to set and the object definition, without an
+     * object header. TRAC will create a header when it assigns and ID for the new
+     * object. Only FLOW and CUSTOM objects can be created by this API call.
+     *
+     * Validation is performed on new objects before they are saved. Objects can
+     * fail validation because they are semantically invalid (e.g. missing
+     * required fields or inconsistencies within the object definition) or due to
+     * consistency errors (referring to other metadata items that don't exist or
+     * don't meet certain requirements).
+     *
+     * NOTE: Validation is only partially implemented in the current release.
+     *
+     * The call returns an ID response to indicate the ID of the newly created
+     * object, as well as the object and tag version (which will always be 1).
+     *
+     * Error conditions include: Invalid request, unknown tenant, object type does
+     * not match the supplied definition, validation failure.
+     *
+     * @see MetadataWriteRequest
+     * @see ObjectDefinition
+     * @see Tag
+     * @see TagHeader
+     */
+    rpc createObject (MetadataWriteRequest) returns (metadata.TagHeader) {
+        option (google.api.http) = {
+            post: "/{tenant}/create-object"
+            body: "*"
+        };
+    }
+
+    /**
+     * Update an existing object in the TRAC metadata store.
+     *
+     * To save a new version, supply a metadata write request with the tenant code,
+     * object type and a tag for the item you want to save. The tag should contain
+     * all the attributes you want to set and the updated object definition, which
+     * must be supplied with the header from the *previous* version of the object.
+     * TRAC will apply the new version number when it creates the new version of
+     * the object. Only the latest version of an object can be updated and only
+     * CUSTOM objects can be updated by this API call.
+     *
+     * Validation is performed on new objects before they are saved. Objects can
+     * fail validation because they are semantically invalid (e.g. missing
+     * required fields or inconsistencies within the object definition) or due to
+     * consistency errors (referring to other metadata items that don't exist or
+     * don't meet certain requirements). For new versions, validation also covers
+     * checking for compatibility with the previous version of the object.
+     *
+     * NOTE: Validation is only partially implemented in the current release.
+     *
+     * The call returns an ID response with the ID object and the newly assigned
+     * version number, as well as the tag version (which will always be 1).
+     *
+     * Error conditions include: Invalid request, unknown tenant, unknown object
+     * ID or version, wrong object type (not the same as the prior version), object
+     * version is superseded.
+     *
+     * @see MetadataWriteRequest
+     * @see ObjectDefinition
+     * @see Tag
+     * @see TagHeader
+     */
+    rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader) {
+        option (google.api.http) = {
+            post: "/{tenant}/update-object"
+            body: "*"
+        };
+    }
+
+    /**
+     * Update the tag for an existing object in the TRAC metadata store.
+     *
+     * To save a new tag, supply a metadata write request with the tenant code,
+     * object type and a tag for the item you want to save. The tag should contain
+     * all the attributes you want to include in the new tag, even if they have
+     * not been changed. The object definition must be supplied with a header only,
+     * supplying an object body is an invalid request. Tags for any type of object
+     * can be updated by this API call. Only the latest version of a tag can be
+     * updated.
+     *
+     * The call returns an ID response with the ID and version of the object and
+     * the newly assigned tag number.
+     *
+     * Error conditions include: Invalid request, unknown tenant, unknown object
+     * ID, object version or tag version, wrong object type (does not match what
+     * is stored in TRAC), tag version is superseded.
+     *
+     * @see MetadataWriteRequest
+     * @see ObjectDefinition
+     * @see Tag
+     * @see TagHeader
+     */
+    rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
+        option (google.api.http) = {
+            post: "/{tenant}/update-tag"
+            body: "*"
+        };
+    }
+
+
+    /**
+     * Read a single object from the TRAC metadata store using a tag selector.
+     *
+     * Tag selectors are used throughout the TRAC metadata structures and API
+     * calls to refer to objects. For example, a job definition includes
+     * selectors to define the data sets and models that were selected for the
+     * job. Those selectors can be passed directly into this call.
+     *
+     * Tag selectors can refer to object and tag versions either using explicit
+     * version numbers, with as-of times or by referring to the current latest
+     * version. Combinations are also possible (e.g. object version x, latest
+     * tag).
+     *
+     * This call takes a single selector and returns a single Tag, including the
+     * object definition. Error conditions include: Invalid request, unknown
+     * tenant, unknown object ID, object type does not match ID, unknown object
+     * version, unknown tag version.
+     *
+     * @see MetadataReadRequest
+     * @see TagSelector
+     * @see Tag
+     */
+    rpc readObject(MetadataReadRequest) returns (metadata.Tag) {
+        option (google.api.http) = {
+            post: "/{tenant}/read-object"
+            body: "selector"
+        };
+    }
+
+    /**
+     * Read multiple objects from the TRAC metadata store using tag selectors.
+     *
+     * Tag selectors are used throughout the TRAC metadata structures and API
+     * calls to refer to objects. For example, a job definition includes
+     * selectors to define the data sets and models that were selected for the
+     * job. Those selectors can be passed directly into this call.
+     *
+     * Tag selectors can refer to object and tag versions either using explicit
+     * version numbers, with as-of times or by referring to the current latest
+     * version. Combinations are also possible (e.g. object version x, latest
+     * tag).
+     *
+     * This call takes multiple selectors and returns multiple Tags in the same
+     * order, including their object definitions. Selectors for different object
+     * types and with different criteria for selecting versions can be mixed
+     * freely in a single request. Error conditions include: Invalid request,
+     * unknown tenant, unknown object ID, object type does not match ID, unknown
+     * object version, unknown tag version. If there is an error for any of the
+     * selectors the whole request will fail.
+     *
+     * @see MetadataBatchRequest
+     * @see MetadataBatchResponse
+     * @see TagSelector
+     * @see Tag
+     */
+    rpc readBatch(MetadataBatchRequest) returns (MetadataBatchResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/read-batch"
+            body: "selector"
+        };
+    }
+
+    /**
+     * Perform a search against the TRAC metadata store.
+     *
+     * Searches are always for a specific tenant and object type. For details of the
+     * available search parameters, see SearchParameters.
+     *
+     * In gRPC calls, a MetadataSearchRequest specifies the tenant and includes the
+     * SearchParameters, where object type and the search expression are set. For
+     * REST calls the tenant is passed in the URL and searchParameters are supplied
+     * as the request body.
+     *
+     * @see MetadataSearchRequest
+     * @see MetadataSearchResponse
+     * @see SearchParameters
+     */
+    rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/search"
+            body: "searchParams"
+        };
+    }
+
+    /**
+     * Get a single metadata object using an HTTP GET request.
+     *
+     * This call is intended for use by REST clients to provide TRAC metadata
+     * objects as RESTFUL resources. For gRPC clients it is recommended to use
+     * readObject instead and supply a TagSelector.
+     *
+     * To use this call, supply a tenant code, object type, ID, object version
+     * and tag version. The call will return a tag for the exact object version
+     * and tag version specified, including the full object definition.
+     *
+     * Error conditions include: Invalid request, unknown tenant, unknown object
+     * ID, object type does not match ID, unknown object version, unknown tag
+     * version.
+     *
+     * @see MetadataReadRequest
+     * @see Tag
+     */
+    rpc getObject(MetadataGetRequest) returns (trac.metadata.Tag) {
+        option (google.api.http) = {
+            get: "/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/{tagVersion}"
+        };
+    }
+
+    /**
+     * Get the latest version of a metadata object using an HTTP GET request.
+     *
+     * This call is intended for use by REST clients to provide TRAC metadata
+     * objects as RESTFUL resources. For gRPC clients it is recommended to use
+     * readObject instead and supply a TagSelector.
+     *
+     * To use this call, supply a tenant code, object type and ID. The call will
+     * return the latest version of the object with its latest tag, including
+     * the full object definition.
+     *
+     * Error conditions include: Invalid request, unknown tenant, unknown object
+     * ID, object type does not match ID.
+     *
+     * @see MetadataReadRequest
+     * @see Tag
+     */
+    rpc getLatestObject(MetadataGetRequest) returns (trac.metadata.Tag) {
+        option (google.api.http) = {
+            get: "/{tenant}/{objectType}/{objectId}/versions/latest/tags/latest"
+        };
+    }
+
+    /**
+     * Get the latest tag for a metadata object using an HTTP GET request.
+     *
+     * This call is intended for use by REST clients to provide TRAC metadata
+     * objects as RESTFUL resources. For gRPC clients it is recommended to use
+     * readObject instead and supply a TagSelector.
+     *
+     * To use this call, supply a tenant code, object type, ID and version. The
+      * call will return the latest tag for the specified version of the object,
+     * including the full object definition.
+     *
+     * Error conditions include: Invalid request, unknown tenant, unknown object
+     * ID, object type does not match ID, unknown object version.
+     *
+     * @see MetadataReadRequest
+     * @see Tag
+     */
+    rpc getLatestTag(MetadataGetRequest) returns (trac.metadata.Tag) {
+        option (google.api.http) = {
+            get: "/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/latest"
+        };
+    }
+};
+
+
+/**
+ * Trusted API reading, writing and searching for objects in the TRAC metadata store.
+ *
+ * This API is only available to other components of the TRAC platform, it is
+ * not exposed to clients via the platform gateway.
+ *
+ * Most of the calls in this interface are identical to their public equivalents.
+ * Extra calls are available for pre-allocating objects, a facility which is not
+ * available to clients of the platform. Restrictions on the creation of certain
+ * object types and manipulation of controlled tag attributes are lifted. Methods
+ * for performing HTTP GET requests of RESTFUL resources are not duplicated.
+ *
+ * @see TracMetadataApi
+ */
+service TrustedMetadataApi {
+
+    /**
+     * Create a new object in the TRAC metadata store.
+     *
+     * This call behaves identically to the equivalent public API call, without the
+     * restriction on which types of object can be saved.
+     *
+     * @see TracMetadataApi
+     */
+    rpc createObject (MetadataWriteRequest) returns (metadata.TagHeader) {
+        option (google.api.http) = {
+            post: "/{tenant}/trusted/create-object"
+            body: "*"
+        };
+    }
+
+    /**
+     * Update an existing object in the TRAC metadata store.
+     *
+     * This call behaves identically to the equivalent public API call, however it
+     * can be used with any type of object that supports versioning (currently DATA
+     * and CUSTOM).
+     *
+     * @see TracMetadataApi
+     */
+    rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader) {
+        option (google.api.http) = {
+            post: "/{tenant}/trusted/update-object"
+            body: "*"
+        };
+    }
+
+    /**
+     * Update the tag for an existing object in the TRAC metadata store.
+     *
+     * This call behaves identically to the equivalent public API call.
+     *
+     * @see TracMetadataApi
+     */
+    rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
+        option (google.api.http) = {
+            post: "/{tenant}/trusted/update-tag"
+            body: "*"
+        };
+    }
+
+
+    /**
+     * Preallocate an object ID for an object that will be created later.
+     *
+     * This call is for use by TRAC components that need to reserve an ID before
+     * it is used, particularly if the object ID must be included in the definition
+     * of an object that has not been created yet. When creating an ID the tenant
+     * and object type must be specified, the object that is eventually saved must
+     * match these two conditions. Orphan IDs are expected - if a component request
+     * an ID and encounters an error before that ID is used, the orphan ID is just
+     * ignored.
+     *
+     * @see MetadataWriteRequest
+     */
+    rpc preallocateId (MetadataWriteRequest) returns (metadata.TagHeader) {
+        option (google.api.http) = {
+            post: "/{tenant}/trusted/preallocate"
+            body: "*"
+        };
+    }
+
+    /**
+     * Create an object using an ID that was previously preallocated.
+     *
+     * This call behaves essentially the same as saveNewObject(), with all the
+     * same validation. The only difference is that the new definition must be
+     * supplied with an object header, including the object ID returned from a
+     * prior call to preallocateId().
+     *
+     * Error conditions include all the error conditions for saveNewObject().
+     * Using a preallocated ID twice, attempting to save to an unknown ID or the
+     * ID of another object that already exists are also errors.
+     *
+     * @see MetadataWriteRequest
+     */
+    rpc createPreallocatedObject (MetadataWriteRequest) returns (metadata.TagHeader) {
+        option (google.api.http) = {
+            post: "/{tenant}/trusted/create-preallocated"
+            body: "*"
+        };
+    }
+
+    /**
+     * Read a single object from the TRAC metadata store using a tag selector.
+     *
+     * This call behaves identically to the equivalent public API call.
+     *
+     * @see TracMetadataApi
+     */
+    rpc readObject(MetadataReadRequest) returns (metadata.Tag) {
+        option (google.api.http) = {
+            post: "/{tenant}/trusted/read-object"
+            body: "selector"
+        };
+    }
+
+    /**
+     * Read multiple objects from the TRAC metadata store using tag selectors.
+     *
+     * This call behaves identically to the equivalent public API call.
+     *
+     * @see TracMetadataApi
+     */
+    rpc readBatch(MetadataBatchRequest) returns (MetadataBatchResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/trusted/read-batch"
+            body: "selector"
+        };
+    }
+
+    /**
+     * Perform a search against the TRAC metadata store.
+     *
+     * This call behaves identically to the equivalent public API call.
+     *
+     * @see TracMetadataApi
+     */
+    rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
+        option (google.api.http) = {
+            post: "/{tenant}/trusted/search"
+            body: "searchParams"
+        };
+    }
+};
+
+
+/**
+ * Request to create or update an object in the TRAC metadata store.
+ *
+ * @see MetadataPublicWriteApi
+ * @see MetadataTrustedWriteApi
+ */
+message MetadataWriteRequest {
+
+    /**
+     * Tenant code for the requested operation, always required.
+     */
+    string tenant = 1;
+
+    /**
+     * Object type for the requested operation, always required.
+     *
+     * @see ObjectType
+     */
+    metadata.ObjectType objectType = 2;
+
+    /**
+     * Prior object/tag version to use for update operations.
+     *
+     * This field must be left blank for create operations.
+     */
+    metadata.TagSelector priorVersion = 3;
+
+    /**
+     * New object definition to save.
+     *
+     * A definition is required to create or update an object, for tag updates
+     * the definition field should be left blank.
+     *
+     * This field must be left blank for tag update operations (saveNew.
+     */
+    metadata.ObjectDefinition definition = 4;
+
+    /**
+     * Tag update operations to be applied.
+     *
+     * The updates are applied in order and must all succeeded in order for the
+     * request to be successful. If the API call fails for any reason, none of
+     * the requested tag updates will be applied.
+     */
+    repeated metadata.TagUpdate tagUpdate = 5;
+};
+
+
+/**
+ * Request to read an object from the TRAC metadata store.
+ *
+ * @see MetadataReadApi
+ */
+message MetadataReadRequest {
+
+    string tenant = 1;
+
+    metadata.TagSelector selector = 2;
+};
+
+
+/**
+ * Request to read a batch of objects from the TRAC metadata store.
+ *
+ * @see MetadataReadApi
+ */
+message MetadataBatchRequest {
+
+    string tenant = 1;
+
+    repeated metadata.TagSelector selector = 2;
+};
+
+
+/**
+ * Response to reading a batch of objects from the TRAC metadata store.
+ *
+ * @see MetadataReadApi
+ */
+message MetadataBatchResponse {
+
+    repeated metadata.Tag tag = 1;
+};
+
+
+/**
+ * Request for a search against the TRAC metadata store.
+ *
+ * @see MetadataSearchApi
+ */
+message MetadataSearchRequest {
+
+    string tenant = 1;
+
+    metadata.search.SearchParameters searchParams = 2;
+};
+
+
+/**
+ * Response to a search against the TRAC metadata store.
+ *
+ * @see MetadataSearchApi
+ */
+message MetadataSearchResponse {
+
+    repeated metadata.Tag searchResult = 1;
+};
+
+
+/**
+ * Request to get an object from the TRAC metadata store.
+ *
+ * @see MetadataReadApi
+ */
+message MetadataGetRequest {
+
+    string tenant = 1;
+
+    trac.metadata.ObjectType objectType = 2;
+    string objectId = 3;
+    int32 objectVersion = 4;
+    int32 tagVersion = 5;
+};

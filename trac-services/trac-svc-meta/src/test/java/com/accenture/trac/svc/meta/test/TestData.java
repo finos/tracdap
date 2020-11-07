@@ -16,8 +16,9 @@
 
 package com.accenture.trac.svc.meta.test;
 
-import com.accenture.trac.common.api.meta.TagUpdate;
-import com.accenture.trac.common.metadata.*;
+import com.accenture.trac.metadata.*;
+import com.accenture.trac.common.metadata.TypeSystem;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.google.protobuf.ByteString;
 
 import java.math.BigDecimal;
@@ -99,8 +100,8 @@ public class TestData {
                 .setObjectId(UUID.randomUUID().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
-                .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
-                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .build();
     }
 
@@ -110,7 +111,7 @@ public class TestData {
 
         return priorTagHeader.toBuilder()
                 .setTagVersion(priorTagHeader.getTagVersion() + 1)
-                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .build();
     }
 
@@ -327,8 +328,8 @@ public class TestData {
             var header = previous.getHeader().toBuilder()
                     .setObjectVersion(previous.getHeader().getObjectVersion() + 1)
                     .setTagVersion(1)
-                    .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
-                    .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                    .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                    .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                     .build();
 
             return newTag.setHeader(header).build();

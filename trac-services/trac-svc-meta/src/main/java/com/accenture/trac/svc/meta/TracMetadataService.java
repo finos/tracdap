@@ -22,10 +22,7 @@ import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.exception.*;
 import com.accenture.trac.common.util.InterfaceLogging;
 import com.accenture.trac.common.util.VersionInfo;
-import com.accenture.trac.svc.meta.api.MetadataPublicWriteApi;
-import com.accenture.trac.svc.meta.api.MetadataReadApi;
-import com.accenture.trac.svc.meta.api.MetadataSearchApi;
-import com.accenture.trac.svc.meta.api.MetadataTrustedWriteApi;
+import com.accenture.trac.svc.meta.api.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
 import com.accenture.trac.svc.meta.services.MetadataReadService;
@@ -106,14 +103,12 @@ public class TracMetadataService {
         // Set up services and APIs
         var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
 
-        var readLogic = new MetadataReadService(dalWithLogging);
-        var writeLogic = new MetadataWriteService(dalWithLogging);
-        var searchLogic = new MetadataSearchService(dalWithLogging);
+        var readService = new MetadataReadService(dalWithLogging);
+        var writeService = new MetadataWriteService(dalWithLogging);
+        var searchService = new MetadataSearchService(dalWithLogging);
 
-        var readApi = new MetadataReadApi(readLogic);
-        var publicWriteApi = new MetadataPublicWriteApi(writeLogic);
-        var trustedWriteApi = new MetadataTrustedWriteApi(writeLogic);
-        var searchApi = new MetadataSearchApi(searchLogic);
+        var publicApi = new TracMetadataApi(readService, writeService, searchService);
+        var trustedApi = new TrustedMetadataApi(readService, writeService, searchService);
 
         // Create the main server
 
@@ -121,10 +116,8 @@ public class TracMetadataService {
 
         this.server = ServerBuilder
                 .forPort(servicePort)
-                .addService(readApi)
-                .addService(publicWriteApi)
-                .addService(trustedWriteApi)
-                .addService(searchApi)
+                .addService(publicApi)
+                .addService(trustedApi)
                 .executor(executor)
                 .build();
 

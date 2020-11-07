@@ -16,8 +16,8 @@
 
 package com.accenture.trac.svc.meta.services;
 
-import com.accenture.trac.common.api.meta.TagUpdate;
-import com.accenture.trac.common.metadata.*;
+import com.accenture.trac.metadata.*;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.validation.MetadataValidator;
 
@@ -66,9 +66,9 @@ public class MetadataWriteService {
                 .setObjectType(objectType)
                 .setObjectId(objectId.toString())
                 .setObjectVersion(OBJECT_FIRST_VERSION)
-                .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(TAG_FIRST_VERSION)
-                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .build();
 
         var newTag = Tag.newBuilder()
@@ -131,9 +131,9 @@ public class MetadataWriteService {
 
         var newHeader = oldHeader.toBuilder()
                 .setObjectVersion(oldHeader.getObjectVersion() + 1)
-                .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(TAG_FIRST_VERSION)
-                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .build();
 
         var newTag = priorTag.toBuilder()
@@ -184,7 +184,7 @@ public class MetadataWriteService {
 
         var newHeader = oldHeader.toBuilder()
                 .setTagVersion(oldHeader.getTagVersion() + 1)
-                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .build();
 
         var newTag = priorTag.toBuilder()
@@ -242,9 +242,9 @@ public class MetadataWriteService {
                 .setObjectType(objectType)
                 .setObjectId(objectId.toString())
                 .setObjectVersion(OBJECT_FIRST_VERSION)
-                .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(TAG_FIRST_VERSION)
-                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .build();
 
         var newTag = Tag.newBuilder()

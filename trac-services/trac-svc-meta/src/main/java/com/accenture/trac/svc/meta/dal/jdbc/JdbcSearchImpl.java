@@ -17,7 +17,7 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
 
-import com.accenture.trac.common.metadata.search.SearchParameters;
+import com.accenture.trac.metadata.search.SearchParameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

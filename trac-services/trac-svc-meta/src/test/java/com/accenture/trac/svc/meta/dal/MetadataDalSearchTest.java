@@ -16,8 +16,10 @@
 
 package com.accenture.trac.svc.meta.dal;
 
-import com.accenture.trac.common.metadata.*;
-import com.accenture.trac.common.metadata.search.*;
+import com.accenture.trac.metadata.*;
+import com.accenture.trac.metadata.search.*;
+import com.accenture.trac.common.metadata.TypeSystem;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.svc.meta.test.IDalTestable;
 import com.accenture.trac.svc.meta.test.JdbcUnit;
 import com.accenture.trac.svc.meta.test.JdbcIntegration;
@@ -1413,7 +1415,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         dal.saveNewObject(TEST_TENANT, v1Tag);
 
         // Use a search timestamp after both objects have been created, but before either is updated
-        var v1SearchTime = MetadataCodec.parseDatetime(v1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
+        var v1SearchTime = MetadataCodec.decodeDatetime(v1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
 
         Thread.sleep(10);
         var v2Timestamp = Instant.now().atOffset(ZoneOffset.UTC);
@@ -1421,9 +1423,9 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var v2Tag = v1Tag.toBuilder()
                 .setHeader(v1Tag.getHeader().toBuilder()
                 .setObjectVersion(2)
-                .setObjectTimestamp(MetadataCodec.quoteDatetime(v2Timestamp))
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(v2Timestamp))
                 .setTagVersion(1)
-                .setTagTimestamp(MetadataCodec.quoteDatetime(v2Timestamp)))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(v2Timestamp)))
                 .putAttr("dal_as_of_attr_1", MetadataCodec.encodeValue("updated_value"))
                 .build();
 
@@ -1451,7 +1453,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // The object created last should be top of the list
 
         var asOfSearch = searchParams.toBuilder()
-                .setSearchAsOf(MetadataCodec.quoteDatetime(v1SearchTime))
+                .setSearchAsOf(MetadataCodec.encodeDatetime(v1SearchTime))
                 .build();
 
         var asOfResult = unwrap(dal.search(TEST_TENANT, asOfSearch));
@@ -1492,11 +1494,11 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         unwrap(saveAll);
 
-        var preCreateTime = MetadataCodec.parseDatetime(v1t1Tag.getHeader().getTagTimestamp()).minusNanos(5000);
-        var v1t1Time = MetadataCodec.parseDatetime(v1t1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
-        var v1t2Time = MetadataCodec.parseDatetime(v1t2Tag.getHeader().getTagTimestamp()).plusNanos(5000);
-        var v2t1Time = MetadataCodec.parseDatetime(v2t1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
-        var v2t2Time = MetadataCodec.parseDatetime(v2t2Tag.getHeader().getTagTimestamp()).plusNanos(5000);
+        var preCreateTime = MetadataCodec.decodeDatetime(v1t1Tag.getHeader().getTagTimestamp()).minusNanos(5000);
+        var v1t1Time = MetadataCodec.decodeDatetime(v1t1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
+        var v1t2Time = MetadataCodec.decodeDatetime(v1t2Tag.getHeader().getTagTimestamp()).plusNanos(5000);
+        var v2t1Time = MetadataCodec.decodeDatetime(v2t1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
+        var v2t2Time = MetadataCodec.decodeDatetime(v2t2Tag.getHeader().getTagTimestamp()).plusNanos(5000);
 
         var searchExpr = SearchExpression.newBuilder()
                 .setTerm(SearchTerm.newBuilder()
@@ -1512,7 +1514,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var search1 = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setSearch(searchExpr)
-                .setSearchAsOf(MetadataCodec.quoteDatetime(v2t2Time))
+                .setSearchAsOf(MetadataCodec.encodeDatetime(v2t2Time))
                 .build();
 
         var result1 = unwrap(dal.search(TEST_TENANT, search1));
@@ -1523,7 +1525,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var search2 = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setSearch(searchExpr)
-                .setSearchAsOf(MetadataCodec.quoteDatetime(v2t1Time))
+                .setSearchAsOf(MetadataCodec.encodeDatetime(v2t1Time))
                 .build();
 
         var result2 = unwrap(dal.search(TEST_TENANT, search2));
@@ -1534,7 +1536,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var search3 = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setSearch(searchExpr)
-                .setSearchAsOf(MetadataCodec.quoteDatetime(v1t2Time))
+                .setSearchAsOf(MetadataCodec.encodeDatetime(v1t2Time))
                 .build();
 
         var result3 = unwrap(dal.search(TEST_TENANT, search3));
@@ -1545,7 +1547,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var search4 = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setSearch(searchExpr)
-                .setSearchAsOf(MetadataCodec.quoteDatetime(v1t1Time))
+                .setSearchAsOf(MetadataCodec.encodeDatetime(v1t1Time))
                 .build();
 
         var result4 = unwrap(dal.search(TEST_TENANT, search4));
@@ -1558,7 +1560,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var search5 = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setSearch(searchExpr)
-                .setSearchAsOf(MetadataCodec.quoteDatetime(preCreateTime))
+                .setSearchAsOf(MetadataCodec.encodeDatetime(preCreateTime))
                 .build();
 
         var result5 = unwrap(dal.search(TEST_TENANT, search5));
@@ -1588,7 +1590,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         unwrap(dal.saveNewObject(TEST_TENANT, obj1t1Tag));
         unwrap(dal.saveNewObject(TEST_TENANT, obj2t1Tag));
 
-        var t1Time = MetadataCodec.parseDatetime(obj2t1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
+        var t1Time = MetadataCodec.decodeDatetime(obj2t1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
 
         Thread.sleep(10);
 
@@ -1642,7 +1644,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var search2 = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setSearch(searchExpr)
-                .setSearchAsOf(MetadataCodec.quoteDatetime(t1Time))
+                .setSearchAsOf(MetadataCodec.encodeDatetime(t1Time))
                 .build();
 
         var result2 = unwrap(dal.search(TEST_TENANT, search2));
@@ -1734,12 +1736,12 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                                 .setSearchValue(MetadataCodec.encodeValue("not_the_droids_you_are_looking_for")))))))
                 .build();
 
-        var searchTime = MetadataCodec.parseDatetime(v3t1.getHeader().getTagTimestamp()).minusNanos(5000);
+        var searchTime = MetadataCodec.decodeDatetime(v3t1.getHeader().getTagTimestamp()).minusNanos(5000);
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setSearch(searchExpr)
-                .setSearchAsOf(MetadataCodec.quoteDatetime(searchTime))
+                .setSearchAsOf(MetadataCodec.encodeDatetime(searchTime))
                 .setPriorVersions(true)
                 .setPriorTags(true)
                 .build();
