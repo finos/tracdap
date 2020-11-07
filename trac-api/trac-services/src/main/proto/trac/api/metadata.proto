@@ -260,9 +260,9 @@ service TracMetadataApi {
      * available search parameters, see SearchParameters.
      *
      * In gRPC calls, a MetadataSearchRequest specifies the tenant and includes the
-     * SearchParameters, where object type and the search expression set. For REST
-     * calls, tenant, object type and other members of SearchParameters are passed
-     * in the URL, only the SearchExpression object is passed in the request body.
+     * SearchParameters, where object type and the search expression are set. For
+     * REST calls the tenant is passed in the URL and searchParameters are supplied
+     * as the request body.
      *
      * @see MetadataSearchRequest
      * @see MetadataSearchResponse
@@ -270,8 +270,8 @@ service TracMetadataApi {
      */
     rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
         option (google.api.http) = {
-            post: "/{tenant}/search?objectType={searchParams.objectType}&searchAsOf={searchParams.searchAsOf}&priorVersions={searchParams.priorVersions}&priorTags={searchParams.priorTags}"
-            body: "searchParams.search"
+            post: "/{tenant}/search"
+            body: "searchParams"
         };
     }
 
@@ -487,8 +487,8 @@ service TrustedMetadataApi {
      */
     rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
         option (google.api.http) = {
-            post: "/{tenant}/trusted/search?objectType={searchParams.objectType}&searchAsOf={searchParams.searchAsOf}&priorVersions={searchParams.priorVersions}&priorTags={searchParams.priorTags}"
-            body: "searchParams.search"
+            post: "/{tenant}/trusted/search"
+            body: "searchParams"
         };
     }
 };

@@ -19,6 +19,7 @@ package com.accenture.trac.gateway;
 import com.accenture.trac.common.api.*;
 import com.accenture.trac.common.metadata.TagSelector;
 import com.accenture.trac.common.metadata.search.SearchExpression;
+import com.accenture.trac.common.metadata.search.SearchParameters;
 import com.accenture.trac.gateway.proxy.RestApiRequestBuilder;
 import com.accenture.trac.gateway.proxy.RestApiRouteMatcher;
 import com.accenture.trac.gateway.proxy.RestApiUnaryHandler;
@@ -74,17 +75,12 @@ public class TracApiConfig {
                 MetadataBatchRequest.getDefaultInstance(),
                 "selector", TagSelector.getDefaultInstance());
 
-        var searchQueryParams = "objectType={searchParams.objectType}&" +
-                "searchAsOf={searchParams.searchAsOf}&" +
-                "priorVersions={searchParams.priorVersions}&" +
-                "priorTags={searchParams.priorTags}";
-
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/search?" + searchQueryParams,
+                "/trac-meta/api/v1/{tenant}/search",
                 serviceHost, servicePort,
                 TracMetadataApiGrpc.getSearchMethod(),
                 MetadataSearchRequest.getDefaultInstance(),
-                "searchParams.search", SearchExpression.getDefaultInstance());
+                "searchParams", SearchParameters.getDefaultInstance());
 
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.GET,
                 "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/{tagVersion}",
@@ -153,17 +149,12 @@ public class TracApiConfig {
                 TracMetadataApiGrpc.getReadBatchMethod(),
                 MetadataBatchRequest.getDefaultInstance(), true);
 
-        var searchQueryParams = "objectType={searchParams.objectType}&" +
-                "searchAsOf={searchParams.searchAsOf}&" +
-                "priorVersions={searchParams.priorVersions}&" +
-                "priorTags={searchParams.priorTags}";
-
         TracApiConfig.addApiCall(apiRoutes, HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/search?" + searchQueryParams,
+                "/trac-meta-trusted/api/v1/{tenant}/trusted/search",
                 serviceHost, servicePort,
                 TracMetadataApiGrpc.getSearchMethod(),
                 MetadataSearchRequest.getDefaultInstance(),
-                "searchParams.search", SearchExpression.getDefaultInstance());
+                "searchParams", SearchParameters.getDefaultInstance());
 
         return apiRoutes;
     }
