@@ -73,7 +73,7 @@ public class BaseMetadataApi {
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
 
-            if (!PUBLIC_TYPES.contains(objectType)) {
+            if (apiTrustLevel == PUBLIC_API && !PUBLIC_TYPES.contains(objectType)) {
                 var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
                 var status = Status.PERMISSION_DENIED.withDescription(message);
                 return CompletableFuture.failedFuture(status.asRuntimeException());
@@ -82,7 +82,7 @@ public class BaseMetadataApi {
             return writeService.createObject(tenant, objectType,
                     request.getDefinition(),
                     request.getTagUpdateList(),
-                    PUBLIC_API);
+                    apiTrustLevel);
         });
     }
 
@@ -93,7 +93,7 @@ public class BaseMetadataApi {
             var tenant = request.getTenant();
             var objectType = request.getObjectType();
 
-            if (!PUBLIC_TYPES.contains(objectType)) {
+            if (apiTrustLevel == PUBLIC_API && !PUBLIC_TYPES.contains(objectType)) {
                 var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
                 var status = Status.PERMISSION_DENIED.withDescription(message);
                 return CompletableFuture.failedFuture(status.asRuntimeException());
@@ -103,7 +103,7 @@ public class BaseMetadataApi {
                     request.getPriorVersion(),
                     request.getDefinition(),
                     request.getTagUpdateList(),
-                    PUBLIC_API);
+                    apiTrustLevel);
         });
     }
 
@@ -116,7 +116,7 @@ public class BaseMetadataApi {
                     request.getObjectType(),
                     request.getPriorVersion(),
                     request.getTagUpdateList(),
-                    PUBLIC_API);
+                    apiTrustLevel);
         });
     }
 
