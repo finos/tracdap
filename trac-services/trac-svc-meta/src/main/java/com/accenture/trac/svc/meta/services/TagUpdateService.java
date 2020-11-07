@@ -16,9 +16,6 @@
 
 package com.accenture.trac.svc.meta.services;
 
-
-import com.accenture.trac.common.api.meta.TagOperation;
-import com.accenture.trac.common.api.meta.TagUpdate;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.common.exception.*;
@@ -34,7 +31,6 @@ import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 
-import static com.accenture.trac.svc.meta.services.MetadataConstants.PUBLIC_API;
 import static com.accenture.trac.svc.meta.services.MetadataConstants.TRAC_RESERVED_IDENTIFIER;
 
 

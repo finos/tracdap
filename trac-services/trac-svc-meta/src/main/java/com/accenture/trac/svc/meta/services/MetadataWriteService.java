@@ -16,7 +16,6 @@
 
 package com.accenture.trac.svc.meta.services;
 
-import com.accenture.trac.common.api.meta.TagUpdate;
 import com.accenture.trac.common.metadata.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.validation.MetadataValidator;
