@@ -98,8 +98,8 @@ public class TestData {
                 .setObjectId(UUID.randomUUID().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
-                .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
-                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .build();
     }
 
@@ -109,7 +109,7 @@ public class TestData {
 
         return priorTagHeader.toBuilder()
                 .setTagVersion(priorTagHeader.getTagVersion() + 1)
-                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .build();
     }
 
@@ -326,8 +326,8 @@ public class TestData {
             var header = previous.getHeader().toBuilder()
                     .setObjectVersion(previous.getHeader().getObjectVersion() + 1)
                     .setTagVersion(1)
-                    .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
-                    .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                    .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                    .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                     .build();
 
             return newTag.setHeader(header).build();

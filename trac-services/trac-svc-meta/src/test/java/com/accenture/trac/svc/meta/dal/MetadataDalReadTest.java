@@ -142,9 +142,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
         unwrap(dal.saveNewTag(TEST_TENANT, nextDefTag2));
 
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
-        var v1t1AsOf = MetadataCodec.parseDatetime(origTag.getHeader().getTagTimestamp()).plusNanos(500000);
-        var v2t1AsOf = MetadataCodec.parseDatetime(nextDefTag1.getHeader().getTagTimestamp()).plusNanos(500000);
-        var v2t2AsOf = MetadataCodec.parseDatetime(nextDefTag2.getHeader().getTagTimestamp()).plusNanos(500000);
+        var v1t1AsOf = MetadataCodec.decodeDatetime(origTag.getHeader().getTagTimestamp()).plusNanos(500000);
+        var v2t1AsOf = MetadataCodec.decodeDatetime(nextDefTag1.getHeader().getTagTimestamp()).plusNanos(500000);
+        var v2t2AsOf = MetadataCodec.decodeDatetime(nextDefTag2.getHeader().getTagTimestamp()).plusNanos(500000);
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -152,18 +152,18 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         // Load all three items by explicit version / tag number
         var selector1t1 = selector
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v1t1AsOf))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v1t1AsOf))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v1t1AsOf))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v1t1AsOf))
                 .build();
 
         var selector2t1 = selector
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v2t1AsOf))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v2t1AsOf))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v2t1AsOf))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v2t1AsOf))
                 .build();
 
         var selector2t2 = selector
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v2t2AsOf))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v2t2AsOf))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v2t2AsOf))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v2t2AsOf))
                 .build();
 
         var v1t1 = unwrap(dal.loadObject(TEST_TENANT, selector1t1));
@@ -192,9 +192,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
         unwrap(dal.saveNewTag(TEST_TENANT, nextDefTag2));
 
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
-        var v1t1AsOf = MetadataCodec.parseDatetime(origTag.getHeader().getTagTimestamp()).plusNanos(500000);
-        var v2t1AsOf = MetadataCodec.parseDatetime(nextDefTag1.getHeader().getTagTimestamp()).plusNanos(500000);
-        var v2t2AsOf = MetadataCodec.parseDatetime(nextDefTag2.getHeader().getTagTimestamp()).plusNanos(500000);
+        var v1t1AsOf = MetadataCodec.decodeDatetime(origTag.getHeader().getTagTimestamp()).plusNanos(500000);
+        var v2t1AsOf = MetadataCodec.decodeDatetime(nextDefTag1.getHeader().getTagTimestamp()).plusNanos(500000);
+        var v2t2AsOf = MetadataCodec.decodeDatetime(nextDefTag2.getHeader().getTagTimestamp()).plusNanos(500000);
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -202,18 +202,18 @@ abstract class MetadataDalReadTest implements IDalTestable {
 
         // Load all three items by explicit version / tag number
         var selector1t1 = selector
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v1t1AsOf))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v1t1AsOf))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v1t1AsOf))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v1t1AsOf))
                 .build();
 
         var selector2t1 = selector
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v2t1AsOf))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v2t1AsOf))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v2t1AsOf))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v2t1AsOf))
                 .build();
 
         var selector2t2 = selector
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v2t2AsOf))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v2t2AsOf))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v2t2AsOf))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v2t2AsOf))
                 .build();
 
         // Same test with batch load
@@ -325,7 +325,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         unwrap(dal.saveNewVersion(TEST_TENANT, v3t1Tag));
 
         var origId = UUID.fromString(v1Tag.getHeader().getObjectId());
-        var v2t1AsOf = MetadataCodec.parseDatetime(v2t1Tag.getHeader().getTagTimestamp()).plusNanos(500000);
+        var v2t1AsOf = MetadataCodec.decodeDatetime(v2t1Tag.getHeader().getTagTimestamp()).plusNanos(500000);
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -340,7 +340,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         // Use object as-of for v2t1, but select latest tag, should give v1t2
 
         var selectCombo2 = selector
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v2t1AsOf))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v2t1AsOf))
                 .setLatestTag(true)
                 .build();
 
@@ -381,7 +381,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         unwrap(dal.saveNewVersion(TEST_TENANT, v3t1Tag));
 
         var origId = UUID.fromString(v1Tag.getHeader().getObjectId());
-        var v2t1AsOf = MetadataCodec.parseDatetime(v2t1Tag.getHeader().getTagTimestamp()).plusNanos(500000);
+        var v2t1AsOf = MetadataCodec.decodeDatetime(v2t1Tag.getHeader().getTagTimestamp()).plusNanos(500000);
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -397,7 +397,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         // Use object as-of for v2t1, but select latest tag, should give v1t2
 
         var selectCombo2 = selector
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v2t1AsOf))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v2t1AsOf))
                 .setLatestTag(true)
                 .build();
 
@@ -495,19 +495,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origId = UUID.fromString(v1Tag.getHeader().getObjectId());
 
         // Metadata timestamps use millisecond precision
-        var v2BoundaryTime = MetadataCodec.parseDatetime(v2Tag.getHeader().getTagTimestamp());
+        var v2BoundaryTime = MetadataCodec.decodeDatetime(v2Tag.getHeader().getTagTimestamp());
         var v2PriorTime = v2BoundaryTime.minusNanos(1000);
-        var t2BoundaryTime = MetadataCodec.parseDatetime(t2Tag.getHeader().getTagTimestamp());
+        var t2BoundaryTime = MetadataCodec.decodeDatetime(t2Tag.getHeader().getTagTimestamp());
         var t2PriorTime = t2BoundaryTime.minusNanos(1000);
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setObjectId(origId.toString());
 
-        var v2BoundarySelector = selector.setObjectAsOf(MetadataCodec.quoteDatetime(v2BoundaryTime)).setTagVersion(1).build();
-        var v2PriorSelector = selector.setObjectAsOf(MetadataCodec.quoteDatetime(v2PriorTime)).setTagVersion(1).build();
-        var t2BoundarySelector = selector.setObjectVersion(2).setTagAsOf(MetadataCodec.quoteDatetime(t2BoundaryTime)).build();
-        var t2PriorSelector = selector.setObjectVersion(2).setTagAsOf(MetadataCodec.quoteDatetime(t2PriorTime)).build();
+        var v2BoundarySelector = selector.setObjectAsOf(MetadataCodec.encodeDatetime(v2BoundaryTime)).setTagVersion(1).build();
+        var v2PriorSelector = selector.setObjectAsOf(MetadataCodec.encodeDatetime(v2PriorTime)).setTagVersion(1).build();
+        var t2BoundarySelector = selector.setObjectVersion(2).setTagAsOf(MetadataCodec.encodeDatetime(t2BoundaryTime)).build();
+        var t2PriorSelector = selector.setObjectVersion(2).setTagAsOf(MetadataCodec.encodeDatetime(t2PriorTime)).build();
 
         var v2BoundaryTag = unwrap(dal.loadObject(TEST_TENANT, v2BoundarySelector));
         var v2PriorTag = unwrap(dal.loadObject(TEST_TENANT, v2PriorSelector));
@@ -539,19 +539,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origId = UUID.fromString(v1Tag.getHeader().getObjectId());
 
         // Metadata timestamps use millisecond precision
-        var v2BoundaryTime = MetadataCodec.parseDatetime(v2Tag.getHeader().getTagTimestamp());
+        var v2BoundaryTime = MetadataCodec.decodeDatetime(v2Tag.getHeader().getTagTimestamp());
         var v2PriorTime = v2BoundaryTime.minusNanos(1000);
-        var t2BoundaryTime = MetadataCodec.parseDatetime(t2Tag.getHeader().getTagTimestamp());
+        var t2BoundaryTime = MetadataCodec.decodeDatetime(t2Tag.getHeader().getTagTimestamp());
         var t2PriorTime = t2BoundaryTime.minusNanos(1000);
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setObjectId(origId.toString());
 
-        var v2BoundarySelector = selector.setObjectAsOf(MetadataCodec.quoteDatetime(v2BoundaryTime)).setTagVersion(1).build();
-        var v2PriorSelector = selector.setObjectAsOf(MetadataCodec.quoteDatetime(v2PriorTime)).setTagVersion(1).build();
-        var t2BoundarySelector = selector.setObjectVersion(2).setTagAsOf(MetadataCodec.quoteDatetime(t2BoundaryTime)).build();
-        var t2PriorSelector = selector.setObjectVersion(2).setTagAsOf(MetadataCodec.quoteDatetime(t2PriorTime)).build();
+        var v2BoundarySelector = selector.setObjectAsOf(MetadataCodec.encodeDatetime(v2BoundaryTime)).setTagVersion(1).build();
+        var v2PriorSelector = selector.setObjectAsOf(MetadataCodec.encodeDatetime(v2PriorTime)).setTagVersion(1).build();
+        var t2BoundarySelector = selector.setObjectVersion(2).setTagAsOf(MetadataCodec.encodeDatetime(t2BoundaryTime)).build();
+        var t2PriorSelector = selector.setObjectVersion(2).setTagAsOf(MetadataCodec.encodeDatetime(t2PriorTime)).build();
 
         var batch = unwrap(dal.loadObjects(TEST_TENANT, List.of(v2BoundarySelector, v2PriorSelector)));
         var v2BoundaryTag = batch.get(0);
@@ -575,7 +575,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         Thread.sleep(1);
-        var asOfTime = MetadataCodec.parseDatetime(origTag.getHeader().getTagTimestamp()).minusNanos(500000);
+        var asOfTime = MetadataCodec.decodeDatetime(origTag.getHeader().getTagTimestamp()).minusNanos(500000);
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -584,7 +584,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var missing1 = selector.setObjectVersion(1).setTagVersion(2).build(); // Missing tag
         var missing2 = selector.setObjectVersion(2).setTagVersion(1).build(); // Missing ver
         var missing3 = selector.setObjectVersion(2).setLatestTag(true).build(); // Missing ver
-        var missing4 = selector.setObjectAsOf(MetadataCodec.quoteDatetime(asOfTime)).setLatestTag(true).build(); // as-of before object creation
+        var missing4 = selector.setObjectAsOf(MetadataCodec.encodeDatetime(asOfTime)).setLatestTag(true).build(); // as-of before object creation
 
         // Object should definitely be missing before it is saved!
         assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing1)));
@@ -623,7 +623,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         Thread.sleep(1);
-        var asOfTime = MetadataCodec.parseDatetime(origTag.getHeader().getTagTimestamp()).minusNanos(500000);
+        var asOfTime = MetadataCodec.decodeDatetime(origTag.getHeader().getTagTimestamp()).minusNanos(500000);
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -632,7 +632,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var missing1 = selector.setObjectVersion(1).setTagVersion(2).build(); // Missing tag
         var missing2 = selector.setObjectVersion(2).setTagVersion(1).build(); // Missing ver
         var missing3 = selector.setObjectVersion(2).setLatestTag(true).build(); // Missing ver
-        var missing4 = selector.setObjectAsOf(MetadataCodec.quoteDatetime(asOfTime)).setLatestTag(true).build(); // as-of before object creation
+        var missing4 = selector.setObjectAsOf(MetadataCodec.encodeDatetime(asOfTime)).setLatestTag(true).build(); // as-of before object creation
 
         // Object should definitely be missing before it is saved!
         assertThrows(EMissingItem.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing1))));

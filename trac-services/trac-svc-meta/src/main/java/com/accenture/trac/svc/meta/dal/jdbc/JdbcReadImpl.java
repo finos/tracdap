@@ -77,7 +77,7 @@ class JdbcReadImpl {
             return readDefinitionByVersion(conn, tenantId, objectPk, selector.getObjectVersion());
 
         if (selector.getObjectVersionCriteriaCase() == TagSelector.ObjectVersionCriteriaCase.OBJECTASOF) {
-            var objectAsOf = MetadataCodec.parseDatetime(selector.getObjectAsOf()).toInstant();
+            var objectAsOf = MetadataCodec.decodeDatetime(selector.getObjectAsOf()).toInstant();
             return readDefinitionByAsOf(conn, tenantId, objectPk, objectAsOf);
         }
 
@@ -196,7 +196,7 @@ class JdbcReadImpl {
             return readTagRecordByVersion(conn, tenantId, definitionPk, selector.getTagVersion());
 
         if (selector.getTagVersionCriteriaCase() == TagSelector.TagVersionCriteriaCase.TAGASOF) {
-            var tagAsOf = MetadataCodec.parseDatetime(selector.getTagAsOf()).toInstant();
+            var tagAsOf = MetadataCodec.decodeDatetime(selector.getTagAsOf()).toInstant();
             return readTagRecordByAsOf(conn, tenantId, definitionPk, tagAsOf);
         }
 

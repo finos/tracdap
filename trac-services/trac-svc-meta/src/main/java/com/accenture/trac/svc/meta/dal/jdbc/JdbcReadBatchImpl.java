@@ -296,7 +296,7 @@ class JdbcReadBatchImpl {
                             .setObjectType(objectType)
                             .setObjectId(objectId.toString())
                             .setObjectVersion(objectVersion)
-                            .setObjectTimestamp(MetadataCodec.quoteDatetime(objectTimestamp.atOffset(ZoneOffset.UTC)))
+                            .setObjectTimestamp(MetadataCodec.encodeDatetime(objectTimestamp.atOffset(ZoneOffset.UTC)))
                             .build();
 
                     pks[i] = definitionPk;
@@ -427,7 +427,7 @@ class JdbcReadBatchImpl {
         for (var i = 0; i < headers.keys.length; i++) {
 
             var tagTimestamp = MetadataCodec
-                    .quoteDatetime(tagRecords.timestamps[i]
+                    .encodeDatetime(tagRecords.timestamps[i]
                     .atOffset(ZoneOffset.UTC));
 
             var header = headers.items[i].toBuilder()
@@ -632,7 +632,7 @@ class JdbcReadBatchImpl {
                         break;
 
                     case OBJECTASOF:
-                        var objectAsOf = MetadataCodec.parseDatetime(selector[i].getObjectAsOf()).toInstant();
+                        var objectAsOf = MetadataCodec.decodeDatetime(selector[i].getObjectAsOf()).toInstant();
                         var sqlAsOf = java.sql.Timestamp.from(objectAsOf);
                         stmt.setTimestamp(3, sqlAsOf);
                         break;
@@ -716,7 +716,7 @@ class JdbcReadBatchImpl {
                         break;
 
                     case TAGASOF:
-                        var tagAsOf = MetadataCodec.parseDatetime(selector[i].getTagAsOf()).toInstant();
+                        var tagAsOf = MetadataCodec.decodeDatetime(selector[i].getTagAsOf()).toInstant();
                         var sqlAsOf = java.sql.Timestamp.from(tagAsOf);
                         stmt.setTimestamp(3, sqlAsOf);
                         break;

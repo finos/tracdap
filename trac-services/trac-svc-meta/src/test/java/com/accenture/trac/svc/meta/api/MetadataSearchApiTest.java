@@ -396,7 +396,7 @@ abstract class MetadataSearchApiTest implements IDalTestable {
         var header2 = writeApi.createObject(create1);
 
         // Use a search timestamp after both objects have been created, but before either is updated
-        var v1SearchTime = MetadataCodec.parseDatetime(header2.getTagTimestamp()).plusNanos(5000);
+        var v1SearchTime = MetadataCodec.decodeDatetime(header2.getTagTimestamp()).plusNanos(5000);
 
         Thread.sleep(10);
 
@@ -440,7 +440,7 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         var asOfSearch = searchRequest.toBuilder()
                 .setSearchParams(searchRequest.getSearchParams().toBuilder()
-                .setSearchAsOf(MetadataCodec.quoteDatetime(v1SearchTime)))
+                .setSearchAsOf(MetadataCodec.encodeDatetime(v1SearchTime)))
                 .build();
 
         var asOfResult = searchApi.search(asOfSearch);

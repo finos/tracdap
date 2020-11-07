@@ -65,9 +65,9 @@ public class MetadataWriteService {
                 .setObjectType(objectType)
                 .setObjectId(objectId.toString())
                 .setObjectVersion(OBJECT_FIRST_VERSION)
-                .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(TAG_FIRST_VERSION)
-                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .build();
 
         var newTag = Tag.newBuilder()
@@ -130,9 +130,9 @@ public class MetadataWriteService {
 
         var newHeader = oldHeader.toBuilder()
                 .setObjectVersion(oldHeader.getObjectVersion() + 1)
-                .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(TAG_FIRST_VERSION)
-                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .build();
 
         var newTag = priorTag.toBuilder()
@@ -183,7 +183,7 @@ public class MetadataWriteService {
 
         var newHeader = oldHeader.toBuilder()
                 .setTagVersion(oldHeader.getTagVersion() + 1)
-                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .build();
 
         var newTag = priorTag.toBuilder()
@@ -241,9 +241,9 @@ public class MetadataWriteService {
                 .setObjectType(objectType)
                 .setObjectId(objectId.toString())
                 .setObjectVersion(OBJECT_FIRST_VERSION)
-                .setObjectTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(TAG_FIRST_VERSION)
-                .setTagTimestamp(MetadataCodec.quoteDatetime(timestamp))
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .build();
 
         var newTag = Tag.newBuilder()

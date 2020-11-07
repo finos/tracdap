@@ -420,29 +420,29 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setObjectId(objectId.toString())
                 .build();
 
-        var v1Time = MetadataCodec.parseDatetime(v1Header.getTagTimestamp()).plusNanos(5000);
-        var v2Time = MetadataCodec.parseDatetime(v2Header.getTagTimestamp()).plusNanos(5000);
-        var t2Time = MetadataCodec.parseDatetime(t2Header.getTagTimestamp()).plusNanos(5000);
+        var v1Time = MetadataCodec.decodeDatetime(v1Header.getTagTimestamp()).plusNanos(5000);
+        var v2Time = MetadataCodec.decodeDatetime(v2Header.getTagTimestamp()).plusNanos(5000);
+        var t2Time = MetadataCodec.decodeDatetime(t2Header.getTagTimestamp()).plusNanos(5000);
 
         var v1MetadataReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(baseSelector.toBuilder()
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v1Time))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v1Time)))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v1Time))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v1Time)))
                 .build();
 
         var v2MetadataReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(baseSelector.toBuilder()
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v2Time))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v2Time)))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v2Time))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v2Time)))
                 .build();
 
         var t2MetadataReadRequest = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(baseSelector.toBuilder()
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v1Time))
-                .setTagAsOf(MetadataCodec.quoteDatetime(t2Time)))
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v1Time))
+                .setTagAsOf(MetadataCodec.encodeDatetime(t2Time)))
                 .build();
 
         var v1TagSaved = readApi.readObject(v1MetadataReadRequest);
@@ -530,21 +530,21 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setObjectId(objectId.toString())
                 .build();
 
-        var v1Time = MetadataCodec.parseDatetime(v1Header.getTagTimestamp()).plusNanos(5000);
-        var v2Time = MetadataCodec.parseDatetime(v2Header.getTagTimestamp()).plusNanos(5000);
-        var t2Time = MetadataCodec.parseDatetime(t2Header.getTagTimestamp()).plusNanos(5000);
+        var v1Time = MetadataCodec.decodeDatetime(v1Header.getTagTimestamp()).plusNanos(5000);
+        var v2Time = MetadataCodec.decodeDatetime(v2Header.getTagTimestamp()).plusNanos(5000);
+        var t2Time = MetadataCodec.decodeDatetime(t2Header.getTagTimestamp()).plusNanos(5000);
 
         var v1SelectorAsOf = baseSelector.toBuilder()
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v1Time))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v1Time));
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v1Time))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v1Time));
 
         var v2SelectorAsOf = baseSelector.toBuilder()
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v2Time))
-                .setTagAsOf(MetadataCodec.quoteDatetime(v2Time));
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v2Time))
+                .setTagAsOf(MetadataCodec.encodeDatetime(v2Time));
 
         var t2SelectorAsOf = baseSelector.toBuilder()
-                .setObjectAsOf(MetadataCodec.quoteDatetime(v1Time))
-                .setTagAsOf(MetadataCodec.quoteDatetime(t2Time));
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v1Time))
+                .setTagAsOf(MetadataCodec.encodeDatetime(t2Time));
 
         var readRequest = MetadataBatchRequest.newBuilder()
                 .setTenant(TEST_TENANT)

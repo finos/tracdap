@@ -27,38 +27,6 @@ import java.util.stream.Collectors;
 
 public class MetadataCodec {
 
-    public static DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
-
-    // Using DateTimeFormatter.ISO_OFFSET_DATE_TIME results in > 6 decimal points.
-    // TRAC metadata tags are stored with timestamps at precision 6
-    // To avoid discrepancies, define a formatter that always uses 6 d.p.
-
-    public static DateTimeFormatter DATETIME_FORMAT = new DateTimeFormatterBuilder()
-            .appendPattern("uuuu-MM-dd'T'kk:mm:ss")
-            .appendFraction(ChronoField.MICRO_OF_SECOND, 6, 6, true)
-            .appendOffsetId()
-            .toFormatter();
-
-    public static OffsetDateTime parseDatetime(String isoDatetime) {
-
-        return OffsetDateTime.from(DATETIME_FORMAT.parse(isoDatetime));
-    }
-
-    public static LocalDate parseDate(String isoDate) {
-
-        return LocalDate.from(DATE_FORMAT.parse(isoDate));
-    }
-
-    public static String  quoteDatetime(OffsetDateTime datetime) {
-
-        return DATETIME_FORMAT.format(datetime);
-    }
-
-    public static String quoteDate(LocalDate date) {
-
-        return DATE_FORMAT.format(date);
-    }
-
     public static Value encodeNativeObject(Object value) {
 
         // We need to handle int/long and float/double separately
@@ -224,23 +192,35 @@ public class MetadataCodec {
 
     public static Value encodeValue(LocalDate dateValue) {
 
-        var isoDate = ISO_DATE_FORMAT.format(dateValue);
-
         return Value.newBuilder()
                 .setType(TypeSystem.descriptor(BasicType.DATE))
-                .setDateValue(DateValue.newBuilder()
-                .setIsoDate(isoDate))
+                .setDateValue(encodeDate(dateValue))
                 .build();
     }
 
     public static Value encodeValue(OffsetDateTime datetimeValue) {
 
-        var isoDatetime = ISO_DATE_TIME_FORMAT.format(datetimeValue);
-
         return Value.newBuilder()
                 .setType(TypeSystem.descriptor(BasicType.DATETIME))
-                .setDatetimeValue(DatetimeValue.newBuilder()
-                .setIsoDatetime(isoDatetime))
+                .setDatetimeValue(encodeDatetime(datetimeValue))
+                .build();
+    }
+
+    public static DateValue encodeDate(LocalDate date) {
+
+        var isoDate = ISO_DATE_FORMAT.format(date);
+
+        return DateValue.newBuilder()
+                .setIsoDate(isoDate)
+                .build();
+    }
+
+    public static DatetimeValue encodeDatetime(OffsetDateTime datetime) {
+
+        var isoDatetime = ISO_DATETIME_FORMAT.format(datetime);
+
+        return DatetimeValue.newBuilder()
+                .setIsoDatetime(isoDatetime)
                 .build();
     }
 
@@ -346,7 +326,7 @@ public class MetadataCodec {
         if (TypeSystem.basicType(value) != BasicType.DATE)
             throw new IllegalArgumentException("Value is not a date");
 
-        return LocalDate.parse(value.getDateValue().getIsoDate(), ISO_DATE_FORMAT);
+        return decodeDate(value.getDateValue());
     }
 
     public static OffsetDateTime decodeDateTimeValue(Value value) {
@@ -354,7 +334,7 @@ public class MetadataCodec {
         if (TypeSystem.basicType(value) != BasicType.DATETIME)
             throw new IllegalArgumentException("Value is not a date-time");
 
-        return OffsetDateTime.parse(value.getDatetimeValue().getIsoDatetime(), ISO_DATE_TIME_FORMAT);
+        return decodeDatetime(value.getDatetimeValue());
     }
 
     public static List<?> decodeArrayValue(Value value) {
@@ -365,9 +345,29 @@ public class MetadataCodec {
         return value.getArrayValue().getItemList().stream()
                 .map(MetadataCodec::decodeValue)
                 .collect(Collectors.toList());
-
     }
 
-    private static final DateTimeFormatter ISO_DATE_FORMAT = DateTimeFormatter.ISO_DATE;
-    private static final DateTimeFormatter ISO_DATE_TIME_FORMAT = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+    public static LocalDate decodeDate(DateValue date) {
+
+        return LocalDate.from(ISO_DATE_FORMAT.parse(date.getIsoDate()));
+    }
+
+    public static OffsetDateTime decodeDatetime(DatetimeValue datetime) {
+
+        return OffsetDateTime.from(ISO_DATETIME_FORMAT.parse(datetime.getIsoDatetime()));
+    }
+
+    private static final DateTimeFormatter ISO_DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
+
+    // Using DateTimeFormatter.ISO_OFFSET_DATE_TIME results in > 6 decimal points.
+    // TRAC metadata tags are stored with timestamps at precision 6
+    // To avoid discrepancies, define a formatter that always uses 6 d.p.
+
+    private static final DateTimeFormatter ISO_DATETIME_FORMAT = new DateTimeFormatterBuilder()
+            .appendPattern("uuuu-MM-dd'T'kk:mm:ss")
+            .appendFraction(ChronoField.MICRO_OF_SECOND, 6, 6, true)
+            .appendOffsetId()
+            .toFormatter();
+
+    // private static final DateTimeFormatter ISO_DATETIME_FORMAT = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 }
