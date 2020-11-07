@@ -1,5 +1,8 @@
 {
-    "logical": {
+    "objectType": "FLOW",
+
+    "search": { "logical": {
+
         "operator": "AND",
         "expr": [
 
@@ -14,14 +17,17 @@
                 "attrName": "brand",
                 "attrType": "STRING",
                 "operator": "IN",
-                "searchValue": { "arrayValue": { "item": [
-                    { "stringValue": "ACME Financial" },
-                    { "stringValue": "ACME SubCo" },
-                    { "stringValue": "ACME Legacy Brands" }
-                ]}}
+                "searchValue": { "arrayValue": {
+                    "item": [
+                        { "stringValue": "ACME Financial" },
+                        { "stringValue": "ACME SubCo" },
+                        { "stringValue": "ACME Legacy Brands" }
+                    ]
+                }}
             }},
 
             { "logical": {
+
                 "operator": "OR",
                 "expr": [
 
@@ -29,7 +35,7 @@
                         "attrName": "last_review_date",
                         "attrType": "DATE",
                         "operator": "GE",
-                        "searchValue": { "dateValue": { "isoDate": "2019-10-01" } }
+                        "searchValue": { "dateValue": { "isoDate": "2019-10-01" }}
                     }},
 
                     { "term": {
@@ -40,6 +46,6 @@
                     }}
                 ]
             }}
-        ]
+        ]}
     }
 }
