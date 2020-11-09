@@ -44,7 +44,14 @@ class PythonicGenerator:
         """\n""" \
         """{IMPORT_STATEMENTS}\n""" \
         """\n""" \
-        """{ENUMS_CODE}\n"""
+        """{ENUMS_CODE}\n""" \
+        """{MESSAGES_CODE}\n"""
+
+    MESSAGE_TEMPLATE = \
+        """{INDENT}\n""" \
+        """@dataclass\n""" \
+        """{INDENT}class {CLASS_NAME}:\n""" \
+        """{NEXT_INDENT} pass\n"""
 
     ENUM_TEMPLATE = \
         """{INDENT}\n""" \
@@ -64,6 +71,7 @@ class PythonicGenerator:
         self._log = logging.getLogger(PythonicGenerator.__name__)
 
         self._enum_type_field = self.get_field_number(pb_desc.FileDescriptorProto, "enum_type")
+        self._message_type_field = self.get_field_number(pb_desc.FileDescriptorProto, "message_type")
         self._enum_value_field = self.get_field_number(pb_desc.EnumDescriptorProto, "value")
 
     def generate_file(self, src_loc, indent: int, descriptor: pb_desc.FileDescriptorProto) -> str:
@@ -77,13 +85,26 @@ class PythonicGenerator:
         enum_ctx = self.index_sub_ctx(src_loc, self._enum_type_field, indent)
         enum_code = list(it.starmap(self.generate_enum, zip(enum_ctx, descriptor.enum_type)))
 
+        message_ctx = self.index_sub_ctx(src_loc, self._message_type_field, indent)
+        message_code = list(it.starmap(self.generate_message, zip(message_ctx, descriptor.message_type)))
+
         # Populate the template
         code = self.FILE_TEMPLATE \
             .replace("{INDENT}", self.INDENT_TEMPLATE * indent) \
             .replace("{IMPORT_STATEMENTS}", "\n".join(imports)) \
-            .replace("{ENUMS_CODE}", "\n\n".join(enum_code))
+            .replace("{ENUMS_CODE}", "\n\n".join(enum_code)) \
+            .replace("{MESSAGES_CODE}", "\n\n".join(message_code))
 
         return code
+
+    def generate_message(self, ctx: LocationContext, descriptor: pb_desc.DescriptorProto) -> str:
+
+        # filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
+
+        return self.MESSAGE_TEMPLATE \
+            .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
+            .replace("{NEXT_INDENT}", self.INDENT_TEMPLATE * (ctx.indent + 1)) \
+            .replace("{CLASS_NAME}", descriptor.name)
 
     def generate_enum(self, ctx: LocationContext, descriptor: pb_desc.EnumDescriptorProto) -> str:
 
