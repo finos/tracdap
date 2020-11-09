@@ -44,7 +44,9 @@ class PythonicPlugin:
             if not file_descriptor.source_code_info.ByteSize():
                 continue
 
-            file_code = generator.generate_file(0, file_descriptor)
+            src_locations = file_descriptor.source_code_info.location
+
+            file_code = generator.generate_file(src_locations, 0, file_descriptor)
 
             self._log.debug(file_descriptor.name + "\n" + file_code)
 

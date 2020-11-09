@@ -12,9 +12,27 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import functools as func
+import itertools as it
+import re
+import typing as tp
+import logging
 
-import google.protobuf.descriptor as pb_desc
+import google.protobuf.descriptor_pb2 as pb_desc
+
+
+class LocationContext:
+
+    def __init__(self, src_locations: tp.List[pb_desc.SourceCodeInfo.Location],
+                 src_loc_code: int, src_loc_index: int, indent: int):
+
+        self.src_locations = src_locations
+        self.src_loc_code = src_loc_code
+        self.src_loc_index = src_loc_index
+        self.indent = indent
+
+    def for_index(self, index: int) -> 'LocationContext':
+
+        return LocationContext(self.src_locations, self.src_loc_code, index, self.indent)
 
 
 class PythonicGenerator:
@@ -33,49 +51,133 @@ class PythonicGenerator:
         """{INDENT}class {CLASS_NAME}(enum.Enum):\n""" \
         """{NEXT_INDENT}\n""" \
         """{NEXT_INDENT}\"\"\"\n""" \
-        """{NEXT_INDENT}{DOC_COMMENT}\n""" \
+        """{DOC_COMMENT}\n""" \
         """{NEXT_INDENT}\"\"\"\n""" \
         """{INDENT}\n""" \
         """{ENUM_VALUES}\n"""
 
     ENUM_VALUE_TEMPLATE = \
-        """{INDENT}{ENUM_VALUE_NAME} = {ENUM_VALUE_NUMBER}, "{COMMENT}"\n"""
+        """{INDENT}{ENUM_VALUE_NAME} = {ENUM_VALUE_NUMBER}, {QUOTED_COMMENT}\n"""
 
-    def generate_file(self, indent: int, descriptor: pb_desc.FileDescriptor) -> str:
+    def __init__(self):
+
+        self._log = logging.getLogger(PythonicGenerator.__name__)
+
+        self._enum_type_field = self.get_field_number(pb_desc.FileDescriptorProto, "enum_type")
+        self._enum_value_field = self.get_field_number(pb_desc.EnumDescriptorProto, "value")
+
+    def generate_file(self, src_loc, indent: int, descriptor: pb_desc.FileDescriptorProto) -> str:
 
         imports = []
 
         if len(descriptor.enum_type) > 0:
             imports.append("import enum")
 
-        enums_code = list(map(func.partial(self.generate_enum, indent), descriptor.enum_type))
+        # Generate enums
+        enum_ctx = self.index_sub_ctx(src_loc, self._enum_type_field, indent)
+        enum_code = list(it.starmap(self.generate_enum, zip(enum_ctx, descriptor.enum_type)))
 
+        # Populate the template
         code = self.FILE_TEMPLATE \
             .replace("{INDENT}", self.INDENT_TEMPLATE * indent) \
             .replace("{IMPORT_STATEMENTS}", "\n".join(imports)) \
-            .replace("{ENUMS_CODE}", "\n\n".join(enums_code))
+            .replace("{ENUMS_CODE}", "\n\n".join(enum_code))
 
         return code
 
-    def generate_enum(self, indent: int, descriptor: pb_desc.EnumDescriptor) -> str:
+    def generate_enum(self, ctx: LocationContext, descriptor: pb_desc.EnumDescriptorProto) -> str:
 
-        values_code = list(map(func.partial(self.generate_enum_value, indent + 1), descriptor.value))
+        filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
 
+        # Generate enum values
+        values_ctx = self.index_sub_ctx(filtered_loc, self._enum_value_field, ctx.indent + 1)
+        values_code = list(it.starmap(self.generate_enum_value, zip(values_ctx, descriptor.value)))
+
+        # Comments from current code location
+        current_loc = self.current_location(filtered_loc)
+
+        if current_loc is not None:
+            current_comment = current_loc.leading_comments
+        else:
+            current_comment = None
+
+        current_comment = re.sub("^(\\*\n)|/", "", current_comment, count=1)
+        current_comment = re.sub("\n$", "", current_comment)
+        current_comment = re.sub("^ ?", self.INDENT_TEMPLATE * (ctx.indent + 1), current_comment)
+        current_comment = re.sub("\\n ?", "\n" + self.INDENT_TEMPLATE * (ctx.indent + 1), current_comment)
+
+        # Populate the template
         code = self.ENUM_TEMPLATE \
-            .replace("{INDENT}", self.INDENT_TEMPLATE * indent) \
-            .replace("{NEXT_INDENT}", self.INDENT_TEMPLATE * (indent + 1)) \
-            .replace("{DOC_COMMENT}", "# TODO: Doc comments") \
+            .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
+            .replace("{NEXT_INDENT}", self.INDENT_TEMPLATE * (ctx.indent + 1)) \
+            .replace("{DOC_COMMENT}", current_comment) \
             .replace("{CLASS_NAME}", descriptor.name) \
             .replace("{ENUM_VALUES}", "\n".join(values_code))
 
         return code
 
-    def generate_enum_value(self, indent: int, descriptor: pb_desc.EnumValueDescriptor) -> str:
+    def generate_enum_value(self, ctx: LocationContext, descriptor: pb_desc.EnumValueDescriptorProto) -> str:
 
+        filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
+
+        # Comments from current code location
+        current_loc = self.current_location(filtered_loc)
+
+        if current_loc is not None:
+            current_comment = current_loc.leading_comments
+        else:
+            current_comment = None
+
+        current_comment = re.sub("^(\\*\n)|/", "", current_comment, count=1)
+        current_comment = re.sub("\n$", "", current_comment)
+        current_comment = re.sub("^ ?", "", current_comment)
+        current_comment = re.sub("\\n ?", "\n" + self.INDENT_TEMPLATE * (ctx.indent + 1), current_comment)
+
+        if "\n" in current_comment:
+            quoted_comment = '"""' + current_comment + '"""'
+        else:
+            quoted_comment = '"' + current_comment + '"'
+
+        # Populate the template
         code = self.ENUM_VALUE_TEMPLATE \
-            .replace("{INDENT}", self.INDENT_TEMPLATE * indent) \
-            .replace("{COMMENT}", "# TODO: Doc comments") \
+            .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
+            .replace("{QUOTED_COMMENT}", quoted_comment) \
             .replace("{ENUM_VALUE_NAME}", descriptor.name) \
             .replace("{ENUM_VALUE_NUMBER}", str(descriptor.number))
 
         return code
+
+    # Helpers
+
+    def filter_src_location(self, locations, loc_type, loc_index):
+
+        def relative_path(loc: pb_desc.SourceCodeInfo.Location):
+
+            return pb_desc.SourceCodeInfo.Location(
+                path=loc.path[2:], span=loc.span,
+                leading_comments=loc.leading_comments,
+                trailing_comments=loc.trailing_comments,
+                leading_detached_comments=loc.leading_detached_comments)
+
+        filtered = filter(lambda l: len(l.path) >= 2 and l.path[0] == loc_type and l.path[1] == loc_index, locations)
+        return list(map(relative_path, filtered))
+
+    def current_location(self, locations) -> pb_desc.SourceCodeInfo.Location:
+
+        return next(filter(lambda l: len(l.path) == 0, locations), None)
+
+    def index_sub_ctx(self, src_locations, field_number, indent):
+
+        base_ctx = LocationContext(src_locations, field_number, 0, indent)
+        return iter(map(base_ctx.for_index, it.count(0)))
+
+    def get_field_number(self, message_descriptor, field_name: str):
+
+        field_descriptor = next(filter(
+            lambda f: f.name == field_name,
+            message_descriptor.DESCRIPTOR.fields), None)
+
+        if field_descriptor is None:
+            raise RuntimeError(f"Field {field_name} not found int type {message_descriptor.DESCRIPTOR.name}")
+
+        return field_descriptor.number
