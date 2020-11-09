@@ -29,4 +29,6 @@ build/
 .idea/libraries/
 .idea/shelf/
 
-
+/trac-executors/python/venv/**
+/trac-executors/python/**/*.pyc
+/trac-executors/python/.idea/**
