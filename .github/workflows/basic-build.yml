@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
 
-  build:
+  platform_build:
 
     runs-on: ubuntu-latest
 
@@ -16,10 +16,46 @@ jobs:
         java-version: 11.0.x
     
     - name: Checkout
-      uses: actions/checkout@v1
+      uses: actions/checkout@v2
 
     - name: Build
       run: ./gradlew build -x test
 
     - name: Unit tests
       run: ./gradlew test
+
+  python_executor_build:
+
+    runs-on: ubuntu-latest
+
+    # Testing targets for the Python executor runtime
+    # Include the latest stable release (3.9)
+    # Include the oldest supported release in the 3.X family
+    # Do not include 2.7 - that ship has sailed!
+    strategy:
+      matrix:
+        python-version: [3.9, 3.5]
+
+    steps:
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          cd trac-executors/python
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Protoc Code Generation
+        run: |
+          python trac-executors/python/codegen/pythonic.py --protoc
+          python trac-executors/python/codegen/pythonic.py --pythonic
+
+      - name: Unit tests
+        run: python -m unittest -s trac-executors/python/test/trac_test -t trac_executors/python/test
