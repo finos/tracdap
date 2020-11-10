@@ -16,6 +16,7 @@
 
 import sys
 import logging
+import itertools as it
 
 import google.protobuf.compiler.plugin_pb2 as pb_plugin
 
@@ -36,25 +37,22 @@ class PythonicPlugin:
         generator = gen.PythonicGenerator()
         generated_response = pb_plugin.CodeGeneratorResponse()
 
-        for file_descriptor in self._request.proto_file:
+        input_files = self._request.proto_file
+        input_files = filter(lambda f: f.name in self._request.file_to_generate, input_files)
+        input_files = filter(lambda f: f.source_code_info.ByteSize() > 0, input_files)
 
-            if file_descriptor.name not in self._request.file_to_generate:
-                continue
+        sorted_files = sorted(input_files, key=lambda f: f.package)
+        packages = it.groupby(sorted_files, lambda f: f.package)
 
-            if not file_descriptor.source_code_info.ByteSize():
-                continue
+        for package, files in packages:
 
-            src_locations = file_descriptor.source_code_info.location
+            # Take files out of iter group, they may be used multiple times
+            files = list(files)
 
-            file_code = generator.generate_file(src_locations, 0, file_descriptor)
+            self._log.info(f"{package}, {len(files)}")
 
-            self._log.debug(file_descriptor.name + "\n" + file_code)
-
-            file_response = pb_plugin.CodeGeneratorResponse.File()
-            file_response.name = file_descriptor.name.replace(".proto", ".py")
-            file_response.content = file_code
-
-            generated_response.file.append(file_response)
+            package_files = generator.generate_package(package, files)
+            generated_response.file.extend(package_files)
 
         return generated_response
 

@@ -15,9 +15,11 @@
 import itertools as it
 import re
 import typing as tp
+import pathlib
 import logging
 
 import google.protobuf.descriptor_pb2 as pb_desc
+import google.protobuf.compiler.plugin_pb2 as pb_plugin
 
 
 class LocationContext:
@@ -51,7 +53,11 @@ class PythonicGenerator:
         """{INDENT}\n""" \
         """@dataclass\n""" \
         """{INDENT}class {CLASS_NAME}:\n""" \
-        """{NEXT_INDENT} pass\n"""
+        """{NEXT_INDENT}\n""" \
+        """{NEXT_INDENT}\"\"\"\n""" \
+        """{DOC_COMMENT}\n""" \
+        """{NEXT_INDENT}\"\"\"\n""" \
+        """{NEXT_INDENT}pass\n"""
 
     ENUM_TEMPLATE = \
         """{INDENT}\n""" \
@@ -68,15 +74,78 @@ class PythonicGenerator:
 
     def __init__(self):
 
+        logging.basicConfig(level=logging.DEBUG)
         self._log = logging.getLogger(PythonicGenerator.__name__)
 
         self._enum_type_field = self.get_field_number(pb_desc.FileDescriptorProto, "enum_type")
         self._message_type_field = self.get_field_number(pb_desc.FileDescriptorProto, "message_type")
         self._enum_value_field = self.get_field_number(pb_desc.EnumDescriptorProto, "value")
 
+    def generate_package(self, package: str, files: tp.List[pb_desc.FileDescriptorProto]) \
+            -> tp.List[pb_plugin.CodeGeneratorResponse.File]:
+
+        output_files = []
+
+        # Use the protobuf package as the Python package
+        package_path = pathlib.Path(*package.split("."))
+        package_imports = ""
+
+        for file_descriptor in files:
+
+            # Run the generator to produce code for the Python module
+            src_locations = file_descriptor.source_code_info.location
+            file_code = self.generate_file(src_locations, 0, file_descriptor)
+
+            # Find the module name inside the package - this is the stem of the .proto file
+            file_path = pathlib.PurePath(file_descriptor.name)
+            file_stem = file_path.stem
+
+            # Create a generator response for the module
+            file_response = pb_plugin.CodeGeneratorResponse.File()
+            file_response.content = file_code
+
+            # File name is formed from the python package and the module name (.proto file stem)
+            file_response.name = str(package_path.joinpath(f"{file_stem}.py"))
+
+            output_files.append(file_response)
+
+            # Generate import statements to include in the package-level __init__ file
+            package_imports += self.generate_package_imports(file_descriptor)
+
+        # Add an extra generator response file for the package-level __init__ file
+        package_init_file = pb_plugin.CodeGeneratorResponse.File()
+        package_init_file.name = str(package_path.joinpath("__init__.py"))
+        package_init_file.content = package_imports
+
+        output_files.append(package_init_file)
+
+        return output_files
+
+    def generate_package_imports(self, descriptor: pb_desc.FileDescriptorProto) -> str:
+
+        file_path = pathlib.Path(descriptor.name)
+        module_name = file_path.stem
+
+        imports = ""
+
+        if len(descriptor.enum_type) > 0 or len(descriptor.message_type) > 0:
+            imports += "\n"
+
+        for enum_type in descriptor.enum_type:
+            imports += f"from .{module_name} import {enum_type.name}\n"
+
+        for message_type in descriptor.message_type:
+            imports += f"from .{module_name} import {message_type.name}\n"
+
+        return imports
+
     def generate_file(self, src_loc, indent: int, descriptor: pb_desc.FileDescriptorProto) -> str:
 
+        # print(descriptor.name)
+        # self._log.info(descriptor.name)
+
         imports = []
+        imports.append("from dataclasses import dataclass")
 
         if len(descriptor.enum_type) > 0:
             imports.append("import enum")
@@ -85,6 +154,7 @@ class PythonicGenerator:
         enum_ctx = self.index_sub_ctx(src_loc, self._enum_type_field, indent)
         enum_code = list(it.starmap(self.generate_enum, zip(enum_ctx, descriptor.enum_type)))
 
+        # Generate message classes
         message_ctx = self.index_sub_ctx(src_loc, self._message_type_field, indent)
         message_code = list(it.starmap(self.generate_message, zip(message_ctx, descriptor.message_type)))
 
@@ -99,12 +169,26 @@ class PythonicGenerator:
 
     def generate_message(self, ctx: LocationContext, descriptor: pb_desc.DescriptorProto) -> str:
 
-        # filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
+        filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
+
+        # Comments from current code location
+        current_loc = self.current_location(filtered_loc)
+
+        if current_loc is not None:
+            current_comment = current_loc.leading_comments
+        else:
+            current_comment = None
+
+        current_comment = re.sub("^(\\*\n)|/", "", current_comment, count=1)
+        current_comment = re.sub("\n$", "", current_comment)
+        current_comment = re.sub("^ ?", self.INDENT_TEMPLATE * (ctx.indent + 1), current_comment)
+        current_comment = re.sub("\\n ?", "\n" + self.INDENT_TEMPLATE * (ctx.indent + 1), current_comment)
 
         return self.MESSAGE_TEMPLATE \
             .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
             .replace("{NEXT_INDENT}", self.INDENT_TEMPLATE * (ctx.indent + 1)) \
-            .replace("{CLASS_NAME}", descriptor.name)
+            .replace("{CLASS_NAME}", descriptor.name) \
+            .replace("{DOC_COMMENT}", current_comment)
 
     def generate_enum(self, ctx: LocationContext, descriptor: pb_desc.EnumDescriptorProto) -> str:
 
