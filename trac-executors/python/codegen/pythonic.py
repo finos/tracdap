@@ -20,14 +20,17 @@ import protoc
 
 def main(argv):
 
+    proto_location = "../../trac-api/trac-metadata/src/main/proto"
+    output_location = "../../build/modules/trac-executors/python/generated"
+
     protoc_args = [
 
         # Arg 0 is the name given to the process, not actually passed to it!
         # (This is on macOS, may behave differently on other platforms, especially Windows)
         "protoc",
 
-        "--python_out=../../build/modules/trac-executors/python/generated/protoc",
-        "--proto_path=../../trac-api/trac-metadata/src/main/proto",
+        f"--python_out={output_location}/trac_gen/protoc",
+        f"--proto_path={proto_location}",
 
         "@codegen/metadata_inputs.txt"
     ]
@@ -38,19 +41,27 @@ def main(argv):
         # (This is on macOS, may behave differently on other platforms, especially Windows)
         "protoc",
 
-        "--plugin=protoc-gen-pythonic=./codegen/pythonic_plugin.py",
-        "--pythonic_out=../../build/modules/trac-executors/python/generated/pythonic",
-        "--proto_path=../../trac-api/trac-metadata/src/main/proto",
+        f"--plugin=protoc-gen-pythonic=./codegen/pythonic_plugin.py",
+        f"--pythonic_out={output_location}/trac_gen/pythonic",
+        f"--proto_path={proto_location}",
 
         "@codegen/metadata_inputs.txt"
     ]
 
-    pathlib.Path("../../build/modules/trac-executors/python/generated/protoc").mkdir(parents=True, exist_ok=True)
-    pathlib.Path("../../build/modules/trac-executors/python/generated/pythonic").mkdir(parents=True, exist_ok=True)
-
     if len(argv) > 1 and argv[1] == "--pythonic":
+
+        pathlib.Path(output_location).joinpath("trac_gen/pythonic").mkdir(parents=True, exist_ok=True)
+        pathlib.Path(output_location).joinpath("trac_gen/pythonic/__init__.py").touch(exist_ok=True)
+        pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
+
         protoc.exec_protoc(pythonic_args)
+
     else:
+
+        pathlib.Path(output_location).joinpath("trac_gen/protoc").mkdir(parents=True, exist_ok=True)
+        pathlib.Path(output_location).joinpath("trac_gen/protoc/__init__.py").touch(exist_ok=True)
+        pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
+
         protoc.exec_protoc(protoc_args)
 
 
