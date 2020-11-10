@@ -289,6 +289,11 @@ class PythonicGenerator:
             message_descriptor.DESCRIPTOR.fields), None)
 
         if field_descriptor is None:
-            raise RuntimeError(f"Field {field_name} not found int type {message_descriptor.DESCRIPTOR.name}")
+
+            # TODO: Debug code
+            for field in message_descriptor.DESCRIPTOR.fields:
+                print(field.name)
+
+            raise RuntimeError("Field {} not found in type {}".format(field_name, message_descriptor.DESCRIPTOR.name))
 
         return field_descriptor.number
