@@ -61,4 +61,4 @@ jobs:
       - name: Unit tests
         run: |
           cd trac-executors/python
-          python -m unittest -s test/trac_test -t test
+          python -m unittest discover -s test/trac_test -t test

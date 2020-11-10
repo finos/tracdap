@@ -29,8 +29,8 @@ def main(argv):
         # (This is on macOS, may behave differently on other platforms, especially Windows)
         "protoc",
 
-        f"--python_out={output_location}/trac_gen/protoc",
-        f"--proto_path={proto_location}",
+        "--python_out={}/trac_gen/protoc".format(output_location),
+        "--proto_path={}".format(proto_location),
 
         "@metadata_inputs.txt"
     ]
@@ -41,9 +41,9 @@ def main(argv):
         # (This is on macOS, may behave differently on other platforms, especially Windows)
         "protoc",
 
-        f"--plugin=protoc-gen-pythonic=./pythonic_plugin.py",
-        f"--pythonic_out={output_location}/trac_gen/pythonic",
-        f"--proto_path={proto_location}",
+        "--plugin=protoc-gen-pythonic=./pythonic_plugin.py",
+        "--pythonic_out={}/trac_gen/pythonic".format(output_location),
+        "--proto_path={}".format(proto_location),
 
         "@metadata_inputs.txt"
     ]

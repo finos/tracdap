@@ -105,7 +105,7 @@ class PythonicGenerator:
             file_response.content = file_code
 
             # File name is formed from the python package and the module name (.proto file stem)
-            file_response.name = str(package_path.joinpath(f"{file_stem}.py"))
+            file_response.name = str(package_path.joinpath(file_stem + ".py"))
 
             output_files.append(file_response)
 
