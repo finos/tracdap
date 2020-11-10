@@ -49,7 +49,7 @@ class PythonicPlugin:
             # Take files out of iter group, they may be used multiple times
             files = list(files)
 
-            self._log.info(f"{package}, {len(files)}")
+            self._log.info("package '{}' ({} files)".format(package, len(files)))
 
             package_files = generator.generate_package(package, files)
             generated_response.file.extend(package_files)
