@@ -54,8 +54,11 @@ jobs:
 
       - name: Protoc Code Generation
         run: |
-          python trac-executors/python/codegen/pythonic.py --protoc
-          python trac-executors/python/codegen/pythonic.py --pythonic
+          cd trac-executors/python
+          python codegen/pythonic.py --protoc
+          python codegen/pythonic.py --pythonic
 
       - name: Unit tests
-        run: python -m unittest -s trac-executors/python/test/trac_test -t trac_executors/python/test
+        run: |
+          cd trac-executors/python
+          python -m unittest -s test/trac_test -t test
