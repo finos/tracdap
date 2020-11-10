@@ -60,6 +60,9 @@ jobs:
 
       - name: Unit tests
         run: |
+          cd trac-executors/python/codegen
+          python pythonic.py --pythonic
+          cd ../../..
           export PYTHONPATH=build/modules/trac-executors/python/generated
           export PYTHONPATH=trac-executors/python/test:PYTHONPATH
           export PYTHONPATH=trac-executors/python/src:$PYTHONPATH
