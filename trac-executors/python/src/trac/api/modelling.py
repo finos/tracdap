@@ -15,8 +15,8 @@
 import abc
 import typing as tp
 
-from trac.metadata.data import TableDefinition
-from trac.metadata.model import ModelParameter
+from trac.metadata import TableDefinition
+from trac.metadata import ModelParameter
 
 
 class TracContext:
