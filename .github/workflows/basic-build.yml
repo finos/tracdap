@@ -60,5 +60,8 @@ jobs:
 
       - name: Unit tests
         run: |
+          export PYTHONPATH=build/modules/trac-executors/python/generated
+          export PYTHONPATH=trac-executors/python/test:PYTHONPATH
+          export PYTHONPATH=trac-executors/python/src:$PYTHONPATH
           cd trac-executors/python
           python -m unittest discover -s test/trac_test -t test
