@@ -20,8 +20,8 @@ import protoc
 
 def main(argv):
 
-    proto_location = "../../trac-api/trac-metadata/src/main/proto"
-    output_location = "../../build/modules/trac-executors/python/generated"
+    proto_location = "../../../trac-api/trac-metadata/src/main/proto"
+    output_location = "../../../build/modules/trac-executors/python/generated"
 
     protoc_args = [
 
@@ -32,7 +32,7 @@ def main(argv):
         f"--python_out={output_location}/trac_gen/protoc",
         f"--proto_path={proto_location}",
 
-        "@codegen/metadata_inputs.txt"
+        "@metadata_inputs.txt"
     ]
 
     pythonic_args = [
@@ -41,11 +41,11 @@ def main(argv):
         # (This is on macOS, may behave differently on other platforms, especially Windows)
         "protoc",
 
-        f"--plugin=protoc-gen-pythonic=./codegen/pythonic_plugin.py",
+        f"--plugin=protoc-gen-pythonic=./pythonic_plugin.py",
         f"--pythonic_out={output_location}/trac_gen/pythonic",
         f"--proto_path={proto_location}",
 
-        "@codegen/metadata_inputs.txt"
+        "@metadata_inputs.txt"
     ]
 
     if len(argv) > 1 and argv[1] == "--pythonic":

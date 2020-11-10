@@ -20,7 +20,7 @@ import itertools as it
 
 import google.protobuf.compiler.plugin_pb2 as pb_plugin
 
-import codegen.generator as gen
+import generator as gen
 
 
 class PythonicPlugin:
