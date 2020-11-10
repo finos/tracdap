@@ -63,5 +63,4 @@ jobs:
           export PYTHONPATH=build/modules/trac-executors/python/generated
           export PYTHONPATH=trac-executors/python/test:PYTHONPATH
           export PYTHONPATH=trac-executors/python/src:$PYTHONPATH
-          cd trac-executors/python
-          python -m unittest discover -s test/trac_test -t test
+          python -m unittest discover -s trac-executors/python/test/trac_test -t trac-executors/python/test
