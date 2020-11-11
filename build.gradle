@@ -19,11 +19,14 @@ plugins {
 }
 
 apply from: 'gradle/config.gradle'
+apply from: 'gradle/functions.gradle'
+
+def versionNumber = ext.getVersionFromGit()
 
 allprojects {
 
     group 'com.accenture.trac'
-    version '0.1.0'
+    version versionNumber
 }
 
 subprojects {
