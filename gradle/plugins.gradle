@@ -44,4 +44,6 @@ ext {
     BUILD_sql_postgresql = false
     BUILD_sql_sqlserver = false
     BUILD_sql_oracle = false
+
+    BUILD_aws_config = false
 }

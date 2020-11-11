@@ -45,6 +45,9 @@ ext {
     // Flyway (database deploy tool)
     flyway_version = '7.1.0'
 
+    // Plugins
+    aws_sdk_version = '1.11.163'
+
 
     // Test dependencies
 

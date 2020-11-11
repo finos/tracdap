@@ -53,5 +53,9 @@ project(":trac-gateway").projectDir = file("trac-services/trac-gateway")
 // Tools and utilities
 
 include 'deploy-metadb'
-
 project(":deploy-metadb").projectDir = file("trac-tools/deploy-metadb")
+
+// Plugins
+
+include 'aws-config'
+project(":aws-config").projectDir = file("trac-plugins/aws-config")

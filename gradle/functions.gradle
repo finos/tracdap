@@ -60,8 +60,26 @@ def addVersionInfo(SourceSet sourceSet, String serviceName) {
     }
 }
 
+def isFeatureEnabled(String key) {
+    def env = System.getenv()
+    def buildKey = (String) "BUILD_${key}"
+    def buildFeature = false
+
+    if (project.hasProperty("BUILD_ALL_PLUGINS") && project.property("BUILD_ALL_PLUGINS"))
+        buildFeature = true
+
+    if (project.hasProperty(buildKey) && project.property(buildKey))
+        buildFeature = true
+
+    if (env.containsKey(buildKey) && Boolean.parseBoolean(env.get(buildKey)))
+        buildFeature = true
+
+    return buildFeature
+}
+
 
 ext {
     addVersionInfo = { SourceSet sourceSet, String name -> this.addVersionInfo(sourceSet, name) }
     getVersionFromGit = { -> getVersionFromGit() }
+    isFeatureEnabled = { String key -> this.isFeatureEnabled(key) }
 }

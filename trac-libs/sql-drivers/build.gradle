@@ -36,6 +36,7 @@ plugins {
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/plugins.gradle"
+apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
 
 // Set up source sets and dependencies for all supported SQL dialects
@@ -96,18 +97,8 @@ sourceSets.each { dialect ->
 
         // Only build drivers that are enabled in gradle/plugins.gradle or using the matching env variable
 
-        def env = System.getenv()
-        def buildKey = (String) "BUILD_sql_${dialect.name}"
-        def buildDriver = false
-
-        if (project.hasProperty("BUILD_ALL_PLUGINS") && project.property("BUILD_ALL_PLUGINS"))
-            buildDriver = true
-
-        if (project.hasProperty(buildKey) && project.property(buildKey))
-            buildDriver = true
-
-        if (env.containsKey(buildKey) && Boolean.parseBoolean(env.get(buildKey)))
-            buildDriver = true
+        def key = (String) "sql_${dialect.name}"
+        def buildDriver = isFeatureEnabled(key)
 
         if (buildDriver) {
 
@@ -122,6 +113,5 @@ sourceSets.each { dialect ->
             tasks.create("packPlugin_sql.${dialect.name}", { -> packPlugin(dialect) })
             tasks.packPlugins.dependsOn("packPlugin_sql.${dialect.name}")
         }
-
     }
 }

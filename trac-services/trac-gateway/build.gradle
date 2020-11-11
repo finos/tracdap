@@ -21,6 +21,7 @@ plugins {
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
+apply from: "${rootProject.projectDir.path}/gradle/plugins.gradle"
 
 ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Platform Gateway")
 
@@ -28,6 +29,10 @@ ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Platform Gateway")
 application {
     mainClassName = 'com.accenture.trac.gateway.TracPlatformGateway'
     tasks.run.workingDir = rootProject.projectDir
+}
+
+sourceSets {
+    aws {}
 }
 
 dependencies {
@@ -52,13 +57,35 @@ dependencies {
     implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: "$log4j_version"
     implementation group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: "$log4j_version"
 
+    awsRuntimeOnly project(':aws-config')
+
     // Test
 
     // Migration support for JUnit 4 Rules, provided by gRPC for managing test service instances
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-migrationsupport', version: "$junit_version"
 
-    testImplementation (group: 'io.grpc', name: 'grpc-testing', version: "$grpc_version") {
+    testImplementation(group: 'io.grpc', name: 'grpc-testing', version: "$grpc_version") {
         // Do not pull in JUnit 4, use migration support from JUnit 5 instead
         exclude group: 'junit', module: 'junit'
+    }
+}
+
+sourceSets.each { cloudProvider ->
+
+    if (cloudProvider.name != "main" && cloudProvider.name != "test") {
+
+        // Only build drivers that are enabled in gradle/plugins.gradle or using the matching env variable
+
+        def key = (String) "${cloudProvider.name}_config"
+        def buildDriver = isFeatureEnabled(key)
+
+        if (buildDriver) {
+
+            println("Enabling cloud plugin: ${cloudProvider.name}")
+
+            dependencies {
+                implementation cloudProvider.runtimeClasspath
+            }
+        }
     }
 }
