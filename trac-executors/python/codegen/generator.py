@@ -166,7 +166,6 @@ class PythonicGenerator:
         # self._log.info(descriptor.name)
 
         imports = []
-        imports.append("from dataclasses import dataclass")
         imports.append("import typing as tp")
 
         if len(descriptor.enum_type) > 0:
