@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import functools as func
 import itertools as it
 import re
 import typing as tp
@@ -53,13 +54,27 @@ class PythonicGenerator:
 
     MESSAGE_TEMPLATE = \
         """{INDENT}\n""" \
-        """@dataclass\n""" \
         """{INDENT}class {CLASS_NAME}:\n""" \
         """{NEXT_INDENT}\n""" \
         """{NEXT_INDENT}\"\"\"\n""" \
         """{DOC_COMMENT}\n""" \
         """{NEXT_INDENT}\"\"\"\n""" \
-        """{NEXT_INDENT}pass\n"""
+        """{NEXT_INDENT}\n""" \
+        """{INIT_METHOD}\n"""
+
+    INIT_METHOD_TEMPLATE = \
+        """{INDENT}def __init__(self{INIT_PARAMS}):{PEP_FLAG}\n""" \
+        """{NEXT_INDENT}\n""" \
+        """{INIT_VARS}\n"""
+
+    INIT_PARAM_TEMPLATE = \
+        ",{PEP_FLAG}\n{INDENT}{PARAM_NAME}: {PARAM_TYPE}"
+
+    INIT_VAR_TEMPLATE = \
+        "{INDENT}self.{PARAM_NAME} = {PARAM_NAME}\n"
+
+    INIT_PASS_TEMPLATE = \
+        "{INDENT}pass\n"
 
     ENUM_TEMPLATE = \
         """{INDENT}\n""" \
@@ -152,6 +167,7 @@ class PythonicGenerator:
 
         imports = []
         imports.append("from dataclasses import dataclass")
+        imports.append("import typing as tp")
 
         if len(descriptor.enum_type) > 0:
             imports.append("import enum")
@@ -180,11 +196,54 @@ class PythonicGenerator:
         raw_comment = self.comment_for_current_location(filtered_loc)
         formatted_comment = self.comment_block_translation(ctx, raw_comment)
 
+        init_ctx = self.indent_sub_ctx(ctx, 1)
+        init_method = self.generate_init_method(init_ctx, descriptor)
+
         return self.MESSAGE_TEMPLATE \
             .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
             .replace("{NEXT_INDENT}", self.INDENT_TEMPLATE * (ctx.indent + 1)) \
             .replace("{CLASS_NAME}", descriptor.name) \
-            .replace("{DOC_COMMENT}", formatted_comment)
+            .replace("{DOC_COMMENT}", formatted_comment) \
+            .replace("{INIT_METHOD}", init_method)
+
+    def generate_init_method(self, ctx: LocationContext, descriptor: pb_desc.DescriptorProto) -> str:
+
+        params_ctx = self.indent_sub_ctx(ctx, 2)
+        params_iter = it.starmap(func.partial(self.generate_init_param, params_ctx), enumerate(descriptor.field))
+
+        vars_ctx = self.indent_sub_ctx(ctx, 1)
+        vars_iter = map(func.partial(self.generate_init_var, vars_ctx), descriptor.field)
+        vars_pass = self.INIT_PASS_TEMPLATE.replace("{INDENT}", self.INDENT_TEMPLATE * (ctx.indent + 1))
+
+        init_params = "".join(params_iter) if len(descriptor.field) > 0 else ""
+        init_vars = "".join(vars_iter) if len(descriptor.field) > 0 else vars_pass
+
+        # Do not apply the PEP flag if there are no parameters
+        pep_flag = "  # noqa" if len(descriptor.field) > 0 else ""
+
+        return self.INIT_METHOD_TEMPLATE \
+            .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
+            .replace("{NEXT_INDENT}", self.INDENT_TEMPLATE * (ctx.indent + 1)) \
+            .replace("{INIT_PARAMS}", "".join(init_params)) \
+            .replace("{INIT_VARS}", "".join(init_vars)) \
+            .replace("{PEP_FLAG}", pep_flag)
+
+    def generate_init_param(self, ctx: LocationContext, field_index: int, descriptor: pb_desc.FieldDescriptorProto):
+
+        # Do not apply the PEP flag before the first parameter (i.e. against the 'self' parameter)
+        pep_flag = "  # noqa" if field_index > 0 else ""
+
+        return self.INIT_PARAM_TEMPLATE \
+            .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
+            .replace("{PEP_FLAG}", pep_flag) \
+            .replace("{PARAM_NAME}", descriptor.name) \
+            .replace("{PARAM_TYPE}", "tp.Any")
+
+    def generate_init_var(self, ctx: LocationContext, descriptor: pb_desc.FieldDescriptorProto):
+
+        return self.INIT_VAR_TEMPLATE \
+            .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
+            .replace("{PARAM_NAME}", descriptor.name)
 
     def generate_enum(self, ctx: LocationContext, descriptor: pb_desc.EnumDescriptorProto) -> str:
 
@@ -287,6 +346,10 @@ class PythonicGenerator:
 
         base_ctx = LocationContext(src_locations, field_number, 0, indent)
         return iter(map(base_ctx.for_index, it.count(0)))
+
+    def indent_sub_ctx(self, ctx: LocationContext, indent: int):
+
+        return LocationContext(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index, ctx.indent + indent)
 
     def get_field_number(self, message_descriptor, field_name: str):
 
