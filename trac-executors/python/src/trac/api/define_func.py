@@ -17,15 +17,15 @@ from trac.metadata import *
 
 
 def define_parameter(*args, **kwargs):
-    return ModelParameter()
+    return ModelParameter(*args, **kwargs)
 
 
 def define_table(*args, **kwargs):
-    return TableDefinition()
+    return TableDefinition(*args, **kwargs)
 
 
 def define_field(*args, **kwargs):
-    return FieldDefinition()
+    return FieldDefinition(*args, **kwargs)
 
 
 P = define_parameter

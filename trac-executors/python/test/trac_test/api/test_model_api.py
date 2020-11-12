@@ -22,7 +22,7 @@ class SampleModel(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
-        return {"param1": trac.P("param1", 123)}
+        return {"param1": trac.P("param1", trac.BasicType.INTEGER, 123)}
 
     def define_inputs(self) -> tp.Dict[str, trac.TableDefinition]:
 
