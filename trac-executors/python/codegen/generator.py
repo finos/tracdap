@@ -177,24 +177,14 @@ class PythonicGenerator:
 
         filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
 
-        # Comments from current code location
-        current_loc = self.current_location(filtered_loc)
-
-        if current_loc is not None:
-            current_comment = current_loc.leading_comments
-        else:
-            current_comment = None
-
-        current_comment = re.sub("^(\\*\n)|/", "", current_comment, count=1)
-        current_comment = re.sub("\n$", "", current_comment)
-        current_comment = re.sub("^ ?", self.INDENT_TEMPLATE * (ctx.indent + 1), current_comment)
-        current_comment = re.sub("\\n ?", "\n" + self.INDENT_TEMPLATE * (ctx.indent + 1), current_comment)
+        raw_comment = self.comment_for_current_location(filtered_loc)
+        formatted_comment = self.comment_block_translation(ctx, raw_comment)
 
         return self.MESSAGE_TEMPLATE \
             .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
             .replace("{NEXT_INDENT}", self.INDENT_TEMPLATE * (ctx.indent + 1)) \
             .replace("{CLASS_NAME}", descriptor.name) \
-            .replace("{DOC_COMMENT}", current_comment)
+            .replace("{DOC_COMMENT}", formatted_comment)
 
     def generate_enum(self, ctx: LocationContext, descriptor: pb_desc.EnumDescriptorProto) -> str:
 
@@ -204,24 +194,14 @@ class PythonicGenerator:
         values_ctx = self.index_sub_ctx(filtered_loc, self._enum_value_field, ctx.indent + 1)
         values_code = list(it.starmap(self.generate_enum_value, zip(values_ctx, descriptor.value)))
 
-        # Comments from current code location
-        current_loc = self.current_location(filtered_loc)
-
-        if current_loc is not None:
-            current_comment = current_loc.leading_comments
-        else:
-            current_comment = None
-
-        current_comment = re.sub("^(\\*\n)|/", "", current_comment, count=1)
-        current_comment = re.sub("\n$", "", current_comment)
-        current_comment = re.sub("^ ?", self.INDENT_TEMPLATE * (ctx.indent + 1), current_comment)
-        current_comment = re.sub("\\n ?", "\n" + self.INDENT_TEMPLATE * (ctx.indent + 1), current_comment)
+        raw_comment = self.comment_for_current_location(filtered_loc)
+        formatted_comment = self.comment_block_translation(ctx, raw_comment)
 
         # Populate the template
         code = self.ENUM_TEMPLATE \
             .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
             .replace("{NEXT_INDENT}", self.INDENT_TEMPLATE * (ctx.indent + 1)) \
-            .replace("{DOC_COMMENT}", current_comment) \
+            .replace("{DOC_COMMENT}", formatted_comment) \
             .replace("{CLASS_NAME}", descriptor.name) \
             .replace("{ENUM_VALUES}", "\n".join(values_code))
 
@@ -232,27 +212,13 @@ class PythonicGenerator:
         filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
 
         # Comments from current code location
-        current_loc = self.current_location(filtered_loc)
-
-        if current_loc is not None:
-            current_comment = current_loc.leading_comments
-        else:
-            current_comment = None
-
-        current_comment = re.sub("^(\\*\n)|/", "", current_comment, count=1)
-        current_comment = re.sub("\n$", "", current_comment)
-        current_comment = re.sub("^ ?", "", current_comment)
-        current_comment = re.sub("\\n ?", "\n" + self.INDENT_TEMPLATE * (ctx.indent + 1), current_comment)
-
-        if "\n" in current_comment:
-            quoted_comment = '"""' + current_comment + '"""'
-        else:
-            quoted_comment = '"' + current_comment + '"'
+        raw_comment = self.comment_for_current_location(filtered_loc)
+        formatted_comment = self.comment_inline_translation(ctx, raw_comment)
 
         # Populate the template
         code = self.ENUM_VALUE_TEMPLATE \
             .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
-            .replace("{QUOTED_COMMENT}", quoted_comment) \
+            .replace("{QUOTED_COMMENT}", formatted_comment) \
             .replace("{ENUM_VALUE_NAME}", descriptor.name) \
             .replace("{ENUM_VALUE_NUMBER}", str(descriptor.number))
 
@@ -276,6 +242,46 @@ class PythonicGenerator:
     def current_location(self, locations) -> pb_desc.SourceCodeInfo.Location:
 
         return next(filter(lambda l: len(l.path) == 0, locations), None)
+
+    def comment_for_current_location(self, locations) -> tp.Optional[str]:
+
+        # Comments from current code location
+        current_loc = self.current_location(locations)
+
+        if current_loc is not None:
+            return current_loc.leading_comments
+        else:
+            return None
+
+    def comment_block_translation(self, ctx: LocationContext, comment: tp.Optional[str]) -> tp.Optional[str]:
+
+        if comment is None:
+            return ""
+
+        translated_comment = re.sub("^(\\*\n)|/", "", comment, count=1)
+        translated_comment = re.sub("\n$", "", translated_comment)
+        translated_comment = re.sub("^ ?", self.INDENT_TEMPLATE * (ctx.indent + 1), translated_comment)
+        translated_comment = re.sub("\\n ?", "\n" + self.INDENT_TEMPLATE * (ctx.indent + 1), translated_comment)
+
+        if translated_comment.strip() == "":
+            return ""
+
+        return translated_comment
+
+    def comment_inline_translation(self, ctx: LocationContext, comment: tp.Optional[str]) -> tp.Optional[str]:
+
+        if comment is None:
+            return ''
+
+        translated_comment = re.sub("^(\\*\n)|/", "", comment, count=1)
+        translated_comment = re.sub("\n$", "", translated_comment)
+        translated_comment = re.sub("^ ?", "", translated_comment)
+        translated_comment = re.sub("\\n ?", "\n" + self.INDENT_TEMPLATE * (ctx.indent + 1), translated_comment)
+
+        if translated_comment.strip() == "":
+            return ''
+
+        return '"""{}"""'.format(translated_comment)
 
     def index_sub_ctx(self, src_locations, field_number, indent):
 
