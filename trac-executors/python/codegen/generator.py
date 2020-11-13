@@ -39,6 +39,39 @@ class LocationContext:
 
 
 class PythonicGenerator:
+    
+    _FieldType = pb_desc.FieldDescriptorProto.Type
+
+    PROTO_TYPE_MAPPING = dict({
+
+        _FieldType.TYPE_DOUBLE: float,
+        _FieldType.TYPE_FLOAT: float,
+        _FieldType.TYPE_INT64: int,
+        _FieldType.TYPE_UINT64: int,
+        _FieldType.TYPE_INT32: int,
+        _FieldType.TYPE_FIXED64: int,
+        _FieldType.TYPE_FIXED32: int,
+        _FieldType.TYPE_BOOL: bool,
+        _FieldType.TYPE_STRING: str,
+        
+        # Group type is deprecated and not supported in proto3
+        # _FieldType.TYPE_GROUP
+        
+        # Do not include a mapping for message type, it will be handle specially
+        # _FieldType.TYPE_MESSAGE
+
+        _FieldType.TYPE_BYTES: bytes,  # TODO: Use bytearray?
+        
+        _FieldType.TYPE_UINT32: int,
+
+        # Do not include a mapping for enum type, it will be handle specially
+        # _FieldType.TYPE_ENUM
+
+        _FieldType.TYPE_SFIXED32: int,
+        _FieldType.TYPE_SFIXED64: int,
+        _FieldType.TYPE_SINT32: int,
+        _FieldType.TYPE_SINT64: int
+    })
 
     INDENT_TEMPLATE = " " * 4
 
@@ -71,7 +104,8 @@ class PythonicGenerator:
         ",{PEP_FLAG}\n{INDENT}{PARAM_NAME}: {PARAM_TYPE}"
 
     INIT_VAR_TEMPLATE = \
-        "{INDENT}self.{PARAM_NAME} = {PARAM_NAME}\n"
+        "{INDENT}self.{IVAR_NAME} = {PARAM_NAME}\n" \
+        "{IVAR_COMMENT}"
 
     INIT_PASS_TEMPLATE = \
         "{INDENT}pass\n"
@@ -89,6 +123,21 @@ class PythonicGenerator:
     ENUM_VALUE_TEMPLATE = \
         """{INDENT}{ENUM_VALUE_NAME} = {ENUM_VALUE_NUMBER}, {QUOTED_COMMENT}\n"""
 
+    INLINE_COMMENT_SINGLE_LINE = \
+        '\n{INDENT}"""{COMMENT}"""\n' \
+
+    INLINE_COMMENT_MULTI_LINE = \
+        '\n{INDENT}"""\n' \
+        '{INDENT}{COMMENT}\n' \
+        '{INDENT}"""\n'
+
+    ENUM_COMMENT_SINGLE_LINE = \
+        '"""{COMMENT}"""'
+
+    ENUM_COMMENT_MULTI_LINE = \
+        '"""{COMMENT}\n' \
+        '{INDENT}"""'
+
     def __init__(self):
 
         logging.basicConfig(level=logging.DEBUG)
@@ -96,6 +145,7 @@ class PythonicGenerator:
 
         self._enum_type_field = self.get_field_number(pb_desc.FileDescriptorProto, "enum_type")
         self._message_type_field = self.get_field_number(pb_desc.FileDescriptorProto, "message_type")
+        self._message_field_field = self.get_field_number(pb_desc.DescriptorProto, "field")
         self._enum_value_field = self.get_field_number(pb_desc.EnumDescriptorProto, "value")
 
     def generate_package(self, package: str, files: tp.List[pb_desc.FileDescriptorProto]) \
@@ -195,7 +245,7 @@ class PythonicGenerator:
         raw_comment = self.comment_for_current_location(filtered_loc)
         formatted_comment = self.comment_block_translation(ctx, raw_comment)
 
-        init_ctx = self.indent_sub_ctx(ctx, 1)
+        init_ctx = LocationContext(filtered_loc, ctx.src_loc_code, ctx.src_loc_index, ctx.indent + 1)
         init_method = self.generate_init_method(init_ctx, descriptor)
 
         return self.MESSAGE_TEMPLATE \
@@ -207,15 +257,15 @@ class PythonicGenerator:
 
     def generate_init_method(self, ctx: LocationContext, descriptor: pb_desc.DescriptorProto) -> str:
 
-        params_ctx = self.indent_sub_ctx(ctx, 2)
-        params_iter = it.starmap(func.partial(self.generate_init_param, params_ctx), enumerate(descriptor.field))
+        fields_ctx = self.index_sub_ctx(ctx.src_locations, self._message_field_field, ctx.indent + 2)
+        params_iter = it.starmap(self.generate_init_param, zip(fields_ctx, descriptor.field))
 
-        vars_ctx = self.indent_sub_ctx(ctx, 1)
-        vars_iter = map(func.partial(self.generate_init_var, vars_ctx), descriptor.field)
+        fields_ctx = self.index_sub_ctx(ctx.src_locations, self._message_field_field, ctx.indent + 1)
+        vars_iter = it.starmap(self.generate_init_var, zip(fields_ctx, descriptor.field))
         vars_pass = self.INIT_PASS_TEMPLATE.replace("{INDENT}", self.INDENT_TEMPLATE * (ctx.indent + 1))
 
         init_params = "".join(params_iter) if len(descriptor.field) > 0 else ""
-        init_vars = "".join(vars_iter) if len(descriptor.field) > 0 else vars_pass
+        init_vars = "\n".join(vars_iter) if len(descriptor.field) > 0 else vars_pass
 
         # Do not apply the PEP flag if there are no parameters
         pep_flag = "  # noqa" if len(descriptor.field) > 0 else ""
@@ -223,26 +273,57 @@ class PythonicGenerator:
         return self.INIT_METHOD_TEMPLATE \
             .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
             .replace("{NEXT_INDENT}", self.INDENT_TEMPLATE * (ctx.indent + 1)) \
-            .replace("{INIT_PARAMS}", "".join(init_params)) \
-            .replace("{INIT_VARS}", "".join(init_vars)) \
+            .replace("{INIT_PARAMS}", init_params) \
+            .replace("{INIT_VARS}", init_vars) \
             .replace("{PEP_FLAG}", pep_flag)
 
-    def generate_init_param(self, ctx: LocationContext, field_index: int, descriptor: pb_desc.FieldDescriptorProto):
+    def generate_init_param(self, ctx: LocationContext, descriptor: pb_desc.FieldDescriptorProto):
+
+        field_index = ctx.src_loc_index
 
         # Do not apply the PEP flag before the first parameter (i.e. against the 'self' parameter)
         pep_flag = "  # noqa" if field_index > 0 else ""
+
+        field_type = self.python_field_type(descriptor)
 
         return self.INIT_PARAM_TEMPLATE \
             .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
             .replace("{PEP_FLAG}", pep_flag) \
             .replace("{PARAM_NAME}", descriptor.name) \
-            .replace("{PARAM_TYPE}", "tp.Any")
+            .replace("{PARAM_TYPE}", field_type)
 
     def generate_init_var(self, ctx: LocationContext, descriptor: pb_desc.FieldDescriptorProto):
 
+        filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
+        raw_comment = self.comment_for_current_location(filtered_loc)
+        formatted_comment = self.comment_inline_translation(ctx, raw_comment)
+
         return self.INIT_VAR_TEMPLATE \
             .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
-            .replace("{PARAM_NAME}", descriptor.name)
+            .replace("{PARAM_NAME}", descriptor.name) \
+            .replace("{IVAR_NAME}", descriptor.name) \
+            .replace("{IVAR_COMMENT}", formatted_comment)
+    
+    def python_field_type(self, descriptor: pb_desc.FieldDescriptorProto):
+        
+        if descriptor.type == descriptor.Type.TYPE_MESSAGE or descriptor.type == descriptor.Type.TYPE_ENUM:
+            base_type = descriptor.type_name.replace(".", "", 1)
+        elif descriptor.type in self.PROTO_TYPE_MAPPING:
+            base_type = self.PROTO_TYPE_MAPPING[descriptor.type].__name__
+        else:
+            raise RuntimeError(
+                "Unknown type in protobuf field descriptor: field = {}, type code = {}"
+                .format(descriptor.name, descriptor.type))
+
+        # TODO: Map types
+        # Create a map of all message types, look up the base type and check the map_entry flag
+
+        if descriptor.label == descriptor.Label.LABEL_REPEATED:
+            full_type = "tp.List[{}]".format(base_type)
+        else:
+            full_type = base_type
+
+        return full_type
 
     def generate_enum(self, ctx: LocationContext, descriptor: pb_desc.EnumDescriptorProto) -> str:
 
@@ -271,7 +352,7 @@ class PythonicGenerator:
 
         # Comments from current code location
         raw_comment = self.comment_for_current_location(filtered_loc)
-        formatted_comment = self.comment_inline_translation(ctx, raw_comment)
+        formatted_comment = self.comment_enum_translation(ctx, raw_comment)
 
         # Populate the template
         code = self.ENUM_VALUE_TEMPLATE \
@@ -334,12 +415,44 @@ class PythonicGenerator:
         translated_comment = re.sub("^(\\*\n)|/", "", comment, count=1)
         translated_comment = re.sub("\n$", "", translated_comment)
         translated_comment = re.sub("^ ?", "", translated_comment)
+        translated_comment = re.sub("\\n ?", "\n" + self.INDENT_TEMPLATE * ctx.indent, translated_comment)
+
+        if translated_comment.strip() == "":
+            return ''
+
+        elif "\n" not in translated_comment.strip():
+            return self.INLINE_COMMENT_SINGLE_LINE \
+                .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
+                .replace("{COMMENT}", translated_comment.strip())
+
+        else:
+            return self.INLINE_COMMENT_MULTI_LINE \
+                .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
+                .replace("{COMMENT}", translated_comment)
+
+    def comment_enum_translation(self, ctx: LocationContext, comment: tp.Optional[str]) -> tp.Optional[str]:
+
+        if comment is None:
+            return ''
+
+        translated_comment = re.sub("^(\\*\n)|/", "", comment, count=1)
+        translated_comment = re.sub("\n$", "", translated_comment)
+        translated_comment = re.sub("^ ?", "", translated_comment)
         translated_comment = re.sub("\\n ?", "\n" + self.INDENT_TEMPLATE * (ctx.indent + 1), translated_comment)
 
         if translated_comment.strip() == "":
             return ''
 
-        return '"""{}"""'.format(translated_comment)
+        elif "\n" not in translated_comment.strip():
+            return self.ENUM_COMMENT_SINGLE_LINE \
+                .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
+                .replace("{COMMENT}", translated_comment.strip())
+
+        else:
+            return self.ENUM_COMMENT_MULTI_LINE \
+                .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
+                .replace("{COMMENT}", translated_comment)
+
 
     def index_sub_ctx(self, src_locations, field_number, indent):
 
