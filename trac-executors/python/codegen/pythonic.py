@@ -43,9 +43,14 @@ def main(argv):
         "@metadata_inputs.txt"
     ]
 
+    if platform.system().lower().startswith("win"):
+        pythonic_plugin = "--plugin=protoc-gen-pythonic.py"
+    else:
+        pythonic_plugin = "--plugin=protoc-gen-pythonic=./protoc-gen-pythonic.py"
+
     pythonic_args = [
 
-        "--plugin=protoc-gen-pythonic.py",
+        pythonic_plugin,
         "--pythonic_out={}/trac_gen/pythonic".format(output_location),
         "--proto_path={}".format(proto_location),
 
