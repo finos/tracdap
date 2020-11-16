@@ -13,9 +13,21 @@
 #  limitations under the License.
 
 import pathlib
+import platform
 import sys
 
 import protoc
+
+
+def platform_args(raw_args):
+
+    # On Linux/macOS, arg 0 is the name given to the process and is not actually passed to it!
+    # Windows just passes all the arguments to the process
+
+    if platform.system().lower().startswith("win"):
+        return raw_args
+    else:
+        return ["protoc"] + raw_args
 
 
 def main(argv):
@@ -25,10 +37,6 @@ def main(argv):
 
     protoc_args = [
 
-        # Arg 0 is the name given to the process, not actually passed to it!
-        # (This is on macOS, may behave differently on other platforms, especially Windows)
-        "protoc",
-
         "--python_out={}/trac_gen/protoc".format(output_location),
         "--proto_path={}".format(proto_location),
 
@@ -36,10 +44,6 @@ def main(argv):
     ]
 
     pythonic_args = [
-
-        # Arg 0 is the name given to the process, not actually passed to it!
-        # (This is on macOS, may behave differently on other platforms, especially Windows)
-        "protoc",
 
         "--plugin=protoc-gen-pythonic.py",
         "--pythonic_out={}/trac_gen/pythonic".format(output_location),
@@ -54,7 +58,7 @@ def main(argv):
         pathlib.Path(output_location).joinpath("trac_gen/pythonic/__init__.py").touch(exist_ok=True)
         pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
 
-        protoc.exec_protoc(pythonic_args)
+        protoc.exec_protoc(platform_args(pythonic_args))
 
     else:
 
@@ -62,7 +66,7 @@ def main(argv):
         pathlib.Path(output_location).joinpath("trac_gen/protoc/__init__.py").touch(exist_ok=True)
         pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
 
-        protoc.exec_protoc(protoc_args)
+        protoc.exec_protoc(platform_args(protoc_args))
 
 
 if __name__ == "__main__":
