@@ -41,7 +41,7 @@ def main(argv):
         # (This is on macOS, may behave differently on other platforms, especially Windows)
         "protoc",
 
-        "--plugin=protoc-gen-pythonic=./pythonic_plugin.py",
+        "--plugin=protoc-gen-pythonic.py",
         "--pythonic_out={}/trac_gen/pythonic".format(output_location),
         "--proto_path={}".format(proto_location),
 
