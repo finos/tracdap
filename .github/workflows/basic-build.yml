@@ -52,10 +52,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      # PyPanDoc dependency is not managed correctly by PySpark 2.4 package
+      # It needs to be installed explicitly first
       - name: Install dependencies
         run: |
           cd trac-executors/python
           python -m pip install --upgrade pip
+          pip install pypandoc
           pip install -r requirements.txt
 
       - name: Protoc Code Generation
