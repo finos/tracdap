@@ -6,7 +6,5 @@ protoc-wheel-0 >= 3.13.0, < 3.14.0
 # Try to avoid supporting the 0.x series!
 pandas >= 1.0.0, < 2.0.0
 
-# Baseline support for PySpark on series 2.4.x
-# Series 3.x support will be required, a CI matrix is needed to test both in parallel
-pypandoc >= 1.0.0, < 2.0.0
-pyspark >= 2.4.0, < 3.0.0
+# Support PySpark series 2.4.x and 3.0.x
+pyspark >= 2.4.0, < 3.1.0
