@@ -15,8 +15,8 @@
 
 # Code gen creates outputs under artificial locations:
 #
-#   trac_gen.pythonic.trac.metadata - TRAC metadata classes for use in the API
-#   trac_gen.protoc.trac.metadata - Output of Google's native protoc
+#   trac_gen.domain.trac.metadata - TRAC metadata domain objects for use in the API
+#   trac_gen.proto.trac.metadata - Output of Google's native protoc for Python
 #
 # The generator respects the package layout of the source .proto files, however
 # having the top level trac namespace defined in two source roots means only one
@@ -24,10 +24,10 @@
 # around this by copying the output of the generator under the correct locations
 # in the package, which will be as follows:
 #
-#   trac_gen.pythonic.trac.metadata -> trac.metadata
-#   trac_gen.protoc.trac.metadata -> trac.impl.protoc
+#   trac_gen.domain.trac.metadata -> trac.metadata
+#   trac_gen.proto.trac.metadata -> trac.impl.proto
 #
 # This proxy import means the API will work as expected during development
 # without needing to run packaging jobs.
 
-from trac_gen.pythonic.trac.metadata import *
+from trac_gen.domain.trac.metadata import *

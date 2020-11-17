@@ -35,43 +35,52 @@ def main(argv):
     proto_location = "../../../trac-api/trac-metadata/src/main/proto"
     output_location = "../../../build/modules/trac-executors/python/generated"
 
-    protoc_args = [
+    gen_proto_args = [
 
-        "--python_out={}/trac_gen/protoc".format(output_location),
+        "--plugin=python",
+        "--python_out={}/trac_gen/proto".format(output_location),
         "--proto_path={}".format(proto_location),
 
         "@metadata_inputs.txt"
     ]
 
     if platform.system().lower().startswith("win"):
-        pythonic_plugin = "--plugin=protoc-gen-pythonic.py"
+        protoc_plugin = "--plugin=protoc-gen-trac.py"
     else:
-        pythonic_plugin = "--plugin=protoc-gen-pythonic=./protoc-gen-pythonic.py"
+        protoc_plugin = "--plugin=./protoc-gen-trac.py"
 
-    pythonic_args = [
+    gen_trac_args = [
 
-        pythonic_plugin,
-        "--pythonic_out={}/trac_gen/pythonic".format(output_location),
+        protoc_plugin,
+        "--trac_out={}/trac_gen/domain".format(output_location),
         "--proto_path={}".format(proto_location),
 
         "@metadata_inputs.txt"
     ]
 
-    if len(argv) > 1 and argv[1] == "--pythonic":
+    if len(argv) > 1 and argv[1] == "--domain":
 
-        pathlib.Path(output_location).joinpath("trac_gen/pythonic").mkdir(parents=True, exist_ok=True)
-        pathlib.Path(output_location).joinpath("trac_gen/pythonic/__init__.py").touch(exist_ok=True)
+        # TRAC domain classes generator adds init scripts for its own package hierarchy
+        # Since we nesting inside trac_gen/domain, add init files for those packages here
+
+        pathlib.Path(output_location).joinpath("trac_gen/domain").mkdir(parents=True, exist_ok=True)
+        pathlib.Path(output_location).joinpath("trac_gen/domain/__init__.py").touch(exist_ok=True)
         pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
 
-        protoc.exec_protoc(platform_args(pythonic_args))
+        protoc.exec_protoc(platform_args(gen_trac_args))
 
     else:
 
-        pathlib.Path(output_location).joinpath("trac_gen/protoc").mkdir(parents=True, exist_ok=True)
-        pathlib.Path(output_location).joinpath("trac_gen/protoc/__init__.py").touch(exist_ok=True)
+        # Native Python plugin does not create init scripts for its own package hierarchy
+        # Add them here instead
+
+        pathlib.Path(output_location).joinpath("trac_gen/proto/trac/metadata").mkdir(parents=True, exist_ok=True)
+        pathlib.Path(output_location).joinpath("trac_gen/proto/trac/metadata/__init__.py").touch(exist_ok=True)
+        pathlib.Path(output_location).joinpath("trac_gen/proto/trac/__init__.py").touch(exist_ok=True)
+        pathlib.Path(output_location).joinpath("trac_gen/proto/__init__.py").touch(exist_ok=True)
         pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
 
-        protoc.exec_protoc(platform_args(protoc_args))
+        protoc.exec_protoc(platform_args(gen_proto_args))
 
 
 if __name__ == "__main__":
