@@ -37,7 +37,7 @@ class LocationContext:
         return LocationContext(self.src_locations, self.src_loc_code, index, self.indent)
 
 
-class PythonicGenerator:
+class TracGenerator:
     
     _FieldType = pb_desc.FieldDescriptorProto.Type
 
@@ -140,7 +140,7 @@ class PythonicGenerator:
     def __init__(self):
 
         logging.basicConfig(level=logging.DEBUG)
-        self._log = logging.getLogger(PythonicGenerator.__name__)
+        self._log = logging.getLogger(TracGenerator.__name__)
 
         self._enum_type_field = self.get_field_number(pb_desc.FileDescriptorProto, "enum_type")
         self._message_type_field = self.get_field_number(pb_desc.FileDescriptorProto, "message_type")

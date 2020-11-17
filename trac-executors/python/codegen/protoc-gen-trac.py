@@ -23,18 +23,18 @@ import google.protobuf.compiler.plugin_pb2 as pb_plugin
 import generator as gen
 
 
-class PythonicPlugin:
+class TracPlugin:
 
     def __init__(self, pb_request: pb_plugin.CodeGeneratorRequest):
 
         logging.basicConfig(level=logging.DEBUG)
-        self._log = logging.getLogger(PythonicPlugin.__name__)
+        self._log = logging.getLogger(TracPlugin.__name__)
 
         self._request = pb_request
 
     def generate(self):
 
-        generator = gen.PythonicGenerator()
+        generator = gen.TracGenerator()
         generated_response = pb_plugin.CodeGeneratorResponse()
 
         input_files = self._request.proto_file
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     request = pb_plugin.CodeGeneratorRequest()
     request.ParseFromString(data)
 
-    plugin = PythonicPlugin(request)
+    plugin = TracPlugin(request)
 
     response = plugin.generate()
     output = response.SerializeToString()
