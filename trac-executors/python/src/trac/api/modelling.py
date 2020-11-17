@@ -14,9 +14,14 @@
 
 import abc
 import typing as tp
+import logging
 
 from trac.metadata import TableDefinition
 from trac.metadata import ModelParameter
+
+import pandas as pd
+import pyspark as pys
+import pyspark.sql as pyss
 
 
 class TracContext:
@@ -30,7 +35,43 @@ class TracContext:
         pass
 
     @abc.abstractmethod
+    def get_pandas_dataset(self, dataset_name: str, dataset_format: type) -> pd.DataFrame:
+        pass
+
+    @abc.abstractmethod
+    def get_spark_dataset(self, dataset_name: str) -> pys.RDD:
+        pass
+
+    @abc.abstractmethod
+    def get_spark_sql_dataset(self, dataset_name: str) -> pyss.DataFrame:
+        pass
+
+    @abc.abstractmethod
     def put_dataset_schema(self, dataset_name: str, schema: TableDefinition):
+        pass
+
+    @abc.abstractmethod
+    def put_pandas_dataset(self, dataset_name: str, dataset: pd.DataFrame):
+        pass
+
+    @abc.abstractmethod
+    def put_spark_dataset(self, dataset_name: str, dataset: pys.RDD):
+        pass
+
+    @abc.abstractmethod
+    def put_spark_sql_dataset(self, dataset_name: str, dataset: pyss.DataFrame):
+        pass
+
+    @abc.abstractmethod
+    def get_spark_context(self) -> pys.SparkContext:
+        pass
+
+    @abc.abstractmethod
+    def get_spark_sql_context(self) -> pyss.SQLContext:
+        pass
+
+    @abc.abstractmethod
+    def get_logger(self, model_class: tp.Union[type, str, None] = None) -> logging.Logger:
         pass
 
 
