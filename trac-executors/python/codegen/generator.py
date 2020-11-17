@@ -266,7 +266,7 @@ class TracGenerator:
     def generate_init_method(self, ctx: LocationContext, descriptor: pb_desc.DescriptorProto) -> str:
 
         fields_ctx = self.index_sub_ctx(ctx.src_locations, self._message_field_field, ctx.indent + 2)
-        params_iter = it.starmap(self.generate_init_param, zip(fields_ctx, descriptor.field))
+        params_iter = it.starmap(self.generate_init_param, zip(fields_ctx, descriptor.field, it.repeat(descriptor)))
 
         fields_ctx = self.index_sub_ctx(ctx.src_locations, self._message_field_field, ctx.indent + 1)
         vars_iter = it.starmap(self.generate_init_var, zip(fields_ctx, descriptor.field))
@@ -285,14 +285,15 @@ class TracGenerator:
             .replace("{INIT_VARS}", init_vars) \
             .replace("{PEP_FLAG}", pep_flag)
 
-    def generate_init_param(self, ctx: LocationContext, descriptor: pb_desc.FieldDescriptorProto):
+    def generate_init_param(self, ctx: LocationContext, descriptor: pb_desc.FieldDescriptorProto,
+                            message: pb_desc.DescriptorProto):
 
         field_index = ctx.src_loc_index
 
         # Do not apply the PEP flag before the first parameter (i.e. against the 'self' parameter)
         pep_flag = "  # noqa" if field_index > 0 else ""
 
-        field_type = self.python_field_type(descriptor)
+        field_type = self.python_field_type(descriptor, message)
 
         return self.INIT_PARAM_TEMPLATE \
             .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
@@ -312,37 +313,57 @@ class TracGenerator:
             .replace("{IVAR_NAME}", descriptor.name) \
             .replace("{IVAR_COMMENT}", formatted_comment)
     
-    def python_field_type(self, descriptor: pb_desc.FieldDescriptorProto):
-        
-        if descriptor.type == descriptor.Type.TYPE_MESSAGE or descriptor.type == descriptor.Type.TYPE_ENUM:
-            base_type = self.python_object_type(descriptor.type_name)
-        elif descriptor.type in self.PROTO_TYPE_MAPPING:
-            base_type = self.PROTO_TYPE_MAPPING[descriptor.type].__name__
-        else:
-            raise RuntimeError(
-                "Unknown type in protobuf field descriptor: field = {}, type code = {}"
-                .format(descriptor.name, descriptor.type))
+    def python_field_type(self, descriptor: pb_desc.FieldDescriptorProto, message: pb_desc.DescriptorProto):
 
-        # TODO: Map types
-        # Create a map of all message types, look up the base type and check the map_entry flag
+        base_type = self.python_base_type(descriptor)
 
         if descriptor.label == descriptor.Label.LABEL_REPEATED:
-            full_type = "tp.List[{}]".format(base_type)
+
+            sub_type_pattern = re.compile("\'{}\\.(.*)\'".format(message.name))
+            sub_type_match = sub_type_pattern.match(base_type)
+
+            if sub_type_match:
+
+                sub_type = sub_type_match.group(1)
+                sub_descriptor = next(filter(lambda msg: msg.name == sub_type, message.nested_type))
+                key_type = self.python_base_type(sub_descriptor.field[0])
+                value_type = self.python_base_type(sub_descriptor.field[1])
+
+                return "tp.Dict[{}, {}]".format(key_type, value_type)
+
+            else:
+
+                return "tp.List[{}]".format(base_type)
+
         else:
-            full_type = base_type
+            return base_type
 
-        return full_type
+    def python_base_type(self, descriptor: pb_desc.FieldDescriptorProto):
 
-    def python_object_type(self, type_name: str):
+        # Messages (classes) and enums use the type name declared in the field
+        if descriptor.type == descriptor.Type.TYPE_MESSAGE or descriptor.type == descriptor.Type.TYPE_ENUM:
 
-        # Quote all object type names for now
-        # Types that are already declared or imported could be hinted without quotes
-        # This would require building a map of type names and tracking which ones are already declared
-        # Quoted names just work everywhere!
-        # There is no integrity check, but, protoc will already do this
+            type_name = descriptor.type_name
+            relative_name = type_name.replace(".trac.metadata.", "", 1)
 
-        relative_name = type_name.replace(".trac.metadata.", "", 1)
-        return "'{}'".format(relative_name)
+            # Quote all object type names for now
+            # Types that are already declared or imported could be hinted without quotes
+            # This would require building a map of type names and tracking which ones are already declared
+            # Quoted names just work everywhere!
+            # There is no integrity check, but, protoc will already do this
+
+            return "'{}'".format(relative_name)
+
+        # For built in types, use a static mapping of proto type names
+        if descriptor.type in self.PROTO_TYPE_MAPPING:
+
+            return self.PROTO_TYPE_MAPPING[descriptor.type].__name__
+
+        # Any unrecognised type is an error
+        raise RuntimeError(
+            "Unknown type in protobuf field descriptor: field = {}, type code = {}"
+                .format(descriptor.name, descriptor.type))
+
 
     def generate_enum(self, ctx: LocationContext, descriptor: pb_desc.EnumDescriptorProto) -> str:
 
