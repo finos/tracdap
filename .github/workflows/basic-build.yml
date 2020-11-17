@@ -72,7 +72,7 @@ jobs:
       # PyPanDoc dependency is not managed correctly by PySpark 2.4 package
       # It needs to be installed explicitly first
       - name: Install pre-req dependencies
-        if: ${{ matrix.environemtn.PYPANDOC }}
+        if: ${{ matrix.enviroment.PYPANDOC }}
         run: |
           cd trac-executors/python
           python -m pip install --upgrade pip
@@ -82,6 +82,7 @@ jobs:
         run: |
           cd trac-executors/python
           python -m pip install --upgrade pip
+          pip install wheel
           pip install "pyspark ${{ matrix.enviroment.PYSPARK_VERSION }}"
           pip install "pandas ${{ matrix.enviroment.PANDAS_VERSION }}"
           pip install -r requirements.txt
