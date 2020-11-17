@@ -13,11 +13,21 @@
 #  limitations under the License.
 
 
+import typing as tp
 from trac.metadata import *
 
 
-def define_parameter(*args, **kwargs):
-    return ModelParameter(*args, **kwargs)
+def define_parameter(
+        label: str,
+        param_type: tp.Union[TypeDescriptor, BasicType],
+        default_value: tp.Optional[Value] = None):
+
+    if isinstance(param_type, TypeDescriptor):
+        param_type_descriptor = param_type
+    else:
+        param_type_descriptor = TypeDescriptor(param_type, None, None)
+
+    return ModelParameter(label, param_type_descriptor, default_value)
 
 
 def define_table(*args, **kwargs):
