@@ -61,8 +61,8 @@ jobs:
       - name: Protoc Code Generation
         run: |
           cd trac-executors/python/codegen
-          python pythonic.py --protoc
-          python pythonic.py --pythonic
+          python protoc-ctrl.py --domain
+          python protoc-ctrl.py --proto
 
       - name: Unit tests
         run: |
