@@ -47,7 +47,7 @@ def main(argv):
     if platform.system().lower().startswith("win"):
         protoc_plugin = "--plugin=protoc-gen-trac.py"
     else:
-        protoc_plugin = "--plugin=./protoc-gen-trac.py"
+        protoc_plugin = "--plugin=protoc-gen-trac=./protoc-gen-trac.py"
 
     gen_trac_args = [
 
