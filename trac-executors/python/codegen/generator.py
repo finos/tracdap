@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import functools as func
 import itertools as it
 import re
 import typing as tp
@@ -221,6 +220,15 @@ class PythonicGenerator:
         if len(descriptor.enum_type) > 0:
             imports.append("import enum")
 
+        # Generate imports
+        for import_proto in descriptor.dependency:
+            if import_proto.startswith("trac/metadata/"):
+                import_module = import_proto \
+                    .replace("trac/metadata/", "") \
+                    .replace("/", ".") \
+                    .replace(".proto", "")
+                imports.append("from .{} import *".format(import_module))
+
         # Generate enums
         enum_ctx = self.index_sub_ctx(src_loc, self._enum_type_field, indent)
         enum_code = list(it.starmap(self.generate_enum, zip(enum_ctx, descriptor.enum_type)))
@@ -307,7 +315,7 @@ class PythonicGenerator:
     def python_field_type(self, descriptor: pb_desc.FieldDescriptorProto):
         
         if descriptor.type == descriptor.Type.TYPE_MESSAGE or descriptor.type == descriptor.Type.TYPE_ENUM:
-            base_type = descriptor.type_name.replace(".", "", 1)
+            base_type = self.python_object_type(descriptor.type_name)
         elif descriptor.type in self.PROTO_TYPE_MAPPING:
             base_type = self.PROTO_TYPE_MAPPING[descriptor.type].__name__
         else:
@@ -324,6 +332,17 @@ class PythonicGenerator:
             full_type = base_type
 
         return full_type
+
+    def python_object_type(self, type_name: str):
+
+        # Quote all object type names for now
+        # Types that are already declared or imported could be hinted without quotes
+        # This would require building a map of type names and tracking which ones are already declared
+        # Quoted names just work everywhere!
+        # There is no integrity check, but, protoc will already do this
+
+        relative_name = type_name.replace(".trac.metadata.", "", 1)
+        return "'{}'".format(relative_name)
 
     def generate_enum(self, ctx: LocationContext, descriptor: pb_desc.EnumDescriptorProto) -> str:
 
