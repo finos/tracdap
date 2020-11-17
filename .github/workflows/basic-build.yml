@@ -33,11 +33,12 @@ jobs:
 
     # Testing targets for the Python executor runtime
     # Include the latest stable release (3.9)
-    # Include the oldest supported release in the 3.X family
+    # Oldest supported version is 3.6, this is required by Pandas 1.0
+    # (also note Python 3.5 is EOL, final release 3.5.10 was in September 2020)
     # Do not include 2.7 - that ship has sailed!
     strategy:
       matrix:
-        python-version: [3.9, 3.5]
+        python-version: [3.9, 3.6]
 
     steps:
 
