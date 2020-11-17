@@ -37,6 +37,10 @@ jobs:
     # (also note Python 3.5 is EOL, final release 3.5.10 was in September 2020)
     # Do not include 2.7 - that ship has sailed!
     strategy:
+
+      # Try to finish all jobs - it can be helpful to see if some succeed and others fail
+      fail-fast: false
+
       matrix:
         enviroment:
 

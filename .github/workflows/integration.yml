@@ -19,7 +19,7 @@ jobs:
 
     strategy:
 
-      # Try to finish all jobs - it can be helpful to see if some dialects succeed and others fail
+      # Try to finish all jobs - it can be helpful to see if some succeed and others fail
       fail-fast: false
 
       matrix:
