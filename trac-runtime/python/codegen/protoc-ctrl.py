@@ -18,30 +18,44 @@ import sys
 
 import protoc
 
+proto_location = "../../../trac-api/trac-metadata/src/main/proto"
+output_location = "../../../build/modules/trac-runtime/python/generated"
 
-def platform_args(raw_args):
+
+def find_proto_files(path):
+
+    base_path = pathlib.Path(path)
+
+    for entry in base_path.iterdir():
+
+        if entry.is_file() and entry.name.endswith(".proto"):
+            yield base_path.joinpath(entry.name)
+
+        elif entry.is_dir():
+            for sub_entry in find_proto_files(base_path.joinpath(entry.name)):
+                yield sub_entry
+
+
+def platform_args(base_args, proto_files):
 
     # On Linux/macOS, arg 0 is the name given to the process and is not actually passed to it!
     # Windows just passes all the arguments to the process
 
     if platform.system().lower().startswith("win"):
-        return raw_args
+        return base_args + proto_files
     else:
-        return ["protoc"] + raw_args
+        return ["protoc"] + base_args + proto_files
 
 
 def main(argv):
 
-    proto_location = "../../../trac-api/trac-metadata/src/main/proto"
-    output_location = "../../../build/modules/trac-runtime/python/generated"
+    proto_files = list(find_proto_files(proto_location))
 
     gen_proto_args = [
 
         "--plugin=python",
         "--python_out={}/trac_gen/proto".format(output_location),
-        "--proto_path={}".format(proto_location),
-
-        "@metadata_inputs.txt"
+        "--proto_path={}".format(proto_location)
     ]
 
     if platform.system().lower().startswith("win"):
@@ -53,9 +67,7 @@ def main(argv):
 
         protoc_plugin,
         "--trac_out={}/trac_gen/domain".format(output_location),
-        "--proto_path={}".format(proto_location),
-
-        "@metadata_inputs.txt"
+        "--proto_path={}".format(proto_location)
     ]
 
     if len(argv) > 1 and argv[1] == "--domain":
@@ -67,7 +79,7 @@ def main(argv):
         pathlib.Path(output_location).joinpath("trac_gen/domain/__init__.py").touch(exist_ok=True)
         pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
 
-        protoc.exec_protoc(platform_args(gen_trac_args))
+        protoc.exec_protoc(platform_args(gen_trac_args, proto_files))
 
     else:
 
@@ -80,7 +92,7 @@ def main(argv):
         pathlib.Path(output_location).joinpath("trac_gen/proto/__init__.py").touch(exist_ok=True)
         pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
 
-        protoc.exec_protoc(platform_args(gen_proto_args))
+        protoc.exec_protoc(platform_args(gen_proto_args, proto_files))
 
 
 if __name__ == "__main__":
