@@ -12,10 +12,3 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-
-from trac.metadata import *
-
-from .modelling import TracContext
-from .modelling import TracModel
-
-from .define_func import *
