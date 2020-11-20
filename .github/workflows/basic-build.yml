@@ -27,11 +27,11 @@ jobs:
     - name: Unit Tests
       run: ./gradlew test
 
-  python_executor_build:
+  python_runtime:
 
     runs-on: ubuntu-latest
 
-    # Testing targets for the Python executor runtime
+    # Testing targets for the Python model runtime
     # Include the latest stable release (3.9)
     # Oldest supported version is 3.6, this is required by Pandas 1.0
     # (also note Python 3.5 is EOL, final release 3.5.10 was in September 2020)
@@ -74,13 +74,13 @@ jobs:
       - name: Install pre-req dependencies
         if: ${{ matrix.enviroment.PYPANDOC }}
         run: |
-          cd trac-executors/python
+          cd trac-runtime/python
           python -m pip install --upgrade pip
           pip install pypandoc
 
       - name: Install dependencies
         run: |
-          cd trac-executors/python
+          cd trac-runtime/python
           python -m pip install --upgrade pip
           pip install wheel
           pip install "pyspark ${{ matrix.enviroment.PYSPARK_VERSION }}"
@@ -89,13 +89,13 @@ jobs:
 
       - name: Protoc Code Generation
         run: |
-          cd trac-executors/python/codegen
+          cd trac-runtime/python/codegen
           python protoc-ctrl.py --domain
           python protoc-ctrl.py --proto
 
       - name: Unit tests
         run: |
-          export PYTHONPATH=build/modules/trac-executors/python/generated
-          export PYTHONPATH=trac-executors/python/test:$PYTHONPATH
-          export PYTHONPATH=trac-executors/python/src:$PYTHONPATH
-          python -m unittest discover -s trac-executors/python/test/trac_test -t trac-executors/python/test
+          export PYTHONPATH=build/modules/trac-runtime/python/generated
+          export PYTHONPATH=trac-runtime/python/test:$PYTHONPATH
+          export PYTHONPATH=trac-runtime/python/src:$PYTHONPATH
+          python -m unittest discover -s trac-runtime/python/test/trac_test -t trac-runtime/python/test

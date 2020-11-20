@@ -29,6 +29,6 @@ build/
 .idea/libraries/
 .idea/shelf/
 
-/trac-executors/python/venv/**
-/trac-executors/python/**/*.pyc
-/trac-executors/python/.idea/**
+/trac-runtime/python/venv/**
+/trac-runtime/python/**/*.pyc
+/trac-runtime/python/.idea/**

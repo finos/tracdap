@@ -33,7 +33,7 @@ def platform_args(raw_args):
 def main(argv):
 
     proto_location = "../../../trac-api/trac-metadata/src/main/proto"
-    output_location = "../../../build/modules/trac-executors/python/generated"
+    output_location = "../../../build/modules/trac-runtime/python/generated"
 
     gen_proto_args = [
 
