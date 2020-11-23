@@ -22,7 +22,7 @@ import platform
 def get_trac_version():
 
     if platform.system().lower().startswith("win"):
-        command = ['powershell', '-ExecutionPolicy', 'Bypass', '-File' '..\\..\\dev\\version.ps1']
+        command = ['powershell', '-ExecutionPolicy', 'Bypass', '-File', '..\\..\\dev\\version.ps1']
     else:
         command = ['../../dev/version.sh']
 
@@ -43,4 +43,6 @@ print(f'TRAC version: {trac_version}')
 setuptools.setup(
     name='trac-model-runtime',
     version=trac_version,
-    python_requires='>=3.6')
+    python_requires='>=3.6',
+    packages=setuptools.find_packages('src'),
+    package_dir={'': 'src'})
