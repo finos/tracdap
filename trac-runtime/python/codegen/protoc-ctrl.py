@@ -19,7 +19,7 @@ import sys
 import protoc
 
 proto_location = "../../../trac-api/trac-metadata/src/main/proto"
-output_location = "../../../build/modules/trac-runtime/python/generated"
+output_location = "../generated"
 
 
 def find_proto_files(path):

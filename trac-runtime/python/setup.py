@@ -39,10 +39,20 @@ def get_trac_version():
 trac_version = get_trac_version()
 print(f'TRAC version: {trac_version}')
 
+trac_rt_packages = setuptools.find_packages('src')
+trac_rt_package_dir = {
+    '': 'src',
+    'trac.rt.metadata': 'generated/trac_gen/domain/trac/metadata',
+    'trac.rt.metadata.search': 'generated/trac_gen/domain/trac/metadata/search'
+}
 
 setuptools.setup(
-    name='trac-model-runtime',
+    name='trac-runtime',
     version=trac_version,
+    description='TRAC Model Runtime for Python',
+    url='https://github.com/accenture/trac',
+    license='http://www.apache.org/licenses/LICENSE-2.0',
+    platforms=['any'],
     python_requires='>=3.6',
-    packages=setuptools.find_packages('src'),
-    package_dir={'': 'src'})
+    packages=trac_rt_packages,
+    package_dir=trac_rt_package_dir)
