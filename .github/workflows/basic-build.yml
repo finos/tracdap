@@ -82,16 +82,15 @@ jobs:
         run: |
           cd trac-runtime/python
           python -m pip install --upgrade pip
-          pip install wheel
           pip install "pyspark ${{ matrix.enviroment.PYSPARK_VERSION }}"
           pip install "pandas ${{ matrix.enviroment.PANDAS_VERSION }}"
           pip install -r requirements.txt
 
-      - name: Protoc Code Generation
+      - name: Protoc code generation
         run: |
-          cd trac-runtime/python/codegen
-          python protoc-ctrl.py --domain
-          python protoc-ctrl.py --proto
+          cd trac-runtime/python
+          python codegen/protoc-ctrl.py --domain
+          python codegen/protoc-ctrl.py --proto
 
       - name: Unit tests
         run: |
