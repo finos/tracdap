@@ -1,10 +1,16 @@
 
-protobuf >= 3.13.0, < 3.14.0
-protoc-wheel-0 >= 3.13.0, < 3.14.0
-
 # Baseline support for Pandas on series 1.x
 # Try to avoid supporting the 0.x series!
 pandas >= 1.0.0, < 2.0.0
 
 # Support PySpark series 2.4.x and 3.0.x
 pyspark >= 2.4.0, < 3.1.0
+
+# Protobuf is required at runtime to parse/quote transmitted metadata
+protobuf >= 3.13.0, < 3.14.0
+
+# Protoc is only required at build time for code generation
+protoc-wheel-0 >= 3.13.0, < 3.14.0
+
+# Wheel required at build time for packaging
+wheel >= 0.35
