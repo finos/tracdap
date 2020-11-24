@@ -15,9 +15,11 @@
 import pathlib
 import platform
 import sys
+import os
 
 import protoc
 
+# Paths are relative to the codegen folder
 proto_location = "../../../trac-api/trac-metadata/src/main/proto"
 output_location = "../generated"
 
@@ -47,9 +49,21 @@ def platform_args(base_args, proto_files):
         return ["protoc"] + base_args + proto_files
 
 
-def main(argv):
+# Context class to change directory for the lifetime of the codegen process
+class cd:
 
-    proto_files = list(find_proto_files(proto_location))
+    def __init__(self, new_path):
+        self.new_path = os.path.expanduser(new_path)
+
+    def __enter__(self):
+        self.saved_path = os.getcwd()
+        os.chdir(self.new_path)
+
+    def __exit__(self, etype, value, traceback):
+        os.chdir(self.saved_path)
+
+
+def main(argv):
 
     gen_proto_args = [
 
@@ -70,29 +84,36 @@ def main(argv):
         "--proto_path={}".format(proto_location)
     ]
 
-    if len(argv) > 1 and argv[1] == "--domain":
+    # Always run codegen from the codegen folder
+    # This makes finding the TRAC protoc plugin much easier
+    codegen_path = str(pathlib.Path(__file__).parent)
+    with cd(codegen_path):
 
-        # TRAC domain classes generator adds init scripts for its own package hierarchy
-        # Since we nesting inside trac_gen/domain, add init files for those packages here
+        if len(argv) > 1 and argv[1] == "--domain":
 
-        pathlib.Path(output_location).joinpath("trac_gen/domain").mkdir(parents=True, exist_ok=True)
-        pathlib.Path(output_location).joinpath("trac_gen/domain/__init__.py").touch(exist_ok=True)
-        pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
+            # TRAC domain classes generator adds init scripts for its own package hierarchy
+            # Since we nesting inside trac_gen/domain, add init files for those packages here
 
-        protoc.exec_protoc(platform_args(gen_trac_args, proto_files))
+            pathlib.Path(output_location).joinpath("trac_gen/domain").mkdir(parents=True, exist_ok=True)
+            pathlib.Path(output_location).joinpath("trac_gen/domain/__init__.py").touch(exist_ok=True)
+            pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
 
-    else:
+            proto_files = list(find_proto_files(proto_location))
+            protoc.exec_protoc(platform_args(gen_trac_args, proto_files))
 
-        # Native Python plugin does not create init scripts for its own package hierarchy
-        # Add them here instead
+        else:
 
-        pathlib.Path(output_location).joinpath("trac_gen/proto/trac/metadata").mkdir(parents=True, exist_ok=True)
-        pathlib.Path(output_location).joinpath("trac_gen/proto/trac/metadata/__init__.py").touch(exist_ok=True)
-        pathlib.Path(output_location).joinpath("trac_gen/proto/trac/__init__.py").touch(exist_ok=True)
-        pathlib.Path(output_location).joinpath("trac_gen/proto/__init__.py").touch(exist_ok=True)
-        pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
+            # Native Python plugin does not create init scripts for its own package hierarchy
+            # Add them here instead
 
-        protoc.exec_protoc(platform_args(gen_proto_args, proto_files))
+            pathlib.Path(output_location).joinpath("trac_gen/proto/trac/metadata").mkdir(parents=True, exist_ok=True)
+            pathlib.Path(output_location).joinpath("trac_gen/proto/trac/metadata/__init__.py").touch(exist_ok=True)
+            pathlib.Path(output_location).joinpath("trac_gen/proto/trac/__init__.py").touch(exist_ok=True)
+            pathlib.Path(output_location).joinpath("trac_gen/proto/__init__.py").touch(exist_ok=True)
+            pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
+
+            proto_files = list(find_proto_files(proto_location))
+            protoc.exec_protoc(platform_args(gen_proto_args, proto_files))
 
 
 if __name__ == "__main__":
