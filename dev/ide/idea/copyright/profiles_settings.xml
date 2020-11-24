@@ -1,0 +1,8 @@
+<component name="CopyrightManager">
+  <settings default="Accenture / Apache">
+    <LanguageOptions name="SQL">
+      <option name="fileTypeOverride" value="3" />
+      <option name="block" value="false" />
+    </LanguageOptions>
+  </settings>
+</component>

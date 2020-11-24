@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SqlDialectMappings">
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/main/java/com/accenture/trac/svc/meta/dal/jdbc/dialects/H2SqlDialect.java" dialect="H2" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/main/java/com/accenture/trac/svc/meta/dal/jdbc/dialects/MySqlDialect.java" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/main/java/com/accenture/trac/svc/meta/dal/jdbc/dialects/PostgreSqlDialect.java" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/main/java/com/accenture/trac/svc/meta/dal/jdbc/dialects/SqlServerDialect.java" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/main/resources/jdbc/h2" dialect="H2" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/main/resources/jdbc/mariadb" dialect="MariaDB" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/main/resources/jdbc/mysql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/main/resources/jdbc/postgresql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/main/resources/jdbc/sqlserver" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/schema/h2" dialect="H2" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/schema/mariadb" dialect="MariaDB" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/schema/mysql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/schema/oracle" dialect="Oracle" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/schema/postgresql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/trac-services/trac-svc-meta/src/schema/sqlserver" dialect="TSQL" />
+    <file url="PROJECT" dialect="SQL92" />
+  </component>
+</project>
