@@ -39,12 +39,24 @@ def get_trac_version():
 trac_version = get_trac_version()
 print(f'TRAC version: {trac_version}')
 
-trac_rt_packages = setuptools.find_packages('src')
+# Use trac. as a namespace, so models will import from trac.rt
+# Allows for future packages e.g. trac.web
+trac_rt_packages = setuptools.find_namespace_packages('src', include=['trac.*'])
+
+# Map the metadata packages to generated output locations
 trac_rt_package_dir = {
     '': 'src',
     'trac.rt.metadata': 'generated/trac_gen/domain/trac/metadata',
     'trac.rt.metadata.search': 'generated/trac_gen/domain/trac/metadata/search'
 }
+
+# Runtime dependencies
+# Protoc is not required, it is only needed for codegen
+trac_rt_dependencies = [
+    'protobuf',
+    'pandas',
+    'pyspark']
+
 
 setuptools.setup(
     name='trac-runtime',
@@ -55,4 +67,6 @@ setuptools.setup(
     platforms=['any'],
     python_requires='>=3.6',
     packages=trac_rt_packages,
-    package_dir=trac_rt_package_dir)
+    package_dir=trac_rt_package_dir,
+    namespace_packages=['trac'],
+    install_requires=trac_rt_dependencies)
