@@ -29,4 +29,9 @@ build/
 .idea/libraries/
 .idea/shelf/
 
-
+/trac-runtime/python/.idea/**
+/trac-runtime/python/venv/**
+/trac-runtime/python/generated/**
+/trac-runtime/python/build/**
+/trac-runtime/python/dist/**
+/trac-runtime/python/*.egg-info

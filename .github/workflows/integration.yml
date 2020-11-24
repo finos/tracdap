@@ -19,7 +19,7 @@ jobs:
 
     strategy:
 
-      # Try to finish all jobs - it can be helpful to see if some dialects succeed and others fail
+      # Try to finish all jobs - it can be helpful to see if some succeed and others fail
       fail-fast: false
 
       matrix:
@@ -87,18 +87,21 @@ jobs:
         with:
           java-version: 11.0.x
 
+      # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: Build
         run: ./gradlew trac-svc-meta:build trac-svc-meta:testClasses deploy-metadb:build -x test
 
-      - name: Prepare database
+      - name: Prepare Database
         run: |
           ./gradlew deploy-metadb:run --args="\
           --config ${{ matrix.database.TRAC_CONFIG_FILE }} \
           --task deploy_schema \
           --task add_tenant:ACME_CORP"
 
-      - name: Integration tests
+      - name: Integration Tests
         run: ./gradlew integration -DintegrationTags="int-metadb"
