@@ -28,12 +28,16 @@ copyRecursive() {
 
   for source_config_file in `find "${source_dir}" -type f`; do
     target_config_file=`echo ${source_config_file} | sed "s#${source_dir}#${target_dir}#"`
-    echo "Updating -> ${source_config_file}"
+    echo "Updating -> ${target_config_file}"
     cp "${source_config_file}" "${target_config_file}"
   done
 }
 
 ide_source_dir=`dirname "$0"`/idea
 ide_target_dir=`dirname "$0"`/../../.idea
+
+# Normalize target dir
+working_dir=`pwd`
+ide_target_dir="$(cd "${ide_target_dir}"; pwd | sed "s#${working_dir}/##")"
 
 copyRecursive "${ide_source_dir}" "${ide_target_dir}"
