@@ -15,19 +15,10 @@
 # -----------------------------------------------------------------------------
 
 build/
-
 .gradle/
 
-.idea/.name
-.idea/workspace.xml
-.idea/misc.xml
-.idea/compiler.xml
-.idea/jarRepositories.xml
-.idea/gradle.xml
-.idea/modules.xml
-.idea/modules/
-.idea/libraries/
-.idea/shelf/
+# Tracked IDEA config files are in dev/ide/idea
+.idea/*
 
 /trac-runtime/python/.idea/**
 /trac-runtime/python/venv/**
