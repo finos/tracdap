@@ -19,6 +19,9 @@ echo Updating settings for IntelliJ IDEA...
 set ide_source_dir=%~dp0%idea
 set ide_target_dir=%~dp0%..\..\.idea
 
+REM Normalize target path
+for %%i in ("%ide_target_dir%") do SET "ide_target_dir=%%~fi"
+
 call :copyRecursive %ide_source_dir% %ide_target_dir%
 goto :eof
 
@@ -29,7 +32,7 @@ goto :eof
 
     REM copy files in the source directory
     for %%f in (%1\*) do (
-        echo Updating -^> %%f
+        echo Updating -^> %2\%%~nxf
         copy /y "%%f" "%2" >nul
     )
 
