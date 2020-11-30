@@ -12,41 +12,38 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import typing as tp
 import trac.rt.metadata as meta
+from .graph import *
 
 
-class NodeId:
+class GraphBuilder:
 
-    def __init__(self, name: str, ctx: tp.List[str]):
-        self.name = name
-        self.ctx = ctx
-
-
-class Node:
-    pass
-
-
-class Graph:
-
-    def __init__(self):
+    @staticmethod
+    def build_job() -> Graph:
         pass
 
+    @staticmethod
+    def build_calculation_job(
+            job_def: meta.JobDefinition,
+            metadata: tp.Dict[meta.TagSelector, meta.ObjectDefinition]):
 
-class ContextPushNode:
+        job_ctx_mapping = dict()
+        job_ctx_push = ContextPushNode(job_ctx_mapping)
 
-    def __init__(self, mapping: tp.Dict[str, NodeId]):
-        self.mapping = mapping
+        job_inputs = list(map(GraphBuilder.build_data_load, job_def.input.values()))
 
-
-class ContextPopNode:
-
-    def __init__(self, mapping: tp.Dict[str, NodeId]):
-        self.mapping = mapping
+        job_target = metadata[job_def.target]
 
 
-class LoadDataNode:
+    @staticmethod
+    def build_data_load():
+        pass
 
-    def __init__(self, node_id: NodeId, data_def: meta.DataDefinition):
-        self.node_id = node_id
-        self.data_def = data_def
+    def build_model_or_flow(self):
+        pass
+
+    def build_model(self):
+        pass
+
+    def build_flow(self):
+        pass
