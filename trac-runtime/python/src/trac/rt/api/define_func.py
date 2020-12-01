@@ -32,7 +32,7 @@ from trac.rt.metadata import *
 def define_parameter(
         label: str,
         param_type: tp.Union[TypeDescriptor, BasicType],
-        default_value: tp.Optional[Value] = None):
+        default_value: tp.Optional[tp.Any] = None):
 
     if isinstance(param_type, TypeDescriptor):
         param_type_descriptor = param_type
