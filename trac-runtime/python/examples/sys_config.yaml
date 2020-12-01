@@ -1,0 +1,15 @@
+
+storage:
+
+  example_inputs:
+
+    storageType: LOCAL_STORAGE
+    storageConfig:
+      rootPath: ./examples/data
+
+  example_data:
+
+    storageType: LOCAL_STORAGE
+    storageConfig:
+      rootPath: ./build/example_data
+    default: true
