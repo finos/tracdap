@@ -47,7 +47,7 @@ class TracContext:
         pass
 
     @abc.abstractmethod
-    def get_pandas_dataset(self, dataset_name: str, dataset_format: type) -> pd.DataFrame:
+    def get_pandas_dataset(self, dataset_name: str) -> pd.DataFrame:
         pass
 
     @abc.abstractmethod
