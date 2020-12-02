@@ -29,17 +29,36 @@ import typing as tp
 from trac.rt.metadata import *
 
 
+class NamedParameter:
+
+    def __init__(self, param_name: str, param: ModelParameter):
+        self.paramName = param_name
+        self.param = param
+
+
+def define_parameters(
+        *params: tp.Union[NamedParameter, tp.List[NamedParameter]]) \
+        -> tp.Dict[str, ModelParameter]:
+
+    if len(params) == 1 and isinstance(params[0], list):
+        return {p.paramName: p.param for p in params[0]}
+    else:
+        return {p.paramName: p.param for p in params}
+
+
 def define_parameter(
-        label: str,
+        param_name: str,
         param_type: tp.Union[TypeDescriptor, BasicType],
-        default_value: tp.Optional[tp.Any] = None):
+        label: str,
+        default_value: tp.Optional[tp.Any] = None) \
+        -> NamedParameter:
 
     if isinstance(param_type, TypeDescriptor):
         param_type_descriptor = param_type
     else:
         param_type_descriptor = TypeDescriptor(param_type, None, None)
 
-    return ModelParameter(label, param_type_descriptor, default_value)
+    return NamedParameter(param_name, ModelParameter(label, param_type_descriptor, default_value))
 
 
 def define_table(*args, **kwargs):
