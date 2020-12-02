@@ -21,12 +21,17 @@ class HelloPyspark(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
-        return {
+        return trac.define_parameters(
 
-            "filter_defaults": trac.P(
-                "Exclude defaulted loans from the calculation",
-                trac.BasicType.BOOLEAN, default_value=False)
-        }
+            trac.P("eur_usd_rate", trac.BasicType.FLOAT,
+                   label="EUR/USD spot rate for reporting"),
+
+            trac.P("default_weighting", trac.BasicType.FLOAT,
+                   label="Weighting factor applied to the profit/loss of a defaulted loan"),
+
+            trac.P("filter_defaults", trac.BasicType.BOOLEAN,
+                   label="Exclude defaulted loans from the calculation",
+                   default_value=False))
 
     def define_inputs(self) -> tp.Dict[str, trac.TableDefinition]:
 
@@ -43,12 +48,14 @@ class HelloPyspark(trac.TracModel):
 
         profit_by_region = trac.define_table(
             trac.F("region", trac.BasicType.STRING, label="Customer home region", categorical=True),
-            trac.F("gross_profit", trac.BasicType.DECIMAL, label="Total gross profit", format_code="CCY:EUR"))
+            trac.F("gross_profit", trac.BasicType.DECIMAL, label="Total gross profit", format_code="CCY:USD"))
 
         return {"profit_by_region": profit_by_region}
 
     def run_model(self, ctx: trac.TracContext):
 
+        eur_usd_rate = ctx.get_parameter("eur_usd_rate")
+        default_weighting = ctx.get_parameter("default_weighting")
         filter_defaults = ctx.get_parameter("filter_defaults")
 
         customer_loans = ctx.get_spark_sql_dataset("customer_loans")
@@ -56,7 +63,18 @@ class HelloPyspark(trac.TracModel):
         if filter_defaults:
             customer_loans = customer_loans.filter(f.col("loan_condition_cat") == 0)
 
-        customer_loans = customer_loans.withColumn("gross_profit", f.col("total_pymnt") - f.col("loan_amount"))
+        customer_loans = customer_loans.withColumn(
+            "gross_profit_unweighted",
+            f.col("total_pymnt") - f.col("loan_amount"))
+
+        customer_loans = customer_loans.withColumn(
+            "gross_profit_weighted",
+            f.col("gross_profit_unweighted") *
+            f.when(f.col("loan_condition_cat") > 0, default_weighting).otherwise(1.0))
+
+        customer_loans = customer_loans.withColumn(
+            "gross_profit",
+            f.col("gross_profit_weighted") * eur_usd_rate)
 
         profit_by_region = customer_loans \
             .groupBy("region") \
