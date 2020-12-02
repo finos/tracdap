@@ -1,6 +1,6 @@
 
 storageSettings:
-  defaultStorge: example_data
+  defaultStorge: example_outputs
   defaultFormat: CSV
 
 storage:
@@ -9,13 +9,13 @@ storage:
 
     storageType: LOCAL_STORAGE
     storageConfig:
-      rootPath: ./examples/data
+      rootPath: ./data/inputs
 
-  example_data:
+  example_outputs:
 
     storageType: LOCAL_STORAGE
     storageConfig:
-      rootPath: ./build/example_data
+      rootPath: ./data/outputs
 
 
 sparkSettings:

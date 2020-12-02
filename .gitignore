@@ -26,3 +26,5 @@ build/
 /trac-runtime/python/build/**
 /trac-runtime/python/dist/**
 /trac-runtime/python/*.egg-info
+
+/doc/examples/models/python/data/outputs/**
