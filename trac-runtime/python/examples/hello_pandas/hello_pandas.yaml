@@ -1,5 +1,7 @@
 
 parameters:
+  eur_usd_rate: 1.2071
+  default_weighting: 1.5
   filter_defaults: false
 
 inputs:
