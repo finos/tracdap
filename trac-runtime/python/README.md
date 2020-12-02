@@ -1,4 +1,4 @@
-* TRAC Model Runtime for Python
+# TRAC Model Runtime for Python
 
 *A next-generation data and analytics platform for use in highly regulated environments*
 

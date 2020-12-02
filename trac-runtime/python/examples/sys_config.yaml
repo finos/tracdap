@@ -1,0 +1,28 @@
+
+storageSettings:
+  defaultStorge: example_data
+  defaultFormat: CSV
+
+storage:
+
+  example_inputs:
+
+    storageType: LOCAL_STORAGE
+    storageConfig:
+      rootPath: ./examples/data
+
+  example_data:
+
+    storageType: LOCAL_STORAGE
+    storageConfig:
+      rootPath: ./build/example_data
+
+
+sparkSettings:
+
+  sparkConfig:
+    [spark.cores.max]: 4
+    [spark.driver.memory]: 2G
+    [spark.executor.memory]: 2G
+    [spark.default.parallelism]: 8
+    [spark.sql.shuffle.partitions]: 8

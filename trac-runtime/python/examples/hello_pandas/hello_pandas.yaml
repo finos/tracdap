@@ -1,0 +1,13 @@
+
+parameters:
+  eur_usd_rate: 1.2071
+  default_weighting: 1.5
+  filter_defaults: false
+
+inputs:
+  customer_loans:
+    storage_key: "example_inputs"
+    path: "loan_final313_100.csv"
+
+outputs:
+  profit_by_region: "profit_by_region.csv"
