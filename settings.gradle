@@ -59,3 +59,6 @@ project(":deploy-metadb").projectDir = file("trac-tools/deploy-metadb")
 
 include 'aws-config'
 project(":aws-config").projectDir = file("trac-plugins/aws-config")
+
+include 'gcp-config'
+project(":gcp-config").projectDir = file("trac-plugins/gcp-config")

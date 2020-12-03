@@ -33,6 +33,7 @@ application {
 
 sourceSets {
     aws {}
+    gcp {}
 }
 
 dependencies {
@@ -58,6 +59,7 @@ dependencies {
     implementation group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: "$log4j_version"
 
     awsRuntimeOnly project(':aws-config')
+    gcpRuntimeOnly project(':gcp-config')
 
     // Test
 

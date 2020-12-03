@@ -47,6 +47,7 @@ ext {
 
     // Plugins
     aws_sdk_version = '1.11.163'
+    gcp_sdk_version = '1.17.0'
 
 
     // Test dependencies
