@@ -30,6 +30,10 @@ application {
     tasks.run.workingDir = rootProject.projectDir
 }
 
+sourceSets {
+    aws {}
+}
+
 dependencies {
 
     implementation project(':trac-api-metadata')
@@ -42,6 +46,8 @@ dependencies {
     // There may be licensing implications to enabling certain JDBC drivers
     // See the NOTICE file for more information on licensing restrictions
     runtimeOnly project(':sql-drivers')
+
+    awsRuntimeOnly project(':aws-config')
 
     // Core framework - gRPC on Netty
     implementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
@@ -71,4 +77,24 @@ dependencies {
 processTestResources {
 
     from "${project(':trac-svc-meta').projectDir.path}/src/schema"
+}
+
+sourceSets.each { cloudProvider ->
+
+    if (cloudProvider.name != "main" && cloudProvider.name != "test") {
+
+        // Only build drivers that are enabled in gradle/plugins.gradle or using the matching env variable
+
+        def key = (String) "${cloudProvider.name}_config"
+        def buildDriver = isFeatureEnabled(key)
+
+        if (buildDriver) {
+
+            println("Enabling cloud plugin: ${cloudProvider.name}")
+
+            dependencies {
+                implementation cloudProvider.runtimeClasspath
+            }
+        }
+    }
 }
