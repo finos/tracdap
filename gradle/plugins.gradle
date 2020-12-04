@@ -46,4 +46,5 @@ ext {
     BUILD_sql_oracle = false
 
     BUILD_aws_config = false
+    BUILD_gcp_config = false
 }

@@ -32,6 +32,7 @@ application {
 
 sourceSets {
     aws {}
+    gcp {}
 }
 
 dependencies {
@@ -48,6 +49,7 @@ dependencies {
     runtimeOnly project(':sql-drivers')
 
     awsRuntimeOnly project(':aws-config')
+    gcpRuntimeOnly project(':gcp-config')
 
     // Core framework - gRPC on Netty
     implementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
