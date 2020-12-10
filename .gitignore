@@ -21,6 +21,8 @@ build/
 .idea/*
 
 /trac-api/packages/js/node_modules/**
+/trac-api/packages/js/build/**
+/trac-api/packages/js/umd/**
 
 /trac-runtime/python/.idea/**
 /trac-runtime/python/venv/**

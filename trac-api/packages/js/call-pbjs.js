@@ -20,8 +20,8 @@ const pbjs = require('protobufjs/cli/pbjs');
 
 
 const packages = {
-    'trac/metadata': '../../../trac-metadata/src/main/proto',
-    'trac/api/meta': '../../../trac-services/src/main/proto'
+    'trac/metadata': '../../trac-metadata/src/main/proto',
+    'trac/api': '../../trac-services/src/main/proto'
 };
 
 const args = [
