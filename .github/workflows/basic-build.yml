@@ -112,3 +112,36 @@ jobs:
         run: |
           cd trac-runtime/python
           python setup.py sdist bdist_wheel
+
+  javascript_api:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v1
+      with:
+        node-version: 14.x
+
+    - name: Install dependencies
+      run: |
+        cd trac-api/packages/js
+        npm install
+
+    - name: Set TRAC version
+      run: |
+        cd trac-api/packages/js
+        npm run tracVersion:posix
+
+    - name: PBJS code generation
+      run: |
+        cd trac-api/packages/js
+        npm run pbjs
+        npm run pbts
+
+    - name: Build
+      run: |
+        cd trac-api/packages/js
+        npm run build:dev
+        npm run build:prod
