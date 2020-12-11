@@ -132,22 +132,22 @@ jobs:
 
     - name: Install dependencies
       run: |
-        cd trac-api/packages/js
+        cd trac-api/packages/javascript
         npm install
 
     - name: Set TRAC version
       run: |
-        cd trac-api/packages/js
+        cd trac-api/packages/javascript
         npm run tracVersion:posix
 
     - name: PBJS code generation
       run: |
-        cd trac-api/packages/js
+        cd trac-api/packages/javascript
         npm run pbjs
         npm run pbts
 
     - name: Build
       run: |
-        cd trac-api/packages/js
+        cd trac-api/packages/javascript
         npm run build:dev
         npm run build:prod

@@ -20,9 +20,9 @@ build/
 # Tracked IDEA config files are in dev/ide/idea
 .idea/*
 
-/trac-api/packages/js/node_modules/**
-/trac-api/packages/js/build/**
-/trac-api/packages/js/umd/**
+/trac-api/packages/javascript/node_modules/**
+/trac-api/packages/javascript/build/**
+/trac-api/packages/javascript/umd/**
 
 /trac-runtime/python/.idea/**
 /trac-runtime/python/venv/**
