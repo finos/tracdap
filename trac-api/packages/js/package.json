@@ -1,6 +1,6 @@
 {
   "name": "trac-web-api",
-  "version": "0.1.0",
+  "version": "0.0.0-DEVELOPMENT",
   "description": "JavaScript API for building web applications on the TRAC platform",
   "repository": {
     "type": "git",
@@ -27,6 +27,8 @@
     "webpack-cli": "^3.3.12"
   },
   "scripts": {
+    "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
+    "tracVersion:posix": "npm version `../../../dev/version.sh`",
     "pbjs": "node call-pbjs.js",
     "pbts": "pbts -o trac.d.ts trac.js",
     "build:dev": "webpack --mode development",
