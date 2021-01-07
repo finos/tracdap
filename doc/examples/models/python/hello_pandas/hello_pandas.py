@@ -83,5 +83,5 @@ class HelloPandas(trac.TracModel):
 
 
 if __name__ == "__main__":
-    import trac.launch as launch
+    import trac.rt.launch as launch
     launch.launch_model(HelloPandas, "hello_pandas.yaml", "examples/sys_config.yaml")

@@ -1,6 +1,6 @@
 
 storageSettings:
-  defaultStorge: example_outputs
+  defaultStorage: example_outputs
   defaultFormat: CSV
 
 storage:
@@ -21,8 +21,8 @@ storage:
 sparkSettings:
 
   sparkConfig:
-    [spark.cores.max]: 4
-    [spark.driver.memory]: 2G
-    [spark.executor.memory]: 2G
-    [spark.default.parallelism]: 8
-    [spark.sql.shuffle.partitions]: 8
+    spark.cores.max: 4
+    spark.driver.memory: 2G
+    spark.executor.memory: 2G
+    spark.default.parallelism: 8
+    spark.sql.shuffle.partitions: 8
