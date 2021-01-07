@@ -14,8 +14,9 @@
 
 import typing as tp
 
-import actor
-import graph
+import trac.rt.impl.util as util
+import trac.rt.exec.actors as actors
+import trac.rt.exec.graph as graph
 
 
 class GraphContextNode:
@@ -30,7 +31,7 @@ class GraphContext:
         self.nodes = nodes
 
 
-class NodeProcessor(actor.Actor[GraphContext]):
+class NodeProcessor(actors.Actor[GraphContext]):
 
     def __init__(self, ctx: GraphContext, node_id: str, task: callable):
         super().__init__(ctx)
@@ -39,7 +40,7 @@ class NodeProcessor(actor.Actor[GraphContext]):
         pass
 
 
-class GraphProcessor(actor.Actor[GraphContext]):
+class GraphProcessor(actors.Actor[GraphContext]):
 
     def __init__(self, ctx: GraphContext, tasks: dict):
         super().__init__(ctx)
@@ -50,7 +51,7 @@ class GraphProcessor(actor.Actor[GraphContext]):
         remaining_nodes = self._submit_viable_nodes(self._ctx.nodes)
         self.become(GraphContext(remaining_nodes))
 
-    @actor.Message
+    @actors.Message
     def submit_viable_nodes(self):
 
         remaining_nodes = self._submit_viable_nodes(self._ctx.nodes)
@@ -63,13 +64,13 @@ class GraphProcessor(actor.Actor[GraphContext]):
         for node_id, node in nodes:
 
             if node.is_viable:
-                processor = NodeProcessor(self._ctx, node_id, node.task)
+                processor = self._system.spawn(NodeProcessor, self._ctx, node_id, node.task)
                 processor.start()
                 remaining_nodes.pop(node_id)
 
         return remaining_nodes
 
-    @actor.Message
+    @actors.Message
     def node_succeeded(self, node_id, result):
 
         new_nodes = {**self._ctx.nodes, node_id: result}
@@ -94,6 +95,26 @@ class GraphProcessor(actor.Actor[GraphContext]):
         pass
 
 
+class GraphBuilder(actors.Actor[None]):
+
+    def __init__(self):
+        super().__init__(None)
+
+    def start(self):
+
+        # build graph context
+
+        # store graph context
+
+        # post graph context to parent
+
+        pass
+
+    def get_execution_graph(self):
+
+        pass  # post graph context to parent
+
+
 class EngineContext:
 
     def __init__(self):
@@ -101,11 +122,15 @@ class EngineContext:
         self.data = {}
 
 
-class TracEngine(actor.Actor[EngineContext]):
+class TracEngine(actors.Actor[EngineContext]):
 
     def __init__(self):
         super().__init__(EngineContext())
+        self._log = util.logger_for_object(self)
 
-    @actor.Message
+    def start(self):
+        self._log.info("Engine is up and running")
+
+    @actors.Message
     def submit_job(self, job_info: object):
         pass

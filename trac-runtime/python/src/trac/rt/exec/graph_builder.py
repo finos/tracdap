@@ -13,13 +13,14 @@
 #  limitations under the License.
 
 import trac.rt.metadata as meta
+import trac.rt.config.config as config
 from .graph import *
 
 
 class GraphBuilder:
 
     @staticmethod
-    def build_job() -> Graph:
+    def build_job(job_config: config.JobConfig) -> Graph:
         pass
 
     @staticmethod
