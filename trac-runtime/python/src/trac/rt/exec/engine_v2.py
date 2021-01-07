@@ -12,12 +12,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import typing as tp
+
 import actor
+import graph
+
+
+class GraphContextNode:
+
+    def __init__(self):
+        pass
 
 
 class GraphContext:
 
-    def __init__(self, nodes: dict):
+    def __init__(self, nodes: tp.Dict[graph.NodeId, GraphContextNode]):
         self.nodes = nodes
 
 
