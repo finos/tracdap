@@ -22,19 +22,33 @@ import trac.rt.impl.util as util
 T = tp.TypeVar('T')
 
 
-class Actor(tp.Generic[T]):
+class ActorContext:
 
-    def __init__(self, ctx: T):
-        self._ctx = ctx
+    def __init__(self):
+        self._current_actor: 'ActorRef'
+        self._system: 'ActorSystem'
+
+    def spawn(self, actor_class: 'Actor'.__class__, *args, **kwargs) -> 'ActorRef':
+
+        actor = actor_class(*args, **kwargs)
+        return actor.ref
+
+    def send(self, ref: 'ActorRef', message: str, *args, **kwargs):
+        pass
+
+
+class Actor:
+
+    def __init__(self):
+        self.ref: 'ActorRef' = None
         self._parent: 'ActorRef' = None
         self._system: 'ActorSystem' = None
         self.__messages = {}
 
-    def start(self):
+    @classmethod
+    def start(cls):
         print("Actor start method")
-
-    def stop(self):
-        pass
+        return cls.__new__(cls)
 
     def receive(self, message: callable, *args, **kwargs):
 
@@ -44,6 +58,15 @@ class Actor(tp.Generic[T]):
 
         else:
             raise RuntimeError()  # TODO: Error
+
+    def actors(self) -> ActorContext:
+        pass
+
+    def on_start(self):
+        pass
+
+    def on_stop(self):
+        pass
 
     def become(self, ctx: T):
         self._ctx = ctx

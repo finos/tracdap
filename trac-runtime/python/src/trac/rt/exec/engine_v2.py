@@ -13,94 +13,150 @@
 #  limitations under the License.
 
 import typing as tp
+from copy import copy
 
 import trac.rt.impl.util as util
 import trac.rt.exec.actors as actors
-import trac.rt.exec.graph as graph
+from trac.rt.exec.graph import NodeId
 
 
 class GraphContextNode:
 
     def __init__(self):
-        pass
+        self.dependencies: tp.List[NodeId] = list()
 
 
 class GraphContext:
 
-    def __init__(self, nodes: tp.Dict[graph.NodeId, GraphContextNode]):
+    def __init__(self, nodes: tp.Dict[NodeId, GraphContextNode]):
         self.nodes = nodes
+        self.pending_nodes: tp.Set[NodeId] = set()
+        self.active_nodes: tp.Set[NodeId] = set()
+        self.succeeded_nodes: tp.Set[NodeId] = set()
+        self.failed_nodes: tp.Set[NodeId] = set()
 
 
-class NodeProcessor(actors.Actor[GraphContext]):
+class NodeProcessor(actors.Actor):
 
-    def __init__(self, ctx: GraphContext, node_id: str, task: callable):
-        super().__init__(ctx)
+    def __init__(self, graph: GraphContext, node_id: str, node: GraphContextNode):
+        super().__init__()
+        self.graph = graph
+        self.node_id = node_id
+        self.node = node
 
-    def start(self):
+    def on_start(self):
         pass
 
 
-class GraphProcessor(actors.Actor[GraphContext]):
+class GraphProcessor(actors.Actor):
 
-    def __init__(self, ctx: GraphContext, tasks: dict):
-        super().__init__(ctx)
-        self.__tasks = tasks
+    def __init__(self, graph: GraphContext):
+        super().__init__()
+        self.graph = graph
+        self.processors: tp.Dict[NodeId, actors.ActorRef] = dict()
 
-    def start(self):
+    def on_start(self):
 
-        remaining_nodes = self._submit_viable_nodes(self._ctx.nodes)
-        self.become(GraphContext(remaining_nodes))
-
-    @actors.Message
-    def submit_viable_nodes(self):
-
-        remaining_nodes = self._submit_viable_nodes(self._ctx.nodes)
-        self.become(GraphContext(remaining_nodes))
-
-    def _submit_viable_nodes(self, nodes: dict):
-
-        remaining_nodes = nodes.copy()
-
-        for node_id, node in nodes:
-
-            if node.is_viable:
-                processor = self._system.spawn(NodeProcessor, self._ctx, node_id, node.task)
-                processor.start()
-                remaining_nodes.pop(node_id)
-
-        return remaining_nodes
+        self.submit_viable_nodes()
 
     @actors.Message
-    def node_succeeded(self, node_id, result):
+    def submit_viable_nodes(self, ctx: actors.ActorContext):
 
-        new_nodes = {**self._ctx.nodes, node_id: result}
-        new_tasks = {**self.__tasks}
-        new_tasks.pop(node_id)
+        pending_nodes = copy(self.graph.pending_nodes)
+        active_nodes = copy(self.graph.active_nodes)
+        processors = dict()
 
-        remaining_nodes = self._submit_viable_nodes(new_nodes)
-        active_nodes = []  # TODO
+        for node_id, node in self.graph.nodes:
+            if self._is_viable_node(node_id, node):
 
-        # Check for completion
-        if not any(remaining_nodes):
-            self._parent.send('done')
+                node_ref = ctx.spawn(NodeProcessor, self.graph, node_id, node)
+                processors[node_id] = node_ref
 
-        # Check for cyclic dependency lockup (should never happen)
-        elif len(active_nodes) == 0:
-            self._parent.send('failed', 'Cyclic dependencies detected during processing')
+                pending_nodes.discard(node_id)
+                active_nodes.add(node_id)
 
-        self.become(GraphContext(remaining_nodes))
+        new_graph = copy(self.graph)
+        new_graph.pending_nodes = pending_nodes
+        new_graph.active_nodes = active_nodes
 
-    def node_failed(self, node_id, err):
+        self.graph = new_graph
+        self.processors = {**self.processors, **processors}
 
-        pass
+    def _is_viable_node(self, node_id: NodeId, node: GraphContextNode):
+
+        return \
+            node_id in self.graph.pending_nodes and \
+            all(map(lambda dep: dep in self.graph.succeeded_nodes, node.dependencies))
+
+    @actors.Message
+    def node_succeeded(self, ctx: actors.ActorContext, node_id: NodeId, result):
+
+        old_node = self.graph.nodes[node_id]
+        node = copy(old_node)
+        node.result = result
+
+        nodes = {**self.graph.nodes, node_id: node}
+
+        active_nodes = copy(self.graph.active_nodes)
+        active_nodes.remove(node_id)
+
+        succeeded_nodes = copy(self.graph.succeeded_nodes)
+        succeeded_nodes.add(node_id)
+
+        new_graph = copy(self.graph)
+        new_graph.nodes = nodes
+        new_graph.active_nodes = active_nodes
+        new_graph.succeeded_nodes = succeeded_nodes
+
+        self.graph = new_graph
+
+        # Only submit new nodes if there have not been any failures
+        if any(self.graph.pending_nodes) and not any(self.graph.failed_nodes):
+            self.submit_viable_nodes()
+
+        # If processing is complete, report the final status to the engine
+        elif not any(self.graph.active_nodes):
+            if any(self.graph.failed_nodes):
+                ctx.send(None, 'job_failed')
+            else:
+                ctx.send(None, "job_succeeded")
+
+    @actors.Message
+    def node_failed(self, ctx: actors.ActorContext, node_id: NodeId, error):
+
+        old_node = self.graph.nodes[node_id]
+        node = copy(old_node)
+        node.error = error
+
+        nodes = {**self.graph.nodes, node_id: node}
+
+        active_nodes = copy(self.graph.active_nodes)
+        active_nodes.remove(node_id)
+
+        failed_nodes = copy(self.graph.succeeded_nodes)
+        failed_nodes.add(node_id)
+
+        new_graph = copy(self.graph)
+        new_graph.nodes = nodes
+        new_graph.active_nodes = active_nodes
+        new_graph.failed_nodes = failed_nodes
+
+        self.graph = new_graph
+
+        # If other nodes are still active, allow those nodes to complete
+        # Otherwise, report a failed status to the engine right away
+        if not any(self.graph.active_nodes):
+            ctx.send(None, 'job_failed')
 
 
-class GraphBuilder(actors.Actor[None]):
+class JobBuilder(actors.Actor):
 
-    def __init__(self):
-        super().__init__(None)
+    def __init__(self, job_info: object):
+        super().__init__()
+        self.job_info = job_info
+        self.graph: tp.Optional[GraphContext] = None
 
-    def start(self):
+    def on_start(self):
 
         # build graph context
 
@@ -122,15 +178,35 @@ class EngineContext:
         self.data = {}
 
 
-class TracEngine(actors.Actor[EngineContext]):
+class TracEngine(actors.Actor):
 
     def __init__(self):
-        super().__init__(EngineContext())
+        super().__init__()
+        self.engine_ctx = EngineContext()
         self._log = util.logger_for_object(self)
 
-    def start(self):
+    def on_start(self):
         self._log.info("Engine is up and running")
 
+    def on_stop(self):
+        pass
+
+    @actors.Message("new_job")
+    def job_info_received(self, ctx: actors.ActorContext, job_info: object):
+
+        self._log.info("A job has been submitted")
+
+        ctx.spawn(JobBuilder, job_info)
+
+    @actors.Message("new_job_graph")
+    def job_graph_built(self, ctx: actors.ActorContext, job_graph: GraphContext):
+
+        pass
+
     @actors.Message
-    def submit_job(self, job_info: object):
+    def job_succeeded(self):
+        pass
+
+    @actors.Message
+    def job_failed(self):
         pass
