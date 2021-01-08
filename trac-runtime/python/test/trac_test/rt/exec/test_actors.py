@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import trac.rt.exec.actor as actor
+import trac.rt.exec.actors as actors
 import unittest
 
 
@@ -20,29 +20,31 @@ class ActorSystemTest(unittest.TestCase):
 
     def test_basic_example(self):
 
-        class PlusActor(actor.Actor[int]):
+        class PlusActor(actors.Actor):
 
-            def __init__(self, ctx: int):
-                super().__init__(ctx)
+            def __init__(self, value):
+                super().__init__()
+                self.value = value
 
-            @actor.Message
-            def add(self, inc):
-                new_value = self._ctx + inc
-                self._parent.send('new_value', new_value)
-                self.become(new_value)
+            @actors.Message
+            def add(self, ctx: actors.ActorContext, inc):
 
-        class RootActor(actor.Actor[actor.ActorRef]):
+                new_value = self.value + inc
+                self.value = new_value
+
+                ctx.send_parent('new_value', new_value)
+
+        class RootActor(actors.Actor):
 
             def __init__(self):
-                super().__init__(None)
+                super().__init__()
 
-            @actor.Message
+            @actors.Message
             def start(self):
                 plus = self._system.spawn(PlusActor, value=0)
                 plus.send('start')
-                self.become(plus)
 
-            @actor.Message
+            @actors.Message
             def new_value(self, new_value):
                 print(new_value)
                 if new_value < 10:
@@ -51,4 +53,4 @@ class ActorSystemTest(unittest.TestCase):
                     self.stop()
 
         root = RootActor()
-        system = actor.ActorSystem()
+        system = actors.ActorSystem()

@@ -12,8 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import threading
-import inspect
 import typing as tp
 
 import trac.rt.impl.util as util
@@ -21,43 +22,53 @@ import trac.rt.impl.util as util
 
 T = tp.TypeVar('T')
 
+ActorId = str
+
 
 class ActorContext:
 
-    def __init__(self):
-        self._current_actor: 'ActorRef'
-        self._system: 'ActorSystem'
+    def __init__(self, current_actor: ActorId, sender: ActorId, system: ActorSystem):
+        self.__current_actor = current_actor
+        self.__sender = sender
+        self.__system = system
 
-    def spawn(self, actor_class: 'Actor'.__class__, *args, **kwargs) -> 'ActorRef':
+    def spawn(self, actor_class: Actor.__class__, *args, **kwargs) -> ActorRef:
 
         actor = actor_class(*args, **kwargs)
         return actor.ref
 
-    def send(self, ref: 'ActorRef', message: str, *args, **kwargs):
-        pass
+    def send(self, target_id: ActorId, message: str, *args, **kwargs):
+
+        self.__system._send_message(self.__current_actor, target_id, message, *args, **kwargs)
 
 
 class Actor:
 
     def __init__(self):
-        self.ref: 'ActorRef' = None
-        self._parent: 'ActorRef' = None
-        self._system: 'ActorSystem' = None
-        self.__messages = {}
+        self.ref: ActorRef = None
+        self._parent: ActorRef = None
+        self._system: ActorSystem = None
+        self.__handlers: tp.Dict[str, tp.Callable] = dict()
 
-    @classmethod
-    def start(cls):
-        print("Actor start method")
-        return cls.__new__(cls)
+    def _receive(self, msg: 'Msg', ctx: ActorContext):
 
-    def receive(self, message: callable, *args, **kwargs):
+        # Handle system messages
+        if msg.message == 'actor:start':
+            self.on_start()
 
-        if message in self.__messages:
-            method = self.__messages[message]
-            method.__call__(*args, **kwargs)
+        elif msg.message == 'actor:stop':
+            self.on_stop()
 
         else:
-            raise RuntimeError()  # TODO: Error
+
+            handler = self.__handlers.get(msg.message)
+
+            if handler:
+                handler(ctx, *msg.args, **msg.kwargs)
+
+            else:
+                # TODO: Notify unhandled messages
+                print(f"Unhandled message: {self.__class__.__name__} {msg.message}")
 
     def actors(self) -> ActorContext:
         pass
@@ -68,8 +79,14 @@ class Actor:
     def on_stop(self):
         pass
 
-    def become(self, ctx: T):
-        self._ctx = ctx
+
+class ActorRef:
+
+    def __init__(self, actor: Actor, system: ActorSystem):
+        self._system = system
+
+    def send(self, signal: callable, *args, **kwargs):
+        pass
 
 
 class Message:  # noqa
@@ -77,30 +94,25 @@ class Message:  # noqa
     def __init__(self, method):
         self.__method = method
 
-    def __call__(self, **kwargs):
-        self.__method(**kwargs)
+    def __call__(self, *args, **kwargs):
+        self.__method(*args, **kwargs)
 
 
 class Msg:
 
-    def __init__(self, ref: tp.List[str], method: tp.Callable, *args: tp.List[tp.Any]):
-        self.ref = ref
-        self.method: tp.Callable = method
+    def __init__(self, sender: ActorId, target: ActorId, message: str, *args, **kwargs):
+        self.sender = sender
+        self.target = target
+        self.message = message
         self.args = args
+        self.kwargs = kwargs
 
 
-class ActorRef:
-
-    def __init__(self, actor: Actor, system: 'ActorSystem'):
-        self._system = system
-
-    def send(self, signal: callable, *args, **kwargs):
-        pass
 
 
 class ActorMapping:
 
-    def __init__(self, actor: Actor, children: tp.Dict[str, 'ActorMapping'] = None):
+    def __init__(self, actor: Actor, children: tp.Dict[str, ActorMapping] = None):
         self.actor = actor
         self.children = children or {}
 
@@ -111,22 +123,20 @@ class ActorSystem:
 
         self._log = util.logger_for_object(self)
 
+        self.__actors: tp.Dict[ActorId, Actor] = dict()
+        self.__message_queue: tp.List[Msg] = list()
+
+        self.__main_id = "/engine"
+        self.__actors[self.__main_id] = main_actor
+
         self.__system_thread = threading.Thread(
             name=system_thread,
             target=self._actor_system_main)
 
-        self.__ref_map = ActorMapping(None)
-        self.__message_queue = []
-
-        main_actor_mapping = ActorMapping(main_actor)
-        self.__ref_map.children['main'] = main_actor_mapping
-
     def start(self):
 
         self.__system_thread.start()
-
-        main_actor = self._lookup_actor(['main'])
-        self.send(['main'], type(main_actor).start)
+        self._start_actor(self.__main_id)
 
     def stop(self):
         pass
@@ -135,13 +145,17 @@ class ActorSystem:
 
         self.__system_thread.join()
 
-    def spawn(self):
+    def _spawn_actor(self, parent_id: ActorId, actor_class: Actor.__class__, *args, **kwargs):
 
         pass
 
-    def send(self, ref: tp.List[str], method: tp.Callable, *args):
+    def _start_actor(self, actor_id: ActorId):
 
-        msg = Msg(ref, method, *args)
+        self._send_message("/system", actor_id, 'actor:start')
+
+    def _send_message(self, sender_id: ActorId, target_id: ActorId, message: str, *args, **kwargs):
+
+        msg = Msg(sender_id, target_id, message, args, kwargs)
         self.__message_queue.append(msg)
 
     def _actor_system_main(self):
@@ -164,30 +178,19 @@ class ActorSystem:
 
     def _process_message(self, msg: Msg):
 
-        actor = self._lookup_actor(msg.ref)
-        self._execute_message(actor, msg)
+        actor = self._lookup_actor(msg.target)
+        ctx = ActorContext(msg.target, msg.sender, self)
 
-    def _execute_message(self, actor: Actor, msg: Msg):
+        actor._receive(msg, ctx)
 
-        new_ctx = msg.method(actor, *msg.args)
+    def _lookup_actor(self, actor_id: ActorId) -> Actor:
 
-        if new_ctx is not None:
-            actor._ctx = new_ctx
+        actor = self.__actors.get(actor_id)
 
-    def _lookup_actor(self, ref: tp.List[str]) -> Actor:
+        if not actor:
+            raise RuntimeError()  # TODO: Error
 
-        ref_map = self.__ref_map
-
-        for segment in ref:
-
-            child_map = ref_map.children.get(segment)
-
-            if child_map:
-                ref_map = child_map
-            else:
-                raise RuntimeError()  # TODO: Error
-
-        return ref_map.actor
+        return actor
 
     def spawn(self, actor: Actor.__class__, **actor_args) -> ActorRef:
 

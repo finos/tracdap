@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import typing as tp
 from copy import copy
 
@@ -24,6 +26,8 @@ class GraphContextNode:
 
     def __init__(self):
         self.dependencies: tp.List[NodeId] = list()
+        self.result: tp.Optional[tp.Any] = None
+        self.error: tp.Optional[str] = None
 
 
 class GraphContext:
@@ -191,14 +195,14 @@ class TracEngine(actors.Actor):
     def on_stop(self):
         pass
 
-    @actors.Message("new_job")
+    @actors.Message
     def job_info_received(self, ctx: actors.ActorContext, job_info: object):
 
         self._log.info("A job has been submitted")
 
         ctx.spawn(JobBuilder, job_info)
 
-    @actors.Message("new_job_graph")
+    @actors.Message
     def job_graph_built(self, ctx: actors.ActorContext, job_graph: GraphContext):
 
         pass
