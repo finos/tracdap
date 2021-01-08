@@ -31,4 +31,8 @@ def launch_job(job_config, sys_config):
 
 
 def launch_model(model_class, job_config, sys_config):
-    pass
+
+    with runtime.TracRuntime(sys_config, dev_mode=True) as rt:
+        # TODO: Put model class into job config
+        rt.submit_job(job_config)
+        rt.wait_for_shutdown()
