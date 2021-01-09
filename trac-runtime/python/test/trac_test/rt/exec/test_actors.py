@@ -12,13 +12,24 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import trac.rt.impl.util as util
 import trac.rt.exec.actors as actors
 import unittest
 
 
 class ActorSystemTest(unittest.TestCase):
 
+    def setUp(self):
+        util.configure_logging()
+
     def test_basic_example(self):
+
+        program_output = {
+            'root_id': None,
+            'plus_id': None,
+            'result': None,
+            'stop_seq': []
+        }
 
         class PlusActor(actors.Actor):
 
@@ -27,30 +38,50 @@ class ActorSystemTest(unittest.TestCase):
                 self.value = value
 
             @actors.Message
-            def add(self, ctx: actors.ActorContext, inc):
+            def add(self, inc):
 
                 new_value = self.value + inc
                 self.value = new_value
 
-                ctx.send_parent('new_value', new_value)
+                self.actors().send_parent('new_value', new_value)
+
+            def on_stop(self):
+                print("Plus actor got a stop message")
+                program_output['result'] = self.value
+                program_output['stop_seq'].append(self.actors().id)
 
         class RootActor(actors.Actor):
 
             def __init__(self):
                 super().__init__()
+                self.plus = None
 
-            @actors.Message
-            def start(self):
-                plus = self._system.spawn(PlusActor, value=0)
-                plus.send('start')
+            def on_start(self):
+                print("Start root")
+                self.plus = self.actors().spawn(PlusActor, 0)
+                self.actors().send(self.plus, "add", 1)
+
+            def on_stop(self):
+                print("Root actor got a stop message")
+                program_output['stop_seq'].append(self.actors().id)
 
             @actors.Message
             def new_value(self, new_value):
                 print(new_value)
                 if new_value < 10:
-                    self._ctx.send('add')
+                    self.actors().send(self.plus, 'add', 1)
                 else:
-                    self.stop()
+                    self.actors().stop()
 
         root = RootActor()
-        system = actors.ActorSystem()
+        system = actors.ActorSystem(root)
+        system.start(wait=True)
+        system.wait_for_shutdown()
+
+        self.assertEqual(program_output['result'], 10)
+
+        self.assertIsNotNone(program_output['root_id'])
+        self.assertIsNotNone(program_output['plus_id'])
+
+        expected_stop_seq = [program_output['plus_id'], program_output['root_id']]
+        self.assertEqual(program_output['stop_seq'], expected_stop_seq)
