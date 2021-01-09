@@ -17,6 +17,7 @@ from __future__ import annotations
 import threading
 import functools as func
 import typing as tp
+import enum
 
 import trac.rt.impl.util as util
 
@@ -60,8 +61,8 @@ class ActorContext:
 
 class Actor:
 
-    START = "actor:start"
-    STOP = "actor:stop"
+    STARTED = "actor:started"
+    STOPPED = "actor:stopped"
 
     __class_handlers: tp.Dict[type, tp.Dict[str, tp.Callable]] = dict()
     __log: tp.Optional[util.logging.Logger] = None
@@ -100,10 +101,10 @@ class Actor:
         try:
             self.__ctx = ctx
 
-            if msg.message == Actor.START:
+            if msg.message == Actor.STARTED:
                 self.on_start()
 
-            elif msg.message == Actor.STOP:
+            elif msg.message == Actor.STOPPED:
                 self.on_stop()
 
             else:
@@ -126,7 +127,7 @@ class Actor:
 Actor._Actor__log = util.logger_for_class(Actor)
 
 
-class Message:  # noqa
+class Message:
 
     def __init__(self, method):
         self.__method = method
@@ -148,17 +149,32 @@ class Msg:
         self.kwargs = kwargs
 
 
+class ActorStateCode(enum.Enum):
+
+    NOT_STARTED = 0
+    STARTING = 1
+    RUNNING = 2
+    STOPPING = 3
+    STOPPED = 4
+
+
+class ActorState:
+
+    def __init__(self, actor: Actor, state_code: ActorStateCode):
+        self.actor = actor
+        self.state_code = state_code
+
+
 class ActorSystem:
 
     def __init__(self, main_actor: Actor, system_thread: str = "actor_system"):
 
         self._log = util.logger_for_object(self)
 
-        self.__actors: tp.Dict[ActorId, Actor] = dict()
+        self.__actors: tp.Dict[ActorId, ActorState] = dict()
         self.__message_queue: tp.List[Msg] = list()
 
-        self.__main_id = "/engine"
-        self.__actors[self.__main_id] = main_actor
+        self.__main_id = self._spawn_main_actor("/", main_actor)
 
         self.__system_thread = threading.Thread(
             name=system_thread,
@@ -166,17 +182,19 @@ class ActorSystem:
 
         self.__system_lock = threading.Lock()
         self.__system_up = threading.Event()
+        self.__system_msg = threading.Event()
 
     def start(self, wait=False):
 
         self.__system_thread.start()
-        self._start_actor(self.__main_id)
+        self._start_actor("/system", self.__main_id)
 
         if wait:
             self.__system_up.wait()  # TODO: Startup timeout
 
     def stop(self):
-        pass
+
+        self._stop_actor("/system", self.__main_id)
 
     def wait_for_shutdown(self):
 
@@ -190,19 +208,54 @@ class ActorSystem:
 
         actor_id = self._new_actor_id(parent_id, actor_class)
         actor = actor_class(*args, **kwargs)
+        actor_state = ActorState(actor, ActorStateCode.NOT_STARTED)
 
-        self.__actors[actor_id] = actor
-        self._send_message(parent_id, actor_id, Actor.START, [], {})
+        self.__actors[actor_id] = actor_state
+        self._start_actor(parent_id, actor_id)
 
         return actor_id
 
-    def _start_actor(self, actor_id: ActorId):
+    def _spawn_main_actor(self, parent_id: ActorId, actor: Actor):
 
-        self._send_message("/system", actor_id, 'actor:start', [], {})
+        actor_id = self._new_actor_id(parent_id, actor.__class__)
+        actor_state = ActorState(actor, ActorStateCode.NOT_STARTED)
+
+        self.__actors[actor_id] = actor_state
+
+        return actor_id
+
+    def _start_actor(self, started_by_id: ActorId, actor_id: ActorId):
+
+        actor_state = self.__actors[actor_id]
+        actor_state.state_code = ActorStateCode.STARTING
+
+        self._send_message(started_by_id, actor_id, Actor.STARTED, [], {})
+
+        return actor_id
 
     def _stop_actor(self, sender_id: ActorId, target_id: ActorId):
 
-        self._send_message(sender_id, target_id, Actor.STOP, [], {})
+        if not (sender_id == target_id or self._parent_id(target_id) == sender_id or sender_id == "/system"):
+            self._log.warning(
+                f"Signal ignored: [{Actor.STOPPED}] -> {target_id}" +
+                f" ({sender_id} is not allowed to stop this actor)")
+            return
+
+        target_state = self.__actors.get(target_id)
+
+        if not target_state:
+            self._log.warning(
+                f"Signal ignored: [{Actor.STOPPED}] -> {target_id}" +
+                f" (target actor not found)")
+            return
+
+        for aid, state in self.__actors.items():
+            if aid.startswith(target_id + "/"):
+                state.state_code = ActorStateCode.STOPPING
+                self._send_message(sender_id, aid, Actor.STOPPED, [], {})
+
+        target_state.state_code = ActorStateCode.STOPPING
+        self._send_message(sender_id, target_id, Actor.STOPPED, [], {})
 
     def _send_message(self, sender_id: ActorId, target_id: ActorId, message: str, args, kwargs):
 
@@ -218,10 +271,11 @@ class ActorSystem:
 
     def _message_loop(self):
 
-        self._log.info("Begin normal operations")
         self.__system_up.set()
 
-        while True:
+        main_actor_state = self.__actors.get(self.__main_id)
+
+        while main_actor_state.state_code != ActorStateCode.STOPPED:
 
             if len(self.__message_queue):
                 next_msg = self.__message_queue.pop(0)
@@ -230,14 +284,20 @@ class ActorSystem:
 
             if next_msg:
                 self._process_message(next_msg)
+            else:
+                self.__system_msg.wait(0.01)
 
     def _process_message(self, msg: Msg):
 
-        actor = self._lookup_actor(msg.target)
+        actor_state = self._lookup_actor(msg.target)
 
-        if not actor:
+        if not actor_state:
             # Unhandled messages are dropped, with just a warning in the log
             self._log.warning(f"Message ignored: [{msg.message}] -> {msg.target}  (target actor not found)")
+            return
+
+        if actor_state.state_code != ActorStateCode.RUNNING and not msg.message.startswith("actor:"):
+            self._log.warning(f"Message ignored: [{msg.message}] -> {msg.target}  (target actor not running)")
             return
 
         parent_id = self._parent_id(msg.target)
@@ -247,13 +307,23 @@ class ActorSystem:
 
         ctx = ActorContext(self, msg.target, parent_id, msg.sender, send_func, spawn_func, stop_func)
 
-        actor._receive(msg, ctx)
+        actor = actor_state.actor
+        actor._receive(msg, ctx)  # noqa
 
-    def _lookup_actor(self, actor_id: ActorId) -> tp.Optional[Actor]:
+        if msg.message == Actor.STARTED:
+            actor_state.state_code = ActorStateCode.RUNNING
+        elif msg.message == Actor.STOPPED:
+            actor_state.state_code = ActorStateCode.STOPPED
+            self.__actors.pop(msg.target)
+
+    def _lookup_actor(self, actor_id: ActorId) -> tp.Optional[ActorState]:
 
         return self.__actors.get(actor_id)
 
     def _new_actor_id(self, parent_id: ActorId, actor_class: Actor.__class__) -> ActorId:
+
+        if parent_id == "/":
+            return "/" + actor_class.__name__.lower()
 
         return parent_id + "/" + actor_class.__name__.lower()
 

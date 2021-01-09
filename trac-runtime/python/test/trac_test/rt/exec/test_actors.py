@@ -45,6 +45,9 @@ class ActorSystemTest(unittest.TestCase):
 
                 self.actors().send_parent('new_value', new_value)
 
+            def on_start(self):
+                program_output['plus_id'] = self.actors().id
+
             def on_stop(self):
                 print("Plus actor got a stop message")
                 program_output['result'] = self.value
@@ -58,6 +61,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
                 print("Start root")
+                program_output['root_id'] = self.actors().id
                 self.plus = self.actors().spawn(PlusActor, 0)
                 self.actors().send(self.plus, "add", 1)
 
@@ -76,7 +80,7 @@ class ActorSystemTest(unittest.TestCase):
         root = RootActor()
         system = actors.ActorSystem(root)
         system.start(wait=True)
-        # system.wait_for_shutdown()
+        system.wait_for_shutdown()
 
         self.assertEqual(program_output['result'], 10)
 
