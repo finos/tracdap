@@ -76,7 +76,7 @@ class ActorSystemTest(unittest.TestCase):
         root = RootActor()
         system = actors.ActorSystem(root)
         system.start(wait=True)
-        system.wait_for_shutdown()
+        # system.wait_for_shutdown()
 
         self.assertEqual(program_output['result'], 10)
 

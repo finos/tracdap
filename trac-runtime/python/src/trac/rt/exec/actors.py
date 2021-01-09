@@ -20,9 +20,6 @@ import typing as tp
 
 import trac.rt.impl.util as util
 
-
-T = tp.TypeVar('T')
-
 ActorId = str
 
 
@@ -30,15 +27,16 @@ class ActorContext:
 
     def __init__(self, system: ActorSystem,
                  current_actor: ActorId, parent: ActorId, sender: tp.Optional[ActorId],
-                 send_func: tp.Callable, spawn_func: tp.Callable):
+                 send_func: tp.Callable, spawn_func: tp.Callable, stop_func: tp.Callable):
 
-        self.self = current_actor
+        self.id = current_actor
         self.parent = parent
         self.sender = sender
 
         self.__system = system
         self.__send_func = send_func
         self.__spawn_func = spawn_func
+        self.__stop_func = stop_func
 
     def spawn(self, actor_class: Actor.__class__, *args, **kwargs) -> ActorId:
         return self.__spawn_func(actor_class, args, kwargs)
@@ -52,6 +50,13 @@ class ActorContext:
     def reply(self, message: str, *args, **kwargs):
         self.__send_func(self.sender, message, args, kwargs)
 
+    def stop(self, target_id: tp.Optional[ActorId] = None):
+
+        if target_id:
+            self.__stop_func(target_id)
+        else:
+            self.__stop_func(self.id)
+
 
 class Actor:
 
@@ -59,6 +64,7 @@ class Actor:
     STOP = "actor:stop"
 
     __class_handlers: tp.Dict[type, tp.Dict[str, tp.Callable]] = dict()
+    __log: tp.Optional[util.logging.Logger] = None
 
     def __init__(self):
         self.__handlers = self._inspect_handlers()
@@ -91,36 +97,33 @@ class Actor:
 
     def _receive(self, msg: Msg, ctx: ActorContext):
 
-        if msg.message == Actor.START:
-            handler = self.on_start
+        try:
+            self.__ctx = ctx
 
-        elif msg.message == Actor.STOP:
-            handler = self.on_stop
+            if msg.message == Actor.START:
+                self.on_start()
 
-        else:
-            handler = self.__handlers.get(msg.message)
+            elif msg.message == Actor.STOP:
+                self.on_stop()
 
-        if not handler:
-            # TODO: Notify unhandled messages
-            print(f"Unhandled message: {self.__class__.__name__} {msg.message}")
-            return
+            else:
+                handler = self.__handlers.get(msg.message)
 
-        self.__ctx = ctx
-        handler(*msg.args, **msg.kwargs)
-        self.__ctx = None
+                if handler:
+                    handler(*msg.args, **msg.kwargs)
+
+                else:
+                    # Unhandled messages are dropped, with just a warning in the log
+                    log = util.logger_for_class(Actor)
+                    log.warning(f"Message ignored: [{msg.message}] -> {msg.target}" +
+                                f" (actor {self.__class__.__name__} does not support this message)")
+
+        finally:
+            self.__ctx = None
 
 
-# class ActorRef:
-#
-#     def __init__(self, actor_id: ActorId, actor: self.
-#         self.__system = system
-#         self.__actor_id = actor_id
-#
-#     def send(self, target: tp.Union[ActorId, ActorRef], message, *args, **kwargs):
-#
-#         target_id = target if target is ActorId else target.__actor_id
-#
-#         self.__system._send_message(self.__actor_id, target_id, message, args, kwargs)
+# Static member __log can only be set after class Actor is declared
+Actor._Actor__log = util.logger_for_class(Actor)
 
 
 class Message:  # noqa
@@ -135,21 +138,14 @@ class Message:  # noqa
 
 class Msg:
 
-    def __init__(self, sender: ActorId, target: ActorId, message: str, args: tp.List[tp.Any], kwargs: tp.Dict[str, tp.Any]):
+    def __init__(self, sender: ActorId, target: ActorId, message: str,
+                 args: tp.List[tp.Any], kwargs: tp.Dict[str, tp.Any]):
+
         self.sender = sender
         self.target = target
         self.message = message
         self.args = args
         self.kwargs = kwargs
-
-
-
-
-class ActorMapping:
-
-    def __init__(self, actor: Actor, children: tp.Dict[str, ActorMapping] = None):
-        self.actor = actor
-        self.children = children or {}
 
 
 class ActorSystem:
@@ -192,7 +188,7 @@ class ActorSystem:
 
     def _spawn_actor(self, parent_id: ActorId, actor_class: Actor.__class__, args, kwargs):
 
-        actor_id = parent_id + "/" + actor_class.__name__.lower()
+        actor_id = self._new_actor_id(parent_id, actor_class)
         actor = actor_class(*args, **kwargs)
 
         self.__actors[actor_id] = actor
@@ -203,6 +199,10 @@ class ActorSystem:
     def _start_actor(self, actor_id: ActorId):
 
         self._send_message("/system", actor_id, 'actor:start', [], {})
+
+    def _stop_actor(self, sender_id: ActorId, target_id: ActorId):
+
+        self._send_message(sender_id, target_id, Actor.STOP, [], {})
 
     def _send_message(self, sender_id: ActorId, target_id: ActorId, message: str, args, kwargs):
 
@@ -234,20 +234,32 @@ class ActorSystem:
     def _process_message(self, msg: Msg):
 
         actor = self._lookup_actor(msg.target)
-        parent_id = msg.target[-msg.target.rfind("/")]
 
+        if not actor:
+            # Unhandled messages are dropped, with just a warning in the log
+            self._log.warning(f"Message ignored: [{msg.message}] -> {msg.target}  (target actor not found)")
+            return
+
+        parent_id = self._parent_id(msg.target)
         send_func = func.partial(self._send_message, msg.target)
         spawn_func = func.partial(self._spawn_actor, msg.target)
+        stop_func = func.partial(self._stop_actor, msg.target)
 
-        ctx = ActorContext(self, msg.target, parent_id, msg.sender, send_func, spawn_func)
+        ctx = ActorContext(self, msg.target, parent_id, msg.sender, send_func, spawn_func, stop_func)
 
         actor._receive(msg, ctx)
 
-    def _lookup_actor(self, actor_id: ActorId) -> Actor:
+    def _lookup_actor(self, actor_id: ActorId) -> tp.Optional[Actor]:
 
-        actor = self.__actors.get(actor_id)
+        return self.__actors.get(actor_id)
 
-        if not actor:
-            raise RuntimeError()  # TODO: Error
+    def _new_actor_id(self, parent_id: ActorId, actor_class: Actor.__class__) -> ActorId:
 
-        return actor
+        return parent_id + "/" + actor_class.__name__.lower()
+
+    def _parent_id(self, actor_id: ActorId) -> ActorId:
+
+        parent_delim = actor_id.rfind("/")
+        parent_id = actor_id[0] if parent_delim == 0 else actor_id[:actor_id.rfind("/")]
+
+        return parent_id
