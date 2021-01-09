@@ -25,14 +25,15 @@ def launch_session(sys_config):
 
 def launch_job(job_config, sys_config):
 
-    with runtime.TracRuntime(sys_config, dev_mode=True) as rt:
-        rt.submit_job(job_config)
+    with runtime.TracRuntime(sys_config, job_config, dev_mode=True) as rt:
+        rt.submit_batch()
         rt.wait_for_shutdown()
 
 
 def launch_model(model_class, job_config, sys_config):
 
-    with runtime.TracRuntime(sys_config, dev_mode=True) as rt:
-        # TODO: Put model class into job config
-        rt.submit_job(job_config)
+    # TODO: Put model class into job config
+
+    with runtime.TracRuntime(sys_config, job_config, dev_mode=True) as rt:
+        rt.submit_batch()
         rt.wait_for_shutdown()

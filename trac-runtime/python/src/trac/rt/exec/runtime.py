@@ -31,14 +31,18 @@ import trac.rt.exec.engine_v2 as engine
 
 class TracRuntime:
 
-    def __init__(self, sys_config_path: str, dev_mode: bool):
+    def __init__(self, sys_config_path: str, job_config_path: tp.Optional[str] = None, dev_mode: bool = False):
 
         python_version = sys.version.replace("\n", "")
+        mode = "batch" if job_config_path else "service"
 
-        print(f">>> TRAC Python Runtime {'DEVELOPMENT VERSION'} starting at {dt.datetime.now()}")
+        print(f">>> TRAC Python Runtime {'DEVELOPMENT VERSION'} starting {mode} at {dt.datetime.now()}")
         print(f">>> Python installation: {python_version} ({sys.exec_prefix})")
         print(f">>> Working directory: {pathlib.Path.cwd()}")
         print(f">>> System config: {sys_config_path}")
+
+        if job_config_path:
+            print(f">>> Job config: {job_config_path}")
 
         if dev_mode:
             print(f">>> Development mode enabled (DO NOT USE THIS IN PRODUCTION)")
@@ -50,6 +54,13 @@ class TracRuntime:
         self._sys_config_path = sys_config_path
         self._sys_config: config.RuntimeConfig = self._load_config(sys_config_path, config.RuntimeConfig)
 
+        if job_config_path:
+            self._batch_mode = True
+            self._job_config_path = job_config_path
+            self._job_config: config.JobConfig = self._load_config(job_config_path, config.JobConfig)
+        else:
+            self._batch_mode = False
+
         self._engine: tp.Optional[engine.TracEngine] = None
         self._system: tp.Optional[actors.ActorSystem] = None
 
@@ -58,19 +69,20 @@ class TracRuntime:
     # ------------------------------------------------------------------------------------------------------------------
 
     def __enter__(self):
-        self.start()
+        self.start(wait=True)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
 
-    def start(self):
+    def start(self, wait: bool = False):
 
         self._log.info("Begin startup sequence")
 
         self._engine = engine.TracEngine()
         self._system = actors.ActorSystem(self._engine, system_thread="engine")
-        self._system.start()
+
+        self._system.start(wait=wait)
 
     def stop(self):
 
@@ -87,8 +99,17 @@ class TracRuntime:
 
     def submit_job(self, job_config_path: str):
 
-        # job_config = self._load_config(job_config_path, config.JobConfig)
-        pass
+        if self._batch_mode:
+            raise RuntimeError()  # TODO: Error
+
+        self._system.send("submit_job", job_config_path)
+
+    def submit_batch(self):
+
+        if not self._batch_mode:
+            raise RuntimeError()  # TODO Error
+
+        self._system.send("submit_job", self._job_config)
 
     # ------------------------------------------------------------------------------------------------------------------
     # Config loading

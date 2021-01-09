@@ -64,7 +64,7 @@ class GraphProcessor(actors.Actor):
         self.submit_viable_nodes()
 
     @actors.Message
-    def submit_viable_nodes(self, ctx: actors.ActorContext):
+    def submit_viable_nodes(self):
 
         pending_nodes = copy(self.graph.pending_nodes)
         active_nodes = copy(self.graph.active_nodes)
@@ -73,7 +73,7 @@ class GraphProcessor(actors.Actor):
         for node_id, node in self.graph.nodes:
             if self._is_viable_node(node_id, node):
 
-                node_ref = ctx.spawn(NodeProcessor, self.graph, node_id, node)
+                node_ref = self.actors().spawn(NodeProcessor, self.graph, node_id, node)
                 processors[node_id] = node_ref
 
                 pending_nodes.discard(node_id)
@@ -93,7 +93,7 @@ class GraphProcessor(actors.Actor):
             all(map(lambda dep: dep in self.graph.succeeded_nodes, node.dependencies))
 
     @actors.Message
-    def node_succeeded(self, ctx: actors.ActorContext, node_id: NodeId, result):
+    def node_succeeded(self, node_id: NodeId, result):
 
         old_node = self.graph.nodes[node_id]
         node = copy(old_node)
@@ -121,12 +121,12 @@ class GraphProcessor(actors.Actor):
         # If processing is complete, report the final status to the engine
         elif not any(self.graph.active_nodes):
             if any(self.graph.failed_nodes):
-                ctx.send(None, 'job_failed')
+                self.actors().parent.send('job_failed')
             else:
-                ctx.send(None, "job_succeeded")
+                self.actors().parent.send("job_succeeded")
 
     @actors.Message
-    def node_failed(self, ctx: actors.ActorContext, node_id: NodeId, error):
+    def node_failed(self, node_id: NodeId, error):
 
         old_node = self.graph.nodes[node_id]
         node = copy(old_node)
@@ -150,17 +150,20 @@ class GraphProcessor(actors.Actor):
         # If other nodes are still active, allow those nodes to complete
         # Otherwise, report a failed status to the engine right away
         if not any(self.graph.active_nodes):
-            ctx.send(None, 'job_failed')
+            self.actors().parent.send(None, 'job_failed')
 
 
-class JobBuilder(actors.Actor):
+class GraphBuilder(actors.Actor):
 
     def __init__(self, job_info: object):
         super().__init__()
         self.job_info = job_info
         self.graph: tp.Optional[GraphContext] = None
+        self._log = util.logger_for_object(self)
 
     def on_start(self):
+
+        self._log.info("Begin building graph...")
 
         # build graph context
 
@@ -168,8 +171,7 @@ class JobBuilder(actors.Actor):
 
         # post graph context to parent
 
-        pass
-
+    @actors.Message
     def get_execution_graph(self):
 
         pass  # post graph context to parent
@@ -190,20 +192,22 @@ class TracEngine(actors.Actor):
         self._log = util.logger_for_object(self)
 
     def on_start(self):
+
         self._log.info("Engine is up and running")
 
     def on_stop(self):
         pass
 
     @actors.Message
-    def job_info_received(self, ctx: actors.ActorContext, job_info: object):
+    def submit_job(self, job_info: object):
+
+        job_id = 'test_job'
 
         self._log.info("A job has been submitted")
-
-        ctx.spawn(JobBuilder, job_info)
+        self.actors().spawn(JobProcessor, job_id, job_info)
 
     @actors.Message
-    def job_graph_built(self, ctx: actors.ActorContext, job_graph: GraphContext):
+    def job_graph_built(self, job_graph: GraphContext):
 
         pass
 
@@ -214,3 +218,30 @@ class TracEngine(actors.Actor):
     @actors.Message
     def job_failed(self):
         pass
+
+
+class JobProcessor(actors.Actor):
+
+    def __init__(self, job_id, job_config):
+        super().__init__()
+        self.job_id = job_id
+        self.job_config = job_config
+        self._log = util.logger_for_object(self)
+
+    def on_start(self):
+        self._log.info("Starting job")
+        self.actors().spawn(GraphBuilder, self.job_config)
+
+    @actors.Message
+    def job_graph_ready(self, graph: GraphContext):
+        self.actors().spawn(GraphProcessor, graph)
+
+    @actors.Message
+    def job_succeeded(self, job_id):
+        self._log.info(f"Batch job succeeded {job_id}")
+        self.actors().send_parent("actors:shutdown")
+
+    @actors.Message
+    def job_failed(self, job_id):
+        self._log.info(f"Batch job failed {job_id}")
+        self.actors().send_parent("actors:shutdown")

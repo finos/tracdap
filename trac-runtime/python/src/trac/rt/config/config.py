@@ -57,5 +57,10 @@ class RuntimeConfig:
 
 class JobConfig:
 
-    def __init__(self):
-        pass
+    def __init__(self,
+                 parameters: tp.Dict[str, str],
+                 inputs: tp.Dict[str, tp.Dict[str, str]],
+                 outputs: tp.Dict[str, str]):
+        self.parameters = parameters
+        self.inputs = inputs
+        self.outputs = outputs
