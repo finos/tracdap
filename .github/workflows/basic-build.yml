@@ -7,6 +7,7 @@ jobs:
   platform_build:
 
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
 
@@ -30,6 +31,7 @@ jobs:
   python_runtime:
 
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     # Testing targets for the Python model runtime
     # Include the latest stable release (3.9)
