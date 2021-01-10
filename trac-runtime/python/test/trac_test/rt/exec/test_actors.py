@@ -23,75 +23,10 @@ class ActorSystemTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         util.configure_logging()
 
-    def test_basic_example(self):
-
-        program_output = {
-            'root_id': None,
-            'plus_id': None,
-            'result': None,
-            'stop_seq': []
-        }
-
-        class PlusActor(actors.Actor):
-
-            def __init__(self, value):
-                super().__init__()
-                self.value = value
-
-            @actors.Message
-            def add(self, inc):
-
-                new_value = self.value + inc
-                self.value = new_value
-
-                self.actors().send_parent('new_value', new_value)
-
-            def on_start(self):
-                program_output['plus_id'] = self.actors().id
-
-            def on_stop(self):
-                print("Plus actor got a stop message")
-                program_output['result'] = self.value
-                program_output['stop_seq'].append(self.actors().id)
-
-        class RootActor(actors.Actor):
-
-            def __init__(self):
-                super().__init__()
-                self.plus = None
-
-            def on_start(self):
-                print("Start root")
-                program_output['root_id'] = self.actors().id
-                self.plus = self.actors().spawn(PlusActor, 0)
-                self.actors().send(self.plus, "add", 1)
-
-            def on_stop(self):
-                print("Root actor got a stop message")
-                program_output['stop_seq'].append(self.actors().id)
-
-            @actors.Message
-            def new_value(self, new_value):
-                print(new_value)
-                if new_value < 10:
-                    self.actors().send(self.plus, 'add', 1)
-                else:
-                    self.actors().stop()
-
-        root = RootActor()
-        system = actors.ActorSystem(root)
-        system.start(wait=True)
-        system.wait_for_shutdown()
-
-        self.assertEqual(program_output['result'], 10)
-
-        self.assertIsNotNone(program_output['root_id'])
-        self.assertIsNotNone(program_output['plus_id'])
-
-        expected_stop_seq = [program_output['plus_id'], program_output['root_id']]
-        self.assertEqual(program_output['stop_seq'], expected_stop_seq)
-
     def test_actor_lifecycle(self):
+
+        # The most basic test case:
+        # Start one actor, it processes a single message and stops
 
         results = []
 
@@ -115,10 +50,109 @@ class ActorSystemTest(unittest.TestCase):
         system.send("sample_message", 1)
         system.wait_for_shutdown()
 
-        self.assertEqual(results, ["on_start", "sample_message", 1, "on_stop"])
+        self.assertEqual(["on_start", "sample_message", 1, "on_stop"], results)
+
+    def test_bad_message_params(self):
+
+        # What happens if a message is sent with the wrong parameters
+        # Can this be an error at the sending site, if the target actor / message can be looked up?
+
+        self.fail("not implemented")
+
+    def test_actor_failure_1(self):
+
+        # Actor throws an error while processing a message
+
+        results = []
+
+        class TestActor(actors.Actor):
+
+            def on_start(self):
+                results.append("on_start")
+
+            def on_stop(self):
+                results.append("on_stop")
+                raise RuntimeError("err_code_1")
+
+            @actors.Message
+            def sample_message(self, value):
+                results.append("sample_message")
+                results.append(value)
+                self.actors().stop()
+
+        root = TestActor()
+        system = actors.ActorSystem(root)
+        system.start()
+        system.send("sample_message", 1)
+        system.wait_for_shutdown()
+
+        self.assertEqual(["on_start", "sample_message", 1, "on_stop"], results)
+
+        # TODO: Get final error status from ActorSystem
+
+    def test_actor_failure_2(self):
+
+        # Actor throws an error during on_start
+
+        results = []
+
+        class TestActor(actors.Actor):
+
+            def on_start(self):
+                results.append("on_start")
+                raise RuntimeError("err_code_2")
+
+            def on_stop(self):
+                results.append("on_stop")
+
+            @actors.Message
+            def sample_message(self, value):
+                results.append("sample_message")
+                results.append(value)
+                self.actors().stop()
+
+        root = TestActor()
+        system = actors.ActorSystem(root)
+        system.start()
+        system.send("sample_message", 1)
+        system.wait_for_shutdown()
+
+        self.assertEqual(["on_start", "on_stop"], results)
+
+    def test_actor_failure_3(self):
+
+        # Actor throws an error during on_stop
+
+        results = []
+
+        class TestActor(actors.Actor):
+
+            def on_start(self):
+                results.append("on_start")
+
+            def on_stop(self):
+                results.append("on_stop")
+
+            @actors.Message
+            def sample_message(self, value):
+                results.append("sample_message")
+                results.append(value)
+                raise RuntimeError("err_code_3")
+
+        root = TestActor()
+        system = actors.ActorSystem(root)
+        system.start()
+        system.send("sample_message", 1)
+        system.wait_for_shutdown()
+
+        self.assertEqual(["on_start", "sample_message", 1, "on_stop"], results)
 
     @unittest.skip
     def test_child_lifecycle(self):
+
+        # Parent creates one child and sends it a message
+        # Child processes one message and stops, child.on_stop should be called
+        # child stopped signal should be received in the parent
 
         results = []
 
@@ -158,25 +192,83 @@ class ActorSystemTest(unittest.TestCase):
         system.start()
         system.wait_for_shutdown()
 
-        self.assertEqual(results, [
+        self.assertEqual([
             "child_start", "parent_notified_start",
-            "child_stop", "parent_notified_signal", "actor:stopped"])
+            "child_stop", "parent_notified_signal", "actor:stopped"],
+            results)
 
-    def test_shutdown_order(self):
-        pass
+    def test_child_shutdown_order(self):
+        self.fail("not implemented")
+
+    def test_child_failure_1(self):
+        self.fail("not implemented")
+
+    def test_child_failure_2(self):
+        self.fail("not implemented")
+
+    def test_child_failure_3(self):
+        self.fail("not implemented")
 
     def test_unknown_actor_ignored(self):
-        pass
+
+        # Messages sent to an unknown actor ID are silently dropped (there is a warning in the logs)
+
+        results = []
+
+        class TestActor(actors.Actor):
+
+            def on_start(self):
+                results.append("on_start")
+                self.actors().send("/nonexistent/actor", "sample_message", 1)
+                self.actors().send(self.actors().id, "sample_message", 1)
+
+            def on_stop(self):
+                results.append("on_stop")
+
+            @actors.Message
+            def sample_message(self, value):
+                results.append("sample_message")
+                results.append(value)
+                self.actors().stop()
+
+        root = TestActor()
+        system = actors.ActorSystem(root)
+        system.start()
+        system.wait_for_shutdown()
+
+        self.assertEqual(["on_start", "sample_message", 1, "on_stop"], results)
 
     def test_unknown_message_ignored(self):
-        pass
 
-    def test_stop_self(self):
-        pass
+        # Message types an actor does not know about are silently dropped (there is a warning in the logs)
 
-    def test_stop_child(self):
-        pass
+        results = []
+
+        class TestActor(actors.Actor):
+
+            def on_start(self):
+                results.append("on_start")
+                self.actors().send(self.actors().id, "unknown_message", 1)
+                self.actors().send(self.actors().id, "sample_message", 1)
+
+            def on_stop(self):
+                results.append("on_stop")
+
+            @actors.Message
+            def sample_message(self, value):
+                results.append("sample_message")
+                results.append(value)
+                self.actors().stop()
+
+        root = TestActor()
+        system = actors.ActorSystem(root)
+        system.start()
+        system.wait_for_shutdown()
+
+        self.assertEqual(["on_start", "sample_message", 1, "on_stop"], results)
 
     def test_stop_not_allowed(self):
-        pass
 
+        # Actors are only allowed to stop themselves or their direct children
+
+        self.fail("not implemented")
