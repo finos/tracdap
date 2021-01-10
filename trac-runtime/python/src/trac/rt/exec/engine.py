@@ -26,6 +26,10 @@ from trac.rt.exec.graph import NodeId
 @dataclass
 class GraphContextNode:
 
+    """
+    Represents the state of a single node in the execution graph for processing by the TRAC engine
+    """
+
     dependencies: tp.List[NodeId]
     result: tp.Optional[tp.Any]
     error: tp.Optional[str]
@@ -33,6 +37,10 @@ class GraphContextNode:
 
 @dataclass
 class GraphContext:
+
+    """
+    Represents the state of an execution graph being processed by the TRAC engine
+    """
 
     nodes: tp.Dict[NodeId, GraphContextNode]
     pending_nodes: tp.Set[NodeId]
@@ -42,6 +50,11 @@ class GraphContext:
 
 
 class GraphBuilder(actors.Actor):
+
+    """
+    GraphBuilder is a worker (actors.Worker) responsible for building the execution graph for a job
+    The logic for graph building is provided in graph_builder.py
+    """
 
     def __init__(self, job_info: object):
         super().__init__()
@@ -66,6 +79,17 @@ class GraphBuilder(actors.Actor):
 
 
 class GraphProcessor(actors.Actor):
+
+    """
+    GraphProcessor is the actor that runs the execution graph for a job
+    Nodes are dispatched for execution as soon as all their dependencies are met
+    When a node completes, the remaining nodes are checked to see if more can be dispatched
+    The graph is fully processed when all its nodes are processed
+
+    If there is an error with any node, the job is considered to have failed
+    In this case, nodes already running are allowed to complete but no new nodes are submitted
+    Once all running nodes are stopped, an error is reported to the parent
+    """
 
     def __init__(self, graph: GraphContext):
         super().__init__()
@@ -168,6 +192,11 @@ class GraphProcessor(actors.Actor):
 
 class NodeProcessor(actors.Actor):
 
+    """
+    Processor responsible for running individual nodes in an execution graph
+    TODO: How to decide when to allocate an actors.Worker (long running, separate thread)
+    """
+
     def __init__(self, graph: GraphContext, node_id: str, node: GraphContextNode):
         super().__init__()
         self.graph = graph
@@ -179,6 +208,11 @@ class NodeProcessor(actors.Actor):
 
 
 class JobProcessor(actors.Actor):
+
+    """
+    JobProcessor oversees the whole lifecycle of a job
+    This includes setup (GraphBuilder), execution (GraphProcessor) and reporting results
+    """
 
     def __init__(self, job_id, job_config):
         super().__init__()
@@ -205,18 +239,23 @@ class JobProcessor(actors.Actor):
         self.actors().send_parent("actors:shutdown")
 
 
+@dataclass
 class EngineContext:
 
-    def __init__(self):
-        self.jobs = {}
-        self.data = {}
+    jobs: tp.Dict
+    data: tp.Dict
 
 
 class TracEngine(actors.Actor):
 
+    """
+    TracEngine is the main actor that controls all operations in the TRAC runtime
+    Messages may be passed in externally via ActorSystem, e.g. commands to launch jobs
+    """
+
     def __init__(self):
         super().__init__()
-        self.engine_ctx = EngineContext()
+        self.engine_ctx = EngineContext(jobs={}, data={})
         self._log = util.logger_for_object(self)
 
     def on_start(self):
