@@ -26,7 +26,7 @@ import trac.rt.impl.util as util
 import trac.rt.impl.config_parser as cpi
 
 import trac.rt.exec.actors as actors
-import trac.rt.exec.engine_v2 as engine
+import trac.rt.exec.engine as engine
 
 
 class TracRuntime:
