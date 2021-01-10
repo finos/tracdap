@@ -19,7 +19,8 @@ import unittest
 
 class ActorSystemTest(unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls) -> None:
         util.configure_logging()
 
     def test_basic_example(self):
@@ -89,3 +90,93 @@ class ActorSystemTest(unittest.TestCase):
 
         expected_stop_seq = [program_output['plus_id'], program_output['root_id']]
         self.assertEqual(program_output['stop_seq'], expected_stop_seq)
+
+    def test_actor_lifecycle(self):
+
+        results = []
+
+        class TestActor(actors.Actor):
+
+            def on_start(self):
+                results.append("on_start")
+
+            def on_stop(self):
+                results.append("on_stop")
+
+            @actors.Message
+            def sample_message(self, value):
+                results.append("sample_message")
+                results.append(value)
+                self.actors().stop()
+
+        root = TestActor()
+        system = actors.ActorSystem(root)
+        system.start()
+        system.send("sample_message", 1)
+        system.wait_for_shutdown()
+
+        self.assertEqual(results, ["on_start", "sample_message", 1, "on_stop"])
+
+    @unittest.skip
+    def test_child_lifecycle(self):
+
+        results = []
+
+        class ParentActor(actors.Actor):
+
+            def __init__(self):
+                super().__init__()
+                self.child_id = None
+
+            def on_start(self):
+                self.child_id = self.actors().spawn(ChildActor)
+
+            def on_signal(self, actor_id, signal):
+
+                if actor_id == self.child_id:
+                    results.append("parent_notified_signal")
+                    results.append(signal)
+
+                self.actors().stop()
+
+            @actors.Message
+            def child_started(self, child_id):
+                results.append("parent_notified_start")
+                self.actors().stop(child_id)
+
+        class ChildActor(actors.Actor):
+
+            def on_start(self):
+                results.append("child_start")
+                self.actors().send_parent("child_started", self.actors().id)
+
+            def on_stop(self):
+                results.append("child_stop")
+
+        root = ParentActor()
+        system = actors.ActorSystem(root)
+        system.start()
+        system.wait_for_shutdown()
+
+        self.assertEqual(results, [
+            "child_start", "parent_notified_start",
+            "child_stop", "parent_notified_signal", "actor:stopped"])
+
+    def test_shutdown_order(self):
+        pass
+
+    def test_unknown_actor_ignored(self):
+        pass
+
+    def test_unknown_message_ignored(self):
+        pass
+
+    def test_stop_self(self):
+        pass
+
+    def test_stop_child(self):
+        pass
+
+    def test_stop_not_allowed(self):
+        pass
+
