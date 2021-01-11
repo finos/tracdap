@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import unittest
+import importlib.util
 
 import trac.rt.launch as launch
 
@@ -24,4 +25,9 @@ class HelloPandasExample(unittest.TestCase):
         job_config = 'doc/examples/models/python/hello_pandas/hello_pandas.yaml'
         sys_config = 'doc/examples/models/python/sys_config.yaml'
 
-        launch.launch_job(job_config, sys_config)
+        spec = importlib.util.spec_from_file_location("hello_pandas", "doc/examples/models/python/hello_pandas/hello_pandas.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        model_class = module.__dict__["HelloPandas"]
+
+        launch.launch_model(model_class, job_config, sys_config)
