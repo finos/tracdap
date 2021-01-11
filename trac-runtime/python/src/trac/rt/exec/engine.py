@@ -209,7 +209,10 @@ class NodeProcessor(actors.Actor):
         self._log = util.logger_for_object(self)
 
     def on_start(self):
-        self._log.info(f"Start node {self.node_id}")
+        self._log.info(f"Start node {self.node_id} ({type(self.node.node).__name__})")
+
+        if isinstance(self.node.node, _graph.ModelNode):
+            self._log.info("Model entry point: " + self.node.node.model_def.entryPoint)
 
 
 class JobProcessor(actors.Actor):

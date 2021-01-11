@@ -19,6 +19,10 @@ import decimal
 import enum
 import inspect
 
+import pathlib
+import json
+import yaml
+
 
 class ConfigParser:
 
@@ -41,13 +45,34 @@ class ConfigParser:
         self._config_class = config_class
         self._errors = []
 
+    @classmethod
+    def load_raw_config(cls, config_file: str):
+
+        config_path = pathlib.Path(config_file)
+        extension = config_path.suffix.lower()
+
+        # self._log.info(f"Loading config file: {str(config_path)}")
+
+        if not config_path.exists() or not config_path.is_file():
+            raise RuntimeError()  # TODO: Error
+
+        with config_path.open('r') as config_stream:
+            if extension == ".yaml" or extension == ".yml":
+                config_dict = yaml.safe_load(config_stream)
+            elif extension == ".json":
+                config_dict = json.load(config_stream)
+            else:
+                raise RuntimeError()  # TODO: Error
+
+            return config_dict
+
     def parse(self, config_dict: dict, config_file: str = None) -> object:
 
         config = self._parse_value("", config_dict, self._config_class)
 
         if any(self._errors):
 
-            message = f"Errors found in config file" + (config_file if config_file is not None else "")
+            message = f"Errors found in config file" + (" " + config_file if config_file is not None else "")
 
             for (location, error) in self._errors:
                 location_info = f" (in {location})" if location else ""

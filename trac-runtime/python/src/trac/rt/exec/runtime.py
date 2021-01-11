@@ -21,17 +21,21 @@ import sys
 import pathlib
 import typing as tp
 
+import trac.rt.api as api
 import trac.rt.config.config as config
+import trac.rt.impl.config_parser as cfg
 import trac.rt.impl.util as util
 import trac.rt.impl.config_parser as cpi
 
 import trac.rt.exec.actors as actors
 import trac.rt.exec.engine as engine
+import trac.rt.exec.dev_mode as dev_mode
 
 
 class TracRuntime:
 
-    def __init__(self, sys_config_path: str, job_config_path: tp.Optional[str] = None, dev_mode: bool = False):
+    def __init__(self, sys_config_path: str, job_config_path: tp.Optional[str] = None,
+                 dev_mode: bool = False, model_class: api.TracModel.__class__ = None):
 
         python_version = sys.version.replace("\n", "")
         mode = "batch" if job_config_path else "service"
@@ -50,16 +54,18 @@ class TracRuntime:
         util.configure_logging(self.__class__)
         self._log = util.logger_for_object(self)
 
-        self._dev_mode = dev_mode
         self._sys_config_path = sys_config_path
-        self._sys_config: config.RuntimeConfig = self._load_config(sys_config_path, config.RuntimeConfig)
+        self._sys_config: tp.Optional[config.RuntimeConfig] = None
 
         if job_config_path:
             self._batch_mode = True
             self._job_config_path = job_config_path
-            self._job_config: config.JobConfig = self._load_config(job_config_path, config.JobConfig)
+            self._job_config: tp.Optional[config.JobConfig] = None
         else:
             self._batch_mode = False
+
+        self._dev_mode = dev_mode
+        self._model_class = model_class
 
         self._engine: tp.Optional[engine.TracEngine] = None
         self._system: tp.Optional[actors.ActorSystem] = None
@@ -75,9 +81,28 @@ class TracRuntime:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
 
+    def pre_start(self):
+
+        self._log.info("Loading system config...")
+        raw_sys_config = cfg.ConfigParser.load_raw_config(self._sys_config_path)
+        self._sys_config = cfg.ConfigParser(config.RuntimeConfig).parse(raw_sys_config, self._sys_config_path)
+
+        if self._batch_mode:
+            self._log.info("Loading job config...")
+            raw_job_config = cfg.ConfigParser.load_raw_config(self._job_config_path)
+            self._job_config = cfg.ConfigParser(config.JobConfig).parse(raw_job_config, self._job_config_path)
+
+        if self._dev_mode:
+
+            if self._model_class:
+                job_config, sys_config = dev_mode.DevModeTranslator \
+                    .translate_integrated_launch(self._model_class, self._job_config, self._sys_config)
+                self._job_config = job_config
+                self._sys_config = sys_config
+
     def start(self, wait: bool = False):
 
-        self._log.info("Begin startup sequence")
+        self._log.info("Starting the engine")
 
         self._engine = engine.TracEngine()
         self._system = actors.ActorSystem(self._engine, system_thread="engine")
@@ -110,33 +135,3 @@ class TracRuntime:
             raise RuntimeError()  # TODO Error
 
         self._system.send("submit_job", self._job_config)
-
-    # ------------------------------------------------------------------------------------------------------------------
-    # Config loading
-    # ------------------------------------------------------------------------------------------------------------------
-
-    def _load_config(self, config_file: str, config_class):
-
-        config_path = pathlib.Path(config_file)
-        extension = config_path.suffix.lower()
-
-        self._log.info(f"Loading config file: {str(config_path)}")
-
-        if not config_path.exists() or not config_path.is_file():
-            raise RuntimeError()  # TODO: Error
-
-        with config_path.open('r') as config_stream:
-            if extension == ".yaml" or extension == ".yml":
-                config_dict = yaml.safe_load(config_stream)
-            elif extension == ".json":
-                config_dict = json.load(config_stream)
-            else:
-                raise RuntimeError()  # TODO: Error
-
-            parser = cpi.ConfigParser(config_class)
-            cfg = parser.parse(config_dict)
-
-            if not isinstance(cfg, config_class):
-                raise RuntimeError()  # TODO: Error
-
-            return cfg

@@ -12,7 +12,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# from __future__ import annotations
+
 import typing as tp
+import dataclasses as dc
+
+import trac.rt.metadata as meta
+
+
+def _empty(factory: tp.Callable):
+    return dc.field(default_factory=factory)
 
 
 class StorageConfig:
@@ -55,12 +64,15 @@ class RuntimeConfig:
         self.sparkSettings = sparkSettings
 
 
+@dc.dataclass
 class JobConfig:
 
-    def __init__(self,
-                 parameters: tp.Dict[str, str],
-                 inputs: tp.Dict[str, tp.Dict[str, str]],
-                 outputs: tp.Dict[str, str]):
-        self.parameters = parameters
-        self.inputs = inputs
-        self.outputs = outputs
+    target: tp.Optional[str] = None
+
+    parameters: tp.Dict[str, str] = _empty(dict)
+    inputs: tp.Dict[str, str] = _empty(dict)
+    outputs: tp.Dict[str, str] = _empty(dict)
+
+    objects: tp.Dict[str, meta.ObjectDefinition] = _empty(dict)
+
+    job: tp.Optional[meta.JobDefinition] = None

@@ -12,6 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
+import trac.rt.api as api
 import trac.rt.exec.runtime as runtime
 
 
@@ -19,21 +22,29 @@ def launch_cli():
     pass
 
 
-def launch_session(sys_config):
-    pass
+def launch_session(sys_config: str):
+
+    runtime_instance = runtime.TracRuntime(sys_config, dev_mode=True)
+
+    with runtime_instance as rt:
+        rt.wait_for_shutdown()
 
 
-def launch_job(job_config, sys_config):
+def launch_job(job_config: str, sys_config: str):
 
-    with runtime.TracRuntime(sys_config, job_config, dev_mode=True) as rt:
+    runtime_instance = runtime.TracRuntime(sys_config, job_config, dev_mode=True)
+    runtime_instance.pre_start()
+
+    with runtime_instance as rt:
         rt.submit_batch()
         rt.wait_for_shutdown()
 
 
-def launch_model(model_class, job_config, sys_config):
+def launch_model(model_class: api.TracModel.__class__, job_config: str, sys_config: str):
 
-    # TODO: Put model class into job config
+    runtime_instance = runtime.TracRuntime(sys_config, job_config, dev_mode=True, model_class=model_class)
+    runtime_instance.pre_start()
 
-    with runtime.TracRuntime(sys_config, job_config, dev_mode=True) as rt:
+    with runtime_instance as rt:
         rt.submit_batch()
         rt.wait_for_shutdown()

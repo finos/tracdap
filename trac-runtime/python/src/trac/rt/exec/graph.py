@@ -66,7 +66,4 @@ class LoadDataNode(Node):
 @dataclass
 class ModelNode(Node):
 
-    language: str
-    repository: str
-    path: str
-    entryPoint: str
+    model_def: meta.ModelDefinition

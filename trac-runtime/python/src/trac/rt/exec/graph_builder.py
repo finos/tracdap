@@ -26,7 +26,8 @@ class GraphBuilder:
         job_ctx = NodeCtx(f"job={job_id}")
 
         model_node_id = NodeId(job_ctx, "MODEL")
-        model_node = GraphBuilder.build_model()
+        model_def = job_config.objects[job_config.target].model
+        model_node = GraphBuilder.build_model(model_def)
 
         return Graph({model_node_id: model_node}, model_node_id)
 
@@ -51,11 +52,9 @@ class GraphBuilder:
         pass
 
     @staticmethod
-    def build_model():
+    def build_model(model_def: meta.ModelDefinition):
 
-        return ModelNode("python", "integrated",
-                         "doc/examples/models/python/hello_pandas",
-                         "hello_pandas.HelloPandas")
+        return ModelNode(model_def)
 
     @staticmethod
     def build_flow():
