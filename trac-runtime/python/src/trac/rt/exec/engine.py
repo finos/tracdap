@@ -16,10 +16,11 @@ from __future__ import annotations
 
 import typing as tp
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import trac.rt.impl.util as util
 import trac.rt.exec.actors as actors
+import trac.rt.exec.graph_builder as _graph
 from trac.rt.exec.graph import NodeId
 
 
@@ -30,9 +31,10 @@ class GraphContextNode:
     Represents the state of a single node in the execution graph for processing by the TRAC engine
     """
 
+    node: _graph.Node
     dependencies: tp.List[NodeId]
-    result: tp.Optional[tp.Any]
-    error: tp.Optional[str]
+    result: tp.Optional[tp.Any] = None
+    error: tp.Optional[str] = None
 
 
 @dataclass
@@ -43,10 +45,10 @@ class GraphContext:
     """
 
     nodes: tp.Dict[NodeId, GraphContextNode]
-    pending_nodes: tp.Set[NodeId]
-    active_nodes: tp.Set[NodeId]
-    succeeded_nodes: tp.Set[NodeId]
-    failed_nodes: tp.Set[NodeId]
+    pending_nodes: tp.Set[NodeId] = field(default_factory=set)
+    active_nodes: tp.Set[NodeId] = field(default_factory=set)
+    succeeded_nodes: tp.Set[NodeId] = field(default_factory=set)
+    failed_nodes: tp.Set[NodeId] = field(default_factory=set)
 
 
 class GraphBuilder(actors.Actor):
@@ -66,16 +68,16 @@ class GraphBuilder(actors.Actor):
 
         self._log.info("Begin building graph...")
 
-        # build graph context
+        graph_data = _graph.GraphBuilder.build_job(self.job_info)
+        graph_nodes = {node_id: GraphContextNode(node, []) for node_id, node in graph_data.nodes.items()}
+        self.graph = GraphContext(graph_nodes, pending_nodes=set(graph_nodes.keys()))
 
-        # store graph context
-
-        # post graph context to parent
+        self.actors().send_parent("job_graph", self.graph)
 
     @actors.Message
     def get_execution_graph(self):
 
-        pass  # post graph context to parent
+        self.actors().send(self.actors().sender, "job_graph", self.graph)
 
 
 class GraphProcessor(actors.Actor):
@@ -95,10 +97,12 @@ class GraphProcessor(actors.Actor):
         super().__init__()
         self.graph = graph
         self.processors: tp.Dict[NodeId, actors.ActorId] = dict()
+        self._log = util.logger_for_object(self)
 
     def on_start(self):
 
-        self.submit_viable_nodes()
+        self._log.info("Begin processing graph")
+        self.actors().send(self.actors().id, "submit_viable_nodes")
 
     @actors.Message
     def submit_viable_nodes(self):
@@ -107,7 +111,7 @@ class GraphProcessor(actors.Actor):
         active_nodes = copy(self.graph.active_nodes)
         processors = dict()
 
-        for node_id, node in self.graph.nodes:
+        for node_id, node in self.graph.nodes.items():
             if self._is_viable_node(node_id, node):
 
                 node_ref = self.actors().spawn(NodeProcessor, self.graph, node_id, node)
@@ -153,7 +157,7 @@ class GraphProcessor(actors.Actor):
 
         # Only submit new nodes if there have not been any failures
         if any(self.graph.pending_nodes) and not any(self.graph.failed_nodes):
-            self.submit_viable_nodes()
+            self.actors().send(self.actors().id, "submit_viable_nodes")
 
         # If processing is complete, report the final status to the engine
         elif not any(self.graph.active_nodes):
@@ -202,9 +206,10 @@ class NodeProcessor(actors.Actor):
         self.graph = graph
         self.node_id = node_id
         self.node = node
+        self._log = util.logger_for_object(self)
 
     def on_start(self):
-        pass
+        self._log.info(f"Start node {self.node_id}")
 
 
 class JobProcessor(actors.Actor):
@@ -225,8 +230,9 @@ class JobProcessor(actors.Actor):
         self.actors().spawn(GraphBuilder, self.job_config)
 
     @actors.Message
-    def job_graph_ready(self, graph: GraphContext):
+    def job_graph(self, graph: GraphContext):
         self.actors().spawn(GraphProcessor, graph)
+        self.actors().stop(self.actors().sender)
 
     @actors.Message
     def job_succeeded(self, job_id):

@@ -21,7 +21,14 @@ class GraphBuilder:
 
     @staticmethod
     def build_job(job_config: config.JobConfig) -> Graph:
-        pass
+
+        job_id = 1
+        job_ctx = NodeCtx(f"job={job_id}")
+
+        model_node_id = NodeId(job_ctx, "MODEL")
+        model_node = GraphBuilder.build_model()
+
+        return Graph({model_node_id: model_node}, model_node_id)
 
     @staticmethod
     def build_calculation_job(
@@ -35,16 +42,21 @@ class GraphBuilder:
 
         job_target = metadata[job_def.target]
 
-
     @staticmethod
     def build_data_load():
         pass
 
-    def build_model_or_flow(self):
+    @staticmethod
+    def build_model_or_flow():
         pass
 
-    def build_model(self):
-        pass
+    @staticmethod
+    def build_model():
 
-    def build_flow(self):
+        return ModelNode("python", "integrated",
+                         "doc/examples/models/python/hello_pandas",
+                         "hello_pandas.HelloPandas")
+
+    @staticmethod
+    def build_flow():
         pass

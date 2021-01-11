@@ -13,40 +13,60 @@
 #  limitations under the License.
 
 import typing as tp
+from dataclasses import dataclass
+
 import trac.rt.metadata as meta
 
 
+@dataclass(frozen=True)
+class NodeCtx:
+
+    namespace: str
+    parent: tp.Optional['NodeCtx'] = None
+
+
+@dataclass(frozen=True)
 class NodeId:
 
-    def __init__(self, name: str, ctx: tp.List[str]):
-        self.name = name
-        self.ctx = ctx
+    ctx: NodeCtx
+    name: str
 
 
+@dataclass
 class Node:
     pass
 
 
+@dataclass
 class Graph:
 
-    def __init__(self):
-        pass
+    nodes: tp.Dict[NodeId, Node]
+    root_id: NodeId
 
 
-class ContextPushNode:
+@dataclass
+class ContextPushNode(Node):
 
-    def __init__(self, mapping: tp.Dict[str, NodeId]):
-        self.mapping = mapping
-
-
-class ContextPopNode:
-
-    def __init__(self, mapping: tp.Dict[str, NodeId]):
-        self.mapping = mapping
+    mapping: tp.Dict[str, NodeId]
 
 
-class LoadDataNode:
+@dataclass
+class ContextPopNode(Node):
 
-    def __init__(self, node_id: NodeId, data_def: meta.DataDefinition):
-        self.node_id = node_id
-        self.data_def = data_def
+    mapping: tp.Dict[str, NodeId]
+
+
+@dataclass
+class LoadDataNode(Node):
+
+    node_id: NodeId
+    data_def: meta.DataDefinition
+
+
+@dataclass
+class ModelNode(Node):
+
+    language: str
+    repository: str
+    path: str
+    entryPoint: str
