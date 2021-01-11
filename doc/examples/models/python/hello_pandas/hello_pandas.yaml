@@ -5,9 +5,7 @@ parameters:
   filter_defaults: false
 
 inputs:
-  customer_loans:
-    storage_key: "example_inputs"
-    path: "loan_final313_100.csv"
+  customer_loans: "inputs/loan_final313_100.csv"
 
 outputs:
-  profit_by_region: "hello_pandas/profit_by_region.csv"
+  profit_by_region: "outputs/hello_pandas/profit_by_region.csv"
