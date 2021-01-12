@@ -43,35 +43,35 @@ class TracContext:
         pass
 
     @abc.abstractmethod
-    def get_dataset_schema(self, dataset_name: str) -> TableDefinition:
+    def get_table_schema(self, dataset_name: str) -> TableDefinition:
         pass
 
     @abc.abstractmethod
-    def get_pandas_dataset(self, dataset_name: str) -> pd.DataFrame:
+    def get_pandas_table(self, dataset_name: str) -> pd.DataFrame:
         pass
 
     @abc.abstractmethod
-    def get_spark_dataset(self, dataset_name: str) -> pys.RDD:
+    def get_spark_table(self, dataset_name: str) -> pyss.DataFrame:
         pass
 
     @abc.abstractmethod
-    def get_spark_sql_dataset(self, dataset_name: str) -> pyss.DataFrame:
+    def get_spark_table_rdd(self, dataset_name: str) -> pys.RDD:
         pass
 
     @abc.abstractmethod
-    def put_dataset_schema(self, dataset_name: str, schema: TableDefinition):
+    def put_table_schema(self, dataset_name: str, schema: TableDefinition):
         pass
 
     @abc.abstractmethod
-    def put_pandas_dataset(self, dataset_name: str, dataset: pd.DataFrame):
+    def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
         pass
 
     @abc.abstractmethod
-    def put_spark_dataset(self, dataset_name: str, dataset: pys.RDD):
+    def put_spark_table(self, dataset_name: str, dataset: pyss.DataFrame):
         pass
 
     @abc.abstractmethod
-    def put_spark_sql_dataset(self, dataset_name: str, dataset: pyss.DataFrame):
+    def put_spark_table_rdd(self, dataset_name: str, dataset: pys.RDD):
         pass
 
     @abc.abstractmethod
@@ -83,7 +83,7 @@ class TracContext:
         pass
 
     @abc.abstractmethod
-    def get_logger(self, model_class: tp.Union[type, str, None] = None) -> logging.Logger:
+    def get_logger(self) -> logging.Logger:
         pass
 
 

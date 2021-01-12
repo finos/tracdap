@@ -57,7 +57,7 @@ class HelloPandas(trac.TracModel):
         default_weighting = ctx.get_parameter("default_weighting")
         filter_defaults = ctx.get_parameter("filter_defaults")
 
-        customer_loans = ctx.get_pandas_dataset("customer_loans")
+        customer_loans = ctx.get_pandas_table("customer_loans")
 
         if filter_defaults:
             customer_loans = customer_loans[customer_loans["loan_condition_cat"] == 0]
@@ -79,7 +79,7 @@ class HelloPandas(trac.TracModel):
             .groupby("region", as_index=False) \
             .aggregate({"gross_profit": "sum"})
 
-        ctx.put_pandas_dataset("profit_by_region", profit_by_region)
+        ctx.put_pandas_table("profit_by_region", profit_by_region)
 
 
 if __name__ == "__main__":
