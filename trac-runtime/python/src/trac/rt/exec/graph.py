@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import typing as tp
 from dataclasses import dataclass
 
@@ -22,7 +24,7 @@ import trac.rt.metadata as meta
 class NodeCtx:
 
     namespace: str
-    parent: tp.Optional['NodeCtx'] = None
+    parent: tp.Optional[NodeCtx] = None
 
 
 @dataclass(frozen=True)

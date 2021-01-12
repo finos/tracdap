@@ -12,10 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
+from .graph import *
+from .context import ModelContext
+
 import abc
 import typing as tp
-
-from .graph import NodeId
 
 
 class GraphFunction:
@@ -28,9 +31,10 @@ class GraphFunction:
         pass
 
 
-class PushContextFunc:
+class PushContextFunc(GraphFunction):
 
     def __init__(self, namespace: list[str], mapping: tp.Dict[str, NodeId]):
+        super().__init__()
         self.mapping = mapping
 
     def __call__(self, ctx: tp.Dict[NodeId, object]) -> tp.Dict[NodeId, object]:
@@ -50,7 +54,7 @@ class PushContextFunc:
         return push_ctx
 
 
-class PopContextFunc:
+class PopContextFunc(GraphFunction):
 
     def __call__(self, ctx: tp.Dict[NodeId, object]) -> tp.Dict[NodeId, object]:
         pass
@@ -87,6 +91,34 @@ class ModelFunc(GraphFunction):
 
     def __init__(self):
         super().__init__()
+        self.node: ModelNode = None
 
-    def __call__(self):
+    def __call__(self, graph_ctx: tp.Dict[NodeId, object]) -> tp.Dict[NodeId, object]:
+
+        model_ctx = ModelContext()
+        model = object()
+
+        model.run_model(model_ctx)
+
+        return graph_ctx
+
+
+class FunctionResolver:
+
+    @classmethod
+    def resolve_node(cls, node: Node) -> GraphFunction:
+
+        resolve_func = cls.__node_mapping[node.__class__]
+
+        if resolve_func is None:
+            raise RuntimeError()  # TODO: Error
+
+        return resolve_func(cls, node)
+
+    @classmethod
+    def resolve_model_node(cls, node: ModelNode):
         pass
+
+    __node_mapping: tp.Dict[Node.__class__, tp.Callable] = {
+        ModelNode: resolve_model_node
+    }

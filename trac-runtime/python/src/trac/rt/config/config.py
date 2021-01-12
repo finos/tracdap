@@ -24,44 +24,41 @@ def _empty(factory: tp.Callable):
     return dc.field(default_factory=factory)
 
 
+@dc.dataclass
+class RepositoryConfig:
+
+    repoType: str
+    repoUrl: str = None
+    repoSettings: tp.Dict[str, str] = _empty(dict)
+
+
+@dc.dataclass
 class StorageConfig:
 
-    def __init__(self,
-                 storageType: str,  # noqa
-                 storageConfig: tp.Dict[str, str] = {}):  # noqa
-
-        self.storageType = storageType
-        self.storageConfig = storageConfig
+    storageType: str
+    storageConfig: tp.Dict[str, str] = _empty(dict)
 
 
+@dc.dataclass
 class StorageSettings:
 
-    def __init__(self,
-                 defaultStorage: str,  # noqa
-                 defaultFormat: str):  # noqa
-
-        self.defaultStorage = defaultStorage
-        self.defaultFormat = defaultFormat
+    defaultStorage: str
+    defaultFormat: str
 
 
+@dc.dataclass
 class SparkSettings:
 
-    def __init__(self,
-                 sparkConfig: tp.Dict[str, str]):  # noqa
-
-        self.sparkConfig = sparkConfig
+    sparkConfig: tp.Dict[str, str] = _empty(dict)
 
 
+@dc.dataclass
 class RuntimeConfig:
 
-    def __init__(self,
-                 storage: tp.Dict[str, StorageConfig],
-                 storageSettings: StorageSettings,  # noqa
-                 sparkSettings: SparkSettings):  # noqa
-
-        self.storage = storage
-        self.storageSettings = storageSettings
-        self.sparkSettings = sparkSettings
+    repositories: tp.Dict[str, RepositoryConfig] = _empty(dict)
+    storage: tp.Dict[str, StorageConfig] = _empty(dict)
+    storageSetting: tp.Optional[StorageSettings] = None
+    sparkSetting: tp.Optional[SparkSettings] = None
 
 
 @dc.dataclass
