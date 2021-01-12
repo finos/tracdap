@@ -295,6 +295,14 @@ class TracGenerator:
 
         field_type = self.python_field_type(descriptor, message)
 
+        # Make all fields optional for now
+        field_type = "tp.Optional[" + field_type + "] = None"
+
+        # TODO: For dict and list types, use an empty container
+        # Since minimum Python version for TRAC will now be 3.7,
+        # We can change the generator to output dataclasses
+        # For the time being, this implementation allows work on the engine to proceed
+
         return self.INIT_PARAM_TEMPLATE \
             .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
             .replace("{PEP_FLAG}", pep_flag) \
