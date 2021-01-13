@@ -17,6 +17,9 @@ from __future__ import annotations
 from .graph import *
 from .context import ModelContext
 
+import trac.rt.api as api
+import trac.rt.impl.repositories as repos
+
 import abc
 import typing as tp
 
@@ -89,14 +92,15 @@ class SaveDataFunc(GraphFunction):
 
 class ModelFunc(GraphFunction):
 
-    def __init__(self):
+    def __init__(self, node: ModelNode, model_class: api.TracModel.__class__):
         super().__init__()
-        self.node: ModelNode = None
+        self.node = node
+        self.model_class = model_class
 
     def __call__(self, graph_ctx: tp.Dict[NodeId, object]) -> tp.Dict[NodeId, object]:
 
         model_ctx = ModelContext()
-        model = object()
+        model: api.TracModel = self.model_class()
 
         model.run_model(model_ctx)
 
@@ -105,19 +109,24 @@ class ModelFunc(GraphFunction):
 
 class FunctionResolver:
 
-    @classmethod
-    def resolve_node(cls, node: Node) -> GraphFunction:
+    def __init__(self, repositories: repos.Repositories):
+        self._repos = repositories
 
-        resolve_func = cls.__node_mapping[node.__class__]
+    def resolve_node(self, node: Node) -> GraphFunction:
+
+        resolve_func = self.__node_mapping[node.__class__]
 
         if resolve_func is None:
             raise RuntimeError()  # TODO: Error
 
-        return resolve_func(cls, node)
+        return resolve_func(self, node)
 
-    @classmethod
-    def resolve_model_node(cls, node: ModelNode):
-        pass
+    def resolve_model_node(self, node: ModelNode) -> GraphFunction:
+
+        model_loader = self._repos.get_model_loader(node.model_def.repository)
+        model_class = model_loader.load_model(node.model_def)
+
+        return ModelFunc(node, model_class)
 
     __node_mapping: tp.Dict[Node.__class__, tp.Callable] = {
         ModelNode: resolve_model_node

@@ -60,7 +60,13 @@ class DevModeTranslator:
         translated_job_config.objects = copy.copy(job_config.objects)
         translated_job_config.objects[model_id] = model_object
 
-        return translated_job_config, sys_config
+        repos = copy.copy(sys_config.repositories)
+        repos["trac_integrated"] = cfg.RepositoryConfig("integrated")
+
+        translated_sys_config = copy.copy(sys_config)
+        translated_sys_config.repositories = repos
+
+        return translated_job_config, translated_sys_config
 
 
 DevModeTranslator._log = util.logger_for_class(DevModeTranslator)

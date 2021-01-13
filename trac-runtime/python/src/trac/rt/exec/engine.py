@@ -18,9 +18,13 @@ import typing as tp
 from copy import copy
 from dataclasses import dataclass, field
 
+import trac.rt.config as config
 import trac.rt.impl.util as util
+import trac.rt.impl.repositories as repos
+
 import trac.rt.exec.actors as actors
 import trac.rt.exec.graph_builder as _graph
+import trac.rt.exec.functions as _func
 from trac.rt.exec.graph import NodeId
 
 
@@ -33,6 +37,7 @@ class GraphContextNode:
 
     node: _graph.Node
     dependencies: tp.List[NodeId]
+    function: tp.Optional[_func.GraphFunction] = None
     result: tp.Optional[tp.Any] = None
     error: tp.Optional[str] = None
 
@@ -58,19 +63,26 @@ class GraphBuilder(actors.Actor):
     The logic for graph building is provided in graph_builder.py
     """
 
-    def __init__(self, job_info: object):
+    def __init__(self, job_config: config.JobConfig, repositories: repos.Repositories):
         super().__init__()
-        self.job_info = job_info
+        self.job_config = job_config
         self.graph: tp.Optional[GraphContext] = None
+
+        self._resolver = _func.FunctionResolver(repositories)
         self._log = util.logger_for_object(self)
 
     def on_start(self):
 
-        self._log.info("Begin building graph...")
+        self._log.info("Building execution graph")
 
-        graph_data = _graph.GraphBuilder.build_job(self.job_info)
+        graph_data = _graph.GraphBuilder.build_job(self.job_config)
         graph_nodes = {node_id: GraphContextNode(node, []) for node_id, node in graph_data.nodes.items()}
         self.graph = GraphContext(graph_nodes, pending_nodes=set(graph_nodes.keys()))
+
+        self._log.info("Resolving graph nodes to executable code")
+
+        for node_id, node in self.graph.nodes.items():
+            node.function = self._resolver.resolve_node(node.node)
 
         self.actors().send_parent("job_graph", self.graph)
 
@@ -209,10 +221,13 @@ class NodeProcessor(actors.Actor):
         self._log = util.logger_for_object(self)
 
     def on_start(self):
+
         self._log.info(f"Start node {self.node_id} ({type(self.node.node).__name__})")
 
         if isinstance(self.node.node, _graph.ModelNode):
             self._log.info("Model entry point: " + self.node.node.model_def.entryPoint)
+
+        self.node.function(self.graph.nodes)
 
 
 class JobProcessor(actors.Actor):
@@ -222,15 +237,16 @@ class JobProcessor(actors.Actor):
     This includes setup (GraphBuilder), execution (GraphProcessor) and reporting results
     """
 
-    def __init__(self, job_id, job_config):
+    def __init__(self, job_id, job_config, repositories: repos.Repositories):
         super().__init__()
         self.job_id = job_id
         self.job_config = job_config
+        self._repos = repositories
         self._log = util.logger_for_object(self)
 
     def on_start(self):
         self._log.info("Starting job")
-        self.actors().spawn(GraphBuilder, self.job_config)
+        self.actors().spawn(GraphBuilder, self.job_config, self._repos)
 
     @actors.Message
     def job_graph(self, graph: GraphContext):
@@ -262,10 +278,12 @@ class TracEngine(actors.Actor):
     Messages may be passed in externally via ActorSystem, e.g. commands to launch jobs
     """
 
-    def __init__(self):
+    def __init__(self, sys_config: config.RuntimeConfig, repositories: repos.Repositories):
         super().__init__()
         self.engine_ctx = EngineContext(jobs={}, data={})
         self._log = util.logger_for_object(self)
+        self._sys_config = sys_config
+        self._repos = repositories
 
     def on_start(self):
 
@@ -280,7 +298,7 @@ class TracEngine(actors.Actor):
         job_id = 'test_job'
 
         self._log.info("A job has been submitted")
-        self.actors().spawn(JobProcessor, job_id, job_info)
+        self.actors().spawn(JobProcessor, job_id, job_info, self._repos)
 
     @actors.Message
     def job_graph_built(self, job_graph: GraphContext):

@@ -25,7 +25,7 @@ import trac.rt.api as api
 import trac.rt.config.config as config
 import trac.rt.impl.config_parser as cfg
 import trac.rt.impl.util as util
-import trac.rt.impl.config_parser as cpi
+import trac.rt.impl.repositories as repos
 
 import trac.rt.exec.actors as actors
 import trac.rt.exec.engine as engine
@@ -67,6 +67,10 @@ class TracRuntime:
         self._dev_mode = dev_mode
         self._model_class = model_class
 
+        # Top level resources
+        self._repos: tp.Optional[repos.Repositories] = None
+
+        # The execution engine
         self._engine: tp.Optional[engine.TracEngine] = None
         self._system: tp.Optional[actors.ActorSystem] = None
 
@@ -82,6 +86,8 @@ class TracRuntime:
         self.stop()
 
     def pre_start(self):
+
+        # Plugins will be loaded here, before config
 
         self._log.info("Loading system config...")
         raw_sys_config = cfg.ConfigParser.load_raw_config(self._sys_config_path)
@@ -104,7 +110,9 @@ class TracRuntime:
 
         self._log.info("Starting the engine")
 
-        self._engine = engine.TracEngine()
+        self._repos = repos.Repositories(self._sys_config)
+
+        self._engine = engine.TracEngine(self._sys_config, self._repos)
         self._system = actors.ActorSystem(self._engine, system_thread="engine")
 
         self._system.start(wait=wait)

@@ -23,20 +23,6 @@ import trac.rt.metadata as meta
 import trac.rt.config as config
 
 
-class Repositories:
-
-    def __init__(self, sys_config: config.RuntimeConfig):
-
-        self._loaders: tp.Dict[str, IModelLoader] = dict()
-        self._repo_types: tp.Dict[str, tp.Callable[[config.StorageConfig], IModelLoader]] = dict()
-
-        self._repo_types["integrated"] = IntegratedModelLoader.__class__
-        self._repo_types["local"] = LocalModelLoader.__class__
-
-    def get_model_loader(self, repo_name: str) -> IModelLoader.__class__:
-        pass
-
-
 class IModelLoader:
 
     @abc.abstractmethod
@@ -47,7 +33,7 @@ class IModelLoader:
 class IntegratedModelLoader(IModelLoader):
 
     def __init__(self, repo_config: config.StorageConfig):
-        pass
+        self._repo_config = repo_config
 
     def load_model(self, model_def: meta.ModelDefinition) -> api.TracModel.__class__:
 
@@ -64,7 +50,7 @@ class IntegratedModelLoader(IModelLoader):
 class LocalModelLoader(IModelLoader):
 
     def __init__(self, repo_config: config.StorageConfig):
-        pass
+        self._repo_config = repo_config
 
     def load_model(self, model_def: meta.ModelDefinition) -> api.TracModel.__class__:
         raise NotImplementedError()
@@ -72,5 +58,44 @@ class LocalModelLoader(IModelLoader):
 
 class GitModelLoader(IModelLoader):
 
+    def __init__(self, repo_config: config.StorageConfig):
+        self._repo_config = repo_config
+
     def load_model(self, model_def: meta.ModelDefinition) -> api.TracModel.__class__:
         raise NotImplementedError()
+
+
+class Repositories:
+
+    __repo_types: tp.Dict[str, tp.Callable[[config.RepositoryConfig], IModelLoader]] = {
+        "integrated": IntegratedModelLoader,
+        "local": LocalModelLoader
+    }
+
+    @classmethod
+    def register_repo_type(cls, repo_type: str, loader_class: tp.Callable[[config.RepositoryConfig], IModelLoader]):
+        cls.__repo_types[repo_type] = loader_class
+
+    def __init__(self, sys_config: config.RuntimeConfig):
+
+        self._loaders: tp.Dict[str, IModelLoader] = dict()
+
+        for repo_name, repo_config in sys_config.repositories.items():
+
+            if repo_config.repoType not in self.__repo_types:
+                # TODO: Exception type
+                raise RuntimeError(f"No model loader plugin is available for repository type '{repo_config.repoType}'")
+
+            loader_class = self.__repo_types[repo_config.repoType]
+            loader = loader_class(repo_config)
+            self._loaders[repo_name] = loader
+
+    def get_model_loader(self, repo_name: str) -> IModelLoader.__class__:
+
+        loader = self._loaders.get(repo_name)
+
+        if loader is None:
+            # TODO: Exception type
+            raise RuntimeError(f"Repository '{repo_name}' is unknown or not configured, no model loader available")
+
+        return loader
