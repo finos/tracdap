@@ -20,15 +20,14 @@ import trac.rt.launch as launch
 
 class HelloPandasExample(unittest.TestCase):
 
-    @unittest.skip
     def test_hello_pandas(self):
 
         job_config = 'doc/examples/models/python/hello_pandas/hello_pandas.yaml'
         sys_config = 'doc/examples/models/python/sys_config.yaml'
 
-        spec = importlib.util.spec_from_file_location("hello_pandas", "doc/examples/models/python/hello_pandas/hello_pandas.py")
+        spec = importlib.util.spec_from_file_location("hello_world", "doc/examples/models/python/hello_world/hello_world.py")
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        model_class = module.__dict__["HelloPandas"]
+        model_class = module.__dict__["HelloWorldModel"]
 
         launch.launch_model(model_class, job_config, sys_config)
