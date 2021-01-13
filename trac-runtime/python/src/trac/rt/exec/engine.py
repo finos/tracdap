@@ -227,7 +227,14 @@ class NodeProcessor(actors.Actor):
         if isinstance(self.node.node, _graph.ModelNode):
             self._log.info("Model entry point: " + self.node.node.model_def.entryPoint)
 
-        self.node.function(self.graph.nodes)
+        # Execute the node
+
+        try:
+            result = self.node.function(self.graph.nodes)
+            self.actors().send_parent("node_succeeded", self.node_id, result)
+
+        except Exception as e:
+            self.actors().send_parent("node_failed", self.node_id, e)
 
 
 class JobProcessor(actors.Actor):
@@ -254,14 +261,14 @@ class JobProcessor(actors.Actor):
         self.actors().stop(self.actors().sender)
 
     @actors.Message
-    def job_succeeded(self, job_id):
-        self._log.info(f"Batch job succeeded {job_id}")
-        self.actors().send_parent("actors:shutdown")
+    def job_succeeded(self):
+        self._log.info(f"Job succeeded {self.job_id}")
+        self.actors().send_parent("job_succeeded", self.job_id)
 
     @actors.Message
-    def job_failed(self, job_id):
-        self._log.info(f"Batch job failed {job_id}")
-        self.actors().send_parent("actors:shutdown")
+    def job_failed(self):
+        self._log.info(f"Job failed {self.job_id}")
+        self.actors().send_parent("job_failed", self.job_id)
 
 
 @dataclass
@@ -301,14 +308,9 @@ class TracEngine(actors.Actor):
         self.actors().spawn(JobProcessor, job_id, job_info, self._repos)
 
     @actors.Message
-    def job_graph_built(self, job_graph: GraphContext):
-
-        pass
-
-    @actors.Message
-    def job_succeeded(self):
-        pass
+    def job_succeeded(self, job_id: str):
+        self._log.info(f"Recording job as successful: {job_id}")
 
     @actors.Message
-    def job_failed(self):
-        pass
+    def job_failed(self, job_id: str):
+        self._log.info(f"Recording job as failed: {job_id}")
