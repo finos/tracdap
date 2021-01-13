@@ -285,12 +285,15 @@ class TracEngine(actors.Actor):
     Messages may be passed in externally via ActorSystem, e.g. commands to launch jobs
     """
 
-    def __init__(self, sys_config: config.RuntimeConfig, repositories: repos.Repositories):
+    def __init__(self, sys_config: config.RuntimeConfig, repositories: repos.Repositories, batch_mode=False):
         super().__init__()
+
         self.engine_ctx = EngineContext(jobs={}, data={})
+
         self._log = util.logger_for_object(self)
         self._sys_config = sys_config
         self._repos = repositories
+        self._batch_mode = batch_mode
 
     def on_start(self):
 
@@ -305,12 +308,30 @@ class TracEngine(actors.Actor):
         job_id = 'test_job'
 
         self._log.info("A job has been submitted")
-        self.actors().spawn(JobProcessor, job_id, job_info, self._repos)
+
+        job_actor_id = self.actors().spawn(JobProcessor, job_id, job_info, self._repos)
+
+        jobs = {**self.engine_ctx.jobs, job_id: job_actor_id}
+        self.engine_ctx = EngineContext(jobs, self.engine_ctx.data)
 
     @actors.Message
     def job_succeeded(self, job_id: str):
+
         self._log.info(f"Recording job as successful: {job_id}")
+        self._clean_up_job(job_id)
 
     @actors.Message
     def job_failed(self, job_id: str):
+
         self._log.info(f"Recording job as failed: {job_id}")
+        self._clean_up_job(job_id)
+
+    def _clean_up_job(self, job_id: str):
+
+        jobs = copy(self.engine_ctx.jobs)
+        job_actor_id = jobs.pop(job_id)
+        self.actors().stop(job_actor_id)
+
+        if self._batch_mode:
+            self._log.info("Batch run complete, shutting down the engine")
+            self.actors().stop()

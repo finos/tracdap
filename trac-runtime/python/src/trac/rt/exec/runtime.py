@@ -112,7 +112,7 @@ class TracRuntime:
 
         self._repos = repos.Repositories(self._sys_config)
 
-        self._engine = engine.TracEngine(self._sys_config, self._repos)
+        self._engine = engine.TracEngine(self._sys_config, self._repos, batch_mode=self._batch_mode)
         self._system = actors.ActorSystem(self._engine, system_thread="engine")
 
         self._system.start(wait=wait)
