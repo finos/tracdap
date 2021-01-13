@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# TODO: Need to update config_parser to support deferred annotations before turning on the new behaviour
 # from __future__ import annotations
 
 import typing as tp
@@ -57,8 +58,8 @@ class RuntimeConfig:
 
     repositories: tp.Dict[str, RepositoryConfig] = _empty(dict)
     storage: tp.Dict[str, StorageConfig] = _empty(dict)
-    storageSetting: tp.Optional[StorageSettings] = None
-    sparkSetting: tp.Optional[SparkSettings] = None
+    storageSettings: tp.Optional[StorageSettings] = None
+    sparkSettings: tp.Optional[SparkSettings] = None
 
 
 @dc.dataclass

@@ -28,8 +28,7 @@ class ConfigParser:
 
     # The metaclass for generic types varies between versions of the typing library
     # To work around this, detect the correct metaclass by inspecting a generic type variable
-    __generic_metaclass = type(tp.List[str])
-    __union_metaclass = type(tp.Union[str, int])
+    __generic_metaclass = type(tp.List[object])
 
     __primitive_types: tp.Dict[type, callable] = {
         bool: bool,
@@ -93,7 +92,7 @@ class ConfigParser:
         if isinstance(annotation, enum.EnumMeta):
             return self._parse_enum(location, raw_value, annotation)
 
-        if isinstance(annotation, self.__generic_metaclass) or isinstance(annotation, self.__union_metaclass):
+        if isinstance(annotation, self.__generic_metaclass):
             return self._parse_generic_class(location, raw_value, annotation)
 
         # If there is no special handling for the given type, try to interpret as a simple Python class
@@ -222,7 +221,7 @@ class ConfigParser:
         origin = metaclass.__origin__
         args = metaclass.__args__
 
-        if origin == list or origin == tp.List:
+        if origin == tp.List or origin == list:
 
             list_type = args[0]
 
@@ -233,7 +232,7 @@ class ConfigParser:
                 self._parse_value(self._child_location(location, str(idx)), item, list_type)
                 for (idx, item) in enumerate(raw_value)]
 
-        if origin == dict or origin == tp.Dict:
+        if origin == tp.Dict or origin == dict:
 
             key_type = args[0]
             value_type = args[1]
@@ -246,7 +245,15 @@ class ConfigParser:
                 self._parse_value(self._child_location(location, key), value, value_type)
                 for key, value in raw_value.items()}
 
-        return self._error(location, f"Config parser does not support generic type '{origin.__name__}'")
+        # Handle Optional, which is a shorthand for tp.Union[type, None]
+        if origin == tp.Union and len(args) == 2 and args[1] == type(None):  # noqa
+
+            if raw_value is not None:
+                return self._parse_value(location, raw_value, args[0])
+            else:
+                return None
+
+        return self._error(location, f"Config parser does not support generic type '{str(origin)}'")
 
     def _error(self, location: str, error: str) -> None:
         self._errors.append((location, error))
