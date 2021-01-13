@@ -17,18 +17,51 @@ from __future__ import annotations
 import logging
 import sys
 
+_BLACK = '\033[0;30m'
+_RED = '\033[0;31m'
+_GREEN = '\033[0;32m'
+_BROWN = '\033[0;33m'
+_BLUE = '\033[0;34m'
+_PURPLE = '\033[0;35m'
+_CYAN = '\033[1;36m'
+_GREY = '\033[0;37m'
+
+_DARK_GREY = '\033[1;30m'
+_LIGHT_RED = '\033[1;31m'
+_LIGHT_GREEN = '\033[1;32m'
+_YELLOW = '\033[1;33m'
+_LIGHT_BLUE = '\033[1;34m'
+_LIGHT_PURPLE = '\033[1;35m'
+_LIGHT_CYAN = '\033[0;36m'
+_WHITE = '\033[0;38m'
+
 
 def configure_logging(clazz: type = None):
 
     root_logger = logging.getLogger()
 
     if not root_logger.hasHandlers():
-        console_formatter = logging.Formatter("%(asctime)s [%(threadName)s] %(levelname)s %(name)s - %(message)s")
+
+        message_format = f"{_WHITE}%(asctime)s [%(threadName)s] %(levelname)s %(name)s - {_LIGHT_CYAN}%(message)s"
+        console_formatter = logging.Formatter(message_format)
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(console_formatter)
         console_handler.setLevel(logging.INFO)
         root_logger.addHandler(console_handler)
         root_logger.setLevel(logging.INFO)
+
+        # Put logs from the TRAC runtime in grey, so model logs stand out - quick solution!
+        # A more sophisticated approach is needed anyway to output job logs as datasets
+
+        trac_logger = logging.getLogger("trac")
+
+        message_format = f"{_GREY}%(asctime)s [%(threadName)s] %(levelname)s %(name)s - %(message)s"
+        console_formatter = logging.Formatter(message_format)
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(console_formatter)
+        console_handler.setLevel(logging.INFO)
+        trac_logger.addHandler(console_handler)
+        trac_logger.propagate = False
 
     if clazz is None:
         startup_logger = root_logger

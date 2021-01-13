@@ -99,7 +99,7 @@ class ModelFunc(GraphFunction):
 
     def __call__(self, graph_ctx: tp.Dict[NodeId, object]) -> tp.Dict[NodeId, object]:
 
-        model_ctx = ModelContext()
+        model_ctx = ModelContext(self.node.model_def, self.model_class)
         model: api.TracModel = self.model_class()
 
         model.run_model(model_ctx)

@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import logging
 import typing as tp
 
@@ -20,9 +22,15 @@ import pyspark as pys
 from pyspark import sql as pyss
 
 import trac.rt.api as api
+import trac.rt.metadata as meta
+import trac.rt.impl.util as util
 
 
 class ModelContext(api.TracContext):
+
+    def __init__(self, model_def: meta.ModelDefinition, model_class: api.TracModel.__class__):
+        self.__model_def = model_def
+        self.__model_class = model_class
 
     def get_parameter(self, parameter_name: str) -> tp.Any:
         raise NotImplementedError()
@@ -58,4 +66,4 @@ class ModelContext(api.TracContext):
         raise NotImplementedError()
 
     def get_logger(self) -> logging.Logger:
-        raise NotImplementedError()
+        return util.logger_for_class(self.__model_class)

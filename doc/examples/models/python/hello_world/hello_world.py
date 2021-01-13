@@ -35,7 +35,7 @@ class HelloWorldModel(trac.TracModel):
 
     def run_model(self, ctx: trac.TracContext):
 
-        print("Hello world model is running")
+        ctx.get_logger().info("Hello world model is running")
 
         # meaning_of_life = ctx.get_parameter("meaning_of_life")
         # print(f"The meaning of life is {meaning_of_life}")
