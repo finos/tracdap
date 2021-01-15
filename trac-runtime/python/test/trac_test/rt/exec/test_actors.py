@@ -57,10 +57,70 @@ class ActorSystemTest(unittest.TestCase):
 
     def test_bad_message_params(self):
 
-        # What happens if a message is sent with the wrong parameters
-        # Can this be an error at the sending site, if the target actor / message can be looked up?
+        errors = []
 
-        self.fail("not implemented")
+        class TargetActor(actors.Actor):
+
+            @actors.Message
+            def sample_message(self, value: int):
+                pass
+
+            @actors.Message
+            def sample_message_2(self, value: int, other: str = ''):
+                pass
+
+            @actors.Message
+            def sample_with_default(self, value: int = 0):
+                pass
+
+        class TestActor(actors.Actor):
+
+            def on_start(self):
+
+                target_id = self.actors().spawn(TargetActor)
+
+                try:
+                    self.actors().send(target_id, "sample_message")
+                except Exception:  # noqa
+                    errors.append("missing_param")
+
+                try:
+                    self.actors().send(target_id, "sample_message", 1, 2)
+                except Exception:  # noqa
+                    errors.append("extra_param")
+
+                try:
+                    self.actors().send(target_id, "sample_message_2", 1, unknown=2)
+                except Exception:  # noqa
+                    errors.append("unknown_param")
+
+                try:
+                    self.actors().send(target_id, "sample_message", "wrong_param_type")
+                except Exception:  # noqa
+                    errors.append("wrong_param_type")
+
+                try:
+                    self.actors().send(target_id, "sample_message", value="wrong_kw_param_type")
+                except Exception:  # noqa
+                    errors.append("wrong_kw_param_type")
+
+                # Should not error, parameter 'value' should take the default
+                self.actors().send(target_id, "sample_with_default")
+
+                self.actors().stop()
+
+        root = TestActor()
+        system = actors.ActorSystem(root)
+        system.start()
+        system.wait_for_shutdown()
+
+        self.assertEqual([
+            "missing_param", "extra_param", "unknown_param",
+            "wrong_param_type", "wrong_kw_param_type"],
+            errors)
+
+        # System should have gone down cleanly, errors are caught where they occur
+        self.assertEqual(0, system.shutdown_code())
 
     def test_actor_failure_1(self):
 
@@ -75,13 +135,12 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_stop(self):
                 results.append("on_stop")
-                raise RuntimeError("err_code_1")
 
             @actors.Message
             def sample_message(self, value):
                 results.append("sample_message")
                 results.append(value)
-                self.actors().stop()
+                raise RuntimeError("err_code_1")
 
         root = TestActor()
         system = actors.ActorSystem(root)

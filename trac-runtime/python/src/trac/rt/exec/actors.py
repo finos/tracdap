@@ -19,6 +19,7 @@ import functools as func
 import typing as tp
 import enum
 import dataclasses as dc
+import inspect
 
 import trac.rt.impl.util as util
 
@@ -90,7 +91,7 @@ class Actor:
 
         except Exception as e:
 
-            system._process_error(ctx.id, e)  # noqa
+            system._process_error(ctx.id, msg.message, e)  # noqa
             return False
 
         finally:
@@ -141,6 +142,9 @@ class Message:
     def __init__(self, method):
         self.__method = method
         func.update_wrapper(self, method)
+
+        params = inspect.signature(method).parameters
+        self.params = list(params.values())[1:]  # skip 'self' parameter
 
     def __call__(self, *args, **kwargs):
         self.__method(*args, **kwargs)
@@ -285,6 +289,12 @@ class ActorSystem:
         _args = args or []
         _kwargs = kwargs or {}
 
+        target_state = self.__actors.get(target_id)
+
+        if target_state is not None and not message.startswith("actor:"):
+            target_class = target_state.actor.__class__
+            self._check_message_signature(target_id, target_class, message, args, kwargs)
+
         msg = Msg(sender_id, target_id, message, _args, _kwargs)
         self.__message_queue.append(msg)
 
@@ -348,7 +358,7 @@ class ActorSystem:
                 actor_state.state_code = ActorStateCode.FAILED
             self.__actors.pop(msg.target)
 
-    def _process_error(self, actor_id: ActorId, error: Exception):
+    def _process_error(self, actor_id: ActorId, message: str, error: Exception):
 
         actor_state = self.__actors.get(actor_id)
 
@@ -357,6 +367,9 @@ class ActorSystem:
                 f"Error ignored: [{Actor.STOPPED}] -> {actor_id}" +
                 f" (failed actor not found)")
             return
+
+        self._log.error(f"{actor_id} [{message}]: {str(error)}")
+        self._log.error(f"Actor failed: {actor_id} [{message}] (actor will be stopped)")
 
         pre_error_state = actor_state.state_code
 
@@ -384,3 +397,66 @@ class ActorSystem:
         parent_id = actor_id[0] if parent_delim == 0 else actor_id[:actor_id.rfind("/")]
 
         return parent_id
+
+    def _check_message_signature(self, target_id: ActorId, target_class: Actor.__class__, message: str, args, kwargs):
+
+        target_handler = Actor._Actor__class_handlers.get(target_class).get(message)  # noqa
+
+        if target_handler is None:
+            return  # TODO: Should this be an error? Existing behaviour is to ignore unknown messages
+            # raise RuntimeError()  # TODO: Error
+
+        target_params = target_handler.func.params
+
+        if len(args) + len(kwargs) > len(target_params):
+            error = f"Invalid message: [{message}] -> {target_id} (too many arguments)"
+            self._log.error(error)
+            raise RuntimeError(error)
+
+        pos_params = target_params[:len(args)]
+        kw_params = target_params[len(args):]
+        kw_param_names = set(map(lambda p: p.name, kw_params))
+
+        # Missing params
+        for param in kw_params:
+            if param.default is inspect._empty and param.name not in kwargs:  # noqa
+                error = f"Invalid message: [{message}] -> {target_id} (missing required parameter '{param.name}')"
+                self._log.error(error)
+                raise RuntimeError(error)
+
+        # Extra (unknown) kw params
+        for param_name in kwargs.keys():
+            if param_name not in kw_param_names:
+                error = f"Invalid message: [{message}] -> {target_id} (unknown parameter '{param_name}')"
+                self._log.error(error)
+                raise RuntimeError(error)
+
+        # Positional arg types
+        for pos_param, pos_arg in zip(pos_params, args):
+
+            # If arg type is not annotated, we cannot do a type check
+            if pos_param.annotation == inspect._empty:  # noqa
+                continue
+
+            if not isinstance(pos_arg, pos_param.annotation):
+                error = f"Invalid message: [{message}] -> {target_id} (wrong parameter type for '{pos_param.name}')"
+                self._log.error(error)
+                raise RuntimeError(error)
+
+        # Kw arg types
+        for kw_param in kw_params:
+
+            # If arg type is not annotated, we cannot do a type check
+            if kw_param.annotation == inspect._empty:  # noqa
+                continue
+
+            kw_arg = kwargs.get(kw_param.name)
+
+            # If param has taken a default value, no type check is needed
+            if kw_arg is None:
+                continue
+
+            if not isinstance(kw_arg, kw_param.annotation):
+                error = f"Invalid message: [{message}] -> {target_id} (wrong parameter type for '{kw_param.name}')"
+                self._log.error(error)
+                raise RuntimeError(error)
