@@ -52,6 +52,9 @@ class ActorSystemTest(unittest.TestCase):
 
         self.assertEqual(["on_start", "sample_message", 1, "on_stop"], results)
 
+        # Make sure the system went down cleanly
+        self.assertEqual(0, system.shutdown_code())
+
     def test_bad_message_params(self):
 
         # What happens if a message is sent with the wrong parameters
@@ -86,9 +89,14 @@ class ActorSystemTest(unittest.TestCase):
         system.send("sample_message", 1)
         system.wait_for_shutdown()
 
+        # Actor should receive on_stop after raising the error
         self.assertEqual(["on_start", "sample_message", 1, "on_stop"], results)
 
-        # TODO: Get final error status from ActorSystem
+        code = system.shutdown_code()
+        error = system.shutdown_error()
+        self.assertNotEqual(0, code)
+        self.assertIsInstance(error, RuntimeError)
+        self.assertEqual("err_code_1", error.args[0])
 
     def test_actor_failure_2(self):
 
@@ -117,7 +125,14 @@ class ActorSystemTest(unittest.TestCase):
         system.send("sample_message", 1)
         system.wait_for_shutdown()
 
-        self.assertEqual(["on_start", "on_stop"], results)
+        # Actor should not receive on_stop if on_start fails
+        self.assertEqual(["on_start"], results)
+
+        code = system.shutdown_code()
+        error = system.shutdown_error()
+        self.assertNotEqual(0, code)
+        self.assertIsInstance(error, RuntimeError)
+        self.assertEqual("err_code_2", error.args[0])
 
     def test_actor_failure_3(self):
 
@@ -132,12 +147,13 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_stop(self):
                 results.append("on_stop")
+                raise RuntimeError("err_code_3")
 
             @actors.Message
             def sample_message(self, value):
                 results.append("sample_message")
                 results.append(value)
-                raise RuntimeError("err_code_3")
+                self.actors().stop()
 
         root = TestActor()
         system = actors.ActorSystem(root)
@@ -146,6 +162,12 @@ class ActorSystemTest(unittest.TestCase):
         system.wait_for_shutdown()
 
         self.assertEqual(["on_start", "sample_message", 1, "on_stop"], results)
+
+        code = system.shutdown_code()
+        error = system.shutdown_error()
+        self.assertNotEqual(0, code)
+        self.assertIsInstance(error, RuntimeError)
+        self.assertEqual("err_code_3", error.args[0])
 
     @unittest.skip
     def test_child_lifecycle(self):

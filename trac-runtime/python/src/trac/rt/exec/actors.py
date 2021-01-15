@@ -18,45 +18,12 @@ import threading
 import functools as func
 import typing as tp
 import enum
+import dataclasses as dc
 
 import trac.rt.impl.util as util
 
+
 ActorId = str
-
-
-class ActorContext:
-
-    def __init__(self, system: ActorSystem,
-                 current_actor: ActorId, parent: ActorId, sender: tp.Optional[ActorId],
-                 send_func: tp.Callable, spawn_func: tp.Callable, stop_func: tp.Callable):
-
-        self.id = current_actor
-        self.parent = parent
-        self.sender = sender
-
-        self.__system = system
-        self.__send_func = send_func
-        self.__spawn_func = spawn_func
-        self.__stop_func = stop_func
-
-    def spawn(self, actor_class: Actor.__class__, *args, **kwargs) -> ActorId:
-        return self.__spawn_func(actor_class, args, kwargs)
-
-    def send(self, target_id: ActorId, message: str, *args, **kwargs):
-        self.__send_func(target_id, message, args, kwargs)
-
-    def send_parent(self, message: str, *args, **kwargs):
-        self.__send_func(self.parent, message, args, kwargs)
-
-    def reply(self, message: str, *args, **kwargs):
-        self.__send_func(self.sender, message, args, kwargs)
-
-    def stop(self, target_id: tp.Optional[ActorId] = None):
-
-        if target_id:
-            self.__stop_func(target_id)
-        else:
-            self.__stop_func(self.id)
 
 
 class Actor:
@@ -96,7 +63,7 @@ class Actor:
         Actor.__class_handlers[self.__class__] = handlers
         return handlers
 
-    def _receive(self, msg: Msg, ctx: ActorContext):
+    def _receive(self, system: ActorSystem, ctx: ActorContext, msg: Msg) -> bool:
 
         try:
             self.__ctx = ctx
@@ -119,12 +86,54 @@ class Actor:
                     log.warning(f"Message ignored: [{msg.message}] -> {msg.target}" +
                                 f" (actor {self.__class__.__name__} does not support this message)")
 
+            return True
+
+        except Exception as e:
+
+            system._process_error(ctx.id, e)  # noqa
+            return False
+
         finally:
             self.__ctx = None
 
 
 # Static member __log can only be set after class Actor is declared
 Actor._Actor__log = util.logger_for_class(Actor)
+
+
+class ActorContext:
+
+    def __init__(self, system: ActorSystem,
+                 current_actor: ActorId, parent: ActorId, sender: tp.Optional[ActorId],
+                 send_func: tp.Callable, spawn_func: tp.Callable, stop_func: tp.Callable):
+
+        self.id = current_actor
+        self.parent = parent
+        self.sender = sender
+
+        self.__system = system
+        self.__send_func = send_func
+        self.__spawn_func = spawn_func
+        self.__stop_func = stop_func
+
+    def spawn(self, actor_class: Actor.__class__, *args, **kwargs) -> ActorId:
+        return self.__spawn_func(actor_class, args, kwargs)
+
+    def send(self, target_id: ActorId, message: str, *args, **kwargs):
+        self.__send_func(target_id, message, args, kwargs)
+
+    def send_parent(self, message: str, *args, **kwargs):
+        self.__send_func(self.parent, message, args, kwargs)
+
+    def reply(self, message: str, *args, **kwargs):
+        self.__send_func(self.sender, message, args, kwargs)
+
+    def stop(self, target_id: tp.Optional[ActorId] = None):
+
+        if target_id:
+            self.__stop_func(target_id)
+        else:
+            self.__stop_func(self.id)
 
 
 class Message:
@@ -137,18 +146,6 @@ class Message:
         self.__method(*args, **kwargs)
 
 
-class Msg:
-
-    def __init__(self, sender: ActorId, target: ActorId, message: str,
-                 args: tp.List[tp.Any], kwargs: tp.Dict[str, tp.Any]):
-
-        self.sender = sender
-        self.target = target
-        self.message = message
-        self.args = args
-        self.kwargs = kwargs
-
-
 class ActorStateCode(enum.Enum):
 
     NOT_STARTED = 0
@@ -156,13 +153,27 @@ class ActorStateCode(enum.Enum):
     RUNNING = 2
     STOPPING = 3
     STOPPED = 4
+    ERROR = 5
+    FAILED = 6
 
 
+@dc.dataclass
 class ActorState:
 
-    def __init__(self, actor: Actor, state_code: ActorStateCode):
-        self.actor = actor
-        self.state_code = state_code
+    actor: Actor
+    state_code: ActorStateCode
+    error: tp.Optional[Exception] = None
+
+
+@dc.dataclass(frozen=True)
+class Msg:
+
+    sender: ActorId
+    target: ActorId
+    message: str
+
+    args: tp.List[tp.Any] = dc.field(default_factory=list)
+    kwargs: tp.Dict[str, tp.Any] = dc.field(default_factory=dict)
 
 
 class ActorSystem:
@@ -184,6 +195,10 @@ class ActorSystem:
         self.__system_up = threading.Event()
         self.__system_msg = threading.Event()
 
+        self.__system_error: tp.Optional[Exception] = None
+
+    # Public API
+
     def start(self, wait=False):
 
         self.__system_thread.start()
@@ -199,6 +214,14 @@ class ActorSystem:
     def wait_for_shutdown(self):
 
         self.__system_thread.join()
+
+    def shutdown_code(self) -> int:
+
+        return 0 if self.__system_error is None else -1
+
+    def shutdown_error(self) -> tp.Optional[Exception]:
+
+        return self.__system_error
 
     def send(self, message: str, *args, **kwargs):
 
@@ -275,7 +298,7 @@ class ActorSystem:
 
         main_actor_state = self.__actors.get(self.__main_id)
 
-        while main_actor_state.state_code != ActorStateCode.STOPPED:
+        while main_actor_state.state_code not in [ActorStateCode.STOPPED, ActorStateCode.FAILED]:
 
             if len(self.__message_queue):
                 next_msg = self.__message_queue.pop(0)
@@ -286,6 +309,8 @@ class ActorSystem:
                 self._process_message(next_msg)
             else:
                 self.__system_msg.wait(0.01)
+
+        self.__system_error = main_actor_state.error
 
     def _process_message(self, msg: Msg):
 
@@ -308,13 +333,39 @@ class ActorSystem:
         ctx = ActorContext(self, msg.target, parent_id, msg.sender, send_func, spawn_func, stop_func)
 
         actor = actor_state.actor
-        actor._receive(msg, ctx)  # noqa
+        msg_ok = actor._receive(self, ctx, msg)  # noqa
 
+        # TODO: This is a bit messy! Find a cleaner way?
         if msg.message == Actor.STARTED:
-            actor_state.state_code = ActorStateCode.RUNNING
+            if msg_ok:
+                actor_state.state_code = ActorStateCode.RUNNING
+            else:
+                actor_state.state_code = ActorStateCode.FAILED
         elif msg.message == Actor.STOPPED:
-            actor_state.state_code = ActorStateCode.STOPPED
+            if actor_state.state_code == ActorStateCode.STOPPING and msg_ok:
+                actor_state.state_code = ActorStateCode.STOPPED
+            else:
+                actor_state.state_code = ActorStateCode.FAILED
             self.__actors.pop(msg.target)
+
+    def _process_error(self, actor_id: ActorId, error: Exception):
+
+        actor_state = self.__actors.get(actor_id)
+
+        if not actor_state:
+            self._log.warning(
+                f"Error ignored: [{Actor.STOPPED}] -> {actor_id}" +
+                f" (failed actor not found)")
+            return
+
+        pre_error_state = actor_state.state_code
+
+        actor_state.state_code = ActorStateCode.ERROR
+        actor_state.error = error
+
+        # Dp not send STOP signal if actor was not started successfully
+        if pre_error_state not in [ActorStateCode.NOT_STARTED, ActorStateCode.STARTING]:
+            self._send_message("/system", actor_id, Actor.STOPPED, [], {})
 
     def _lookup_actor(self, actor_id: ActorId) -> tp.Optional[ActorState]:
 
