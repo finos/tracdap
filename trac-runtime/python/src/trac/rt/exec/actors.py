@@ -145,6 +145,7 @@ class Message:
 
         params = inspect.signature(method).parameters
         self.params = list(params.values())[1:]  # skip 'self' parameter
+        self.type_hints = tp.get_type_hints(method)
 
     def __call__(self, *args, **kwargs):
         self.__method(*args, **kwargs)
@@ -407,6 +408,7 @@ class ActorSystem:
             # raise RuntimeError()  # TODO: Error
 
         target_params = target_handler.func.params
+        type_hints = target_handler.func.type_hints
 
         if len(args) + len(kwargs) > len(target_params):
             error = f"Invalid message: [{message}] -> {target_id} (too many arguments)"
@@ -434,11 +436,10 @@ class ActorSystem:
         # Positional arg types
         for pos_param, pos_arg in zip(pos_params, args):
 
-            # If arg type is not annotated, we cannot do a type check
-            if pos_param.annotation == inspect._empty:  # noqa
-                continue
+            type_hint = type_hints.get(pos_param.name)
 
-            if not isinstance(pos_arg, pos_param.annotation):
+            # If no type hint is available, allow anything through
+            if type_hint is not None and not isinstance(pos_arg, type_hint):
                 error = f"Invalid message: [{message}] -> {target_id} (wrong parameter type for '{pos_param.name}')"
                 self._log.error(error)
                 raise RuntimeError(error)
@@ -446,17 +447,15 @@ class ActorSystem:
         # Kw arg types
         for kw_param in kw_params:
 
-            # If arg type is not annotated, we cannot do a type check
-            if kw_param.annotation == inspect._empty:  # noqa
-                continue
-
             kw_arg = kwargs.get(kw_param.name)
+            type_hint = type_hints.get(kw_param.name)
 
             # If param has taken a default value, no type check is needed
             if kw_arg is None:
                 continue
 
-            if not isinstance(kw_arg, kw_param.annotation):
+            # If no type hint is available, allow anything through
+            if type_hint is not None and not isinstance(kw_arg, type_hint):
                 error = f"Invalid message: [{message}] -> {target_id} (wrong parameter type for '{kw_param.name}')"
                 self._log.error(error)
                 raise RuntimeError(error)
