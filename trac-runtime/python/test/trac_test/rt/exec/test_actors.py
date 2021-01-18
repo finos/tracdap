@@ -323,9 +323,9 @@ class ActorSystemTest(unittest.TestCase):
                 print("parent_stop")
                 results.append("parent_stop")
 
-            def on_signal(self, actor_id: actors.ActorId, signal: str) -> bool:
+            def on_signal(self, signal: str) -> bool:
 
-                if actor_id == self.child_id:
+                if self.actors().sender == self.child_id:
                     print(f"parent_signal: {signal}")
                     results.append("parent_signal")
                     results.append(signal)
@@ -335,8 +335,8 @@ class ActorSystemTest(unittest.TestCase):
 
             @actors.Message
             def child_started(self, child_id):
-                print("parent_message")
-                results.append("parent_message")
+                print("child_started")
+                results.append("child_started")
                 self.actors().stop(child_id)
 
         root = ParentActor()
@@ -346,7 +346,7 @@ class ActorSystemTest(unittest.TestCase):
 
         self.assertEqual([
             "parent_start",
-            "child_start", "parent_message",
+            "child_start", "child_started",
             "child_stop", "parent_signal", "actor:stopped",
             "parent_stop"],
             results)
@@ -375,7 +375,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
                 results.append("child_start")
-                self.actors().spawn(Grandchild)
+                self.actors().spawn(Grandchild, self.actors().parent)
 
             def on_stop(self):
                 results.append("child_stop")
@@ -391,7 +391,7 @@ class ActorSystemTest(unittest.TestCase):
 
             @actors.Message
             def grandchild_started(self):
-                results.append("grandchild_up")
+                results.append("grandchild_started")
                 self.actors().stop()
 
         root = Parent()
@@ -401,7 +401,7 @@ class ActorSystemTest(unittest.TestCase):
 
         self.assertEqual([
             "parent_start", "child_start", "grandchild_start",
-            "parent_message",
+            "grandchild_started",
             "grandchild_stop", "child_stop", "parent_stop"],
             results)
 

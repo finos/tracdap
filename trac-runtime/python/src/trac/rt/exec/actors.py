@@ -27,6 +27,17 @@ import trac.rt.impl.util as util
 ActorId = str
 
 
+class ActorState(enum.Enum):
+
+    NOT_STARTED = 0
+    STARTING = 1
+    RUNNING = 2
+    STOPPING = 3
+    STOPPED = 4
+    ERROR = 5
+    FAILED = 6
+
+
 class Actor:
 
     __class_handlers: tp.Dict[type, tp.Dict[str, tp.Callable]] = dict()
@@ -34,7 +45,15 @@ class Actor:
 
     def __init__(self):
         self.__handlers = self._inspect_handlers()
+        self.__state = ActorState.NOT_STARTED
+        self.__error: tp.Optional[Exception] = None
         self.__ctx: tp.Optional[ActorContext] = None
+
+    def state(self) -> ActorState:
+        return self.__state
+
+    def error(self) -> tp.Optional[Exception]:
+        return self.__error
 
     def actors(self) -> ActorContext:
         return self.__ctx
@@ -44,6 +63,9 @@ class Actor:
 
     def on_stop(self):
         pass
+
+    def on_signal(self, signal: str) -> tp.Optional[bool]:
+        return None
 
     def _inspect_handlers(self) -> tp.Dict[str, tp.Callable]:
 
@@ -61,38 +83,65 @@ class Actor:
         Actor.__class_handlers[self.__class__] = handlers
         return handlers
 
-    def _receive(self, system: ActorSystem, ctx: ActorContext, msg: Msg) -> bool:
+    def _receive_message(self, system: ActorSystem, ctx: ActorContext, msg: Msg):
 
         try:
             self.__ctx = ctx
 
-            if msg.message == Signal.START:
-                self.on_start()
+            handler = self.__handlers.get(msg.message)
 
-            elif msg.message == Signal.STOP:
-                self.on_stop()
+            if handler:
+                handler(*msg.args, **msg.kwargs)
 
             else:
-                handler = self.__handlers.get(msg.message)
+                # Unhandled messages are dropped, with just a warning in the log
+                log = util.logger_for_class(Actor)
+                log.warning(f"Message ignored: [{msg.message}] -> {msg.target}" +
+                            f" (actor {self.__class__.__name__} does not support this message)")
 
-                if handler:
-                    handler(*msg.args, **msg.kwargs)
+        except Exception as error:
 
-                else:
-                    # Unhandled messages are dropped, with just a warning in the log
-                    log = util.logger_for_class(Actor)
-                    log.warning(f"Message ignored: [{msg.message}] -> {msg.target}" +
-                                f" (actor {self.__class__.__name__} does not support this message)")
-
-            return True
-
-        except Exception as e:
-
-            system._process_error(ctx.id, msg.message, e)  # noqa
-            return False
+            self.__state = ActorState.ERROR
+            self.__error = error
+            system._report_error(ctx.id, msg.message, error)  # noqa
 
         finally:
             self.__ctx = None
+
+    def _receive_signal(self, system: ActorSystem, ctx: ActorContext, signal: Msg) -> tp.Optional[bool]:
+
+        try:
+            self.__ctx = ctx
+
+            if signal.message == Signal.START:
+                self._require_state([ActorState.NOT_STARTED, ActorState.STARTING])
+                self.on_start()
+                self.__state = ActorState.RUNNING
+                return True
+
+            elif signal.message == Signal.STOP:
+                self._require_state([ActorState.RUNNING, ActorState.STOPPING, ActorState.ERROR])
+                self.on_stop()
+                self.__state = ActorState.STOPPED if self.__error is None else ActorState.FAILED
+                return True
+
+            else:
+                return self.on_signal(signal.message)
+
+        except Exception as error:
+
+            self.__state = ActorState.ERROR
+            self.__error = error
+            system._report_error(ctx.id, signal.message, error)  # noqa
+            return None
+
+        finally:
+            self.__ctx = None
+
+    def _require_state(self, allowed_states: tp.List[ActorState]):
+
+        if self.__state not in allowed_states:
+            raise RuntimeError("Actor lifecycle error")  # TODO: Error
 
 
 # Static member __log can only be set after class Actor is declared
@@ -101,37 +150,35 @@ Actor._Actor__log = util.logger_for_class(Actor)
 
 class ActorContext:
 
-    def __init__(self, system: ActorSystem,
-                 current_actor: ActorId, parent: ActorId, sender: tp.Optional[ActorId],
-                 send_func: tp.Callable, spawn_func: tp.Callable, stop_func: tp.Callable):
+    def __init__(self, system: ActorSystem, current_actor: ActorId, parent: ActorId, sender: tp.Optional[ActorId]):
 
         self.id = current_actor
         self.parent = parent
         self.sender = sender
 
         self.__system = system
-        self.__send_func = send_func
-        self.__spawn_func = spawn_func
-        self.__stop_func = stop_func
+        self.__id = current_actor
+        self.__parent = parent
+        self.__sender = sender
 
     def spawn(self, actor_class: Actor.__class__, *args, **kwargs) -> ActorId:
-        return self.__spawn_func(actor_class, args, kwargs)
+        return self.__system._spawn_actor(self.__id, actor_class, args, kwargs)  # noqa
 
     def send(self, target_id: ActorId, message: str, *args, **kwargs):
-        self.__send_func(target_id, message, args, kwargs)
+        self.__system._send_message(self.__id, target_id, message, args, kwargs)  # noqa
 
     def send_parent(self, message: str, *args, **kwargs):
-        self.__send_func(self.parent, message, args, kwargs)
+        self.__system._send_message(self.__id, self.__parent, message, args, kwargs)  # noqa
 
     def reply(self, message: str, *args, **kwargs):
-        self.__send_func(self.sender, message, args, kwargs)
+        self.__system._send_message(self.__id, self.__sender, message, args, kwargs)  # noqa
 
     def stop(self, target_id: tp.Optional[ActorId] = None):
 
         if target_id:
-            self.__stop_func(target_id)
+            self.__system._stop_actor(self.__id, target_id)  # noqa
         else:
-            self.__stop_func(self.id)
+            self.__system._stop_actor(self.__id, self.__id)  # noqa
 
 
 class Message:
@@ -150,29 +197,14 @@ class Message:
 
 class Signal:
 
+    PREFIX = "actor:"
+
     START = "actor:start"
     STOP = "actor:stop"
+
     STARTED = "actor:started"
     STOPPED = "actor:stopped"
-
-
-class ActorStateCode(enum.Enum):
-
-    NOT_STARTED = 0
-    STARTING = 1
-    RUNNING = 2
-    STOPPING = 3
-    STOPPED = 4
-    ERROR = 5
-    FAILED = 6
-
-
-@dc.dataclass
-class ActorState:
-
-    actor: Actor
-    state_code: ActorStateCode
-    error: tp.Optional[Exception] = None
+    FAILED = "actor:failed"
 
 
 @dc.dataclass(frozen=True)
@@ -192,7 +224,7 @@ class ActorSystem:
 
         self._log = util.logger_for_object(self)
 
-        self.__actors: tp.Dict[ActorId, ActorState] = dict()
+        self.__actors: tp.Dict[ActorId, Actor] = dict()
         self.__message_queue: tp.List[Msg] = list()
 
         self.__main_id = self._spawn_main_actor("/", main_actor)
@@ -241,9 +273,8 @@ class ActorSystem:
 
         actor_id = self._new_actor_id(parent_id, actor_class)
         actor = actor_class(*args, **kwargs)
-        actor_state = ActorState(actor, ActorStateCode.NOT_STARTED)
 
-        self.__actors[actor_id] = actor_state
+        self.__actors[actor_id] = actor
         self._start_actor(parent_id, actor_id)
 
         return actor_id
@@ -251,18 +282,13 @@ class ActorSystem:
     def _spawn_main_actor(self, parent_id: ActorId, actor: Actor):
 
         actor_id = self._new_actor_id(parent_id, actor.__class__)
-        actor_state = ActorState(actor, ActorStateCode.NOT_STARTED)
-
-        self.__actors[actor_id] = actor_state
+        self.__actors[actor_id] = actor
 
         return actor_id
 
     def _start_actor(self, started_by_id: ActorId, actor_id: ActorId):
 
-        actor_state = self.__actors[actor_id]
-        actor_state.state_code = ActorStateCode.STARTING
-
-        self._send_message(started_by_id, actor_id, Signal.START, [], {})
+        self._send_signal(started_by_id, actor_id, Signal.START)
 
         return actor_id
 
@@ -282,23 +308,33 @@ class ActorSystem:
                 f" (target actor not found)")
             return
 
-        for aid, state in self.__actors.items():
-            if aid.startswith(target_id + "/"):
-                state.state_code = ActorStateCode.STOPPING
-                self._send_message(sender_id, aid, Signal.STOP, [], {})
+        # TODO: This could get expensive! Keep an explicit record of children
+        for aid, actor in self.__actors.items():
+            if self._parent_id(aid) == target_id:
+                self._stop_actor(target_id, aid)
 
-        target_state.state_code = ActorStateCode.STOPPING
-        self._send_message(sender_id, target_id, Signal.STOP, [], {})
+        self._send_signal(sender_id, target_id, Signal.STOP)
+
+    def _send_signal(self, sender_id: ActorId, target_id: ActorId, signal: str):
+
+        if not signal.startswith(Signal.PREFIX):
+            raise RuntimeError("Invalid signal")  # TODO: Error
+
+        msg = Msg(sender_id, target_id, signal)
+        self.__message_queue.append(msg)
 
     def _send_message(self, sender_id: ActorId, target_id: ActorId, message: str, args, kwargs):
+
+        if message.startswith(Signal.PREFIX):
+            raise RuntimeError("Signals cannot be sent like messages")  # TODO: Error
 
         _args = args or []
         _kwargs = kwargs or {}
 
-        target_state = self.__actors.get(target_id)
+        actor = self.__actors.get(target_id)
 
-        if target_state is not None and not message.startswith("actor:"):
-            target_class = target_state.actor.__class__
+        if actor is not None:
+            target_class = actor.__class__
             self._check_message_signature(target_id, target_class, message, args, kwargs)
 
         msg = Msg(sender_id, target_id, message, _args, _kwargs)
@@ -312,9 +348,9 @@ class ActorSystem:
 
         self.__system_up.set()
 
-        main_actor_state = self.__actors.get(self.__main_id)
+        main_actor = self.__actors.get(self.__main_id)
 
-        while main_actor_state.state_code not in [ActorStateCode.STOPPED, ActorStateCode.FAILED]:
+        while main_actor.state() not in [ActorState.STOPPED, ActorState.FAILED]:
 
             if len(self.__message_queue):
                 next_msg = self.__message_queue.pop(0)
@@ -322,71 +358,90 @@ class ActorSystem:
                 next_msg = None
 
             if next_msg:
-                self._process_message(next_msg)
+                if next_msg.message.startswith(Signal.PREFIX):
+                    self._process_signal(next_msg)
+                else:
+                    self._process_message(next_msg)
             else:
                 self.__system_msg.wait(0.01)
 
-        self.__system_error = main_actor_state.error
+        self.__system_error = main_actor.error()
 
     def _process_message(self, msg: Msg):
 
-        actor_state = self._lookup_actor(msg.target)
+        actor = self._lookup_actor(msg.target)
 
-        if not actor_state:
+        if not actor:
             # Unhandled messages are dropped, with just a warning in the log
             self._log.warning(f"Message ignored: [{msg.message}] -> {msg.target}  (target actor not found)")
             return
 
-        if actor_state.state_code != ActorStateCode.RUNNING and not msg.message.startswith("actor:"):
+        if actor.state() != ActorState.RUNNING:
             self._log.warning(f"Message ignored: [{msg.message}] -> {msg.target}  (target actor not running)")
             return
 
         parent_id = self._parent_id(msg.target)
-        send_func = func.partial(self._send_message, msg.target)
-        spawn_func = func.partial(self._spawn_actor, msg.target)
-        stop_func = func.partial(self._stop_actor, msg.target)
+        ctx = ActorContext(self, msg.target, parent_id, msg.sender)
 
-        ctx = ActorContext(self, msg.target, parent_id, msg.sender, send_func, spawn_func, stop_func)
+        actor._receive_message(self, ctx, msg)  # noqa
 
-        actor = actor_state.actor
-        msg_ok = actor._receive(self, ctx, msg)  # noqa
+    def _process_signal(self, signal: Msg):
 
-        # TODO: This is a bit messy! Find a cleaner way?
-        if msg.message == Signal.START:
-            if msg_ok:
-                actor_state.state_code = ActorStateCode.RUNNING
+        actor = self._lookup_actor(signal.target)
+
+        if not actor:
+            # Unhandled messages are dropped, with just a warning in the log
+            self._log.warning(f"Signal ignored: [{signal.message}] -> {signal.target}  (target actor not found)")
+            return
+
+        parent_id = self._parent_id(signal.target)
+        ctx = ActorContext(self, signal.target, parent_id, signal.sender)
+        result = actor._receive_signal(self, ctx, signal)  # noqa
+
+        # Notifications
+
+        # TODO: If the error was reposted with _report_error, the parent will already have a FAILED signal
+        if signal.message == Signal.STOP:
+            if actor.error():
+                self._send_signal(signal.target, self._parent_id(signal.target), Signal.FAILED)
             else:
-                actor_state.state_code = ActorStateCode.FAILED
-        elif msg.message == Signal.STOP:
-            if actor_state.state_code == ActorStateCode.STOPPING and msg_ok:
-                actor_state.state_code = ActorStateCode.STOPPED
-            else:
-                actor_state.state_code = ActorStateCode.FAILED
-            self.__actors.pop(msg.target)
+                self._send_signal(signal.target, self._parent_id(signal.target), Signal.STOPPED)
 
-    def _process_error(self, actor_id: ActorId, message: str, error: Exception):
+        # Error propagation
+        # When an actor dies due to an error, a FAILED signal is sent to its direct parent
+        # If the parent does not handle the error successfully, the parent also dies and the error propagates
 
-        actor_state = self.__actors.get(actor_id)
+        if signal.message == Signal.FAILED:
+            if signal.target == self._parent_id(signal.sender) and result is not True:
+                actor._Actor__error = RuntimeError("propagation error")  # TODO: Needs to wrap the original error
+                self._stop_actor("/system", signal.target)
+                self._send_signal(signal.target, self._parent_id(signal.target), Signal.FAILED)
 
-        if not actor_state:
-            self._log.warning(
-                f"Error ignored: [{Signal.STOP}] -> {actor_id}" +
-                f" (failed actor not found)")
+        if actor.state() in [ActorState.STOPPED, ActorState.FAILED]:
+            self.__actors.pop(signal.target)
+
+    def _report_error(self, actor_id: ActorId, message: str, error: Exception):
+
+        actor = self.__actors.get(actor_id)
+
+        if not actor:
+            message = f"Error ignored: [{Signal.STOP}] -> {actor_id} (failed actor not found)"
+            self._log.warning(message)
             return
 
         self._log.error(f"{actor_id} [{message}]: {str(error)}")
         self._log.error(f"Actor failed: {actor_id} [{message}] (actor will be stopped)")
 
-        pre_error_state = actor_state.state_code
-
-        actor_state.state_code = ActorStateCode.ERROR
-        actor_state.error = error
-
         # Dp not send STOP signal if actor was not started successfully
-        if pre_error_state not in [ActorStateCode.NOT_STARTED, ActorStateCode.STARTING]:
-            self._send_message("/system", actor_id, Signal.STOP, [], {})
+        if message in [Signal.START, Signal.STOP]:
+            actor._Actor__state = ActorState.FAILED
+        else:
+            self._stop_actor("/system", actor_id)
 
-    def _lookup_actor(self, actor_id: ActorId) -> tp.Optional[ActorState]:
+        # Notify the parent
+        self._send_signal(actor_id, self._parent_id(actor_id), Signal.FAILED)
+
+    def _lookup_actor(self, actor_id: ActorId) -> tp.Optional[Actor]:
 
         return self.__actors.get(actor_id)
 
@@ -409,8 +464,9 @@ class ActorSystem:
         target_handler = Actor._Actor__class_handlers.get(target_class).get(message)  # noqa
 
         if target_handler is None:
-            return  # TODO: Should this be an error? Existing behaviour is to ignore unknown messages
-            # raise RuntimeError()  # TODO: Error
+            error = f"Invalid message: [{message}] -> {target_id} (unknown message '{message}')"
+            self._log.error(error)
+            raise RuntimeError(error)
 
         target_params = target_handler.func.params
         type_hints = target_handler.func.type_hints
