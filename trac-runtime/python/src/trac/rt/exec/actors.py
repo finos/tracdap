@@ -29,9 +29,6 @@ ActorId = str
 
 class Actor:
 
-    STARTED = "actor:started"
-    STOPPED = "actor:stopped"
-
     __class_handlers: tp.Dict[type, tp.Dict[str, tp.Callable]] = dict()
     __log: tp.Optional[util.logging.Logger] = None
 
@@ -69,10 +66,10 @@ class Actor:
         try:
             self.__ctx = ctx
 
-            if msg.message == Actor.STARTED:
+            if msg.message == Signal.START:
                 self.on_start()
 
-            elif msg.message == Actor.STOPPED:
+            elif msg.message == Signal.STOP:
                 self.on_stop()
 
             else:
@@ -149,6 +146,14 @@ class Message:
 
     def __call__(self, *args, **kwargs):
         self.__method(*args, **kwargs)
+
+
+class Signal:
+
+    START = "actor:start"
+    STOP = "actor:stop"
+    STARTED = "actor:started"
+    STOPPED = "actor:stopped"
 
 
 class ActorStateCode(enum.Enum):
@@ -257,7 +262,7 @@ class ActorSystem:
         actor_state = self.__actors[actor_id]
         actor_state.state_code = ActorStateCode.STARTING
 
-        self._send_message(started_by_id, actor_id, Actor.STARTED, [], {})
+        self._send_message(started_by_id, actor_id, Signal.START, [], {})
 
         return actor_id
 
@@ -265,7 +270,7 @@ class ActorSystem:
 
         if not (sender_id == target_id or self._parent_id(target_id) == sender_id or sender_id == "/system"):
             self._log.warning(
-                f"Signal ignored: [{Actor.STOPPED}] -> {target_id}" +
+                f"Signal ignored: [{Signal.STOP}] -> {target_id}" +
                 f" ({sender_id} is not allowed to stop this actor)")
             return
 
@@ -273,17 +278,17 @@ class ActorSystem:
 
         if not target_state:
             self._log.warning(
-                f"Signal ignored: [{Actor.STOPPED}] -> {target_id}" +
+                f"Signal ignored: [{Signal.STOP}] -> {target_id}" +
                 f" (target actor not found)")
             return
 
         for aid, state in self.__actors.items():
             if aid.startswith(target_id + "/"):
                 state.state_code = ActorStateCode.STOPPING
-                self._send_message(sender_id, aid, Actor.STOPPED, [], {})
+                self._send_message(sender_id, aid, Signal.STOP, [], {})
 
         target_state.state_code = ActorStateCode.STOPPING
-        self._send_message(sender_id, target_id, Actor.STOPPED, [], {})
+        self._send_message(sender_id, target_id, Signal.STOP, [], {})
 
     def _send_message(self, sender_id: ActorId, target_id: ActorId, message: str, args, kwargs):
 
@@ -347,12 +352,12 @@ class ActorSystem:
         msg_ok = actor._receive(self, ctx, msg)  # noqa
 
         # TODO: This is a bit messy! Find a cleaner way?
-        if msg.message == Actor.STARTED:
+        if msg.message == Signal.START:
             if msg_ok:
                 actor_state.state_code = ActorStateCode.RUNNING
             else:
                 actor_state.state_code = ActorStateCode.FAILED
-        elif msg.message == Actor.STOPPED:
+        elif msg.message == Signal.STOP:
             if actor_state.state_code == ActorStateCode.STOPPING and msg_ok:
                 actor_state.state_code = ActorStateCode.STOPPED
             else:
@@ -365,7 +370,7 @@ class ActorSystem:
 
         if not actor_state:
             self._log.warning(
-                f"Error ignored: [{Actor.STOPPED}] -> {actor_id}" +
+                f"Error ignored: [{Signal.STOP}] -> {actor_id}" +
                 f" (failed actor not found)")
             return
 
@@ -379,7 +384,7 @@ class ActorSystem:
 
         # Dp not send STOP signal if actor was not started successfully
         if pre_error_state not in [ActorStateCode.NOT_STARTED, ActorStateCode.STARTING]:
-            self._send_message("/system", actor_id, Actor.STOPPED, [], {})
+            self._send_message("/system", actor_id, Signal.STOP, [], {})
 
     def _lookup_actor(self, actor_id: ActorId) -> tp.Optional[ActorState]:
 
