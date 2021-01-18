@@ -12,8 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-# TODO: Need to update config_parser to support deferred annotations before turning on the new behaviour
-# from __future__ import annotations
+from __future__ import annotations
 
 import typing as tp
 import dataclasses as dc

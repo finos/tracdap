@@ -143,37 +143,39 @@ class ConfigParser:
         if raw_dict is not None and not isinstance(raw_dict, dict):
             pass
 
-        obj = metaclass.__new__(metaclass, object())
+        obj = metaclass.__new__(metaclass, object())  # noqa
 
-        init = inspect.signature(metaclass.__init__)
-        init_params = iter(init.parameters)
+        init_signature = inspect.signature(metaclass.__init__)
+        init_types = tp.get_type_hints(metaclass.__init__)
+        init_params = iter(init_signature.parameters.items())
         init_values: tp.List[tp.Any] = list()
 
         # Do not process 'self'
         next(init_params)
 
-        for param_name in init_params:
+        for param_name, param in init_params:
 
-            param = init.parameters[param_name]
             param_location = self._child_location(location, param_name)
+            param_type = init_types.get(param_name)
 
-            if param.annotation == inspect._empty:
+            if param_type is None:
                 message = f"Class {metaclass.__name__} does not support config decoding: " + \
-                          f"Missing type annotation for init parameter {param_name}"
-                init_values.append(self._error(location, message))
+                          f"Missing type information for init parameter '{param_name}'"
+                self._error(location, message)
+                init_values.append(None)
 
             elif param_name in raw_dict:
-                param_value = self._parse_value(param_location, raw_dict[param_name], param.annotation)
+                param_value = self._parse_value(param_location, raw_dict[param_name], param_type)
                 init_values.append(param_value)
 
-            elif param.default != inspect._empty:
+            elif param.default != inspect._empty:  # noqa
                 init_values.append(param.default)
 
             else:
-                self._error(param_location, f"Required value is missing")
+                self._error(location, f"Missing required value '{param_name}'")
                 init_values.append(None)
 
-        binding = init.bind(obj, *init_values)
+        binding = init_signature.bind(obj, *init_values)
         metaclass.__init__(*binding.args, **binding.kwargs)
 
         # Now go back over the members and look for any that weren't declared in __init__
@@ -184,16 +186,20 @@ class ConfigParser:
             member_location = self._child_location(location, member_name)
             default_value = obj.__dict__[member_name]
 
-            if member_name in init.parameters or member_name.startswith("_"):
+            if member_name in init_signature.parameters or member_name.startswith("_"):
                 continue
 
             # Members not declared in __init__ must have a non-null default in order to get type info
             if default_value is None:
-                pass
+                message = f"Class {metaclass.__name__} does not support config decoding: " + \
+                          f"Generic member must be declared in __init__: '{member_name}'"
+                self._error(location, message)
 
             # Generic members must be declared in __init__ since that is the only way to get the full annotation
             if isinstance(type(default_value), self.__generic_metaclass):
-                pass
+                message = f"Class {metaclass.__name__} does not support config decoding: " + \
+                          f"Members with no default value must be declared in __init__: '{member_name}'"
+                self._error(location, message)
 
             # Use default value if none supplied
             if member_name not in raw_dict:
@@ -218,8 +224,8 @@ class ConfigParser:
 
     def _parse_generic_class(self, location: str, raw_value: tp.Any, metaclass:  __generic_metaclass):
 
-        origin = metaclass.__origin__
-        args = metaclass.__args__
+        origin = tp.get_origin(metaclass)
+        args = tp.get_args(metaclass)
 
         if origin == tp.List or origin == list:
 
