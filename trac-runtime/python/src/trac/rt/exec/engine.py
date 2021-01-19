@@ -300,7 +300,8 @@ class TracEngine(actors.Actor):
         self._log.info("Engine is up and running")
 
     def on_stop(self):
-        pass
+
+        self._log.info("Engine shutdown complete")
 
     @actors.Message
     def submit_job(self, job_info: object):
@@ -330,8 +331,12 @@ class TracEngine(actors.Actor):
 
         jobs = copy(self.engine_ctx.jobs)
         job_actor_id = jobs.pop(job_id)
-        self.actors().stop(job_actor_id)
 
         if self._batch_mode:
+            # If the engine is in batch mode, shut down the whole engine once the first job completes
             self._log.info("Batch run complete, shutting down the engine")
             self.actors().stop()
+
+        else:
+            # Otherwise, just stop the individual job actor for the job that has completed
+            self.actors().stop(job_actor_id)

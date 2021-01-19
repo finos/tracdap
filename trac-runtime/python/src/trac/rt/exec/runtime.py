@@ -14,8 +14,6 @@
 
 from __future__ import annotations
 
-import yaml
-import json
 import datetime as dt
 import sys
 import pathlib
@@ -83,7 +81,12 @@ class TracRuntime:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.stop()
+
+        # Do not call self.stop()
+        # In batch mode, the engine will stop itself once the job is complete, so no need to stop twice
+        # It may be necessary to call self.stop() in service mode, depending how the stop is triggered (e.g. interrupt)
+
+        pass
 
     def pre_start(self):
 
@@ -119,12 +122,18 @@ class TracRuntime:
 
     def stop(self):
 
-        self._log.info("Begin shutdown sequence")
+        self._log.info("Shutting down the engine")
         self._system.stop()
 
     def wait_for_shutdown(self):
 
         self._system.wait_for_shutdown()
+
+        if self._system.shutdown_code() == 0:
+            self._log.info("TRAC runtime has gone down cleanly")
+        else:
+            self._log.error("TRAC runtime has gone down with errors", exc_info=self._system.shutdown_error())
+            raise RuntimeError("TRAC runtime has gone down with errors") from self._system.shutdown_error()
 
     # ------------------------------------------------------------------------------------------------------------------
     # Job submission

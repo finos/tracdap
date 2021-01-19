@@ -450,7 +450,9 @@ class ActorSystem:
                 self._stop_actor("/system", signal.target)
                 self._send_signal(signal.target, target.parent_id, Signal.FAILED)
 
-        # If the actor is now stopped (or failed), take it out of the actor registry
+        # Remove dead actors
+        # If the actor is now stopped or failed, take it out of the registry
+
         if target.actor.state() in [ActorState.STOPPED, ActorState.FAILED]:
             with self.__system_lock:
                 self.__actors.pop(signal.target)
