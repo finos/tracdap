@@ -326,13 +326,14 @@ class ActorSystem:
 
     def _stop_actor(self, sender_id: ActorId, target_id: ActorId):
 
-        sender = self._lookup_actor_node(sender_id)
-
         if not (sender_id == target_id or self._parent_id(target_id) == sender_id or sender_id == "/system"):
-            self._log.warning(
-                f"Signal ignored: [{Signal.STOP}] -> {target_id}" +
-                f" ({sender_id} is not allowed to stop this actor)")
-            return
+
+            message = f"Stop request rejected: [{Signal.STOP}] -> {target_id}" + \
+                      f" ({sender_id} is not allowed to stop this actor)"
+            self._log.error(message)
+
+            # TODO: Error type
+            raise RuntimeError(message)
 
         target = self._lookup_actor_node(target_id)
 
