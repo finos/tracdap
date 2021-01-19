@@ -431,17 +431,17 @@ class ActorSystem:
         ctx = ActorContext(self, signal.target, parent_id, signal.sender)
         result = target.actor._receive_signal(self, ctx, signal)  # noqa
 
-        # Notifications
+        # Generate lifecycle notifications
 
-        # TODO: If the error was reposted with _report_error, the parent will already have a FAILED signal
         if signal.message == Signal.STOP:
+
             if target.actor.error():
                 self._send_signal(signal.target, target.parent_id, Signal.FAILED)
             else:
                 self._send_signal(signal.target, target.parent_id, Signal.STOPPED)
 
         # Error propagation
-        # When an actor dies due to an error, a FAILED signal is sent to its direct parent
+        # When an actor dies due to an error, a FAILED signal is generated and sent to its direct parent
         # If the parent does not handle the error successfully, the parent also dies and the error propagates
 
         if signal.message == Signal.FAILED:
@@ -450,8 +450,14 @@ class ActorSystem:
                 self._stop_actor("/system", signal.target)
                 self._send_signal(signal.target, target.parent_id, Signal.FAILED)
 
+        # If the actor is now stopped (or failed), take it out of the actor registry
         if target.actor.state() in [ActorState.STOPPED, ActorState.FAILED]:
-            self.__actors.pop(signal.target)
+            with self.__system_lock:
+                self.__actors.pop(signal.target)
+                parent = self.__actors.get(target.parent_id)
+                if parent is not None:
+                    parent = parent.without_child(signal.target)
+                    self.__actors[target.parent_id] = parent
 
     def _report_error(self, actor_id: ActorId, message: str, error: Exception):
 
@@ -465,14 +471,15 @@ class ActorSystem:
         self._log.error(f"{actor_id} [{message}]: {str(error)}")
         self._log.error(f"Actor failed: {actor_id} [{message}] (actor will be stopped)")
 
-        # Dp not send STOP signal if actor was not started successfully
+        # Dp not send STOP signal for errors that occur while processing START or STOP
+        # In this case, directly set the state to FAILED and send a FAILED notification to the parent
         if message in [Signal.START, Signal.STOP]:
             actor_node.actor._Actor__state = ActorState.FAILED
+            self._send_signal(actor_id, actor_node.parent_id, Signal.FAILED)
+
+        # Otherwise stop the actor, a FAILED notification will be generated when the STOP signal is processed
         else:
             self._stop_actor("/system", actor_id)
-
-        # Notify the parent
-        self._send_signal(actor_id, actor_node.parent_id, Signal.FAILED)
 
     def _lookup_actor_node(self, actor_id: ActorId) -> tp.Optional[ActorNode]:
 
