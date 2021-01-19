@@ -218,16 +218,37 @@ class Msg:
     kwargs: tp.Dict[str, tp.Any] = dc.field(default_factory=dict)
 
 
+@dc.dataclass(frozen=True)
+class ActorNode:
+
+    parent_id: ActorId
+    actor_id: ActorId
+    actor: Actor
+
+    children: tp.FrozenSet[ActorId] = dc.field(default_factory=frozenset)
+    next_child_number: int = 0
+
+    def with_child(self, child_id: ActorId):
+        children = self.children.union([child_id])
+        return ActorNode(self.parent_id, self.actor_id, self.actor, children, self.next_child_number + 1)
+
+    def without_child(self, child_id: ActorId):
+        children = frozenset(filter(lambda c: c != child_id, self.children))
+        return ActorNode(self.parent_id, self.actor_id, self.actor, children, self.next_child_number)
+
+
 class ActorSystem:
 
+    __DELIMITER = "/"
+    __ROOT_ID = __DELIMITER
+
     def __init__(self, main_actor: Actor, system_thread: str = "actor_system"):
+        super().__init__()
 
         self._log = util.logger_for_object(self)
 
-        self.__actors: tp.Dict[ActorId, Actor] = dict()
+        self.__actors: tp.Dict[ActorId, ActorNode] = {self.__ROOT_ID: ActorNode("", self.__ROOT_ID, None)}
         self.__message_queue: tp.List[Msg] = list()
-
-        self.__main_id = self._spawn_main_actor("/", main_actor)
 
         self.__system_thread = threading.Thread(
             name=system_thread,
@@ -236,8 +257,9 @@ class ActorSystem:
         self.__system_lock = threading.Lock()
         self.__system_up = threading.Event()
         self.__system_msg = threading.Event()
-
         self.__system_error: tp.Optional[Exception] = None
+
+        self.__main_id = self._register_actor(self.__ROOT_ID, main_actor, do_start=False)
 
     # Public API
 
@@ -255,7 +277,7 @@ class ActorSystem:
 
     def wait_for_shutdown(self):
 
-        self.__system_thread.join()
+        self.__system_thread.join()   # TODO: Timeout
 
     def shutdown_code(self) -> int:
 
@@ -271,18 +293,28 @@ class ActorSystem:
 
     def _spawn_actor(self, parent_id: ActorId, actor_class: Actor.__class__, args, kwargs):
 
-        actor_id = self._new_actor_id(parent_id, actor_class)
         actor = actor_class(*args, **kwargs)
 
-        self.__actors[actor_id] = actor
-        self._start_actor(parent_id, actor_id)
+        return self._register_actor(parent_id, actor, do_start=True)
 
-        return actor_id
+    def _register_actor(self, parent_id: ActorId, actor: Actor, do_start: bool = True):
 
-    def _spawn_main_actor(self, parent_id: ActorId, actor: Actor):
+        actor_class = actor.__class__
 
-        actor_id = self._new_actor_id(parent_id, actor.__class__)
-        self.__actors[actor_id] = actor
+        with self.__system_lock:
+
+            # TODO: Parent already discarded, can that happen?
+            parent_node = self.__actors.get(parent_id)
+            actor_id = self._new_actor_id(parent_node, actor_class)
+
+            parent_node = parent_node.with_child(actor_id)
+            actor_node = ActorNode(parent_id, actor_id, actor)
+
+            self.__actors[parent_id] = parent_node
+            self.__actors[actor_id] = actor_node
+
+        if do_start:
+            self._start_actor(parent_id, actor_id)
 
         return actor_id
 
@@ -294,24 +326,24 @@ class ActorSystem:
 
     def _stop_actor(self, sender_id: ActorId, target_id: ActorId):
 
+        sender = self._lookup_actor_node(sender_id)
+
         if not (sender_id == target_id or self._parent_id(target_id) == sender_id or sender_id == "/system"):
             self._log.warning(
                 f"Signal ignored: [{Signal.STOP}] -> {target_id}" +
                 f" ({sender_id} is not allowed to stop this actor)")
             return
 
-        target_state = self.__actors.get(target_id)
+        target = self._lookup_actor_node(target_id)
 
-        if not target_state:
+        if target is None:
             self._log.warning(
                 f"Signal ignored: [{Signal.STOP}] -> {target_id}" +
                 f" (target actor not found)")
             return
 
-        # TODO: This could get expensive! Keep an explicit record of children
-        for aid, actor in self.__actors.items():
-            if self._parent_id(aid) == target_id:
-                self._stop_actor(target_id, aid)
+        for child_id in target.children:
+            self._stop_actor(target_id, child_id)
 
         self._send_signal(sender_id, target_id, Signal.STOP)
 
@@ -331,10 +363,10 @@ class ActorSystem:
         _args = args or []
         _kwargs = kwargs or {}
 
-        actor = self.__actors.get(target_id)
+        target = self._lookup_actor_node(target_id)
 
-        if actor is not None:
-            target_class = actor.__class__
+        if target is not None:
+            target_class = target.actor.__class__
             self._check_message_signature(target_id, target_class, message, args, kwargs)
 
         msg = Msg(sender_id, target_id, message, _args, _kwargs)
@@ -348,7 +380,7 @@ class ActorSystem:
 
         self.__system_up.set()
 
-        main_actor = self.__actors.get(self.__main_id)
+        main_actor = self._lookup_actor(self.__main_id)
 
         while main_actor.state() not in [ActorState.STOPPED, ActorState.FAILED]:
 
@@ -369,43 +401,43 @@ class ActorSystem:
 
     def _process_message(self, msg: Msg):
 
-        actor = self._lookup_actor(msg.target)
+        target = self._lookup_actor_node(msg.target)
 
-        if not actor:
+        if target is None:
             # Unhandled messages are dropped, with just a warning in the log
             self._log.warning(f"Message ignored: [{msg.message}] -> {msg.target}  (target actor not found)")
             return
 
-        if actor.state() != ActorState.RUNNING:
+        if target.actor.state() != ActorState.RUNNING:
             self._log.warning(f"Message ignored: [{msg.message}] -> {msg.target}  (target actor not running)")
             return
 
-        parent_id = self._parent_id(msg.target)
+        parent_id = target.parent_id
         ctx = ActorContext(self, msg.target, parent_id, msg.sender)
 
-        actor._receive_message(self, ctx, msg)  # noqa
+        target.actor._receive_message(self, ctx, msg)  # noqa
 
     def _process_signal(self, signal: Msg):
 
-        actor = self._lookup_actor(signal.target)
+        target = self._lookup_actor_node(signal.target)
 
-        if not actor:
+        if target is None:
             # Unhandled messages are dropped, with just a warning in the log
             self._log.warning(f"Signal ignored: [{signal.message}] -> {signal.target}  (target actor not found)")
             return
 
-        parent_id = self._parent_id(signal.target)
+        parent_id = target.parent_id
         ctx = ActorContext(self, signal.target, parent_id, signal.sender)
-        result = actor._receive_signal(self, ctx, signal)  # noqa
+        result = target.actor._receive_signal(self, ctx, signal)  # noqa
 
         # Notifications
 
         # TODO: If the error was reposted with _report_error, the parent will already have a FAILED signal
         if signal.message == Signal.STOP:
-            if actor.error():
-                self._send_signal(signal.target, self._parent_id(signal.target), Signal.FAILED)
+            if target.actor.error():
+                self._send_signal(signal.target, target.parent_id, Signal.FAILED)
             else:
-                self._send_signal(signal.target, self._parent_id(signal.target), Signal.STOPPED)
+                self._send_signal(signal.target, target.parent_id, Signal.STOPPED)
 
         # Error propagation
         # When an actor dies due to an error, a FAILED signal is sent to its direct parent
@@ -413,18 +445,18 @@ class ActorSystem:
 
         if signal.message == Signal.FAILED:
             if signal.target == self._parent_id(signal.sender) and result is not True:
-                actor._Actor__error = RuntimeError("propagation error")  # TODO: Needs to wrap the original error
+                target.actor._Actor__error = RuntimeError("propagation error")  # TODO: Needs to wrap the original error
                 self._stop_actor("/system", signal.target)
-                self._send_signal(signal.target, self._parent_id(signal.target), Signal.FAILED)
+                self._send_signal(signal.target, target.parent_id, Signal.FAILED)
 
-        if actor.state() in [ActorState.STOPPED, ActorState.FAILED]:
+        if target.actor.state() in [ActorState.STOPPED, ActorState.FAILED]:
             self.__actors.pop(signal.target)
 
     def _report_error(self, actor_id: ActorId, message: str, error: Exception):
 
-        actor = self.__actors.get(actor_id)
+        actor_node = self._lookup_actor_node(actor_id)
 
-        if not actor:
+        if not actor_node:
             message = f"Error ignored: [{Signal.STOP}] -> {actor_id} (failed actor not found)"
             self._log.warning(message)
             return
@@ -434,28 +466,37 @@ class ActorSystem:
 
         # Dp not send STOP signal if actor was not started successfully
         if message in [Signal.START, Signal.STOP]:
-            actor._Actor__state = ActorState.FAILED
+            actor_node.actor._Actor__state = ActorState.FAILED
         else:
             self._stop_actor("/system", actor_id)
 
         # Notify the parent
-        self._send_signal(actor_id, self._parent_id(actor_id), Signal.FAILED)
+        self._send_signal(actor_id, actor_node.parent_id, Signal.FAILED)
+
+    def _lookup_actor_node(self, actor_id: ActorId) -> tp.Optional[ActorNode]:
+
+        with self.__system_lock:
+            return self.__actors.get(actor_id)
 
     def _lookup_actor(self, actor_id: ActorId) -> tp.Optional[Actor]:
 
-        return self.__actors.get(actor_id)
+        with self.__system_lock:
+            actor_node = self.__actors.get(actor_id)
+            return actor_node.actor if actor_node is not None else None
 
-    def _new_actor_id(self, parent_id: ActorId, actor_class: Actor.__class__) -> ActorId:
+    def _new_actor_id(self, parent_node: ActorNode, actor_class: Actor.__class__) -> ActorId:
 
-        if parent_id == "/":
-            return "/" + actor_class.__name__.lower()
+        classname = actor_class.__name__.lower()
 
-        return parent_id + "/" + actor_class.__name__.lower()
+        if parent_node.actor_id == self.__ROOT_ID:
+            return f"{self.__ROOT_ID}{classname}"
+        else:
+            return f"{parent_node.actor_id}{self.__DELIMITER}{classname}-{parent_node.next_child_number}"
 
     def _parent_id(self, actor_id: ActorId) -> ActorId:
 
-        parent_delim = actor_id.rfind("/")
-        parent_id = actor_id[0] if parent_delim == 0 else actor_id[:actor_id.rfind("/")]
+        parent_delim = actor_id.rfind(self.__DELIMITER)
+        parent_id = self.__ROOT_ID if parent_delim == 0 else actor_id[:parent_delim]
 
         return parent_id
 

@@ -354,6 +354,59 @@ class ActorSystemTest(unittest.TestCase):
         # Make sure the system went down cleanly
         self.assertEqual(0, system.shutdown_code())
 
+    def test_multiple_children(self):
+
+        results = []
+
+        class ChildActor(actors.Actor):
+
+            def on_start(self):
+                results.append("child_start")
+                self.actors().send_parent("new_child")
+
+            def on_stop(self):
+                results.append("child_stop")
+
+        class ParentActor(actors.Actor):
+
+            def __init__(self):
+                super().__init__()
+                self.child_count = 0
+
+            def on_start(self):
+                results.append("parent_start")
+                self.actors().spawn(ChildActor)
+
+            def on_stop(self):
+                results.append("parent_stop")
+
+            @actors.Message
+            def new_child(self):
+                results.append("new_child")
+                self.child_count += 1
+
+                if self.child_count < 3:
+                    self.actors().spawn(ChildActor)
+                else:
+                    self.actors().stop()
+
+        root = ParentActor()
+        system = actors.ActorSystem(root)
+        system.start()
+        system.wait_for_shutdown()
+
+        self.assertEqual([
+            "parent_start",
+            "child_start", "new_child",
+            "child_start", "new_child",
+            "child_start", "new_child",
+            "child_stop", "child_stop", "child_stop",
+            "parent_stop"],
+            results)
+
+        # Make sure the system went down cleanly
+        self.assertEqual(0, system.shutdown_code())
+
     def test_child_shutdown_order(self):
 
         results = []
