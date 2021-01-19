@@ -17,23 +17,74 @@ from __future__ import annotations
 import logging
 import sys
 
-_BLACK = '\033[0;30m'
-_RED = '\033[0;31m'
-_GREEN = '\033[0;32m'
-_BROWN = '\033[0;33m'
-_BLUE = '\033[0;34m'
-_PURPLE = '\033[0;35m'
-_CYAN = '\033[1;36m'
-_GREY = '\033[0;37m'
 
-_DARK_GREY = '\033[1;30m'
-_LIGHT_RED = '\033[1;31m'
-_LIGHT_GREEN = '\033[1;32m'
-_YELLOW = '\033[1;33m'
-_LIGHT_BLUE = '\033[1;34m'
-_LIGHT_PURPLE = '\033[1;35m'
-_LIGHT_CYAN = '\033[0;36m'
-_WHITE = '\033[0;38m'
+class ColorFormatter(logging.Formatter):
+
+    _BLACK, _RED, _GREEN, _YELLOW, _BLUE, _MAGENTA, _CYAN, _WHITE, _DEFAULT_WHITE = range(9)
+    _DARK_BASE = 30
+    _LIGHT_BASE = 90
+
+    # DARK_BASE + WHITE = light grey
+    # DARK_BASE + DEFAULT_WHITE = regular console white
+    # LIGHT_BASE + WHITE = bright white (0xffffff), very bright!
+
+    def __init__(self, is_bright: bool):
+
+        super().__init__(self._base_fmt(is_bright))
+        self._level_colors = self._make_level_colors(is_bright)
+        self._default_color = self._make_default_color(is_bright)
+
+    def format(self, record):
+
+        level_name = record.levelname
+        level_color = self._level_colors.get(level_name)
+
+        if level_color:
+            record.levelname = level_color
+        else:
+            record.levelname = self._default_color + level_name
+
+        return logging.Formatter.format(self, record)
+
+    def _base_fmt(self, is_bright: bool):
+
+        if is_bright:
+            base_color = self._make_ansi_code(self._DARK_BASE, self._DEFAULT_WHITE, is_bold=False)
+            message_color = self._make_ansi_code(self._LIGHT_BASE, self._CYAN, is_bold=False)
+        else:
+            base_color = self._make_ansi_code(self._DARK_BASE, self._WHITE, is_bold=False)
+            message_color = self._make_ansi_code(self._DARK_BASE, self._CYAN, is_bold=False)
+
+        return f"{base_color}%(asctime)s [%(threadName)s] %(levelname)s{base_color} %(name)s" + \
+               f" - {message_color}%(message)s"
+
+    def _make_level_colors(self, is_bright: bool):
+
+        base_code = self._LIGHT_BASE if is_bright else self._DARK_BASE
+
+        green = self._make_ansi_code(base_code, self._GREEN, is_bold=is_bright)
+        yellow = self._make_ansi_code(base_code, self._YELLOW, is_bold=is_bright)
+        red = self._make_ansi_code(base_code, self._RED, is_bold=is_bright)
+
+        level_colors = {
+            'CRITICAL': f"{red}CRITICAL",
+            'ERROR': f"{red}ERROR",
+            'WARNING': f"{yellow}WARNING",
+            'INFO': f"{green}INFO"
+        }
+
+        return level_colors
+
+    def _make_default_color(self, is_bright: bool):
+
+        base_code = self._LIGHT_BASE if is_bright else self._DARK_BASE
+        blue = self._make_ansi_code(base_code, self._BLUE, is_bold=is_bright)
+
+        return blue
+
+    @classmethod
+    def _make_ansi_code(cls, base_code: int, color_offset: int, is_bold: bool):
+        return f"\033[{1 if is_bold else 0};{base_code + color_offset}m"
 
 
 def configure_logging(clazz: type = None):
@@ -42,21 +93,18 @@ def configure_logging(clazz: type = None):
 
     if not root_logger.hasHandlers():
 
-        message_format = f"{_WHITE}%(asctime)s [%(threadName)s] %(levelname)s %(name)s - {_LIGHT_CYAN}%(message)s"
-        console_formatter = logging.Formatter(message_format)
+        console_formatter = ColorFormatter(is_bright=True)
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(console_formatter)
         console_handler.setLevel(logging.INFO)
         root_logger.addHandler(console_handler)
         root_logger.setLevel(logging.INFO)
 
-        # Put logs from the TRAC runtime in grey, so model logs stand out - quick solution!
-        # A more sophisticated approach is needed anyway to output job logs as datasets
+        # Use is_bright=False for logs from the TRAC runtime, so model logs stand out
 
         trac_logger = logging.getLogger("trac")
 
-        message_format = f"{_GREY}%(asctime)s [%(threadName)s] %(levelname)s %(name)s - %(message)s"
-        console_formatter = logging.Formatter(message_format)
+        console_formatter = ColorFormatter(is_bright=False)
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(console_formatter)
         console_handler.setLevel(logging.INFO)
@@ -64,7 +112,7 @@ def configure_logging(clazz: type = None):
         trac_logger.propagate = False
 
     if clazz is None:
-        startup_logger = root_logger
+        startup_logger = logger_for_namespace("trac.rt")
     else:
         startup_logger = logger_for_class(clazz)
 
@@ -78,3 +126,7 @@ def logger_for_object(obj: object) -> logging.Logger:
 def logger_for_class(clazz: type) -> logging.Logger:
     qualified_class_name = f"{clazz.__module__}.{clazz.__name__}"
     return logging.getLogger(qualified_class_name)
+
+
+def logger_for_namespace(namespace: str) -> logging.Logger:
+    return logging.getLogger(namespace)
