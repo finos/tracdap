@@ -78,7 +78,7 @@ class Actor:
 
         for member in self.__class__.__dict__.values():
             if isinstance(member, Message):
-                handlers[member.__name__] = func.partial(member, self)
+                handlers[member.__name__] = member
 
         Actor.__class_handlers[self.__class__] = handlers
         return handlers
@@ -91,7 +91,7 @@ class Actor:
             handler = self.__handlers.get(msg.message)
 
             if handler:
-                handler(*msg.args, **msg.kwargs)
+                handler(self, *msg.args, **msg.kwargs)
 
             else:
                 # Unhandled messages are dropped, with just a warning in the log
@@ -519,8 +519,8 @@ class ActorSystem:
             self._log.error(error)
             raise RuntimeError(error)
 
-        target_params = target_handler.func.params
-        type_hints = target_handler.func.type_hints
+        target_params = target_handler.params
+        type_hints = target_handler.type_hints
 
         if len(args) + len(kwargs) > len(target_params):
             error = f"Invalid message: [{message}] -> {target_id} (too many arguments)"
