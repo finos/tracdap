@@ -301,11 +301,9 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
                 results.append("child_start")
-                print("child_start")
                 self.actors().send_parent("child_started", self.actors().id)
 
             def on_stop(self):
-                print("child_stop")
                 results.append("child_stop")
 
         class ParentActor(actors.Actor):
@@ -315,27 +313,23 @@ class ActorSystemTest(unittest.TestCase):
                 self.child_id = None
 
             def on_start(self):
-                print("parent_start")
                 results.append("parent_start")
                 self.child_id = self.actors().spawn(ChildActor)
 
             def on_stop(self):
-                print("parent_stop")
                 results.append("parent_stop")
 
-            def on_signal(self, signal: str) -> bool:
+            def on_signal(self, signal: actors.Signal) -> bool:
 
-                if self.actors().sender == self.child_id:
-                    print(f"parent_signal: {signal}")
+                if signal.sender == self.child_id:
                     results.append("parent_signal")
-                    results.append(signal)
+                    results.append(signal.message)
 
                 self.actors().stop()
                 return True
 
             @actors.Message
             def child_started(self, child_id):
-                print("child_started")
                 results.append("child_started")
                 self.actors().stop(child_id)
 
@@ -702,11 +696,11 @@ class ActorSystemTest(unittest.TestCase):
             def on_stop(self):
                 results.append("parent_stop")
 
-            def on_signal(self, signal: str):
+            def on_signal(self, signal: actors.Signal):
 
-                if self.actors().sender == self.child_id:
+                if signal.sender == self.child_id:
                     results.append("child_signal")
-                    results.append(signal)
+                    results.append(signal.message)
 
                 self.actors().stop()
 

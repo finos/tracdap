@@ -38,6 +38,29 @@ class ActorState(enum.Enum):
     FAILED = 6
 
 
+@dc.dataclass(frozen=True)
+class Msg:
+
+    sender: ActorId
+    target: ActorId
+    message: str
+
+    args: tp.List[tp.Any] = dc.field(default_factory=list)
+    kwargs: tp.Dict[str, tp.Any] = dc.field(default_factory=dict)
+
+
+@dc.dataclass(frozen=True)
+class Signal(Msg):
+    pass
+
+
+@dc.dataclass(frozen=True)
+class ErrorSignal(Signal):
+
+    error: Exception = None
+    origin: ActorId = None
+
+
 class Actor:
 
     __class_handlers: tp.Dict[type, tp.Dict[str, tp.Callable]] = dict()
@@ -64,7 +87,7 @@ class Actor:
     def on_stop(self):
         pass
 
-    def on_signal(self, signal: str) -> tp.Optional[bool]:
+    def on_signal(self, signal: Signal) -> tp.Optional[bool]:
         return None
 
     def _inspect_handlers(self) -> tp.Dict[str, tp.Callable]:
@@ -108,25 +131,25 @@ class Actor:
         finally:
             self.__ctx = None
 
-    def _receive_signal(self, system: ActorSystem, ctx: ActorContext, signal: Msg) -> tp.Optional[bool]:
+    def _receive_signal(self, system: ActorSystem, ctx: ActorContext, signal: Signal) -> tp.Optional[bool]:
 
         try:
             self.__ctx = ctx
 
-            if signal.message == Signal.START:
+            if signal.message == SignalNames.START:
                 self._require_state([ActorState.NOT_STARTED, ActorState.STARTING])
                 self.on_start()
                 self.__state = ActorState.RUNNING
                 return True
 
-            elif signal.message == Signal.STOP:
+            elif signal.message == SignalNames.STOP:
                 self._require_state([ActorState.RUNNING, ActorState.STOPPING, ActorState.ERROR])
                 self.on_stop()
                 self.__state = ActorState.STOPPED if self.__error is None else ActorState.FAILED
                 return True
 
             else:
-                return self.on_signal(signal.message)
+                return self.on_signal(signal)
 
         except Exception as error:
 
@@ -195,7 +218,7 @@ class Message:
         self.__method(*args, **kwargs)
 
 
-class Signal:
+class SignalNames:
 
     PREFIX = "actor:"
 
@@ -205,17 +228,6 @@ class Signal:
     STARTED = "actor:started"
     STOPPED = "actor:stopped"
     FAILED = "actor:failed"
-
-
-@dc.dataclass(frozen=True)
-class Msg:
-
-    sender: ActorId
-    target: ActorId
-    message: str
-
-    args: tp.List[tp.Any] = dc.field(default_factory=list)
-    kwargs: tp.Dict[str, tp.Any] = dc.field(default_factory=dict)
 
 
 @dc.dataclass(frozen=True)
@@ -320,7 +332,7 @@ class ActorSystem:
 
     def _start_actor(self, started_by_id: ActorId, actor_id: ActorId):
 
-        self._send_signal(started_by_id, actor_id, Signal.START)
+        self._send_signal(started_by_id, actor_id, SignalNames.START)
 
         return actor_id
 
@@ -328,7 +340,7 @@ class ActorSystem:
 
         if not (sender_id == target_id or self._parent_id(target_id) == sender_id or sender_id == "/system"):
 
-            message = f"Stop request rejected: [{Signal.STOP}] -> {target_id}" + \
+            message = f"Stop request rejected: [{SignalNames.STOP}] -> {target_id}" + \
                       f" ({sender_id} is not allowed to stop this actor)"
             self._log.error(message)
 
@@ -339,26 +351,29 @@ class ActorSystem:
 
         if target is None:
             self._log.warning(
-                f"Signal ignored: [{Signal.STOP}] -> {target_id}" +
+                f"Signal ignored: [{SignalNames.STOP}] -> {target_id}" +
                 f" (target actor not found)")
             return
 
         for child_id in target.children:
             self._stop_actor(target_id, child_id)
 
-        self._send_signal(sender_id, target_id, Signal.STOP)
+        self._send_signal(sender_id, target_id, SignalNames.STOP)
 
-    def _send_signal(self, sender_id: ActorId, target_id: ActorId, signal: str):
+    def _send_signal(self, sender_id: ActorId, target_id: ActorId, signal: str, error: tp.Optional[Exception] = None):
 
-        if not signal.startswith(Signal.PREFIX):
+        if not signal.startswith(SignalNames.PREFIX):
             raise RuntimeError("Invalid signal")  # TODO: Error
 
-        msg = Msg(sender_id, target_id, signal)
+        if signal == SignalNames.FAILED:
+            msg = ErrorSignal(sender_id, target_id, signal, error=error)
+        else:
+            msg = Signal(sender_id, target_id, signal)
         self.__message_queue.append(msg)
 
     def _send_message(self, sender_id: ActorId, target_id: ActorId, message: str, args, kwargs):
 
-        if message.startswith(Signal.PREFIX):
+        if message.startswith(SignalNames.PREFIX):
             raise RuntimeError("Signals cannot be sent like messages")  # TODO: Error
 
         _args = args or []
@@ -391,7 +406,7 @@ class ActorSystem:
                 next_msg = None
 
             if next_msg:
-                if next_msg.message.startswith(Signal.PREFIX):
+                if next_msg.message.startswith(SignalNames.PREFIX):
                     self._process_signal(next_msg)
                 else:
                     self._process_message(next_msg)
@@ -433,22 +448,22 @@ class ActorSystem:
 
         # Generate lifecycle notifications
 
-        if signal.message == Signal.STOP:
+        if signal.message == SignalNames.STOP:
 
             if target.actor.error():
-                self._send_signal(signal.target, target.parent_id, Signal.FAILED)
+                self._send_signal(signal.target, target.parent_id, SignalNames.FAILED, target.actor.error())
             else:
-                self._send_signal(signal.target, target.parent_id, Signal.STOPPED)
+                self._send_signal(signal.target, target.parent_id, SignalNames.STOPPED)
 
         # Error propagation
         # When an actor dies due to an error, a FAILED signal is generated and sent to its direct parent
         # If the parent does not handle the error successfully, the parent also dies and the error propagates
 
-        if signal.message == Signal.FAILED:
+        if isinstance(signal, ErrorSignal):
             if signal.target == self._parent_id(signal.sender) and result is not True:
-                target.actor._Actor__error = RuntimeError("propagation error")  # TODO: Needs to wrap the original error
+                target.actor._Actor__error = signal.error  # TODO: Error could be wrapped to indicate propagation?
                 self._stop_actor("/system", signal.target)
-                self._send_signal(signal.target, target.parent_id, Signal.FAILED)
+                self._send_signal(signal.sender, target.parent_id, SignalNames.FAILED, signal.error)
 
         # Remove dead actors
         # If the actor is now stopped or failed, take it out of the registry
@@ -466,7 +481,7 @@ class ActorSystem:
         actor_node = self._lookup_actor_node(actor_id)
 
         if not actor_node:
-            message = f"Error ignored: [{Signal.STOP}] -> {actor_id} (failed actor not found)"
+            message = f"Error ignored: [{SignalNames.STOP}] -> {actor_id} (failed actor not found)"
             self._log.warning(message)
             return
 
@@ -475,9 +490,9 @@ class ActorSystem:
 
         # Dp not send STOP signal for errors that occur while processing START or STOP
         # In this case, directly set the state to FAILED and send a FAILED notification to the parent
-        if message in [Signal.START, Signal.STOP]:
+        if message in [SignalNames.START, SignalNames.STOP]:
             actor_node.actor._Actor__state = ActorState.FAILED
-            self._send_signal(actor_id, actor_node.parent_id, Signal.FAILED)
+            self._send_signal(actor_id, actor_node.parent_id, SignalNames.FAILED, error)  # TODO: Wrap for propagation?
 
         # Otherwise stop the actor, a FAILED notification will be generated when the STOP signal is processed
         else:
