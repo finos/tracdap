@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import typing as tp
+import re
 
 import pandas as pd
 import pyspark as pys
@@ -26,14 +27,35 @@ import trac.rt.metadata as meta
 import trac.rt.impl.util as util
 
 
+# TODO: Exception hierarchy
+class ModelRuntimeException(RuntimeError):
+
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+
+
 class ModelContext(api.TracContext):
 
-    def __init__(self, model_def: meta.ModelDefinition, model_class: api.TracModel.__class__):
+    def __init__(self,
+                 model_def: meta.ModelDefinition,
+                 model_class: api.TracModel.__class__,
+                 parameters: tp.Dict[str, tp.Any]):
+
         self.__model_def = model_def
         self.__model_class = model_class
+        self.__model_log = util.logger_for_class(self.__model_class)
+
+        self.__parameters = parameters or {}
+
+        self.__val = ModelRuntimeValidator(frozenset(self.__parameters.keys()))
 
     def get_parameter(self, parameter_name: str) -> tp.Any:
-        raise NotImplementedError()
+
+        self.__val.check_param_valid_identifier(parameter_name)
+        self.__val.check_param_exists(parameter_name)
+
+        return self.__parameters[parameter_name]
 
     def get_table_schema(self, dataset_name: str) -> api.TableDefinition:
         raise NotImplementedError()
@@ -65,5 +87,25 @@ class ModelContext(api.TracContext):
     def get_spark_sql_context(self) -> pyss.SQLContext:
         raise NotImplementedError()
 
-    def get_logger(self) -> logging.Logger:
-        return util.logger_for_class(self.__model_class)
+    def log(self) -> logging.Logger:
+        return self.__model_log
+
+
+class ModelRuntimeValidator:
+
+    __VALID_IDENTIFIER = re.compile("^[a-zA-Z_]\\w*$",)
+    __RESERVED_IDENTIFIER = re.compile("^(trac_|_)\\w*")
+
+    def __init__(self, param_names: tp.FrozenSet[str]):
+        self.__param_names = param_names
+
+    @classmethod
+    def check_param_valid_identifier(cls, param_name: str):
+
+        if not cls.__VALID_IDENTIFIER.match(param_name):
+            raise ModelRuntimeException(f"Parameter name {param_name} is not a valid identifier")
+
+    def check_param_exists(self, param_name: str):
+
+        if param_name not in self.__param_names:
+            raise ModelRuntimeException(f"Parameter {param_name} does not exist in the current context")

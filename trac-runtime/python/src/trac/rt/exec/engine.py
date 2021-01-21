@@ -82,7 +82,7 @@ class GraphBuilder(actors.Actor):
         self._log.info("Resolving graph nodes to executable code")
 
         for node_id, node in self.graph.nodes.items():
-            node.function = self._resolver.resolve_node(node.node)
+            node.function = self._resolver.resolve_node(self.job_config, node.node)
 
         self.actors().send_parent("job_graph", self.graph)
 

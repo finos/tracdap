@@ -83,7 +83,7 @@ class TracContext:
         pass
 
     @abc.abstractmethod
-    def get_logger(self) -> logging.Logger:
+    def log(self) -> logging.Logger:
         pass
 
 

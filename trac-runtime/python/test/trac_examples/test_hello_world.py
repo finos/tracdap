@@ -19,9 +19,9 @@ import sys
 import trac.rt.launch as launch
 
 
-class HelloPandasExample(unittest.TestCase):
+class HelloWorldExample(unittest.TestCase):
 
-    def test_hello_pandas(self):
+    def test_hello_world(self):
 
         job_config = 'doc/examples/models/python/hello_world/hello_world.yaml'
         sys_config = 'doc/examples/models/python/sys_config.yaml'
