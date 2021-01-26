@@ -14,13 +14,13 @@
 
 import unittest
 import importlib.util
+import sys
 
 import trac.rt.launch as launch
 
 
 class HelloPandasExample(unittest.TestCase):
 
-    @unittest.skip
     def test_hello_pandas(self):
 
         job_config = 'doc/examples/models/python/hello_pandas/hello_pandas.yaml'
@@ -28,6 +28,7 @@ class HelloPandasExample(unittest.TestCase):
 
         spec = importlib.util.spec_from_file_location("hello_pandas", "doc/examples/models/python/hello_pandas/hello_pandas.py")
         module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
         spec.loader.exec_module(module)
         model_class = module.__dict__["HelloPandas"]
 
