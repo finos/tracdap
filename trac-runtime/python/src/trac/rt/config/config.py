@@ -64,8 +64,9 @@ class RuntimeConfig:
 @dc.dataclass
 class JobConfig:
 
-    target: tp.Optional[str] = None
+    job_id: tp.Optional[str] = None
 
+    target: tp.Optional[str] = None
     parameters: tp.Dict[str, str] = _empty(dict)
     inputs: tp.Dict[str, str] = _empty(dict)
     outputs: tp.Dict[str, str] = _empty(dict)

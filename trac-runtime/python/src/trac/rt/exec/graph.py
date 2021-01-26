@@ -15,57 +15,105 @@
 from __future__ import annotations
 
 import typing as tp
-from dataclasses import dataclass
+import dataclasses as dc
 
 import trac.rt.metadata as meta
 
 
-@dataclass(frozen=True)
-class NodeCtx:
+@dc.dataclass(frozen=True)
+class NodeContext:
 
     namespace: str
-    parent: tp.Optional[NodeCtx] = None
+    parent: tp.Optional[NodeContext] = None
 
 
-@dataclass(frozen=True)
+@dc.dataclass(frozen=True)
 class NodeId:
 
-    ctx: NodeCtx
+    context: NodeContext
     name: str
 
 
-@dataclass
+@dc.dataclass(frozen=True)
 class Node:
-    pass
+
+    """A node in the TRAC execution graph"""
+
+    id: NodeId
+    """ID of this node"""
+
+    dependencies: tp.FrozenSet[NodeId] = dc.field(init=False)
+    """Set of node IDs that are dependencies for this node"""
 
 
-@dataclass
+NodeMap = tp.Dict[NodeId, Node]
+
+
+@dc.dataclass(frozen=True)
 class Graph:
 
-    nodes: tp.Dict[NodeId, Node]
+    nodes: NodeMap
     root_id: NodeId
 
 
-@dataclass
+@dc.dataclass(frozen=True)
+class IdentityNode(Node):
+
+    proxy_for: dc.InitVar[tp.Union[NodeId, tp.FrozenSet[NodeId]]]
+
+    def __post_init__(self, proxy_for: tp.Union[NodeId, tp.FrozenSet[NodeId]]):
+        if isinstance(proxy_for, frozenset):
+            object.__setattr__(self, 'dependencies', proxy_for)
+        else:
+            object.__setattr__(self, 'dependencies', frozenset({proxy_for}))
+
+
+@dc.dataclass(frozen=True)
+class JobNode(Node):
+
+    job_def: meta.JobDefinition
+    root_exec_node: NodeId
+
+    def __post_init__(self):
+        object.__setattr__(self, 'dependencies', frozenset([self.root_exec_node]))
+
+
+@dc.dataclass(frozen=True)
 class ContextPushNode(Node):
 
-    mapping: tp.Dict[str, NodeId]
+    """Push a new execution context onto the stack"""
+
+    mapping: tp.Dict[NodeId, NodeId] = dc.field(default_factory=dict)
+    """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being pushed)"""
+
+    def __post_init__(self):
+        # Since this is a context push, dependencies are the IDs from the outer context
+        object.__setattr__(self, 'dependencies', frozenset(self.mapping.values()))
 
 
-@dataclass
+@dc.dataclass(frozen=True)
 class ContextPopNode(Node):
 
-    mapping: tp.Dict[str, NodeId]
+    mapping: tp.Dict[NodeId, NodeId]
+    """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being popped)"""
+
+    def __post_init__(self):
+        # Since this is a context pop, dependencies are the IDs from the inner context
+        object.__setattr__(self, 'dependencies', frozenset(self.mapping.keys()))
 
 
-@dataclass
+@dc.dataclass(frozen=True)
 class LoadDataNode(Node):
 
     node_id: NodeId
     data_def: meta.DataDefinition
 
 
-@dataclass
+@dc.dataclass(frozen=True)
 class ModelNode(Node):
 
     model_def: meta.ModelDefinition
+    input_ids: dc.InitVar[tp.FrozenSet[NodeId]]
+
+    def __post_init__(self, input_ids):
+        object.__setattr__(self, 'dependencies', input_ids)
