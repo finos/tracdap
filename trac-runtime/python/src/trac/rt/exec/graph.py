@@ -21,16 +21,19 @@ import trac.rt.metadata as meta
 
 
 @dc.dataclass(frozen=True)
-class NodeContext:
+class NodeNamespace:
 
-    namespace: str
-    parent: tp.Optional[NodeContext] = None
+    name: str
+    parent: tp.Optional[NodeNamespace] = None
+
+    def __repr__(self):
+        return "NAMESPACE"
 
 
 @dc.dataclass(frozen=True)
 class NodeId:
 
-    context: NodeContext
+    namespace: NodeNamespace
     name: str
 
 
@@ -71,7 +74,7 @@ class IdentityNode(Node):
 @dc.dataclass(frozen=True)
 class JobNode(Node):
 
-    job_def: meta.JobDefinition
+    # job_def: meta.JobDefinition
     root_exec_node: NodeId
 
     def __post_init__(self):
@@ -83,6 +86,7 @@ class ContextPushNode(Node):
 
     """Push a new execution context onto the stack"""
 
+    namespace: NodeNamespace
     mapping: tp.Dict[NodeId, NodeId] = dc.field(default_factory=dict)
     """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being pushed)"""
 
@@ -94,6 +98,7 @@ class ContextPushNode(Node):
 @dc.dataclass(frozen=True)
 class ContextPopNode(Node):
 
+    namespace: NodeNamespace
     mapping: tp.Dict[NodeId, NodeId]
     """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being popped)"""
 
