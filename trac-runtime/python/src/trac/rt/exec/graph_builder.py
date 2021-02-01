@@ -38,7 +38,9 @@ class GraphBuilder:
 
         null_graph = Graph({}, NodeId('', NodeNamespace('')))
         job_namespace = NodeNamespace(f"job={job_config.job_id}")
-        job_ctx_push = GraphBuilder.build_context_push(job_namespace, null_graph, dict())
+
+        job_ctx_push = GraphBuilder.build_context_push(
+            job_namespace, null_graph, dict())
 
         # Create load operations to load data into the job context once it is created
 
@@ -64,7 +66,8 @@ class GraphBuilder:
         # Do not pop any data back into the global context
         # For the time being, data is loaded and saved independently for each job
 
-        job_ctx_pop = GraphBuilder.build_context_pop(job_namespace, exec_graph, dict())
+        job_ctx_pop = GraphBuilder.build_context_pop(
+            job_namespace, exec_graph, dict())
 
         job_node_id = NodeId("trac_job_marker", job_namespace)
         job_node = JobNode(job_node_id, job_ctx_pop.root_id)
@@ -123,8 +126,9 @@ class GraphBuilder:
 
         # Input data should already be mapped to named inputs in the model context
         input_ids = frozenset(map(node_id_for, model_def.input.keys()))
+        ctx_push_id = graph.root_id
 
-        model_node = ModelNode(model_id, model_def, input_ids)
+        model_node = ModelNode(model_id, model_def, input_ids, explicit_deps=[ctx_push_id])
 
         return Graph({**graph.nodes, model_id: model_node}, model_id)
 
@@ -183,7 +187,7 @@ class GraphBuilder:
             in output_mapping.items()}
 
         pop_id = NodeId("trac_ctx_pop", namespace)
-        pop_node = ContextPopNode(pop_id, namespace, pop_mapping)
+        pop_node = ContextPopNode(pop_id, namespace, pop_mapping, explicit_deps=[graph.root_id])
 
         # Create an explicit marker for each data node popped into the outer context
         marker_nodes = {

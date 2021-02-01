@@ -50,6 +50,18 @@ class NodeId:
 
 
 @dc.dataclass(frozen=True)
+class DependencyType:
+
+    immediate: bool = True
+    tolerant: bool = False
+
+    HARD: tp.ClassVar[DependencyType]
+
+
+DependencyType.HARD = DependencyType(immediate=True, tolerant=False)
+
+
+@dc.dataclass(frozen=True)
 class Node:
 
     """A node in the TRAC execution graph"""
@@ -57,7 +69,7 @@ class Node:
     id: NodeId
     """ID of this node"""
 
-    dependencies: tp.FrozenSet[NodeId] = dc.field(init=False)
+    dependencies: tp.Dict[NodeId, DependencyType] = dc.field(init=False)
     """Set of node IDs that are dependencies for this node"""
 
 
@@ -74,13 +86,13 @@ class Graph:
 @dc.dataclass(frozen=True)
 class IdentityNode(Node):
 
-    proxy_for: dc.InitVar[tp.Union[NodeId, tp.FrozenSet[NodeId]]]
+    proxy_for: dc.InitVar[tp.Union[NodeId, tp.Dict[NodeId, DependencyType]]]
 
-    def __post_init__(self, proxy_for: tp.Union[NodeId, tp.FrozenSet[NodeId]]):
-        if isinstance(proxy_for, frozenset):
-            object.__setattr__(self, 'dependencies', proxy_for)
+    def __post_init__(self, proxy_for):
+        if isinstance(proxy_for, NodeId):
+            object.__setattr__(self, 'dependencies', {proxy_for: DependencyType.HARD})
         else:
-            object.__setattr__(self, 'dependencies', frozenset({proxy_for}))
+            object.__setattr__(self, 'dependencies', proxy_for)
 
 
 @dc.dataclass(frozen=True)
@@ -90,7 +102,7 @@ class JobNode(Node):
     root_exec_node: NodeId
 
     def __post_init__(self):
-        object.__setattr__(self, 'dependencies', frozenset([self.root_exec_node]))
+        object.__setattr__(self, 'dependencies', {self.root_exec_node: DependencyType.HARD})
 
 
 @dc.dataclass(frozen=True)
@@ -102,9 +114,16 @@ class ContextPushNode(Node):
     mapping: tp.Dict[NodeId, NodeId] = dc.field(default_factory=dict)
     """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being pushed)"""
 
-    def __post_init__(self):
+    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
+
+    def __post_init__(self, explicit_deps):
+
         # Since this is a context push, dependencies are the IDs from the outer context
-        object.__setattr__(self, 'dependencies', frozenset(self.mapping.values()))
+        mapping_dependencies = {src_id: DependencyType.HARD for src_id in self.mapping.values()}
+        object.__setattr__(self, 'dependencies', mapping_dependencies)
+
+        if explicit_deps:
+            self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
 
 
 @dc.dataclass(frozen=True)
@@ -114,9 +133,15 @@ class ContextPopNode(Node):
     mapping: tp.Dict[NodeId, NodeId]
     """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being popped)"""
 
-    def __post_init__(self):
+    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
+
+    def __post_init__(self, explicit_deps):
         # Since this is a context pop, dependencies are the IDs from the inner context
-        object.__setattr__(self, 'dependencies', frozenset(self.mapping.keys()))
+        mapping_dependencies = {src_id: DependencyType.HARD for src_id in self.mapping.keys()}
+        object.__setattr__(self, 'dependencies', mapping_dependencies)
+
+        if explicit_deps:
+            self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
 
 
 @dc.dataclass(frozen=True)
@@ -130,7 +155,14 @@ class LoadDataNode(Node):
 class ModelNode(Node):
 
     model_def: meta.ModelDefinition
-    input_ids: dc.InitVar[tp.FrozenSet[NodeId]]
+    input_ids: tp.FrozenSet[NodeId]
 
-    def __post_init__(self, input_ids):
-        object.__setattr__(self, 'dependencies', input_ids)
+    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
+
+    def __post_init__(self, explicit_deps):
+
+        input_dependencies = {input_id: DependencyType.HARD for input_id in self.input_ids}
+        object.__setattr__(self, 'dependencies', input_dependencies)
+
+        if explicit_deps:
+            self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})

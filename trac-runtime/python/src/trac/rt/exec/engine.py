@@ -36,10 +36,14 @@ class GraphContextNode:
     """
 
     node: _graph.Node
-    dependencies: tp.List[NodeId]
-    function: tp.Optional[_func.GraphFunction] = None
+    dependencies: tp.Dict[NodeId, _graph.DependencyType]
+    function: tp.Optional[_func.NodeFunction] = None
     result: tp.Optional[tp.Any] = None
     error: tp.Optional[str] = None
+
+    def __post_init__(self):
+        if not self.dependencies:
+            self.dependencies = copy(self.node.dependencies)
 
 
 @dataclass
@@ -76,7 +80,7 @@ class GraphBuilder(actors.Actor):
         self._log.info("Building execution graph")
 
         graph_data = _graph.GraphBuilder.build_job(self.job_config)
-        graph_nodes = {node_id: GraphContextNode(node, []) for node_id, node in graph_data.nodes.items()}
+        graph_nodes = {node_id: GraphContextNode(node, {}) for node_id, node in graph_data.nodes.items()}
         self.graph = GraphContext(graph_nodes, pending_nodes=set(graph_nodes.keys()))
 
         self._log.info("Resolving graph nodes to executable code")
@@ -119,31 +123,64 @@ class GraphProcessor(actors.Actor):
     @actors.Message
     def submit_viable_nodes(self):
 
-        pending_nodes = copy(self.graph.pending_nodes)
-        active_nodes = copy(self.graph.active_nodes)
-        processors = dict()
+        node_processors = dict()
 
-        for node_id, node in self.graph.nodes.items():
-            if self._is_viable_node(node_id, node):
+        def process_graph(graph: GraphContext) -> GraphContext:
 
-                node_ref = self.actors().spawn(NodeProcessor, self.graph, node_id, node)
-                processors[node_id] = node_ref
+            pending_nodes = copy(graph.pending_nodes)
+            active_nodes = copy(graph.active_nodes)
+            failed_nodes = copy(graph.failed_nodes)
 
-                pending_nodes.discard(node_id)
-                active_nodes.add(node_id)
+            for node_id in graph.pending_nodes:
 
-        new_graph = copy(self.graph)
-        new_graph.pending_nodes = pending_nodes
-        new_graph.active_nodes = active_nodes
+                node = self.graph.nodes[node_id]
+
+                if self._upstream_failure(node, graph):
+
+                    self._log.warning(f"SKIP {str(node_id)} (upstream failure)")
+
+                    pending_nodes.discard(node_id)
+                    failed_nodes.add(node_id)
+
+                elif self._is_viable_node(node, graph):
+
+                    node_ref = self.actors().spawn(NodeProcessor, self.graph, node_id, node)
+                    node_processors[node_id] = node_ref
+
+                    pending_nodes.discard(node_id)
+                    active_nodes.add(node_id)
+
+            processed_graph = copy(self.graph)
+            processed_graph.pending_nodes = pending_nodes
+            processed_graph.active_nodes = active_nodes
+            processed_graph.failed_nodes = failed_nodes
+
+            return processed_graph
+
+        current_graph = self.graph
+        new_graph = process_graph(current_graph)
+
+        # Let errors propagate as far as they can without any nodes being evaluated
+        while len(new_graph.failed_nodes) > len(current_graph.failed_nodes):
+            current_graph = new_graph
+            new_graph = process_graph(current_graph)
 
         self.graph = new_graph
-        self.processors = {**self.processors, **processors}
+        self.processors = {**self.processors, **node_processors}
 
-    def _is_viable_node(self, node_id: NodeId, node: GraphContextNode):
+        # Job may have completed due to error propagation
+        self.check_job_status(do_submit=False)
 
-        return \
-            node_id in self.graph.pending_nodes and \
-            all(map(lambda dep: dep in self.graph.succeeded_nodes, node.dependencies))
+    @classmethod
+    def _is_viable_node(cls, node: GraphContextNode, graph: GraphContext):
+
+        return all(dep in graph.succeeded_nodes for dep in node.dependencies)
+
+    @classmethod
+    def _upstream_failure(cls, node: GraphContextNode, graph: GraphContext):
+
+        return any(not dep_type.tolerant and dep in graph.failed_nodes
+                   for dep, dep_type in node.dependencies.items())
 
     @actors.Message
     def node_succeeded(self, node_id: NodeId, result):
@@ -166,17 +203,7 @@ class GraphProcessor(actors.Actor):
         new_graph.succeeded_nodes = succeeded_nodes
 
         self.graph = new_graph
-
-        # Only submit new nodes if there have not been any failures
-        if any(self.graph.pending_nodes) and not any(self.graph.failed_nodes):
-            self.actors().send(self.actors().id, "submit_viable_nodes")
-
-        # If processing is complete, report the final status to the engine
-        elif not any(self.graph.active_nodes):
-            if any(self.graph.failed_nodes):
-                self.actors().send_parent("job_failed")
-            else:
-                self.actors().send_parent("job_succeeded")
+        self.check_job_status()
 
     @actors.Message
     def node_failed(self, node_id: NodeId, error):
@@ -190,7 +217,7 @@ class GraphProcessor(actors.Actor):
         active_nodes = copy(self.graph.active_nodes)
         active_nodes.remove(node_id)
 
-        failed_nodes = copy(self.graph.succeeded_nodes)
+        failed_nodes = copy(self.graph.failed_nodes)
         failed_nodes.add(node_id)
 
         new_graph = copy(self.graph)
@@ -199,11 +226,27 @@ class GraphProcessor(actors.Actor):
         new_graph.failed_nodes = failed_nodes
 
         self.graph = new_graph
+        self.check_job_status()
 
-        # If other nodes are still active, allow those nodes to complete
-        # Otherwise, report a failed status to the engine right away
+    def check_job_status(self, do_submit=True):
+
+        # Do not check final status if there are pending nodes to be submitted
+        if do_submit and any(self.graph.pending_nodes):
+            self.actors().send(self.actors().id, "submit_viable_nodes")
+            return
+
+        # If processing is complete, report the final status to the engine
         if not any(self.graph.active_nodes):
-            self.actors().send_parent("job_failed")
+
+            if any(self.graph.pending_nodes):
+                self._log.error("Processor has become deadlocked (cyclic dependency error)")
+                self.actors().send_parent("job_failed")
+
+            elif any(self.graph.failed_nodes):
+                self.actors().send_parent("job_failed")
+
+            else:
+                self.actors().send_parent("job_succeeded")
 
 
 class NodeProcessor(actors.Actor):
@@ -223,6 +266,14 @@ class NodeProcessor(actors.Actor):
     def on_start(self):
 
         self.actors().send(self.actors().id, "evaluate_node")
+
+    @actors.Message
+    def graph_event(self):
+        pass
+
+    @actors.Message
+    def stream_event(self):
+        pass
 
     @actors.Message
     def evaluate_node(self):
