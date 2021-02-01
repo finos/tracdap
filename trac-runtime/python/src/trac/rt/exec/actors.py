@@ -115,6 +115,7 @@ class Actor:
 
             if handler:
                 handler(self, *msg.args, **msg.kwargs)
+                self._check_for_fail(ctx)
 
             else:
                 # Unhandled messages are dropped, with just a warning in the log
@@ -139,17 +140,21 @@ class Actor:
             if signal.message == SignalNames.START:
                 self._require_state([ActorState.NOT_STARTED, ActorState.STARTING])
                 self.on_start()
-                self.__state = ActorState.RUNNING
+                self._check_for_fail(ctx)
+                self.__state = ActorState.RUNNING if self.__error is None else ActorState.FAILED
                 return True
 
             elif signal.message == SignalNames.STOP:
                 self._require_state([ActorState.RUNNING, ActorState.STOPPING, ActorState.ERROR])
                 self.on_stop()
+                self._check_for_fail(ctx)
                 self.__state = ActorState.STOPPED if self.__error is None else ActorState.FAILED
                 return True
 
             else:
-                return self.on_signal(signal)
+                signal_result = self.on_signal(signal)
+                self._check_for_fail(ctx)
+                return signal_result
 
         except Exception as error:
 
@@ -160,6 +165,13 @@ class Actor:
 
         finally:
             self.__ctx = None
+
+    def _check_for_fail(self, ctx: ActorContext):
+
+        failure = ctx._ActorContext__error  # noqa
+        if failure:
+            self.__state = ActorState.ERROR
+            self.__error = failure
 
     def _require_state(self, allowed_states: tp.List[ActorState]):
 
@@ -173,16 +185,19 @@ Actor._Actor__log = util.logger_for_class(Actor)
 
 class ActorContext:
 
-    def __init__(self, system: ActorSystem, current_actor: ActorId, parent: ActorId, sender: tp.Optional[ActorId]):
+    def __init__(self, system: ActorSystem, message: str,
+                 current_actor: ActorId, parent: ActorId, sender: tp.Optional[ActorId]):
 
         self.id = current_actor
         self.parent = parent
         self.sender = sender
 
         self.__system = system
+        self.__message = message
         self.__id = current_actor
         self.__parent = parent
         self.__sender = sender
+        self.__error: tp.Optional[Exception] = None
 
     def spawn(self, actor_class: Actor.__class__, *args, **kwargs) -> ActorId:
         return self.__system._spawn_actor(self.__id, actor_class, args, kwargs)  # noqa
@@ -201,6 +216,16 @@ class ActorContext:
         if target_id:
             self.__system._stop_actor(self.__id, target_id)  # noqa
         else:
+            self.__system._stop_actor(self.__id, self.__id)  # noqa
+
+    def fail(self, error: Exception, cause: tp.Optional[Exception] = None):
+
+        if not error.__cause__:
+            error.__cause__ = cause
+
+        self.__error = error
+
+        if self.__message not in [SignalNames.START, SignalNames.STOP]:
             self.__system._stop_actor(self.__id, self.__id)  # noqa
 
 
@@ -429,7 +454,7 @@ class ActorSystem:
             return
 
         parent_id = target.parent_id
-        ctx = ActorContext(self, msg.target, parent_id, msg.sender)
+        ctx = ActorContext(self, msg.message, msg.target, parent_id, msg.sender)
 
         target.actor._receive_message(self, ctx, msg)  # noqa
 
@@ -443,7 +468,7 @@ class ActorSystem:
             return
 
         parent_id = target.parent_id
-        ctx = ActorContext(self, signal.target, parent_id, signal.sender)
+        ctx = ActorContext(self, signal.message, signal.target, parent_id, signal.sender)
         result = target.actor._receive_signal(self, ctx, signal)  # noqa
 
         # Generate lifecycle notifications

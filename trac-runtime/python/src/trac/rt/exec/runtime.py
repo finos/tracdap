@@ -132,7 +132,7 @@ class TracRuntime:
         if self._system.shutdown_code() == 0:
             self._log.info("TRAC runtime has gone down cleanly")
         else:
-            self._log.error("TRAC runtime has gone down with errors", exc_info=self._system.shutdown_error())
+            self._log.error("TRAC runtime has gone down with errors")
             raise RuntimeError("TRAC runtime has gone down with errors") from self._system.shutdown_error()
 
     # ------------------------------------------------------------------------------------------------------------------

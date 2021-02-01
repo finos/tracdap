@@ -243,7 +243,15 @@ class GraphProcessor(actors.Actor):
                 self.actors().send_parent("job_failed")
 
             elif any(self.graph.failed_nodes):
-                self.actors().send_parent("job_failed")
+
+                errors = list(filter(
+                    lambda e: e is not None,
+                    iter(self.graph.nodes[n].error for n in self.graph.failed_nodes)))
+
+                if len(errors) == 1:
+                    self.actors().send_parent("job_failed", errors[0])
+                else:
+                    self.actors().send_parent("job_failed", RuntimeError("Job suffered multiple errors", errors))
 
             else:
                 self.actors().send_parent("job_succeeded")
@@ -294,6 +302,7 @@ class NodeProcessor(actors.Actor):
         except Exception as e:
             self.actors().send_parent("node_failed", self.node_id, e)
             self._log.error(f"FAILED {str(self.node_id)} ({node_type})")
+            self._log.exception(e)
 
 
 class JobProcessor(actors.Actor):
@@ -325,9 +334,9 @@ class JobProcessor(actors.Actor):
         self.actors().send_parent("job_succeeded", self.job_id)
 
     @actors.Message
-    def job_failed(self):
-        self._log.info(f"Job failed {self.job_id}")
-        self.actors().send_parent("job_failed", self.job_id)
+    def job_failed(self, error: Exception):
+        self._log.error(f"Job failed {self.job_id}")
+        self.actors().send_parent("job_failed", self.job_id, error)
 
 
 @dataclass
@@ -381,20 +390,27 @@ class TracEngine(actors.Actor):
         self._clean_up_job(job_id)
 
     @actors.Message
-    def job_failed(self, job_id: str):
+    def job_failed(self, job_id: str, error: Exception):
 
-        self._log.info(f"Recording job as failed: {job_id}")
-        self._clean_up_job(job_id)
+        self._log.error(f"Recording job as failed: {job_id}")
+        self._clean_up_job(job_id, error)
 
-    def _clean_up_job(self, job_id: str):
+    def _clean_up_job(self, job_id: str, error: tp.Optional[Exception] = None):
 
         jobs = copy(self.engine_ctx.jobs)
         job_actor_id = jobs.pop(job_id)
 
         if self._batch_mode:
+
             # If the engine is in batch mode, shut down the whole engine once the first job completes
-            self._log.info("Batch run complete, shutting down the engine")
-            self.actors().stop()
+            if error:
+                self._log.error("Batch run failed, shutting down the engine")
+                engine_error = RuntimeError("Batch job failed")
+                self.actors().fail(engine_error, cause=error)
+
+            else:
+                self._log.info("Batch run complete, shutting down the engine")
+                self.actors().stop()
 
         else:
             # Otherwise, just stop the individual job actor for the job that has completed
