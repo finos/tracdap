@@ -222,19 +222,27 @@ class NodeProcessor(actors.Actor):
 
     def on_start(self):
 
-        self._log.info(f"Start node {self.node_id} ({type(self.node.node).__name__})")
+        self.actors().send(self.actors().id, "evaluate_node")
 
-        if isinstance(self.node.node, _graph.ModelNode):
-            self._log.info("Model entry point: " + self.node.node.model_def.entryPoint)
+    @actors.Message
+    def evaluate_node(self):
 
-        # Execute the node
+        node_type = type(self.node.node).__name__
 
         try:
+            self._log.info(f"START {str(self.node_id)} ({node_type})")
+
+            if isinstance(self.node.node, _graph.ModelNode):
+                self._log.info("Model entry point: " + self.node.node.model_def.entryPoint)
+
             result = self.node.function(self.graph.nodes)
+
             self.actors().send_parent("node_succeeded", self.node_id, result)
+            self._log.info(f"DONE {str(self.node_id)} ({node_type})")
 
         except Exception as e:
             self.actors().send_parent("node_failed", self.node_id, e)
+            self._log.error(f"FAILED {str(self.node_id)} ({node_type})")
 
 
 class JobProcessor(actors.Actor):

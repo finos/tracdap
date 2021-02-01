@@ -36,7 +36,7 @@ class GraphBuilder:
         # Create a job context with no dependencies and no external data mappings
         # All input data will be loaded inside the job context
 
-        null_graph = Graph({}, NodeId(NodeNamespace(''), ''))
+        null_graph = Graph({}, NodeId('', NodeNamespace('')))
         job_namespace = NodeNamespace(f"job={job_config.job_id}")
         job_ctx_push = GraphBuilder.build_context_push(job_namespace, null_graph, dict())
 
@@ -66,7 +66,7 @@ class GraphBuilder:
 
         job_ctx_pop = GraphBuilder.build_context_pop(job_namespace, exec_graph, dict())
 
-        job_node_id = NodeId(job_namespace, "trac_job_marker")
+        job_node_id = NodeId("trac_job_marker", job_namespace)
         job_node = JobNode(job_node_id, job_ctx_pop.root_id)
 
         return Graph({**job_ctx_pop.nodes, job_node_id: job_node}, job_node_id)
@@ -117,7 +117,7 @@ class GraphBuilder:
             model_def: meta.ModelDefinition) -> Graph:
 
         def node_id_for(node_name):
-            return NodeId(namespace, node_name)
+            return NodeId(node_name, namespace)
 
         model_id = node_id_for('trac_model_exec')  # TODO: Model name
 
@@ -146,14 +146,14 @@ class GraphBuilder:
         """
 
         def node_id_for(input_name):
-            return NodeId(namespace, input_name)
+            return NodeId(input_name, namespace)
 
         push_mapping = {
             node_id_for(input_name): input_id
             for input_name, input_id
             in input_mapping.items()}
 
-        push_id = NodeId(namespace, "trac_ctx_push")
+        push_id = NodeId("trac_ctx_push", namespace)
         push_node = ContextPushNode(push_id, namespace, push_mapping)
 
         # Create an explicit marker for each data node pushed into the new context
@@ -175,14 +175,14 @@ class GraphBuilder:
         """
 
         def node_id_for(input_name):
-            return NodeId(namespace, input_name)
+            return NodeId(input_name, namespace)
 
         pop_mapping = {
             node_id_for(output_name): output_id
             for output_name, output_id
             in output_mapping.items()}
 
-        pop_id = NodeId(namespace, "trac_ctx_pop")
+        pop_id = NodeId("trac_ctx_pop", namespace)
         pop_node = ContextPopNode(pop_id, namespace, pop_mapping)
 
         # Create an explicit marker for each data node popped into the outer context

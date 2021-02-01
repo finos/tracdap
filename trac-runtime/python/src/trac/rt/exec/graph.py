@@ -26,15 +26,27 @@ class NodeNamespace:
     name: str
     parent: tp.Optional[NodeNamespace] = None
 
+    def __str__(self):
+        return ", ".join(self.components())
+
     def __repr__(self):
-        return "NAMESPACE"
+        return self.components()
+
+    def components(self) -> [str]:
+        level = self
+        while level is not None:
+            yield level.name
+            level = level.parent
 
 
 @dc.dataclass(frozen=True)
 class NodeId:
 
-    namespace: NodeNamespace
     name: str
+    namespace: NodeNamespace
+
+    def __str__(self):
+        return f"{self.name} / {self.namespace}"
 
 
 @dc.dataclass(frozen=True)
