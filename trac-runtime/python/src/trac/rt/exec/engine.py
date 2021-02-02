@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 import trac.rt.config as config
 import trac.rt.impl.util as util
 import trac.rt.impl.repositories as repos
+import trac.rt.impl.storage as _storage
 
 import trac.rt.exec.actors as actors
 import trac.rt.exec.graph_builder as _graph
@@ -353,7 +354,12 @@ class TracEngine(actors.Actor):
     Messages may be passed in externally via ActorSystem, e.g. commands to launch jobs
     """
 
-    def __init__(self, sys_config: config.RuntimeConfig, repositories: repos.Repositories, batch_mode=False):
+    def __init__(
+            self, sys_config: config.RuntimeConfig,
+            repositories: repos.Repositories,
+            storage: _storage.StorageManager,
+            batch_mode=False):
+
         super().__init__()
 
         self.engine_ctx = EngineContext(jobs={}, data={})
@@ -361,6 +367,7 @@ class TracEngine(actors.Actor):
         self._log = util.logger_for_object(self)
         self._sys_config = sys_config
         self._repos = repositories
+        self._storage = storage
         self._batch_mode = batch_mode
 
     def on_start(self):

@@ -24,6 +24,7 @@ import trac.rt.config.config as config
 import trac.rt.impl.config_parser as cfg
 import trac.rt.impl.util as util
 import trac.rt.impl.repositories as repos
+import trac.rt.impl.storage as storage
 
 import trac.rt.exec.actors as actors
 import trac.rt.exec.engine as engine
@@ -67,6 +68,7 @@ class TracRuntime:
 
         # Top level resources
         self._repos: tp.Optional[repos.Repositories] = None
+        self._storage: tp.Optional[storage.StorageManager] = None
 
         # The execution engine
         self._engine: tp.Optional[engine.TracEngine] = None
@@ -114,8 +116,9 @@ class TracRuntime:
         self._log.info("Starting the engine")
 
         self._repos = repos.Repositories(self._sys_config)
+        self._storage = storage.StorageManager(self._sys_config)
 
-        self._engine = engine.TracEngine(self._sys_config, self._repos, batch_mode=self._batch_mode)
+        self._engine = engine.TracEngine(self._sys_config, self._repos, self._storage, batch_mode=self._batch_mode)
         self._system = actors.ActorSystem(self._engine, system_thread="engine")
 
         self._system.start(wait=wait)

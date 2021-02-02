@@ -90,7 +90,7 @@ class Repositories:
             loader = loader_class(repo_config)
             self._loaders[repo_name] = loader
 
-    def get_model_loader(self, repo_name: str) -> IModelLoader.__class__:
+    def get_model_loader(self, repo_name: str) -> IModelLoader:
 
         loader = self._loaders.get(repo_name)
 

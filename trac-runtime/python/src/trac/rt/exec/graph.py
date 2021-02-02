@@ -149,6 +149,18 @@ class LoadDataNode(Node):
 
     node_id: NodeId
     data_def: meta.DataDefinition
+    storage_def: object
+
+    part: str
+    snap: str
+    delta: str
+    incarnation: int
+
+
+@dc.dataclass(frozen=True)
+class DataViewNode(Node):
+
+    pass
 
 
 @dc.dataclass(frozen=True)

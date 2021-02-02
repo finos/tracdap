@@ -19,7 +19,9 @@ from .context import ModelContext
 
 import trac.rt.api as api
 import trac.rt.config as config
+
 import trac.rt.impl.repositories as repos
+import trac.rt.impl.storage as _storage
 
 import abc
 import typing as tp
@@ -111,11 +113,21 @@ class MapDataFunc(NodeFunction):
 
 class LoadDataFunc(NodeFunction):
 
-    def __init__(self):
+    def __init__(self, storage: _storage.StorageManager, node: LoadDataNode):
         super().__init__()
+        self.storage = storage
+        self.node = node
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
-        pass
+
+        data_item = ""
+        data_storage = self.node.storage_def.dataItem.get(data_item)
+        storage_key = data_storage.storageKey
+
+        data_loader = self.storage.get_data_storage(storage_key)
+        data_table = data_loader.read_table(data_storage)
+
+        return data_table
 
 
 class SaveDataFunc(NodeFunction):
