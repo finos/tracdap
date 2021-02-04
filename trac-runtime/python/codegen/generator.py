@@ -92,6 +92,8 @@ class TracGenerator:
         """{DOC_COMMENT}\n""" \
         """{NEXT_INDENT}\"\"\"\n""" \
         """{NEXT_INDENT}\n""" \
+        """{NESTED_ENUMS}""" \
+        """{NESTED_MESSAGES}""" \
         """{INIT_METHOD}\n"""
 
     INIT_METHOD_TEMPLATE = \
@@ -248,11 +250,20 @@ class TracGenerator:
 
     def generate_message(self, ctx: LocationContext, descriptor: pb_desc.DescriptorProto) -> str:
 
+        # Generate comments
         filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
-
         raw_comment = self.comment_for_current_location(filtered_loc)
         formatted_comment = self.comment_block_translation(ctx, raw_comment)
 
+        # Generate nested enums
+        enum_ctx = self.index_sub_ctx(filtered_loc, self._enum_type_field, ctx.indent + 1)
+        enum_code = list(it.starmap(self.generate_enum, zip(enum_ctx, descriptor.enum_type)))
+
+        # Generate nested message classes
+        message_ctx = self.index_sub_ctx(filtered_loc, self._message_type_field, ctx.indent + 1)
+        message_code = list(it.starmap(self.generate_message, zip(message_ctx, descriptor.nested_type)))
+
+        # Generate init
         init_ctx = LocationContext(filtered_loc, ctx.src_loc_code, ctx.src_loc_index, ctx.indent + 1)
         init_method = self.generate_init_method(init_ctx, descriptor)
 
@@ -261,6 +272,8 @@ class TracGenerator:
             .replace("{NEXT_INDENT}", self.INDENT_TEMPLATE * (ctx.indent + 1)) \
             .replace("{CLASS_NAME}", descriptor.name) \
             .replace("{DOC_COMMENT}", formatted_comment) \
+            .replace("{NESTED_ENUMS}", "\n".join(enum_code)) \
+            .replace("{NESTED_MESSAGES}", "\n".join(message_code)) \
             .replace("{INIT_METHOD}", init_method)
 
     def generate_init_method(self, ctx: LocationContext, descriptor: pb_desc.DescriptorProto) -> str:
