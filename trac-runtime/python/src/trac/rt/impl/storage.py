@@ -15,49 +15,86 @@
 import abc
 import typing as tp
 import pathlib
+import os
+import io
+import datetime as dt
+import dataclasses as dc
 
+import pandas as pd
+
+import trac.rt.metadata as _meta
 import trac.rt.config as _cfg
+
+
+@dc.dataclass
+class FileStat:
+
+    size: int
+
+    ctime: dt.datetime
+    mtime: dt.datetime
+    atime: dt.datetime
+
+    uid: int
+    gid: int
+    mode: int
 
 
 class IFileStorage:
 
     @abc.abstractmethod
-    def exists(self, relative_path: str) -> bool:
+    def exists(self, storage_path: str) -> bool:
         pass
 
     @abc.abstractmethod
-    def stat(self, relative_path: str) -> object:  # TODO: Structure of stat return object
+    def size(self, storage_path: str) -> int:
         pass
 
     @abc.abstractmethod
-    def ls(self, relative_path: str) -> tp.List[str]:
+    def stat(self, storage_path: str) -> FileStat:  # TODO: Structure of stat return object
         pass
 
     @abc.abstractmethod
-    def mkdir(self, relative_path: str, recursive: bool = False):
+    def ls(self, storage_path: str) -> tp.List[str]:
         pass
 
     @abc.abstractmethod
-    def rm(self, relative_path: str, recursive: bool = False):
+    def mkdir(self, storage_path: str, recursive: bool = False):
         pass
 
     @abc.abstractmethod
-    def read_bytes(self, relative_path: str):
+    def rm(self, storage_path: str, recursive: bool = False):
         pass
 
     @abc.abstractmethod
-    def write_bytes(self, relative_path: str):
+    def read_bytes(self, storage_path: str) -> bytes:
+        pass
+
+    @abc.abstractmethod
+    def read_byte_stream(self, storage_path: str) -> io.BytesIO:
+        pass
+
+    @abc.abstractmethod
+    def write_bytes(self, storage_path: str, data: bytes):
+        pass
+
+    @abc.abstractmethod
+    def write_byte_stream(self, storage_path: str) -> io.BytesIO:
         pass
 
 
 class IDataStorage:
 
     @abc.abstractmethod
-    def read_table(self):
+    def read_pandas_table(
+            self, schema: _meta.TableDefinition,
+            storage_path: str, storage_format: str,
+            storage_options: tp.Dict[str, tp.Any]) \
+            -> pd.DataFrame:
         pass
 
     @abc.abstractmethod
-    def write_table(self):
+    def write_pandas_table(self):
         pass
 
     @abc.abstractmethod
@@ -95,18 +132,103 @@ class StorageManager:
         data_impl = self.__data_impls.get(storage_type)
 
         file_storage = file_impl(storage_config)
-        data_storage = data_impl(storage_config)
+        data_storage = data_impl(storage_config, file_storage)
 
         self.__file_storage[storage_key] = file_storage
         self.__data_storage[storage_key] = data_storage
+
+    def has_file_storage(self, storage_key: str) -> bool:
+
+        return storage_key in self.__file_storage
 
     def get_file_storage(self, storage_key: str) -> IFileStorage:
 
         return self.__file_storage[storage_key]
 
+    def has_data_storage(self, storage_key: str) -> bool:
+
+        return storage_key in self.__data_storage
+
     def get_data_storage(self, storage_key: str) -> IDataStorage:
 
         return self.__data_storage[storage_key]
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# COMMON STORAGE IMPLEMENTATION
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class _StorageFormat:
+
+    @abc.abstractmethod
+    def read_pandas(self, src, schema: _meta.TableDefinition, options: dict):
+        pass
+
+
+class _CsvStorageFormat(_StorageFormat):
+
+    def read_pandas(self, src, schema: _meta.TableDefinition, options: dict):
+
+        columns = list(map(lambda f: f.fieldName, schema.field))
+
+        return pd.read_csv(src, usecols=columns)
+
+
+class CommonDataStorage(IDataStorage):
+
+    __formats = {
+        'csv': _CsvStorageFormat()
+    }
+
+    def __init__(
+            self, config: _cfg.StorageConfig, file_storage: IFileStorage,
+            pushdown_pandas: bool = False, pushdown_spark: bool = False):
+
+        root_path = config.storageConfig.get("rootPath")  # TODO: Config / constants
+        self.__root_path = pathlib.Path(root_path).resolve(strict=True)
+
+        self.__file_storage = file_storage
+        self.__pushdown_pandas = pushdown_pandas
+        self.__pushdown_spark = pushdown_spark
+
+    def read_pandas_table(
+            self, schema: _meta.TableDefinition,
+            storage_path: str, storage_format: str,
+            storage_options: tp.Dict[str, tp.Any]) \
+            -> pd.DataFrame:
+
+        format_impl = self.__formats.get(storage_format)
+
+        if format_impl is None:
+            raise NotImplementedError(f"Format '{storage_format} is not supported")  # TODO: Error
+
+        if self.__pushdown_pandas:
+
+            full_path = self.__root_path / storage_path
+            return format_impl.read_pandas(full_path, schema, storage_options)
+
+        else:
+
+            with self.__file_storage.read_byte_stream(storage_path) as byte_stream:
+                return format_impl.read_pandas(byte_stream, schema, storage_options)
+
+    def write_pandas_table(self):
+        pass
+
+    def read_spark_table(
+            self, schema: _meta.TableDefinition,
+            storage_path: str, storage_format: str,
+            storage_options: tp.Dict[str, tp.Any]) \
+            -> object:
+
+        pass
+
+    def write_spark_table(self):
+        pass
+
+    def query_table(self):
+        pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -121,52 +243,61 @@ class LocalFileStorage(IFileStorage):
         root_path = config.storageConfig.get("rootPath")  # TODO: Config / constants
         self.__root_path = pathlib.Path(root_path).resolve(strict=True)
 
-    def exists(self, relative_path: str) -> bool:
+    def exists(self, storage_path: str) -> bool:
 
-        item_path = self.__root_path / relative_path
+        item_path = self.__root_path / storage_path
         return item_path.exists()
 
-    def stat(self, relative_path: str) -> object:
+    def size(self, storage_path: str) -> int:
 
-        item_path = self.__root_path / relative_path
+        return self.stat(storage_path).st_size
+
+    def stat(self, storage_path: str) -> os.stat_result:  # TODO: Convert to FileStat
+
+        item_path = self.__root_path / storage_path
         return item_path.stat()
 
-    def ls(self, relative_path: str) -> tp.List[str]:
+    def ls(self, storage_path: str) -> tp.List[str]:
 
-        item_path = self.__root_path / relative_path
+        item_path = self.__root_path / storage_path
         return [str(x.relative_to(self.__root_path))
                 for x in item_path.iterdir()
                 if x.is_file() or x.is_dir()]
 
-    def mkdir(self, relative_path: str, recursive: bool = False):
+    def mkdir(self, storage_path: str, recursive: bool = False):
 
-        item_path = self.__root_path / relative_path
+        item_path = self.__root_path / storage_path
         item_path.mkdir(parents=recursive, exist_ok=recursive)
 
-    def rm(self, relative_path: str, recursive: bool = False):
+    def rm(self, storage_path: str, recursive: bool = False):
 
         raise NotImplementedError()
 
-    def read_bytes(self, relative_path: str):
-        pass
+    def read_bytes(self, storage_path: str) -> bytes:
 
-    def write_bytes(self, relative_path: str):
-        pass
+        item_path = self.__root_path / storage_path
+        return item_path.read_bytes()
+
+    def read_byte_stream(self, storage_path: str) -> io.BytesIO:
+
+        item_path = self.__root_path / storage_path
+        return open(item_path, mode='rb')
+
+    def write_bytes(self, storage_path: str, data: bytes):
+
+        item_path = self.__root_path / storage_path
+        item_path.write_bytes(data)
+
+    def write_byte_stream(self, storage_path: str) -> io.BytesIO:
+
+        item_path = self.__root_path / storage_path
+        return open(item_path, mode='wb')
 
 
-class LocalDataStorage(IDataStorage):
+class LocalDataStorage(CommonDataStorage):
 
-    def __init__(self, config: _cfg.StorageConfig):
-        pass
-
-    def read_table(self):
-        pass
-
-    def write_table(self):
-        pass
-
-    def query_table(self):
-        pass
+    def __init__(self, storage_config: _cfg.StorageConfig, file_storage: LocalFileStorage):
+        super().__init__(storage_config, file_storage, pushdown_pandas=True, pushdown_spark=True)
 
 
 StorageManager.register_storage_type("LOCAL_STORAGE", LocalFileStorage, LocalDataStorage)
