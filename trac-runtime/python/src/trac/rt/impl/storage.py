@@ -19,6 +19,7 @@ import os
 import io
 import datetime as dt
 import dataclasses as dc
+import enum
 
 import pandas as pd
 
@@ -26,9 +27,16 @@ import trac.rt.metadata as _meta
 import trac.rt.config as _cfg
 
 
+class FileType(enum.Enum):
+
+    FILE = 1
+    DIRECTORY = 2
+
+
 @dc.dataclass
 class FileStat:
 
+    file_type: FileType
     size: int
 
     ctime: dt.datetime

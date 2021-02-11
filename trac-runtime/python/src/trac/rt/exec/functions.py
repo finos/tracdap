@@ -20,8 +20,9 @@ from .context import ModelContext
 import trac.rt.api as api
 import trac.rt.config as config
 
-import trac.rt.impl.repositories as repos
+import trac.rt.impl.repositories as _repos
 import trac.rt.impl.storage as _storage
+import trac.rt.impl.data as _data
 
 import abc
 import typing as tp
@@ -111,6 +112,18 @@ class MapDataFunc(NodeFunction):
         pass
 
 
+class DataViewFunc(NodeFunction):
+
+    def __init__(self, node: DataViewNode):
+        super().__init__()
+        self.node = node
+
+    def __call__(self, ctx: NodeContext) -> NodeResult:
+
+        root_item: _data.DataItem = ctx.get(self.node.root_item)  # noqa
+        return _data.DataView(self.node.schema, root_item)
+
+
 class LoadDataFunc(NodeFunction):
 
     def __init__(self, storage: _storage.StorageManager, node: LoadDataNode):
@@ -120,14 +133,50 @@ class LoadDataFunc(NodeFunction):
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
 
-        data_item = ""
-        data_storage = self.node.storage_def.dataItem.get(data_item)
-        storage_key = data_storage.storageKey
+        data_item = self.node.data_item
+        data_copy = self.choose_copy(data_item, self.node.storage_def)
 
-        data_loader = self.storage.get_data_storage(storage_key)
-        data_table = data_loader.read_table(data_storage)
+        file_storage = self.storage.get_file_storage(data_copy.storageKey)
+        data_storage = self.storage.get_data_storage(data_copy.storageKey)
 
-        return data_table
+        stat = file_storage.stat(data_copy.storagePath)
+
+        if stat.file_type == _storage.FileType.FILE:
+
+            table = data_storage.read_pandas_table(
+                self.node.data_def.schema,
+                data_copy.storagePath, data_copy.storageFormat,
+                storage_options={})
+
+            return _data.DataItem(pandas=table)
+
+        else:
+
+            raise NotImplementedError("Directory storage format not available yet")
+
+    def choose_copy(self, data_item: str, storage_def: meta.StorageDefinition) -> meta.StorageCopy:
+
+        storage_info = storage_def.dataItems.get(data_item)
+
+        if storage_info is None:
+            raise RuntimeError("Invalid metadata")  # TODO: Error
+
+        incarnation = next(filter(
+            lambda i: i.incarnationStatus == meta.IncarnationStatus.INCARNATION_AVAILABLE,
+            reversed(storage_info.incarnations)), None)
+
+        if incarnation is None:
+            raise RuntimeError("Data item not available (it has been expunged)")  # TODO: Error
+
+        copy = next(filter(
+            lambda c: c.copyStatus == meta.CopyStatus.COPY_AVAILABLE
+            and self.storage.has_data_storage(c.storageKey),
+            incarnation.copies), None)
+
+        if copy is None:
+            raise RuntimeError("No copy of the data is available in a connected storage location")  # TODO: Error
+
+        return copy
 
 
 class SaveDataFunc(NodeFunction):
@@ -149,7 +198,7 @@ class ModelFunc(NodeFunction):
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
 
-        model_ctx = ModelContext(self.node.model_def, self.model_class, self.job_config.parameters)
+        model_ctx = ModelContext(self.node.model_def, self.model_class, self.job_config.parameters, data={})
         model: api.TracModel = self.model_class()
 
         model.run_model(model_ctx)
@@ -161,7 +210,7 @@ class FunctionResolver:
 
     __ResolveFunc = tp.Callable[['FunctionResolver', config.JobConfig, Node], NodeFunction]
 
-    def __init__(self, repositories: repos.Repositories):
+    def __init__(self, repositories: _repos.Repositories):
         self._repos = repositories
 
     def resolve_node(self, job_config, node: Node) -> NodeFunction:

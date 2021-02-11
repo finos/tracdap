@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import typing as tp
 import copy
+import pathlib
 
 import trac.rt.api as api
 import trac.rt.metadata as meta
@@ -67,6 +68,18 @@ class DevModeTranslator:
         translated_sys_config.repositories = repos
 
         return translated_job_config, translated_sys_config
+
+    @classmethod
+    def translate_dev_mode_config(
+            cls,
+            job_config: cfg.JobConfig,
+            sys_config: cfg.RuntimeConfig) \
+            -> (cfg.JobConfig, cfg.RuntimeConfig):
+
+        for input_key, input_def in job_config.inputs:
+            pass
+
+        return job_config, sys_config
 
 
 DevModeTranslator._log = util.logger_for_class(DevModeTranslator)

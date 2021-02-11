@@ -144,23 +144,32 @@ class ContextPopNode(Node):
             self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
 
 
-@dc.dataclass(frozen=True)
-class LoadDataNode(Node):
-
-    node_id: NodeId
-    data_def: meta.DataDefinition
-    storage_def: object
-
-    part: str
-    snap: str
-    delta: str
-    incarnation: int
+class DataNode:
+    pass
 
 
 @dc.dataclass(frozen=True)
 class DataViewNode(Node):
 
-    pass
+    schema: meta.TableDefinition
+    root_item: NodeId
+
+
+@dc.dataclass(frozen=True)
+class LoadDataNode(Node):
+
+    """
+    Load an individual data item from storage
+    The latest incarnation of the item will be loaded from any available copy
+    """
+
+    node_id: NodeId
+    data_item: str
+    data_def: meta.DataDefinition
+    storage_def: meta.StorageDefinition
+
+
+
 
 
 @dc.dataclass(frozen=True)
