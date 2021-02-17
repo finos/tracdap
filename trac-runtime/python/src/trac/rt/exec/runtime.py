@@ -28,13 +28,14 @@ import trac.rt.impl.storage as storage
 
 import trac.rt.exec.actors as actors
 import trac.rt.exec.engine as engine
-import trac.rt.exec.dev_mode as dev_mode
+import trac.rt.exec.dev_mode as _dev_mode
 
 
 class TracRuntime:
 
-    def __init__(self, sys_config_path: str, job_config_path: tp.Optional[str] = None,
-                 dev_mode: bool = False, model_class: api.TracModel.__class__ = None):
+    def __init__(
+            self, sys_config_path: str, job_config_path: tp.Optional[str] = None,
+            dev_mode: bool = False, model_class: tp.Optional[api.TracModel.__class__] = None):
 
         python_version = sys.version.replace("\n", "")
         mode = "batch" if job_config_path else "service"
@@ -105,11 +106,11 @@ class TracRuntime:
 
         if self._dev_mode:
 
-            if self._model_class:
-                job_config, sys_config = dev_mode.DevModeTranslator \
-                    .translate_integrated_launch(self._model_class, self._job_config, self._sys_config)
-                self._job_config = job_config
-                self._sys_config = sys_config
+            job_config, sys_config = _dev_mode.DevModeTranslator.translate_dev_mode_config(
+                self._job_config, self._sys_config, self._model_class)
+
+            self._job_config = job_config
+            self._sys_config = sys_config
 
     def start(self, wait: bool = False):
 

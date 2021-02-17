@@ -17,6 +17,7 @@ from __future__ import annotations
 import typing as tp
 import copy
 import pathlib
+import uuid
 
 import trac.rt.api as api
 import trac.rt.metadata as meta
@@ -29,15 +30,71 @@ class DevModeTranslator:
     _log: tp.Optional[util.logging.Logger] = None
 
     @classmethod
-    def translate_integrated_launch(
-            cls, model_class: type,
+    def translate_dev_mode_config(
+            cls,
+            job_config: cfg.JobConfig,
+            sys_config: cfg.RuntimeConfig,
+            model_class: tp.Optional[api.TracModel.__class__]) \
+            -> (cfg.JobConfig, cfg.RuntimeConfig):
+
+        cls._log.info(f"Applying dev mode config translation")
+
+        if model_class is not None:
+            job_config, sys_config = cls._generate_integrated_model_definition(model_class, job_config, sys_config)
+
+        original_inputs = job_config.inputs
+        original_objects = job_config.objects
+        translated_inputs = copy.copy(original_inputs)
+        translated_objects = job_config.objects
+
+        for input_key, input_value in original_inputs.items():
+
+            # Inputs that refer to an existing object definition do not need dev mode translation
+            if isinstance(input_value, str) and input_value in original_objects:
+                continue
+
+            if isinstance(input_value, str):
+                storage_path = input_value
+                storage_key = sys_config.storageSettings.defaultStorage
+                storage_format = sys_config.storageSettings.defaultFormat
+
+            elif isinstance(input_value, dict):
+
+                storage_path = input_value.get("path")
+
+                if not storage_path:
+                    raise RuntimeError(f"Invalid configuration for input '{input_key}' (missing required value 'path'")
+
+                storage_key = input_value.get("storageKey") or sys_config.storageSettings.defaultStorage
+                storage_format = input_value.get("format") or sys_config.storageSettings.defaultFormat
+
+            else:
+                raise RuntimeError(f"Invalid configuration for input '{input_key}'")
+
+            data_id = uuid.uuid4()
+            storage_id = uuid.uuid4()
+
+            cls._log.info(f"Generating data definition for '{input_key}' (assigned ID {data_id})")
+
+            data_obj, storage_obj = cls._generate_input_definition(
+                data_id, storage_id, storage_key, storage_path, storage_format)
+
+            translated_objects[str(data_id)] = data_obj
+            translated_objects[str(storage_id)] = storage_obj
+            translated_inputs[input_key] = str(data_id)
+
+        return job_config, sys_config
+
+    @classmethod
+    def _generate_integrated_model_definition(
+            cls, model_class: api.TracModel.__class__,
             job_config: cfg.JobConfig,
             sys_config: cfg.RuntimeConfig) \
             -> (cfg.JobConfig, cfg.RuntimeConfig):
 
-        cls._log.info(f"Applying translation for integrated model launch")
+        model_id = uuid.uuid4()
 
-        model_id = "launch_target"  # TODO: Generate dummy ID
+        cls._log.info(f"Generating model definition for '{model_class.__name__}' (assigned ID {model_id})")
 
         modeL_def = meta.ModelDefinition(  # noqa
             language="python",
@@ -70,16 +127,57 @@ class DevModeTranslator:
         return translated_job_config, translated_sys_config
 
     @classmethod
-    def translate_dev_mode_config(
-            cls,
-            job_config: cfg.JobConfig,
-            sys_config: cfg.RuntimeConfig) \
-            -> (cfg.JobConfig, cfg.RuntimeConfig):
+    def _generate_input_definition(
+            cls, data_id: uuid.UUID, storage_id: uuid.UUID,
+            storage_key: str, storage_path: str, storage_format: str) \
+            -> (meta.ObjectDefinition, meta.ObjectDefinition):
 
-        for input_key, input_def in job_config.inputs:
-            pass
+        part_key = meta.DataDefinition.PartKey(
+            opaqueKey="part-root",
+            partType=meta.DataDefinition.PartType.PART_ROOT)
 
-        return job_config, sys_config
+        snap_index = 1
+        delta_index = 1
+        data_item_id = f"DATA:{data_id}:{part_key.opaqueKey}:{snap_index}:{delta_index}"
+
+        delta = meta.DataDefinition.Delta(
+            deltaIndex=delta_index,
+            dataItemId=data_item_id)
+
+        snap = meta.DataDefinition.Snap(
+            snapIndex=snap_index,
+            deltas=[delta])
+
+        part = meta.DataDefinition.Part(
+            partKey=part_key,
+            snap=snap)
+
+        data_def = meta.DataDefinition(parts={})
+        data_def.storageId = str(storage_id)
+        data_def.schema = meta.TableDefinition()
+        data_def.parts[part_key.opaqueKey] = part
+
+        storage_copy = meta.StorageCopy(
+            storageKey=storage_key,
+            storagePath=storage_path,
+            storageFormat=storage_format)
+
+        storage_incarnation = meta.StorageIncarnation(
+            incarnationIndex=1,
+            incarnationTimestamp=meta.DatetimeValue(isoDatetime=""),  # TODO: Timestamp
+            incarnationStatus=meta.IncarnationStatus.INCARNATION_AVAILABLE,
+            copies=[storage_copy])
+
+        storage_item = meta.StorageItem(
+            incarnations=[storage_incarnation])
+
+        storage_def = meta.StorageDefinition(dataItems={})
+        storage_def.dataItems[delta.dataItemId] = storage_item
+
+        data_obj = meta.ObjectDefinition(objectType=meta.ObjectType.DATA, data=data_def)
+        storage_obj = meta.ObjectDefinition(objectType=meta.ObjectType.STORAGE, storage=storage_def)
+
+        return data_obj, storage_obj
 
 
 DevModeTranslator._log = util.logger_for_class(DevModeTranslator)
