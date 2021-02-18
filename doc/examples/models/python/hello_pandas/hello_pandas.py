@@ -60,19 +60,19 @@ class HelloPandas(trac.TracModel):
         customer_loans = ctx.get_pandas_table("customer_loans")
 
         if filter_defaults:
-            customer_loans = customer_loans[customer_loans["loan_condition_cat"] == 0]
+            customer_loans.loc[:, :] = customer_loans[customer_loans["loan_condition_cat"] == 0]
 
-        customer_loans["gross_profit_unweighted"] = \
+        customer_loans.loc[:, "gross_profit_unweighted"] = \
             customer_loans["total_pymnt"] - \
             customer_loans["loan_amount"]
 
-        customer_loans["gross_profit_weighted"] = \
+        customer_loans.loc[:, "gross_profit_weighted"] = \
             customer_loans["gross_profit_unweighted"] * \
             customer_loans["loan_condition_cat"] \
             .apply(lambda c: default_weighting if c > 0 else 1.0)
 
-        customer_loans["gross_profit"] = \
-            customer_loans["gross_profit_eur"] \
+        customer_loans.loc[:, "gross_profit"] = \
+            customer_loans["gross_profit_weighted"] \
             .apply(lambda x: x * eur_usd_rate)
 
         profit_by_region = customer_loans \
