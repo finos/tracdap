@@ -68,12 +68,16 @@ class GraphBuilder(actors.Actor):
     The logic for graph building is provided in graph_builder.py
     """
 
-    def __init__(self, job_config: config.JobConfig, repositories: repos.Repositories):
+    def __init__(
+            self, job_config: config.JobConfig,
+            repositories: repos.Repositories,
+            storage: _storage.StorageManager):
+
         super().__init__()
         self.job_config = job_config
         self.graph: tp.Optional[GraphContext] = None
 
-        self._resolver = _func.FunctionResolver(repositories)
+        self._resolver = _func.FunctionResolver(repositories, storage)
         self._log = util.logger_for_object(self)
 
     def on_start(self):
@@ -313,16 +317,17 @@ class JobProcessor(actors.Actor):
     This includes setup (GraphBuilder), execution (GraphProcessor) and reporting results
     """
 
-    def __init__(self, job_id, job_config, repositories: repos.Repositories):
+    def __init__(self, job_id, job_config, repositories: repos.Repositories, storage: _storage.StorageManager):
         super().__init__()
         self.job_id = job_id
         self.job_config = job_config
         self._repos = repositories
+        self._storage = storage
         self._log = util.logger_for_object(self)
 
     def on_start(self):
         self._log.info("Starting job")
-        self.actors().spawn(GraphBuilder, self.job_config, self._repos)
+        self.actors().spawn(GraphBuilder, self.job_config, self._repos, self._storage)
 
     @actors.Message
     def job_graph(self, graph: GraphContext):
@@ -385,7 +390,7 @@ class TracEngine(actors.Actor):
 
         self._log.info("A job has been submitted")
 
-        job_actor_id = self.actors().spawn(JobProcessor, job_id, job_info, self._repos)
+        job_actor_id = self.actors().spawn(JobProcessor, job_id, job_info, self._repos, self._storage)
 
         jobs = {**self.engine_ctx.jobs, job_id: job_actor_id}
         self.engine_ctx = EngineContext(jobs, self.engine_ctx.data)

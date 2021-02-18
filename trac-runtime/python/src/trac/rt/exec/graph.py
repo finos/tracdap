@@ -154,6 +154,10 @@ class DataViewNode(Node):
     schema: meta.TableDefinition
     root_item: NodeId
 
+    def __post_init__(self):
+        eager_data_deps = {self.root_item: DependencyType.HARD}
+        object.__setattr__(self, 'dependencies', eager_data_deps)
+
 
 @dc.dataclass(frozen=True)
 class LoadDataNode(Node):
@@ -163,13 +167,12 @@ class LoadDataNode(Node):
     The latest incarnation of the item will be loaded from any available copy
     """
 
-    node_id: NodeId
     data_item: str
     data_def: meta.DataDefinition
     storage_def: meta.StorageDefinition
 
-
-
+    def __post_init__(self):
+        object.__setattr__(self, 'dependencies', {})
 
 
 @dc.dataclass(frozen=True)

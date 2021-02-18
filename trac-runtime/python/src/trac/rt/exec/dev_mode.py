@@ -83,6 +83,10 @@ class DevModeTranslator:
             translated_objects[str(storage_id)] = storage_obj
             translated_inputs[input_key] = str(data_id)
 
+        job_config = copy.copy(job_config)
+        job_config.objects = translated_objects
+        job_config.inputs = translated_inputs
+
         return job_config, sys_config
 
     @classmethod
@@ -160,7 +164,8 @@ class DevModeTranslator:
         storage_copy = meta.StorageCopy(
             storageKey=storage_key,
             storagePath=storage_path,
-            storageFormat=storage_format)
+            storageFormat=storage_format,
+            copyStatus=meta.CopyStatus.COPY_AVAILABLE)
 
         storage_incarnation = meta.StorageIncarnation(
             incarnationIndex=1,

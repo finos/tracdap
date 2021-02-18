@@ -14,7 +14,11 @@
 
 import trac.rt.metadata as meta
 import trac.rt.config.config as config
+import trac.rt.impl.data as _data
+
 from .graph import *
+
+import functools as f
 
 
 class GraphBuilder:
@@ -44,7 +48,27 @@ class GraphBuilder:
 
         # Create load operations to load data into the job context once it is created
 
-        # TODO
+        # f.reduce()
+
+        load_inputs = f.reduce(
+            f.partial(GraphBuilder.build_data_load, job_config, job_namespace),
+            job_config.inputs.keys(), job_ctx_push)
+
+
+        # for job_input, data_id in job_config.inputs.items():
+        #
+        #     data_def = job_config.objects[data_id].data
+        #     storage_def = job_config.objects[data_def.storageId].storage
+        #
+        #     # TODO: Get this from somewhere
+        #     root_part_opaque_key = 'part-root'
+        #
+        #     data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItemId
+        #     data_item_id = NodeId(data_item, job_namespace)
+        #     load_node = LoadDataNode(data_item_id, data_item, data_def, storage_def)
+        #
+        #     vide_node_id = NodeId(job_input, job_namespace)
+        #     view_node = DataViewNode(vide_node_id, data_def.schema, data_item_id)
 
         # Now create the root execution node, which will be either a single model or a flow
         # The root exec node can run directly in the job context, no need to do a context push
@@ -52,7 +76,7 @@ class GraphBuilder:
 
         exec_target = job_config.objects.get(job_config.target)
         exec_graph = GraphBuilder.build_model_or_flow(
-            job_config, job_namespace, job_ctx_push, exec_target)
+            job_config, job_namespace, load_inputs, exec_target)
 
         # Create save operations, data will be saved directly from the job context
 
@@ -75,8 +99,30 @@ class GraphBuilder:
         return Graph({**job_ctx_pop.nodes, job_node_id: job_node}, job_node_id)
 
     @staticmethod
-    def build_data_load():
-        pass
+    def build_data_load(
+            job_config: config.JobConfig,
+            namespace: NodeNamespace, graph: Graph,
+            job_input_name: str) -> Graph:
+
+        data_id = job_config.inputs[job_input_name]
+        data_def = job_config.objects[data_id].data
+        storage_def = job_config.objects[data_def.storageId].storage
+
+        # TODO: Get this from somewhere
+        root_part_opaque_key = 'part-root'
+
+        data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItemId
+        data_item_id = NodeId(data_item, namespace)
+        load_node = LoadDataNode(data_item_id, data_item, data_def, storage_def)
+
+        vide_node_id = NodeId(job_input_name, namespace)
+        view_node = DataViewNode(vide_node_id, data_def.schema, data_item_id)
+
+        return Graph({
+            **graph.nodes,
+            data_item_id: load_node,
+            vide_node_id: view_node},
+            graph.root_id)
 
     @staticmethod
     def build_model_or_flow_with_context(
@@ -128,7 +174,7 @@ class GraphBuilder:
         input_ids = frozenset(map(node_id_for, model_def.input.keys()))
         ctx_push_id = graph.root_id
 
-        model_node = ModelNode(model_id, model_def, input_ids, explicit_deps=[ctx_push_id])
+        model_node = ModelNode(model_id, model_def, input_ids, explicit_deps=[ctx_push_id, *input_ids])
 
         return Graph({**graph.nodes, model_id: model_node}, model_id)
 

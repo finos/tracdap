@@ -210,8 +210,9 @@ class FunctionResolver:
 
     __ResolveFunc = tp.Callable[['FunctionResolver', config.JobConfig, Node], NodeFunction]
 
-    def __init__(self, repositories: _repos.Repositories):
+    def __init__(self, repositories: _repos.Repositories, storage: _storage.StorageManager):
         self._repos = repositories
+        self._storage = storage
 
     def resolve_node(self, job_config, node: Node) -> NodeFunction:
 
@@ -228,6 +229,9 @@ class FunctionResolver:
     def resolve_context_pop(self, job_config: config.JobConfig, node: ContextPopNode):
         return ContextPopFunc(node.namespace, node.mapping)
 
+    def resolve_load_data(self, job_config: config.JobConfig, node: LoadDataNode):
+        return LoadDataFunc(self._storage, node)
+
     def resolve_model_node(self, job_config: config.JobConfig, node: ModelNode) -> NodeFunction:
 
         model_loader = self._repos.get_model_loader(node.model_def.repository)
@@ -239,8 +243,10 @@ class FunctionResolver:
 
         IdentityNode: lambda s, j, n: IdentityFunc(),
         JobNode: lambda s, j, n: JobNodeFunc(),
+        DataViewNode: lambda s, j, n: JobNodeFunc(),
 
         ContextPushNode: resolve_context_push,
         ContextPopNode: resolve_context_pop,
+        LoadDataNode: resolve_load_data,
         ModelNode: resolve_model_node
     }
