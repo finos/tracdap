@@ -120,8 +120,11 @@ class DataViewFunc(NodeFunction):
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
 
-        root_item: _data.DataItem = ctx.get(self.node.root_item)  # noqa
-        return _data.DataView(self.node.schema, root_item)
+        root_node = ctx.get(self.node.root_item)  # noqa
+        root_item: _data.DataItem = root_node.result  # noqa
+        root_part_key = _data.DataPartKey.for_root()
+
+        return _data.DataView(self.node.schema, {root_part_key: [root_item]})
 
 
 class LoadDataFunc(NodeFunction):
@@ -198,7 +201,11 @@ class ModelFunc(NodeFunction):
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
 
-        model_ctx = ModelContext(self.node.model_def, self.model_class, self.job_config.parameters, data={})
+        input_ids = set(map(lambda mi: NodeId(mi, self.node.id.namespace), self.node.model_def.input))
+        output_ids = set(map(lambda mo: NodeId(mo, self.node.id.namespace), self.node.model_def.output))
+        local_data_ctx = {nid.name: n.result for nid, n in ctx.items() if nid in input_ids or nid in output_ids}
+
+        model_ctx = ModelContext(self.node.model_def, self.model_class, self.job_config.parameters, data=local_data_ctx)
         model: api.TracModel = self.model_class()
 
         model.run_model(model_ctx)
@@ -229,6 +236,9 @@ class FunctionResolver:
     def resolve_context_pop(self, job_config: config.JobConfig, node: ContextPopNode):
         return ContextPopFunc(node.namespace, node.mapping)
 
+    def resolve_data_view(self, job_config: config.JobConfig, node: DataViewNode):
+        return DataViewFunc(node)
+
     def resolve_load_data(self, job_config: config.JobConfig, node: LoadDataNode):
         return LoadDataFunc(self._storage, node)
 
@@ -243,10 +253,10 @@ class FunctionResolver:
 
         IdentityNode: lambda s, j, n: IdentityFunc(),
         JobNode: lambda s, j, n: JobNodeFunc(),
-        DataViewNode: lambda s, j, n: JobNodeFunc(),
 
         ContextPushNode: resolve_context_push,
         ContextPopNode: resolve_context_pop,
+        DataViewNode: resolve_data_view,
         LoadDataNode: resolve_load_data,
         ModelNode: resolve_model_node
     }

@@ -174,7 +174,7 @@ class GraphBuilder:
         input_ids = frozenset(map(node_id_for, model_def.input.keys()))
         ctx_push_id = graph.root_id
 
-        model_node = ModelNode(model_id, model_def, input_ids, explicit_deps=[ctx_push_id, *input_ids])
+        model_node = ModelNode(model_id, model_def, input_ids, explicit_deps=[ctx_push_id])
 
         return Graph({**graph.nodes, model_id: model_node}, model_id)
 

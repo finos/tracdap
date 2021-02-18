@@ -39,13 +39,13 @@ class FileStat:
     file_type: FileType
     size: int
 
-    ctime: dt.datetime
-    mtime: dt.datetime
-    atime: dt.datetime
+    ctime: tp.Optional[dt.datetime] = None
+    mtime: tp.Optional[dt.datetime] = None
+    atime: tp.Optional[dt.datetime] = None
 
-    uid: int
-    gid: int
-    mode: int
+    uid: tp.Optional[int] = None
+    gid: tp.Optional[int] = None
+    mode: tp.Optional[int] = None
 
 
 class IFileStorage:
@@ -178,7 +178,7 @@ class _CsvStorageFormat(_StorageFormat):
 
     def read_pandas(self, src, schema: _meta.TableDefinition, options: dict):
 
-        columns = list(map(lambda f: f.fieldName, schema.field))
+        columns = list(map(lambda f: f.fieldName, schema.field)) if schema.field else None
 
         return pd.read_csv(src, usecols=columns)
 
@@ -206,10 +206,10 @@ class CommonDataStorage(IDataStorage):
             storage_options: tp.Dict[str, tp.Any]) \
             -> pd.DataFrame:
 
-        format_impl = self.__formats.get(storage_format)
+        format_impl = self.__formats.get(storage_format.lower())
 
         if format_impl is None:
-            raise NotImplementedError(f"Format '{storage_format} is not supported")  # TODO: Error
+            raise NotImplementedError(f"Format '{storage_format}' is not supported")  # TODO: Error
 
         if self.__pushdown_pandas:
 
@@ -258,12 +258,20 @@ class LocalFileStorage(IFileStorage):
 
     def size(self, storage_path: str) -> int:
 
-        return self.stat(storage_path).st_size
+        return self.stat(storage_path).size
 
-    def stat(self, storage_path: str) -> os.stat_result:  # TODO: Convert to FileStat
+    def stat(self, storage_path: str) -> FileStat:  # TODO: Convert to FileStat
 
         item_path = self.__root_path / storage_path
-        return item_path.stat()
+        os_stat = item_path.stat()
+
+        file_type = FileType.FILE if item_path.is_file() \
+            else FileType.DIRECTORY if item_path.is_dir() \
+            else None
+
+        return FileStat(
+            file_type=file_type,
+            size=os_stat.st_size)
 
     def ls(self, storage_path: str) -> tp.List[str]:
 

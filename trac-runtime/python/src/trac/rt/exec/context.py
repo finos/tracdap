@@ -79,8 +79,11 @@ class ModelContext(api.TracContext):
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_dataset_exists(dataset_name)
 
+        part_key = _data.DataPartKey.for_root()
+
         data_view = self.__data[dataset_name]
-        data_item = data_view.item
+        deltas = data_view.parts[part_key]
+        data_item = deltas[0]
 
         if data_item.pandas is not None:
             return data_item.pandas

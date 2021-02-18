@@ -32,7 +32,7 @@ class IModelLoader:
 
 class IntegratedModelLoader(IModelLoader):
 
-    def __init__(self, repo_config: config.StorageConfig):
+    def __init__(self, repo_config: config.RepositoryConfig):
         self._repo_config = repo_config
 
     def load_model(self, model_def: meta.ModelDefinition) -> api.TracModel.__class__:

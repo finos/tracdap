@@ -30,7 +30,17 @@ class DataItem:
 
 
 @dc.dataclass(frozen=True)
+class DataPartKey:
+
+    @classmethod
+    def for_root(cls) -> 'DataPartKey':
+        return DataPartKey(opaque_key='part_root')
+
+    opaque_key: str
+
+
+@dc.dataclass(frozen=True)
 class DataView:
 
     schema: _meta.TableDefinition
-    item: DataItem
+    parts: tp.Dict[DataPartKey, tp.List[DataItem]]

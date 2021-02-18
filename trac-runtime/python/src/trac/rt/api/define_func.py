@@ -26,7 +26,10 @@
 
 
 import typing as tp
+import inspect
 from trac.rt.metadata import *
+
+__field_def_params = inspect.signature(FieldDefinition.__init__).parameters
 
 
 class NamedParameter:
@@ -61,11 +64,35 @@ def define_parameter(
     return NamedParameter(param_name, ModelParameter(label, param_type_descriptor, default_value))
 
 
-def define_table(*args, **kwargs):
-    return TableDefinition(*args, **kwargs)
+def define_table(*fields: FieldDefinition):
+    return TableDefinition([*fields])
 
 
 def define_field(*args, **kwargs):
+
+    arg_names = list(kwargs.keys())
+
+    for arg_name in arg_names:
+
+        if arg_name in __field_def_params:
+            continue
+
+        # Convert arg names starting with "field", e.g. label -> fieldLabel
+        prefix_name = "field" + arg_name[0].upper() + arg_name[1:]
+
+        if prefix_name in __field_def_params:
+            kwargs[prefix_name] = kwargs[arg_name]
+            kwargs.pop(arg_name)
+            continue
+
+        # Convert snake-case to camel-case
+        camel_words = arg_name.split('_')
+        camel_name = camel_words[0] + ''.join(word.title() for word in camel_words[1:])
+
+        if camel_name in __field_def_params:
+            kwargs[camel_name] = kwargs[arg_name]
+            kwargs.pop(arg_name)
+
     return FieldDefinition(*args, **kwargs)
 
 

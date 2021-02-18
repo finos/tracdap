@@ -22,6 +22,7 @@ import uuid
 import trac.rt.api as api
 import trac.rt.metadata as meta
 import trac.rt.config as cfg
+import trac.rt.impl.repositories as _repos
 import trac.rt.impl.util as util
 
 
@@ -100,7 +101,7 @@ class DevModeTranslator:
 
         cls._log.info(f"Generating model definition for '{model_class.__name__}' (assigned ID {model_id})")
 
-        modeL_def = meta.ModelDefinition(  # noqa
+        skeleton_modeL_def = meta.ModelDefinition(  # noqa
             language="python",
             repository="trac_integrated",
             entryPoint=f"{model_class.__module__}.{model_class.__name__}",
@@ -113,9 +114,30 @@ class DevModeTranslator:
             overlay=False,
             schemaUnchanged=False)
 
+        loader = _repos.IntegratedModelLoader(cfg.RepositoryConfig(repoType="INTEGRATED", repoUrl=""))
+        model_class = loader.load_model(skeleton_modeL_def)
+        model: api.TracModel = model_class()
+
+        model_params = model.define_parameters()
+        model_inputs = model.define_inputs()
+        model_outputs = model.define_outputs()
+
+        model_def = meta.ModelDefinition(  # noqa
+            language="python",
+            repository="trac_integrated",
+            entryPoint=f"{model_class.__module__}.{model_class.__name__}",
+
+            path="",
+            repositoryVersion="",
+            input=model_inputs,
+            output=model_outputs,
+            param=model_params,
+            overlay=False,
+            schemaUnchanged=False)
+
         model_object = meta.ObjectDefinition(
             objectType=meta.ObjectType.MODEL,
-            model=modeL_def)
+            model=model_def)
 
         translated_job_config = copy.copy(job_config)
         translated_job_config.target = model_id
