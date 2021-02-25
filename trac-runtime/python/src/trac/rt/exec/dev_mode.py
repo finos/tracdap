@@ -44,51 +44,70 @@ class DevModeTranslator:
             job_config, sys_config = cls._generate_integrated_model_definition(model_class, job_config, sys_config)
 
         original_inputs = job_config.inputs
+        original_outputs = job_config.outputs
         original_objects = job_config.objects
+
         translated_inputs = copy.copy(original_inputs)
+        translated_outputs = copy.copy(original_outputs)
         translated_objects = job_config.objects
 
-        for input_key, input_value in original_inputs.items():
-
-            # Inputs that refer to an existing object definition do not need dev mode translation
-            if isinstance(input_value, str) and input_value in original_objects:
-                continue
-
-            if isinstance(input_value, str):
-                storage_path = input_value
-                storage_key = sys_config.storageSettings.defaultStorage
-                storage_format = sys_config.storageSettings.defaultFormat
-
-            elif isinstance(input_value, dict):
-
-                storage_path = input_value.get("path")
-
-                if not storage_path:
-                    raise RuntimeError(f"Invalid configuration for input '{input_key}' (missing required value 'path'")
-
-                storage_key = input_value.get("storageKey") or sys_config.storageSettings.defaultStorage
-                storage_format = input_value.get("format") or sys_config.storageSettings.defaultFormat
-
-            else:
-                raise RuntimeError(f"Invalid configuration for input '{input_key}'")
+        def process_input_or_output(data_key, data_value, is_input: bool):
 
             data_id = uuid.uuid4()
             storage_id = uuid.uuid4()
 
-            cls._log.info(f"Generating data definition for '{input_key}' (assigned ID {data_id})")
-
-            data_obj, storage_obj = cls._generate_input_definition(
-                data_id, storage_id, storage_key, storage_path, storage_format)
+            data_obj, storage_obj = cls._process_job_io(sys_config, data_key, data_value, data_id, storage_id)
 
             translated_objects[str(data_id)] = data_obj
             translated_objects[str(storage_id)] = storage_obj
-            translated_inputs[input_key] = str(data_id)
+
+            if is_input:
+                translated_inputs[data_key] = str(data_id)
+            else:
+                translated_outputs[data_key] = str(data_id)
+
+        for input_key, input_value in original_inputs.items():
+            if not (isinstance(input_value, str) and input_value in original_objects):
+                process_input_or_output(input_key, input_value, is_input=True)
+
+        for output_key, output_value in original_outputs.items():
+            if not (isinstance(output_value, str) and output_value in original_outputs):
+                process_input_or_output(output_key, output_value, is_input=False)
 
         job_config = copy.copy(job_config)
         job_config.objects = translated_objects
         job_config.inputs = translated_inputs
+        job_config.outputs = translated_outputs
 
         return job_config, sys_config
+
+    @classmethod
+    def _process_job_io(cls, sys_config, data_key, data_value, data_id, storage_id):
+
+        if isinstance(data_value, str):
+            storage_path = data_value
+            storage_key = sys_config.storageSettings.defaultStorage
+            storage_format = sys_config.storageSettings.defaultFormat
+
+        elif isinstance(data_value, dict):
+
+            storage_path = data_value.get("path")
+
+            if not storage_path:
+                raise RuntimeError(f"Invalid configuration for input '{data_key}' (missing required value 'path'")
+
+            storage_key = data_value.get("storageKey") or sys_config.storageSettings.defaultStorage
+            storage_format = data_value.get("format") or sys_config.storageSettings.defaultFormat
+
+        else:
+            raise RuntimeError(f"Invalid configuration for input '{data_key}'")
+
+        cls._log.info(f"Generating data definition for '{data_key}' (assigned ID {data_id})")
+
+        data_obj, storage_obj = cls._generate_input_definition(
+            data_id, storage_id, storage_key, storage_path, storage_format)
+
+        return data_obj, storage_obj
 
     @classmethod
     def _generate_integrated_model_definition(

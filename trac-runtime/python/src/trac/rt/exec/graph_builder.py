@@ -44,15 +44,14 @@ class GraphBuilder:
         job_namespace = NodeNamespace(f"job={job_config.job_id}")
 
         job_ctx_push = GraphBuilder.build_context_push(
-            job_namespace, null_graph, dict())
+            job_namespace, null_graph, input_mapping=dict())
 
         # Create load operations to load data into the job context once it is created
 
         # f.reduce()
 
-        load_inputs = f.reduce(
-            f.partial(GraphBuilder.build_data_load, job_config, job_namespace),
-            job_config.inputs.keys(), job_ctx_push)
+        load_input_builder = f.partial(GraphBuilder.build_data_load, job_config, job_namespace)
+        load_inputs = f.reduce(load_input_builder, job_config.inputs, job_ctx_push)
 
 
         # for job_input, data_id in job_config.inputs.items():
@@ -78,7 +77,9 @@ class GraphBuilder:
         exec_graph = GraphBuilder.build_model_or_flow(
             job_config, job_namespace, load_inputs, exec_target)
 
-        # Create save operations, data will be saved directly from the job context
+
+        save_output_builder = f.partial(GraphBuilder.build_data_save, job_config, job_namespace)
+        save_outputs = f.reduce(save_output_builder, job_config.outputs, exec_graph)
 
         # TODO
 
@@ -100,9 +101,8 @@ class GraphBuilder:
 
     @staticmethod
     def build_data_load(
-            job_config: config.JobConfig,
-            namespace: NodeNamespace, graph: Graph,
-            job_input_name: str) -> Graph:
+            job_config: config.JobConfig, namespace: NodeNamespace,
+            graph: Graph, job_input_name: str) -> Graph:
 
         data_id = job_config.inputs[job_input_name]
         data_def = job_config.objects[data_id].data
@@ -123,6 +123,17 @@ class GraphBuilder:
             data_item_id: load_node,
             vide_node_id: view_node},
             graph.root_id)
+
+    @staticmethod
+    def build_data_save(
+            job_config: config.JobConfig, namespace: NodeNamespace,
+            graph: Graph, job_input_name: str) -> Graph:
+
+        data_id = job_config.outputs[job_input_name]
+        data_def = job_config.objects[data_id].data
+        storage_def = job_config.objects[data_def.storageId].storage
+
+        return graph
 
     @staticmethod
     def build_model_or_flow_with_context(
