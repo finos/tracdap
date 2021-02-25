@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import typing as tp
+import copy
 import re
 
 import pandas as pd
@@ -55,8 +56,8 @@ class ModelContext(api.TracContext):
 
         self.__val = ModelRuntimeValidator(
             self.__ctx_log,
-            frozenset(self.__parameters.keys()),
-            frozenset(self.__data.keys()))
+            self.__parameters,
+            self.__data)
 
     def get_parameter(self, parameter_name: str) -> tp.Any:
 
@@ -76,10 +77,11 @@ class ModelContext(api.TracContext):
 
     def get_pandas_table(self, dataset_name: str) -> pd.DataFrame:
 
+        part_key = _data.DataPartKey.for_root()
+
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_dataset_exists(dataset_name)
-
-        part_key = _data.DataPartKey.for_root()
+        self.__val.check_dataset_part_present(dataset_name, part_key)
 
         data_view = self.__data[dataset_name]
         deltas = data_view.parts[part_key]
@@ -100,7 +102,22 @@ class ModelContext(api.TracContext):
         raise NotImplementedError()
 
     def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
-        raise NotImplementedError()
+
+        part_key = _data.DataPartKey.for_root()
+
+        self.__val.check_dataset_valid_identifier(dataset_name)
+        self.__val.check_dataset_exists(dataset_name)
+        self.__val.check_dataset_schema_defined(dataset_name)
+        self.__val.check_dataset_part_not_present(dataset_name, part_key)
+
+        data_view = self.__data[dataset_name]
+        data_item = _data.DataItem(pandas=dataset, column_filter=None)
+
+        new_data_parts = copy.copy(data_view.parts)
+        new_data_parts[part_key] = [data_item]  # List of a single delta
+        new_data_view = _data.DataView(data_view.schema, new_data_parts)
+
+        self.__data[dataset_name] = new_data_view
 
     def put_spark_table(self, dataset_name: str, dataset: pyss.DataFrame):
         raise NotImplementedError()
@@ -125,12 +142,12 @@ class ModelRuntimeValidator:
 
     def __init__(
             self, log: logging.Logger,
-            param_names: tp.FrozenSet[str],
-            dataset_names: tp.FrozenSet[str]):
+            parameters: tp.Dict[str, tp.Any],
+            data_ctx: tp.Dict[str, _data.DataView]):
 
         self.__log = log
-        self.__param_names = param_names
-        self.__dataset_names = dataset_names
+        self.__parameters = parameters
+        self.__data_ctx = data_ctx
 
     def _report_error(self, message):
         self.__log.error(message)
@@ -143,7 +160,7 @@ class ModelRuntimeValidator:
 
     def check_param_exists(self, param_name: str):
 
-        if param_name not in self.__param_names:
+        if param_name not in self.__parameters:
             self._report_error(f"Parameter {param_name} does not exist in the current context")
 
     def check_dataset_valid_identifier(self, dataset_name: str):
@@ -153,5 +170,33 @@ class ModelRuntimeValidator:
 
     def check_dataset_exists(self, dataset_name: str):
 
-        if dataset_name not in self.__dataset_names:
+        if dataset_name not in self.__data_ctx:
             self._report_error(f"Dataset {dataset_name} does not exist in the current context")
+
+    def check_dataset_schema_defined(self, dataset_name: str):
+
+        schema = self.__data_ctx[dataset_name].schema
+
+        if schema is None or not schema.field:
+            self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
+
+    def check_dataset_schema_not_defined(self, dataset_name: str):
+
+        schema = self.__data_ctx[dataset_name].schema
+
+        if schema is not None and schema.field:
+            self._report_error(f"Schema already defined for dataset {dataset_name} in the current context")
+
+    def check_dataset_part_present(self, dataset_name: str, part_key: _data.DataPartKey):
+
+        part = self.__data_ctx[dataset_name].parts.get(part_key)
+
+        if part is None or len(part) == 0:
+            self._report_error(f"No data present for dataset {dataset_name} ({part_key}) in the current context")
+
+    def check_dataset_part_not_present(self, dataset_name: str, part_key: _data.DataPartKey):
+
+        part = self.__data_ctx[dataset_name].parts.get(part_key)
+
+        if part is not None and len(part) > 0:
+            self._report_error(f"Data already present for dataset {dataset_name} ({part_key}) in the current context")

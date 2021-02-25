@@ -203,11 +203,23 @@ class ModelFunc(NodeFunction):
 
         input_ids = set(map(lambda mi: NodeId(mi, self.node.id.namespace), self.node.model_def.input))
         output_ids = set(map(lambda mo: NodeId(mo, self.node.id.namespace), self.node.model_def.output))
-        local_data_ctx = {nid.name: n.result for nid, n in ctx.items() if nid in input_ids or nid in output_ids}
 
-        model_ctx = ModelContext(self.node.model_def, self.model_class, self.job_config.parameters, data=local_data_ctx)
-        model: api.TracModel = self.model_class()
+        data_inputs = {
+            nid.name: ctx[nid].result
+            for nid in input_ids}
 
+        data_outputs = {
+            nid.name: _data.DataView(schema=self.node.model_def.output[nid.name], parts={})
+            for nid in output_ids}
+
+        data_ctx = {**data_inputs, **data_outputs}
+
+        model_ctx = ModelContext(
+            self.node.model_def, self.model_class,
+            parameters=self.job_config.parameters,
+            data=data_ctx)
+
+        model = self.model_class()
         model.run_model(model_ctx)
 
         return dict()
