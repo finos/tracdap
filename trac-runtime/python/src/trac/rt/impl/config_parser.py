@@ -110,9 +110,20 @@ class ConfigParser(tp.Generic[_T]):
         parse_func = ConfigParser.__primitive_types[metaclass]
 
         try:
-            return parse_func(raw_value)
+            if isinstance(raw_value, metaclass):
+                return raw_value
+
+            elif isinstance(raw_value, str):
+                return parse_func(raw_value)
+
+            elif metaclass == str:
+                return str(raw_value)
+
+            else:
+                raise TypeError
+
         except (ValueError, TypeError):
-            return self._error(location, f"Expected primitive type {metaclass.__name__}, got {str(raw_value)}")
+            return self._error(location, f"Expected primitive type {metaclass.__name__}, got '{str(raw_value)}'")
 
     def _parse_enum(self, location: str, raw_value: tp.Any, metaclass: enum.EnumMeta):
 
