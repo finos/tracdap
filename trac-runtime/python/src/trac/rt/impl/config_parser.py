@@ -24,7 +24,10 @@ import json
 import yaml
 
 
-class ConfigParser:
+_T = tp.TypeVar('_T')
+
+
+class ConfigParser(tp.Generic[_T]):
 
     # The metaclass for generic types varies between versions of the typing library
     # To work around this, detect the correct metaclass by inspecting a generic type variable
@@ -40,7 +43,7 @@ class ConfigParser:
         # TODO: Datetime (requires type system)
     }
 
-    def __init__(self, config_class: type):
+    def __init__(self, config_class: _T.__class__):
         self._config_class = config_class
         self._errors = []
 
@@ -65,7 +68,7 @@ class ConfigParser:
 
             return config_dict
 
-    def parse(self, config_dict: dict, config_file: str = None) -> object:
+    def parse(self, config_dict: dict, config_file: str = None) -> _T:
 
         config = self._parse_value("", config_dict, self._config_class)
 
@@ -88,6 +91,10 @@ class ConfigParser:
 
         if annotation in ConfigParser.__primitive_types:
             return self._parse_primitive(location, raw_value, annotation)
+
+        # Allow parsing of generic primitives, this allows for e.g. param maps of mixed primitive types
+        if annotation == tp.Any and type(raw_value) in ConfigParser.__primitive_types:
+            return self._parse_primitive(location, raw_value, type(raw_value))
 
         if isinstance(annotation, enum.EnumMeta):
             return self._parse_enum(location, raw_value, annotation)

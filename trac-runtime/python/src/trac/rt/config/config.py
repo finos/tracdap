@@ -67,7 +67,7 @@ class JobConfig:
     job_id: tp.Optional[str] = None
 
     target: tp.Optional[str] = None
-    parameters: tp.Dict[str, str] = _empty(dict)
+    parameters: tp.Dict[str, tp.Any] = _empty(dict)
     inputs: tp.Dict[str, str] = _empty(dict)
     outputs: tp.Dict[str, str] = _empty(dict)
 
