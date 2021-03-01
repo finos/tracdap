@@ -86,13 +86,14 @@ class GraphBuilder(actors.Actor):
 
         graph_data = _graph.GraphBuilder.build_job(self.job_config)
         graph_nodes = {node_id: GraphContextNode(node, {}) for node_id, node in graph_data.nodes.items()}
-        self.graph = GraphContext(graph_nodes, pending_nodes=set(graph_nodes.keys()))
+        graph = GraphContext(graph_nodes, pending_nodes=set(graph_nodes.keys()))
 
         self._log.info("Resolving graph nodes to executable code")
 
-        for node_id, node in self.graph.nodes.items():
+        for node_id, node in graph.nodes.items():
             node.function = self._resolver.resolve_node(self.job_config, node.node)
 
+        self.graph = graph
         self.actors().send_parent("job_graph", self.graph)
 
     @actors.Message

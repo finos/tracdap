@@ -176,6 +176,18 @@ class LoadDataNode(Node):
 
 
 @dc.dataclass(frozen=True)
+class SaveDataNode(Node):
+
+    """
+    Save an individual data item to storage
+    """
+
+    data_item: str
+    data_def: meta.DataDefinition
+    storage_def: meta.StorageDefinition
+
+
+@dc.dataclass(frozen=True)
 class ModelNode(Node):
 
     model_def: meta.ModelDefinition

@@ -102,7 +102,10 @@ class IDataStorage:
         pass
 
     @abc.abstractmethod
-    def write_pandas_table(self):
+    def write_pandas_table(
+            self, schema: _meta.TableDefinition, df: pd.DataFrame,
+            storage_path: str, storage_format: str,
+            storage_options: tp.Dict[str, tp.Any]):
         pass
 
     @abc.abstractmethod
@@ -170,7 +173,11 @@ class StorageManager:
 class _StorageFormat:
 
     @abc.abstractmethod
-    def read_pandas(self, src, schema: _meta.TableDefinition, options: dict):
+    def read_pandas(self, src, schema: _meta.TableDefinition, options: dict) -> pd.DataFrame:
+        pass
+
+    @abc.abstractmethod
+    def write_pandas(self, tgt, schema: _meta.TableDefinition, data: pd.DataFrame, options: dict):
         pass
 
 
@@ -181,6 +188,12 @@ class _CsvStorageFormat(_StorageFormat):
         columns = list(map(lambda f: f.fieldName, schema.field)) if schema.field else None
 
         return pd.read_csv(src, usecols=columns)
+
+    def write_pandas(self, tgt, schema: _meta.TableDefinition, data: pd.DataFrame, options: dict):
+
+        columns = list(map(lambda f: f.fieldName, schema.field)) if schema.field else None
+
+        data.to_csv(tgt, columns=columns)
 
 
 class CommonDataStorage(IDataStorage):
@@ -212,17 +225,30 @@ class CommonDataStorage(IDataStorage):
             raise NotImplementedError(f"Format '{storage_format}' is not supported")  # TODO: Error
 
         if self.__pushdown_pandas:
-
             full_path = self.__root_path / storage_path
             return format_impl.read_pandas(full_path, schema, storage_options)
 
         else:
-
             with self.__file_storage.read_byte_stream(storage_path) as byte_stream:
                 return format_impl.read_pandas(byte_stream, schema, storage_options)
 
-    def write_pandas_table(self):
-        pass
+    def write_pandas_table(
+            self, schema: _meta.TableDefinition, df: pd.DataFrame,
+            storage_path: str, storage_format: str,
+            storage_options: tp.Dict[str, tp.Any]):
+
+        format_impl = self.__formats.get(storage_format.lower())
+
+        if format_impl is None:
+            raise NotImplementedError(f"Format '{storage_format}' is not supported")  # TODO: Error
+
+        if self.__pushdown_pandas:
+            full_path = self.__root_path / storage_path
+            return format_impl.write_pandas(full_path, schema, df, storage_options)
+
+        else:
+            with self.__file_storage.write_byte_stream(storage_path) as byte_stream:
+                format_impl.write_pandas(byte_stream, schema, df, storage_options)
 
     def read_spark_table(
             self, schema: _meta.TableDefinition,

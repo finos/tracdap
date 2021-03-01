@@ -146,12 +146,12 @@ class LoadDataFunc(NodeFunction):
 
         if stat.file_type == _storage.FileType.FILE:
 
-            table = data_storage.read_pandas_table(
+            df = data_storage.read_pandas_table(
                 self.node.data_def.schema,
                 data_copy.storagePath, data_copy.storageFormat,
                 storage_options={})
 
-            return _data.DataItem(pandas=table)
+            return _data.DataItem(pandas=df)
 
         else:
 
@@ -184,11 +184,30 @@ class LoadDataFunc(NodeFunction):
 
 class SaveDataFunc(NodeFunction):
 
-    def __init__(self):
+    def __init__(self, storage: _storage.StorageManager, node: SaveDataNode):
         super().__init__()
+        self.storage = storage
+        self.node = node
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
-        pass
+
+        data_item = self.node.data_item
+        data_copy: meta.StorageCopy = self.choose_copy(data_item, self.node.storage_def)
+
+        df_id = NodeId(data_item, self.node.id.namespace)
+        df = ctx[df_id].result
+
+        file_storage = self.storage.get_file_storage(data_copy.storageKey)
+        data_storage = self.storage.get_data_storage(data_copy.storageKey)
+
+        # TODO!: decide where to store!
+
+        data_storage.write_pandas_table(
+            self.node.data_def.schema, df,
+            data_copy.storagePath, data_copy.storageFormat,
+            storage_options={})
+
+        return True
 
 
 class ModelFunc(NodeFunction):

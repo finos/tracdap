@@ -18,7 +18,7 @@ import trac.rt.impl.data as _data
 
 from .graph import *
 
-import functools as f
+import functools
 
 
 class GraphBuilder:
@@ -48,26 +48,8 @@ class GraphBuilder:
 
         # Create load operations to load data into the job context once it is created
 
-        # f.reduce()
-
-        load_input_builder = f.partial(GraphBuilder.build_data_load, job_config, job_namespace)
-        load_inputs = f.reduce(load_input_builder, job_config.inputs, job_ctx_push)
-
-
-        # for job_input, data_id in job_config.inputs.items():
-        #
-        #     data_def = job_config.objects[data_id].data
-        #     storage_def = job_config.objects[data_def.storageId].storage
-        #
-        #     # TODO: Get this from somewhere
-        #     root_part_opaque_key = 'part-root'
-        #
-        #     data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItemId
-        #     data_item_id = NodeId(data_item, job_namespace)
-        #     load_node = LoadDataNode(data_item_id, data_item, data_def, storage_def)
-        #
-        #     vide_node_id = NodeId(job_input, job_namespace)
-        #     view_node = DataViewNode(vide_node_id, data_def.schema, data_item_id)
+        load_input_builder = functools.partial(GraphBuilder.build_data_load, job_config, job_namespace)
+        load_inputs = functools.reduce(load_input_builder, job_config.inputs, job_ctx_push)
 
         # Now create the root execution node, which will be either a single model or a flow
         # The root exec node can run directly in the job context, no need to do a context push
@@ -77,9 +59,8 @@ class GraphBuilder:
         exec_graph = GraphBuilder.build_model_or_flow(
             job_config, job_namespace, load_inputs, exec_target)
 
-
-        save_output_builder = f.partial(GraphBuilder.build_data_save, job_config, job_namespace)
-        save_outputs = f.reduce(save_output_builder, job_config.outputs, exec_graph)
+        save_output_builder = functools.partial(GraphBuilder.build_data_save, job_config, job_namespace)
+        save_outputs = functools.reduce(save_output_builder, job_config.outputs, exec_graph)
 
         # TODO
 
@@ -127,11 +108,21 @@ class GraphBuilder:
     @staticmethod
     def build_data_save(
             job_config: config.JobConfig, namespace: NodeNamespace,
-            graph: Graph, job_input_name: str) -> Graph:
+            graph: Graph, job_output_name: str) -> Graph:
 
-        data_id = job_config.outputs[job_input_name]
+        data_id = job_config.outputs[job_output_name]
         data_def = job_config.objects[data_id].data
         storage_def = job_config.objects[data_def.storageId].storage
+
+        view_node_id = NodeId(job_output_name, namespace)
+        view_node = DataViewNode()
+
+        # TODO: Get this from somewhere
+        root_part_opaque_key = 'part-root'
+
+        data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItemId
+        save_node_id = NodeId()
+        save_node = SaveDataNode(save_node_id, view_node_id, data_item, data_def, storage_def)
 
         return graph
 
