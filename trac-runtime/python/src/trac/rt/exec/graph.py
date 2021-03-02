@@ -56,9 +56,11 @@ class DependencyType:
     tolerant: bool = False
 
     HARD: tp.ClassVar[DependencyType]
+    TOLERANT: tp.ClassVar[DependencyType]
 
 
 DependencyType.HARD = DependencyType(immediate=True, tolerant=False)
+DependencyType.TOLERANT = DependencyType(immediate=True, tolerant=True)
 
 
 @dc.dataclass(frozen=True)
@@ -93,16 +95,6 @@ class IdentityNode(Node):
             object.__setattr__(self, 'dependencies', {proxy_for: DependencyType.HARD})
         else:
             object.__setattr__(self, 'dependencies', proxy_for)
-
-
-@dc.dataclass(frozen=True)
-class JobNode(Node):
-
-    # job_def: meta.JobDefinition
-    root_exec_node: NodeId
-
-    def __post_init__(self):
-        object.__setattr__(self, 'dependencies', {self.root_exec_node: DependencyType.HARD})
 
 
 @dc.dataclass(frozen=True)
@@ -144,8 +136,33 @@ class ContextPopNode(Node):
             self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
 
 
-class DataNode:
+@dc.dataclass(frozen=True)
+class MappingNode(Node):
+
     pass
+
+
+@dc.dataclass(frozen=True)
+class MapIdentityNode(MappingNode):
+
+    """Map one graph node directly from another (identity function)"""
+
+    src_id: NodeId
+
+    def __post_init__(self):
+        object.__setattr__(self, 'dependencies', {self.src_id: DependencyType.HARD})
+
+
+@dc.dataclass(frozen=True)
+class MapKeyedItemNode(MappingNode):
+
+    """Map a graph node from a keyed item in an existing node (dictionary lookup)"""
+
+    src_id: NodeId
+    src_item: str
+
+    def __post_init__(self):
+        object.__setattr__(self, 'dependencies', {self.src_id: DependencyType.HARD})
 
 
 @dc.dataclass(frozen=True)
@@ -157,6 +174,18 @@ class DataViewNode(Node):
     def __post_init__(self):
         eager_data_deps = {self.root_item: DependencyType.HARD}
         object.__setattr__(self, 'dependencies', eager_data_deps)
+
+
+@dc.dataclass(frozen=True)
+class MapDataItemNode(MappingNode):
+
+    """Map a data item out of an assembled data view"""
+
+    data_view_id: NodeId
+    data_item: str
+
+    def __post_init__(self):
+        object.__setattr__(self, 'dependencies', {self.data_view_id: DependencyType.HARD})
 
 
 @dc.dataclass(frozen=True)
@@ -182,9 +211,12 @@ class SaveDataNode(Node):
     Save an individual data item to storage
     """
 
-    data_item: str
+    data_item_id: NodeId
     data_def: meta.DataDefinition
     storage_def: meta.StorageDefinition
+
+    def __post_init__(self):
+        object.__setattr__(self, 'dependencies', {self.data_item_id: DependencyType.HARD})
 
 
 @dc.dataclass(frozen=True)
@@ -202,3 +234,48 @@ class ModelNode(Node):
 
         if explicit_deps:
             self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
+
+
+@dc.dataclass(frozen=True)
+class JobOutputMetadataNode(Node):
+
+    data_view_id: NodeId
+    physical_items: tp.Dict[NodeId, str]
+
+    def __post_init__(self):
+        object.__setattr__(self, 'dependencies', {self.data_view_id: DependencyType.HARD})
+
+
+@dc.dataclass(frozen=True)
+class JobResultMetadataNode(Node):
+
+    outputs: tp.FrozenSet[NodeId]
+
+    def __post_init__(self):
+
+        output_deps = {output_meta_id: DependencyType.TOLERANT for output_meta_id in self.outputs}
+        object.__setattr__(self, 'dependencies', output_deps)
+
+
+@dc.dataclass(frozen=True)
+class JobMetricsNode(Node):
+
+    pass
+
+
+@dc.dataclass(frozen=True)
+class JobLogsNode(Node):
+
+    pass
+
+
+@dc.dataclass(frozen=True)
+class JobNode(Node):
+
+    # job_def: meta.JobDefinition
+    root_exec_node: NodeId
+
+    def __post_init__(self):
+        object.__setattr__(self, 'dependencies', {self.root_exec_node: DependencyType.HARD})
+
+

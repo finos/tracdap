@@ -34,12 +34,15 @@ NodeResult = tp.Any  # Result of a node function (will be recorded against the n
 
 class NodeFunction(tp.Callable[[NodeContext], NodeResult]):
 
-    def __init__(self):
-        pass
-
     @abc.abstractmethod
     def __call__(self, ctx: NodeContext) -> NodeResult:
         pass
+
+
+class NoopNode(NodeFunction):
+
+    def __call__(self, _: NodeContext) -> NodeResult:
+        return None
 
 
 class IdentityFunc(NodeFunction):
@@ -56,23 +59,21 @@ class JobNodeFunc(NodeFunction):
 
 class ContextPushFunc(NodeFunction):
 
-    def __init__(self, namespace: NodeNamespace, mapping: tp.Dict[NodeId, NodeId]):
-        super().__init__()
-        self.namespace = namespace
-        self.mapping = mapping
+    def __init__(self, node: ContextPushNode):
+        self.node = node
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
 
         target_ctx = dict()
 
-        for target_id, source_id in self.mapping.items():
+        for target_id, source_id in self.node.mapping.items():
 
             source_item = ctx.get(source_id)
 
             if source_item is None:
                 raise RuntimeError()  # TODO, should never happen
 
-            if target_id.namespace != self.namespace:
+            if target_id.namespace != self.node.namespace:
                 raise RuntimeError()  # TODO, should never happen
 
             target_ctx[target_id] = source_item
@@ -82,16 +83,14 @@ class ContextPushFunc(NodeFunction):
 
 class ContextPopFunc(NodeFunction):
 
-    def __init__(self, namespace: NodeNamespace, mapping: tp.Dict[NodeId, NodeId]):
-        super().__init__()
-        self.namespace = namespace
-        self.mapping = mapping
+    def __init__(self, node: ContextPopNode):
+        self.node = node
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
 
         target_ctx = dict()
 
-        for source_id, target_id in self.mapping.items():
+        for source_id, target_id in self.node.mapping.items():
 
             source_item = ctx.get(source_id)
 
@@ -101,6 +100,26 @@ class ContextPopFunc(NodeFunction):
             target_ctx[target_id] = source_item
 
         return target_ctx
+
+
+class MapIdentityFunc(NodeFunction):
+
+    def __init__(self, node: MapIdentityNode):
+        self.node = node
+
+    def __call__(self, ctx: NodeContext) -> NodeResult:
+        return ctx[self.node.src_id].result
+
+
+class MapKeyedItemFunc(NodeFunction):
+
+    def __init__(self, node: MapKeyedItemNode):
+        self.node = node
+
+    def __call__(self, ctx: NodeContext) -> NodeResult:
+        src_node_result = ctx[self.node.src_id].result
+        src_item = src_node_result.get(self.node.src_item)
+        return src_item
 
 
 class MapDataFunc(NodeFunction):
@@ -127,12 +146,32 @@ class DataViewFunc(NodeFunction):
         return _data.DataView(self.node.schema, {root_part_key: [root_item]})
 
 
+class DataItemFunc(NodeFunction):
+
+    def __init__(self, node: MapDataItemNode):
+        super().__init__()
+        self.node = node
+
+    def __call__(self, ctx: NodeContext) -> NodeResult:
+
+        data_view: _data.DataView = ctx[self.node.data_view_id].result
+
+        # TODO: Support selecting data item described by self.node
+
+        # Selecting data item for part-root, delta=0
+        part_key = _data.DataPartKey.for_root()
+        part = data_view.parts[part_key]
+        delta: _data.DataItem = part[0]  # selects delta=0
+
+        return delta
+
+
 class LoadDataFunc(NodeFunction):
 
-    def __init__(self, storage: _storage.StorageManager, node: LoadDataNode):
+    def __init__(self, node: LoadDataNode, storage: _storage.StorageManager):
         super().__init__()
-        self.storage = storage
         self.node = node
+        self.storage = storage
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
 
@@ -184,27 +223,31 @@ class LoadDataFunc(NodeFunction):
 
 class SaveDataFunc(NodeFunction):
 
-    def __init__(self, storage: _storage.StorageManager, node: SaveDataNode):
+    def __init__(self, node: SaveDataNode, storage: _storage.StorageManager):
         super().__init__()
-        self.storage = storage
         self.node = node
+        self.storage = storage
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
 
-        data_item = self.node.data_item
-        data_copy: meta.StorageCopy = self.choose_copy(data_item, self.node.storage_def)
+        data_item: _data.DataItem = ctx[self.node.data_item_id].result
+        df = data_item.pandas
 
-        df_id = NodeId(data_item, self.node.id.namespace)
-        df = ctx[df_id].result
+        # TODO: Feed through these values
+        # data_item_name= self.node.data_item_id.name
+        # data_copy: meta.StorageCopy = self.choose_copy(data_item_name, self.node.storage_def)
+        storage_key = "example_data"
+        storage_path = "temp_output.csv"
+        storage_format = "CSV"
 
-        file_storage = self.storage.get_file_storage(data_copy.storageKey)
-        data_storage = self.storage.get_data_storage(data_copy.storageKey)
+        file_storage = self.storage.get_file_storage(storage_key)
+        data_storage = self.storage.get_data_storage(storage_key)
 
         # TODO!: decide where to store!
 
         data_storage.write_pandas_table(
             self.node.data_def.schema, df,
-            data_copy.storagePath, data_copy.storageFormat,
+            storage_path, storage_format,
             storage_options={})
 
         return True
@@ -212,10 +255,10 @@ class SaveDataFunc(NodeFunction):
 
 class ModelFunc(NodeFunction):
 
-    def __init__(self, job_config: config.JobConfig, node: ModelNode, model_class: api.TracModel.__class__):
+    def __init__(self, node: ModelNode, job_config: config.JobConfig, model_class: api.TracModel.__class__):
         super().__init__()
-        self.job_config = job_config
         self.node = node
+        self.job_config = job_config
         self.model_class = model_class
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
@@ -241,7 +284,7 @@ class ModelFunc(NodeFunction):
         model = self.model_class()
         model.run_model(model_ctx)
 
-        return dict()
+        return data_ctx
 
 
 class FunctionResolver:
@@ -254,6 +297,11 @@ class FunctionResolver:
 
     def resolve_node(self, job_config, node: Node) -> NodeFunction:
 
+        basic_node_class = self.__basic_node_mapping.get(node.__class__)
+
+        if basic_node_class:
+            return basic_node_class(node)
+
         resolve_func = self.__node_mapping[node.__class__]
 
         if resolve_func is None:
@@ -261,33 +309,37 @@ class FunctionResolver:
 
         return resolve_func(self, job_config, node)
 
-    def resolve_context_push(self, job_config: config.JobConfig, node: ContextPushNode):
-        return ContextPushFunc(node.namespace, node.mapping)
-
-    def resolve_context_pop(self, job_config: config.JobConfig, node: ContextPopNode):
-        return ContextPopFunc(node.namespace, node.mapping)
-
-    def resolve_data_view(self, job_config: config.JobConfig, node: DataViewNode):
-        return DataViewFunc(node)
-
     def resolve_load_data(self, job_config: config.JobConfig, node: LoadDataNode):
-        return LoadDataFunc(self._storage, node)
+        return LoadDataFunc(node, self._storage)
+
+    def resolve_save_data(self, job_config: config.JobConfig, node: SaveDataNode):
+        return SaveDataFunc(node, self._storage)
 
     def resolve_model_node(self, job_config: config.JobConfig, node: ModelNode) -> NodeFunction:
 
         model_loader = self._repos.get_model_loader(node.model_def.repository)
         model_class = model_loader.load_model(node.model_def)
 
-        return ModelFunc(job_config, node, model_class)
+        return ModelFunc(node, job_config, model_class)
+
+    __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
+        ContextPushNode: ContextPushFunc,
+        ContextPopNode: ContextPopFunc,
+        MapIdentityNode: MapIdentityFunc,
+        MapKeyedItemNode: MapKeyedItemFunc,
+        DataViewNode: DataViewFunc,
+        MapDataItemNode: DataItemFunc}
 
     __node_mapping: tp.Dict[Node.__class__, __ResolveFunc] = {
 
         IdentityNode: lambda s, j, n: IdentityFunc(),
+
+        JobOutputMetadataNode: lambda s, j, n: NoopNode(),
+        JobResultMetadataNode: lambda s, j, n: NoopNode(),
         JobNode: lambda s, j, n: JobNodeFunc(),
 
-        ContextPushNode: resolve_context_push,
-        ContextPopNode: resolve_context_pop,
-        DataViewNode: resolve_data_view,
+
         LoadDataNode: resolve_load_data,
+        SaveDataNode: resolve_save_data,
         ModelNode: resolve_model_node
     }
