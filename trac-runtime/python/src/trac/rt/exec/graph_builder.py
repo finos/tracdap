@@ -12,9 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import trac.rt.metadata as meta
 import trac.rt.config.config as config
-import trac.rt.impl.data as _data
 
 from .graph import *
 
@@ -111,11 +109,11 @@ class GraphBuilder:
             # Physical load of data items from disk
             # Currently one item per input, since inputs are single part/delta
             data_load_id = NodeId(f"{data_item}:LOAD", namespace)
-            data_load_node = LoadDataNode(data_load_id, data_item, data_def, storage_def)
+            data_load_node = LoadDataNode(data_load_id, data_item, data_def, storage_def, explicit_deps=[graph.root_id])
 
             # Input items mapped directly from their load operations
             data_item_id = NodeId(data_item, namespace)
-            data_item_node = MapIdentityNode(data_item_id, data_load_id)
+            data_item_node = IdentityNode(data_item_id, data_load_id)
 
             # Inputs views assembled by mapping one root part to each view
             data_view_id = NodeId(input_name, namespace)
@@ -148,7 +146,7 @@ class GraphBuilder:
 
             # Map one data item from each view, since outputs are single part/delta
             data_item_id = NodeId(data_item, namespace)
-            data_item_node = MapDataItemNode(data_item_id, data_view_id, data_item)
+            data_item_node = DataItemNode(data_item_id, data_view_id, data_item)
 
             # Create a physical save operation for the data item
             data_save_id = NodeId(f"{data_item}:SAVE", namespace)
@@ -232,7 +230,7 @@ class GraphBuilder:
         for output_name in model_def.output:
 
             output_id = NodeId(output_name, namespace)
-            output_node = MapKeyedItemNode(output_id, model_id, output_name)
+            output_node = KeyedItemNode(output_id, model_id, output_name)
 
             model_node_map[output_id] = output_node
 

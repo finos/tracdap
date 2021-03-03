@@ -292,23 +292,52 @@ class NodeProcessor(actors.Actor):
     @actors.Message
     def evaluate_node(self):
 
-        node_type = type(self.node.node).__name__
+        node_type = self._display_node_type()
+        is_mapping_node = isinstance(self.node.node, _graph.MappingNode)
 
         try:
-            self._log.info(f"START {str(self.node_id)} ({node_type})")
+
+            if is_mapping_node:
+                self._log.info(f"MAPPING [{node_type}]: {str(self.node_id)}")
+                self._log_mapping_info(self.node.node)
+            else:
+                self._log.info(f"START [{node_type}]: {str(self.node_id)}")
 
             if isinstance(self.node.node, _graph.ModelNode):
                 self._log.info("Model entry point: " + self.node.node.model_def.entryPoint)
 
             result = self.node.function(self.graph.nodes)
-
             self.actors().send_parent("node_succeeded", self.node_id, result)
-            self._log.info(f"DONE {str(self.node_id)} ({node_type})")
+
+            if not is_mapping_node:
+                self._log.info(f"DONE [{node_type}]: {str(self.node_id)}")
 
         except Exception as e:
             self.actors().send_parent("node_failed", self.node_id, e)
-            self._log.error(f"FAILED {str(self.node_id)} ({node_type})")
+            self._log.error(f"FAILED [{node_type}]: {str(self.node_id)}")
             self._log.exception(e)
+
+    def _display_node_type(self):
+
+        # Just remove "Node" from "xxxNode"
+        return type(self.node.node).__name__[:-4]
+
+    def _log_mapping_info(self, node: _graph.Node):
+
+        if isinstance(node, _graph.IdentityNode):
+            self._log.info(f"  * <- {str(node.src_id)}")
+
+        elif isinstance(node, _graph.KeyedItemNode):
+            self._log.info(f"  * <- {node.src_item} | {str(node.src_id)}")
+
+        elif isinstance(node, _graph.DataItemNode):
+            self._log.info(f"  * <- part-root | {str(node.data_view_id)}")
+
+        elif isinstance(node, _graph.DataViewNode):
+            self._log.info(f"  part-root <- {str(node.root_item)}")
+
+        else:
+            self._log.warning("  (mapping info cannot be displayed)")
 
 
 class JobProcessor(actors.Actor):

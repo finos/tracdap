@@ -138,12 +138,11 @@ class ContextPopNode(Node):
 
 @dc.dataclass(frozen=True)
 class MappingNode(Node):
-
     pass
 
 
 @dc.dataclass(frozen=True)
-class MapIdentityNode(MappingNode):
+class IdentityNode(MappingNode):
 
     """Map one graph node directly from another (identity function)"""
 
@@ -154,7 +153,7 @@ class MapIdentityNode(MappingNode):
 
 
 @dc.dataclass(frozen=True)
-class MapKeyedItemNode(MappingNode):
+class KeyedItemNode(MappingNode):
 
     """Map a graph node from a keyed item in an existing node (dictionary lookup)"""
 
@@ -166,7 +165,7 @@ class MapKeyedItemNode(MappingNode):
 
 
 @dc.dataclass(frozen=True)
-class DataViewNode(Node):
+class DataViewNode(MappingNode):
 
     schema: meta.TableDefinition
     root_item: NodeId
@@ -177,7 +176,7 @@ class DataViewNode(Node):
 
 
 @dc.dataclass(frozen=True)
-class MapDataItemNode(MappingNode):
+class DataItemNode(MappingNode):
 
     """Map a data item out of an assembled data view"""
 
@@ -200,8 +199,14 @@ class LoadDataNode(Node):
     data_def: meta.DataDefinition
     storage_def: meta.StorageDefinition
 
-    def __post_init__(self):
+    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
+
+    def __post_init__(self, explicit_deps):
+
         object.__setattr__(self, 'dependencies', {})
+
+        if explicit_deps:
+            self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
 
 
 @dc.dataclass(frozen=True)
@@ -243,7 +248,11 @@ class JobOutputMetadataNode(Node):
     physical_items: tp.Dict[NodeId, str]
 
     def __post_init__(self):
-        object.__setattr__(self, 'dependencies', {self.data_view_id: DependencyType.HARD})
+
+        output_meta_deps = {physical_node_id: DependencyType.HARD for physical_node_id in self.physical_items}
+        output_meta_deps[self.data_view_id] = DependencyType.HARD
+
+        object.__setattr__(self, 'dependencies', output_meta_deps)
 
 
 @dc.dataclass(frozen=True)
@@ -253,7 +262,7 @@ class JobResultMetadataNode(Node):
 
     def __post_init__(self):
 
-        output_deps = {output_meta_id: DependencyType.TOLERANT for output_meta_id in self.outputs}
+        output_deps = {output_meta_id: DependencyType.HARD for output_meta_id in self.outputs}
         object.__setattr__(self, 'dependencies', output_deps)
 
 

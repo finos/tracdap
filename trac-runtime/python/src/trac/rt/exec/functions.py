@@ -46,18 +46,6 @@ class NoopNode(NodeFunction):
         return None
 
 
-class IdentityFunc(NodeFunction):
-
-    def __call__(self, ctx: NodeContext) -> NodeResult:
-        return ctx
-
-
-class JobNodeFunc(NodeFunction):
-
-    def __call__(self, ctx: NodeContext) -> NodeResult:
-        return ctx
-
-
 class ContextPushFunc(NodeFunction):
 
     def __init__(self, node: ContextPushNode):
@@ -103,33 +91,24 @@ class ContextPopFunc(NodeFunction):
         return target_ctx
 
 
-class MapIdentityFunc(NodeFunction):
+class IdentityFunc(NodeFunction):
 
-    def __init__(self, node: MapIdentityNode):
+    def __init__(self, node: IdentityNode):
         self.node = node
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
         return ctx[self.node.src_id].result
 
 
-class MapKeyedItemFunc(NodeFunction):
+class KeyedItemFunc(NodeFunction):
 
-    def __init__(self, node: MapKeyedItemNode):
+    def __init__(self, node: KeyedItemNode):
         self.node = node
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
         src_node_result = ctx[self.node.src_id].result
         src_item = src_node_result.get(self.node.src_item)
         return src_item
-
-
-class MapDataFunc(NodeFunction):
-
-    def __init__(self):
-        super().__init__()
-
-    def __call__(self, ctx: NodeContext) -> NodeResult:
-        pass
 
 
 class DataViewFunc(NodeFunction):
@@ -149,7 +128,7 @@ class DataViewFunc(NodeFunction):
 
 class DataItemFunc(NodeFunction):
 
-    def __init__(self, node: MapDataItemNode):
+    def __init__(self, node: DataItemNode):
         super().__init__()
         self.node = node
 
@@ -336,21 +315,18 @@ class FunctionResolver:
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
         ContextPushNode: ContextPushFunc,
         ContextPopNode: ContextPopFunc,
-        MapIdentityNode: MapIdentityFunc,
-        MapKeyedItemNode: MapKeyedItemFunc,
+        IdentityNode: IdentityFunc,
+        KeyedItemNode: KeyedItemFunc,
         DataViewNode: DataViewFunc,
-        MapDataItemNode: DataItemFunc}
+        DataItemNode: DataItemFunc}
 
     __node_mapping: tp.Dict[Node.__class__, __ResolveFunc] = {
 
-        IdentityNode: lambda s, j, n: IdentityFunc(),
+        LoadDataNode: resolve_load_data,
+        SaveDataNode: resolve_save_data,
+        ModelNode: resolve_model_node,
 
         JobOutputMetadataNode: lambda s, j, n: NoopNode(),
         JobResultMetadataNode: lambda s, j, n: NoopNode(),
-        JobNode: lambda s, j, n: JobNodeFunc(),
-
-
-        LoadDataNode: resolve_load_data,
-        SaveDataNode: resolve_save_data,
-        ModelNode: resolve_model_node
+        JobNode: lambda s, j, n: NoopNode()
     }
