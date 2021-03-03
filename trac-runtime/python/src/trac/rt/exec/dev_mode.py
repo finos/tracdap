@@ -23,6 +23,7 @@ import trac.rt.api as api
 import trac.rt.metadata as meta
 import trac.rt.config as cfg
 import trac.rt.impl.repositories as _repos
+import trac.rt.impl.storage as _storage
 import trac.rt.impl.util as util
 
 
@@ -56,7 +57,9 @@ class DevModeTranslator:
             data_id = uuid.uuid4()
             storage_id = uuid.uuid4()
 
-            data_obj, storage_obj = cls._process_job_io(sys_config, data_key, data_value, data_id, storage_id)
+            data_obj, storage_obj = cls._process_job_io(
+                sys_config, data_key, data_value, data_id, storage_id,
+                new_unique_file=not is_input)
 
             translated_objects[str(data_id)] = data_obj
             translated_objects[str(storage_id)] = storage_obj
@@ -82,12 +85,13 @@ class DevModeTranslator:
         return job_config, sys_config
 
     @classmethod
-    def _process_job_io(cls, sys_config, data_key, data_value, data_id, storage_id):
+    def _process_job_io(cls, sys_config, data_key, data_value, data_id, storage_id, new_unique_file=False):
 
         if isinstance(data_value, str):
             storage_path = data_value
             storage_key = sys_config.storageSettings.defaultStorage
             storage_format = sys_config.storageSettings.defaultFormat
+            snap = 1
 
         elif isinstance(data_value, dict):
 
@@ -98,14 +102,34 @@ class DevModeTranslator:
 
             storage_key = data_value.get("storageKey") or sys_config.storageSettings.defaultStorage
             storage_format = data_value.get("format") or sys_config.storageSettings.defaultFormat
+            snap = 1
 
         else:
             raise RuntimeError(f"Invalid configuration for input '{data_key}'")
 
         cls._log.info(f"Generating data definition for '{data_key}' (assigned ID {data_id})")
 
+        # For unique outputs, increment the snap number to find a new unique snap
+        # These are not incarnations, bc likely in dev mode model code and inputs are changing
+        # Incarnations are for recreation of a dataset using the exact same code path and inputs
+
+        if new_unique_file:
+
+            x_storage_mgr = _storage.StorageManager(sys_config)
+            x_storage = x_storage_mgr.get_file_storage(storage_key)
+            x_orig_path = pathlib.PurePath(storage_path)
+
+            while x_storage.exists(storage_path):
+
+                snap += 1
+                x_stem = f"{x_orig_path.stem}-{snap}"
+                storage_path = str(x_orig_path.with_stem(x_stem))
+
+            cls._log.info(f"Output for {data_key} will be snap version {snap}")
+
         data_obj, storage_obj = cls._generate_input_definition(
-            data_id, storage_id, storage_key, storage_path, storage_format)
+            data_id, storage_id, storage_key, storage_path, storage_format,
+            snap_index=snap, delta_index=1, incarnation_index=1)
 
         return data_obj, storage_obj
 
@@ -174,15 +198,14 @@ class DevModeTranslator:
     @classmethod
     def _generate_input_definition(
             cls, data_id: uuid.UUID, storage_id: uuid.UUID,
-            storage_key: str, storage_path: str, storage_format: str) \
+            storage_key: str, storage_path: str, storage_format: str,
+            snap_index: int, delta_index: int, incarnation_index: int) \
             -> (meta.ObjectDefinition, meta.ObjectDefinition):
 
         part_key = meta.DataDefinition.PartKey(
             opaqueKey="part-root",
             partType=meta.DataDefinition.PartType.PART_ROOT)
 
-        snap_index = 1
-        delta_index = 1
         data_item_id = f"DATA:{data_id}:{part_key.opaqueKey}:{snap_index}:{delta_index}"
 
         delta = meta.DataDefinition.Delta(
@@ -209,7 +232,7 @@ class DevModeTranslator:
             copyStatus=meta.CopyStatus.COPY_AVAILABLE)
 
         storage_incarnation = meta.StorageIncarnation(
-            incarnationIndex=1,
+            incarnationIndex=incarnation_index,
             incarnationTimestamp=meta.DatetimeValue(isoDatetime=""),  # TODO: Timestamp
             incarnationStatus=meta.IncarnationStatus.INCARNATION_AVAILABLE,
             copies=[storage_copy])
