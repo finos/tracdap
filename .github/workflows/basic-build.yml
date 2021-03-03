@@ -101,6 +101,13 @@ jobs:
           export PYTHONPATH=trac-runtime/python/test:$PYTHONPATH
           python -m unittest discover -s trac-runtime/python/test/trac_test -t trac-runtime/python/test
 
+      - name: Python example models
+        run: |
+          export PYTHONPATH=trac-runtime/python/generated
+          export PYTHONPATH=trac-runtime/python/src:$PYTHONPATH
+          export PYTHONPATH=trac-runtime/python/test:$PYTHONPATH
+          python -m unittest discover -s trac-runtime/python/test/trac_examples -t trac-runtime/python/test
+
       - name: Build packages
         run: |
           cd trac-runtime/python
