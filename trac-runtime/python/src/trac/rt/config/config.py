@@ -53,7 +53,7 @@ class SparkSettings:
 
 
 @dc.dataclass
-class RuntimeConfig:
+class SystemConfig:
 
     repositories: tp.Dict[str, RepositoryConfig] = _empty(dict)
     storage: tp.Dict[str, StorageConfig] = _empty(dict)

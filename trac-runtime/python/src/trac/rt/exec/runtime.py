@@ -55,7 +55,7 @@ class TracRuntime:
         self._log = util.logger_for_object(self)
 
         self._sys_config_path = sys_config_path
-        self._sys_config: tp.Optional[config.RuntimeConfig] = None
+        self._sys_config: tp.Optional[config.SystemConfig] = None
 
         if job_config_path:
             self._batch_mode = True
@@ -97,7 +97,7 @@ class TracRuntime:
 
         self._log.info("Loading system config...")
         raw_sys_config = cfg.ConfigParser.load_raw_config(self._sys_config_path)
-        self._sys_config = cfg.ConfigParser(config.RuntimeConfig).parse(raw_sys_config, self._sys_config_path)
+        self._sys_config = cfg.ConfigParser(config.SystemConfig).parse(raw_sys_config, self._sys_config_path)
 
         if self._batch_mode:
             self._log.info("Loading job config...")

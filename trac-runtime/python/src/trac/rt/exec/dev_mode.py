@@ -35,9 +35,9 @@ class DevModeTranslator:
     def translate_dev_mode_config(
             cls,
             job_config: cfg.JobConfig,
-            sys_config: cfg.RuntimeConfig,
+            sys_config: cfg.SystemConfig,
             model_class: tp.Optional[api.TracModel.__class__]) \
-            -> (cfg.JobConfig, cfg.RuntimeConfig):
+            -> (cfg.JobConfig, cfg.SystemConfig):
 
         cls._log.info(f"Applying dev mode config translation")
 
@@ -149,8 +149,8 @@ class DevModeTranslator:
     def _generate_integrated_model_definition(
             cls, model_class: api.TracModel.__class__,
             job_config: cfg.JobConfig,
-            sys_config: cfg.RuntimeConfig) \
-            -> (cfg.JobConfig, cfg.RuntimeConfig):
+            sys_config: cfg.SystemConfig) \
+            -> (cfg.JobConfig, cfg.SystemConfig):
 
         model_id = uuid.uuid4()
 

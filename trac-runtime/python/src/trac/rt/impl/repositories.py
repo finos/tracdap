@@ -76,7 +76,7 @@ class Repositories:
     def register_repo_type(cls, repo_type: str, loader_class: tp.Callable[[config.RepositoryConfig], IModelLoader]):
         cls.__repo_types[repo_type] = loader_class
 
-    def __init__(self, sys_config: config.RuntimeConfig):
+    def __init__(self, sys_config: config.SystemConfig):
 
         self._loaders: tp.Dict[str, IModelLoader] = dict()
 

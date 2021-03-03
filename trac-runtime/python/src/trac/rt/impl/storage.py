@@ -127,7 +127,7 @@ class StorageManager:
         cls.__file_impls[storage_type] = file_impl
         cls.__data_impls[storage_type] = data_impl
 
-    def __init__(self, sys_config: _cfg.RuntimeConfig):
+    def __init__(self, sys_config: _cfg.SystemConfig):
 
         self.__file_storage: tp.Dict[str, IFileStorage] = dict()
         self.__data_storage: tp.Dict[str, IDataStorage] = dict()

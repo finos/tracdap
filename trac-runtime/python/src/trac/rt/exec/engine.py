@@ -390,7 +390,7 @@ class TracEngine(actors.Actor):
     """
 
     def __init__(
-            self, sys_config: config.RuntimeConfig,
+            self, sys_config: config.SystemConfig,
             repositories: repos.Repositories,
             storage: _storage.StorageManager,
             batch_mode=False):
