@@ -263,28 +263,31 @@ class ModelFunc(NodeFunction):
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
 
-        input_ids = set(map(lambda mi: NodeId(mi, self.node.id.namespace), self.node.model_def.input))
-        output_ids = set(map(lambda mo: NodeId(mo, self.node.id.namespace), self.node.model_def.output))
+        # Create a context containing only items in the current namespace, addressed by name
+        local_ctx = {
+            nid.name: n.result for nid, n in ctx.items()
+            if nid.namespace == self.node.id.namespace}
 
-        data_inputs = {
-            nid.name: ctx[nid].result
-            for nid in input_ids}
+        # Add empty data views to the local context to hold model outputs
+        local_ctx.update({
+            output_name: _data.DataView(schema=self.node.model_def.output[output_name], parts={})
+            for output_name in self.node.model_def.output})
 
-        data_outputs = {
-            nid.name: _data.DataView(schema=self.node.model_def.output[nid.name], parts={})
-            for nid in output_ids}
-
-        data_ctx = {**data_inputs, **data_outputs}
-
+        # Run the model against the mapped local context
         model_ctx = ModelContext(
             self.node.model_def, self.model_class,
             parameters=self.job_config.parameters,
-            data=data_ctx)
+            data=local_ctx)
 
         model = self.model_class()
         model.run_model(model_ctx)
 
-        return data_ctx
+        # The node result is just the model outputs taken from the local context
+        model_outputs = {
+            name: obj for name, obj in local_ctx.items()
+            if name in self.node.model_def.output}
+
+        return model_outputs
 
 
 class FunctionResolver:

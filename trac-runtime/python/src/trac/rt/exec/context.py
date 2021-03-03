@@ -69,7 +69,8 @@ class ModelContext(api.TracContext):
     def get_table_schema(self, dataset_name: str) -> api.TableDefinition:
 
         self.__val.check_dataset_valid_identifier(dataset_name)
-        self.__val.check_dataset_exists(dataset_name)
+        self.__val.check_context_item_exists(dataset_name)
+        self.__val.check_context_item_is_dataset(dataset_name)
 
         data_view = self.__data[dataset_name]
 
@@ -80,7 +81,8 @@ class ModelContext(api.TracContext):
         part_key = _data.DataPartKey.for_root()
 
         self.__val.check_dataset_valid_identifier(dataset_name)
-        self.__val.check_dataset_exists(dataset_name)
+        self.__val.check_context_item_exists(dataset_name)
+        self.__val.check_context_item_is_dataset(dataset_name)
         self.__val.check_dataset_part_present(dataset_name, part_key)
 
         data_view = self.__data[dataset_name]
@@ -106,7 +108,8 @@ class ModelContext(api.TracContext):
         part_key = _data.DataPartKey.for_root()
 
         self.__val.check_dataset_valid_identifier(dataset_name)
-        self.__val.check_dataset_exists(dataset_name)
+        self.__val.check_context_item_exists(dataset_name)
+        self.__val.check_context_item_is_dataset(dataset_name)
         self.__val.check_dataset_schema_defined(dataset_name)
         self.__val.check_dataset_part_not_present(dataset_name, part_key)
 
@@ -161,17 +164,24 @@ class ModelRuntimeValidator:
     def check_param_exists(self, param_name: str):
 
         if param_name not in self.__parameters:
-            self._report_error(f"Parameter {param_name} does not exist in the current context")
+            self._report_error(f"Parameter {param_name} is not defined in the current context")
 
     def check_dataset_valid_identifier(self, dataset_name: str):
 
         if not self.__VALID_IDENTIFIER.match(dataset_name):
             self._report_error(f"Dataset name {dataset_name} is not a valid identifier")
 
-    def check_dataset_exists(self, dataset_name: str):
+    def check_context_item_exists(self, item_name: str):
 
-        if dataset_name not in self.__data_ctx:
-            self._report_error(f"Dataset {dataset_name} does not exist in the current context")
+        if item_name not in self.__data_ctx:
+            self._report_error(f"The identifier {item_name} is not defined in the current context")
+
+    def check_context_item_is_dataset(self, item_name: str):
+
+        ctx_item = self.__data_ctx[item_name]
+
+        if not isinstance(ctx_item, _data.DataView):
+            self._report_error(f"The object referenced by {item_name} is not a dataset in the current context")
 
     def check_dataset_schema_defined(self, dataset_name: str):
 
