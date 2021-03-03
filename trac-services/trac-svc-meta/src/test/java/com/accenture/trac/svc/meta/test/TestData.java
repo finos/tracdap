@@ -56,6 +56,7 @@ public class TestData {
             case JOB: return dummyJobDef();
             case FILE: return dummyFileDef();
             case CUSTOM: return dummyCustomDef();
+            case STORAGE: return dummyStorageDef();
 
             default:
                 throw new RuntimeException("No dummy data available for object type " + objectType.name());
@@ -80,10 +81,12 @@ public class TestData {
             case DATA: return nextDataDef(definition);
             case MODEL: return nextModelDef(definition);
             case CUSTOM: return nextCustomDef(definition);
+            case STORAGE: return nextStorageDef(definition);
 
             case FLOW:
             case JOB:
             case FILE:
+
                 return definition;
 
             default:
@@ -120,9 +123,11 @@ public class TestData {
         return ObjectDefinition.newBuilder()
             .setObjectType(ObjectType.DATA)
             .setData(DataDefinition.newBuilder()
-            .addStorage("test-storage")
-            .setPath("path/to/test/dataset")
-            .setFormat(DataFormat.CSV)
+
+            // There is no attempt here to link this to a storage definition
+            // Not needed yet to test metadata semantics in isolation
+            .setStorageId("dummy_storage")
+
             .setSchema(TableDefinition.newBuilder()
                 .addField(FieldDefinition.newBuilder()
                         .setFieldName("transaction_id")
@@ -162,6 +167,46 @@ public class TestData {
                     .setFieldLabel("We got an extra field!")
                     .setFormatCode("PERCENT"))))
                 .build();
+    }
+
+    public static ObjectDefinition dummyStorageDef() {
+
+        return ObjectDefinition.newBuilder()
+            .setObjectType(ObjectType.STORAGE)
+            .setStorage(StorageDefinition.newBuilder()
+            .putDataItems("dummy_item", StorageItem.newBuilder()
+                .addIncarnations(StorageIncarnation.newBuilder()
+                .setIncarnationIndex(1)
+                .setIncarnationTimestamp(MetadataCodec.encodeDatetime(OffsetDateTime.now()))
+                .setIncarnationStatus(IncarnationStatus.INCARNATION_AVAILABLE)
+                .addCopies(StorageCopy.newBuilder()
+                    .setStorageKey("DUMMY_STORAGE")
+                    .setStoragePath("path/to/the/dataset")
+                    .setStorageFormat("AVRO")
+                    .setCopyStatus(CopyStatus.COPY_AVAILABLE)))
+                    .build())).build();
+    }
+
+    public static ObjectDefinition nextStorageDef(ObjectDefinition definition) {
+
+        var archiveCopy = StorageCopy.newBuilder()
+            .setStorageKey("DUMMY_ARCHIVE_STORAGE")
+            .setStoragePath("path/to/the/dataset")
+            .setStorageFormat("PARQUET")
+            .setCopyStatus(CopyStatus.COPY_AVAILABLE);
+
+        var archivedIncarnation = definition
+            .getStorage()
+            .getDataItemsOrThrow("dummy_item")
+            .getIncarnations(0)
+            .toBuilder()
+            .addCopies(archiveCopy);
+
+        return definition.toBuilder()
+            .setStorage(definition.getStorage().toBuilder()
+            .putDataItems("dummy_item", StorageItem.newBuilder()
+            .addIncarnations(archivedIncarnation).build()))
+            .build();
     }
 
     public static ObjectDefinition dummyModelDef() {
