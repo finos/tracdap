@@ -41,6 +41,18 @@ class DevModeTranslator:
 
         cls._log.info(f"Applying dev mode config translation")
 
+        if not job_config.job_id:
+
+            job_id = uuid.uuid4()
+            job_config = copy.copy(job_config)
+            job_config.job_id = job_id
+
+            cls._log.info(f"Assigned dev mode job ID = {job_config.job_id}")
+
+        else:
+
+            cls._log.info(f"Using dev mode job ID = {job_config.job_id}")
+
         if model_class is not None:
             job_config, sys_config = cls._generate_integrated_model_definition(model_class, job_config, sys_config)
 
