@@ -284,7 +284,12 @@ class JobNode(Node):
     # job_def: meta.JobDefinition
     root_exec_node: NodeId
 
-    def __post_init__(self):
+    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
+
+    def __post_init__(self, explicit_deps):
         object.__setattr__(self, 'dependencies', {self.root_exec_node: DependencyType.HARD})
+
+        if explicit_deps:
+            self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
 
 

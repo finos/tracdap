@@ -73,8 +73,8 @@ class GraphBuilder:
 
         # Build the top level job node
 
-        job_node_id = NodeId("trac_job_monitor", job_namespace)
-        job_node = JobNode(job_node_id, job_metadata_id)
+        job_node_id = NodeId("trac_job_completion", job_namespace)
+        job_node = JobNode(job_node_id, job_metadata_id, explicit_deps=job_models)
 
         job_graph_nodes = {
             **output_graph.nodes,
