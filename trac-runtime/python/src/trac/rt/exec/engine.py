@@ -303,9 +303,6 @@ class NodeProcessor(actors.Actor):
             else:
                 self._log.info(f"START [{node_type}]: {str(self.node_id)}")
 
-            if isinstance(self.node.node, _graph.ModelNode):
-                self._log.info("Model entry point: " + self.node.node.model_def.entryPoint)
-
             result = self.node.function(self.graph.nodes)
             self.actors().send_parent("node_succeeded", self.node_id, result)
 

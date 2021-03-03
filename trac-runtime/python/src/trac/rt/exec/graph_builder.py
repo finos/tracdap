@@ -215,7 +215,8 @@ class GraphBuilder:
         # Always add the prior graph root ID as a dependency
         # This is to ensure dependencies are still pulled in for models with no inputs!
 
-        model_id = node_id_for('trac_model_exec')  # TODO: Model name
+        model_name = model_def.entryPoint.split(".")[-1]  # TODO: Check unique model name
+        model_id = node_id_for(model_name)
         model_node = ModelNode(model_id, model_def, input_ids, explicit_deps=[graph.root_id])
 
         # Create nodes for each model output
