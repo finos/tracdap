@@ -58,7 +58,7 @@ class HelloPyspark(trac.TracModel):
         default_weighting = ctx.get_parameter("default_weighting")
         filter_defaults = ctx.get_parameter("filter_defaults")
 
-        customer_loans = ctx.get_spark_sql_dataset("customer_loans")
+        customer_loans = ctx.get_spark_table("customer_loans")
 
         if filter_defaults:
             customer_loans = customer_loans.filter(f.col("loan_condition_cat") == 0)
@@ -80,9 +80,9 @@ class HelloPyspark(trac.TracModel):
             .groupBy("region") \
             .agg(f.col("region"), f.sum(f.col("gross_profit")).alias("gross_profit"))
 
-        ctx.put_spark_sql_dataset("profit_by_region", profit_by_region)
+        ctx.put_spark_table("profit_by_region", profit_by_region)
 
 
 if __name__ == "__main__":
-    import trac.launch as launch
+    import trac.rt.launch as launch
     launch.launch_model(HelloPyspark, "hello_pyspark.yaml", "examples/sys_config.yaml")

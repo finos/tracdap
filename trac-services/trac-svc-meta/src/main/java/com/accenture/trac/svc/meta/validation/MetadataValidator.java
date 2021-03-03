@@ -39,7 +39,8 @@ public class MetadataValidator {
             ObjectDefinition.DefinitionCase.FLOW, ObjectType.FLOW,
             ObjectDefinition.DefinitionCase.JOB, ObjectType.JOB,
             ObjectDefinition.DefinitionCase.FILE, ObjectType.FILE,
-            ObjectDefinition.DefinitionCase.CUSTOM, ObjectType.CUSTOM);
+            ObjectDefinition.DefinitionCase.CUSTOM, ObjectType.CUSTOM,
+            ObjectDefinition.DefinitionCase.STORAGE, ObjectType.STORAGE);
 
     private final List<String> validationErrors;
 

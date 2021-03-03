@@ -7,6 +7,7 @@ jobs:
   platform_build:
 
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
 
@@ -30,6 +31,7 @@ jobs:
   python_runtime:
 
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     # Testing targets for the Python model runtime
     # Include the latest stable release (3.9)
@@ -50,8 +52,8 @@ jobs:
               PANDAS_VERSION: ">= 1.1.0, < 2.0.0",
               PYPANDOC: false }
 
-          - { ENV_NAME: "Oldest: Python 3.6, PySpark 2.4.0, Pandas 1.0.0",
-              PYTHON_VERSION: "3.6",
+          - { ENV_NAME: "Oldest: Python 3.7, PySpark 2.4.0, Pandas 1.0.0",
+              PYTHON_VERSION: "3.7",
               PYSPARK_VERSION: "== 2.4.0",
               PANDAS_VERSION: "== 1.0.0",
               PYPANDOC: true }
@@ -98,6 +100,13 @@ jobs:
           export PYTHONPATH=trac-runtime/python/src:$PYTHONPATH
           export PYTHONPATH=trac-runtime/python/test:$PYTHONPATH
           python -m unittest discover -s trac-runtime/python/test/trac_test -t trac-runtime/python/test
+
+      - name: Python example models
+        run: |
+          export PYTHONPATH=trac-runtime/python/generated
+          export PYTHONPATH=trac-runtime/python/src:$PYTHONPATH
+          export PYTHONPATH=trac-runtime/python/test:$PYTHONPATH
+          python -m unittest discover -s trac-runtime/python/test/trac_examples -t trac-runtime/python/test
 
       - name: Build packages
         run: |

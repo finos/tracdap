@@ -28,6 +28,7 @@ import "trac/metadata/flow.proto";
 import "trac/metadata/job.proto";
 import "trac/metadata/file.proto";
 import "trac/metadata/custom.proto";
+import "trac/metadata/stoarge.proto";
 
 
 /**
@@ -72,5 +73,6 @@ message ObjectDefinition {
         JobDefinition job = 5;
         FileDefinition file = 6;
         CustomDefinition custom = 7;
+        StorageDefinition storage = 8;
     }
 }

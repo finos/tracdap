@@ -52,13 +52,46 @@ message TableDefinition {
     repeated FieldDefinition field = 1;
 }
 
+
+
 message DataDefinition {
 
+    enum PartType {
+        PART_ROOT = 0;
+        PART_BY_RANGE = 1;
+        PART_BY_VALUE = 2;
+    }
+
+    message PartKey {
+
+        string opaqueKey = 1;
+
+        PartType partType = 2;
+        repeated Value partValues = 3;
+        Value partRangeMin = 4;
+        Value partRangeMax = 5;
+    }
+
+    message Delta {
+
+        uint32 deltaIndex = 1;
+        string dataItemId = 2;
+    }
+
+    message Snap {
+
+        uint32 snapIndex = 1;
+        repeated Delta deltas = 2;
+    }
+
+    message Part {
+
+        PartKey partKey = 1;
+        Snap snap = 2;
+    }
+
     TableDefinition schema = 1;
+    map<string, Part> parts = 2;
 
-    repeated string storage = 2;
-    map<string, Value> storageInfo = 3;
-
-    string path = 4;
-    DataFormat format = 5;
+    string storageId = 3;
 }

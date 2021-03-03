@@ -1,28 +1,21 @@
 
 storageSettings:
-  defaultStorge: example_outputs
+  defaultStorage: example_data
   defaultFormat: CSV
 
 storage:
 
-  example_inputs:
+  example_data:
 
     storageType: LOCAL_STORAGE
     storageConfig:
-      rootPath: ./data/inputs
-
-  example_outputs:
-
-    storageType: LOCAL_STORAGE
-    storageConfig:
-      rootPath: ./data/outputs
-
+      rootPath: doc/examples/models/python/data
 
 sparkSettings:
 
   sparkConfig:
-    [spark.cores.max]: 4
-    [spark.driver.memory]: 2G
-    [spark.executor.memory]: 2G
-    [spark.default.parallelism]: 8
-    [spark.sql.shuffle.partitions]: 8
+    spark.cores.max: 4
+    spark.driver.memory: 2G
+    spark.executor.memory: 2G
+    spark.default.parallelism: 8
+    spark.sql.shuffle.partitions: 8

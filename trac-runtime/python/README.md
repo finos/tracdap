@@ -2,13 +2,16 @@
 
 *A next-generation data and analytics platform for use in highly regulated environments*
 
-This package contains just the model runtime API, the execution engine will follow shortly!
+This is a beta version of the Python model runtime, to give early sight of what it is
+like to build and run models in TRAC. The current version works with Pandas data, there
+are notable gaps around validation and type conversion. These gaps will be filled in the
+second beta, along with PySpark support.
 
 ## Requirements
 
 The Python Runtime has these requirements:
 
-* Python: 3.6 or later
+* Python: 3.7 or later
 * Pandas: 1.0 or later
 * PySpark 2.4.x or 3.0.x
 
@@ -72,45 +75,14 @@ Your IDE will be able to generate stubs for the model API (for PyCharm on Window
 press *ctrl + i*). Fill in the stubs to define your inputs, outputs and parameters,
 then you can add your model code in run_model().
 
-Here is a hello-world example that receives two parameters and writes some output
-to the model run log.
+For model code examples, look at the [documented model examples for Python](../../doc/examples/models/python).
+We're running these models from CI, so they will work with a runtime built from
+the same version of the code.
 
-    import typing as tp
-    import trac.rt.api as trac
-    
-    
-    class SampleModel(trac.TracModel):
-    
-        def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
-    
-            # trac.P is an alias for define_parameter()
-            # Every parameter must have a label and a type
-            # More details such as default values, formatting etc. are optional
-    
-            return {
-                'start_date': trac.P('A date to say hello', trac.BasicType.DATE),
-                'end_date': trac.P('A date to say goodbye', trac.BasicType.DATE)
-            }
-    
-        def define_inputs(self) -> tp.Dict[str, trac.TableDefinition]:
-        
-            # No inputs
-            return {}
-    
-        def define_outputs(self) -> tp.Dict[str, trac.TableDefinition]:
-        
-            # No outputs
-            return {}
-    
-        def run_model(self, ctx: trac.TracContext):
-    
-            # Parameters of type DATE are provided using Python's standard datetime.date class
-            start_date = ctx.get_parameter('start_date')
-            end_date = ctx.get_parameter('end_date')
-    
-            elapsed_days = (end_date - start_date).days
-    
-            # TRAC supplies a standard Python logger for use in models
-            # Log output will be stored automatically when models run on the platform
-            log = ctx.get_logger(SampleModel)
-            log.info(f"The model will simulate {elapsed_days} day(s)")
+If you are using IntelliJ IDEA you can run the examples directly out of the IDE.
+In the project root directory, run dev\ide\copy_settings.bat or dev/ide/copy_settings
+to update your IDEA config with module definitions for the Python runtime. You'll need
+to change the module configs to use your Python venv for TRAC as their runtime. Once
+that is done you can use the pre-defined run configs, use the Codegen run config first
+to generate the  Python metadata classes, then use the Examples run config to run the
+Python example models as tests.

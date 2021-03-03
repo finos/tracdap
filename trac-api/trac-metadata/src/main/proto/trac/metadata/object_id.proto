@@ -36,6 +36,7 @@ enum ObjectType {
   JOB = 4;
   FILE = 5;
   CUSTOM = 6;
+  STORAGE = 7;
 }
 
 
