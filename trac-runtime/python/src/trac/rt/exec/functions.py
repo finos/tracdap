@@ -26,13 +26,14 @@ import trac.rt.impl.data as _data
 
 import abc
 import typing as tp
+import pathlib
 
 
 NodeContext = tp.Dict[NodeId, object]  # Available prior node results when a node function is called
 NodeResult = tp.Any  # Result of a node function (will be recorded against the node ID)
 
 
-class NodeFunction(tp.Callable[[NodeContext], NodeResult]):
+class NodeFunction(tp.Callable[[NodeContext], NodeResult], abc.ABC):
 
     @abc.abstractmethod
     def __call__(self, ctx: NodeContext) -> NodeResult:
@@ -166,37 +167,12 @@ class DataItemFunc(NodeFunction):
         return delta
 
 
-class LoadDataFunc(NodeFunction):
+class DataIoFunc(NodeFunction, abc.ABC):
 
-    def __init__(self, node: LoadDataNode, storage: _storage.StorageManager):
-        super().__init__()
-        self.node = node
+    def __init__(self, storage: _storage.StorageManager):
         self.storage = storage
 
-    def __call__(self, ctx: NodeContext) -> NodeResult:
-
-        data_item = self.node.data_item
-        data_copy = self.choose_copy(data_item, self.node.storage_def)
-
-        file_storage = self.storage.get_file_storage(data_copy.storageKey)
-        data_storage = self.storage.get_data_storage(data_copy.storageKey)
-
-        stat = file_storage.stat(data_copy.storagePath)
-
-        if stat.file_type == _storage.FileType.FILE:
-
-            df = data_storage.read_pandas_table(
-                self.node.data_def.schema,
-                data_copy.storagePath, data_copy.storageFormat,
-                storage_options={})
-
-            return _data.DataItem(pandas=df)
-
-        else:
-
-            raise NotImplementedError("Directory storage format not available yet")
-
-    def choose_copy(self, data_item: str, storage_def: meta.StorageDefinition) -> meta.StorageCopy:
+    def _choose_copy(self, data_item: str, storage_def: meta.StorageDefinition) -> meta.StorageCopy:
 
         storage_info = storage_def.dataItems.get(data_item)
 
@@ -221,34 +197,66 @@ class LoadDataFunc(NodeFunction):
         return copy
 
 
-class SaveDataFunc(NodeFunction):
+class LoadDataFunc(DataIoFunc):
 
-    def __init__(self, node: SaveDataNode, storage: _storage.StorageManager):
-        super().__init__()
+    def __init__(self, node: LoadDataNode, storage: _storage.StorageManager):
+        super().__init__(storage)
         self.node = node
-        self.storage = storage
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
 
-        data_item: _data.DataItem = ctx[self.node.data_item_id].result
+        data_item = self.node.data_item
+        data_copy = self._choose_copy(data_item, self.node.storage_def)
+
+        file_storage = self.storage.get_file_storage(data_copy.storageKey)
+        data_storage = self.storage.get_data_storage(data_copy.storageKey)
+
+        stat = file_storage.stat(data_copy.storagePath)
+
+        if stat.file_type == _storage.FileType.FILE:
+
+            df = data_storage.read_pandas_table(
+                self.node.data_def.schema,
+                data_copy.storagePath, data_copy.storageFormat,
+                storage_options={})
+
+            return _data.DataItem(pandas=df)
+
+        else:
+
+            raise NotImplementedError("Directory storage format not available yet")
+
+
+class SaveDataFunc(DataIoFunc):
+
+    def __init__(self, node: SaveDataNode, storage: _storage.StorageManager):
+        super().__init__(storage)
+        self.node = node
+
+    def __call__(self, ctx: NodeContext) -> NodeResult:
+
+        # This function assumes that metadata for item to be saved has already been generated
+        # i.e. it is already known which incarnation / copy of the data will be created
+        # For dev mode, these decisions will happen during dev mode config translation
+
+        data_item_name = self.node.data_item.name
+        data_copy = self._choose_copy(data_item_name, self.node.storage_def)
+
+        file_storage = self.storage.get_file_storage(data_copy.storageKey)
+        data_storage = self.storage.get_data_storage(data_copy.storageKey)
+
+        # Make sure parent directory exists
+        parent_dir = pathlib.PurePath(data_copy.storagePath).parent
+        file_storage.mkdir(parent_dir, recursive=True, exists_ok=True)
+
+        # Item to be saved should exist in the current context, for now assume it is always Pandas
+        data_item: _data.DataItem = ctx[self.node.data_item].result
         df = data_item.pandas
-
-        # TODO: Feed through these values
-        # data_item_name= self.node.data_item_id.name
-        # data_copy: meta.StorageCopy = self.choose_copy(data_item_name, self.node.storage_def)
-        storage_key = "example_data"
-        storage_path = "temp_output.csv"
-        storage_format = "CSV"
-
-        file_storage = self.storage.get_file_storage(storage_key)
-        data_storage = self.storage.get_data_storage(storage_key)
-
-        # TODO!: decide where to store!
 
         data_storage.write_pandas_table(
             self.node.data_def.schema, df,
-            storage_path, storage_format,
-            storage_options={})
+            data_copy.storagePath, data_copy.storageFormat,
+            storage_options={}, overwrite=False)
 
         return True
 

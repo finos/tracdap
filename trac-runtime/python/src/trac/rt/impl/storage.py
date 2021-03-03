@@ -15,7 +15,6 @@
 import abc
 import typing as tp
 import pathlib
-import os
 import io
 import datetime as dt
 import dataclasses as dc
@@ -59,7 +58,7 @@ class IFileStorage:
         pass
 
     @abc.abstractmethod
-    def stat(self, storage_path: str) -> FileStat:  # TODO: Structure of stat return object
+    def stat(self, storage_path: str) -> FileStat:
         pass
 
     @abc.abstractmethod
@@ -67,7 +66,7 @@ class IFileStorage:
         pass
 
     @abc.abstractmethod
-    def mkdir(self, storage_path: str, recursive: bool = False):
+    def mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
         pass
 
     @abc.abstractmethod
@@ -83,11 +82,11 @@ class IFileStorage:
         pass
 
     @abc.abstractmethod
-    def write_bytes(self, storage_path: str, data: bytes):
+    def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
         pass
 
     @abc.abstractmethod
-    def write_byte_stream(self, storage_path: str) -> io.BytesIO:
+    def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> io.BytesIO:
         pass
 
 
@@ -105,7 +104,8 @@ class IDataStorage:
     def write_pandas_table(
             self, schema: _meta.TableDefinition, df: pd.DataFrame,
             storage_path: str, storage_format: str,
-            storage_options: tp.Dict[str, tp.Any]):
+            storage_options: tp.Dict[str, tp.Any],
+            overwrite: bool = False):
         pass
 
     @abc.abstractmethod
@@ -187,13 +187,13 @@ class _CsvStorageFormat(_StorageFormat):
 
         columns = list(map(lambda f: f.fieldName, schema.field)) if schema.field else None
 
-        return pd.read_csv(src, usecols=columns)
+        return pd.read_csv(src, usecols=columns, **options)
 
     def write_pandas(self, tgt, schema: _meta.TableDefinition, data: pd.DataFrame, options: dict):
 
         columns = list(map(lambda f: f.fieldName, schema.field)) if schema.field else None
 
-        data.to_csv(tgt, columns=columns)
+        data.to_csv(tgt, columns=columns, **options)
 
 
 class CommonDataStorage(IDataStorage):
@@ -235,19 +235,27 @@ class CommonDataStorage(IDataStorage):
     def write_pandas_table(
             self, schema: _meta.TableDefinition, df: pd.DataFrame,
             storage_path: str, storage_format: str,
-            storage_options: tp.Dict[str, tp.Any]):
+            storage_options: tp.Dict[str, tp.Any],
+            overwrite: bool = False):
 
         format_impl = self.__formats.get(storage_format.lower())
 
         if format_impl is None:
             raise NotImplementedError(f"Format '{storage_format}' is not supported")  # TODO: Error
 
+        # TODO: Switch between binary and text mode depending on format
+
         if self.__pushdown_pandas:
+
             full_path = self.__root_path / storage_path
-            return format_impl.write_pandas(full_path, schema, df, storage_options)
+            file_mode = 'wt' if overwrite else 'xt'
+            pushdown_options = {**storage_options, 'mode': file_mode}
+
+            return format_impl.write_pandas(full_path, schema, df, pushdown_options)
 
         else:
-            with self.__file_storage.write_byte_stream(storage_path) as byte_stream:
+
+            with self.__file_storage.write_byte_stream(storage_path, overwrite) as byte_stream:
                 format_impl.write_pandas(byte_stream, schema, df, storage_options)
 
     def read_spark_table(
@@ -306,10 +314,10 @@ class LocalFileStorage(IFileStorage):
                 for x in item_path.iterdir()
                 if x.is_file() or x.is_dir()]
 
-    def mkdir(self, storage_path: str, recursive: bool = False):
+    def mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
 
         item_path = self.__root_path / storage_path
-        item_path.mkdir(parents=recursive, exist_ok=recursive)
+        item_path.mkdir(parents=recursive, exist_ok=exists_ok)
 
     def rm(self, storage_path: str, recursive: bool = False):
 
@@ -317,23 +325,27 @@ class LocalFileStorage(IFileStorage):
 
     def read_bytes(self, storage_path: str) -> bytes:
 
-        item_path = self.__root_path / storage_path
-        return item_path.read_bytes()
+        with self.read_byte_stream(storage_path) as stream:
+            return stream.read()
 
     def read_byte_stream(self, storage_path: str) -> io.BytesIO:
 
         item_path = self.__root_path / storage_path
-        return open(item_path, mode='rb')
+        file_mode = 'rb'
 
-    def write_bytes(self, storage_path: str, data: bytes):
+        return open(item_path, mode=file_mode)
+
+    def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
+
+        with self.write_byte_stream(storage_path, overwrite) as stream:
+            stream.write(data)
+
+    def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> io.BytesIO:
 
         item_path = self.__root_path / storage_path
-        item_path.write_bytes(data)
+        file_mode = 'wb' if overwrite else 'xb'
 
-    def write_byte_stream(self, storage_path: str) -> io.BytesIO:
-
-        item_path = self.__root_path / storage_path
-        return open(item_path, mode='wb')
+        return open(item_path, mode=file_mode)
 
 
 class LocalDataStorage(CommonDataStorage):

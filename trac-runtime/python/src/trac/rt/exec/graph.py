@@ -211,12 +211,12 @@ class SaveDataNode(Node):
     Save an individual data item to storage
     """
 
-    data_item_id: NodeId
+    data_item: NodeId
     data_def: meta.DataDefinition
     storage_def: meta.StorageDefinition
 
     def __post_init__(self):
-        object.__setattr__(self, 'dependencies', {self.data_item_id: DependencyType.HARD})
+        object.__setattr__(self, 'dependencies', {self.data_item: DependencyType.HARD})
 
 
 @dc.dataclass(frozen=True)
