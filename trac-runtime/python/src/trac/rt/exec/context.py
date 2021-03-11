@@ -21,40 +21,33 @@ import re
 
 import pandas as pd
 import pyspark as pys
-from pyspark import sql as pyss
+import pyspark.sql as pyss
 
-import trac.rt.api as api
-import trac.rt.metadata as meta
-import trac.rt.impl.util as util
+import trac.rt.api as _api
+import trac.rt.metadata as _meta
+import trac.rt.exceptions as _ex
 import trac.rt.impl.data as _data
+import trac.rt.impl.util as _util
 
 
-# TODO: Exception hierarchy
-class ModelRuntimeException(RuntimeError):
-
-    def __init__(self, message):
-        super().__init__(message)
-        self.message = message
-
-
-class ModelContext(api.TracContext):
+class TracContext(_api.TracContext):
 
     def __init__(self,
-                 model_def: meta.ModelDefinition,
-                 model_class: api.TracModel.__class__,
+                 model_def: _meta.ModelDefinition,
+                 model_class: _api.TracModel.__class__,
                  parameters: tp.Dict[str, tp.Any],
                  data: tp.Dict[str, _data.DataView]):
 
-        self.__ctx_log = util.logger_for_object(self)
+        self.__ctx_log = _util.logger_for_object(self)
 
         self.__model_def = model_def
         self.__model_class = model_class
-        self.__model_log = util.logger_for_class(self.__model_class)
+        self.__model_log = _util.logger_for_class(self.__model_class)
 
         self.__parameters = parameters or {}
         self.__data = data or {}
 
-        self.__val = ModelRuntimeValidator(
+        self.__val = TracContextValidator(
             self.__ctx_log,
             self.__parameters,
             self.__data)
@@ -66,7 +59,7 @@ class ModelContext(api.TracContext):
 
         return self.__parameters[parameter_name]
 
-    def get_table_schema(self, dataset_name: str) -> api.TableDefinition:
+    def get_table_schema(self, dataset_name: str) -> _meta.TableDefinition:
 
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_context_item_exists(dataset_name)
@@ -100,7 +93,7 @@ class ModelContext(api.TracContext):
     def get_spark_table_rdd(self, dataset_name: str) -> pys.RDD:
         raise NotImplementedError()
 
-    def put_table_schema(self, dataset_name: str, schema: api.TableDefinition):
+    def put_table_schema(self, dataset_name: str, schema: _meta.TableDefinition):
         raise NotImplementedError()
 
     def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
@@ -138,7 +131,7 @@ class ModelContext(api.TracContext):
         return self.__model_log
 
 
-class ModelRuntimeValidator:
+class TracContextValidator:
 
     __VALID_IDENTIFIER = re.compile("^[a-zA-Z_]\\w*$",)
     __RESERVED_IDENTIFIER = re.compile("^(trac_|_)\\w*")
@@ -154,7 +147,7 @@ class ModelRuntimeValidator:
 
     def _report_error(self, message):
         self.__log.error(message)
-        raise ModelRuntimeException(message)
+        raise _ex.ERuntimeValidation(message)
 
     def check_param_valid_identifier(self, param_name: str):
 

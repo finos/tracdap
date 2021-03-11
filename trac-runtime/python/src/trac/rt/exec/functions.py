@@ -14,15 +14,14 @@
 
 from __future__ import annotations
 
-from .graph import *
-from .context import ModelContext
-
-import trac.rt.api as api
-import trac.rt.config as config
-
+import trac.rt.api as _api
+import trac.rt.config as _config
 import trac.rt.impl.repositories as _repos
 import trac.rt.impl.storage as _storage
 import trac.rt.impl.data as _data
+
+import trac.rt.exec.context as _ctx
+from trac.rt.exec.graph import *
 
 import abc
 import typing as tp
@@ -242,7 +241,7 @@ class SaveDataFunc(DataIoFunc):
 
 class ModelFunc(NodeFunction):
 
-    def __init__(self, node: ModelNode, job_config: config.JobConfig, model_class: api.TracModel.__class__):
+    def __init__(self, node: ModelNode, job_config: _config.JobConfig, model_class: _api.TracModel.__class__):
         super().__init__()
         self.node = node
         self.job_config = job_config
@@ -261,13 +260,13 @@ class ModelFunc(NodeFunction):
             for output_name in self.node.model_def.output})
 
         # Run the model against the mapped local context
-        model_ctx = ModelContext(
+        trac_ctx = _ctx.TracContext(
             self.node.model_def, self.model_class,
             parameters=self.job_config.parameters,
             data=local_ctx)
 
         model = self.model_class()
-        model.run_model(model_ctx)
+        model.run_model(trac_ctx)
 
         # The node result is just the model outputs taken from the local context
         model_outputs = {
@@ -279,7 +278,7 @@ class ModelFunc(NodeFunction):
 
 class FunctionResolver:
 
-    __ResolveFunc = tp.Callable[['FunctionResolver', config.JobConfig, Node], NodeFunction]
+    __ResolveFunc = tp.Callable[['FunctionResolver', _config.JobConfig, Node], NodeFunction]
 
     def __init__(self, repositories: _repos.Repositories, storage: _storage.StorageManager):
         self._repos = repositories
@@ -299,13 +298,13 @@ class FunctionResolver:
 
         return resolve_func(self, job_config, node)
 
-    def resolve_load_data(self, job_config: config.JobConfig, node: LoadDataNode):
+    def resolve_load_data(self, job_config: _config.JobConfig, node: LoadDataNode):
         return LoadDataFunc(node, self._storage)
 
-    def resolve_save_data(self, job_config: config.JobConfig, node: SaveDataNode):
+    def resolve_save_data(self, job_config: _config.JobConfig, node: SaveDataNode):
         return SaveDataFunc(node, self._storage)
 
-    def resolve_model_node(self, job_config: config.JobConfig, node: ModelNode) -> NodeFunction:
+    def resolve_model_node(self, job_config: _config.JobConfig, node: ModelNode) -> NodeFunction:
 
         model_loader = self._repos.get_model_loader(node.model_def.repository)
         model_class = model_loader.load_model(node.model_def)
