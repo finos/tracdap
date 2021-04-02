@@ -53,13 +53,18 @@ regular JavaScript objects and then converting them using the TRAC API to valida
             return flow;
         }
     
-        // Create a flow definition using regular JavaScript objects and then convert it
+        // Create a flow definition using regular JavaScript objects, then verify and convert
         createFlow2(inputName, outputName) {
             
             const flow = {node: {}, edge: []};
             flow.node[inputName] = {nodeType: "INPUT_NODE"};
             flow.node[outputName] = {nodeType: "OUTPUT_NODE"};
             flow.edge.push({head: inputName, tail: outputName});
+
+            const err = trac.api.FlowDefinition.verify(flow);
+
+            if (err)
+                throw err;
     
             return trac.metadata.FlowDefinition.create(flow);
         }
@@ -109,10 +114,14 @@ alternate rpcImpl. Here is an example of how to do that.
             const searchRequest = trac.api.MetadataSearchRequest.decode(searchRequest);
 
             const result = [...];  // Logic to build search results using this.localData
+            const searchResponse = {searchResult: result};
 
-            // Using a structured object verifies the response
-            const searchResponse = trac.api.MetadataSearchResponse.create({searchResult: result});
-        
+            // Verification step (if required for dummy logic)
+            const err = trac.api.MetadataSearchResponse.verify(searchResponse);
+
+            if (err)
+                throw err;
+
             // Encode proto result
             return trac.api.MetadataSearchResponse.encode(searchResponse).finish();
         }
