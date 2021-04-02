@@ -20,6 +20,10 @@ build/
 # Tracked IDEA config files are in dev/ide/idea
 .idea/*
 
+/trac-api/packages/javascript/node_modules/**
+/trac-api/packages/javascript/build/**
+/trac-api/packages/javascript/trac.*
+
 /trac-runtime/python/.idea/**
 /trac-runtime/python/venv/**
 /trac-runtime/python/generated/**
@@ -28,3 +32,6 @@ build/
 /trac-runtime/python/*.egg-info
 
 /doc/examples/models/python/data/outputs/**
+
+.DS_Store
+__pycache__/
