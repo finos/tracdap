@@ -1,5 +1,5 @@
 {
-  "name": "trac-web-api",
+  "name": "trac-js-api",
   "version": "0.0.0-DEVELOPMENT",
   "description": "JavaScript API for building web applications on the TRAC platform",
   "repository": {
