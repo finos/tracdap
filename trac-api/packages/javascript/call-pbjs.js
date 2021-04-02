@@ -26,8 +26,8 @@ const packages = {
 
 const args = [
     "--target", "static-module",
-    "--root", "trac.metadata",
-    "--wrap", "commonjs",
+    "--wrap", "default",  // commonjs + amd
+    "--root", "trac",
     "--force-number",
     "--path", './build',
     "--out", "trac.js"

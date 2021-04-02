@@ -14,8 +14,7 @@
     }
   ],
   "files": [
-    "trac.*",
-    "umd/**"
+    "trac.*"
   ],
   "main": "trac.js",
   "dependencies": {
