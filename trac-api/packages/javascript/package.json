@@ -29,8 +29,6 @@
     "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
     "tracVersion:posix": "npm version `../../../dev/version.sh`",
     "pbjs": "node call-pbjs.js",
-    "pbts": "pbts -o trac.d.ts trac.js",
-    "build:dev": "webpack --mode development",
-    "build:prod": "webpack --mode production"
+    "pbts": "pbts -o trac.d.ts trac.js"
   }
 }

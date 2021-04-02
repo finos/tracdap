@@ -145,9 +145,3 @@ jobs:
         cd trac-api/packages/javascript
         npm run pbjs
         npm run pbts
-
-    - name: Build
-      run: |
-        cd trac-api/packages/javascript
-        npm run build:dev
-        npm run build:prod
