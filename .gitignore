@@ -32,3 +32,6 @@ build/
 /trac-runtime/python/*.egg-info
 
 /doc/examples/models/python/data/outputs/**
+
+.DS_Store
+__pycache__/
