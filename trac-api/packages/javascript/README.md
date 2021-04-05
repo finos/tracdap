@@ -79,21 +79,27 @@ alternate rpcImpl. Here is an example of how to do that.
  
 App.js:
 
-    import React from "react";
+    import React, {useState, useEffect} from "react";
     import {ExampleLogic} from "./apis/protobuf/exampleLogic";
     
-    // When called using null the search call will be a dummy with a spoofed response
+    // When called using null the search call will be a dummy one with a spoofed response
     const controllerRpc = new ExampleLogic(null)
-
-    function App() {
     
-        const fakeSearchResults = controllerRpc.exampleSearch("ACME_CORP", {})
+    function App() {
+
+        const [fakeSearchResults, setFakeSearchResults] = useState("Not run")
+    
+        useEffect(() => {
+    
+           controllerRpc.exampleSearch("ACME_CORP", {}).then((response) => setFakeSearchResults(response))
+    
+        }, [])
     
         return (
     
             <React.Fragment>
                 <div>
-                    Welcome to TRAC rpc calls in a React App using protobuf.js
+                    Welcome to TRAC rpc calls in React App using protobuf.js
                 </div>
     
                 <div>
@@ -102,14 +108,14 @@ App.js:
             </React.Fragment>
         );
     }
-    
-    export default App;
+
+export default App;
 
 exampleLogic.js
 
     import {trac} from 'trac-js-api';
     import {LocalServiceImpl} from "./localServiceImpl"
-
+    
     export class ExampleLogic {
     
         constructor(rpcImpl) {
@@ -129,8 +135,6 @@ exampleLogic.js
     
             const searchRequest = {tenant: tenant, searchParams: search};
     
-            const localImpl = new LocalServiceImpl();
-    
             if (this.rpcImpl) {
     
                 return this.metaApi.search(searchRequest)
@@ -143,8 +147,7 @@ exampleLogic.js
     
             } else {
     
-                return localImpl.fakeSearch(searchRequest)
-    
+                return this.metaApi.search(searchRequest)
             }
         }
     }
@@ -154,91 +157,95 @@ localServiceIpl.js
     import {trac} from 'trac-js-api';
 
     export class LocalServiceImpl {
-    
-        constructor() {
-    
-            // This needs to be a valid response, otherwise you get an empty
-            // object when creating the message
-            // TODO "FLOW" caused error see notes below
-            this.fakeResponseObject = {
-                searchResult: [{
-                    header: {
-                        "objectType": "FLOW",
-                        "objectId": "97f1a213-dc88-4cc8-9643-1e9f21018e27",
-                        "objectVersion": 1,
-                        "objectTimestamp": {
-                            "isoDatetime": "2021-03-24T15:50:09.766544Z"
-                        },
-                        "tagVersion": 1,
-                        "tagTimestamp": {
-                            "isoDatetime": "2021-03-24T15:50:09.766544Z"
-                        }
+
+    constructor() {
+
+        // This needs to be a valid response, otherwise you get an empty
+        // object when creating the message
+        // TODO "FLOW" caused error see notes below
+        this.fakeResponseObject = {
+            searchResult: [{
+                header: {
+                    "objectType": "FLOW",
+                    "objectId": "97f1a213-dc88-4cc8-9643-1e9f21018e27",
+                    "objectVersion": 1,
+                    "objectTimestamp": {
+                        "isoDatetime": "2021-03-24T15:50:09.766544Z"
                     },
-                    "attr": {}
-                }]
-            };
-        }
-    
-        // This method creates a real rpcImpl that looks for available method implementations in the class
-        createRpcImpl() {
-    
-            const _self = this;
-    
-            return (method, request, callback) => {
-    
-                if (!method.name in _self || typeof _self[method.name] !== 'function') {
-                    callback(new Error("Unknown API call " + method.name));
-                } else {
-    
-                    try {
-                        const response = _self[method.name](request);
-                        callback(null, response);
-                    } catch (e) {
-                        console.log(e);
-                        callback(e);
+                    "tagVersion": 1,
+                    "tagTimestamp": {
+                        "isoDatetime": "2021-03-24T15:50:09.766544Z"
                     }
+                },
+                "attr": {}
+            }]
+        };
+    }
+
+    // This method creates a real rpcImpl that looks for available method implementations in the class
+    createRpcImpl() {
+
+        const _self = this;
+
+        return (method, request, callback) => {
+
+            if (!method.name in _self || typeof _self[method.name] !== 'function') {
+                callback(new Error("Unknown API call " + method.name));
+            } else {
+
+                try {
+                    const response = _self[method.name](request);
+                    console.log("name: " + method.name);
+                    callback(null, response);
+                } catch (e) {
+                    console.log(e);
+                    callback(e);
                 }
             }
         }
-    
-        // Now add whichever methods you need for testing as plain JS functions
-        fakeSearch(requestObject) {
-    
-            // Example of spoofing a response with a local variable rather than
-            // using a network call
-            const errRequest = trac.api.MetadataSearchRequest.verify(requestObject);
-    
-            if (errRequest)
-                throw errRequest;
-    
-            const requestMessage = trac.api.MetadataSearchRequest.create(requestObject)
-            console.log(`requestMessage = ${JSON.stringify(requestMessage)}`)
-    
-            const requestBuffer = trac.api.MetadataSearchRequest.encode(requestMessage).finish();
-            console.log(`requestBuffer = ${Array.prototype.toString.call(requestBuffer)}`)
-    
-            const requestDecode = trac.api.MetadataSearchRequest.decode(requestBuffer);
-            console.log(`requestDecode = ${JSON.stringify(requestDecode)}`)
-    
-            // Verification step can not be done on the JavaScript object because of the definition
-            // of objectType in the proto. When this is defined as enum it fails verification
-            // see https://github.com/protobufjs/protobuf.js/issues/1261
-            // The solution appears to not validate the object and use fromObject instead of encode.
-            // If you skip the verify check then use create then objectType returns OBJECT_TYPE_NOT_SET
-            // const errResponse = trac.api.MetadataSearchResponse.verify(this.fakeResponseObject);
-            //
-            // if (errResponse)
-            //     throw errResponse;
-    
-            const searchResponseMessage = trac.api.MetadataSearchResponse.fromObject(this.fakeResponseObject)
-            console.log(`searchResponseMessage = ${JSON.stringify(searchResponseMessage)}`)
-    
-            const searchResponseBuffer = trac.api.MetadataSearchResponse.encode(searchResponseMessage).finish()
-            console.log(`searchResponseBuffer = ${Array.prototype.toString.call(searchResponseBuffer)}`)
-    
-            const searchResponseDecoded = trac.api.MetadataSearchResponse.decode(searchResponseBuffer)
-            console.log(`searchResponseDecoded = ${JSON.stringify(searchResponseDecoded)}`)
-    
-            return searchResponseDecoded
-        }
     }
+
+    // Now add whichever methods you need for testing as plain JS functions. The
+    // names of these must match the implemented API so that they
+    // are correctly added to the local implementation
+    search(requestObject) {
+
+        // Example of spoofing a response with a local variable rather than
+        // using a network call
+        const errRequest = trac.api.MetadataSearchRequest.verify(requestObject);
+
+        if (errRequest)
+            throw errRequest;
+
+        const requestMessage = trac.api.MetadataSearchRequest.create(requestObject)
+        console.log(`requestMessage = ${JSON.stringify(requestMessage)}`)
+
+        const requestBuffer = trac.api.MetadataSearchRequest.encode(requestMessage).finish();
+        console.log(`requestBuffer = ${Array.prototype.toString.call(requestBuffer)}`)
+
+        const requestDecode = trac.api.MetadataSearchRequest.decode(requestBuffer);
+        console.log(`requestDecode = ${JSON.stringify(requestDecode)}`)
+
+        // Verification step can not be done on the JavaScript object because of the definition
+        // of objectType in the proto. When this is defined as enum it fails verification
+        // see https://github.com/protobufjs/protobuf.js/issues/1261
+        // The solution appears to not validate the object and use fromObject instead of encode.
+        // If you skip the verify check then use create then objectType returns OBJECT_TYPE_NOT_SET
+        // const errResponse = trac.api.MetadataSearchResponse.verify(this.fakeResponseObject);
+        //
+        // if (errResponse)
+        //     throw errResponse;
+
+        const searchResponseMessage = trac.api.MetadataSearchResponse.fromObject(this.fakeResponseObject)
+        console.log(`searchResponseMessage = ${JSON.stringify(searchResponseMessage)}`)
+
+        const searchResponseBuffer = trac.api.MetadataSearchResponse.encode(searchResponseMessage).finish()
+        console.log(`searchResponseBuffer = ${Array.prototype.toString.call(searchResponseBuffer)}`)
+
+        const searchResponseDecoded = trac.api.MetadataSearchResponse.decode(searchResponseBuffer)
+        console.log(`searchResponseDecoded = ${JSON.stringify(searchResponseDecoded)}`)
+
+        return searchResponseDecoded
+    }
+
+}
