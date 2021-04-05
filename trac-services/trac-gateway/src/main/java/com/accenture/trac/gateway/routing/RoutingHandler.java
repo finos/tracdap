@@ -38,7 +38,7 @@ public class RoutingHandler extends ChannelInboundHandlerAdapter {
     private final RoutingConfig routerConfig;
 
     private boolean routingDone;
-    private HttpVersion protocolVersion;
+    private HttpVersion protocolVersion = HttpVersion.HTTP_1_1;
 
     public RoutingHandler(RoutingConfig routerConfig) {
 
@@ -103,7 +103,7 @@ public class RoutingHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
 
-        log.error("Unhandled error during routing: " + cause.getMessage(), cause);
+        log.error("Unhandled error during routing", cause);
 
         var response = new DefaultHttpResponse(protocolVersion, HttpResponseStatus.INTERNAL_SERVER_ERROR);
         ctx.writeAndFlush(response);

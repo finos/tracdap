@@ -20,20 +20,24 @@ import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.config.StandardArgsProcessor;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.util.VersionInfo;
-import com.accenture.trac.gateway.routing.BasicRouteMatcher;
-import com.accenture.trac.gateway.routing.RoutingConfig;
-import com.accenture.trac.gateway.routing.RoutingHandler;
+import com.accenture.trac.gateway.routing.*;
+import com.google.api.Http;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http2.Http2ConnectionHandlerBuilder;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 
 public class TracPlatformGateway {
@@ -51,16 +55,24 @@ public class TracPlatformGateway {
     private static final String META_SVC_HOST_CONFIG_KEY = "trac.gw.services.meta.host";
     private static final String META_SVC_PORT_CONFIG_KEY = "trac.gw.services.meta.port";
 
+    private static final Duration DEFAULT_SHUTDOWN_TIMEOUT = Duration.of(10, ChronoUnit.SECONDS);
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final ConfigManager configManager;
+
+    private Channel serverChannel;
+    private Thread mainThread;
+    private Thread shutdownThread;
+
 
     public TracPlatformGateway(ConfigManager configManager) {
 
         this.configManager = configManager;
     }
 
-    public void run() throws Exception {
+    public void start() throws Exception {
+
         var componentName = VersionInfo.getComponentName(TracPlatformGateway.class);
         var componentVersion = VersionInfo.getComponentVersion(TracPlatformGateway.class);
         log.info("{} {}", componentName, componentVersion);
@@ -85,30 +97,98 @@ public class TracPlatformGateway {
         EventLoopGroup bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
         EventLoopGroup workerGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("worker"));
 
-        try {
-            ServerBootstrap bootstrap = new ServerBootstrap();
+        var protocolNegotiator = new HttpProtocolNegotiator(
+                () -> new RoutingHandler(routingConfig),
+                Http2Router::new);
 
-            bootstrap
+//        try {
+            ServerBootstrap bootstrap = new ServerBootstrap()
                     .group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class) // (3)
-                    .childHandler(new TracChannelInitializer(routingConfig))
+                    .childHandler(protocolNegotiator)
                     .option(ChannelOption.SO_BACKLOG, 128)          // (5)
                     .childOption(ChannelOption.SO_KEEPALIVE, true); // (6)
 
+            this.mainThread = Thread.currentThread();
+            this.shutdownThread = new Thread(() -> this.jvmShutdownHook(), "shutdown");
+            Runtime.getRuntime().addShutdownHook(shutdownThread);
+
             // Bind and start to accept incoming connections.
-            ChannelFuture f = bootstrap
+            serverChannel = bootstrap
                     .bind(gwPort)
-                    .sync(); // (7)
+                    .sync()
+                    .channel();
 
             log.info("TRAC Platform Gateway is up");
 
             // Wait until the server socket is closed.
             // In this example, this does not happen, but you can do that to gracefully
             // shut down your server.
-            f.channel().closeFuture().sync();
-        } finally {
-            workerGroup.shutdownGracefully();
-            bossGroup.shutdownGracefully();
+            //f.channel().closeFuture().sync();
+//        }
+//        catch (Exception e) {
+//            workerGroup.shutdownGracefully();
+//            bossGroup.shutdownGracefully();
+//        }
+    }
+
+    public void stop() {
+
+        try {
+
+            log.info("Gateway is stopping...");
+
+            var closeResult = serverChannel.close();
+            closeResult.await(DEFAULT_SHUTDOWN_TIMEOUT.getSeconds(), TimeUnit.SECONDS);
+
+            if (closeResult.isDone() && closeResult.isSuccess())
+                log.info("Gateway port closed");
+
+            else
+                log.error("Gateway port failed to close");
+        }
+        catch (InterruptedException e) {
+
+            System.err.println("TRAC Metadata service was interrupted during shutdown");
+            log.warn("TRAC Metadata service was interrupted during shutdown");
+
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    public void jvmShutdownHook() {
+//
+//        try {
+//            log.info("Shutdown request received");
+//
+//            this.stop();
+//            this.mainThread.join(5000);
+//
+//            log.info("Normal shutdown complete");
+//            System.out.println("Normal shutdown complete");
+//        }
+//        catch (InterruptedException e) {
+//            Thread.currentThread().interrupt();
+//        }
+    }
+
+    public void blockUntilShutdown() throws InterruptedException {
+
+        try {
+            log.info("Begin normal operations");
+
+            serverChannel.closeFuture().await();
+
+            System.out.println("Going down in main");
+
+            //log.info("TRAC Platform Gateway is going down");
+        }
+        catch (InterruptedException e) {
+
+            System.out.println("Going down in main int");
+
+            log.info("TRAC Platform Gateway has been interrupted");
+            throw e;
         }
     }
 
@@ -176,9 +256,10 @@ public class TracPlatformGateway {
             configManager.initLogging();
 
             var gateway = new TracPlatformGateway(configManager);
-            gateway.run();
+            gateway.start();
+            gateway.blockUntilShutdown();
 
-            System.exit(0);
+            //System.exit(0);
         }
         catch (EStartup e) {
 
