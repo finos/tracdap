@@ -21,6 +21,8 @@
     "protobufjs": "~6.10.1"
   },
   "devDependencies": {
+    "adm-zip": "^0.5.5",
+    "follow-redirects": "^1.13.3",
     "terser-webpack-plugin": "^4.2.3",
     "webpack": "^4.44.2",
     "webpack-cli": "^3.3.12"
@@ -28,6 +30,9 @@
   "scripts": {
     "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
     "tracVersion:posix": "npm version `../../../dev/version.sh`",
+    "protoc:download": "node call-protoc.js --download",
+    "protoc:js": "node call-protoc.js --js",
+    "protoc:grpcWeb": "node call-protoc.js --grpc-web",
     "pbjs": "node call-pbjs.js",
     "pbts": "pbts -o trac.d.ts trac.js"
   }
