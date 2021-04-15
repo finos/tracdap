@@ -1,0 +1,330 @@
+/*
+ * Copyright 2021 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.accenture.trac.gateway.routing;
+
+import com.accenture.trac.common.exception.EUnexpected;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.*;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.http.*;
+import io.netty.util.ReferenceCountUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.net.URI;
+import java.util.*;
+
+
+public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
+    private static int nextRouterId = 0;
+    private final int routerId = nextRouterId++;
+
+    private final EventLoopGroup workerGroup;
+    private ChannelHandlerContext clientCtx;
+
+    private Bootstrap bootstrap;
+    private final Map<String, ClientState> clients;
+    private final List<Route> routes;
+
+    private long currentInboundRequest;
+    private long currentOutboundRequest;
+    private final Map<Long, RequestState> requests;
+
+    public Http1Router(EventLoopGroup workerGroup) {
+
+        this.workerGroup = workerGroup;
+
+        this.clients = new HashMap<>();
+        this.requests = new HashMap<>();
+        this.routes = new ArrayList<>();
+
+        addDummyRoute();
+    }
+
+    private void addDummyRoute() {
+
+        var matcher = new IRouteMatcher() {
+            @Override
+            public boolean matches(URI uri, HttpMethod method, HttpHeaders headers) {
+                return true;
+            }
+        };
+
+        var route = new Route();
+        route.matcher = matcher;
+        route.clientKey = "the_one_route";
+
+        routes.add(route);
+    }
+
+    @Override
+    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+
+        log.info("HTTP 1.1 handler added with ID {}", routerId);
+
+        var eventLoop = ctx.channel().eventLoop();
+        var executor = ctx.executor();
+
+        this.bootstrap = new Bootstrap()
+                .group(workerGroup)
+                .channel(NioSocketChannel.class)
+                .option(ChannelOption.ALLOCATOR, ctx.alloc());
+
+        clientCtx = ctx;
+
+        super.handlerAdded(ctx);
+    }
+
+    @Override
+    public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
+
+        log.info("HTTP 1.1 channel registered");
+
+        super.channelRegistered(ctx);
+    }
+
+    @Override
+    protected void channelRead0(ChannelHandlerContext ctx, HttpObject msg) throws Exception {
+
+        processInbound(ctx, msg);
+    }
+
+    public void processInbound(ChannelHandlerContext ctx, HttpObject msg) throws Exception {
+
+        if (msg instanceof HttpRequest) {
+            processNewRequest(ctx, (HttpRequest) msg);
+        }
+        else if (msg instanceof HttpContent) {
+            processRequestContent(ctx, (HttpContent) msg);
+        }
+        else {
+            throw new EUnexpected();
+        }
+
+        if (msg instanceof LastHttpContent) {
+            processEndOfRequest(ctx, (LastHttpContent) msg);
+        }
+    }
+
+    public void processOutbound(ChannelHandlerContext ctx, HttpObject msg, long requestId) {
+
+        if (requestId == currentOutboundRequest) {
+
+        }
+        else {
+            // queue
+        }
+
+        if (msg instanceof LastHttpContent) {
+            currentOutboundRequest++;
+        }
+    }
+
+
+    private void processNewRequest(ChannelHandlerContext ctx, HttpRequest msg) throws Exception {
+
+        // Increment counter for inbound requests
+        currentInboundRequest++;
+
+        // Set up a new request state with initial values
+        var request = new RequestState();
+        request.requestId = currentInboundRequest;
+        request.status = RequestStatus.RECEIVING;
+        requests.put(request.requestId, request);
+
+        // Look for a matching route for this request
+        var uri = URI.create(msg.uri());
+        var method = msg.method();
+        var headers = msg.headers();
+
+        Route selectedRoute = null;
+
+        for (var route : this.routes) {
+            if (route.matcher.matches(uri, method, headers)) {
+
+                log.info("{} {} -> {} ({})", method, uri, route.clientKey, routerId);
+                selectedRoute = route;
+                break;
+            }
+        }
+
+        // If there is no matching route, fail the request and respond with 404
+        if (selectedRoute == null) {
+
+            // No route available, send a 404 back to the client
+            log.warn("No route available: " + method + " " + uri);
+
+            var protocolVersion = msg.protocolVersion();
+            var response = new DefaultHttpResponse(protocolVersion, HttpResponseStatus.NOT_FOUND);
+            ctx.writeAndFlush(response);
+
+            request.status = RequestStatus.FAILED;
+
+            // No need to release, base class does it automatically
+            // ReferenceCountUtil.release(msg);
+
+            return;
+        }
+
+        request.clientKey = selectedRoute.clientKey;
+
+        var existingClient = clients.getOrDefault(request.clientKey, null);
+        var client = existingClient != null ? existingClient : new ClientState();
+
+        if (existingClient == null)
+            clients.put(request.clientKey, client);
+
+        if (client.channel == null) {
+
+            var cf = bootstrap
+                    .handler(new ProxyChannelBuilder())
+                    .connect("localhost", 8081);
+
+            cf.addListener((ChannelFutureListener) future -> {
+
+                if (future.isSuccess()) {
+                    log.info("Connection to server ok");
+
+                    var outboundHead = client.outboundQueue.poll();
+
+                    while (outboundHead != null) {
+                        client.channel.write(outboundHead);
+                        outboundHead = client.outboundQueue.poll();
+                    }
+
+                    client.channel.flush();
+                }
+                else
+                    log.error("Connection to server failed", future.cause());
+            });
+
+            client.channel = cf.channel();
+        }
+
+        if (client.channel.isActive())
+            client.channel.write(msg);
+        else
+            client.outboundQueue.add(msg);
+    }
+
+    private void processRequestContent(ChannelHandlerContext ctx, HttpContent msg) {
+
+        var requestState = requests.getOrDefault(currentInboundRequest, null);
+
+        if (requestState == null)
+            throw new EUnexpected();
+
+        var client = clients.getOrDefault(requestState.clientKey, null);
+
+        if (client == null)
+            throw new EUnexpected();
+
+        var open = client.channel.isOpen();
+        var active = client.channel.isActive();
+
+        //log.info("cc open: {}, active: {}", open, active);
+
+        if (client.channel.isActive())
+            client.channel.write(msg);
+        else
+            client.outboundQueue.add(msg);
+    }
+
+    private void processEndOfRequest(ChannelHandlerContext ctx, LastHttpContent msg) {
+
+        var requestState = requests.getOrDefault(currentInboundRequest, null);
+
+        if (requestState == null)
+            throw new EUnexpected();
+
+        var client = clients.getOrDefault(requestState.clientKey, null);
+
+        if (client == null)
+            throw new EUnexpected();
+
+        if (client.channel.isActive())
+            client.channel.flush();
+    }
+
+    private class ProxyChannelBuilder extends ChannelInitializer<Channel> {
+
+        @Override
+        protected void initChannel(Channel ch) throws Exception {
+
+            log.info("init client channel");
+
+            var pipeline = ch.pipeline();
+            pipeline.addLast(new HttpClientCodec());
+            pipeline.addLast(new ProxyChannelHandler());
+
+            pipeline.remove(this);
+        }
+    }
+
+    private class ProxyChannelHandler extends ChannelDuplexHandler {
+
+        @Override
+        public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+
+            //log.info("intercept client write call for msg type {}", msg.getClass().getName());
+
+            super.write(ctx, msg, promise);
+        }
+
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+
+            //log.info("intercept client read call for msg type {}", msg.getClass().getName());
+
+            clientCtx.writeAndFlush(msg);
+
+            //super.channelRead(ctx, msg);
+        }
+    }
+
+    private enum RequestStatus {
+        RECEIVING,
+        RECEIVING_BIDI,
+        WAITING_FOR_RESPONSE,
+        RESPONDING,
+        SUCCEEDED,
+        FAILED
+    }
+
+    private class RequestState {
+
+        long requestId;
+        RequestStatus status;
+        String clientKey;
+    }
+
+    private class ClientState {
+
+        Channel channel;
+        Queue<Object> outboundQueue = new LinkedList<>();
+    }
+
+    private class Route {
+
+        IRouteMatcher matcher;
+        String clientKey;
+    }
+}

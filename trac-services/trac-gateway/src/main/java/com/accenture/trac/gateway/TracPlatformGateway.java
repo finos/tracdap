@@ -95,10 +95,10 @@ public class TracPlatformGateway {
         log.info("Opening gateway on port {}...", gwPort);
 
         EventLoopGroup bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
-        EventLoopGroup workerGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("worker"));
+        EventLoopGroup workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
 
         var protocolNegotiator = new HttpProtocolNegotiator(
-                () -> new RoutingHandler(routingConfig),
+                () -> new Http1Router(workerGroup),
                 Http2Router::new);
 
 //        try {
@@ -110,7 +110,7 @@ public class TracPlatformGateway {
                     .childOption(ChannelOption.SO_KEEPALIVE, true); // (6)
 
             this.mainThread = Thread.currentThread();
-            this.shutdownThread = new Thread(() -> this.jvmShutdownHook(), "shutdown");
+            this.shutdownThread = new Thread(this::jvmShutdownHook, "shutdown");
             Runtime.getRuntime().addShutdownHook(shutdownThread);
 
             // Bind and start to accept incoming connections.

@@ -32,6 +32,7 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
     private static final String PROTOCOL_SELECTOR_HANDLER = "protocol_selector";
     private static final String HTTP_1_INITIALIZER = "http_1_initializer";
+    private static final String HTTP_1_KEEPALIVE = "http_1_keepalive";
     private static final String HTTP_2_INITIALIZER = "http_2_initializer";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
@@ -61,6 +62,8 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
         var pipeline = channel.pipeline();
         pipeline.addLast(PROTOCOL_SELECTOR_HANDLER, cleartextUpgradeHandler);
         pipeline.addLast(HTTP_1_INITIALIZER, http1Init);
+
+        pipeline.remove(this);
     }
 
     private class Http1Initializer extends SimpleChannelInboundHandler<HttpMessage> {
@@ -74,7 +77,8 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
             log.info("{} {} CLEARTEXT", remoteSocket, httpVersion);
 
-            pipeline.addAfter(HTTP_1_INITIALIZER, null, http1Handler.get());
+            pipeline.addAfter(HTTP_1_INITIALIZER, HTTP_1_KEEPALIVE, new HttpServerKeepAliveHandler());
+            pipeline.addAfter(HTTP_1_KEEPALIVE, null, http1Handler.get());
             pipeline.remove(this);
 
             ctx.fireChannelRead(msg);

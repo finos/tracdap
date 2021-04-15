@@ -17,9 +17,8 @@
 const {http, https} = require('follow-redirects');
 const fs = require('fs');
 const path = require('path');
-
+const childProcess = require('child_process');
 const AdmZip = require('adm-zip');
-
 
 const packages = {
     'trac/metadata': '../../trac-metadata/src/main/proto',
@@ -34,6 +33,10 @@ const arch = 'x86_64';
 
 const DOWNLOAD_DIR = './build/download';
 const PROTOC_DIR = './build/protoc';
+const PROTO_DIR = './build/proto';
+const DIST_DIR = './dist'
+
+const GRPC_WEB_MODE = 'grpcweb';  // grpcweb | grpcwebtext
 
 const protocPackageUrl =
     "https://github.com/protocolbuffers/protobuf/releases/download" +
@@ -122,4 +125,67 @@ function download() {
 }
 
 
-download();
+function copyProto() {
+
+    for (const [pkg, pkgDir] of Object.entries(packages)) {
+
+        const srcDir = path.join(pkgDir, pkg);
+        const dstDir = path.join(PROTO_DIR, pkg);
+
+        fs.mkdirSync(dstDir, {recursive: true});
+
+        fs.readdirSync(srcDir).forEach(file => {
+
+            const srcProto = path.join(srcDir, file);
+            const dstProto = path.join(dstDir, file);
+
+            fs.copyFileSync(srcProto, dstProto);
+        })
+    }
+}
+
+
+function sh(cmd) {
+
+    return new Promise(function (resolve, reject) {
+
+        childProcess.exec(cmd, (err, stdout, stderr) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve({ stdout, stderr });
+            }
+        });
+    });
+}
+
+
+
+function generate() {
+
+    fs.mkdirSync(DIST_DIR, {recursive: true});
+
+    const commands = [];
+
+    for (const pkg of Object.keys(packages)) {
+
+        const pkgDir = path.join(PROTO_DIR, pkg);
+
+        fs.readdirSync(pkgDir).forEach(file => {
+
+            const srcProto = path.join(pkgDir, file);
+            const jsCmd = `protoc -I=${PROTO_DIR} ${srcProto} --js_out=import_style=commonjs,binary:${DIST_DIR}`;
+            const grpcWebCmd = `protoc -I=${PROTO_DIR} ${srcProto} --grpc-web_out=import_style=commonjs+dts,mode=${GRPC_WEB_MODE}:${DIST_DIR}`;
+
+            commands.push(jsCmd);
+            commands.push(grpcWebCmd);
+        })
+    }
+
+    Promise.all(commands.map(cmd => sh(cmd)));
+}
+
+
+// download();
+copyProto();
+generate();

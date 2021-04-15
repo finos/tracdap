@@ -22,6 +22,7 @@ build/
 
 /trac-api/packages/javascript/node_modules/**
 /trac-api/packages/javascript/build/**
+/trac-api/packages/javascript/dist/**
 /trac-api/packages/javascript/trac.*
 
 /trac-runtime/python/.idea/**
