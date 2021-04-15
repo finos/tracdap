@@ -15,14 +15,20 @@
  */
 
 
-static def getVersionFromGit() {
+def getVersionFromGit() {
 
     def osName = System.properties.getProperty('os.name').toLowerCase()
     def command = osName.contains("win")
         ? "powershell -ExecutionPolicy Bypass -File dev\\version.ps1"
         : "dev/version.sh"
 
-    def versionNumber = command.execute().text.strip()
+    def proc = command.execute([], rootDir)
+    def exitCode = proc.waitFor()
+
+    if (exitCode != 0)
+        throw new Exception("Get version command failed with error code ${exitCode}")
+
+    def versionNumber = proc.text.strip()
 
     println("TRAC Version: ${versionNumber}")
 
