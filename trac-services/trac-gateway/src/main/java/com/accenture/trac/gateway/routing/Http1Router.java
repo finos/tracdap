@@ -56,23 +56,29 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
         this.requests = new HashMap<>();
         this.routes = new ArrayList<>();
 
-        addDummyRoute();
+        addHardCodedRoutes();
     }
 
-    private void addDummyRoute() {
+    private void addHardCodedRoutes() {
 
-        var matcher = new IRouteMatcher() {
-            @Override
-            public boolean matches(URI uri, HttpMethod method, HttpHeaders headers) {
-                return true;
-            }
-        };
+        var metaApiRoute = new Route();
+        metaApiRoute.clientKey = "API: Metadata";
+        metaApiRoute.matcher = (uri, method, headers) -> uri
+                .getPath()
+                .matches("^/trac.api.TracMetadataApi/.+");
+        metaApiRoute.host = "localhost";
+        metaApiRoute.port = 8086;
+        metaApiRoute.initializer = GrpcProxyBuilder::new;
 
-        var route = new Route();
-        route.matcher = matcher;
-        route.clientKey = "the_one_route";
+        var defaultRoute = new Route();
+        defaultRoute.clientKey = "Static content";
+        defaultRoute.matcher = (uri, method, headers) -> true;;
+        defaultRoute.host = "localhost";
+        defaultRoute.port = 8090;
+        defaultRoute.initializer = Http1ProxyBuilder::new;
 
-        routes.add(route);
+        routes.add(0, metaApiRoute);
+        routes.add(1, defaultRoute);
     }
 
     @Override
@@ -194,11 +200,17 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
 
         if (client.channel == null) {
 
-            var cf = bootstrap
-                    .handler(new ProxyChannelBuilder())
-                    .connect("localhost", 8081);
+            var channelActiveFuture = ctx.newPromise();
 
-            cf.addListener((ChannelFutureListener) future -> {
+            var channelInit = selectedRoute
+                    .initializer
+                    .makeInitializer(clientCtx, channelActiveFuture);
+
+            var channelOpenFuture = bootstrap
+                    .handler(channelInit)
+                    .connect(selectedRoute.host, selectedRoute.port);
+
+            channelActiveFuture.addListener((ChannelFutureListener) future -> {
 
                 if (future.isSuccess()) {
                     log.info("Connection to server ok");
@@ -216,7 +228,9 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
                     log.error("Connection to server failed", future.cause());
             });
 
-            client.channel = cf.channel();
+            client.channel = channelOpenFuture.channel();
+            client.channelOpenFuture = channelOpenFuture;
+            client.channelActiveFuture = channelActiveFuture;
         }
 
         if (client.channel.isActive())
@@ -237,10 +251,7 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
         if (client == null)
             throw new EUnexpected();
 
-        var open = client.channel.isOpen();
-        var active = client.channel.isActive();
-
-        //log.info("cc open: {}, active: {}", open, active);
+        msg.retain();
 
         if (client.channel.isActive())
             client.channel.write(msg);
@@ -264,41 +275,6 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
             client.channel.flush();
     }
 
-    private class ProxyChannelBuilder extends ChannelInitializer<Channel> {
-
-        @Override
-        protected void initChannel(Channel ch) throws Exception {
-
-            log.info("init client channel");
-
-            var pipeline = ch.pipeline();
-            pipeline.addLast(new HttpClientCodec());
-            pipeline.addLast(new ProxyChannelHandler());
-
-            pipeline.remove(this);
-        }
-    }
-
-    private class ProxyChannelHandler extends ChannelDuplexHandler {
-
-        @Override
-        public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-
-            //log.info("intercept client write call for msg type {}", msg.getClass().getName());
-
-            super.write(ctx, msg, promise);
-        }
-
-        @Override
-        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-
-            //log.info("intercept client read call for msg type {}", msg.getClass().getName());
-
-            clientCtx.writeAndFlush(msg);
-
-            //super.channelRead(ctx, msg);
-        }
-    }
 
     private enum RequestStatus {
         RECEIVING,
@@ -309,22 +285,37 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
         FAILED
     }
 
-    private class RequestState {
+    private static class RequestState {
 
         long requestId;
         RequestStatus status;
         String clientKey;
     }
 
-    private class ClientState {
+    private static class ClientState {
 
         Channel channel;
+        ChannelFuture channelOpenFuture;
+        ChannelFuture channelActiveFuture;
+
         Queue<Object> outboundQueue = new LinkedList<>();
     }
 
-    private class Route {
+    private static class Route {
 
         IRouteMatcher matcher;
         String clientKey;
+
+        String host;
+        int port;
+        ProxyInitializer initializer;
+    }
+
+    @FunctionalInterface
+    private interface ProxyInitializer {
+
+        ChannelInitializer<Channel> makeInitializer(
+                ChannelHandlerContext routerCtx,
+                ChannelPromise routeActivePromise);
     }
 }
