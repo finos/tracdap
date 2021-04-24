@@ -52,6 +52,10 @@ dependencies {
     gcpRuntimeOnly project(':gcp-config')
 
     // Core framework - gRPC on Netty
+    implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-codec-http', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-codec-http2', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-handler-proxy', version: "$netty_version"
     implementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
 
     // CLI library for processing startup args (part of the .config package)

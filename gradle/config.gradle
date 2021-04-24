@@ -16,9 +16,11 @@
 
 ext {
 
+    netty_version = '4.1.63.Final'
+
     // Proto / gRPC (use a consistent set of versions, as defined by gRPC)
-    proto_version = '3.12.0'
-    grpc_version = '1.32.1'
+    proto_version = '3.15.8'
+    grpc_version = '1.37.0'
     gapi_version = '1.17.0'
 
     // Apache Commons Components
