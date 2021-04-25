@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.gateway.routing;
+package com.accenture.trac.gateway.proxy.http;
 
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -39,7 +39,7 @@ public class Http1RouterLink extends ChannelDuplexHandler {
     private int serverSeqId = 0;
     private final HttpVersion protocolVersion = HttpVersion.HTTP_1_1;
 
-    Http1RouterLink(ChannelHandlerContext routerCtx, ChannelPromise routeActivePromise) {
+    public Http1RouterLink(ChannelHandlerContext routerCtx, ChannelPromise routeActivePromise) {
         this.routerCtx = routerCtx;
         this.routeActivePromise = routeActivePromise;
     }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.gateway.routing;
+package com.accenture.trac.gateway.proxy.http;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -32,7 +32,7 @@ public class Http1ProxyBuilder extends ChannelInitializer<Channel> {
     private final ChannelHandlerContext routerCtx;
     private final ChannelPromise routeActivePromise;
 
-    Http1ProxyBuilder(ChannelHandlerContext routerCtx, ChannelPromise routeActivePromise) {
+    public Http1ProxyBuilder(ChannelHandlerContext routerCtx, ChannelPromise routeActivePromise) {
         this.routerCtx = routerCtx;
         this.routeActivePromise = routeActivePromise;
     }

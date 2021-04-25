@@ -14,20 +14,16 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.gateway.routing;
+package com.accenture.trac.gateway.proxy.grpc;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import io.netty.buffer.Unpooled;
+import com.accenture.trac.gateway.proxy.http.Http1RouterLink;
+import com.accenture.trac.gateway.proxy.http.Http1to2Framing;
 import io.netty.channel.*;
 import io.netty.handler.codec.http2.*;
 import io.netty.handler.logging.LogLevel;
-import io.netty.util.concurrent.Future;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.nio.BufferOverflowException;
-import java.util.ArrayDeque;
-import java.util.Queue;
 
 
 public class GrpcProxyBuilder extends ChannelInitializer<Channel> {

@@ -17,12 +17,12 @@
 package com.accenture.trac.gateway.routing;
 
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.gateway.proxy.http.Http1ProxyBuilder;
+import com.accenture.trac.gateway.proxy.grpc.GrpcProxyBuilder;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.*;
-import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

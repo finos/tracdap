@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.gateway.routing;
+package com.accenture.trac.gateway.proxy.grpc;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;

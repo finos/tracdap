@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.gateway.routing;
+package com.accenture.trac.gateway.proxy.http;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
@@ -41,7 +40,7 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
     private int inboundSeqId;
     private int outboundSeqId;
 
-    Http1to2Framing() {
+    public Http1to2Framing() {
 
         this.streams = new HashMap<>();
         this.nextSeqId = new AtomicInteger(0);

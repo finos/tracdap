@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.gateway.routing;
+package com.accenture.trac.gateway.proxy.http;
 
 import com.accenture.trac.common.exception.EUnexpected;
 import io.netty.channel.ChannelDuplexHandler;
@@ -25,27 +25,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 
 
-public class Http1Proxy extends ChannelDuplexHandler implements IServerRoute {
-
-    @Override
-    public void forwardMessage(Object msg, int seqId) {
-
-    }
-
-    @Override
-    public void forwardError(Throwable error, int seqId) {
-
-    }
-
-    @Override
-    public void channelError(Throwable error, int routeId) {
-
-    }
-
-    @Override
-    public void prepareServerChannel() {
-
-    }
+public class Http1Proxy extends ChannelDuplexHandler {
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
