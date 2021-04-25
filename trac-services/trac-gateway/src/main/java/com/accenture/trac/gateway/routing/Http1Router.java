@@ -19,26 +19,26 @@ package com.accenture.trac.gateway.routing;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.gateway.proxy.http.Http1ProxyBuilder;
 import com.accenture.trac.gateway.proxy.grpc.GrpcProxyBuilder;
+
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.*;
+import io.netty.util.concurrent.Future;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private static int nextRouterId = 0;
-    private final int routerId = nextRouterId++;
-
-    private final EventLoopGroup workerGroup;
-    private ChannelHandlerContext clientCtx;
+    private static final AtomicInteger nextRouterId = new AtomicInteger();
+    private final int routerId = nextRouterId.getAndIncrement();
 
     private Bootstrap bootstrap;
     private final Map<String, ClientState> clients;
@@ -48,9 +48,7 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
     private long currentOutboundRequest;
     private final Map<Long, RequestState> requests;
 
-    public Http1Router(EventLoopGroup workerGroup) {
-
-        this.workerGroup = workerGroup;
+    public Http1Router() {
 
         this.clients = new HashMap<>();
         this.requests = new HashMap<>();
@@ -86,15 +84,20 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
 
         log.info("HTTP 1.1 handler added with ID {}", routerId);
 
+        // Bootstrap is used to create proxy channels for this router channel
+        // In an HTTP 1 world, browser clients will normally make several connections,
+        // so there will be multiple router instances per client
+
+        // Proxy channels will run on the same event loop as the router channel they belong to
+        // Proxy channels will use the same ByteBuf allocator as the router they belong to
+
         var eventLoop = ctx.channel().eventLoop();
-        var executor = ctx.executor();
+        var allocator = ctx.alloc();
 
         this.bootstrap = new Bootstrap()
-                .group(workerGroup)
+                .group(eventLoop)
                 .channel(NioSocketChannel.class)
-                .option(ChannelOption.ALLOCATOR, ctx.alloc());
-
-        clientCtx = ctx;
+                .option(ChannelOption.ALLOCATOR, allocator);
 
         super.handlerAdded(ctx);
     }
@@ -201,36 +204,30 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
         if (client.channel == null) {
 
             var channelActiveFuture = ctx.newPromise();
+            var channelInactiveFuture = ctx.newPromise();
 
             var channelInit = selectedRoute
                     .initializer
-                    .makeInitializer(clientCtx, channelActiveFuture);
+                    .makeInitializer(ctx, channelActiveFuture);
 
             var channelOpenFuture = bootstrap
                     .handler(channelInit)
                     .connect(selectedRoute.host, selectedRoute.port);
 
-            channelActiveFuture.addListener((ChannelFutureListener) future -> {
+            var channelCloseFuture = channelOpenFuture
+                    .channel()
+                    .closeFuture();
 
-                if (future.isSuccess()) {
-                    log.info("Connection to server ok");
-
-                    var outboundHead = client.outboundQueue.poll();
-
-                    while (outboundHead != null) {
-                        client.channel.write(outboundHead);
-                        outboundHead = client.outboundQueue.poll();
-                    }
-
-                    client.channel.flush();
-                }
-                else
-                    log.error("Connection to server failed", future.cause());
-            });
+            channelOpenFuture.addListener(future -> proxyChannelOpen(ctx, client, future));
+            channelCloseFuture.addListener(future -> proxyChannelClosed(ctx, client, future));
+            channelActiveFuture.addListener(future -> proxyChannelActive(ctx, client, future));
+            channelInactiveFuture.addListener(future -> proxyChannelInactive(ctx, client, future));
 
             client.channel = channelOpenFuture.channel();
             client.channelOpenFuture = channelOpenFuture;
+            client.channelCloseFuture = channelCloseFuture;
             client.channelActiveFuture = channelActiveFuture;
+            client.channelInactiveFuture = channelInactiveFuture;
         }
 
         if (client.channel.isActive())
@@ -275,6 +272,44 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
             client.channel.flush();
     }
 
+    private void proxyChannelOpen(ChannelHandlerContext ctx, ClientState client, Future<?> future) {
+
+        if (!future.isSuccess()) {
+
+            var response = new DefaultFullHttpResponse(
+                    HttpVersion.HTTP_1_1, HttpResponseStatus.
+                    SERVICE_UNAVAILABLE);
+
+            ctx.writeAndFlush(response);
+        }
+    }
+
+    private void proxyChannelActive(ChannelHandlerContext ctx, ClientState client, Future<?> future) {
+
+        if (future.isSuccess()) {
+            log.info("Connection to server ok");
+
+            var outboundHead = client.outboundQueue.poll();
+
+            while (outboundHead != null) {
+                client.channel.write(outboundHead);
+                outboundHead = client.outboundQueue.poll();
+            }
+
+            client.channel.flush();
+        }
+        else
+            log.error("Connection to server failed", future.cause());
+    }
+
+    private void proxyChannelInactive(ChannelHandlerContext ctx, ClientState client, Future<?> future) {
+
+    }
+
+    private void proxyChannelClosed(ChannelHandlerContext ctx, ClientState client, Future<?> future) {
+
+    }
+
 
     private enum RequestStatus {
         RECEIVING,
@@ -296,7 +331,9 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
 
         Channel channel;
         ChannelFuture channelOpenFuture;
+        ChannelFuture channelCloseFuture;
         ChannelFuture channelActiveFuture;
+        ChannelFuture channelInactiveFuture;
 
         Queue<Object> outboundQueue = new LinkedList<>();
     }
