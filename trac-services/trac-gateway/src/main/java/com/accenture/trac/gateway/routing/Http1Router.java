@@ -65,7 +65,7 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
                 .getPath()
                 .matches("^/trac.api.TracMetadataApi/.+");
         metaApiRoute.host = "localhost";
-        metaApiRoute.port = 8086;
+        metaApiRoute.port = 8081;
         metaApiRoute.initializer = GrpcProxyBuilder::new;
 
         var defaultRoute = new Route();

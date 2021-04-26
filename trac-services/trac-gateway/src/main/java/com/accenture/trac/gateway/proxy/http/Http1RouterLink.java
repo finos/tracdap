@@ -72,13 +72,15 @@ public class Http1RouterLink extends ChannelDuplexHandler {
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
+
+        log.info("Forward response message of type {}", msg.getClass().getSimpleName());
 
         routerCtx.write(msg);
     }
 
     @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+    public void channelReadComplete(ChannelHandlerContext ctx) {
 
         routerCtx.flush();
     }

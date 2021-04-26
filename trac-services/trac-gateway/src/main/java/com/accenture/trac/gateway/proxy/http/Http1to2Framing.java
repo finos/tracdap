@@ -73,7 +73,15 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        super.channelRead(ctx, msg);
+
+        if (!(msg instanceof Http2Frame))
+            throw new EUnexpected();
+
+        var frame = (Http2Frame) msg;
+        var httpObjs = translateResponseFrame(frame);
+
+        for (var httpObj : httpObjs)
+            ctx.fireChannelRead(httpObj);
     }
 
     private void newSeqStream() {
@@ -161,4 +169,44 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
 
         return frames;
     }
+
+    private List<HttpObject> translateResponseFrame(Http2Frame frame) {
+
+        if (frame instanceof Http2HeadersFrame)
+            return translateResponseHeaders((Http2HeadersFrame) frame);
+
+        if (frame instanceof Http2DataFrame)
+            return translateResponseData((Http2DataFrame) frame);
+
+        throw new EUnexpected();
+    }
+
+    private List<HttpObject> translateResponseHeaders(Http2HeadersFrame headersFrame) {
+
+        var h2Headers = headersFrame.headers();
+        var h1Headers = new DefaultHttpHeaders();
+
+        for (var header : h2Headers)
+            if (!header.getKey().toString().startsWith(":"))
+                h1Headers.add(header.getKey(), header.getValue());
+
+        var statusCode = HttpResponseStatus.parseLine(h2Headers.get(":status"));
+        var headerObj = new DefaultHttpResponse(HttpVersion.HTTP_1_1, statusCode, h1Headers);
+
+        if (headersFrame.isEndStream())
+            return List.of(headerObj, new DefaultLastHttpContent());
+        else
+            return List.of(headerObj);
+    }
+
+    private List<HttpObject> translateResponseData(Http2DataFrame dataFrame) {
+
+        dataFrame.content().retain();
+
+        if (dataFrame.isEndStream())
+            return List.of(new DefaultLastHttpContent(dataFrame.content()));
+        else
+            return List.of(new DefaultHttpContent(dataFrame.content()));
+    }
+
 }
