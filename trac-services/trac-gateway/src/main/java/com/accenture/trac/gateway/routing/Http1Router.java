@@ -82,7 +82,7 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
 
-        log.info("HTTP 1.1 handler added with ID {}", routerId);
+        log.info("HTTP 1.1 router added for ID {}", routerId);
 
         // Bootstrap is used to create proxy channels for this router channel
         // In an HTTP 1 world, browser clients will normally make several connections,
@@ -100,6 +100,12 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
                 .option(ChannelOption.ALLOCATOR, allocator);
 
         super.handlerAdded(ctx);
+    }
+
+    @Override
+    public void handlerRemoved(ChannelHandlerContext ctx) {
+
+        log.info("HTTP 1.1 router removed for ID {}", routerId);
     }
 
     @Override

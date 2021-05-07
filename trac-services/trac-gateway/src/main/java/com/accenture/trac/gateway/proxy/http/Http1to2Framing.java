@@ -114,17 +114,17 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
             var h1Headers = h1Request.headers();
 
             var h2Headers = new DefaultHttp2Headers()
-                    .scheme(HttpScheme.HTTPS.name())
                     .method(HttpMethod.POST.name())
+                    .scheme(HttpScheme.HTTPS.name())
                     .path(h1Request.uri());
 
+            if (h1Headers.contains(HttpHeaderNames.HOST))
+                h2Headers.authority(h1Headers.get(HttpHeaderNames.HOST));
+
             var filterHeaders = List.of(
-                    "connection",
-                    "content-length");
-//                    "host",
-//                    "content-length",
-//                    "x-user-agent",
-//                    "dnt");
+                    HttpHeaderNames.HOST.toString(),
+                    HttpHeaderNames.CONNECTION.toString(),
+                    HttpHeaderNames.CONTENT_LENGTH.toString());
 
             for (var header : h1Headers)
                 if (!filterHeaders.contains(header.getKey().toLowerCase()))
@@ -189,6 +189,12 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
         for (var header : h2Headers)
             if (!header.getKey().toString().startsWith(":"))
                 h1Headers.add(header.getKey(), header.getValue());
+
+        if (!h1Headers.contains(HttpHeaderNames.CONTENT_LENGTH) &&
+            !h1Headers.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
+
+            h1Headers.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+        }
 
         var statusCode = HttpResponseStatus.parseLine(h2Headers.get(":status"));
         var headerObj = new DefaultHttpResponse(HttpVersion.HTTP_1_1, statusCode, h1Headers);
