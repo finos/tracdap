@@ -22,7 +22,15 @@ def getVersionFromGit() {
         ? "powershell -ExecutionPolicy Bypass -File dev\\version.ps1"
         : "dev/version.sh"
 
-    def proc = command.execute([], rootDir)
+    // CWD for Process.execute on Windows under IDEA 2021.1 is under the Gradle cache location
+    // Using project root as the execution dir prevents picking up Git tags (which is strange)!
+    // On macOS Git tags are not picked up unless the execution dir is set
+    // CI builds also work with the execution dir set
+
+    def proc = osName.contains("win")
+            ? command.execute()
+            : command.execute([], rootDir)
+
     def exitCode = proc.waitFor()
 
     if (exitCode != 0)
