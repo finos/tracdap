@@ -132,6 +132,7 @@ public class GrpcWebProxy extends Http2ChannelDuplexHandler {
             var grpcContentType = contentType.toString().replace("grpc-web", "grpc");
             headersFrame.headers().remove("content-type");
             headersFrame.headers().add("content-type", grpcContentType);
+            headersFrame.headers().add("te", "trailers");
         }
 
         return headersFrame;
