@@ -10,7 +10,7 @@
   "licenses": [
     {
       "type": "Apache-2.0",
-      "url": "http://www.apache.org/licenses/LICENSE-2.0"
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
     }
   ],
   "files": [
@@ -18,9 +18,8 @@
   ],
   "main": "trac.js",
   "dependencies": {
-    "google-protobuf": "^3.15.7",
     "grpc-web": "^1.2.1",
-    "protobufjs": "~6.10.1"
+    "protobufjs": "^6.11.2"
   },
   "devDependencies": {
     "adm-zip": "^0.5.5",
@@ -32,7 +31,7 @@
   "scripts": {
     "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
     "tracVersion:posix": "npm version `../../../dev/version.sh`",
-    "protoc:download": "node call-protoc.js --download",
-    "protoc:generate": "node call-protoc.js --generate"
+    "pbjs": "node call-pbjs.js",
+    "pbts": "pbts -o trac.d.ts trac.js"
   }
 }

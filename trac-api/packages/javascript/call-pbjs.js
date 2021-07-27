@@ -26,7 +26,7 @@ const packages = {
 
 const args = [
     "--target", "static-module",
-    "--wrap", "default",  // commonjs + amd
+    "--wrap", "./wrapper.js",  // commonjs + amd
     "--root", "trac",
     "--force-number",
     "--path", './build',
