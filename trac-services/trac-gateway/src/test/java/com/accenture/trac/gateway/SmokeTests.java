@@ -28,11 +28,149 @@ import java.nio.file.Paths;
 import java.util.stream.Collectors;
 
 import io.grpc.ManagedChannelBuilder;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
 
-public class BasicTest {
+public class SmokeTests {
+
+    @Test
+    void http1SimpleProxy_ok() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void http1SimpleProxy_redirect() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void http1SimpleProxy_404() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void http1SimpleProxy_serverDown() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void http1SimpleProxy_serverTimeout() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void http2SimpleProxy_ok() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void http2SimpleProxy_redirect() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void http2SimpleProxy_404() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void http2SimpleProxy_serverDown() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void http2SimpleProxy_serverTimeout() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void grpcProxy_ok() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void grpcProxy_inBandError() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void grpcProxy_outOfBandError() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void grpcProxy_serverDown() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void grpcWebProxy_ok() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void grpcWebProxy_inBandError() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void grpcWebProxy_outOfBandError() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void grpcWebProxy_serverDown() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void restApi_ok() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void restApi_inBandError() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void restApi_404() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void restApi_translationFailed() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void restApi_serverDown() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void routingError_noMatch() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void routingError_wrongContentType() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void routingError_wrongHttpVersion() throws Exception {
+        Assertions.fail();
+    }
+
+    @Test
+    void configHandling() throws Exception {
+        Assertions.fail();
+    }
+
+
 
     @Test
     void basicTest() throws Exception {
