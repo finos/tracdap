@@ -16,6 +16,7 @@
 
 package com.accenture.trac.gateway;
 
+import com.accenture.trac.common.config.ConfigBootstrap;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.config.StandardArgsProcessor;
 import com.accenture.trac.common.exception.EStartup;
@@ -238,22 +239,8 @@ public class TracPlatformGateway {
 
         try {
 
-            var componentName = VersionInfo.getComponentName(TracPlatformGateway.class);
-            var componentVersion = VersionInfo.getComponentVersion(TracPlatformGateway.class);
-            var startupBanner = String.format(">>> %s %s", componentName, componentVersion);
-            System.out.println(startupBanner);
-
-            var standardArgs = StandardArgsProcessor.processArgs(componentName, args);
-
-            System.out.println(">>> Working directory: " + standardArgs.getWorkingDir());
-            System.out.println(">>> Config file: " + standardArgs.getConfigFile());
-            System.out.println();
-
-            var configManager = new ConfigManager(standardArgs);
-            configManager.initConfigPlugins();
-            configManager.initLogging();
-
-            var gateway = new TracPlatformGateway(configManager);
+            var config = ConfigBootstrap.useCommandLine(TracPlatformGateway.class, args);
+            var gateway = new TracPlatformGateway(config);
             gateway.start();
             gateway.blockUntilShutdown();
 

@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.meta;
 
+import com.accenture.trac.common.config.ConfigBootstrap;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.config.StandardArgsProcessor;
 import com.accenture.trac.common.db.JdbcSetup;
@@ -277,22 +278,8 @@ public class TracMetadataService {
 
         try {
 
-            var componentName = VersionInfo.getComponentName(TracMetadataService.class);
-            var componentVersion = VersionInfo.getComponentVersion(TracMetadataService.class);
-            var startupBanner = String.format(">>> %s %s", componentName, componentVersion);
-            System.out.println(startupBanner);
-
-            var standardArgs = StandardArgsProcessor.processArgs(componentName, args);
-
-            System.out.println(">>> Working directory: " + standardArgs.getWorkingDir());
-            System.out.println(">>> Config file: " + standardArgs.getConfigFile());
-            System.out.println();
-
-            var configManager = new ConfigManager(standardArgs);
-            configManager.initConfigPlugins();
-            configManager.initLogging();
-
-            var service = new TracMetadataService(configManager);
+            var config = ConfigBootstrap.useCommandLine(TracMetadataService.class, args);
+            var service = new TracMetadataService(config);
             service.start();
             service.blockUntilShutdown();
 
