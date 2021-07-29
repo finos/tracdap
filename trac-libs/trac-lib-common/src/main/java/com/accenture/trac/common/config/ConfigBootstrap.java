@@ -18,18 +18,53 @@ package com.accenture.trac.common.config;
 
 import com.accenture.trac.common.util.VersionInfo;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 
 public class ConfigBootstrap {
 
     public static ConfigManager useCommandLine(Class<?> serviceClass, String[] args) {
+
+        printBanner(serviceClass);
+
+        var componentName = VersionInfo.getComponentName(serviceClass);
+        var standardArgs = StandardArgsProcessor.processArgs(componentName, args);
+
+        return loadConfig(standardArgs);
+    }
+
+    public static ConfigManager useConfigFile(Class<?> serviceClass, String configFile) {
+
+        var keystoreKey = "";
+        return useConfigFile(serviceClass, configFile, keystoreKey);
+    }
+
+    public static ConfigManager useConfigFile(Class<?> serviceClass, String configFile, String keystoreKey) {
+
+        var workingDir = Paths.get(".").normalize();
+        return useConfigFile(serviceClass, workingDir, configFile, keystoreKey);
+    }
+
+    public static ConfigManager useConfigFile(Class<?> serviceClass, Path workingDir, String configFile, String keystoreKey) {
+
+        printBanner(serviceClass);
+
+        var standardArgs = new StandardArgs(workingDir, configFile, keystoreKey);
+
+        return loadConfig(standardArgs);
+    }
+
+    private static void printBanner(Class<?> serviceClass) {
 
         var componentName = VersionInfo.getComponentName(serviceClass);
         var componentVersion = VersionInfo.getComponentVersion(serviceClass);
 
         var startupBanner = String.format(">>> %s %s", componentName, componentVersion);
         System.out.println(startupBanner);
+    }
 
-        var standardArgs = StandardArgsProcessor.processArgs(componentName, args);
+    private static ConfigManager loadConfig(StandardArgs standardArgs) {
 
         System.out.println(">>> Working directory: " + standardArgs.getWorkingDir());
         System.out.println(">>> Config file: " + standardArgs.getConfigFile());
