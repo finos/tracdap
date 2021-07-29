@@ -56,13 +56,15 @@ public class Http1Server {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final int port;
+    private final Path contentRoot;
 
     EventLoopGroup bossGroup;
     EventLoopGroup workerGroup;
     private ChannelFuture serverChannel;
 
-    public Http1Server(int port) {
+    public Http1Server(int port, Path contentRoot) {
         this.port = port;
+        this.contentRoot = contentRoot;
     }
 
     public void run() throws Exception {
@@ -123,8 +125,6 @@ public class Http1Server {
     }
 
     private class Http1Handler extends SimpleChannelInboundHandler<HttpObject> {
-
-        private final Path contentRoot = Path.of("C:\\dev\\code\\trac\\doc");
 
         private HttpRequest request;
         //private HttpContent content;

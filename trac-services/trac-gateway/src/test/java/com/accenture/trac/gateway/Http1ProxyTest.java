@@ -19,6 +19,7 @@ package com.accenture.trac.gateway;
 import com.accenture.trac.common.config.ConfigBootstrap;
 
 import io.netty.handler.codec.http.*;
+import org.apache.logging.log4j.core.config.Configurator;
 import org.junit.jupiter.api.*;
 
 import org.slf4j.Logger;
@@ -26,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import static io.netty.util.NetUtil.LOCALHOST;
@@ -42,6 +44,7 @@ public class Http1ProxyTest {
     private static final short TEST_GW_PORT = 8080;
     private static final long TEST_TIMEOUT = 1000;
 
+    private static Path rootDir;
     private static final int svrPort = 8090;
     private static Http1Server svr;
     private static TracPlatformGateway gateway;
@@ -49,10 +52,29 @@ public class Http1ProxyTest {
     @BeforeAll
     public static void setupServer() throws Exception {
 
-        svr = new Http1Server(svrPort);
+        // Gradle sometimes runs tests out of the sub-project folder instead of the root
+        // Find the top level root dir, we need it as a base for content, config files etc.
+
+        var cwd = Paths.get(".").toAbsolutePath().normalize();
+        rootDir = cwd.endsWith("trac-gateway")
+                ? Paths.get("../..").toAbsolutePath().normalize()
+                : cwd;
+
+        var svrContentDir = rootDir.resolve("doc");
+        var testFile = rootDir.resolve(TEST_FILE_LOCAL_PATH);
+
+        Assertions.assertTrue(
+                Files.exists(testFile),
+                "HTTP/1 proxy test must be run from the source root folder");
+
+        // Start up our test server to use as a target
+
+        svr = new Http1Server(svrPort, svrContentDir);
         svr.run();
 
-        var config = ConfigBootstrap.useConfigFile(TracPlatformGateway.class, HTTP1_PROXY_TEST_CONFIG);
+        // Start the gateway
+
+        var config = ConfigBootstrap.useConfigFile(TracPlatformGateway.class, rootDir, HTTP1_PROXY_TEST_CONFIG, "");
         gateway = new TracPlatformGateway(config);
         gateway.start();
     }
@@ -66,22 +88,6 @@ public class Http1ProxyTest {
         if (svr != null)
             svr.shutdown();
     }
-
-    @BeforeEach
-    public void checkRootDir() {
-
-        var workingDir = Paths.get(".").toAbsolutePath().normalize();
-        var testFile = workingDir.resolve(TEST_FILE_LOCAL_PATH);
-
-        log.error(testFile.toString());
-
-        // We use the relative path doc/ to serve static content
-        // If needed, we could try to figure out the CWD and use paths relative to that instead
-        Assertions.assertTrue(
-                Files.exists(testFile),
-                "HTTP/1 proxy test must be run from the source root folder");
-    }
-
 
 //
 //    @Test
@@ -111,7 +117,7 @@ public class Http1ProxyTest {
         var response = request.getNow();
         var contentLength = response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH);
 
-        var fsPath = Paths.get(TEST_FILE_LOCAL_PATH);
+        var fsPath = rootDir.resolve(TEST_FILE_LOCAL_PATH);
         var fsLength = Files.size(fsPath);
 
         Assertions.assertEquals(HttpResponseStatus.OK, response.status());
@@ -132,7 +138,7 @@ public class Http1ProxyTest {
         var contentLength = response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH);
         var content = response.content().readCharSequence(contentLength, StandardCharsets.UTF_8);
 
-        var fsPath = Paths.get(TEST_FILE_LOCAL_PATH);
+        var fsPath = rootDir.resolve(TEST_FILE_LOCAL_PATH);
         var fsLength = Files.size(fsPath);
         var fsContent = Files.readString(fsPath, StandardCharsets.UTF_8);
 
