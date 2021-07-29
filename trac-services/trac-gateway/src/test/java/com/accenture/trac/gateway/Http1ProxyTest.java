@@ -39,11 +39,12 @@ public class Http1ProxyTest {
 
     private static final String TEST_FILE_REMOTE_PATH = "/design_principals.md";
     private static final String TEST_FILE_LOCAL_PATH = "doc/design_principals.md";
-    private static final short TEST_GW_PORT = 9090;
+    private static final short TEST_GW_PORT = 8080;
     private static final long TEST_TIMEOUT = 1000;
 
-    private static final int svrPort = 9090;
+    private static final int svrPort = 8090;
     private static Http1Server svr;
+    private static TracPlatformGateway gateway;
 
     @BeforeAll
     public static void setupServer() throws Exception {
@@ -56,10 +57,17 @@ public class Http1ProxyTest {
 
         svr = new Http1Server(svrPort);
         svr.run();
+
+        var config = ConfigBootstrap.useConfigFile(TracPlatformGateway.class, HTTP1_PROXY_TEST_CONFIG);
+        gateway = new TracPlatformGateway(config);
+        gateway.start();
     }
 
     @AfterAll
     public static void tearDownServer() throws Exception {
+
+        if (gateway != null)
+            gateway.stop();
 
         if (svr != null)
             svr.shutdown();
