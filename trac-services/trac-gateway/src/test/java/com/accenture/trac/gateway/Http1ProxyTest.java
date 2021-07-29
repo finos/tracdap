@@ -49,10 +49,13 @@ public class Http1ProxyTest {
     @BeforeAll
     public static void setupServer() throws Exception {
 
+        var workingDir = Paths.get(".").toAbsolutePath().normalize();
+        var testFile = workingDir.resolve(TEST_FILE_LOCAL_PATH);
+
         // We use the relative path doc/ to serve static content
         // If needed, we could try to figure out the CWD and use paths relative to that instead
         Assertions.assertTrue(
-                Files.exists(Paths.get(TEST_FILE_LOCAL_PATH)),
+                Files.exists(testFile),
                 "HTTP/1 proxy test must be run from the source root folder");
 
         svr = new Http1Server(svrPort);
