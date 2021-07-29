@@ -25,6 +25,11 @@ jobs:
     - name: Build
       run: ./gradlew build -x test
 
+    - name: Path info
+      run: |
+        echo $PATH
+        ls -la
+
     - name: Unit Tests
       run: ./gradlew test
       working-directory: ./
