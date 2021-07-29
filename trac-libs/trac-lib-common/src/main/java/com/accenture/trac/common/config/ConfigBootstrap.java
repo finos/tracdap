@@ -42,7 +42,7 @@ public class ConfigBootstrap {
 
     public static ConfigManager useConfigFile(Class<?> serviceClass, String configFile, String keystoreKey) {
 
-        var workingDir = Paths.get(".").normalize();
+        var workingDir = Paths.get(".").toAbsolutePath().normalize();
         return useConfigFile(serviceClass, workingDir, configFile, keystoreKey);
     }
 
