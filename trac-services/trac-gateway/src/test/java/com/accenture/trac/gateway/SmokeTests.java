@@ -29,179 +29,174 @@ import java.util.stream.Collectors;
 
 import io.grpc.ManagedChannelBuilder;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
 
+
 public class SmokeTests {
 
-    @Test
-    void http1SimpleProxy_ok() throws Exception {
-        Assertions.fail();
-    }
+//    @Test
+//    void http1SimpleProxy_get() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void http1SimpleProxy_post() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void http1SimpleProxy_head() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void http1SimpleProxy_redirect() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void http1SimpleProxy_404() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void http1SimpleProxy_serverDown() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void http1SimpleProxy_serverTimeout() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void http2SimpleProxy_get() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void http2SimpleProxy_post() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void http2SimpleProxy_head() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void http2SimpleProxy_redirect() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void http2SimpleProxy_404() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void http2SimpleProxy_serverDown() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void http2SimpleProxy_serverTimeout() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void grpcProxy_ok() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void grpcProxy_inBandError() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void grpcProxy_outOfBandError() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void grpcProxy_serverDown() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void grpcWebProxy_ok() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void grpcWebProxy_inBandError() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void grpcWebProxy_outOfBandError() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void grpcWebProxy_serverDown() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void restApi_ok() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void restApi_inBandError() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void restApi_404() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void restApi_translationFailed() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void restApi_serverDown() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void routingError_noMatch() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void routingError_wrongContentType() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void routingError_wrongHttpVersion() throws Exception {
+//        Assertions.fail();
+//    }
+//
+//    @Test
+//    void configHandling() throws Exception {
+//        Assertions.fail();
+//    }
 
-    @Test
-    void http1SimpleProxy_redirect() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void http1SimpleProxy_404() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void http1SimpleProxy_serverDown() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void http1SimpleProxy_serverTimeout() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void http2SimpleProxy_ok() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void http2SimpleProxy_redirect() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void http2SimpleProxy_404() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void http2SimpleProxy_serverDown() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void http2SimpleProxy_serverTimeout() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void grpcProxy_ok() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void grpcProxy_inBandError() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void grpcProxy_outOfBandError() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void grpcProxy_serverDown() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void grpcWebProxy_ok() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void grpcWebProxy_inBandError() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void grpcWebProxy_outOfBandError() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void grpcWebProxy_serverDown() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void restApi_ok() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void restApi_inBandError() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void restApi_404() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void restApi_translationFailed() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void restApi_serverDown() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void routingError_noMatch() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void routingError_wrongContentType() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void routingError_wrongHttpVersion() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void configHandling() throws Exception {
-        Assertions.fail();
-    }
 
 
 
-    @Test
-    void basicTest() throws Exception {
-
-        var args = new StandardArgs(Paths.get("."), "etc/trac-devlocal-gw.properties", "");
-        var config = new ConfigManager(args);
-        config.initConfigPlugins();
-        config.initLogging();
-
-        var gw = new TracPlatformGateway(config);
-
-        var log = LoggerFactory.getLogger(this.getClass());
-        log.info("Before run");
-
-        gw.start();
-        var testUrl = new URL("http", "localhost", 8080, "/");
-
-        try(var stream = testUrl.openStream(); var reader = new BufferedReader(new InputStreamReader(stream))) {
-
-            var data = reader
-                    .lines()
-                    .collect(Collectors.joining("\n"));
-        }
-        finally {
-
-            gw.stop();
-        }
-    }
-
-    @Test
-    void basicTest2() throws Exception {
+    @Test @Disabled
+    void grpcSmokeTest() throws Exception {
 
         var args = new StandardArgs(Paths.get("."), "etc/trac-devlocal-gw.properties", "");
         var config = new ConfigManager(args);
