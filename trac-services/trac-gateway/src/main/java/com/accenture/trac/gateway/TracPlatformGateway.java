@@ -18,9 +18,12 @@ package com.accenture.trac.gateway;
 
 import com.accenture.trac.common.config.ConfigBootstrap;
 import com.accenture.trac.common.config.ConfigManager;
-import com.accenture.trac.common.config.StandardArgsProcessor;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.util.VersionInfo;
+import com.accenture.trac.gateway.config.MatchConfig;
+import com.accenture.trac.gateway.config.RouteConfig;
+import com.accenture.trac.gateway.config.RouteType;
+import com.accenture.trac.gateway.config.TargetConfig;
 import com.accenture.trac.gateway.routing.*;
 
 import io.netty.bootstrap.ServerBootstrap;
@@ -35,6 +38,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -70,6 +74,29 @@ public class TracPlatformGateway {
         this.configManager = configManager;
     }
 
+    private List<RouteConfig> getRouteConfigs() {
+
+        var metaApiRoute = new RouteConfig();
+        metaApiRoute.setRouteName("TRAC Metadata API");
+        metaApiRoute.setRouteType(RouteType.GRPC);
+        metaApiRoute.setMatch(new MatchConfig());
+        metaApiRoute.getMatch().setPath("^/trac.api.TracMetadataApi/.+");
+        metaApiRoute.setTarget(new TargetConfig());
+        metaApiRoute.getTarget().setHost("localhost");
+        metaApiRoute.getTarget().setPort((short) 8081);
+
+        var defaultRoute = new RouteConfig();
+        defaultRoute.setRouteName("Default route");
+        defaultRoute.setRouteType(RouteType.HTTP);
+        defaultRoute.setMatch(new MatchConfig());
+        defaultRoute.getMatch().setPath("^/.*");
+        defaultRoute.setTarget(new TargetConfig());
+        defaultRoute.getTarget().setHost("localhost");
+        defaultRoute.getTarget().setPort((short) 8090);
+
+        return List.of(metaApiRoute, defaultRoute);
+    }
+
     public void start() throws Exception {
 
         var componentName = VersionInfo.getComponentName(TracPlatformGateway.class);
@@ -81,6 +108,7 @@ public class TracPlatformGateway {
         var gwPort = readConfigInt(properties, GW_PORT_CONFIG_KEY, null);
         var metaSvcHost = readConfigString(properties, META_SVC_HOST_CONFIG_KEY, null);
         var metaSvcPort = readConfigInt(properties, META_SVC_PORT_CONFIG_KEY, null);
+        var routeConfigs = getRouteConfigs();
 
         log.info("Configuring API routes...");
 
@@ -97,8 +125,8 @@ public class TracPlatformGateway {
         EventLoopGroup workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
 
         var protocolNegotiator = new HttpProtocolNegotiator(
-                Http1Router::new,
-                Http2Router::new);
+                () -> new Http1Router(routeConfigs),
+                () -> new Http2Router(routeConfigs));
 
 //        try {
             ServerBootstrap bootstrap = new ServerBootstrap()

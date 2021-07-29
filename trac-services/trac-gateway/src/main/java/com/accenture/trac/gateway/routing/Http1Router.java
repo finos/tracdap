@@ -17,6 +17,8 @@
 package com.accenture.trac.gateway.routing;
 
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.gateway.config.RouteConfig;
+import com.accenture.trac.gateway.config.RouteType;
 import com.accenture.trac.gateway.proxy.http.Http1ProxyBuilder;
 import com.accenture.trac.gateway.proxy.grpc.GrpcProxyBuilder;
 
@@ -48,35 +50,46 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
     private long currentOutboundRequest;
     private final Map<Long, RequestState> requests;
 
-    public Http1Router() {
+    public Http1Router(List<RouteConfig> routeConfigs) {
 
         this.clients = new HashMap<>();
         this.requests = new HashMap<>();
         this.routes = new ArrayList<>();
 
-        addHardCodedRoutes();
+        setupRoutes(routeConfigs);
     }
 
-    private void addHardCodedRoutes() {
+    private void setupRoutes(List<RouteConfig> routeConfigs) {
 
-        var metaApiRoute = new Route();
-        metaApiRoute.clientKey = "API: Metadata";
-        metaApiRoute.matcher = (uri, method, headers) -> uri
-                .getPath()
-                .matches("^/trac.api.TracMetadataApi/.+");
-        metaApiRoute.host = "localhost";
-        metaApiRoute.port = 8081;
-        metaApiRoute.initializer = GrpcProxyBuilder::new;
+        log.info("Set up routes for HTTP/1");
 
-        var defaultRoute = new Route();
-        defaultRoute.clientKey = "Static content";
-        defaultRoute.matcher = (uri, method, headers) -> true;;
-        defaultRoute.host = "localhost";
-        defaultRoute.port = 8090;
-        defaultRoute.initializer = Http1ProxyBuilder::new;
+        for (var config : routeConfigs) {
 
-        routes.add(0, metaApiRoute);
-        routes.add(1, defaultRoute);
+            log.info("Adding route {} ({}): {} -> {}:{}",
+                    config.getRouteName(), config.getRouteType(),
+                    config.getMatch().getPath(),
+                    config.getTarget().getHost(), config.getTarget().getPort());
+
+            var route = new Route();
+            route.clientKey = config.getRouteName();
+
+            var matchPath = config.getMatch().getPath();
+            route.matcher = (uri, method, headers) -> uri
+                    .getPath()
+                    .matches(matchPath);
+
+            route.targetHost = config.getTarget().getHost();
+            route.targetPort = config.getTarget().getPort();
+
+            if (config.getRouteType() == RouteType.HTTP)
+                route.initializer = Http1ProxyBuilder::new;
+            else if (config.getRouteType() == RouteType.GRPC)
+                route.initializer = GrpcProxyBuilder::new;
+            else
+                throw new RuntimeException("Invalid route config");  // TODO: Error
+
+            routes.add(route);
+        }
     }
 
     @Override
@@ -218,7 +231,7 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
 
             var channelOpenFuture = bootstrap
                     .handler(channelInit)
-                    .connect(selectedRoute.host, selectedRoute.port);
+                    .connect(selectedRoute.targetHost, selectedRoute.targetPort);
 
             var channelCloseFuture = channelOpenFuture
                     .channel()
@@ -349,8 +362,8 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
         IRouteMatcher matcher;
         String clientKey;
 
-        String host;
-        int port;
+        String targetHost;
+        int targetPort;
         ProxyInitializer initializer;
     }
 
