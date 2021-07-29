@@ -27,6 +27,7 @@ jobs:
 
     - name: Unit Tests
       run: ./gradlew test
+      working-directory: ./
 
   python_runtime:
 
