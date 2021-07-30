@@ -55,6 +55,16 @@ public class ConfigBootstrap {
         return loadConfig(standardArgs);
     }
 
+    public static ConfigManager useConfigFile(String configFile) {
+
+        var workingDir = Paths.get(".").toAbsolutePath().normalize();
+        var keystoreKey = "";
+
+        var standardArgs = new StandardArgs(workingDir, configFile, keystoreKey);
+
+        return loadConfig(standardArgs);
+    }
+
     private static void printBanner(Class<?> serviceClass) {
 
         var componentName = VersionInfo.getComponentName(serviceClass);
