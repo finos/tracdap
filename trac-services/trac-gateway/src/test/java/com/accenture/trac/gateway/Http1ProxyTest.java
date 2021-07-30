@@ -19,7 +19,6 @@ package com.accenture.trac.gateway;
 import com.accenture.trac.common.config.ConfigBootstrap;
 
 import io.netty.handler.codec.http.*;
-import org.apache.logging.log4j.core.config.Configurator;
 import org.junit.jupiter.api.*;
 
 import org.slf4j.Logger;
@@ -37,7 +36,7 @@ public class Http1ProxyTest {
 
     private static final Logger log = LoggerFactory.getLogger(Http1ProxyTest.class);
 
-    private static final String HTTP1_PROXY_TEST_CONFIG = "etc/trac-devlocal-gw.properties";
+    private static final String HTTP1_PROXY_TEST_CONFIG = "/trac-unit-gateway-http1.yaml";
 
     private static final String TEST_FILE_REMOTE_PATH = "/design_principals.md";
     private static final String TEST_FILE_LOCAL_PATH = "doc/design_principals.md";
@@ -74,7 +73,14 @@ public class Http1ProxyTest {
 
         // Start the gateway
 
-        var config = ConfigBootstrap.useConfigFile(TracPlatformGateway.class, rootDir, HTTP1_PROXY_TEST_CONFIG, "");
+        var configFile = Http1ProxyTest.class.getResource(HTTP1_PROXY_TEST_CONFIG);
+        var configPath = Paths.get(".")
+                .toAbsolutePath()
+                .relativize(Paths.get(configFile.toURI()))
+                .toString()
+                .replace("\\", "/");
+
+        var config = ConfigBootstrap.useConfigFile(TracPlatformGateway.class, rootDir, configPath, "");
         gateway = new TracPlatformGateway(config);
         gateway.start();
     }

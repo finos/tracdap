@@ -16,12 +16,26 @@
 
 package com.accenture.trac.gateway.config;
 
-import org.apache.logging.log4j.core.appender.routing.Route;
+import java.util.Map;
 
-import java.util.List;
+public class RootConfig {
 
-public class TracGatewayConfig {
+    private Map<String, Object> config;
+    private TracConfig trac;
 
+    public Map<String, Object> getConfig() {
+        return config;
+    }
 
-    private List<Route> routes;
+    public void setConfig(Map<String, Object> config) {
+        this.config = config;
+    }
+
+    public TracConfig getTrac() {
+        return trac;
+    }
+
+    public void setTrac(TracConfig trac) {
+        this.trac = trac;
+    }
 }

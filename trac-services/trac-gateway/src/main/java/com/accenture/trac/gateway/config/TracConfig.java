@@ -16,43 +16,15 @@
 
 package com.accenture.trac.gateway.config;
 
+public class TracConfig {
 
-public class TargetConfig {
+    private GatewayConfig gateway;
 
-    private String scheme;
-    private String host;
-    private short port;
-    private String path;
-
-    public String getScheme() {
-        return scheme;
+    public GatewayConfig getGateway() {
+        return gateway;
     }
 
-    public void setScheme(String scheme) {
-        this.scheme = scheme;
-    }
-
-    public String getHost() {
-        return host;
-    }
-
-    public void setHost(String host) {
-        this.host = host;
-    }
-
-    public short getPort() {
-        return port;
-    }
-
-    public void setPort(short port) {
-        this.port = port;
-    }
-
-    public String getPath() {
-        return path;
-    }
-
-    public void setPath(String path) {
-        this.path = path;
+    public void setGateway(GatewayConfig gateway) {
+        this.gateway = gateway;
     }
 }

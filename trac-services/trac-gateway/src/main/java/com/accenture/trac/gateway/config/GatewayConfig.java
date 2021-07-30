@@ -16,43 +16,27 @@
 
 package com.accenture.trac.gateway.config;
 
+import java.util.List;
 
-public class TargetConfig {
 
-    private String scheme;
-    private String host;
-    private short port;
-    private String path;
+public class GatewayConfig {
 
-    public String getScheme() {
-        return scheme;
+    private ProxyConfig proxy;
+    private List<RouteConfig> routes;
+
+    public ProxyConfig getProxy() {
+        return proxy;
     }
 
-    public void setScheme(String scheme) {
-        this.scheme = scheme;
+    public void setProxy(ProxyConfig proxy) {
+        this.proxy = proxy;
     }
 
-    public String getHost() {
-        return host;
+    public List<RouteConfig> getRoutes() {
+        return routes;
     }
 
-    public void setHost(String host) {
-        this.host = host;
-    }
-
-    public short getPort() {
-        return port;
-    }
-
-    public void setPort(short port) {
-        this.port = port;
-    }
-
-    public String getPath() {
-        return path;
-    }
-
-    public void setPath(String path) {
-        this.path = path;
+    public void setRoutes(List<RouteConfig> routes) {
+        this.routes = routes;
     }
 }

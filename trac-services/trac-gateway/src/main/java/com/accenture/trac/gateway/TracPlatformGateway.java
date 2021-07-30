@@ -20,10 +20,7 @@ import com.accenture.trac.common.config.ConfigBootstrap;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.util.VersionInfo;
-import com.accenture.trac.gateway.config.MatchConfig;
-import com.accenture.trac.gateway.config.RouteConfig;
-import com.accenture.trac.gateway.config.RouteType;
-import com.accenture.trac.gateway.config.TargetConfig;
+import com.accenture.trac.gateway.config.*;
 import com.accenture.trac.gateway.routing.*;
 
 import io.netty.bootstrap.ServerBootstrap;
@@ -74,29 +71,6 @@ public class TracPlatformGateway {
         this.configManager = configManager;
     }
 
-    private List<RouteConfig> getRouteConfigs() {
-
-        var metaApiRoute = new RouteConfig();
-        metaApiRoute.setRouteName("TRAC Metadata API");
-        metaApiRoute.setRouteType(RouteType.GRPC);
-        metaApiRoute.setMatch(new MatchConfig());
-        metaApiRoute.getMatch().setPath("^/trac.api.TracMetadataApi/.+");
-        metaApiRoute.setTarget(new TargetConfig());
-        metaApiRoute.getTarget().setHost("localhost");
-        metaApiRoute.getTarget().setPort((short) 8081);
-
-        var defaultRoute = new RouteConfig();
-        defaultRoute.setRouteName("Default route");
-        defaultRoute.setRouteType(RouteType.HTTP);
-        defaultRoute.setMatch(new MatchConfig());
-        defaultRoute.getMatch().setPath("^/.*");
-        defaultRoute.setTarget(new TargetConfig());
-        defaultRoute.getTarget().setHost("localhost");
-        defaultRoute.getTarget().setPort((short) 8090);
-
-        return List.of(metaApiRoute, defaultRoute);
-    }
-
     public void start() throws Exception {
 
         var componentName = VersionInfo.getComponentName(TracPlatformGateway.class);
@@ -104,22 +78,23 @@ public class TracPlatformGateway {
         log.info("{} {}", componentName, componentVersion);
         log.info("Gateway is starting...");
 
-        var properties = configManager.loadRootProperties();
-        var gwPort = readConfigInt(properties, GW_PORT_CONFIG_KEY, null);
-        var metaSvcHost = readConfigString(properties, META_SVC_HOST_CONFIG_KEY, null);
-        var metaSvcPort = readConfigInt(properties, META_SVC_PORT_CONFIG_KEY, null);
-        var routeConfigs = getRouteConfigs();
+        var rootConfig = configManager.loadRootConfig(RootConfig.class);
+        var gatewayConfig = rootConfig.getTrac().getGateway();
 
-        log.info("Configuring API routes...");
+        var proxyPort = gatewayConfig.getProxy().getPort();
+        var routeConfigs = gatewayConfig.getRoutes();
 
-        var metaApiRoutes = TracApiConfig.metaApiRoutes(metaSvcHost, metaSvcPort);
-        var metaApiTrustedRoutes = TracApiConfig.metaApiTrustedRoutes(metaSvcHost, metaSvcPort);
+        // log.info("Configuring API routes...");
 
-        var routingConfig = RoutingConfig.newBlankConfig()
-                .addRoute(new BasicRouteMatcher("trac-meta"), () -> new RoutingHandler(metaApiRoutes))
-                .addRoute(new BasicRouteMatcher("trac-meta-trusted"), () -> new RoutingHandler(metaApiTrustedRoutes));
+//        var metaSvcHost = readConfigString(properties, META_SVC_HOST_CONFIG_KEY, null);
+//        var metaSvcPort = readConfigInt(properties, META_SVC_PORT_CONFIG_KEY, null);
+//        var metaApiRoutes = TracApiConfig.metaApiRoutes(metaSvcHost, metaSvcPort);
+//        var metaApiTrustedRoutes = TracApiConfig.metaApiTrustedRoutes(metaSvcHost, metaSvcPort);
+//        var routingConfig = RoutingConfig.newBlankConfig()
+//                .addRoute(new BasicRouteMatcher("trac-meta"), () -> new RoutingHandler(metaApiRoutes))
+//                .addRoute(new BasicRouteMatcher("trac-meta-trusted"), () -> new RoutingHandler(metaApiTrustedRoutes));
 
-        log.info("Opening gateway on port {}...", gwPort);
+        log.info("Opening gateway on port {}...", proxyPort);
 
         EventLoopGroup bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
         EventLoopGroup workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
@@ -142,7 +117,7 @@ public class TracPlatformGateway {
 
             // Bind and start to accept incoming connections.
             serverChannel = bootstrap
-                    .bind(gwPort)
+                    .bind(proxyPort)
                     .sync()
                     .channel();
 

@@ -16,29 +16,9 @@
 
 package com.accenture.trac.gateway.config;
 
+public class ProxyConfig {
 
-public class TargetConfig {
-
-    private String scheme;
-    private String host;
     private short port;
-    private String path;
-
-    public String getScheme() {
-        return scheme;
-    }
-
-    public void setScheme(String scheme) {
-        this.scheme = scheme;
-    }
-
-    public String getHost() {
-        return host;
-    }
-
-    public void setHost(String host) {
-        this.host = host;
-    }
 
     public short getPort() {
         return port;
@@ -46,13 +26,5 @@ public class TargetConfig {
 
     public void setPort(short port) {
         this.port = port;
-    }
-
-    public String getPath() {
-        return path;
-    }
-
-    public void setPath(String path) {
-        this.path = path;
     }
 }
