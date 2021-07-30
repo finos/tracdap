@@ -39,15 +39,18 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final RouteConfig routeConfig;
+    private final int sourceHttpVersion;
     private final ChannelHandlerContext routerCtx;
     private final ChannelPromise routeActivePromise;
 
     public GrpcProxyBuilder(
             RouteConfig routeConfig,
+            int sourceHttpVersion,
             ChannelHandlerContext routerCtx,
             ChannelPromise routeActivePromise) {
 
         this.routeConfig = routeConfig;
+        this.sourceHttpVersion = sourceHttpVersion;
         this.routerCtx = routerCtx;
         this.routeActivePromise = routeActivePromise;
     }
@@ -76,15 +79,15 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
         pipeline.addLast(GRPC_PROXY_HANDLER, new GrpcProxy());
         pipeline.addLast(GRPC_WEB_PROXY_HANDLER, new GrpcWebProxy());
 
-        if (true /* HTTP 1 */) {
+        if (sourceHttpVersion == 1) {
 
             pipeline.addLast(HTTP_1_TO_2_FRAMING, new Http1to2Framing());
             pipeline.addLast(HTTP_1_ROUTER_LINK, new Http1RouterLink(routerCtx, routeActivePromise));
         }
-//        else if (false /* HTTP 2 */) {
-//
-//            pipeline.addLast(new Http2Sequencer(outerCtx, routeActivePromise));
-//        }
+        else if (sourceHttpVersion == 2) {
+
+            throw new RuntimeException("HTTP/2 source connection for REST not implemented yet");
+        }
         else
             throw new EUnexpected();
     }

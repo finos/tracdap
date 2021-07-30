@@ -22,8 +22,10 @@ import com.accenture.trac.gateway.config.RouteType;
 import com.accenture.trac.gateway.proxy.http.Http1ProxyBuilder;
 import com.accenture.trac.gateway.proxy.grpc.GrpcProxyBuilder;
 
+import com.accenture.trac.gateway.proxy.rest.RestApiProxyBuilder;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
+import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.util.concurrent.Future;
@@ -33,10 +35,11 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Pattern;
 
 
 public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
+
+    private static final int SOURCE_IS_HTTP_1 = 1;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -47,9 +50,9 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
     private final Map<String, ClientState> clients;
     private final List<Route> routes;
 
+    private final Map<Long, RequestState> requests;
     private long currentInboundRequest;
     private long currentOutboundRequest;
-    private final Map<Long, RequestState> requests;
 
     public Http1Router(List<RouteConfig> routeConfigs) {
 
@@ -82,14 +85,28 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
                     .getPath()
                     .startsWith(matchPath);
 
-            if (config.getRouteType() == RouteType.HTTP)
-                route.initializer = Http1ProxyBuilder::new;
-            else if (config.getRouteType() == RouteType.GRPC)
-                route.initializer = GrpcProxyBuilder::new;
-            else
-                throw new RuntimeException("Invalid route config");  // TODO: Error
-
             routes.add(route);
+        }
+    }
+
+    private ChannelInitializer<Channel> proxyInitializerForRoute(
+            RouteConfig routeConfig,
+            ChannelHandlerContext routerCtx,
+            ChannelPromise routeActivePromise) {
+
+        switch (routeConfig.getRouteType()) {
+
+            case HTTP:
+                return new Http1ProxyBuilder(routeConfig, routerCtx, routeActivePromise);
+
+            case GRPC:
+                return new GrpcProxyBuilder(routeConfig, SOURCE_IS_HTTP_1, routerCtx, routeActivePromise);
+
+            case REST:
+                return new RestApiProxyBuilder(routeConfig, SOURCE_IS_HTTP_1, routerCtx, routeActivePromise);
+
+            default:
+                throw new EUnexpected();
         }
     }
 
@@ -221,34 +238,8 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
         if (existingClient == null)
             clients.put(request.clientKey, client);
 
-        if (client.channel == null) {
-
-            var channelActiveFuture = ctx.newPromise();
-            var channelInactiveFuture = ctx.newPromise();
-
-            var channelInit = selectedRoute
-                    .initializer
-                    .makeInitializer(selectedRoute.config, ctx, channelActiveFuture);
-
-            var channelOpenFuture = bootstrap
-                    .handler(channelInit)
-                    .connect(selectedRoute.targetHost, selectedRoute.targetPort);
-
-            var channelCloseFuture = channelOpenFuture
-                    .channel()
-                    .closeFuture();
-
-            channelOpenFuture.addListener(future -> proxyChannelOpen(ctx, client, future));
-            channelCloseFuture.addListener(future -> proxyChannelClosed(ctx, client, future));
-            channelActiveFuture.addListener(future -> proxyChannelActive(ctx, client, future));
-            channelInactiveFuture.addListener(future -> proxyChannelInactive(ctx, client, future));
-
-            client.channel = channelOpenFuture.channel();
-            client.channelOpenFuture = channelOpenFuture;
-            client.channelCloseFuture = channelCloseFuture;
-            client.channelActiveFuture = channelActiveFuture;
-            client.channelInactiveFuture = channelInactiveFuture;
-        }
+        if (client.channel == null)
+            openProxyChannel(client, selectedRoute, ctx);
 
         if (client.channel.isActive())
             client.channel.write(msg);
@@ -290,6 +281,41 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
 
         if (client.channel.isActive())
             client.channel.flush();
+    }
+
+    private void openProxyChannel(ClientState clientState, Route route, ChannelHandlerContext ctx) {
+
+        var channelActiveFuture = ctx.newPromise();
+        var channelInactiveFuture = ctx.newPromise();
+
+        clientState.channelActiveFuture = channelActiveFuture;
+        clientState.channelInactiveFuture = channelInactiveFuture;
+
+        var channelInit = proxyInitializerForRoute(
+                route.config,
+                ctx, channelActiveFuture);
+
+        if (route.config.getRouteType() == RouteType.REST) {
+
+            clientState.channel = new EmbeddedChannel(channelInit);
+            clientState.channelOpenFuture = clientState.channel.newSucceededFuture();
+            clientState.channelCloseFuture = clientState.channel.closeFuture();
+        }
+
+        else {
+
+            clientState.channelOpenFuture = bootstrap
+                    .handler(channelInit)
+                    .connect(route.targetHost, route.targetPort);
+
+            clientState.channel = clientState.channelOpenFuture.channel();
+            clientState.channelCloseFuture = clientState.channel.closeFuture();
+        }
+
+        clientState.channelOpenFuture.addListener(future -> proxyChannelOpen(ctx, clientState, future));
+        clientState.channelCloseFuture.addListener(future -> proxyChannelClosed(ctx, clientState, future));
+        clientState.channelActiveFuture.addListener(future -> proxyChannelActive(ctx, clientState, future));
+        clientState.channelInactiveFuture.addListener(future -> proxyChannelInactive(ctx, clientState, future));
     }
 
     private void proxyChannelOpen(ChannelHandlerContext ctx, ClientState client, Future<?> future) {
@@ -367,15 +393,5 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
         int targetPort;
 
         IRouteMatcher matcher;
-        ProxyInitializer initializer;
-    }
-
-    @FunctionalInterface
-    private interface ProxyInitializer {
-
-        ChannelInitializer<Channel> makeInitializer(
-                RouteConfig routeConfig,
-                ChannelHandlerContext routerCtx,
-                ChannelPromise routeActivePromise);
     }
 }

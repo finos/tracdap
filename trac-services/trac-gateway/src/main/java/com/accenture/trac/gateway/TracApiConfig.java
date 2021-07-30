@@ -19,10 +19,10 @@ package com.accenture.trac.gateway;
 import com.accenture.trac.api.*;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.metadata.search.SearchParameters;
-import com.accenture.trac.gateway.proxy.RestApiRequestBuilder;
-import com.accenture.trac.gateway.proxy.RestApiRouteMatcher;
-import com.accenture.trac.gateway.proxy.RestApiUnaryHandler;
-import com.accenture.trac.gateway.routing.RoutingConfig;
+import com.accenture.trac.gateway.proxy.rest.RestApiRequestBuilder;
+import com.accenture.trac.gateway.proxy.rest.RestApiRouteMatcher;
+import com.accenture.trac.gateway.proxy.rest.RestApiUnaryHandler;
+import com.accenture.trac.gateway.proxy.rest.RoutingConfig;
 
 import com.google.protobuf.Message;
 import io.grpc.MethodDescriptor;

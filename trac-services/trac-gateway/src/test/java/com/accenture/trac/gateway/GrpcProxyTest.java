@@ -14,10 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.gateway.config;
+package com.accenture.trac.gateway;
 
-public enum RouteType {
-    HTTP,
-    GRPC,
-    REST
+public class GrpcProxyTest {
 }

@@ -34,6 +34,32 @@ trac:
 
     routes:
 
+      - routeName: TRAC Metadata Service
+        routeType: GRPC
+
+        match:
+          host: localhost
+          path: /trac.api.TracMetadataApi/.*
+
+        target:
+          scheme: http
+          host: localhost
+          port: 8081
+          path: /trac.api.TracMetadataApi/
+
+      - routeName: TRAC Metadata API Mapping
+        routeType: REST
+
+        match:
+          host: localhost
+          path: /trac-meta/
+
+        target:
+          scheme: http
+          host: localhost
+          port: 8081
+          path: /trac.api.TracMetadataApi/
+
       # This route can be used to run a local development environment against the TRAC APIs
 
       - routeName: Local App
