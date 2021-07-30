@@ -41,7 +41,7 @@ trac:
 
         match:
           host: localhost
-          path: /.*
+          path: /static/docs/
 
         target:
           scheme: http
@@ -49,28 +49,28 @@ trac:
           port: 8090
           path: /
 
-#      - routeName: Server timeout
-#        routeType: HTTP
-#
-#        match:
-#          host: localhost
-#          path: /static/server_timeout/.*
-#
-#        target:
-#          scheme: http
-#          host: localhost
-#          port: 8091
-#          path: /
-#
-#      - routeName: Server down
-#        routeType: HTTP
-#
-#        match:
-#          host: localhost
-#          path: /static/server_down/.*
-#
-#        target:
-#          scheme: http
-#          host: localhost
-#          port: 8092
-#          path: /
+      - routeName: Server timeout
+        routeType: HTTP
+
+        match:
+          host: localhost
+          path: /static/server_timeout/
+
+        target:
+          scheme: http
+          host: localhost
+          port: 8091
+          path: /
+
+      - routeName: Server down
+        routeType: HTTP
+
+        match:
+          host: localhost
+          path: /static/server_down/
+
+        target:
+          scheme: http
+          host: localhost
+          port: 8092
+          path: /

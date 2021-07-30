@@ -16,6 +16,7 @@
 
 package com.accenture.trac.gateway.proxy.http;
 
+import com.accenture.trac.gateway.config.RouteConfig;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -29,10 +30,16 @@ public class Http1ProxyBuilder extends ChannelInitializer<Channel> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final RouteConfig routeConfig;
     private final ChannelHandlerContext routerCtx;
     private final ChannelPromise routeActivePromise;
 
-    public Http1ProxyBuilder(ChannelHandlerContext routerCtx, ChannelPromise routeActivePromise) {
+    public Http1ProxyBuilder(
+            RouteConfig routeConfig,
+            ChannelHandlerContext routerCtx,
+            ChannelPromise routeActivePromise) {
+
+        this.routeConfig = routeConfig;
         this.routerCtx = routerCtx;
         this.routeActivePromise = routeActivePromise;
     }
@@ -44,7 +51,7 @@ public class Http1ProxyBuilder extends ChannelInitializer<Channel> {
 
         var pipeline = channel.pipeline();
         pipeline.addLast(new HttpClientCodec());
-        pipeline.addLast(new Http1Proxy());
+        pipeline.addLast(new Http1Proxy(routeConfig));
         pipeline.addLast(new Http1RouterLink(routerCtx, routeActivePromise));
     }
 }

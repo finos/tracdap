@@ -17,15 +17,25 @@
 package com.accenture.trac.gateway.proxy.http;
 
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.gateway.config.RouteConfig;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.*;
+
+import java.net.URI;
+import java.util.regex.Pattern;
 
 
 public class Http1Proxy extends ChannelDuplexHandler {
+
+    private final RouteConfig routeConfig;
+    private final Pattern matchPath;
+
+    public Http1Proxy(RouteConfig routeConfig) {
+        this.routeConfig = routeConfig;
+        this.matchPath = Pattern.compile("^" + routeConfig.getMatch().getPath());
+    }
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
@@ -69,9 +79,46 @@ public class Http1Proxy extends ChannelDuplexHandler {
 
     // No-op proxy translation to get things working
 
-    private HttpRequest proxyRequest(HttpRequest clientRequest) {
+    private HttpRequest proxyRequest(HttpRequest sourceRequest) {
 
-        return clientRequest;
+        var sourceUri = URI.create(sourceRequest.uri());
+        var sourcePath = sourceUri.getPath();
+        // var sourceMatch = matchPath.matcher(sourcePath);
+
+        // Match should already be checked before a request is sent to this handler
+        if (!sourcePath.startsWith(routeConfig.getMatch().getPath()))
+            throw new EUnexpected();
+
+        //var targetPath = sourceMatch.replaceFirst(routeConfig.getTarget().getPath());
+        var targetPath = sourcePath.replaceFirst(
+                routeConfig.getMatch().getPath(),
+                routeConfig.getTarget().getPath());
+
+        var targetHeaders = new DefaultHttpHeaders();
+        targetHeaders.add(sourceRequest.headers());
+        targetHeaders.remove(HttpHeaderNames.HOST);
+        targetHeaders.add(HttpHeaderNames.HOST, routeConfig.getTarget().getHost());
+
+        if (sourceRequest instanceof FullHttpRequest) {
+
+            var fullRequest = (FullHttpRequest) sourceRequest;
+
+            return new DefaultFullHttpRequest(
+                    sourceRequest.protocolVersion(),
+                    sourceRequest.method(),
+                    targetPath,
+                    fullRequest.content(),
+                    targetHeaders,
+                    fullRequest.trailingHeaders());
+        }
+        else {
+
+            return new DefaultHttpRequest(
+                    sourceRequest.protocolVersion(),
+                    sourceRequest.method(),
+                    targetPath,
+                    targetHeaders);
+        }
     }
 
     private HttpResponse proxyResponse(HttpResponse serverResponse) {

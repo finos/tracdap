@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 
 
 public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
@@ -71,15 +72,15 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
                     config.getTarget().getHost(), config.getTarget().getPort());
 
             var route = new Route();
+            route.config = config;
             route.clientKey = config.getRouteName();
+            route.targetHost = config.getTarget().getHost();
+            route.targetPort = config.getTarget().getPort();
 
             var matchPath = config.getMatch().getPath();
             route.matcher = (uri, method, headers) -> uri
                     .getPath()
-                    .matches(matchPath);
-
-            route.targetHost = config.getTarget().getHost();
-            route.targetPort = config.getTarget().getPort();
+                    .startsWith(matchPath);
 
             if (config.getRouteType() == RouteType.HTTP)
                 route.initializer = Http1ProxyBuilder::new;
@@ -227,7 +228,7 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
 
             var channelInit = selectedRoute
                     .initializer
-                    .makeInitializer(ctx, channelActiveFuture);
+                    .makeInitializer(selectedRoute.config, ctx, channelActiveFuture);
 
             var channelOpenFuture = bootstrap
                     .handler(channelInit)
@@ -359,11 +360,13 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
 
     private static class Route {
 
-        IRouteMatcher matcher;
-        String clientKey;
+        RouteConfig config;
 
+        String clientKey;
         String targetHost;
         int targetPort;
+
+        IRouteMatcher matcher;
         ProxyInitializer initializer;
     }
 
@@ -371,6 +374,7 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
     private interface ProxyInitializer {
 
         ChannelInitializer<Channel> makeInitializer(
+                RouteConfig routeConfig,
                 ChannelHandlerContext routerCtx,
                 ChannelPromise routeActivePromise);
     }

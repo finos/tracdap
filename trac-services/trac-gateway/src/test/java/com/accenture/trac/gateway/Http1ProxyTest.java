@@ -38,7 +38,11 @@ public class Http1ProxyTest {
 
     private static final String HTTP1_PROXY_TEST_CONFIG = "/trac-unit-gateway-http1.yaml";
 
-    private static final String TEST_FILE_REMOTE_PATH = "/design_principals.md";
+    private static final String TEST_URL_SAMPLE_DOC = "/static/docs/design_principals.md";
+    private static final String TEST_URL_MISSING_DOC = "/static/docs/does_not_exist.md";
+    private static final String TEST_URL_SERVER_DOWN = "/static/server_down/foo.md";
+    private static final String TEST_URL_SERVER_TIMEOUT = "/static/server_timeout/bar.md";
+
     private static final String TEST_FILE_LOCAL_PATH = "doc/design_principals.md";
     private static final short TEST_GW_PORT = 8080;
     private static final long TEST_TIMEOUT = 1000;
@@ -95,26 +99,11 @@ public class Http1ProxyTest {
             svr.shutdown();
     }
 
-//
-//    @Test
-//    public void runServer() throws Exception {
-//
-//        var config = ConfigBootstrap.useConfigFile(
-//                TracPlatformGateway.class,
-//                HTTP1_PROXY_TEST_CONFIG);
-//
-//        var gateway = new TracPlatformGateway(config);
-//        gateway.start();
-//
-//        gateway.stop();
-//        //var gw = new TracPlatformGateway()
-//    }
-
     @Test
     void http1SimpleProxy_head() throws Exception {
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var request = client.headRequest(TEST_FILE_REMOTE_PATH);
+        var request = client.headRequest(TEST_URL_SAMPLE_DOC);
         request.await(TEST_TIMEOUT);
 
         Assertions.assertTrue(request.isDone());
@@ -134,7 +123,7 @@ public class Http1ProxyTest {
     void http1SimpleProxy_get() throws Exception {
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var request = client.getRequest(TEST_FILE_REMOTE_PATH);
+        var request = client.getRequest(TEST_URL_SAMPLE_DOC);
         request.await(TEST_TIMEOUT);
 
         Assertions.assertTrue(request.isDone());
@@ -174,7 +163,7 @@ public class Http1ProxyTest {
     void http1SimpleProxy_notFound() throws Exception {
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-        var request = client.getRequest("/some/bogus/path");
+        var request = client.getRequest(TEST_URL_MISSING_DOC);
         request.await(TEST_TIMEOUT);
 
         // Should be a successful response with error code 404
@@ -188,49 +177,45 @@ public class Http1ProxyTest {
 
         response.release();
     }
-//
-//    @Test
-//    void http1SimpleProxy_serverDown() throws Exception {
-//
-//        // Shut down the back end server before contacting the gateway
-//        svr.shutdown();
-//        svr = null;
-//
-//        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-//        var request = client.getRequest(TEST_FILE_REMOTE_PATH);
-//        request.await(TEST_TIMEOUT);
-//
-//        // Should be a successful response with error code 503, source server is not available
-//
-//        Assertions.assertTrue(request.isDone());
-//        Assertions.assertTrue(request.isSuccess());
-//
-//        var response = request.getNow();
-//
-//        Assertions.assertEquals(HttpResponseStatus.SERVICE_UNAVAILABLE, response.status());
-//
-//        response.release();
-//    }
-//
-//    @Test
-//    void http1SimpleProxy_serverTimeout() throws Exception {
-//
-//        // TODO: set up timeout on svr
-//
-//        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
-//        var request = client.getRequest(TEST_FILE_REMOTE_PATH);
-//        request.await(TEST_TIMEOUT);
-//
-//        // Should be a successful response with error code 504, source server timed out
-//
-//        Assertions.assertTrue(request.isDone());
-//        Assertions.assertTrue(request.isSuccess());
-//
-//        var response = request.getNow();
-//
-//        Assertions.assertEquals(HttpResponseStatus.GATEWAY_TIMEOUT, response.status());
-//
-//        response.release();
-//    }
+
+    @Test @Disabled
+    void http1SimpleProxy_serverDown() throws Exception {
+
+        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
+        var request = client.getRequest(TEST_URL_SERVER_DOWN);
+        request.await(TEST_TIMEOUT);
+
+        // Should be a successful response with error code 503, source server is not available
+
+        Assertions.assertTrue(request.isDone());
+        Assertions.assertTrue(request.isSuccess());
+
+        var response = request.getNow();
+
+        Assertions.assertEquals(HttpResponseStatus.SERVICE_UNAVAILABLE, response.status());
+
+        response.release();
+    }
+
+    @Test @Disabled
+    void http1SimpleProxy_serverTimeout() throws Exception {
+
+        // TODO: set up timeout on svr
+
+        var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
+        var request = client.getRequest(TEST_URL_SERVER_TIMEOUT);
+        request.await(TEST_TIMEOUT);
+
+        // Should be a successful response with error code 504, source server timed out
+
+        Assertions.assertTrue(request.isDone());
+        Assertions.assertTrue(request.isSuccess());
+
+        var response = request.getNow();
+
+        Assertions.assertEquals(HttpResponseStatus.GATEWAY_TIMEOUT, response.status());
+
+        response.release();
+    }
 
 }
