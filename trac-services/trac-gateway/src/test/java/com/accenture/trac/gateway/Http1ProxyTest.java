@@ -21,9 +21,6 @@ import com.accenture.trac.common.config.ConfigBootstrap;
 import io.netty.handler.codec.http.*;
 import org.junit.jupiter.api.*;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,8 +31,6 @@ import static io.netty.util.NetUtil.LOCALHOST;
 
 public class Http1ProxyTest {
 
-    private static final Logger log = LoggerFactory.getLogger(Http1ProxyTest.class);
-
     private static final String HTTP1_PROXY_TEST_CONFIG = "/trac-unit-gateway-http1.yaml";
 
     private static final String TEST_URL_SAMPLE_DOC = "/static/docs/design_principals.md";
@@ -45,11 +40,13 @@ public class Http1ProxyTest {
 
     private static final String TEST_FILE_LOCAL_PATH = "doc/design_principals.md";
     private static final short TEST_GW_PORT = 8080;
-    private static final long TEST_TIMEOUT = 1000;
+    private static final long TEST_TIMEOUT = 10 * 1000;  // 10 second timeout
 
     private static Path rootDir;
     private static final int svrPort = 8090;
+    private static final int timeoutSvrPort = 8091;
     private static Http1Server svr;
+    private static Http1Server timeoutSvr;
     private static TracPlatformGateway gateway;
 
     @BeforeAll
@@ -75,9 +72,14 @@ public class Http1ProxyTest {
         svr = new Http1Server(svrPort, svrContentDir);
         svr.run();
 
+        timeoutSvr = new Http1Server(timeoutSvrPort, svrContentDir, true);
+        timeoutSvr.run();
+
         // Start the gateway
 
         var configFile = Http1ProxyTest.class.getResource(HTTP1_PROXY_TEST_CONFIG);
+        Assertions.assertNotNull(configFile);
+
         var configPath = Paths.get(".")
                 .toAbsolutePath()
                 .relativize(Paths.get(configFile.toURI()))
@@ -85,18 +87,22 @@ public class Http1ProxyTest {
                 .replace("\\", "/");
 
         var config = ConfigBootstrap.useConfigFile(TracPlatformGateway.class, rootDir, configPath, "");
+
         gateway = new TracPlatformGateway(config);
         gateway.start();
     }
 
     @AfterAll
-    public static void tearDownServer() throws Exception {
+    public static void tearDownServer() {
 
         if (gateway != null)
             gateway.stop();
 
         if (svr != null)
             svr.shutdown();
+
+        if (timeoutSvr != null)
+            timeoutSvr.shutdown();
     }
 
     @Test
@@ -145,17 +151,17 @@ public class Http1ProxyTest {
     }
 
     @Test @Disabled
-    void http1SimpleProxy_put() throws Exception {
+    void http1SimpleProxy_put() {
         Assertions.fail();
     }
 
     @Test @Disabled
-    void http1SimpleProxy_post() throws Exception {
+    void http1SimpleProxy_post() {
         Assertions.fail();
     }
 
     @Test @Disabled
-    void http1SimpleProxy_redirect() throws Exception {
+    void http1SimpleProxy_redirect() {
         Assertions.fail();
     }
 
@@ -178,7 +184,7 @@ public class Http1ProxyTest {
         response.release();
     }
 
-    @Test @Disabled
+    @Test
     void http1SimpleProxy_serverDown() throws Exception {
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
@@ -193,14 +199,12 @@ public class Http1ProxyTest {
         var response = request.getNow();
 
         Assertions.assertEquals(HttpResponseStatus.SERVICE_UNAVAILABLE, response.status());
-
-        response.release();
     }
 
     @Test @Disabled
     void http1SimpleProxy_serverTimeout() throws Exception {
 
-        // TODO: set up timeout on svr
+        // Timeout handling not implemented yet in GW
 
         var client = new Http1Client(HttpScheme.HTTP, LOCALHOST, TEST_GW_PORT);
         var request = client.getRequest(TEST_URL_SERVER_TIMEOUT);
@@ -214,8 +218,6 @@ public class Http1ProxyTest {
         var response = request.getNow();
 
         Assertions.assertEquals(HttpResponseStatus.GATEWAY_TIMEOUT, response.status());
-
-        response.release();
     }
 
 }

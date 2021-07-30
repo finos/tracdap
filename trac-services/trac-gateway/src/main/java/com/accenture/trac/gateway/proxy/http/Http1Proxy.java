@@ -44,10 +44,10 @@ public class Http1Proxy extends ChannelDuplexHandler {
 
         if (msg instanceof HttpRequest) {
 
-            var clientRequest = (HttpRequest) msg;
-            var proxyRequest = proxyRequest(clientRequest);
+            var sourceRequest = (HttpRequest) msg;
+            var targetRequest = proxyRequest(sourceRequest);
 
-            ctx.write(proxyRequest, promise);
+            ctx.write(targetRequest, promise);
         }
         else if (msg instanceof HttpContent) {
 

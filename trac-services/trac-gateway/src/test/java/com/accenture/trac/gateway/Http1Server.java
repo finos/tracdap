@@ -40,6 +40,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Locale;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.*;
@@ -57,14 +58,20 @@ public class Http1Server {
 
     private final int port;
     private final Path contentRoot;
+    private final boolean simulateTimeout;
 
     EventLoopGroup bossGroup;
     EventLoopGroup workerGroup;
     private ChannelFuture serverChannel;
 
     public Http1Server(int port, Path contentRoot) {
+        this(port, contentRoot, false);
+    }
+
+    public Http1Server(int port, Path contentRoot, boolean simulateTimeout) {
         this.port = port;
         this.contentRoot = contentRoot;
+        this.simulateTimeout = simulateTimeout;
     }
 
     public void run() throws Exception {
@@ -145,7 +152,11 @@ public class Http1Server {
 
             if (request.method() == HttpMethod.GET || request.method() == HttpMethod.HEAD) {
                 var uri = URI.create(request.uri());
-                serveStaticContent(ctx, uri, request.method());
+
+                if (simulateTimeout)
+                    simulateTimeout(ctx);
+                else
+                    serveStaticContent(ctx, uri, request.method());
             }
             else
                 sendError(ctx, BAD_REQUEST);
@@ -225,6 +236,13 @@ public class Http1Server {
                 if (!keepAlive)
                     ctx.close();
             }
+        }
+
+        private void simulateTimeout(ChannelHandlerContext ctx) {
+
+            ctx.executor().schedule(
+                    (Callable<ChannelFuture>) ctx::close,
+                    60, TimeUnit.SECONDS);
         }
 
         private void setDateAndCacheHeaders(HttpResponse response, Path fileToCache) throws IOException {
