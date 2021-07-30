@@ -80,9 +80,8 @@ public class Http1ProxyTest {
         var configFile = Http1ProxyTest.class.getResource(HTTP1_PROXY_TEST_CONFIG);
         Assertions.assertNotNull(configFile);
 
-        var configPath = Paths.get(".")
-                .toAbsolutePath()
-                .relativize(Paths.get(configFile.toURI()))
+        var configPath = rootDir
+                .relativize(Paths.get(configFile.toURI()).toAbsolutePath())
                 .toString()
                 .replace("\\", "/");
 
