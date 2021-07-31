@@ -16,20 +16,34 @@
 
 package com.accenture.trac.gateway.proxy.rest;
 
-import com.accenture.trac.api.TracMetadataApiGrpc;
+import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.exception.EUnexpected;
+
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
+import com.google.protobuf.util.JsonFormat;
+import io.grpc.CallOptions;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.StatusRuntimeException;
+import io.grpc.stub.ClientCalls;
 
-import io.grpc.stub.AbstractFutureStub;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http2.*;
+import io.netty.util.ReferenceCountUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -39,16 +53,18 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
     private final String grpcHost;
     private final short grpcPort;
+    private final List<RestApiMethod<?, ?, ?>> methods;
 
     private ManagedChannel serviceChannel;
-    private AbstractFutureStub<? extends AbstractFutureStub<?>> stub;
 
     private final Map<Http2FrameStream, RestApiCallState> callStateMap;
 
 
-    public RestApiProxy(String grpcHost, short grpcPort) {
+    public RestApiProxy(String grpcHost, short grpcPort, List<RestApiMethod<?, ?, ?>> methods) {
+
         this.grpcHost = grpcHost;
         this.grpcPort = grpcPort;
+        this.methods = methods;
 
         this.callStateMap = new HashMap<>();
     }
@@ -62,41 +78,258 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                 .disableRetry()
                 .executor(ctx.executor())
                 .build();
-
-        stub = TracMetadataApiGrpc.newFutureStub(serviceChannel);
     }
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
 
-        // REST proxy layer expects all messages to be HTTP/2 frames
-        if (!(msg instanceof Http2Frame))
-            throw new EUnexpected();
+        try {
 
-        var frame = (Http2Frame) msg;
+            // REST proxy layer expects all messages to be HTTP/2 frames
+            if (!(msg instanceof Http2Frame))
+                throw new EUnexpected();
 
-        if (frame instanceof Http2HeadersFrame) {
+            var frame = (Http2Frame) msg;
 
-            var headers = (Http2HeadersFrame) frame;
-            var stream = headers.stream();
+            if (frame instanceof Http2HeadersFrame) {
 
-            if (!callStateMap.containsKey(stream)) {
+                var headersFrame = (Http2HeadersFrame) frame;
+                var stream = headersFrame.stream();
 
-                log.info("New outbound frame in REST API proxy");
+                if (!callStateMap.containsKey(stream)) {
 
-                var callState = new RestApiCallState();
-                callStateMap.put(stream, callState);
+                    log.info("New outbound frame in REST API proxy");
+
+                    var callState = new RestApiCallState();
+                    callState.method = lookupMethod(headersFrame);
+                    callState.requestContent = ctx.alloc().compositeBuffer();
+
+                    callStateMap.put(stream, callState);
+                }
+
+                var callState = callStateMap.get(stream);
+
+            }
+            else if (frame instanceof Http2DataFrame) {
+
+                var dataFrame = (Http2DataFrame) frame;
+                var stream = dataFrame.stream();
+
+                var callState = callStateMap.get(stream);
+
+                // TODO: Check call state and stream are good
+                dataFrame.content().retain();
+                callState.requestContent.addComponent(dataFrame.content());
+
+                if (dataFrame.isEndStream())
+                    dispatchUnaryRequest(callState.method, callState, ctx);
+            }
+            else {
+
+                log.warn("Unexpected frame type {} will be dropped", frame.name());
+            }
+        }
+        finally {
+
+            // RestApiProxy runs on an embedded pipeline, we're taking the message off the pipe here
+            // So, it will not be released automatically by Netty when it reaches the end of the pipe
+            ReferenceCountUtil.release(msg);
+        }
+    }
+
+    private RestApiMethod<?, ?, ?> lookupMethod(Http2HeadersFrame headers) {
+
+        for (var method: this.methods) {
+
+            var uri = URI.create(headers.headers().path().toString());
+            var httpMethod = HttpMethod.valueOf(headers.headers().method().toString());
+            var httpHeaders = new DefaultHttpHeaders();  // TODO: Switch matcher to HTTP/2 headers?
+
+            if (method.matcher.matches(uri, httpMethod, httpHeaders))
+                return method;
+        }
+
+        return null;
+    }
+
+    private <TRequest extends Message, TRequestBody extends Message, TResponse extends Message>
+    void dispatchUnaryRequest(
+            RestApiMethod<TRequest, TRequestBody, TResponse> method,
+            RestApiCallState callState,
+            ChannelHandlerContext ctx) {
+
+        try {
+            TRequest proxyRequest;
+
+            if (method.hasBody) {
+                var requestBody = method.translator.translateRequestBody(callState.requestContent);
+                proxyRequest = method.translator.translateRequest("" /* translated uri */, requestBody);
+            }
+            else {
+                proxyRequest = method.translator.translateRequest("" /* translated uri */);
+            }
+
+            var options = CallOptions.DEFAULT;
+            var serviceCall = serviceChannel.newCall(method.grpcMethod, options);
+            var proxyCall = ClientCalls.futureUnaryCall(serviceCall, proxyRequest);
+
+            var callback = new UnaryCallback<>(method, callState, ctx);
+            Futures.addCallback(proxyCall, callback, ctx.executor());
+        }
+        catch (EInputValidation error) {
+
+            log.warn("Bad request in REST API: " + error.getMessage(), error);
+
+            // Validation errors can occur in the request builder
+            // These are from extracting fields from the URL, or translating JSON -> protobuf
+            // In this case, send some helpful information back about what cause the failure
+
+            var message = error.getLocalizedMessage();
+            var content = ctx.alloc().buffer();
+            content.writeCharSequence(message, StandardCharsets.UTF_8);
+
+            var protocolVersion = clientRequest.protocolVersion();
+            var response = new DefaultFullHttpResponse(protocolVersion, HttpResponseStatus.BAD_REQUEST, content);
+            response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
+            response.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
+
+            ctx.writeAndFlush(response);
+            ctx.close();
+        }
+        finally {
+
+            if (callState.requestContent != null) {
+                callState.requestContent.release();
+                callState.requestContent = null;
+            }
+        }
+    }
+
+    private class UnaryCallback <
+            TRequest extends Message,
+            TRequestBody extends Message,
+            TResponse extends Message>
+            implements FutureCallback<TResponse> {
+
+        private final RestApiMethod<TRequest, TRequestBody, TResponse> method;
+        private final RestApiCallState callState;
+        private final ChannelHandlerContext ctx;
+
+        UnaryCallback(
+                RestApiMethod<TRequest, TRequestBody, TResponse> method,
+                RestApiCallState callState,
+                ChannelHandlerContext ctx) {
+
+            this.method = method;
+            this.callState = callState;
+            this.ctx = ctx;
+        }
+
+        @Override
+        public void onSuccess(TResponse result) {
+
+            try {
+
+                log.info("PROXY REST CALL SUCCEEDED: {}", method.grpcMethod.getFullMethodName());
+
+                var json = JsonFormat.printer().print(result);
+                var content = ctx.alloc().buffer();
+                content.writeBytes(json.getBytes(StandardCharsets.UTF_8));
+
+                var headers = new DefaultHttp2Headers();
+                // TODO: Set status ok and other required fields
+                headers.set(HttpHeaderNames.CONTENT_TYPE, "application/json; charset=UTF-8");
+                headers.setInt(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
+
+                var headersFrame = new DefaultHttp2HeadersFrame(headers);
+                var dataFrame = new DefaultHttp2DataFrame(content, true);
+
+                ctx.fireChannelRead(headersFrame);
+                ctx.fireChannelRead(dataFrame);
+            }
+            catch (InvalidProtocolBufferException e) {
+
+                onFailure(e);
             }
         }
 
+        @Override
+        public void onFailure(Throwable error) {
+
+            log.error("PROXY REST CALL FAILED: {} {}", method.grpcMethod.getFullMethodName(), error.getMessage());
+
+            HttpResponse response;
+
+            if (error instanceof StatusRuntimeException)
+                response = translateGrpcError((StatusRuntimeException) error);
+
+            else {
+
+                var protocolVersion = clientRequest.protocolVersion();
+                response = new DefaultHttpResponse(protocolVersion, HttpResponseStatus.INTERNAL_SERVER_ERROR);
+                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+            }
+
+            ctx.writeAndFlush(response);
+            ctx.close();
+
+            serviceChannel.shutdown();
+        }
+
+        private HttpResponse translateGrpcError(StatusRuntimeException error) {
+
+            var grpcCode = error.getStatus().getCode();
+            HttpResponseStatus httpCode;
+
+            switch (grpcCode) {
+
+                case INVALID_ARGUMENT:
+                    httpCode = HttpResponseStatus.BAD_REQUEST;
+                    break;
+
+                case NOT_FOUND:
+                    httpCode = HttpResponseStatus.NOT_FOUND;
+                    break;
+
+                case ALREADY_EXISTS:
+                    httpCode = HttpResponseStatus.CONFLICT;
+                    break;
+
+                case FAILED_PRECONDITION:
+                    httpCode = HttpResponseStatus.PRECONDITION_FAILED;
+                    break;
+
+                default:
+
+                    // For unrecognised errors, send error code 500 with no message
+                    httpCode = HttpResponseStatus.INTERNAL_SERVER_ERROR;
+                    var protocolVersion = clientRequest.protocolVersion();
+                    return new DefaultHttpResponse(protocolVersion, httpCode);
+
+            }
+
+            // For recognised gRPC errors, assume the error message says something helpful
+            // Putting message in response body for now
+            // It may be more appropriate in a header
+            var message = error.getStatus().getDescription();
+            var content = ctx.alloc().buffer();
+            content.writeCharSequence(message, StandardCharsets.UTF_8);
+
+            var protocolVersion = clientRequest.protocolVersion();
+            var response = new DefaultFullHttpResponse(protocolVersion, httpCode, content);
+            response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
+            response.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
+
+            return response;
+        }
     }
 
-    @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) {
 
-    }
+    private static class RestApiCallState {
 
-    private class RestApiCallState {
+        RestApiMethod<?, ?, ?> method;
+        CompositeByteBuf requestContent;
 
+        boolean receiving = false;
     }
 }

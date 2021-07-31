@@ -55,7 +55,7 @@ public class RestApiUnaryHandler<
     private final int servicePort;
 
     private final MethodDescriptor<TRequest, TResponse> grpcMethod;
-    private final RestApiRequestBuilder<TRequest> requestBuilder;
+    private final RestApiTranslator<TRequest> requestBuilder;
     private final TRequestBody blankRequestBody;
     private final boolean hasBody;
 
@@ -68,7 +68,7 @@ public class RestApiUnaryHandler<
     public RestApiUnaryHandler(
             String serviceHost, int servicePort,
             MethodDescriptor<TRequest, TResponse> grpcMethod,
-            RestApiRequestBuilder<TRequest> requestBuilder,
+            RestApiTranslator<TRequest> requestBuilder,
             TRequestBody blankRequestBody) {
 
         this.log = LoggerFactory.getLogger(getClass());
@@ -85,7 +85,7 @@ public class RestApiUnaryHandler<
     public RestApiUnaryHandler(
             String serviceHost, int servicePort,
             MethodDescriptor<TRequest, TResponse> grpcMethod,
-            RestApiRequestBuilder<TRequest> requestBuilder) {
+            RestApiTranslator<TRequest> requestBuilder) {
 
         this.log = LoggerFactory.getLogger(getClass());
 
@@ -142,10 +142,10 @@ public class RestApiUnaryHandler<
 
             if (hasBody && clientRequestContent != null) {
                 var requestBody = translateRequestBody(clientRequestContent);
-                proxyRequest = requestBuilder.build(clientRequest.uri(), requestBody);
+                proxyRequest = requestBuilder.translateRequest(clientRequest.uri(), requestBody);
             }
             else
-                proxyRequest = requestBuilder.build(clientRequest.uri());
+                proxyRequest = requestBuilder.translateRequest(clientRequest.uri());
 
             serviceChannel = ManagedChannelBuilder.forAddress(serviceHost, servicePort)
                     .userAgent("TRAC/Gateway")

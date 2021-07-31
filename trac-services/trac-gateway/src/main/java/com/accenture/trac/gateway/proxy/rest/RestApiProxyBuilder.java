@@ -18,6 +18,7 @@ package com.accenture.trac.gateway.proxy.rest;
 
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.gateway.config.RouteConfig;
+import com.accenture.trac.gateway.config.rest.MetaApiRestMapping;
 import com.accenture.trac.gateway.proxy.http.Http1RouterLink;
 import com.accenture.trac.gateway.proxy.http.Http1to2Framing;
 
@@ -78,9 +79,12 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
 
         // REST proxy
 
+        // TODO: Build this after reading service config and pass it in
+        var restApiConfig = MetaApiRestMapping.metaApiRoutes();
+
         var grpcHost = routeConfig.getTarget().getHost();
         var grpcPort = routeConfig.getTarget().getPort();
-        var restApiProxy = new RestApiProxy(grpcHost, grpcPort);
+        var restApiProxy = new RestApiProxy(grpcHost, grpcPort, restApiConfig);
         pipeline.addLast(restApiProxy);
 
         // Router link

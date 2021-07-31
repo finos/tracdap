@@ -16,12 +16,20 @@
 
 package com.accenture.trac.gateway.proxy.rest;
 
+import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.exception.EUnexpected;
+import com.google.gson.stream.MalformedJsonException;
 import com.google.protobuf.Descriptors;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
+import com.google.protobuf.util.JsonFormat;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -31,108 +39,42 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 
-public class RestApiRequestBuilder<TRequest extends Message> {
+public class RestApiTranslator<TRequest extends Message, TRequestBody extends Message> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final TRequest blankRequest;
-
-    private final boolean hasBody;
-    private final Function<TRequest.Builder, Message.Builder> bodySubFieldMapper;
-    private final Descriptors.FieldDescriptor bodyFieldDescriptor;
     private final List<BiFunction<URI, TRequest.Builder, TRequest.Builder>> fieldExtractors;
 
+    private final boolean hasBody;
+    private final TRequestBody blankBody;
+    private final Function<TRequest.Builder, Message.Builder> bodySubFieldMapper;
+    private final Descriptors.FieldDescriptor bodyFieldDescriptor;
 
-    public RestApiRequestBuilder(String urlTemplate, TRequest blankRequest, String bodyField) {
+    public RestApiTranslator(String urlTemplate, TRequest blankRequest, String bodyField, TRequestBody blankBody) {
 
         this.blankRequest = blankRequest;
+        this.fieldExtractors = prepareFieldExtractors(urlTemplate, blankRequest.getDescriptorForType());
+
+        this.hasBody = true;
+        this.blankBody = blankBody;
 
         var requestDescriptor = blankRequest.getDescriptorForType();
-
         var bodyFields = RestApiFields.prepareFieldDescriptors(requestDescriptor, bodyField);
         this.bodySubFieldMapper = RestApiFields.prepareSubFieldMapper(bodyFields);
         this.bodyFieldDescriptor = bodyFields.get(bodyFields.size() - 1);
-        this.hasBody = true;
-
-        this.fieldExtractors = prepareFieldExtractors(urlTemplate, blankRequest.getDescriptorForType());
     }
 
-    public RestApiRequestBuilder(String urlTemplate, TRequest blankRequest, boolean hasBody) {
+    public RestApiTranslator(String urlTemplate, TRequest blankRequest) {
 
         this.blankRequest = blankRequest;
+        this.fieldExtractors = prepareFieldExtractors(urlTemplate, blankRequest.getDescriptorForType());
+
+        this.hasBody = false;
+        this.blankBody = null;
 
         this.bodySubFieldMapper = null;
         this.bodyFieldDescriptor = null;
-        this.hasBody = hasBody;
-
-        this.fieldExtractors = prepareFieldExtractors(urlTemplate, blankRequest.getDescriptorForType());
-    }
-
-    private List<BiFunction<URI, TRequest.Builder, TRequest.Builder>>
-    prepareFieldExtractors(String urlTemplate, Descriptors.Descriptor requestDescriptor) {
-
-        var pathAndQuery = urlTemplate.split("\\?");
-        var pathTemplate = pathAndQuery[0];
-        var pathSegments = pathTemplate.split("/");
-
-        var extractors = new ArrayList<BiFunction<URI, TRequest.Builder, TRequest.Builder>>();
-
-        for (var segmentIndex = 0; segmentIndex < pathSegments.length; segmentIndex++) {
-
-            var segment = pathSegments[segmentIndex];
-
-            // If segment does not reference a variable, then there's nothing to extract
-            if (!segment.contains("{"))
-                continue;
-
-            if (RestApiFields.isSegmentCapture(segment)) {
-
-                var segmentFields = RestApiFields.prepareFieldsForPathSegment(requestDescriptor, segment);
-                var targetField = segmentFields.get(segmentFields.size() - 1);
-
-                var pathExtractor = preparePathSegmentExtractor(segmentIndex);
-                var subFieldMapper = RestApiFields.prepareSubFieldMapper(segmentFields);
-
-                var extractor = prepareExtractorForTargetField(pathExtractor, subFieldMapper, targetField);
-                extractors.add(extractor);
-            }
-
-            else
-                // TODO: Error
-                throw new RuntimeException("");
-        }
-
-        return extractors;
-    }
-
-    private BiFunction<URI, TRequest.Builder, TRequest.Builder>
-    prepareExtractorForTargetField(
-            Function<URI, String> rawValueExtractor,
-            Function<TRequest.Builder, Message.Builder> subFieldMapper,
-            Descriptors.FieldDescriptor targetField) {
-
-        switch (targetField.getJavaType()) {
-
-            case STRING:
-                return (url, request) -> extractString(rawValueExtractor, subFieldMapper, targetField, url, request);
-
-            case ENUM:
-                return (url, request) -> extractEnum(rawValueExtractor, subFieldMapper, targetField, url, request);
-
-            case LONG:
-                return (url, request) -> extractLong(rawValueExtractor, subFieldMapper, targetField, url, request);
-
-            case INT:
-                return (url, request) -> extractInt(rawValueExtractor, subFieldMapper, targetField, url, request);
-
-            default:
-                // TODO: Error
-                throw new EUnexpected();
-        }
-    }
-
-    private Function<URI, String> preparePathSegmentExtractor(int pathSegmentIndex) {
-        return uri -> extractPathSegment(pathSegmentIndex, uri);
     }
 
 
@@ -141,7 +83,7 @@ public class RestApiRequestBuilder<TRequest extends Message> {
     // -----------------------------------------------------------------------------------------------------------------
 
     @SuppressWarnings("unchecked")
-    public TRequest build(String url, Message body) {
+    public TRequest translateRequest(String url, Message body) {
 
         // This should be set up correctly when the API route is created
         if (!this.hasBody)
@@ -168,7 +110,7 @@ public class RestApiRequestBuilder<TRequest extends Message> {
     }
 
     @SuppressWarnings("unchecked")
-    public TRequest build(String url) {
+    public TRequest translateRequest(String url) {
 
         // This should be set up correctly when the API route is created
         if (this.hasBody)
@@ -182,6 +124,51 @@ public class RestApiRequestBuilder<TRequest extends Message> {
             request = extractor.apply(requestUrl, request);
 
         return (TRequest) request.build();
+    }
+
+    public Message translateRequestBody(ByteBuf bodyBuffer) {
+
+        if (!hasBody || blankBody == null)
+            throw new EUnexpected();
+
+        try (var jsonStream = new ByteBufInputStream(bodyBuffer);
+             var jsonReader = new InputStreamReader(jsonStream)) {
+
+            var bodyBuilder = blankBody.newBuilderForType();
+            var jsonParser = JsonFormat.parser();
+            jsonParser.merge(jsonReader, bodyBuilder);
+
+            return bodyBuilder.build();
+        }
+        catch (InvalidProtocolBufferException e) {
+
+            // Validation failures will go back to users (API users, i.e. application developers)
+            // Strip out GSON class name from the error message for readability
+            var detailMessage = e.getLocalizedMessage();
+            var classNamePrefix = MalformedJsonException.class.getName() + ": ";
+
+            if (detailMessage.startsWith(classNamePrefix))
+                detailMessage = detailMessage.substring(classNamePrefix.length());
+
+            var message = String.format(
+                    "Invalid JSON input for type [%s]: %s",
+                    blankBody.getDescriptorForType().getName(),
+                    detailMessage);
+
+            log.warn(message);
+            throw new EInputValidation(message, e);
+        }
+        catch (IOException e) {
+
+            // Shouldn't happen, reader source is a buffer already held in memory
+            log.error("Unexpected IO error reading from internal buffer", e);
+            throw new EUnexpected();
+        }
+    }
+
+    public String translateResponseBody(Message grpcResponseBody) throws Exception {
+
+        return JsonFormat.printer().print(grpcResponseBody);
     }
 
     private String extractPathSegment(int pathSegmentIndex, URI uri) {
@@ -274,5 +261,77 @@ public class RestApiRequestBuilder<TRequest extends Message> {
             // Invalid values should not make it past the router matcher
             throw new EUnexpected();
         }
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Preparation methods
+    // -----------------------------------------------------------------------------------------------------------------
+
+    private List<BiFunction<URI, TRequest.Builder, TRequest.Builder>>
+    prepareFieldExtractors(String urlTemplate, Descriptors.Descriptor requestDescriptor) {
+
+        var pathAndQuery = urlTemplate.split("\\?");
+        var pathTemplate = pathAndQuery[0];
+        var pathSegments = pathTemplate.split("/");
+
+        var extractors = new ArrayList<BiFunction<URI, TRequest.Builder, TRequest.Builder>>();
+
+        for (var segmentIndex = 0; segmentIndex < pathSegments.length; segmentIndex++) {
+
+            var segment = pathSegments[segmentIndex];
+
+            // If segment does not reference a variable, then there's nothing to extract
+            if (!segment.contains("{"))
+                continue;
+
+            if (RestApiFields.isSegmentCapture(segment)) {
+
+                var segmentFields = RestApiFields.prepareFieldsForPathSegment(requestDescriptor, segment);
+                var targetField = segmentFields.get(segmentFields.size() - 1);
+
+                var pathExtractor = preparePathSegmentExtractor(segmentIndex);
+                var subFieldMapper = RestApiFields.prepareSubFieldMapper(segmentFields);
+
+                var extractor = prepareExtractorForTargetField(pathExtractor, subFieldMapper, targetField);
+                extractors.add(extractor);
+            }
+
+            else
+                // TODO: Error
+                throw new RuntimeException("");
+        }
+
+        return extractors;
+    }
+
+    private BiFunction<URI, TRequest.Builder, TRequest.Builder>
+    prepareExtractorForTargetField(
+            Function<URI, String> rawValueExtractor,
+            Function<TRequest.Builder, Message.Builder> subFieldMapper,
+            Descriptors.FieldDescriptor targetField) {
+
+        switch (targetField.getJavaType()) {
+
+            case STRING:
+                return (url, request) -> extractString(rawValueExtractor, subFieldMapper, targetField, url, request);
+
+            case ENUM:
+                return (url, request) -> extractEnum(rawValueExtractor, subFieldMapper, targetField, url, request);
+
+            case LONG:
+                return (url, request) -> extractLong(rawValueExtractor, subFieldMapper, targetField, url, request);
+
+            case INT:
+                return (url, request) -> extractInt(rawValueExtractor, subFieldMapper, targetField, url, request);
+
+            default:
+                // TODO: Error
+                throw new EUnexpected();
+        }
+    }
+
+    private Function<URI, String> preparePathSegmentExtractor(int pathSegmentIndex) {
+        return uri -> extractPathSegment(pathSegmentIndex, uri);
     }
 }

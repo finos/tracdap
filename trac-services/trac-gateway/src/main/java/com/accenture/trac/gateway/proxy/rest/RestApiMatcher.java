@@ -34,15 +34,15 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 
-public class RestApiRouteMatcher implements IRouteMatcher {
+public class RestApiMatcher implements IRouteMatcher {
 
-    private final static Logger log = LoggerFactory.getLogger(RestApiRouteMatcher.class);
+    private final static Logger log = LoggerFactory.getLogger(RestApiMatcher.class);
 
     private final HttpMethod httpMethod;
     private final List<Function<String, Boolean>> pathSegmentMatchers;
 
     public <TRequest extends Message>
-    RestApiRouteMatcher(HttpMethod httpMethod, String urlTemplate, TRequest request) {
+    RestApiMatcher(HttpMethod httpMethod, String urlTemplate, TRequest request) {
 
         this.httpMethod = httpMethod;
 
@@ -60,7 +60,7 @@ public class RestApiRouteMatcher implements IRouteMatcher {
 
         // Segments that do not contain variables are a straight-up literal match
         if (!segmentTemplate.contains("{"))
-            return segment -> RestApiRouteMatcher.matchLiteralSegment(segmentTemplate, segment);
+            return segment -> RestApiMatcher.matchLiteralSegment(segmentTemplate, segment);
 
         if (RestApiFields.isSegmentCapture(segmentTemplate)) {
 
@@ -80,17 +80,17 @@ public class RestApiRouteMatcher implements IRouteMatcher {
         switch (targetField.getJavaType()) {
 
             case STRING:
-                return RestApiRouteMatcher::matchStringSegment;
+                return RestApiMatcher::matchStringSegment;
 
             case ENUM:
                 var enumType = targetField.getEnumType();
-                return segment -> RestApiRouteMatcher.matchEnumSegment(enumType, segment);
+                return segment -> RestApiMatcher.matchEnumSegment(enumType, segment);
 
             case LONG:
-                return RestApiRouteMatcher::matchLongSegment;
+                return RestApiMatcher::matchLongSegment;
 
             case INT:
-                return RestApiRouteMatcher::matchIntSegment;
+                return RestApiMatcher::matchIntSegment;
 
             default:
                 // TODO: Error message
