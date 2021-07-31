@@ -18,13 +18,16 @@ package com.accenture.trac.gateway.proxy.rest;
 
 import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.exception.EUnexpected;
+
 import com.google.gson.stream.MalformedJsonException;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
+import io.grpc.StatusRuntimeException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,12 +68,12 @@ public class RestApiTranslator<TRequest extends Message, TRequestBody extends Me
         this.bodyFieldDescriptor = bodyFields.get(bodyFields.size() - 1);
     }
 
-    public RestApiTranslator(String urlTemplate, TRequest blankRequest) {
+    public RestApiTranslator(String urlTemplate, TRequest blankRequest, boolean hasBody) {
 
         this.blankRequest = blankRequest;
         this.fieldExtractors = prepareFieldExtractors(urlTemplate, blankRequest.getDescriptorForType());
 
-        this.hasBody = false;
+        this.hasBody = hasBody;
         this.blankBody = null;
 
         this.bodySubFieldMapper = null;
@@ -128,13 +131,15 @@ public class RestApiTranslator<TRequest extends Message, TRequestBody extends Me
 
     public Message translateRequestBody(ByteBuf bodyBuffer) {
 
-        if (!hasBody || blankBody == null)
+        if (!hasBody)
             throw new EUnexpected();
+
+        var bodyType = (blankBody != null) ? blankBody : blankRequest;
 
         try (var jsonStream = new ByteBufInputStream(bodyBuffer);
              var jsonReader = new InputStreamReader(jsonStream)) {
 
-            var bodyBuilder = blankBody.newBuilderForType();
+            var bodyBuilder = bodyType.newBuilderForType();
             var jsonParser = JsonFormat.parser();
             jsonParser.merge(jsonReader, bodyBuilder);
 
@@ -152,7 +157,7 @@ public class RestApiTranslator<TRequest extends Message, TRequestBody extends Me
 
             var message = String.format(
                     "Invalid JSON input for type [%s]: %s",
-                    blankBody.getDescriptorForType().getName(),
+                    bodyType.getDescriptorForType().getName(),
                     detailMessage);
 
             log.warn(message);
@@ -169,6 +174,48 @@ public class RestApiTranslator<TRequest extends Message, TRequestBody extends Me
     public String translateResponseBody(Message grpcResponseBody) throws Exception {
 
         return JsonFormat.printer().print(grpcResponseBody);
+    }
+
+    public HttpResponseStatus translateGrpcErrorCode(StatusRuntimeException grpcError) {
+
+        var grpcCode = grpcError.getStatus().getCode();
+
+        switch (grpcCode) {
+
+            case INVALID_ARGUMENT:
+                return HttpResponseStatus.BAD_REQUEST;
+
+            case NOT_FOUND:
+                return HttpResponseStatus.NOT_FOUND;
+
+            case ALREADY_EXISTS:
+                return HttpResponseStatus.CONFLICT;
+
+            case FAILED_PRECONDITION:
+                return HttpResponseStatus.PRECONDITION_FAILED;
+
+            default:
+                // For unrecognised errors, send error code 500 with no message
+                return HttpResponseStatus.INTERNAL_SERVER_ERROR;
+        }
+    }
+
+    public String translateGrpcErrorMessage(StatusRuntimeException grpcError) {
+
+        var grpcCode = grpcError.getStatus().getCode();
+
+        switch (grpcCode) {
+
+            case INVALID_ARGUMENT:
+            case NOT_FOUND:
+            case ALREADY_EXISTS:
+            case FAILED_PRECONDITION:
+                return grpcError.getStatus().getDescription();
+
+            default:
+                // For unrecognised errors, send error code 500 with no message
+                return null;
+        }
     }
 
     private String extractPathSegment(int pathSegmentIndex, URI uri) {

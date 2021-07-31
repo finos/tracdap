@@ -103,7 +103,10 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
                 return new GrpcProxyBuilder(routeConfig, SOURCE_IS_HTTP_1, routerCtx, routeActivePromise);
 
             case REST:
-                return new RestApiProxyBuilder(routeConfig, SOURCE_IS_HTTP_1, routerCtx, routeActivePromise);
+                return new RestApiProxyBuilder(
+                        routeConfig, SOURCE_IS_HTTP_1,
+                        routerCtx, routeActivePromise,
+                        routerCtx.executor());
 
             default:
                 throw new EUnexpected();
@@ -297,9 +300,27 @@ public class Http1Router extends SimpleChannelInboundHandler<HttpObject> {
 
         if (route.config.getRouteType() == RouteType.REST) {
 
+//            var x = new EmbeddedChannel();
+//
+//            var x = bootstrap
+//                    .channel(EmbeddedChannel.class)
+//                    .connect();
+
             clientState.channel = new EmbeddedChannel(channelInit);
             clientState.channelOpenFuture = clientState.channel.newSucceededFuture();
             clientState.channelCloseFuture = clientState.channel.closeFuture();
+
+//            var bootstrap = new Bootstrap()
+//                    .group(ctx.channel().eventLoop())
+//                    .channel(EmbeddedChannel.class)
+//                    .option(ChannelOption.ALLOCATOR, ctx.alloc());
+//
+//            clientState.channelOpenFuture = bootstrap
+//                    .handler(channelInit)
+//                    .connect(route.targetHost, route.targetPort);
+//
+//            clientState.channel = clientState.channelOpenFuture.channel();
+//            clientState.channelCloseFuture = clientState.channel.closeFuture();
         }
 
         else {

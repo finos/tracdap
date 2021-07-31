@@ -19,9 +19,7 @@ package com.accenture.trac.gateway.proxy.http;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
-import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,6 +75,9 @@ public class Http1RouterLink extends ChannelDuplexHandler {
         log.info("Forward response message of type {}", msg.getClass().getSimpleName());
 
         routerCtx.write(msg);
+
+        if (msg instanceof LastHttpContent)
+            routerCtx.flush();
     }
 
     @Override

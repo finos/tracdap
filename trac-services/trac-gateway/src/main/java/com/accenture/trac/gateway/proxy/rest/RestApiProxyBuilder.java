@@ -31,6 +31,7 @@ import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.logging.LogLevel;
 
+import io.netty.util.concurrent.EventExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,17 +44,20 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
     private final int sourceHttpVersion;
     private final ChannelHandlerContext routerCtx;
     private final ChannelPromise routeActivePromise;
+    private final EventExecutor executor;
 
     public RestApiProxyBuilder(
             RouteConfig routeConfig,
             int sourceHttpVersion,
             ChannelHandlerContext routerCtx,
-            ChannelPromise routeActivePromise) {
+            ChannelPromise routeActivePromise,
+            EventExecutor executor) {
 
         this.routeConfig = routeConfig;
         this.sourceHttpVersion = sourceHttpVersion;
         this.routerCtx = routerCtx;
         this.routeActivePromise = routeActivePromise;
+        this.executor = executor;
     }
 
     @Override
@@ -84,7 +88,7 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
 
         var grpcHost = routeConfig.getTarget().getHost();
         var grpcPort = routeConfig.getTarget().getPort();
-        var restApiProxy = new RestApiProxy(grpcHost, grpcPort, restApiConfig);
+        var restApiProxy = new RestApiProxy(grpcHost, grpcPort, restApiConfig, executor);
         pipeline.addLast(restApiProxy);
 
         // Router link

@@ -37,6 +37,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http2.*;
 import io.netty.util.ReferenceCountUtil;
 
+import io.netty.util.concurrent.EventExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,16 +56,19 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
     private final short grpcPort;
     private final List<RestApiMethod<?, ?, ?>> methods;
 
+    private final EventExecutor executor;
     private ManagedChannel serviceChannel;
 
     private final Map<Http2FrameStream, RestApiCallState> callStateMap;
 
 
-    public RestApiProxy(String grpcHost, short grpcPort, List<RestApiMethod<?, ?, ?>> methods) {
+    public RestApiProxy(String grpcHost, short grpcPort, List<RestApiMethod<?, ?, ?>> methods, EventExecutor executor) {
 
         this.grpcHost = grpcHost;
         this.grpcPort = grpcPort;
         this.methods = methods;
+
+        this.executor = executor;
 
         this.callStateMap = new HashMap<>();
     }
@@ -76,8 +80,14 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                 .userAgent("TRAC/Gateway")
                 .usePlaintext()
                 .disableRetry()
-                .executor(ctx.executor())
+                .executor(executor)
                 .build();
+    }
+
+    @Override
+    protected void handlerRemoved0(ChannelHandlerContext ctx) {
+
+        serviceChannel.shutdown();
     }
 
     @Override
@@ -98,17 +108,42 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
                 if (!callStateMap.containsKey(stream)) {
 
-                    log.info("New outbound frame in REST API proxy");
+                    var method = lookupMethod(headersFrame);
 
-                    var callState = new RestApiCallState();
-                    callState.method = lookupMethod(headersFrame);
-                    callState.requestContent = ctx.alloc().compositeBuffer();
+                    if (method == null) {
 
-                    callStateMap.put(stream, callState);
+                        log.warn("PROXY REST CALL: {} {} ! NOT MAPPED",
+                                headersFrame.headers().method(),
+                                headersFrame.headers().path());
+
+                        var httpCode = HttpResponseStatus.NOT_FOUND;
+                        var httpContent = "REST API NOT MAPPED";
+
+                        sendErrorResponse(stream, ctx, httpCode, httpContent);
+                        return;
+                    }
+                    else {
+
+                        log.info("PROXY REST CALL: {} {} -> {}",
+                                headersFrame.headers().method(),
+                                headersFrame.headers().path(),
+                                method.grpcMethod.getFullMethodName());
+
+                        var callState = new RestApiCallState();
+                        callState.method = method;
+                        callState.requestHeaders = new DefaultHttp2Headers();
+                        callState.requestContent = ctx.alloc().compositeBuffer();
+                        callState.stream = stream;
+
+                        callStateMap.put(stream, callState);
+                    }
                 }
 
                 var callState = callStateMap.get(stream);
+                callState.requestHeaders.add(headersFrame.headers());
 
+                if (headersFrame.isEndStream())
+                    dispatchUnaryRequest(callState.method, callState, ctx);
             }
             else if (frame instanceof Http2DataFrame) {
 
@@ -118,8 +153,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                 var callState = callStateMap.get(stream);
 
                 // TODO: Check call state and stream are good
-                dataFrame.content().retain();
-                callState.requestContent.addComponent(dataFrame.content());
+                callState.requestContent.addComponent(true, dataFrame.content());
 
                 if (dataFrame.isEndStream())
                     dispatchUnaryRequest(callState.method, callState, ctx);
@@ -133,7 +167,9 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
             // RestApiProxy runs on an embedded pipeline, we're taking the message off the pipe here
             // So, it will not be released automatically by Netty when it reaches the end of the pipe
-            ReferenceCountUtil.release(msg);
+            // ReferenceCountUtil.release(msg);
+
+            ctx.write(msg);
         }
     }
 
@@ -159,14 +195,15 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             ChannelHandlerContext ctx) {
 
         try {
+            var restUrlPath = callState.requestHeaders.path().toString();
             TRequest proxyRequest;
 
             if (method.hasBody) {
                 var requestBody = method.translator.translateRequestBody(callState.requestContent);
-                proxyRequest = method.translator.translateRequest("" /* translated uri */, requestBody);
+                proxyRequest = method.translator.translateRequest(restUrlPath, requestBody);
             }
             else {
-                proxyRequest = method.translator.translateRequest("" /* translated uri */);
+                proxyRequest = method.translator.translateRequest(restUrlPath);
             }
 
             var options = CallOptions.DEFAULT;
@@ -174,7 +211,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             var proxyCall = ClientCalls.futureUnaryCall(serviceCall, proxyRequest);
 
             var callback = new UnaryCallback<>(method, callState, ctx);
-            Futures.addCallback(proxyCall, callback, ctx.executor());
+            Futures.addCallback(proxyCall, callback, executor);
         }
         catch (EInputValidation error) {
 
@@ -184,17 +221,10 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             // These are from extracting fields from the URL, or translating JSON -> protobuf
             // In this case, send some helpful information back about what cause the failure
 
-            var message = error.getLocalizedMessage();
-            var content = ctx.alloc().buffer();
-            content.writeCharSequence(message, StandardCharsets.UTF_8);
+            var errorCode = HttpResponseStatus.BAD_REQUEST;
+            var errorMessage = error.getLocalizedMessage();
 
-            var protocolVersion = clientRequest.protocolVersion();
-            var response = new DefaultFullHttpResponse(protocolVersion, HttpResponseStatus.BAD_REQUEST, content);
-            response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
-            response.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
-
-            ctx.writeAndFlush(response);
-            ctx.close();
+            sendErrorResponse(callState.stream, ctx, errorCode, errorMessage);
         }
         finally {
 
@@ -238,6 +268,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
                 var headers = new DefaultHttp2Headers();
                 // TODO: Set status ok and other required fields
+                headers.status(HttpResponseStatus.OK.toString());
                 headers.set(HttpHeaderNames.CONTENT_TYPE, "application/json; charset=UTF-8");
                 headers.setInt(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
 
@@ -260,76 +291,68 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
             HttpResponse response;
 
-            if (error instanceof StatusRuntimeException)
-                response = translateGrpcError((StatusRuntimeException) error);
+            if (error instanceof StatusRuntimeException) {
 
+                var grpcError = (StatusRuntimeException) error;
+                var httpCode = method.translator.translateGrpcErrorCode(grpcError);
+                var httpContent = method.translator.translateGrpcErrorMessage(grpcError);
+
+                sendErrorResponse(callState.stream, ctx, httpCode, httpContent);
+            }
             else {
 
-                var protocolVersion = clientRequest.protocolVersion();
-                response = new DefaultHttpResponse(protocolVersion, HttpResponseStatus.INTERNAL_SERVER_ERROR);
-                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+                var httpCode = HttpResponseStatus.INTERNAL_SERVER_ERROR;
+                var httpContent = "Unexpected error in REST proxy communicating with gRPC service";
+
+                sendErrorResponse(callState.stream, ctx, httpCode, httpContent);
+
+//                ctx.close();
+//                serviceChannel.shutdown();
             }
 
-            ctx.writeAndFlush(response);
-            ctx.close();
-
-            serviceChannel.shutdown();
-        }
-
-        private HttpResponse translateGrpcError(StatusRuntimeException error) {
-
-            var grpcCode = error.getStatus().getCode();
-            HttpResponseStatus httpCode;
-
-            switch (grpcCode) {
-
-                case INVALID_ARGUMENT:
-                    httpCode = HttpResponseStatus.BAD_REQUEST;
-                    break;
-
-                case NOT_FOUND:
-                    httpCode = HttpResponseStatus.NOT_FOUND;
-                    break;
-
-                case ALREADY_EXISTS:
-                    httpCode = HttpResponseStatus.CONFLICT;
-                    break;
-
-                case FAILED_PRECONDITION:
-                    httpCode = HttpResponseStatus.PRECONDITION_FAILED;
-                    break;
-
-                default:
-
-                    // For unrecognised errors, send error code 500 with no message
-                    httpCode = HttpResponseStatus.INTERNAL_SERVER_ERROR;
-                    var protocolVersion = clientRequest.protocolVersion();
-                    return new DefaultHttpResponse(protocolVersion, httpCode);
-
-            }
-
-            // For recognised gRPC errors, assume the error message says something helpful
-            // Putting message in response body for now
-            // It may be more appropriate in a header
-            var message = error.getStatus().getDescription();
-            var content = ctx.alloc().buffer();
-            content.writeCharSequence(message, StandardCharsets.UTF_8);
-
-            var protocolVersion = clientRequest.protocolVersion();
-            var response = new DefaultFullHttpResponse(protocolVersion, httpCode, content);
-            response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
-            response.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
-
-            return response;
         }
     }
 
+    private void sendErrorResponse(
+            Http2FrameStream stream, ChannelHandlerContext ctx,
+            HttpResponseStatus errorStatus, String errorMessage) {
+
+        var headers = new DefaultHttp2Headers();
+        headers.status(errorStatus.toString());
+        headers.set(":version", "HTTP/2.0");
+
+        if (errorMessage == null || errorMessage.isEmpty()) {
+
+            var headersFrame = new DefaultHttp2HeadersFrame(headers, true).stream(stream);
+            ctx.fireChannelRead(headersFrame);
+        }
+        else {
+
+            // Putting error message in response body for now
+            // It may be more appropriate in a header
+
+            var content = ctx.alloc().buffer();
+            content.writeCharSequence(errorMessage, StandardCharsets.UTF_8);
+
+            headers.set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
+            headers.setInt(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
+
+            var headersFrame = new DefaultHttp2HeadersFrame(headers, false).stream(stream);
+            var dataFrame = new DefaultHttp2DataFrame(content).stream(stream);
+
+            ctx.fireChannelRead(headersFrame);
+            ctx.fireChannelRead(dataFrame);
+        }
+    }
 
     private static class RestApiCallState {
 
         RestApiMethod<?, ?, ?> method;
+
+        Http2Headers requestHeaders;
         CompositeByteBuf requestContent;
 
+        Http2FrameStream stream;
         boolean receiving = false;
     }
 }

@@ -66,7 +66,7 @@ public class RestApiMethod <
 
         // Matcher and builder created once and reused for all matching requests
         var matcher = new RestApiMatcher(httpMethod, urlTemplate, blankRequest);
-        var translator = new RestApiTranslator<>(urlTemplate, blankRequest);
+        var translator = new RestApiTranslator<>(urlTemplate, blankRequest, hasBody);
 
         return new RestApiMethod<>(hasBody, grpcMethod, matcher, translator);
     }
