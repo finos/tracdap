@@ -28,7 +28,7 @@ import org.yaml.snakeyaml.error.YAMLException;
 
 public class ConfigParser {
 
-    private static Logger log = LoggerFactory.getLogger(ConfigParser.class);
+    private static final Logger log = LoggerFactory.getLogger(ConfigParser.class);
 
     static <TConfig> TConfig parseStructuredConfig(
             String configData, ConfigFormat configFormat,
@@ -50,11 +50,13 @@ public class ConfigParser {
 
         try {
 
-            var constructor = new Constructor(elementClass);
-            var yaml = new Yaml(constructor);
-            var configObj = yaml.loadAs(configData, elementClass);
+            var loaderOptions = new LoaderOptions();
+            loaderOptions.setEnumCaseSensitive(false);
 
-            return configObj;
+            var constructor = new Constructor(elementClass, loaderOptions);
+            var yaml = new Yaml(constructor);
+
+            return yaml.loadAs(configData, elementClass);
         }
         catch (MarkedYAMLException e) {
 
