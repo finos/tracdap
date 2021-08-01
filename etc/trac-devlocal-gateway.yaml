@@ -20,57 +20,32 @@ trac:
 
     proxy:
       port: 8080
+      idleTimeout: 10
 
-#    services:
+    services:
+
+      meta:
+
+        protocols: [grpc_web, rest]
+
+        target:
+          scheme: http
+          host: localhost
+          port: 8081
+
+    routes:
+
+#      # This route can be used to run a local development environment against the TRAC APIs
 #
-#      meta:
+#      - routeName: Local App
+#        routeType: HTTP
 #
-#        protocols: [grpc, grpc-web, rest]
+#        match:
+#          host: localhost
+#          path: /local/app
 #
 #        target:
 #          scheme: http
 #          host: localhost
-#          port: 8080
-
-    routes:
-
-      - routeName: TRAC Metadata Service
-        routeType: GRPC
-
-        match:
-          host: localhost
-          path: /trac.api.TracMetadataApi/.*
-
-        target:
-          scheme: http
-          host: localhost
-          port: 8081
-          path: /trac.api.TracMetadataApi/
-
-      - routeName: TRAC Metadata API Mapping
-        routeType: REST
-
-        match:
-          host: localhost
-          path: /trac-meta/
-
-        target:
-          scheme: http
-          host: localhost
-          port: 8081
-          path: /trac.api.TracMetadataApi/
-
-      # This route can be used to run a local development environment against the TRAC APIs
-
-      - routeName: Local App
-        routeType: HTTP
-
-        match:
-          host: localhost
-          path: /local/app
-
-        target:
-          scheme: HTTP
-          host: localhost
-          port: 9090
-          path: /
+#          port: 9090
+#          path: /

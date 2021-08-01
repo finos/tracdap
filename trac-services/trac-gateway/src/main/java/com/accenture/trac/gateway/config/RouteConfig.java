@@ -24,6 +24,7 @@ public class RouteConfig {
     private String routeName;
     private RouteType routeType;
     private List<RouteProtocol> protocols = List.of();
+    private RestMapping restMapping;
 
     private MatchConfig match;
     private TargetConfig target;
@@ -52,6 +53,14 @@ public class RouteConfig {
 
     public void setProtocols(List<RouteProtocol> protocols) {
         this.protocols = protocols;
+    }
+
+    public RestMapping getRestMapping() {
+        return restMapping;
+    }
+
+    public void setRestMapping(RestMapping restMapping) {
+        this.restMapping = restMapping;
     }
 
     public MatchConfig getMatch() {

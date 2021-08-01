@@ -21,12 +21,13 @@ import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.util.VersionInfo;
 import com.accenture.trac.gateway.config.*;
+import com.accenture.trac.gateway.config.helpers.ConfigTranslator;
+import com.accenture.trac.gateway.exec.RouteBuilder;
 import com.accenture.trac.gateway.routing.*;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelOption;
-import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -35,7 +36,6 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -50,10 +50,6 @@ public class TracPlatformGateway {
 
     // The expectation is that the gateway will be substantially re-written at some later point, when
     // more of the core platform components are completed.
-
-    private static final String GW_PORT_CONFIG_KEY = "trac.gw.api.port";
-    private static final String META_SVC_HOST_CONFIG_KEY = "trac.gw.services.meta.host";
-    private static final String META_SVC_PORT_CONFIG_KEY = "trac.gw.services.meta.port";
 
     private static final Duration DEFAULT_SHUTDOWN_TIMEOUT = Duration.of(10, ChronoUnit.SECONDS);
 
@@ -78,30 +74,18 @@ public class TracPlatformGateway {
         log.info("{} {}", componentName, componentVersion);
         log.info("Gateway is starting...");
 
-        var rootConfig = configManager.loadRootConfig(RootConfig.class);
-        var gatewayConfig = rootConfig.getTrac().getGateway();
+        var rawConfig = configManager.loadRootConfig(RootConfig.class);
+        var config = ConfigTranslator.translateServiceRoutes(rawConfig);
+        var gatewayConfig = config.getTrac().getGateway();
+
+        var routes = RouteBuilder.buildAll(gatewayConfig.getRoutes());
+        var protocolNegotiator = new HttpProtocolNegotiator(gatewayConfig, routes);
+
+        var bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
+        var workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
 
         var proxyPort = gatewayConfig.getProxy().getPort();
-        var routeConfigs = gatewayConfig.getRoutes();
 
-        // log.info("Configuring API routes...");
-
-//        var metaSvcHost = readConfigString(properties, META_SVC_HOST_CONFIG_KEY, null);
-//        var metaSvcPort = readConfigInt(properties, META_SVC_PORT_CONFIG_KEY, null);
-//        var metaApiRoutes = TracApiConfig.metaApiRoutes(metaSvcHost, metaSvcPort);
-//        var metaApiTrustedRoutes = TracApiConfig.metaApiTrustedRoutes(metaSvcHost, metaSvcPort);
-//        var routingConfig = RoutingConfig.newBlankConfig()
-//                .addRoute(new BasicRouteMatcher("trac-meta"), () -> new RoutingHandler(metaApiRoutes))
-//                .addRoute(new BasicRouteMatcher("trac-meta-trusted"), () -> new RoutingHandler(metaApiTrustedRoutes));
-
-        log.info("Opening gateway on port {}...", proxyPort);
-
-        EventLoopGroup bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
-        EventLoopGroup workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
-
-        var protocolNegotiator = new HttpProtocolNegotiator(
-                () -> new Http1Router(routeConfigs),
-                () -> new Http2Router(routeConfigs));
 
 //        try {
             ServerBootstrap bootstrap = new ServerBootstrap()
@@ -114,6 +98,8 @@ public class TracPlatformGateway {
             this.mainThread = Thread.currentThread();
             this.shutdownThread = new Thread(this::jvmShutdownHook, "shutdown");
             Runtime.getRuntime().addShutdownHook(shutdownThread);
+
+            log.info("Opening gateway on port {}...", proxyPort);
 
             // Bind and start to accept incoming connections.
             serverChannel = bootstrap

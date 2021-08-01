@@ -17,7 +17,7 @@
 package com.accenture.trac.gateway.proxy.rest;
 
 import com.accenture.trac.common.exception.EStartup;
-import com.accenture.trac.gateway.routing.IRouteMatcher;
+import com.accenture.trac.gateway.exec.IRouteMatcher;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 

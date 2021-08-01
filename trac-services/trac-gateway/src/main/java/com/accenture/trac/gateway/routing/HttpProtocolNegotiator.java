@@ -17,6 +17,8 @@
 package com.accenture.trac.gateway.routing;
 
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.gateway.config.GatewayConfig;
+import com.accenture.trac.gateway.exec.Route;
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.*;
@@ -25,6 +27,7 @@ import io.netty.util.AsciiString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.function.Supplier;
 
 
@@ -37,15 +40,20 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final GatewayConfig config;
+    private final List<Route> routes;
+
     private final Supplier<ChannelInboundHandlerAdapter> http1Handler;
     private final Supplier<ChannelInboundHandlerAdapter> http2Handler;
 
-    public HttpProtocolNegotiator(
-            Supplier<ChannelInboundHandlerAdapter> http1Handler,
-            Supplier<ChannelInboundHandlerAdapter> http2Handler) {
 
-        this.http1Handler = http1Handler;
-        this.http2Handler = http2Handler;
+    public HttpProtocolNegotiator(GatewayConfig config, List<Route> routes) {
+
+        this.config = config;
+        this.routes = routes;
+
+        this.http1Handler = () -> new Http1Router(routes);
+        this.http2Handler = () -> new Http2Router(config.getRoutes());
     }
 
     @Override
