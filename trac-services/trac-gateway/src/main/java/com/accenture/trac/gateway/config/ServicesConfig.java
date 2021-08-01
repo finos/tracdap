@@ -16,24 +16,15 @@
 
 package com.accenture.trac.gateway.config;
 
-public class ProxyConfig {
+public class ServicesConfig {
 
-    private short port;
-    private int idleTimeout;
+    private ServiceConfig meta;
 
-    public short getPort() {
-        return port;
+    public ServiceConfig getMeta() {
+        return meta;
     }
 
-    public void setPort(short port) {
-        this.port = port;
-    }
-
-    public int getIdleTimeout() {
-        return idleTimeout;
-    }
-
-    public void setIdleTimeout(int idleTimeout) {
-        this.idleTimeout = idleTimeout;
+    public void setMeta(ServiceConfig meta) {
+        this.meta = meta;
     }
 }

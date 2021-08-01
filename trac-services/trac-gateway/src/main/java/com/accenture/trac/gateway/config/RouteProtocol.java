@@ -16,24 +16,9 @@
 
 package com.accenture.trac.gateway.config;
 
-public class ProxyConfig {
 
-    private short port;
-    private int idleTimeout;
-
-    public short getPort() {
-        return port;
-    }
-
-    public void setPort(short port) {
-        this.port = port;
-    }
-
-    public int getIdleTimeout() {
-        return idleTimeout;
-    }
-
-    public void setIdleTimeout(int idleTimeout) {
-        this.idleTimeout = idleTimeout;
-    }
+public enum RouteProtocol {
+    GRPC,
+    GRPC_WEB,
+    REST
 }

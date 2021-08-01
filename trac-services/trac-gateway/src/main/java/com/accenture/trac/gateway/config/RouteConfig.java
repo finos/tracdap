@@ -17,10 +17,13 @@
 package com.accenture.trac.gateway.config;
 
 
+import java.util.List;
+
 public class RouteConfig {
 
     private String routeName;
     private RouteType routeType;
+    private List<RouteProtocol> protocols = List.of();
 
     private MatchConfig match;
     private TargetConfig target;
@@ -41,6 +44,14 @@ public class RouteConfig {
 
     public void setRouteType(RouteType routeType) {
         this.routeType = routeType;
+    }
+
+    public List<RouteProtocol> getProtocols() {
+        return protocols;
+    }
+
+    public void setProtocols(List<RouteProtocol> protocols) {
+        this.protocols = protocols;
     }
 
     public MatchConfig getMatch() {

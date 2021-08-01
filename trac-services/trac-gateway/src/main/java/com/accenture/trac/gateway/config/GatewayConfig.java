@@ -22,7 +22,8 @@ import java.util.List;
 public class GatewayConfig {
 
     private ProxyConfig proxy;
-    private List<RouteConfig> routes;
+    private ServicesConfig services;
+    private List<RouteConfig> routes = List.of();
 
     public ProxyConfig getProxy() {
         return proxy;
@@ -30,6 +31,14 @@ public class GatewayConfig {
 
     public void setProxy(ProxyConfig proxy) {
         this.proxy = proxy;
+    }
+
+    public ServicesConfig getServices() {
+        return services;
+    }
+
+    public void setServices(ServicesConfig services) {
+        this.services = services;
     }
 
     public List<RouteConfig> getRoutes() {
