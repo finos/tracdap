@@ -153,7 +153,8 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                 var callState = callStateMap.get(stream);
 
                 // TODO: Check call state and stream are good
-                callState.requestContent.addComponent(true, dataFrame.content());
+                if (dataFrame.content() != null && dataFrame.content().readableBytes() > 0)
+                    callState.requestContent.addComponent(true, dataFrame.content());
 
                 if (dataFrame.isEndStream())
                     dispatchUnaryRequest(callState.method, callState, ctx);
