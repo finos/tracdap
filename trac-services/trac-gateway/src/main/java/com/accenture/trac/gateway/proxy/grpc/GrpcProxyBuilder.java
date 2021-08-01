@@ -81,7 +81,7 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
 
         if (sourceHttpVersion == 1) {
 
-            pipeline.addLast(HTTP_1_TO_2_FRAMING, new Http1to2Framing());
+            pipeline.addLast(HTTP_1_TO_2_FRAMING, new Http1to2Framing(routeConfig));
             pipeline.addLast(HTTP_1_ROUTER_LINK, new Http1RouterLink(routerCtx, routeActivePromise));
         }
         else if (sourceHttpVersion == 2) {

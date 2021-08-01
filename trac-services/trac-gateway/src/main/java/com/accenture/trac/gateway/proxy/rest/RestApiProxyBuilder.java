@@ -95,7 +95,7 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
 
         if (sourceHttpVersion == 1) {
 
-            pipeline.addLast(new Http1to2Framing());
+            pipeline.addLast(new Http1to2Framing(routeConfig));
             pipeline.addLast(new Http1RouterLink(routerCtx, routeActivePromise));
         }
         else if (sourceHttpVersion == 2) {

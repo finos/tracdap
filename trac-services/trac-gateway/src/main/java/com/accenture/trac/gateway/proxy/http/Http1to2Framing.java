@@ -17,6 +17,7 @@
 package com.accenture.trac.gateway.proxy.http;
 
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.gateway.config.RouteConfig;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
@@ -35,12 +36,16 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final RouteConfig routeConfig;
+
     private final Map<Integer, Http2FrameStream> streams;
     private final AtomicInteger nextSeqId;
     private int inboundSeqId;
     private int outboundSeqId;
 
-    public Http1to2Framing() {
+    public Http1to2Framing(RouteConfig routeConfig) {
+
+        this.routeConfig = routeConfig;
 
         this.streams = new HashMap<>();
         this.nextSeqId = new AtomicInteger(0);
@@ -114,13 +119,16 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
             var h1Headers = h1Request.headers();
 
             var h2Headers = new DefaultHttp2Headers()
-                    .method(HttpMethod.POST.name())
-                    .scheme(HttpScheme.HTTPS.name())
+                    .method(h1Request.method().name())
+                    .scheme(routeConfig.getTarget().getScheme())
                     .path(h1Request.uri());
 
             if (h1Headers.contains(HttpHeaderNames.HOST))
                 h2Headers.authority(h1Headers.get(HttpHeaderNames.HOST));
+            else
+                h2Headers.authority(routeConfig.getTarget().getHost());
 
+            // Copy across all other HTTP/1 headers that we are not explicitly changing or removing
             var filterHeaders = List.of(
                     HttpHeaderNames.HOST.toString(),
                     HttpHeaderNames.CONNECTION.toString(),
