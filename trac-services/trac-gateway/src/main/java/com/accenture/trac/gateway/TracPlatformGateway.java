@@ -75,6 +75,12 @@ public class TracPlatformGateway {
 
     public void start() {
 
+        // Do not register a shutdown hook unless explicitly requested
+        start(false);
+    }
+
+    public void start(boolean registerShutdownHook) {
+
         var componentName = VersionInfo.getComponentName(TracPlatformGateway.class);
         var componentVersion = VersionInfo.getComponentVersion(TracPlatformGateway.class);
         log.info("{} {}", componentName, componentVersion);
@@ -132,9 +138,12 @@ public class TracPlatformGateway {
             // No need to keep a reference to the server channel
             // Shutdown is managed using the event loop groups
 
-            // Install a shutdown handler for a graceful exit
-            var shutdownThread = new Thread(this::jvmShutdownHook, "shutdown");
-            Runtime.getRuntime().addShutdownHook(shutdownThread);
+            // If requested, install a shutdown handler for a graceful exit
+            // This is needed when running a real server instance, but not when running embedded tests
+            if (registerShutdownHook) {
+                var shutdownThread = new Thread(this::jvmShutdownHook, "shutdown");
+                Runtime.getRuntime().addShutdownHook(shutdownThread);
+            }
 
             // Keep the logging system active while shutdown hooks are running
             disableLog4jShutdownHook();
@@ -161,7 +170,7 @@ public class TracPlatformGateway {
         }
     }
 
-    public void stop() {
+    public int stop() {
 
         log.info("Gateway server is stopping...");
 
@@ -202,14 +211,9 @@ public class TracPlatformGateway {
         // The logging system can be shut down now that the shutdown hook has completed
         explicitLog4jShutdown();
 
-        // Calling System.exit from inside a shutdown hook can lead to undefined behavior (often JVM hangs)
-        // This is because it calls back into the shutdown handlers
-
-        // Runtime.halt will stop the JVM immediately without calling back into shutdown hooks
-        // At this point everything is either stopped or has failed to stop
-        // So, it should be ok to use Runtime.halt and report the exit code
-
-        Runtime.getRuntime().halt(exitCode);
+        // Do not forcibly exit the JVM inside stop()
+        // Exit code can be checked by embedded tests when the JVM will continue running
+        return exitCode;
     }
 
     private void disableLog4jShutdownHook() {
@@ -250,7 +254,17 @@ public class TracPlatformGateway {
     private void jvmShutdownHook() {
 
         log.info("Shutdown request received");
-        this.stop();
+
+        var exitCode = this.stop();
+
+        // Calling System.exit from inside a shutdown hook can lead to undefined behavior (often JVM hangs)
+        // This is because it calls back into the shutdown handlers
+
+        // Runtime.halt will stop the JVM immediately without calling back into shutdown hooks
+        // At this point everything is either stopped or has failed to stop
+        // So, it should be ok to use Runtime.halt and report the exit code
+
+        Runtime.getRuntime().halt(exitCode);
     }
 
     public static void main(String[] args) {
@@ -259,7 +273,7 @@ public class TracPlatformGateway {
 
             var config = ConfigBootstrap.useCommandLine(TracPlatformGateway.class, args);
             var gateway = new TracPlatformGateway(config);
-            gateway.start();
+            gateway.start(true);
         }
         catch (EStartup e) {
 
