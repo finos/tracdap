@@ -146,7 +146,12 @@ public class Http1Router extends ChannelDuplexHandler {
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
 
-       super.userEventTriggered(ctx, evt);
+        if (evt instanceof IdleStateEvent) {
+            log.info("Idle time expired");
+            ctx.close();
+        }
+        else
+            super.userEventTriggered(ctx, evt);
     }
 
     @Override
@@ -159,6 +164,11 @@ public class Http1Router extends ChannelDuplexHandler {
     // -----------------------------------------------------------------------------------------------------------------
     // REQUEST PROCESSING
     // -----------------------------------------------------------------------------------------------------------------
+
+
+    // TODO: Check Releasing!!!
+    // TODO: Some basic error handling
+
 
     private void processNewRequest(ChannelHandlerContext ctx, HttpRequest msg) throws Exception {
 

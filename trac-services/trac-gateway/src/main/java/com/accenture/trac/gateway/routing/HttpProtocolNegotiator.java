@@ -19,15 +19,19 @@ package com.accenture.trac.gateway.routing;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.gateway.config.GatewayConfig;
 import com.accenture.trac.gateway.exec.Route;
+
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http2.*;
+import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AsciiString;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 
@@ -36,12 +40,14 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
     private static final String PROTOCOL_SELECTOR_HANDLER = "protocol_selector";
     private static final String HTTP_1_INITIALIZER = "http_1_initializer";
     private static final String HTTP_1_KEEPALIVE = "http_1_keepalive";
-    private static final String HTTP_2_INITIALIZER = "http_2_initializer";
+    private static final String HTTP_1_TIMEOUT = "http_1_timeout";
+
+    private static final int MAX_TIMEOUT = 3600;
+    private static final int DEFAULT_TIMEOUT = 60;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final GatewayConfig config;
-    private final List<Route> routes;
+    private final int idleTimeout;
 
     private final Supplier<ChannelInboundHandlerAdapter> http1Handler;
     private final Supplier<ChannelInboundHandlerAdapter> http2Handler;
@@ -49,8 +55,16 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
     public HttpProtocolNegotiator(GatewayConfig config, List<Route> routes) {
 
-        this.config = config;
-        this.routes = routes;
+        int idleTimeout;
+
+        try {
+            idleTimeout = config.getProxy().getIdleTimeout();
+        }
+        catch (Exception e) {
+            idleTimeout = DEFAULT_TIMEOUT;
+        }
+
+        this.idleTimeout = idleTimeout;
 
         this.http1Handler = () -> new Http1Router(routes);
         this.http2Handler = () -> new Http2Router(config.getRoutes());
@@ -76,19 +90,33 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
     private class Http1Initializer extends SimpleChannelInboundHandler<HttpMessage> {
 
+        // Using an inbound handler instead of a regular initializer lets us see the first message on the channel
+        // We can get the HTTP protocol version from that
+
         @Override
-        protected void channelRead0(ChannelHandlerContext ctx, HttpMessage msg) throws Exception {
+        protected void channelRead0(ChannelHandlerContext ctx, HttpMessage msg) {
 
             var pipeline = ctx.pipeline();
             var remoteSocket = ctx.channel().remoteAddress();
             var httpVersion = msg.protocolVersion();
 
-            log.info("{} {} CLEARTEXT", remoteSocket, httpVersion);
+            log.info("New connection: {} {} CLEARTEXT", remoteSocket, httpVersion);
 
+            // Keep alive handler will close connections not marked as keep-alive when a request is complete
             pipeline.addAfter(HTTP_1_INITIALIZER, HTTP_1_KEEPALIVE, new HttpServerKeepAliveHandler());
-            pipeline.addAfter(HTTP_1_KEEPALIVE, null, http1Handler.get());
-            pipeline.remove(this);
 
+            // For connections that are kept alive, we need to handle timeouts
+            // This idle state handler will trigger idle events after the configured timeout
+            // The main Http1Router is responsible for handling the idle events
+            var idleHandler = new IdleStateHandler(MAX_TIMEOUT, MAX_TIMEOUT, idleTimeout, TimeUnit.SECONDS);
+            pipeline.addAfter(HTTP_1_KEEPALIVE, HTTP_1_TIMEOUT, idleHandler);
+
+            // The main Http1Router instance
+            pipeline.addLast(http1Handler.get());
+
+            // Since this handler is not based on ChannelInitializer,
+            // We need to remove it explicitly and re-trigger the first message
+            pipeline.remove(this);
             ctx.fireChannelRead(msg);
         }
     }
@@ -96,12 +124,13 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
     private class Http2Initializer extends ChannelInboundHandlerAdapter {
 
         @Override
-        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        public void channelRead(ChannelHandlerContext ctx, Object msg) {
 
             var pipeline = ctx.pipeline();
             var remoteSocket = ctx.channel().remoteAddress();
+            var httpVersion = "HTTP/2.0";
 
-            log.info("{} {} CLEARTEXT", remoteSocket, "HTTP/2");
+            log.info("New connection: {} {} CLEARTEXT", remoteSocket, httpVersion);
 
             if (pipeline.get(Http2FrameCodec.class) == null) {
 
