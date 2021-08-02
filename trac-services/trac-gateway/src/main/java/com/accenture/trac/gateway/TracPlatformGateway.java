@@ -32,6 +32,11 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.Configurator;
+import org.apache.logging.log4j.core.impl.Log4jContextFactory;
+import org.apache.logging.log4j.core.util.DefaultShutdownCallbackRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -131,6 +136,9 @@ public class TracPlatformGateway {
             var shutdownThread = new Thread(this::jvmShutdownHook, "shutdown");
             Runtime.getRuntime().addShutdownHook(shutdownThread);
 
+            // Keep the logging system active while shutdown hooks are running
+            disableLog4jShutdownHook();
+
             log.info("Gateway server is up and running");
         }
         catch (InterruptedException e) {
@@ -171,10 +179,7 @@ public class TracPlatformGateway {
 
         workerShutdown.awaitUninterruptibly(shutdownTimeRemaining.getSeconds(), TimeUnit.SECONDS);
 
-        // Closing messages are written to stdout / stderr as well as the logs
-        // The default logging configuration disables the logging shutdown hook
-        // However if an alternate configuration is supplied the logging shutdown hook may be active
-        // In this case, the logging system will be stopped before the shutdown sequence completes
+        int exitCode;
 
         if (bossShutdown.isSuccess() && workerShutdown.isSuccess()) {
 
@@ -184,25 +189,65 @@ public class TracPlatformGateway {
             // Setting exit code 0 means the process will finish successfully,
             // even if the shutdown was triggered by an interrupt signal
 
-            Runtime.getRuntime().halt(0);
+            exitCode = 0;
         }
         else {
 
             log.error("Gateway server shutdown did not complete in the allotted time");
             System.out.println("Gateway server shutdown did not complete in the allotted time");
 
-            // Calling System.exit from inside a shutdown hook can lead to undefined behavior (often JVM hangs)
-            // This is because it calls back into the shutdown handlers
+            exitCode = -1;
+        }
 
-            // Runtime.halt will stop the JVM immediately without calling back into shutdown hooks
-            // At this point everything is either stopped or has failed to stop
-            // So, it should be ok to use Runtime.halt and report the exit code
+        // The logging system can be shut down now that the shutdown hook has completed
+        explicitLog4jShutdown();
 
-            Runtime.getRuntime().halt(-1);
+        // Calling System.exit from inside a shutdown hook can lead to undefined behavior (often JVM hangs)
+        // This is because it calls back into the shutdown handlers
+
+        // Runtime.halt will stop the JVM immediately without calling back into shutdown hooks
+        // At this point everything is either stopped or has failed to stop
+        // So, it should be ok to use Runtime.halt and report the exit code
+
+        Runtime.getRuntime().halt(exitCode);
+    }
+
+    private void disableLog4jShutdownHook() {
+
+        // The default logging configuration disables logging in a shutdown hook
+        // The logging system goes down when shutdown is initiated and messages in the shutdown sequence are lost
+        // Removing the logging shutdown hook allows closing messages to go to the logs as normal
+
+        // This is an internal API in Log4j, there is a config setting available
+        // This approach means admins with custom logging configs don't need to know about shutdown hooks
+        // Anyway we would need to use the internal API to explicitly close the context
+
+        try {
+            var logFactory = (Log4jContextFactory) LogManager.getFactory();
+            ((DefaultShutdownCallbackRegistry) logFactory.getShutdownCallbackRegistry()).stop();
+        }
+        catch (Exception e) {
+
+            // In case disabling the shutdown hook doesn't work, do not interrupt the startup sequence
+            // As a backup, final shutdown messages are written to stdout / stderr
+
+            log.warn("Logging shutdown hook is active (shutdown messages may be lost)");
         }
     }
 
-    public void jvmShutdownHook() {
+    private void explicitLog4jShutdown() {
+
+        // Since the logging shutdown hook is disabled, provide a way to explicitly shut down the logging system
+        // Especially important for custom configurations connecting to external logging services or databases
+        // In the event that disabling the shutdown hook did not work, this method will do nothing
+
+        var logContext = LogManager.getContext();
+
+        if (logContext instanceof LoggerContext)
+            Configurator.shutdown((LoggerContext) logContext);
+    }
+
+    private void jvmShutdownHook() {
 
         log.info("Shutdown request received");
         this.stop();
