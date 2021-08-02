@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Accenture Global Solutions Limited
+ * Copyright 2021 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,12 +22,13 @@ import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.util.VersionInfo;
 import com.accenture.trac.gateway.config.*;
 import com.accenture.trac.gateway.config.helpers.ConfigTranslator;
+import com.accenture.trac.gateway.exec.Route;
 import com.accenture.trac.gateway.exec.RouteBuilder;
 import com.accenture.trac.gateway.routing.*;
 
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -35,8 +36,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Properties;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 
@@ -57,9 +59,8 @@ public class TracPlatformGateway {
 
     private final ConfigManager configManager;
 
-    private Channel serverChannel;
-    private Thread mainThread;
-    private Thread shutdownThread;
+    private EventLoopGroup bossGroup = null;
+    private EventLoopGroup workerGroup = null;
 
 
     public TracPlatformGateway(ConfigManager configManager) {
@@ -67,161 +68,144 @@ public class TracPlatformGateway {
         this.configManager = configManager;
     }
 
-    public void start() throws Exception {
+    public void start() {
 
         var componentName = VersionInfo.getComponentName(TracPlatformGateway.class);
         var componentVersion = VersionInfo.getComponentVersion(TracPlatformGateway.class);
         log.info("{} {}", componentName, componentVersion);
-        log.info("Gateway is starting...");
 
-        var rawConfig = configManager.loadRootConfig(RootConfig.class);
-        var config = ConfigTranslator.translateServiceRoutes(rawConfig);
-        var gatewayConfig = config.getTrac().getGateway();
+        GatewayConfig gatewayConfig;
+        short proxyPort;
+        List<Route> routes;
 
-        var routes = RouteBuilder.buildAll(gatewayConfig.getRoutes());
-        var protocolNegotiator = new HttpProtocolNegotiator(gatewayConfig, routes);
+        try {
+            log.info("Preparing gateway config...");
 
-        var bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
-        var workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
+            var rawConfig = configManager.loadRootConfig(RootConfig.class);
+            var config = ConfigTranslator.translateServiceRoutes(rawConfig);
 
-        var proxyPort = gatewayConfig.getProxy().getPort();
+            gatewayConfig = config.getTrac().getGateway();
+            proxyPort = gatewayConfig.getProxy().getPort();
 
+            routes = RouteBuilder.buildAll(gatewayConfig.getRoutes());
 
-//        try {
-            ServerBootstrap bootstrap = new ServerBootstrap()
+            log.info("Gateway config looks ok");
+        }
+        catch (Exception e) {
+
+            var errorMessage = "There was an error preparing the gateway config: " + e.getMessage();
+            log.error(errorMessage, e);
+            throw new EStartup(errorMessage, e);
+        }
+
+        try {
+
+            log.info("Starting the gateway server on port {}...", proxyPort);
+
+            // The protocol negotiator is the top level initializer for new inbound connections
+            var protocolNegotiator = new HttpProtocolNegotiator(gatewayConfig, routes);
+
+            // TODO: Review configuration of thread pools and channel options
+
+            bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
+            workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
+
+            var bootstrap = new ServerBootstrap()
                     .group(bossGroup, workerGroup)
-                    .channel(NioServerSocketChannel.class) // (3)
+                    .channel(NioServerSocketChannel.class)
                     .childHandler(protocolNegotiator)
-                    .option(ChannelOption.SO_BACKLOG, 128)          // (5)
-                    .childOption(ChannelOption.SO_KEEPALIVE, true); // (6)
-
-            this.mainThread = Thread.currentThread();
-            this.shutdownThread = new Thread(this::jvmShutdownHook, "shutdown");
-            Runtime.getRuntime().addShutdownHook(shutdownThread);
-
-            log.info("Opening gateway on port {}...", proxyPort);
+                    .option(ChannelOption.SO_BACKLOG, 128)
+                    .childOption(ChannelOption.SO_KEEPALIVE, true);
 
             // Bind and start to accept incoming connections.
-            serverChannel = bootstrap
-                    .bind(proxyPort)
-                    .sync()
-                    .channel();
+            var startupFuture = bootstrap.bind(proxyPort);
 
-            log.info("TRAC Platform Gateway is up");
+            // Block until the server channel is ready - it's just easier this way!
+            // The sync call will rethrow any errors, so they can be handled before leaving the start() method
+            startupFuture.sync();
 
-            // Wait until the server socket is closed.
-            // In this example, this does not happen, but you can do that to gracefully
-            // shut down your server.
-            //f.channel().closeFuture().sync();
-//        }
-//        catch (Exception e) {
-//            workerGroup.shutdownGracefully();
-//            bossGroup.shutdownGracefully();
-//        }
+            // No need to keep a reference to the server channel
+            // Shutdown is managed using the event loop groups
+
+            // Install a shutdown handler for a graceful exit
+            var shutdownThread = new Thread(this::jvmShutdownHook, "shutdown");
+            Runtime.getRuntime().addShutdownHook(shutdownThread);
+
+            log.info("Gateway server is up and running");
+        }
+        catch (InterruptedException e) {
+
+            log.error("Startup sequence was interrupted");
+            Thread.currentThread().interrupt();
+        }
+        catch (Exception e) {
+
+            var errorMessage = "Gateway server failed to start: " + e.getMessage();
+            log.error(errorMessage, e);
+
+            if (workerGroup != null)
+                workerGroup.shutdownGracefully();
+
+            if (bossGroup != null)
+                bossGroup.shutdownGracefully();
+
+            throw new EStartup(e.getMessage(), e);
+        }
     }
 
     public void stop() {
 
-        try {
+        log.info("Gateway server is stopping...");
 
-            log.info("Gateway is stopping...");
+        var shutdownStartTime = Instant.now();
+        var bossShutdown = bossGroup.shutdownGracefully();
+        var workerShutdown = workerGroup.shutdownGracefully();
 
-            var closeResult = serverChannel.close();
-            closeResult.await(DEFAULT_SHUTDOWN_TIMEOUT.getSeconds(), TimeUnit.SECONDS);
+        // Prevent interruption for the duration of the shutdown timeout
+        // If someone really wants to kill the process in that time, they can send a hard kill signal
 
-            if (closeResult.isDone() && closeResult.isSuccess())
-                log.info("Gateway port closed");
+        bossShutdown.awaitUninterruptibly(DEFAULT_SHUTDOWN_TIMEOUT.getSeconds(), TimeUnit.SECONDS);
 
-            else
-                log.error("Gateway port failed to close");
+        var shutdownElapsedTime = Duration.between(shutdownStartTime, Instant.now());
+        var shutdownTimeRemaining = DEFAULT_SHUTDOWN_TIMEOUT.minus(shutdownElapsedTime);
+
+        workerShutdown.awaitUninterruptibly(shutdownTimeRemaining.getSeconds(), TimeUnit.SECONDS);
+
+        // Closing messages are written to stdout / stderr as well as the logs
+        // The default logging configuration disables the logging shutdown hook
+        // However if an alternate configuration is supplied the logging shutdown hook may be active
+        // In this case, the logging system will be stopped before the shutdown sequence completes
+
+        if (bossShutdown.isSuccess() && workerShutdown.isSuccess()) {
+
+            log.info("Gateway server has gone down cleanly");
+            System.out.println("Gateway server has gone down cleanly");
+
+            // Setting exit code 0 means the process will finish successfully,
+            // even if the shutdown was triggered by an interrupt signal
+
+            Runtime.getRuntime().halt(0);
         }
-        catch (InterruptedException e) {
+        else {
 
-            System.err.println("TRAC Metadata service was interrupted during shutdown");
-            log.warn("TRAC Metadata service was interrupted during shutdown");
+            log.error("Gateway server shutdown did not complete in the allotted time");
+            System.out.println("Gateway server shutdown did not complete in the allotted time");
 
-            Thread.currentThread().interrupt();
+            // Calling System.exit from inside a shutdown hook can lead to undefined behavior (often JVM hangs)
+            // This is because it calls back into the shutdown handlers
+
+            // Runtime.halt will stop the JVM immediately without calling back into shutdown hooks
+            // At this point everything is either stopped or has failed to stop
+            // So, it should be ok to use Runtime.halt and report the exit code
+
+            Runtime.getRuntime().halt(-1);
         }
     }
 
     public void jvmShutdownHook() {
-//
-//        try {
-//            log.info("Shutdown request received");
-//
-//            this.stop();
-//            this.mainThread.join(5000);
-//
-//            log.info("Normal shutdown complete");
-//            System.out.println("Normal shutdown complete");
-//        }
-//        catch (InterruptedException e) {
-//            Thread.currentThread().interrupt();
-//        }
-    }
 
-    public void blockUntilShutdown() throws InterruptedException {
-
-        try {
-            log.info("Begin normal operations");
-
-            serverChannel.closeFuture().await();
-
-            System.out.println("Going down in main");
-
-            //log.info("TRAC Platform Gateway is going down");
-        }
-        catch (InterruptedException e) {
-
-            System.out.println("Going down in main int");
-
-            log.info("TRAC Platform Gateway has been interrupted");
-            throw e;
-        }
-    }
-
-    private String readConfigString(Properties props, String propKey, String propDefault) {
-
-        // TODO: Reading config needs to be centralised
-        // Standard methods for handling defaults, valid ranges etc.
-        // One option is to use proto to define config objects and automate parsing
-        // This would work well where configs need to be sent between components, e.g. the TRAC executor
-
-        var propValue = props.getProperty(propKey);
-
-        if (propValue == null || propValue.isBlank()) {
-
-            if (propDefault == null) {
-
-                var message = "Missing required config property: " + propKey;
-                log.error(message);
-                throw new EStartup(message);
-            }
-            else
-                return propDefault;
-        }
-
-        return propValue;
-    }
-
-    private int readConfigInt(Properties props, String propKey, String propDefault) {
-
-        // TODO: Reading config needs to be centralised
-        // Standard methods for handling defaults, valid ranges etc.
-        // One option is to use proto to define config objects and automate parsing
-        // This would work well where configs need to be sent between components, e.g. the TRAC executor
-
-        var stringValue = readConfigString(props, propKey, propDefault);
-
-        try {
-            return Integer.parseInt(stringValue);
-        }
-        catch (NumberFormatException e) {
-
-            var message = "Config property must be an integer: " + propKey + ", got value '" + stringValue + "'";
-            log.error(message);
-            throw new EStartup(message);
-        }
+        log.info("Shutdown request received");
+        this.stop();
     }
 
     public static void main(String[] args) {
@@ -231,9 +215,6 @@ public class TracPlatformGateway {
             var config = ConfigBootstrap.useCommandLine(TracPlatformGateway.class, args);
             var gateway = new TracPlatformGateway(config);
             gateway.start();
-            gateway.blockUntilShutdown();
-
-            //System.exit(0);
         }
         catch (EStartup e) {
 
