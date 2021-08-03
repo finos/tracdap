@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/javascript-web-api.iml" filepath="$PROJECT_DIR$/.idea/modules/javascript-web-api.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/trac-web-api.iml" filepath="$PROJECT_DIR$/.idea/modules/trac-web-api.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/python-model-runtime.iml" filepath="$PROJECT_DIR$/.idea/modules/python-model-runtime.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/python-examples.iml" filepath="$PROJECT_DIR$/.idea/modules/python-examples.iml" />
     </modules>
