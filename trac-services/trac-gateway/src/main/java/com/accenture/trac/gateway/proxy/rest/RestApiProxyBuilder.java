@@ -19,13 +19,10 @@ package com.accenture.trac.gateway.proxy.rest;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.gateway.config.RouteConfig;
 import com.accenture.trac.gateway.config.rest.MetaApiRestMapping;
-import com.accenture.trac.gateway.proxy.http.Http1RouterLink;
+import com.accenture.trac.gateway.routing.Http1RouterLink;
 import com.accenture.trac.gateway.proxy.http.Http1to2Framing;
 
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPromise;
+import io.netty.channel.*;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2Settings;
@@ -42,21 +39,18 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
 
     private final RouteConfig routeConfig;
     private final int sourceHttpVersion;
-    private final ChannelHandlerContext routerCtx;
-    private final ChannelPromise routeActivePromise;
+    private final ChannelDuplexHandler routerLink;
     private final EventExecutor executor;
 
     public RestApiProxyBuilder(
             RouteConfig routeConfig,
             int sourceHttpVersion,
-            ChannelHandlerContext routerCtx,
-            ChannelPromise routeActivePromise,
+            ChannelDuplexHandler routerLink,
             EventExecutor executor) {
 
         this.routeConfig = routeConfig;
         this.sourceHttpVersion = sourceHttpVersion;
-        this.routerCtx = routerCtx;
-        this.routeActivePromise = routeActivePromise;
+        this.routerLink = routerLink;
         this.executor = executor;
     }
 
@@ -96,7 +90,7 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
         if (sourceHttpVersion == 1) {
 
             pipeline.addLast(new Http1to2Framing(routeConfig));
-            pipeline.addLast(new Http1RouterLink(routerCtx, routeActivePromise));
+            pipeline.addLast(routerLink);
         }
         else if (sourceHttpVersion == 2) {
 

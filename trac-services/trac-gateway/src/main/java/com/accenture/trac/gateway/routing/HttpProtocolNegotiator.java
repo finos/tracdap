@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 
@@ -49,6 +50,7 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
     private final int idleTimeout;
 
+    private final AtomicInteger nextConnectionId = new AtomicInteger();
     private final Supplier<ChannelInboundHandlerAdapter> http1Handler;
     private final Supplier<ChannelInboundHandlerAdapter> http2Handler;
 
@@ -66,7 +68,7 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
         this.idleTimeout = idleTimeout;
 
-        this.http1Handler = () -> new Http1Router(routes);
+        this.http1Handler = () -> new Http1Router(routes, nextConnectionId.getAndIncrement());
         this.http2Handler = () -> new Http2Router(config.getRoutes());
     }
 

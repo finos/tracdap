@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.gateway.proxy.http;
+package com.accenture.trac.gateway.routing;
 
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -22,6 +22,8 @@ import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.function.Function;
 
 
 /**
@@ -46,9 +48,18 @@ public class Http1RouterLink extends ChannelDuplexHandler {
     private final ChannelHandlerContext routerCtx;
     private final ChannelPromise routeActivePromise;
 
-    public Http1RouterLink(ChannelHandlerContext routerCtx, ChannelPromise routeActivePromise) {
+    private final Http1Router router;
+    private final int routeIndex;
+
+    public Http1RouterLink(
+            ChannelHandlerContext routerCtx, ChannelPromise routeActivePromise,
+            Http1Router router, int routeIndex) {
+
         this.routerCtx = routerCtx;
         this.routeActivePromise = routeActivePromise;
+
+        this.router = router;
+        this.routeIndex = routeIndex;
     }
 
     @Override
@@ -89,6 +100,8 @@ public class Http1RouterLink extends ChannelDuplexHandler {
 
         if (log.isDebugEnabled())
             log.debug("Router link inbound message of type {}", msg.getClass().getSimpleName());
+
+        router.associateRoute(msg, routeIndex);
 
         // For inbound messages, we want to relay through the whole of the client-side channel
         // Calling .channel().write() means the message will pass through all handlers, including the router handler

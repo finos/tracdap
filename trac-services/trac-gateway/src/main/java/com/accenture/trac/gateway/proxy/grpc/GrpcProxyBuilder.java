@@ -18,7 +18,6 @@ package com.accenture.trac.gateway.proxy.grpc;
 
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.gateway.config.RouteConfig;
-import com.accenture.trac.gateway.proxy.http.Http1RouterLink;
 import com.accenture.trac.gateway.proxy.http.Http1to2Framing;
 import io.netty.channel.*;
 import io.netty.handler.codec.http2.*;
@@ -40,19 +39,16 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
 
     private final RouteConfig routeConfig;
     private final int sourceHttpVersion;
-    private final ChannelHandlerContext routerCtx;
-    private final ChannelPromise routeActivePromise;
+    private final ChannelDuplexHandler routerLink;
 
     public GrpcProxyBuilder(
             RouteConfig routeConfig,
             int sourceHttpVersion,
-            ChannelHandlerContext routerCtx,
-            ChannelPromise routeActivePromise) {
+            ChannelDuplexHandler routerLink) {
 
         this.routeConfig = routeConfig;
         this.sourceHttpVersion = sourceHttpVersion;
-        this.routerCtx = routerCtx;
-        this.routeActivePromise = routeActivePromise;
+        this.routerLink = routerLink;
     }
 
     @Override
@@ -82,7 +78,7 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
         if (sourceHttpVersion == 1) {
 
             pipeline.addLast(HTTP_1_TO_2_FRAMING, new Http1to2Framing(routeConfig));
-            pipeline.addLast(HTTP_1_ROUTER_LINK, new Http1RouterLink(routerCtx, routeActivePromise));
+            pipeline.addLast(HTTP_1_ROUTER_LINK, routerLink);
         }
         else if (sourceHttpVersion == 2) {
 
