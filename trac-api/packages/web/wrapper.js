@@ -31,9 +31,9 @@
 
     // RPC impl and setup functions should move to a separate source file
 
-    const CommonRpcImpl = (function() {
+    const WebRpcImpl = (function() {
 
-        function CommonRpcImpl(service, namespace) {
+        function WebRpcImpl(service, namespace) {
 
             const trac = $root.trac;
 
@@ -52,7 +52,7 @@
             this.grpcWeb = new grpc.GrpcWebClientBase({format: 'binary'});
         }
 
-        CommonRpcImpl.prototype.rpcImpl = function(method, request, callback) {
+        WebRpcImpl.prototype.rpcImpl = function(method, request, callback) {
 
             try {
 
@@ -71,7 +71,7 @@
             }
         }
 
-        return CommonRpcImpl;
+        return WebRpcImpl;
 
     })();
 
@@ -79,9 +79,9 @@
 
         const setup = {};
 
-        setup.createBoundRpcImpl = function(service) {
+        setup.createWebRpcImpl = function(service) {
 
-            const rpcImpl = new CommonRpcImpl(service, '');
+            const rpcImpl = new WebRpcImpl(service, '');
             return rpcImpl.rpcImpl.bind(rpcImpl);
         }
 
