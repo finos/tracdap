@@ -49,14 +49,15 @@ import java.util.concurrent.TimeUnit;
 
 public class TracPlatformGateway {
 
-    // This is a quick first version of the platform gateway to provide REST -> gRPC translation.
-    // A full implementation will need much more sophistication around how API routes are generated,
-    // ideally using code generation from .proto files to provide the route configuration. It will
-    // also need to support HTTP protocol detection, exposing gRPC and routes for static content,
-    // load balancing, authentication plugins...
-
-    // The expectation is that the gateway will be substantially re-written at some later point, when
-    // more of the core platform components are completed.
+    /*
+     * This version of the gateway provides some basic structures, including a configurable router component
+     * and handler pipelines for HTTP, gRPC (inc. gRPC-Web) and REST proxies. It is intended to provide enough
+     * functionality to allow platform and client development work to proceed. As such it handles the central code
+     * pathways and some of the most obvious/common errors. It is not in a production-ready state!
+     *
+     * The expectation is that a unit of work will be dedicated to gateway when more of the core platform
+     * components are complete.
+     */
 
     private static final Duration DEFAULT_SHUTDOWN_TIMEOUT = Duration.of(10, ChronoUnit.SECONDS);
 
