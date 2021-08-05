@@ -43,6 +43,10 @@ dependencies {
     implementation project(':trac-lib-common')
 
     // Core framework - Netty + gRPC
+    implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-codec-http', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-codec-http2', version: "$netty_version"
+    implementation group: 'io.netty', name: 'netty-handler-proxy', version: "$netty_version"
     implementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
 
     // Protobuf for Java

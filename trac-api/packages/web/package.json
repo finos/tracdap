@@ -1,0 +1,37 @@
+{
+  "name": "trac-web-api",
+  "version": "0.0.0-DEVELOPMENT",
+  "description": "API package for building web applications on the TRAC platform",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/accenture/trac"
+  },
+  "license": "Apache-2.0",
+  "licenses": [
+    {
+      "type": "Apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    }
+  ],
+  "files": [
+    "trac.*"
+  ],
+  "main": "trac.js",
+  "dependencies": {
+    "protobufjs": "~6.11.2",
+    "grpc-web": "~1.2.1"
+  },
+  "devDependencies": {
+    "adm-zip": "^0.5.5",
+    "follow-redirects": "^1.13.3",
+    "terser-webpack-plugin": "^4.2.3",
+    "webpack": "^4.44.2",
+    "webpack-cli": "^3.3.12"
+  },
+  "scripts": {
+    "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
+    "tracVersion:posix": "npm version `../../../dev/version.sh`",
+    "pbjs": "node call-pbjs.js",
+    "pbts": "pbts -o trac.d.ts trac.js"
+  }
+}

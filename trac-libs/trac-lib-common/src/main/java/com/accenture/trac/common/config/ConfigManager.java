@@ -207,6 +207,33 @@ public class ConfigManager {
     }
 
     /**
+     * Load the root configuration as text, for processing by a separate parser
+     *
+     * @return The root configuration text as a single string
+     * @throws EStartup The root configuration file could not be loaded for any reason
+     */
+    public String loadRootConfigAsText() {
+
+        return loadTextFile(configRootFile.toString());
+    }
+
+    /**
+     * Load the root configuration as a structured object
+     *
+     * The configuration must match the structure of the class provided and the file must be in known config format.
+     *
+     * @return The root configuration as a structured object
+     * @throws EStartup The root configuration file could not be loaded or parsed for any reason
+     */
+    public <TConfig> TConfig loadRootConfig(Class<TConfig> configClass) {
+
+        var configFormat = ConfigFormat.fromExtension(configRootFile);
+        var configData = loadTextFile(configRootFile.toString());
+
+        return ConfigParser.parseStructuredConfig(configData, configFormat, configClass);
+    }
+
+    /**
      * Load a secondary set of properties.
      *
      * <p>Config URLs may be relative or absolute. Relative URLs are resolved relative to the

@@ -22,7 +22,10 @@ def getVersionFromGit() {
         ? "powershell -ExecutionPolicy Bypass -File dev\\version.ps1"
         : "dev/version.sh"
 
-    def proc = command.execute([], rootDir)
+    // Default CWD for Process.execute on Windows under IDEA 2021.1 is under the Gradle cache location
+    // Force the version detection script to be called from the repo root dir
+
+    def proc = command.execute(null, rootDir)
     def exitCode = proc.waitFor()
 
     if (exitCode != 0)
