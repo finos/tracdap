@@ -18,16 +18,10 @@
   ],
   "main": "trac.js",
   "dependencies": {
-    "protobufjs": "~6.11.2",
-    "grpc-web": "~1.2.1"
+    "grpc-web": "~1.2.1",
+    "protobufjs": "~6.11.2"
   },
-  "devDependencies": {
-    "adm-zip": "^0.5.5",
-    "follow-redirects": "^1.13.3",
-    "terser-webpack-plugin": "^4.2.3",
-    "webpack": "^4.44.2",
-    "webpack-cli": "^3.3.12"
-  },
+  "devDependencies": {},
   "scripts": {
     "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
     "tracVersion:posix": "npm version `../../../dev/version.sh`",
