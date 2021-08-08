@@ -68,7 +68,7 @@ the TRAC metadata schema into an H2 database file.
 Once you have a database prepared you can start the TRAC services.
 
     gradlew :trac-svc-meta:run --args="--config etc/trac-devlocal.properties"
-    gradlew :trac-gateway:run --args="--config etc/trac-devlocal-gw.properties"
+    gradlew :trac-gateway:run --args="--config etc/trac-devlocal-gateway.yaml"
 
 
 ## Using the TRAC APIs
