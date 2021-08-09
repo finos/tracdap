@@ -30,7 +30,30 @@ import trac.rt.impl.data as _data
 import trac.rt.impl.util as _util
 
 
-class TracContext(_api.TracContext):
+class TracContextImpl(_api.TracContext):
+
+    """
+    TracContextImpl is the main implementation of the API class TracContext (from trac.rt.api).
+    It provides get/put operations the inputs, outputs and parameters of a model according to the model definition,
+    as well as exposing other information needed by the model at runtime and offering a few utility functions.
+
+    An instance of TracContextImpl is constructed by the runtime engine for each model node in the execution graph.
+    Parameters and schemas will be pre-populated from the job definition. Normally, input data will be created by parent
+    nodes in the execution graph and passed in when the context is constructed, so they are available when required. In
+    the simplest case, a get call picks a dataset from the map and a put call puts a dataset into the map. Under this
+    mechanism, no outputs are passed downstream until the model finishes executing.
+
+    Optimizations for lazy loading and eager saving require the context to call back into the runtime engine. For lazy
+    load, the graph node to prepare an input is injected when the data is requested and the model thread blocks until
+    it is available; for eager save child nodes of individual outputs are triggered when those outputs are produced.
+    In both cases this complexity is hidden from the model, which only sees one thread with synchronous get/put calls.
+
+    :param model_def: Definition object for the model that will run in this context
+    :param model_class: Type for the model that will run in this context
+    :param parameters: Dictionary of all parameters that will be available to the model (as Python-native types)
+    :param data: Dictionary of all datasets (inputs and outputs) that will be available to the model
+        (output views will contain schemas but no data)
+    """
 
     def __init__(self,
                  model_def: _meta.ModelDefinition,

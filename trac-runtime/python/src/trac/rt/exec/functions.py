@@ -260,7 +260,7 @@ class ModelFunc(NodeFunction):
             for output_name in self.node.model_def.output})
 
         # Run the model against the mapped local context
-        trac_ctx = _ctx.TracContext(
+        trac_ctx = _ctx.TracContextImpl(
             self.node.model_def, self.model_class,
             parameters=self.job_config.parameters,
             data=local_ctx)
