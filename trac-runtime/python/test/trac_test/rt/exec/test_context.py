@@ -11,8 +11,66 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import typing as tp
 import unittest
+
+import trac.rt.api as _api
+import trac.rt.exceptions as _ex
+
+from trac.rt.exec.context import TracContextImpl
+
+
+class _TestModel(_api.TracModel):
+
+    def define_parameters(self) -> tp.Dict[str, _api.ModelParameter]:
+
+        return _api.define_parameters(
+
+            _api.P("eur_usd_rate", _api.BasicType.FLOAT,
+                   label="EUR/USD spot rate for reporting"),
+
+            _api.P("default_weighting", _api.BasicType.FLOAT,
+                   label="Weighting factor applied to the profit/loss of a defaulted loan"),
+
+            _api.P("filter_defaults", _api.BasicType.BOOLEAN,
+                   label="Exclude defaulted loans from the calculation",
+                   default_value=False))
+
+    def define_inputs(self) -> tp.Dict[str, _api.TableDefinition]:
+
+        customer_loans = _api.define_table(
+            _api.F("id", _api.BasicType.STRING, label="Customer account ID", business_key=True),
+            _api.F("loan_amount", _api.BasicType.DECIMAL, label="Principal loan amount", format_code="CCY:EUR"),
+            _api.F("total_pymnt", _api.BasicType.DECIMAL, label="Total amount repaid", format_code="CCY:EUR"),
+            _api.F("region", _api.BasicType.STRING, label="Customer home region", categorical=True),
+            _api.F("loan_condition_cat", _api.BasicType.INTEGER, label="Loan condition category", categorical=True))
+
+        return {"customer_loans": customer_loans}
+
+    def define_outputs(self) -> tp.Dict[str, _api.TableDefinition]:
+
+        profit_by_region = _api.define_table(
+            _api.F("region", _api.BasicType.STRING, label="Customer home region", categorical=True),
+            _api.F("gross_profit", _api.BasicType.DECIMAL, label="Total gross profit", format_code="CCY:USD"))
+
+        return {"profit_by_region": profit_by_region}
+
+    def run_model(self, ctx: _api.TracContext):
+        pass
+
+
+_test_model_def = _api.ModelDefinition(  # noqa
+    language="python",
+    repository="trac_integrated",
+    entryPoint=f"{_TestModel.__module__}.{_TestModel.__name__}",
+
+    path="",
+    repositoryVersion="",
+    input=_TestModel().define_inputs(),
+    output=_TestModel().define_outputs(),
+    param=_TestModel().define_parameters(),
+    overlay=False,
+    schemaUnchanged=False)
 
 
 class TracContextTest(unittest.TestCase):
@@ -24,6 +82,9 @@ class TracContextTest(unittest.TestCase):
     so the tests mainly cover runtime validation of parameters to those operations
     """
 
+    def setUp(self):
+        self.ctx = TracContextImpl(_test_model_def, _TestModel, {}, {})  # todo data and params
+
     # Getting params
 
     def test_get_parameter_ok(self):
@@ -33,10 +94,18 @@ class TracContextTest(unittest.TestCase):
         pass
 
     def test_get_parameter_name_is_null(self):
-        pass
+
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter(None))  # noqa
 
     def test_get_parameter_name_invalid(self):
-        pass
+
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter(""))
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("test:var"))
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("test-var"))
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("$xyz"))
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("{xyz}"))
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("xyz abc"))
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("中文"))
 
     def test_get_parameter_name_reserved(self):
         pass

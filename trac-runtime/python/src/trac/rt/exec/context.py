@@ -18,6 +18,7 @@ import logging
 import typing as tp
 import copy
 import re
+import traceback
 
 import pandas as pd
 import pyspark as pys
@@ -77,6 +78,7 @@ class TracContextImpl(_api.TracContext):
 
     def get_parameter(self, parameter_name: str) -> tp.Any:
 
+        self.__val.check_param_not_null(parameter_name)
         self.__val.check_param_valid_identifier(parameter_name)
         self.__val.check_param_exists(parameter_name)
 
@@ -84,6 +86,7 @@ class TracContextImpl(_api.TracContext):
 
     def get_table_schema(self, dataset_name: str) -> _meta.TableDefinition:
 
+        self.__val.check_dataset_not_null(dataset_name)
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_context_item_exists(dataset_name)
         self.__val.check_context_item_is_dataset(dataset_name)
@@ -96,6 +99,7 @@ class TracContextImpl(_api.TracContext):
 
         part_key = _data.DataPartKey.for_root()
 
+        self.__val.check_dataset_not_null(dataset_name)
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_context_item_exists(dataset_name)
         self.__val.check_context_item_is_dataset(dataset_name)
@@ -123,6 +127,7 @@ class TracContextImpl(_api.TracContext):
 
         part_key = _data.DataPartKey.for_root()
 
+        self.__val.check_dataset_not_null(dataset_name)
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_context_item_exists(dataset_name)
         self.__val.check_context_item_is_dataset(dataset_name)
@@ -169,8 +174,14 @@ class TracContextValidator:
         self.__data_ctx = data_ctx
 
     def _report_error(self, message):
+
         self.__log.error(message)
         raise _ex.ERuntimeValidation(message)
+
+    def check_param_not_null(self, param_name):
+
+        if param_name is None:
+            self._report_error(f"Parameter name is null")
 
     def check_param_valid_identifier(self, param_name: str):
 
@@ -181,6 +192,11 @@ class TracContextValidator:
 
         if param_name not in self.__parameters:
             self._report_error(f"Parameter {param_name} is not defined in the current context")
+
+    def check_dataset_not_null(self, dataset_name):
+
+        if dataset_name is None:
+            self._report_error(f"Parameter name is null")
 
     def check_dataset_valid_identifier(self, dataset_name: str):
 
