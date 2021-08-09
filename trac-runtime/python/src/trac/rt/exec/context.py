@@ -164,6 +164,10 @@ class TracContextValidator:
     __VALID_IDENTIFIER = re.compile("^[a-zA-Z_]\\w*$",)
     __RESERVED_IDENTIFIER = re.compile("^(trac_|_)\\w*")
 
+    __LAST_MODEL_FRAME = -4
+    __FIRST_MODEL_FRAME_NAME = "run_model"
+    __FIRST_MODEL_FRAME_TEST_NAME = "_callTestMethod"
+
     def __init__(
             self, log: logging.Logger,
             parameters: tp.Dict[str, tp.Any],
@@ -175,8 +179,28 @@ class TracContextValidator:
 
     def _report_error(self, message):
 
+        model_stack = self._build_model_stack_trace()
+        model_stack_str = ''.join(traceback.format_list(reversed(model_stack)))
+
         self.__log.error(message)
+        self.__log.error(f"Model stack trace:\n{model_stack_str}")
+
         raise _ex.ERuntimeValidation(message)
+
+    def _build_model_stack_trace(self):
+
+        full_stack = traceback.extract_stack()
+
+        frame_names = list(map(lambda frame: frame.name, full_stack))
+
+        if self.__FIRST_MODEL_FRAME_NAME in frame_names:
+            first_model_frame = frame_names.index(self.__FIRST_MODEL_FRAME_NAME)
+        elif self.__FIRST_MODEL_FRAME_TEST_NAME in frame_names:
+            first_model_frame = frame_names.index(self.__FIRST_MODEL_FRAME_TEST_NAME)
+        else:
+            first_model_frame = 0
+
+        return full_stack[first_model_frame:self.__LAST_MODEL_FRAME]
 
     def check_param_not_null(self, param_name):
 
