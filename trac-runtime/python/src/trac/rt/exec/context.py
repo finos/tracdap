@@ -86,7 +86,7 @@ class TracContextImpl(_api.TracContext):
 
     def get_table_schema(self, dataset_name: str) -> _meta.TableDefinition:
 
-        self.__val.check_dataset_not_null(dataset_name)
+        self.__val.check_dataset_name_not_null(dataset_name)
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_context_item_exists(dataset_name)
         self.__val.check_context_item_is_dataset(dataset_name)
@@ -99,7 +99,7 @@ class TracContextImpl(_api.TracContext):
 
         part_key = _data.DataPartKey.for_root()
 
-        self.__val.check_dataset_not_null(dataset_name)
+        self.__val.check_dataset_name_not_null(dataset_name)
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_context_item_exists(dataset_name)
         self.__val.check_context_item_is_dataset(dataset_name)
@@ -127,12 +127,14 @@ class TracContextImpl(_api.TracContext):
 
         part_key = _data.DataPartKey.for_root()
 
-        self.__val.check_dataset_not_null(dataset_name)
+        self.__val.check_dataset_name_not_null(dataset_name)
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_context_item_exists(dataset_name)
         self.__val.check_context_item_is_dataset(dataset_name)
         self.__val.check_dataset_schema_defined(dataset_name)
         self.__val.check_dataset_part_not_present(dataset_name, part_key)
+        self.__val.check_provided_dataset_not_null(dataset)
+        self.__val.check_provided_dataset_type(dataset, pd.DataFrame)
 
         data_view = self.__data[dataset_name]
         data_item = _data.DataItem(pandas=dataset, column_filter=None)
@@ -217,7 +219,7 @@ class TracContextValidator:
         if param_name not in self.__parameters:
             self._report_error(f"Parameter {param_name} is not defined in the current context")
 
-    def check_dataset_not_null(self, dataset_name):
+    def check_dataset_name_not_null(self, dataset_name):
 
         if dataset_name is None:
             self._report_error(f"Dataset name is null")
@@ -266,3 +268,29 @@ class TracContextValidator:
 
         if part is not None and len(part) > 0:
             self._report_error(f"Data already present for dataset {dataset_name} ({part_key}) in the current context")
+
+    def check_provided_dataset_not_null(self, dataset):
+
+        if dataset is None:
+            self._report_error(f"Provided dataset is null")
+
+    def check_provided_dataset_type(self, dataset: tp.Any, expected_type: type):
+
+        if not isinstance(dataset, expected_type):
+
+            expected_type_name = self._type_name(expected_type)
+            actual_type_name = self._type_name(type(dataset))
+
+            self._report_error(
+                f"Provided dataset is the wrong type" +
+                f" (expected {expected_type_name}, got {actual_type_name})")
+
+    @staticmethod
+    def _type_name(type_: type):
+
+        module = type_.__module__
+
+        if module is None or module == str.__class__.__module__:
+            return type_.__qualname__
+
+        return module + '.' + type_.__name__
