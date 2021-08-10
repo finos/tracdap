@@ -13,6 +13,8 @@
 #  limitations under the License.
 import typing as tp
 import unittest
+import decimal
+import datetime
 
 import trac.rt.api as _api
 import trac.rt.exceptions as _ex
@@ -26,14 +28,32 @@ class _TestModel(_api.TracModel):
 
         return _api.define_parameters(
 
-            _api.P("eur_usd_rate", _api.BasicType.FLOAT,
-                   label="EUR/USD spot rate for reporting"),
+            _api.P("boolean_param", _api.BasicType.BOOLEAN,
+                   label="A boolean param",
+                   default_value=False),
 
-            _api.P("default_weighting", _api.BasicType.FLOAT,
-                   label="Weighting factor applied to the profit/loss of a defaulted loan"),
+            _api.P("integer_param", _api.BasicType.INTEGER,
+                   label="An integer param",
+                   default_value=False),
 
-            _api.P("filter_defaults", _api.BasicType.BOOLEAN,
-                   label="Exclude defaulted loans from the calculation",
+            _api.P("float_param", _api.BasicType.FLOAT,
+                   label="A float param",
+                   default_value=False),
+
+            _api.P("decimal_param", _api.BasicType.DECIMAL,
+                   label="A decimal param",
+                   default_value=False),
+
+            _api.P("string_param", _api.BasicType.STRING,
+                   label="A string param",
+                   default_value=False),
+
+            _api.P("date_param", _api.BasicType.DATE,
+                   label="A date param",
+                   default_value=False),
+
+            _api.P("datetime_param", _api.BasicType.DATETIME,
+                   label="A datetime param",
                    default_value=False))
 
     def define_inputs(self) -> tp.Dict[str, _api.TableDefinition]:
@@ -82,16 +102,51 @@ class TracContextTest(unittest.TestCase):
     so the tests mainly cover runtime validation of parameters to those operations
     """
 
+    BOOLEAN_PARAM_VALUE = True
+    INTEGER_PARAM_VALUE = 42
+    FLOAT_PARAM_VALUE = 3.14159265358979
+    DECIMAL_PARAM_VALUE = decimal.Decimal("3.141592653589793238462643383279")
+    STRING_PARAM_VALUE = "Slartibartfast"
+    DATE_PARAM_VALUE = datetime.date(2021, 6, 21)
+    DATETIME_PARAM_VALUE = datetime.datetime(2021, 6, 21, 13, 0, 0)
+
     def setUp(self):
-        self.ctx = TracContextImpl(_test_model_def, _TestModel, {}, {})  # todo data and params
+
+        params = {
+            "boolean_param": self.BOOLEAN_PARAM_VALUE,
+            "integer_param": self.INTEGER_PARAM_VALUE,
+            "float_param": self.FLOAT_PARAM_VALUE,
+            "decimal_param": self.DECIMAL_PARAM_VALUE,
+            "string_param": self.STRING_PARAM_VALUE,
+            "date_param": self.DATE_PARAM_VALUE,
+            "datetime_param": self.DATETIME_PARAM_VALUE
+        }
+
+        self.ctx = TracContextImpl(_test_model_def, _TestModel, params, {})  # todo data and params
 
     # Getting params
 
     def test_get_parameter_ok(self):
-        pass
+
+        string_param = self.ctx.get_parameter("string_param")
+        self.assertEqual(self.STRING_PARAM_VALUE, string_param)
 
     def test_get_parameter_types(self):
-        pass
+        
+        types_to_check = [
+            ("boolean_param", self.BOOLEAN_PARAM_VALUE, bool),
+            ("integer_param", self.INTEGER_PARAM_VALUE, int),
+            ("float_param", self.FLOAT_PARAM_VALUE, float),
+            ("decimal_param", self.DECIMAL_PARAM_VALUE, decimal.Decimal),
+            ("string_param", self.STRING_PARAM_VALUE, str),
+            ("date_param", self.DATE_PARAM_VALUE, datetime.date),
+            ("datetime_param", self.DATETIME_PARAM_VALUE, datetime.datetime)]
+
+        for param_name, expected_value, expected_type in types_to_check:
+
+            param_value = self.ctx.get_parameter(param_name)
+            self.assertEqual(expected_type, type(param_value))
+            self.assertEqual(expected_value, param_value)
 
     def test_get_parameter_name_is_null(self):
 
@@ -107,83 +162,81 @@ class TracContextTest(unittest.TestCase):
         self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("xyz abc"))
         self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("中文"))
 
-    def test_get_parameter_name_reserved(self):
-        pass
-
     def test_get_parameter_unknown(self):
-        pass
+
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("unknown_param"))
 
     # Getting tables
 
     def test_get_schema_ok(self):
-        pass
+        self.fail("todo")
 
     def test_get_schema_dynamic(self):
-        pass
+        self.fail("todo")
 
     def test_get_table_pandas_ok(self):
-        pass
+        self.fail("todo")
 
     def test_get_table_dynamic_schema(self):
-        pass
+        self.fail("todo")
 
     def test_get_table_pandas_conversion(self):
-        pass
+        self.fail("todo")
 
     def test_get_table_output_before_put(self):
-        pass
+        self.fail("todo")
 
     def test_get_table_name_is_null(self):
-        pass
+        self.fail("todo")
 
     def test_get_table_name_invalid(self):
-        pass
+        self.fail("todo")
 
     def test_get_table_name_reserved(self):
-        pass
+        self.fail("todo")
 
     def test_get_table_unknown(self):
-        pass
+        self.fail("todo")
 
     # Putting tables
 
     def test_put_schema_ok(self):
-        pass
+        self.fail("todo")
 
     def test_put_schema_not_dynamic(self):
-        pass
+        self.fail("todo")
 
     def test_put_schema_for_input(self):
-        pass
+        self.fail("todo")
 
     def put_table_pandas_ok(self):
-        pass
+        self.fail("todo")
 
     def put_table_pandas_dynamic_schema(self):
-        pass
+        self.fail("todo")
 
     def put_table_pandas_null(self):
-        pass
+        self.fail("todo")
 
     def put_table_pandas_not_a_dataframe(self):
-        pass
+        self.fail("todo")
 
     def put_table_pandas_no_rows(self):
-        pass
+        self.fail("todo")
 
     def test_put_table_name_is_null(self):
-        pass
+        self.fail("todo")
 
     def test_put_table_name_invalid(self):
-        pass
+        self.fail("todo")
 
     def test_put_table_name_reserved(self):
-        pass
+        self.fail("todo")
 
     def test_put_table_unknown(self):
-        pass
+        self.fail("todo")
 
     # Misc extra tests
 
     def test_get_log(self):
-        pass
+        self.fail("todo")
