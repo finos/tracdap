@@ -111,6 +111,8 @@ class TracContextTest(unittest.TestCase):
     DATE_PARAM_VALUE = datetime.date(2021, 6, 21)
     DATETIME_PARAM_VALUE = datetime.datetime(2021, 6, 21, 13, 0, 0)
 
+    INVALID_IDENTIFIERS = ["", "test:var", "test-var", "$xyz", "{xyz}", "xyz abc", "中文"]
+
     def setUp(self):
 
         params = {
@@ -155,13 +157,8 @@ class TracContextTest(unittest.TestCase):
 
     def test_get_parameter_name_invalid(self):
 
-        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter(""))
-        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("test:var"))
-        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("test-var"))
-        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("$xyz"))
-        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("{xyz}"))
-        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("xyz abc"))
-        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter("中文"))
+        for identifier in self.INVALID_IDENTIFIERS:
+            self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_parameter(identifier))
 
     def test_get_parameter_unknown(self):
 
@@ -188,16 +185,27 @@ class TracContextTest(unittest.TestCase):
         self.fail("todo")
 
     def test_get_table_name_is_null(self):
-        self.fail("todo")
+
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_table_schema(None))  # noqa
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_pandas_table(None))  # noqa
+
+        # Add other get methods here as they are implemented, e.g. get_pyspark_table
 
     def test_get_table_name_invalid(self):
-        self.fail("todo")
 
-    def test_get_table_name_reserved(self):
-        self.fail("todo")
+        for identifier in self.INVALID_IDENTIFIERS:
+
+            self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_table_schema(identifier))
+            self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_pandas_table(identifier))
+
+            # Add other get methods here as they are implemented, e.g. get_pyspark_table
 
     def test_get_table_unknown(self):
-        self.fail("todo")
+
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_table_schema("unknown_dataset"))
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_pandas_table("unknown_dataset"))
+
+        # Add other get methods here as they are implemented, e.g. get_pyspark_table
 
     # Putting tables
 
