@@ -16,9 +16,11 @@ import typing as tp
 import unittest
 import decimal
 import datetime
+import pandas as pd
 
 import trac.rt.api as _api
 import trac.rt.exceptions as _ex
+import trac.rt.impl.data as _data
 
 from trac.rt.exec.context import TracContextImpl
 
@@ -113,6 +115,19 @@ class TracContextTest(unittest.TestCase):
 
     INVALID_IDENTIFIERS = ["", "test:var", "test-var", "$xyz", "{xyz}", "xyz abc", "中文"]
 
+    LOANS_DATA = pd.DataFrame({
+        "id": ["acc001", "acc002"],
+        "loan_amount": [decimal.Decimal("1500000.00"), decimal.Decimal("1349374.83")],
+        "total_pymnt": [decimal.Decimal("1650000.00"), decimal.Decimal("1563864.37")],
+        "region": ["LONDON", "SOUTH_WEST"],
+        "loan_condition_cat": [1, 4]
+    })
+
+    RESULT_DATA = pd.DataFrame({
+        "region": ["LONDON", "SOUTH_WEST"],
+        "gross_profit": [decimal.Decimal("150000.00"), decimal.Decimal("214489.54")]
+    })
+
     def setUp(self):
 
         params = {
@@ -125,7 +140,20 @@ class TracContextTest(unittest.TestCase):
             "datetime_param": self.DATETIME_PARAM_VALUE
         }
 
-        self.ctx = TracContextImpl(_test_model_def, _TestModel, params, {})  # todo data and params
+        customer_loans_schema = _test_model_def.input.get("customer_loans")
+        customer_loans_delta0 = _data.DataItem(pandas=self.LOANS_DATA)
+        customer_loans_parts = {_data.DataPartKey.for_root(): [customer_loans_delta0]}
+        customer_loans_view = _data.DataView(customer_loans_schema, customer_loans_parts)
+
+        profit_by_region_schema = _test_model_def.output.get("profit_by_region")
+        profit_by_region_view = _data.DataView(profit_by_region_schema, {})
+
+        data_ctx = {
+            "customer_loans": customer_loans_view,
+            "profit_by_region": profit_by_region_view
+        }
+
+        self.ctx = TracContextImpl(_test_model_def, _TestModel, params, data_ctx)
 
     # Getting params
 
@@ -167,31 +195,47 @@ class TracContextTest(unittest.TestCase):
     # Getting tables
 
     def test_get_schema_ok(self):
-        self.fail("todo")
 
-    def test_get_schema_dynamic(self):
-        self.fail("todo")
+        table_schema = self.ctx.get_table_schema("customer_loans")
 
-    def test_get_table_pandas_ok(self):
-        self.fail("todo")
+        self.assertIsInstance(table_schema, _api.TableDefinition)
+        self.assertEqual(len(table_schema.field), 5)
 
-    def test_get_table_dynamic_schema(self):
-        self.fail("todo")
+    def test_get_schema_for_output(self):
 
-    def test_get_table_pandas_conversion(self):
-        self.fail("todo")
+        table_schema = self.ctx.get_table_schema("profit_by_region")
 
-    def test_get_table_output_before_put(self):
-        self.fail("todo")
+        self.assertIsInstance(table_schema, _api.TableDefinition)
+        self.assertEqual(len(table_schema.field), 2)
 
-    def test_get_table_name_is_null(self):
+    def test_get_pandas_table_ok(self):
+
+        customer_loans = self.ctx.get_pandas_table("customer_loans")
+
+        self.assertIsInstance(customer_loans, pd.DataFrame)
+        self.assertEqual(len(customer_loans.columns), 5)
+        self.assertEqual(len(customer_loans), 2)
+
+    def test_get_pandas_table_for_output(self):
+
+        # Trying to get an output dataset before it has been put is a validation error
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_pandas_table("profit_by_region"))
+
+        self.ctx.put_pandas_table("profit_by_region", self.RESULT_DATA)
+        result_data = self.ctx.get_pandas_table("profit_by_region")
+
+        self.assertIsInstance(result_data, pd.DataFrame)
+        self.assertEqual(len(result_data.columns), 2)
+        self.assertEqual(len(result_data), 2)
+
+    def test_get_dataset_name_is_null(self):
 
         self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_table_schema(None))  # noqa
         self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_pandas_table(None))  # noqa
 
         # Add other get methods here as they are implemented, e.g. get_pyspark_table
 
-    def test_get_table_name_invalid(self):
+    def test_get_dataset_name_invalid(self):
 
         for identifier in self.INVALID_IDENTIFIERS:
 
@@ -200,7 +244,7 @@ class TracContextTest(unittest.TestCase):
 
             # Add other get methods here as they are implemented, e.g. get_pyspark_table
 
-    def test_get_table_unknown(self):
+    def test_get_dataset_unknown(self):
 
         self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_table_schema("unknown_dataset"))
         self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_pandas_table("unknown_dataset"))
@@ -209,41 +253,78 @@ class TracContextTest(unittest.TestCase):
 
     # Putting tables
 
-    def test_put_schema_ok(self):
-        self.fail("todo")
+    def test_put_pandas_table_ok(self):
 
-    def test_put_schema_not_dynamic(self):
-        self.fail("todo")
+        self.ctx.put_pandas_table("profit_by_region", self.RESULT_DATA)
 
-    def test_put_schema_for_input(self):
-        self.fail("todo")
+        result_data = self.ctx.get_pandas_table("profit_by_region")
+        self.assertIsInstance(result_data, pd.DataFrame)
+        self.assertEqual(len(result_data.columns), 2)
+        self.assertEqual(len(result_data), 2)
 
-    def put_table_pandas_ok(self):
-        self.fail("todo")
+    def test_put_pandas_table_empty(self):
 
-    def put_table_pandas_dynamic_schema(self):
-        self.fail("todo")
+        # Corner case: Empty result sets are allowed
 
-    def put_table_pandas_null(self):
-        self.fail("todo")
+        empty_results = pd.DataFrame({"region": [], "gross_profit": []})
+        self.ctx.put_pandas_table("profit_by_region", empty_results)
 
-    def put_table_pandas_not_a_dataframe(self):
-        self.fail("todo")
+        result_data = self.ctx.get_pandas_table("profit_by_region")
+        self.assertIsInstance(result_data, pd.DataFrame)
+        self.assertEqual(len(result_data.columns), 2)
+        self.assertEqual(len(result_data), 0)
 
-    def put_table_pandas_no_rows(self):
-        self.fail("todo")
+    def test_put_pandas_table_twice(self):
 
-    def test_put_table_name_is_null(self):
-        self.fail("todo")
+        self.ctx.put_pandas_table("profit_by_region", self.RESULT_DATA)
 
-    def test_put_table_name_invalid(self):
-        self.fail("todo")
+        self.assertRaises(
+            _ex.ERuntimeValidation,
+            lambda: self.ctx.put_pandas_table("profit_by_region", self.RESULT_DATA))
 
-    def test_put_table_name_reserved(self):
-        self.fail("todo")
+    def test_put_pandas_table_for_input(self):
 
-    def test_put_table_unknown(self):
-        self.fail("todo")
+        self.assertRaises(
+            _ex.ERuntimeValidation,
+            lambda: self.ctx.put_pandas_table("customer_loans", self.RESULT_DATA))
+
+    def test_put_pandas_table_null(self):
+
+        self.assertRaises(
+            _ex.ERuntimeValidation,
+            lambda: self.ctx.put_pandas_table("profit_by_region", None))  # noqa
+
+    def test_put_pandas_table_not_a_dataframe(self):
+
+        self.assertRaises(
+            _ex.ERuntimeValidation,
+            lambda: self.ctx.put_pandas_table("profit_by_region", object()))  # noqa
+
+    def test_put_dataset_name_is_null(self):
+
+        self.assertRaises(
+            _ex.ERuntimeValidation,
+            lambda: self.ctx.put_pandas_table(None, self.RESULT_DATA))  # noqa
+
+        # Add other put methods here as they are implemented, e.g. put_pyspark_table
+
+    def test_put_dataset_name_invalid(self):
+
+        for identifier in self.INVALID_IDENTIFIERS:
+
+            self.assertRaises(
+                _ex.ERuntimeValidation,
+                lambda: self.ctx.put_pandas_table(identifier, self.RESULT_DATA))
+
+            # Add other put methods here as they are implemented, e.g. put_pyspark_table
+
+    def test_put_dataset_unknown(self):
+
+        self.assertRaises(
+            _ex.ERuntimeValidation,
+            lambda: self.ctx.put_pandas_table("unknown_output", self.RESULT_DATA))
+
+        # Add other put methods here as they are implemented, e.g. put_pyspark_table
 
     # Misc extra tests
 
@@ -254,3 +335,16 @@ class TracContextTest(unittest.TestCase):
 
         with self.assertLogs(log.name, logging.INFO):
             log.info("Model logger test")
+
+    """
+    Functionality not available yet:
+    
+    def test_get_schema_dynamic(self):
+    def test_get_table_dynamic_schema(self):
+    def test_get_table_pandas_conversion(self):
+    
+    def test_put_schema_ok(self):
+    def test_put_schema_for_input(self):
+    def test_put_schema_not_dynamic(self):
+    def put_table_pandas_dynamic_schema(self):
+    """
