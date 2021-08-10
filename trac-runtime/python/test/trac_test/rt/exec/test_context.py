@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
 import typing as tp
 import unittest
 import decimal
@@ -129,7 +130,7 @@ class TracContextTest(unittest.TestCase):
     def test_get_parameter_ok(self):
 
         string_param = self.ctx.get_parameter("string_param")
-        self.assertEqual(self.STRING_PARAM_VALUE, string_param)
+        self.assertEqual(string_param, self.STRING_PARAM_VALUE)
 
     def test_get_parameter_types(self):
         
@@ -145,8 +146,8 @@ class TracContextTest(unittest.TestCase):
         for param_name, expected_value, expected_type in types_to_check:
 
             param_value = self.ctx.get_parameter(param_name)
-            self.assertEqual(expected_type, type(param_value))
-            self.assertEqual(expected_value, param_value)
+            self.assertIsInstance(param_value, expected_type)
+            self.assertEqual(param_value, expected_value)
 
     def test_get_parameter_name_is_null(self):
 
@@ -239,4 +240,9 @@ class TracContextTest(unittest.TestCase):
     # Misc extra tests
 
     def test_get_log(self):
-        self.fail("todo")
+
+        log = self.ctx.log()
+        self.assertIsInstance(log, logging.Logger)
+
+        with self.assertLogs(log.name, logging.INFO):
+            log.info("Model logger test")
