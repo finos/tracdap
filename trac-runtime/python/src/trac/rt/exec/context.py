@@ -220,7 +220,7 @@ class TracContextValidator:
     def check_dataset_not_null(self, dataset_name):
 
         if dataset_name is None:
-            self._report_error(f"Parameter name is null")
+            self._report_error(f"Dataset name is null")
 
     def check_dataset_valid_identifier(self, dataset_name: str):
 
