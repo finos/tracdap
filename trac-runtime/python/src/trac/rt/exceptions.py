@@ -168,3 +168,19 @@ class EModelRepoRequest(EModelRepo):
     """
 
     pass
+
+
+class EUnexpected(ETrac):
+
+    """
+    An unexpected error has occurred in the TRAC runtime engine (this is a bug)
+
+    This error always indicates a bug, it signals that the engine is in an inconsistent state.
+    It should never be raised for errors that might legitimately occur during normal operation.
+    The runtime will be shut down with a failed exit code, any running or pending jobs will also be failed.
+
+    This error can be raised for failed sanity checks, where the engine should guarantee some condition
+    and that condition has not been met.
+    """
+
+    pass
