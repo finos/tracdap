@@ -149,7 +149,7 @@ class DataItemFunc(NodeFunction):
         return delta
 
 
-class DataIoFunc(NodeFunction, abc.ABC):
+class _LoadSaveDataFunc(NodeFunction, abc.ABC):
 
     def __init__(self, storage: _storage.StorageManager):
         self.storage = storage
@@ -179,7 +179,7 @@ class DataIoFunc(NodeFunction, abc.ABC):
         return copy
 
 
-class LoadDataFunc(DataIoFunc):
+class LoadDataFunc(_LoadSaveDataFunc):
 
     def __init__(self, node: LoadDataNode, storage: _storage.StorageManager):
         super().__init__(storage)
@@ -209,7 +209,7 @@ class LoadDataFunc(DataIoFunc):
             raise NotImplementedError("Directory storage format not available yet")
 
 
-class SaveDataFunc(DataIoFunc):
+class SaveDataFunc(_LoadSaveDataFunc):
 
     def __init__(self, node: SaveDataNode, storage: _storage.StorageManager):
         super().__init__(storage)
@@ -298,7 +298,7 @@ class FunctionResolver:
         resolve_func = self.__node_mapping[node.__class__]
 
         if resolve_func is None:
-            raise RuntimeError()  # TODO: Error
+            raise _ex.EUnexpected()
 
         return resolve_func(self, job_config, node)
 
