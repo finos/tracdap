@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import trac.rt.api as _api
 import trac.rt.config as _config
+import trac.rt.exceptions as _ex
 import trac.rt.impl.repositories as _repos
 import trac.rt.impl.storage as _storage
 import trac.rt.impl.data as _data
@@ -39,55 +40,10 @@ class NodeFunction(tp.Callable[[NodeContext], NodeResult], abc.ABC):
         pass
 
 
-class NoopNode(NodeFunction):
+class NoopFunc(NodeFunction):
 
     def __call__(self, _: NodeContext) -> NodeResult:
         return None
-
-
-class ContextPushFunc(NodeFunction):
-
-    def __init__(self, node: ContextPushNode):
-        self.node = node
-
-    def __call__(self, ctx: NodeContext) -> NodeResult:
-
-        target_ctx = dict()
-
-        for target_id, source_id in self.node.mapping.items():
-
-            source_item = ctx.get(source_id)
-
-            if source_item is None:
-                raise RuntimeError()  # TODO, should never happen
-
-            if target_id.namespace != self.node.namespace:
-                raise RuntimeError()  # TODO, should never happen
-
-            target_ctx[target_id] = source_item
-
-        return target_ctx
-
-
-class ContextPopFunc(NodeFunction):
-
-    def __init__(self, node: ContextPopNode):
-        self.node = node
-
-    def __call__(self, ctx: NodeContext) -> NodeResult:
-
-        target_ctx = dict()
-
-        for source_id, target_id in self.node.mapping.items():
-
-            source_item = ctx.get(source_id)
-
-            if source_item is None:
-                raise RuntimeError()  # TODO, should never happen
-
-            target_ctx[target_id] = source_item
-
-        return target_ctx
 
 
 class IdentityFunc(NodeFunction):
@@ -97,6 +53,54 @@ class IdentityFunc(NodeFunction):
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
         return ctx[self.node.src_id].result
+
+
+class _ContextPushPopFunc(NodeFunction, abc.ABC):
+
+    # This approach to context push / pop assumes all the nodes to be mapped are already available
+    # A better approach would be to map individual items as they become available
+
+    _PUSH = True
+    _POP = False
+
+    def __init__(self, node: tp.Union[ContextPushNode, ContextPopNode], direction: bool):
+        self.node = node
+        self.direction = direction
+
+    def __call__(self, ctx: NodeContext) -> NodeResult:
+
+        target_ctx = dict()
+
+        for inner_id, outer_id in self.node.mapping.items():
+
+            # Should never happen, push / pop nodes should always be in their own inner context
+            if inner_id.namespace != self.node.namespace:
+                raise _ex.EUnexpected()
+
+            source_id = outer_id if self.direction == self._PUSH else inner_id
+            target_id = inner_id if self.direction == self._PUSH else outer_id
+
+            source_item = ctx.get(source_id)
+
+            # Should never happen, source items are dependencies in the graph
+            if source_item is None:
+                raise _ex.EUnexpected()
+
+            target_ctx[target_id] = source_item
+
+        return target_ctx
+
+
+class ContextPushFunc(_ContextPushPopFunc):
+
+    def __init__(self, node: ContextPushNode):
+        super(ContextPushFunc, self).__init__(node, self._PUSH)
+
+
+class ContextPopFunc(_ContextPushPopFunc):
+
+    def __init__(self, node: ContextPopNode):
+        super(ContextPopFunc, self).__init__(node, self._POP)
 
 
 class KeyedItemFunc(NodeFunction):
@@ -325,7 +329,7 @@ class FunctionResolver:
         SaveDataNode: resolve_save_data,
         ModelNode: resolve_model_node,
 
-        JobOutputMetadataNode: lambda s, j, n: NoopNode(),
-        JobResultMetadataNode: lambda s, j, n: NoopNode(),
-        JobNode: lambda s, j, n: NoopNode()
+        JobOutputMetadataNode: lambda s, j, n: NoopFunc(),
+        JobResultMetadataNode: lambda s, j, n: NoopFunc(),
+        JobNode: lambda s, j, n: NoopFunc()
     }
