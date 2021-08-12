@@ -148,6 +148,15 @@ class EModelRepo(ETrac):
     pass
 
 
+class EModelRepoConfig(EModelRepo):
+
+    """
+    Model repo referenced in metadata is either not supported or not configured
+    """
+
+    pass
+
+
 class EModelRepoCommunication(EModelRepo):
 
     """
