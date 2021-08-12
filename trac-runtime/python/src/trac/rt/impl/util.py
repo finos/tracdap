@@ -87,7 +87,7 @@ class ColorFormatter(logging.Formatter):
         return f"\033[{1 if is_bold else 0};{base_code + color_offset}m"
 
 
-def configure_logging(clazz: type = None):
+def configure_logging():
 
     root_logger = logging.getLogger()
 
@@ -110,13 +110,6 @@ def configure_logging(clazz: type = None):
         console_handler.setLevel(logging.INFO)
         trac_logger.addHandler(console_handler)
         trac_logger.propagate = False
-
-    if clazz is None:
-        startup_logger = logger_for_namespace("trac.rt")
-    else:
-        startup_logger = logger_for_class(clazz)
-
-    startup_logger.info("Logging enabled")
 
 
 def logger_for_object(obj: object) -> logging.Logger:
