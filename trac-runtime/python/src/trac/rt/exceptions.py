@@ -188,17 +188,37 @@ class EModelRepoRequest(EModelRepo):
     pass
 
 
+class ETracInternal(ETrac):
+
+    """
+    An internal error has occurred in the TRAC runtime engine (this is a bug)
+
+    This error indicates a problem with the runtime engine or with one of its subsystems or plugins.
+    It should be used to guard against error conditions between different modules or sub-systems in the engine.
+    In most cases an internal error will cause the platform to shut down, however there may be cases in some
+    modules where these errors can be handled (e.g. by discarding a failing plugin).
+
+    This error can be raised e.g. by an internal component that receives an invalid request from client code
+    in another part of the engine. For error conditions that are wholly under the control o a single module
+    or sub-system, use EUnexpected instead.
+    """
+
+    pass
+
+
 class EUnexpected(ETrac):
 
     """
     An unexpected error has occurred in the TRAC runtime engine (this is a bug)
 
     This error always indicates a bug, it signals that the engine is in an inconsistent state.
-    It should never be raised for errors that might legitimately occur during normal operation.
+    It should be used only for errors that can never happen, within the scope of a module or sub-system
+    when that module is accessed via its public API. Never use EUnexpected for expected errors!
     The runtime will be shut down with a failed exit code, any running or pending jobs will also be failed.
 
-    This error can be raised for failed sanity checks, where the engine should guarantee some condition
-    and that condition has not been met.
+    This error can be raised e.g. for failed sanity checks, where the engine should guarantee some condition
+    and that condition has not been met. For error conditions that might occur as a result of problems in
+    other parts of the engine (but not relating to external systems), use ETracInternal instead.
     """
 
     pass
