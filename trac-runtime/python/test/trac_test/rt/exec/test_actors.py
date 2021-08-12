@@ -17,6 +17,11 @@ import trac.rt.exec.actors as actors
 import unittest
 
 
+# Dummy app-layer exception class
+class AppException(Exception):
+    pass
+
+
 class ActorSystemTest(unittest.TestCase):
 
     @classmethod
@@ -109,34 +114,41 @@ class ActorSystemTest(unittest.TestCase):
 
                 target_id = self.actors().spawn(TargetActor)
 
+                # All these bad calls to send() should result in EBadActor being thrown
+
+                try:
+                    self.actors().send(target_id, "signal:STOP")
+                except actors.EBadActor:
+                    errors.append("illegal_message")
+
                 try:
                     self.actors().send(target_id, "unknown_message")
-                except Exception:  # noqa
+                except actors.EBadActor:
                     errors.append("unknown_message")
 
                 try:
                     self.actors().send(target_id, "sample_message_2", 1, unknown=2)
-                except Exception:  # noqa
+                except actors.EBadActor:
                     errors.append("unknown_param")
 
                 try:
                     self.actors().send(target_id, "sample_message")
-                except Exception:  # noqa
+                except actors.EBadActor:
                     errors.append("missing_param")
 
                 try:
                     self.actors().send(target_id, "sample_message", 1, 2)
-                except Exception:  # noqa
+                except actors.EBadActor:
                     errors.append("extra_param")
 
                 try:
                     self.actors().send(target_id, "sample_message", "wrong_param_type")
-                except Exception:  # noqa
+                except actors.EBadActor:
                     errors.append("wrong_param_type")
 
                 try:
                     self.actors().send(target_id, "sample_message", value="wrong_kw_param_type")
-                except Exception:  # noqa
+                except actors.EBadActor:
                     errors.append("wrong_kw_param_type")
 
                 # Should not error, parameter 'value' should take the default
@@ -150,7 +162,7 @@ class ActorSystemTest(unittest.TestCase):
         system.wait_for_shutdown()
 
         self.assertEqual([
-            "unknown_message", "unknown_param",
+            "illegal_message", "unknown_message", "unknown_param",
             "missing_param", "extra_param",
             "wrong_param_type", "wrong_kw_param_type"],
             errors)
@@ -201,7 +213,7 @@ class ActorSystemTest(unittest.TestCase):
             def sample_message(self, value):
                 results.append("sample_message")
                 results.append(value)
-                raise RuntimeError("err_code_1")
+                raise AppException("err_code_1")
 
         root = TestActor()
         system = actors.ActorSystem(root)
@@ -215,7 +227,7 @@ class ActorSystemTest(unittest.TestCase):
         code = system.shutdown_code()
         error = system.shutdown_error()
         self.assertNotEqual(0, code)
-        self.assertIsInstance(error, RuntimeError)
+        self.assertIsInstance(error, AppException)
         self.assertEqual("err_code_1", error.args[0])
 
     def test_actor_failure_2(self):
@@ -228,7 +240,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
                 results.append("on_start")
-                raise RuntimeError("err_code_2")
+                raise AppException("err_code_2")
 
             def on_stop(self):
                 results.append("on_stop")
@@ -251,7 +263,7 @@ class ActorSystemTest(unittest.TestCase):
         code = system.shutdown_code()
         error = system.shutdown_error()
         self.assertNotEqual(0, code)
-        self.assertIsInstance(error, RuntimeError)
+        self.assertIsInstance(error, AppException)
         self.assertEqual("err_code_2", error.args[0])
 
     def test_actor_failure_3(self):
@@ -267,7 +279,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_stop(self):
                 results.append("on_stop")
-                raise RuntimeError("err_code_3")
+                raise AppException("err_code_3")
 
             @actors.Message
             def sample_message(self, value):
@@ -286,7 +298,7 @@ class ActorSystemTest(unittest.TestCase):
         code = system.shutdown_code()
         error = system.shutdown_error()
         self.assertNotEqual(0, code)
-        self.assertIsInstance(error, RuntimeError)
+        self.assertIsInstance(error, AppException)
         self.assertEqual("err_code_3", error.args[0])
 
     def test_child_lifecycle(self):
@@ -519,7 +531,7 @@ class ActorSystemTest(unittest.TestCase):
             def sample_message(self, value):
                 results.append("sample_message")
                 results.append(value)
-                raise RuntimeError("err_code_1")
+                raise AppException("err_code_1")
 
         class ParentActor(actors.Actor):
 
@@ -548,7 +560,7 @@ class ActorSystemTest(unittest.TestCase):
         code = system.shutdown_code()
         error = system.shutdown_error()
         self.assertNotEqual(0, code)
-        self.assertIsInstance(error, RuntimeError)
+        self.assertIsInstance(error, AppException)
         self.assertEqual("err_code_1", error.args[0])
 
     def test_child_failure_2(self):
@@ -561,7 +573,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_start(self):
                 results.append("child_start")
-                raise RuntimeError("err_code_2")
+                raise AppException("err_code_2")
 
             def on_stop(self):
                 results.append("child_stop")
@@ -598,7 +610,7 @@ class ActorSystemTest(unittest.TestCase):
         code = system.shutdown_code()
         error = system.shutdown_error()
         self.assertNotEqual(0, code)
-        self.assertIsInstance(error, RuntimeError)
+        self.assertIsInstance(error, AppException)
         self.assertEqual("err_code_2", error.args[0])
 
     def test_child_failure_3(self):
@@ -614,7 +626,7 @@ class ActorSystemTest(unittest.TestCase):
 
             def on_stop(self):
                 results.append("child_stop")
-                raise RuntimeError("err_code_3")
+                raise AppException("err_code_3")
 
             @actors.Message
             def sample_message(self, value):
@@ -659,7 +671,7 @@ class ActorSystemTest(unittest.TestCase):
         code = system.shutdown_code()
         error = system.shutdown_error()
         self.assertNotEqual(0, code)
-        self.assertIsInstance(error, RuntimeError)
+        self.assertIsInstance(error, AppException)
         self.assertEqual("err_code_3", error.args[0])
 
     def test_child_failure_signals(self):
@@ -678,7 +690,7 @@ class ActorSystemTest(unittest.TestCase):
             def sample_message(self, value):
                 results.append("sample_message")
                 results.append(value)
-                raise RuntimeError("expected_error")
+                raise AppException("expected_error")
 
         class ParentActor(actors.Actor):
 
