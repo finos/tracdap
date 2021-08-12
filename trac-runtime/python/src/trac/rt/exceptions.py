@@ -31,19 +31,61 @@ class EStartup(ETrac):
     pass
 
 
-class EBadConfig(ETrac):
+class EConfig(ETrac):
 
     """
     Indicates an error in a config file (either system or job config)
-
-    Includes errors for syntax, structure and config validation.
-    Doe not include errors loading the file, e.g. disk read failures or timeouts.
     """
 
     pass
 
 
-class EModelValidation(ETrac):
+class EConfigLoad(EConfig):
+
+    """
+    Config errors related to loading files and resources
+    Includes errors loading config from platform-specific backends using plugins (e.g. cloud key stores and buckets)
+    Does not include errors relating to the content of the configuration
+    """
+
+    pass
+
+
+class EConfigParse(EConfig):
+
+    """
+    Config errors relating to syntax, structure and config validation.
+    Does not include errors loading the file, e.g. disk read failures or timeouts.
+    """
+
+    pass
+
+
+class EValidation(ETrac):
+
+    """
+    Base class for validation errors.
+
+    Validation occurs on the inside of all platform interfaces,
+    including the runtime API for models, the web API and the CLI and platform/jpb config interfaces
+    """
+
+    pass
+
+
+class EJobValidation(EValidation):
+
+    """
+    A job submitted to the engine has failed validation
+
+    This could be because the job config is invalid or does not align with the platform config
+    It could also happen if the job references resources that are superseded or expunged
+    """
+
+    pass
+
+
+class EModelValidation(EValidation):
 
     """
     Validation failure when a model is imported or loaded
@@ -55,7 +97,7 @@ class EModelValidation(ETrac):
     pass
 
 
-class ERuntimeValidation(ETrac):
+class ERuntimeValidation(EValidation):
 
     """
     Validation failure when a model calls into the TRAC API using the methods in TracContext
@@ -64,7 +106,7 @@ class ERuntimeValidation(ETrac):
     pass
 
 
-class EDataValidation(ETrac):
+class EDataValidation(EValidation):
 
     """
     Validation failure when a model output is checked for conformance to its data schema
