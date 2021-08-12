@@ -15,7 +15,6 @@
 import abc
 import typing as tp
 import pathlib
-import io
 import datetime as dt
 import dataclasses as dc
 import enum
@@ -24,6 +23,7 @@ import pandas as pd
 
 import trac.rt.metadata as _meta
 import trac.rt.config as _cfg
+import trac.rt.exceptions as _ex
 
 
 class FileType(enum.Enum):
@@ -34,6 +34,12 @@ class FileType(enum.Enum):
 
 @dc.dataclass
 class FileStat:
+
+    """
+    Dataclass to represent some basic  file stat info independent of the storage technology used
+    I.e. do not depend on Python stat_result class that refers to locally-mounted filesystems
+    Timestamps are held in UTC
+    """
 
     file_type: FileType
     size: int
@@ -78,7 +84,7 @@ class IFileStorage:
         pass
 
     @abc.abstractmethod
-    def read_byte_stream(self, storage_path: str) -> io.BytesIO:
+    def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
         pass
 
     @abc.abstractmethod
@@ -86,7 +92,23 @@ class IFileStorage:
         pass
 
     @abc.abstractmethod
-    def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> io.BytesIO:
+    def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
+        pass
+
+    @abc.abstractmethod
+    def read_text(self, storage_path: str, encoding: str = 'utf-8') -> str:
+        pass
+
+    @abc.abstractmethod
+    def read_text_stream(self, storage_path: str, encoding: str = 'utf-8') -> tp.TextIO:
+        pass
+
+    @abc.abstractmethod
+    def write_text(self, storage_path: str, data: str, encoding: str = 'utf-8', overwrite: bool = False):
+        pass
+
+    @abc.abstractmethod
+    def write_text_stream(self, storage_path: str, encoding: str = 'utf-8', overwrite: bool = False) -> tp.TextIO:
         pass
 
 
@@ -222,15 +244,15 @@ class CommonDataStorage(IDataStorage):
         format_impl = self.__formats.get(storage_format.lower())
 
         if format_impl is None:
-            raise NotImplementedError(f"Format '{storage_format}' is not supported")  # TODO: Error
+            raise _ex.EStorageConfig(f"Requested storage format [{storage_format}] is not available")
 
         if self.__pushdown_pandas:
             full_path = self.__root_path / storage_path
             return format_impl.read_pandas(full_path, schema, storage_options)
 
         else:
-            with self.__file_storage.read_byte_stream(storage_path) as byte_stream:
-                return format_impl.read_pandas(byte_stream, schema, storage_options)
+            with self.__file_storage.read_text_stream(storage_path) as text_stream:
+                return format_impl.read_pandas(text_stream, schema, storage_options)
 
     def write_pandas_table(
             self, schema: _meta.TableDefinition, df: pd.DataFrame,
@@ -241,9 +263,9 @@ class CommonDataStorage(IDataStorage):
         format_impl = self.__formats.get(storage_format.lower())
 
         if format_impl is None:
-            raise NotImplementedError(f"Format '{storage_format}' is not supported")  # TODO: Error
+            raise _ex.EStorageConfig(f"Requested storage format [{storage_format}] is not available")
 
-        # TODO: Switch between binary and text mode depending on format
+        # TODO: Switch between binary and text mode depending on format, also set encoding (default is utf-8)
 
         if self.__pushdown_pandas:
 
@@ -255,8 +277,8 @@ class CommonDataStorage(IDataStorage):
 
         else:
 
-            with self.__file_storage.write_byte_stream(storage_path, overwrite) as byte_stream:
-                format_impl.write_pandas(byte_stream, schema, df, storage_options)
+            with self.__file_storage.write_text_stream(storage_path, overwrite=overwrite) as text_stream:
+                format_impl.write_pandas(text_stream, schema, df, storage_options)
 
     def read_spark_table(
             self, schema: _meta.TableDefinition,
@@ -294,7 +316,7 @@ class LocalFileStorage(IFileStorage):
 
         return self.stat(storage_path).size
 
-    def stat(self, storage_path: str) -> FileStat:  # TODO: Convert to FileStat
+    def stat(self, storage_path: str) -> FileStat:
 
         item_path = self.__root_path / storage_path
         os_stat = item_path.stat()
@@ -305,7 +327,13 @@ class LocalFileStorage(IFileStorage):
 
         return FileStat(
             file_type=file_type,
-            size=os_stat.st_size)
+            size=os_stat.st_size,
+            ctime=dt.datetime.fromtimestamp(os_stat.st_ctime, dt.timezone.utc),
+            mtime=dt.datetime.fromtimestamp(os_stat.st_mtime, dt.timezone.utc),
+            atime=dt.datetime.fromtimestamp(os_stat.st_atime, dt.timezone.utc),
+            uid=os_stat.st_uid,
+            gid=os_stat.st_gid,
+            mode=os_stat.st_mode)
 
     def ls(self, storage_path: str) -> tp.List[str]:
 
@@ -328,24 +356,50 @@ class LocalFileStorage(IFileStorage):
         with self.read_byte_stream(storage_path) as stream:
             return stream.read()
 
-    def read_byte_stream(self, storage_path: str) -> io.BytesIO:
+    def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
         item_path = self.__root_path / storage_path
-        file_mode = 'rb'
 
-        return open(item_path, mode=file_mode)
+        return open(item_path, mode='rb')
 
     def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
 
         with self.write_byte_stream(storage_path, overwrite) as stream:
             stream.write(data)
 
-    def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> io.BytesIO:
+    def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
 
         item_path = self.__root_path / storage_path
-        file_mode = 'wb' if overwrite else 'xb'
 
-        return open(item_path, mode=file_mode)
+        if overwrite:
+            return open(item_path, mode='wb')
+        else:
+            return open(item_path, mode='xb')
+
+    def read_text(self, storage_path: str, encoding: str = 'utf-8') -> str:
+
+        with self.read_text_stream(storage_path, encoding) as stream:
+            return stream.read()
+
+    def read_text_stream(self, storage_path: str, encoding: str = 'utf-8') -> tp.TextIO:
+
+        item_path = self.__root_path / storage_path
+
+        return open(item_path, mode='rt')
+
+    def write_text(self, storage_path: str, data: str, encoding: str = 'utf-8', overwrite: bool = False):
+
+        with self.write_text_stream(storage_path, encoding, overwrite) as stream:
+            stream.write(data)
+
+    def write_text_stream(self, storage_path: str, encoding: str = 'utf-8', overwrite: bool = False) -> tp.TextIO:
+
+        item_path = self.__root_path / storage_path
+
+        if overwrite:
+            return open(item_path, mode='wt')
+        else:
+            return open(item_path, mode='xt')
 
 
 class LocalDataStorage(CommonDataStorage):

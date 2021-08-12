@@ -99,6 +99,15 @@ class EStorage(ETrac):
     pass
 
 
+class EStorageConfig(EStorage):
+
+    """
+    Storage referenced in metadata is either not supported or not configured
+    """
+
+    pass
+
+
 class EStorageCommunication(EStorage):
 
     """
