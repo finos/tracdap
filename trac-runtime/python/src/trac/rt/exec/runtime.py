@@ -196,12 +196,6 @@ class TracRuntime:
             self._log.error(f"TRAC runtime failed to start due to an internal error (this is a bug)")
             raise
 
-        # Unexpected error - something has gone very wrong, unexpected errors mean a basic sanity check has failed
-        # Propagate original exception, this is not a startup error
-        except _ex.EUnexpected:
-            self._log.error(f"TRAC runtime failed to start due to an unexpected error (this is a bug)")
-            raise
-
         # An expected startup error - e.g. missing or bad config, properly handled in the startup code
         # Propagate as EStartup
         except _ex.EStartup as e:

@@ -272,5 +272,4 @@ class EUnexpected(ETrac):
     If this condition is not met, use ETracInternal instead.
     """
 
-    def __init__(self):
-        super(EUnexpected, self).__init__("Unexpected internal error (this is a bug)")
+    pass
