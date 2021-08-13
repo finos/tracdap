@@ -160,13 +160,14 @@ class DevModeTranslator:
         skeleton_modeL_def = meta.ModelDefinition(  # noqa
             language="python",
             repository="trac_integrated",
+            repositoryVersion="",
+            path="",
             entryPoint=f"{model_class.__module__}.{model_class.__name__}",
 
-            path="",
-            repositoryVersion="",
-            input={},
-            output={},
-            param={},
+            params={},
+            inputs={},
+            outputs={},
+
             overlay=False,
             schemaUnchanged=False)
 
@@ -181,13 +182,14 @@ class DevModeTranslator:
         model_def = meta.ModelDefinition(  # noqa
             language="python",
             repository="trac_integrated",
+            repositoryVersion="",
+            path="",
             entryPoint=f"{model_class.__module__}.{model_class.__name__}",
 
-            path="",
-            repositoryVersion="",
-            input=model_inputs,
-            output=model_outputs,
-            param=model_params,
+            params=model_params,
+            inputs=model_inputs,
+            outputs=model_outputs,
+
             overlay=False,
             schemaUnchanged=False)
 

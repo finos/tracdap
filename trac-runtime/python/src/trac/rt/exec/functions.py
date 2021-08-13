@@ -263,8 +263,8 @@ class ModelFunc(NodeFunction):
 
         # Add empty data views to the local context to hold model outputs
         local_ctx.update({
-            output_name: _data.DataView(schema=self.node.model_def.output[output_name], parts={})
-            for output_name in self.node.model_def.output})
+            output_name: _data.DataView(schema=self.node.model_def.outputs[output_name], parts={})
+            for output_name in self.node.model_def.outputs})
 
         # Run the model against the mapped local context
         trac_ctx = _ctx.TracContextImpl(
@@ -278,7 +278,7 @@ class ModelFunc(NodeFunction):
         # The node result is just the model outputs taken from the local context
         model_outputs = {
             name: obj for name, obj in local_ctx.items()
-            if name in self.node.model_def.output}
+            if name in self.node.model_def.outputs}
 
         return model_outputs
 

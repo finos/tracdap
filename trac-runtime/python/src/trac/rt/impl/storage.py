@@ -207,13 +207,13 @@ class _CsvStorageFormat(_StorageFormat):
 
     def read_pandas(self, src, schema: _meta.TableDefinition, options: dict):
 
-        columns = list(map(lambda f: f.fieldName, schema.field)) if schema.field else None
+        columns = list(map(lambda f: f.fieldName, schema.fields)) if schema.fields else None
 
         return pd.read_csv(src, usecols=columns, **options)
 
     def write_pandas(self, tgt, schema: _meta.TableDefinition, data: pd.DataFrame, options: dict):
 
-        columns = list(map(lambda f: f.fieldName, schema.field)) if schema.field else None
+        columns = list(map(lambda f: f.fieldName, schema.fields)) if schema.fields else None
 
         data.to_csv(tgt, columns=columns, **options)
 
