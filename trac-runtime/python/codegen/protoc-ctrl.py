@@ -115,7 +115,7 @@ def main(argv):
             pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
 
             proto_files = list(find_proto_files(proto_location))
-            argv = platform_args(gen_trac_args, proto_files)
+            argv = platform_args(gen_proto_args, proto_files)
             codegen_result = sp.run(executable=protoc.PROTOC_EXE, args=argv)
 
     # We are not piping stdout/stderr
