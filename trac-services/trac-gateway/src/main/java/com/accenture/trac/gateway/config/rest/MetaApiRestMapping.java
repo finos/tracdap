@@ -19,7 +19,7 @@ package com.accenture.trac.gateway.config.rest;
 import com.accenture.trac.api.*;
 import com.accenture.trac.gateway.proxy.rest.RestApiMethod;
 import com.accenture.trac.metadata.TagSelector;
-import com.accenture.trac.metadata.search.SearchParameters;
+import com.accenture.trac.metadata.SearchParameters;
 
 import io.netty.handler.codec.http.HttpMethod;
 

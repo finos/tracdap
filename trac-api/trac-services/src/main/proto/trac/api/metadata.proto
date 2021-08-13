@@ -588,7 +588,7 @@ message MetadataSearchRequest {
 
     string tenant = 1;
 
-    metadata.search.SearchParameters searchParams = 2;
+    metadata.SearchParameters searchParams = 2;
 };
 
 

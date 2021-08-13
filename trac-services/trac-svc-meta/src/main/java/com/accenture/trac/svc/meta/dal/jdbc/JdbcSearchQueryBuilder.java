@@ -16,8 +16,7 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
-import com.accenture.trac.metadata.BasicType;
-import com.accenture.trac.metadata.search.*;
+import com.accenture.trac.metadata.*;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.exception.*;
 
