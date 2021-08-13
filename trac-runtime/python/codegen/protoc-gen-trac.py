@@ -34,38 +34,46 @@ class TracPlugin:
 
     def generate(self):
 
-        generator = gen.TracGenerator()
-        generated_response = pb_plugin.CodeGeneratorResponse()
+        try:
 
-        input_files = self._request.proto_file
-        input_files = filter(lambda f: f.name in self._request.file_to_generate, input_files)
-        input_files = filter(lambda f: f.source_code_info.ByteSize() > 0, input_files)
+            generator = gen.TracGenerator()
+            generated_response = pb_plugin.CodeGeneratorResponse()
 
-        sorted_files = sorted(input_files, key=lambda f: f.package)
-        packages = it.groupby(sorted_files, lambda f: f.package)
+            input_files = self._request.proto_file
+            input_files = filter(lambda f: f.name in self._request.file_to_generate, input_files)
+            input_files = filter(lambda f: f.source_code_info.ByteSize() > 0, input_files)
 
-        for package, files in packages:
+            sorted_files = sorted(input_files, key=lambda f: f.package)
+            packages = it.groupby(sorted_files, lambda f: f.package)
 
-            # Take files out of iter group, they may be used multiple times
-            files = list(files)
+            for package, files in packages:
 
-            self._log.info("package '{}' ({} files)".format(package, len(files)))
+                # Take files out of iter group, they may be used multiple times
+                files = list(files)
 
-            package_files = generator.generate_package(package, files)
-            generated_response.file.extend(package_files)
+                self._log.info("package '{}' ({} files)".format(package, len(files)))
 
-        # Generate package-level files for empty packages
-        # (this creates a valid package tree from the root package)
-
-        proto_packages = set(map(lambda f: f.package, self._request.proto_file))
-        all_packages = self.expand_parent_packages(proto_packages)
-
-        for package in all_packages:
-            if package not in proto_packages:
-                package_files = generator.generate_package(package, [])
+                package_files = generator.generate_package(package, files)
                 generated_response.file.extend(package_files)
 
-        return generated_response
+            # Generate package-level files for empty packages
+            # (this creates a valid package tree from the root package)
+
+            proto_packages = set(map(lambda f: f.package, self._request.proto_file))
+            all_packages = self.expand_parent_packages(proto_packages)
+
+            for package in all_packages:
+                if package not in proto_packages:
+                    package_files = generator.generate_package(package, [])
+                    generated_response.file.extend(package_files)
+
+            return generated_response
+
+        except gen.ECodeGeneration as e:
+
+            error_response = pb_plugin.CodeGeneratorResponse()
+            error_response.error = str(e)
+            return error_response
 
     def expand_parent_packages(self, packages):
 
