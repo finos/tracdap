@@ -118,7 +118,7 @@ message Tag {
      *
      * @see SearchParameters
      */
-    map<string, Value> attr = 2;
+    map<string, Value> attrs = 2;
 
     /**
      * The object definition that the tag is associate with.

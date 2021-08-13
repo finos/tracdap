@@ -35,11 +35,10 @@ enum JobType {
 message JobDefinition {
 
   JobType jobType = 1;
-
   TagSelector target = 2;
 
-  map<string, Value> param = 3;
-  map<string, TagSelector> input = 4;
-  map<string, TagSelector> output = 5;
-  map<string, TagSelector> model = 6;
+  map<string, Value> params = 3;
+  map<string, TagSelector> inputs = 4;
+  map<string, TagSelector> outputs = 5;
+  map<string, TagSelector> models = 6;
 }

@@ -318,7 +318,7 @@ message Value {
  */
 message ArrayValue {
 
-    repeated Value item = 1;
+    repeated Value items = 1;
 }
 
 
@@ -334,5 +334,5 @@ message ArrayValue {
  */
 message MapValue {
 
-    map<string, Value> entry = 1;
+    map<string, Value> entries = 1;
 }
