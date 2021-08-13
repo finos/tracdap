@@ -22,6 +22,7 @@ import uuid
 import trac.rt.api as api
 import trac.rt.metadata as meta
 import trac.rt.config as cfg
+import trac.rt.exceptions as _ex
 import trac.rt.impl.repositories as _repos
 import trac.rt.impl.storage as _storage
 import trac.rt.impl.util as util
@@ -110,14 +111,14 @@ class DevModeTranslator:
             storage_path = data_value.get("path")
 
             if not storage_path:
-                raise RuntimeError(f"Invalid configuration for input '{data_key}' (missing required value 'path'")
+                raise _ex.EConfigParse(f"Invalid configuration for input '{data_key}' (missing required value 'path'")
 
             storage_key = data_value.get("storageKey") or sys_config.storageSettings.defaultStorage
             storage_format = data_value.get("format") or sys_config.storageSettings.defaultFormat
             snap = 1
 
         else:
-            raise RuntimeError(f"Invalid configuration for input '{data_key}'")
+            raise _ex.EConfigParse(f"Invalid configuration for input '{data_key}'")
 
         cls._log.info(f"Generating data definition for '{data_key}' (assigned ID {data_id})")
 
