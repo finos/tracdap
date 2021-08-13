@@ -19,6 +19,9 @@ import decimal
 import enum
 import inspect
 
+import trac.rt.exceptions as _ex
+import trac.rt.impl.util as _util
+
 import pathlib
 import json
 import yaml
@@ -44,27 +47,42 @@ class ConfigParser(tp.Generic[_T]):
     }
 
     def __init__(self, config_class: _T.__class__):
+        self._log = _util.logger_for_object(self)
         self._config_class = config_class
         self._errors = []
 
-    @classmethod
-    def load_raw_config(cls, config_file: str):
+    def load_raw_config(self, config_file: str, config_file_name: str = None):
 
         config_path = pathlib.Path(config_file)
         extension = config_path.suffix.lower()
 
-        # self._log.info(f"Loading config file: {str(config_path)}")
+        if config_file_name is not None:
+            self._log.info(f"Loading {config_file_name} config: {str(config_path)}")
+        else:
+            self._log.info(f"Loading config file: {str(config_path)}")
 
-        if not config_path.exists() or not config_path.is_file():
-            raise RuntimeError()  # TODO: Error
+        if not config_path.exists():
+            msg = f"Config file not found: [{config_file}]"
+            self._log.error(msg)
+            raise _ex.EConfigLoad(msg)
+
+        if not config_path.is_file():
+            msg = f"Config path does not point to a regular file: [{config_file}]"
+            self._log.error(msg)
+            raise _ex.EConfigLoad(msg)
 
         with config_path.open('r') as config_stream:
+
             if extension == ".yaml" or extension == ".yml":
                 config_dict = yaml.safe_load(config_stream)
+
             elif extension == ".json":
                 config_dict = json.load(config_stream)
+
             else:
-                raise RuntimeError()  # TODO: Error
+                msg = f"Format not recognised for config file [{config_path.name}]"
+                self._log.error(msg)
+                raise _ex.EConfigLoad(msg)
 
             return config_dict
 
@@ -80,7 +98,7 @@ class ConfigParser(tp.Generic[_T]):
                 location_info = f" (in {location})" if location else ""
                 message = message + f"\n{error}{location_info}"
 
-            raise RuntimeError(message)
+            raise _ex.EConfigParse(message)
 
         return config
 
@@ -100,7 +118,7 @@ class ConfigParser(tp.Generic[_T]):
             return self._parse_enum(location, raw_value, annotation)
 
         if isinstance(annotation, self.__generic_metaclass):
-            return self._parse_generic_class(location, raw_value, annotation)
+            return self._parse_generic_class(location, raw_value, annotation)  # noqa
 
         # If there is no special handling for the given type, try to interpret as a simple Python class
         return self._parse_simple_class(location, raw_value, annotation)
@@ -141,7 +159,8 @@ class ConfigParser(tp.Generic[_T]):
         except KeyError:
             return self._error(location, f"Invalid value for {metaclass.__name__}: {raw_value}")
 
-    def _parse_enum_value(self, raw_value: str, metaclass: enum.EnumMeta):
+    @staticmethod
+    def _parse_enum_value(raw_value: str, metaclass: enum.EnumMeta):
 
         try:
             return metaclass.__members__[raw_value]
@@ -284,7 +303,8 @@ class ConfigParser(tp.Generic[_T]):
         self._errors.append((location, error))
         return None
 
-    def _child_location(self, parent_location: str, item: str):
+    @staticmethod
+    def _child_location(parent_location: str, item: str):
 
         if parent_location is None or parent_location == "":
             return item

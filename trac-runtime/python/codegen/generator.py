@@ -37,6 +37,16 @@ class LocationContext:
         return LocationContext(self.src_locations, self.src_loc_code, index, self.indent)
 
 
+class ECodeGeneration(RuntimeError):
+
+    """
+    An error occurred in the code generation process
+    (This is not part of the ETrac hierarchy as it is a build-time error)
+    """
+
+    pass
+
+
 class TracGenerator:
     
     _FieldType = pb_desc.FieldDescriptorProto.Type
@@ -381,10 +391,9 @@ class TracGenerator:
             return self.PROTO_TYPE_MAPPING[descriptor.type].__name__
 
         # Any unrecognised type is an error
-        raise RuntimeError(
+        raise ECodeGeneration(
             "Unknown type in protobuf field descriptor: field = {}, type code = {}"
-                .format(descriptor.name, descriptor.type))
-
+            .format(descriptor.name, descriptor.type))
 
     def generate_enum(self, ctx: LocationContext, descriptor: pb_desc.EnumDescriptorProto) -> str:
 
@@ -536,6 +545,8 @@ class TracGenerator:
             for field in message_descriptor.DESCRIPTOR.fields:
                 print(field.name)
 
-            raise RuntimeError("Field {} not found in type {}".format(field_name, message_descriptor.DESCRIPTOR.name))
+            raise ECodeGeneration(
+                "Field {} not found in type {}"
+                .format(field_name, message_descriptor.DESCRIPTOR.name))
 
         return field_descriptor.number

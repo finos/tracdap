@@ -22,9 +22,22 @@ import dataclasses as dc
 import inspect
 
 import trac.rt.impl.util as util
+import trac.rt.exceptions as _ex
 
 
 ActorId = str
+
+
+class EBadActor(_ex.ETracInternal):
+
+    """
+    A bad request has been made to the actors subsystem, e.g. an invalid message or message params
+
+    This error should only be raised where client code has made an invalid or illegal request to the actor system.
+    Errors or inconsistencies in the actor module itself are internal bugs and should be marked by raising EUnexpected.
+    """
+
+    pass
 
 
 class ActorState(enum.Enum):
@@ -175,8 +188,14 @@ class Actor:
 
     def _require_state(self, allowed_states: tp.List[ActorState]):
 
+        # The actor system should prevent, reject or discard out-of-sequence lifecycle events
+        # If one gets through this is an unexpected error
+
         if self.__state not in allowed_states:
-            raise RuntimeError("Actor lifecycle error")  # TODO: Error
+
+            msg = "Actor lifecycle signal received out of sequence"
+            self.__log.error(msg)
+            raise _ex.EUnexpected(msg)
 
 
 # Static member __log can only be set after class Actor is declared
@@ -363,14 +382,15 @@ class ActorSystem:
 
     def _stop_actor(self, sender_id: ActorId, target_id: ActorId):
 
-        if not (sender_id == target_id or self._parent_id(target_id) == sender_id or sender_id == "/system"):
+        if sender_id not in [target_id, self._parent_id(target_id), "/system"]:
+
+            # Client code could submit an invalid stop request, this counts as a bad actor
 
             message = f"Stop request rejected: [{SignalNames.STOP}] -> {target_id}" + \
                       f" ({sender_id} is not allowed to stop this actor)"
-            self._log.error(message)
 
-            # TODO: Error type
-            raise RuntimeError(message)
+            self._log.error(message)
+            raise EBadActor(message)
 
         target = self._lookup_actor_node(target_id)
 
@@ -387,19 +407,29 @@ class ActorSystem:
 
     def _send_signal(self, sender_id: ActorId, target_id: ActorId, signal: str, error: tp.Optional[Exception] = None):
 
+        # Only the actor system can send signals, so a bad signal is an unexpected error
+
         if not signal.startswith(SignalNames.PREFIX):
-            raise RuntimeError("Invalid signal")  # TODO: Error
+            raise _ex.EUnexpected()
 
         if signal == SignalNames.FAILED:
             msg = ErrorSignal(sender_id, target_id, signal, error=error)
         else:
             msg = Signal(sender_id, target_id, signal)
+
         self.__message_queue.append(msg)
 
     def _send_message(self, sender_id: ActorId, target_id: ActorId, message: str, args, kwargs):
 
+        # Client code could try to send a signal string as a message, this counts as a bad actor
+
         if message.startswith(SignalNames.PREFIX):
-            raise RuntimeError("Signals cannot be sent like messages")  # TODO: Error
+
+            message = f"Invalid message: {sender_id} [{message}] -> {target_id}" \
+                    + f" ([{message} looks like a signal, signals cannot be sent with send_message)"
+
+            self._log.error(message)
+            raise EBadActor(message)
 
         _args = args or []
         _kwargs = kwargs or {}
@@ -557,7 +587,7 @@ class ActorSystem:
         if target_handler is None:
             error = f"Invalid message: [{message}] -> {target_id} (unknown message '{message}')"
             self._log.error(error)
-            raise RuntimeError(error)
+            raise EBadActor(error)
 
         target_params = target_handler.params
         type_hints = target_handler.type_hints
@@ -565,7 +595,7 @@ class ActorSystem:
         if len(args) + len(kwargs) > len(target_params):
             error = f"Invalid message: [{message}] -> {target_id} (too many arguments)"
             self._log.error(error)
-            raise RuntimeError(error)
+            raise EBadActor(error)
 
         pos_params = target_params[:len(args)]
         kw_params = target_params[len(args):]
@@ -576,14 +606,14 @@ class ActorSystem:
             if param.default is inspect._empty and param.name not in kwargs:  # noqa
                 error = f"Invalid message: [{message}] -> {target_id} (missing required parameter '{param.name}')"
                 self._log.error(error)
-                raise RuntimeError(error)
+                raise EBadActor(error)
 
         # Extra (unknown) kw params
         for param_name in kwargs.keys():
             if param_name not in kw_param_names:
                 error = f"Invalid message: [{message}] -> {target_id} (unknown parameter '{param_name}')"
                 self._log.error(error)
-                raise RuntimeError(error)
+                raise EBadActor(error)
 
         # Positional arg types
         for pos_param, pos_arg in zip(pos_params, args):
@@ -594,7 +624,7 @@ class ActorSystem:
             if type_hint is not None and not isinstance(pos_arg, type_hint):
                 error = f"Invalid message: [{message}] -> {target_id} (wrong parameter type for '{pos_param.name}')"
                 self._log.error(error)
-                raise RuntimeError(error)
+                raise EBadActor(error)
 
         # Kw arg types
         for kw_param in kw_params:
@@ -610,4 +640,4 @@ class ActorSystem:
             if type_hint is not None and not isinstance(kw_arg, type_hint):
                 error = f"Invalid message: [{message}] -> {target_id} (wrong parameter type for '{kw_param.name}')"
                 self._log.error(error)
-                raise RuntimeError(error)
+                raise EBadActor(error)

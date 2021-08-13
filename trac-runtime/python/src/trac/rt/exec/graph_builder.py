@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import trac.rt.config.config as config
+import trac.rt.exceptions as _ex
 
 from .graph import *
 
@@ -25,7 +26,7 @@ class GraphBuilder:
         target_def = job_config.objects.get(job_config.target)
 
         if target_def is None:
-            raise RuntimeError(f"No definition available for job target '{job_config.target}'")  # TODO: Error
+            raise _ex.EConfigParse(f"No definition available for job target '{job_config.target}'")
 
         # Only calculation jobs are supported at present
         return GraphBuilder.build_calculation_job(job_config)
@@ -197,7 +198,7 @@ class GraphBuilder:
             return GraphBuilder.build_flow(job_config, namespace, graph, model_or_flow.flow)
 
         else:
-            raise RuntimeError("Invalid job config given to the execution engine")  # TODO: Error
+            raise _ex.EConfigParse("Invalid job config given to the execution engine")
 
     @staticmethod
     def build_model(
