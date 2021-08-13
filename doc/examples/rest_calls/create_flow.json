@@ -1,7 +1,7 @@
 {
     "objectType": "FLOW",
 
-    "tagUpdate": [
+    "tagUpdates": [
         {
             "attrName": "flow_type",
             "value": { "stringValue": "account_simulation" }
@@ -23,7 +23,7 @@
     "definition": {
     "flow": {
 
-        "node": {
+        "nodes": {
 
             "customer_accounts": {
                 "nodeType": "INPUT_NODE"
@@ -36,9 +36,9 @@
             "simulate_customer_transactions": {
                 "nodeType": "MODEL_NODE",
                 "modelStub": {
-                    "input": [ "initial_accounts", "economic_scenario" ],
-                    "output": [ "simulated_accounts" ],
-                    "parameter": {
+                    "inputs": [ "initial_accounts", "economic_scenario" ],
+                    "outputs": [ "simulated_accounts" ],
+                    "params": {
                         "number_of_months": { "basicType": "INTEGER" },
                         "include_promotions": { "basicType": "BOOLEAN" }
                     }
@@ -48,9 +48,9 @@
             "simulate_joiners_and_leavers": {
                 "nodeType": "MODEL_NODE",
                 "modelStub": {
-                    "input": [ "initial_accounts" ],
-                    "output": [ "simulated_accounts" ],
-                    "parameter": {
+                    "inputs": [ "initial_accounts" ],
+                    "outputs": [ "simulated_accounts" ],
+                    "params": {
                         "number_of_months": { "basicType": "INTEGER" },
                         "include_promotions": { "basicType": "BOOLEAN" }
                     }
@@ -62,7 +62,7 @@
             }
         },
 
-        "edge": [
+        "edges": [
 
             {
                 "head": { "node": "simulate_customer_transactions", "socket": "initial_accounts" },

@@ -18,7 +18,7 @@
                 "attrType": "STRING",
                 "operator": "IN",
                 "searchValue": { "arrayValue": {
-                    "item": [
+                    "items": [
                         { "stringValue": "ACME Financial" },
                         { "stringValue": "ACME SubCo" },
                         { "stringValue": "ACME Legacy Brands" }
