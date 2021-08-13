@@ -236,13 +236,21 @@ class ETracInternal(ETrac):
     An internal error has occurred in the TRAC runtime engine (this is a bug)
 
     This error indicates a problem with the runtime engine or with one of its subsystems or plugins.
-    It should be used to guard against error conditions between different modules or sub-systems in the engine.
-    In most cases an internal error will cause the platform to shut down, however there may be cases in some
-    modules where these errors can be handled (e.g. by discarding a failing plugin).
+    It always represents a bug (although sometimes there may be a genuine error as well that has not been
+    properly handled). Internal errors are normally fatal because the engine has gone into an inconsistent state.
+    A few special cases may be recoverable (e.g. discarding a failing plugin on load).
+    """
 
-    This error can be raised e.g. by an internal component that receives an invalid request from client code
-    in another part of the engine. For error conditions that are wholly under the control o a single module
-    or sub-system, use EUnexpected instead.
+    pass
+
+
+class EValidationGap(ETracInternal):
+
+    """
+    A validation error has occurred in the TRAC runtime engine (this is a bug)
+
+    A validation gap is a type of internal error, it indicates a condition inside
+    TRAC that should have been caught higher up the stack in a validation layer.
     """
 
     pass
@@ -253,14 +261,16 @@ class EUnexpected(ETrac):
     """
     An unexpected error has occurred in the TRAC runtime engine (this is a bug)
 
-    This error always indicates a bug, it signals that the engine is in an inconsistent state.
-    It should be used only for errors that can never happen, within the scope of a module or sub-system
-    when that module is accessed via its public API. Never use EUnexpected for expected errors!
-    The runtime will be shut down with a failed exit code, any running or pending jobs will also be failed.
+    An unexpected error is an internal error that should never happen, it represents a logical
+    inconsistency within a single component or subsystem. For example, a failed sanity
+    check or a case where a condition that should be guaranteed is not met. Unexpected errors
+    are always fatal.
 
-    This error can be raised e.g. for failed sanity checks, where the engine should guarantee some condition
-    and that condition has not been met. For error conditions that might occur as a result of problems in
-    other parts of the engine (but not relating to external systems), use ETracInternal instead.
+    The conditions for EUnexpected should be wholly expressed by a single component or subsystem.
+    If a component exposes an interface to other components of the engine, and requests via that interface
+    are invalid or can put the component into an illegal state, that does not count as unexpected.
+    If this condition is not met, use ETracInternal instead.
     """
 
-    pass
+    def __init__(self):
+        super(EUnexpected, self).__init__("Unexpected internal error (this is a bug)")

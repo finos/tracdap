@@ -156,17 +156,20 @@ class _LoadSaveDataFunc(NodeFunction, abc.ABC):
 
     def _choose_copy(self, data_item: str, storage_def: meta.StorageDefinition) -> meta.StorageCopy:
 
+        # Metadata should be checked for consistency before a job is accepted
+        # An error here indicates a validation gap
+
         storage_info = storage_def.dataItems.get(data_item)
 
         if storage_info is None:
-            raise RuntimeError("Invalid metadata")  # TODO: Error
+            raise _ex.EValidationGap()
 
         incarnation = next(filter(
             lambda i: i.incarnationStatus == meta.IncarnationStatus.INCARNATION_AVAILABLE,
             reversed(storage_info.incarnations)), None)
 
         if incarnation is None:
-            raise RuntimeError("Data item not available (it has been expunged)")  # TODO: Error
+            raise _ex.EValidationGap()
 
         copy = next(filter(
             lambda c: c.copyStatus == meta.CopyStatus.COPY_AVAILABLE
@@ -174,7 +177,7 @@ class _LoadSaveDataFunc(NodeFunction, abc.ABC):
             incarnation.copies), None)
 
         if copy is None:
-            raise RuntimeError("No copy of the data is available in a connected storage location")  # TODO: Error
+            raise _ex.EValidationGap()
 
         return copy
 
