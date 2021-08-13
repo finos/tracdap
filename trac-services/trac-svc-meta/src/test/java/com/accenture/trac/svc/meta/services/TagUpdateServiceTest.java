@@ -42,10 +42,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(42, attrValue);
     }
 
@@ -64,10 +64,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(List.of(42L, 43L), attrValue);
     }
 
@@ -75,7 +75,7 @@ class TagUpdateServiceTest {
     void createAttr_alreadyExists() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
                 .build();
 
         var update1 = TagUpdate.newBuilder()
@@ -93,7 +93,7 @@ class TagUpdateServiceTest {
     void replaceAttr_ok() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
                 .build();
 
         var update1 = TagUpdate.newBuilder()
@@ -104,10 +104,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(43, attrValue);
     }
 
@@ -130,7 +130,7 @@ class TagUpdateServiceTest {
     void replaceAttr_wrongType() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
                 .build();
 
         var update1 = TagUpdate.newBuilder()
@@ -147,7 +147,7 @@ class TagUpdateServiceTest {
     void replaceAttr_singleToMulti() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
                 .build();
 
         var arrayValue = MetadataCodec.encodeArrayValue(List.of(42, 43), TypeSystem.descriptor(BasicType.INTEGER));
@@ -160,10 +160,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(List.of(42L, 43L), attrValue);
 
         var update2 = TagUpdate.newBuilder()
@@ -174,10 +174,10 @@ class TagUpdateServiceTest {
 
         var updatedTag2 = TagUpdateService.applyTagUpdates(baseTag, List.of(update2));
 
-        assertEquals(1, updatedTag2.getAttrCount());
-        assertTrue(updatedTag2.containsAttr("attr_1"));
+        assertEquals(1, updatedTag2.getAttrsCount());
+        assertTrue(updatedTag2.containsAttrs("attr_1"));
 
-        var attrValue2 = MetadataCodec.decodeIntegerValue(updatedTag2.getAttrOrThrow("attr_1"));
+        var attrValue2 = MetadataCodec.decodeIntegerValue(updatedTag2.getAttrsOrThrow("attr_1"));
         assertEquals(42, attrValue2);
     }
 
@@ -185,7 +185,7 @@ class TagUpdateServiceTest {
     void appendAttr_ok() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
                 .build();
 
         var update1 = TagUpdate.newBuilder()
@@ -196,10 +196,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(List.of(42L, 43L), attrValue);
     }
 
@@ -207,7 +207,7 @@ class TagUpdateServiceTest {
     void appendAttr_multiValue() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
                 .build();
 
         var arrayValue = MetadataCodec.encodeArrayValue(List.of(43, 44), TypeSystem.descriptor(BasicType.INTEGER));
@@ -220,10 +220,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(List.of(42L, 43L, 44L), attrValue);
     }
 
@@ -247,7 +247,7 @@ class TagUpdateServiceTest {
     void appendAttr_wrongType() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
                 .build();
 
         var update1 = TagUpdate.newBuilder()
@@ -264,8 +264,8 @@ class TagUpdateServiceTest {
     void deleteAttr_ok() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
-                .putAttr("attr_2", MetadataCodec.encodeValue("droids_you_are_looking_for"))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_2", MetadataCodec.encodeValue("droids_you_are_looking_for"))
                 .build();
 
         var update1 = TagUpdate.newBuilder()
@@ -275,10 +275,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(42, attrValue);
     }
 
@@ -286,7 +286,7 @@ class TagUpdateServiceTest {
     void deleteAttr_doesNotExist() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
                 .build();
 
         var update1 = TagUpdate.newBuilder()
@@ -302,8 +302,8 @@ class TagUpdateServiceTest {
     void clearAllAttr_ok() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
-                .putAttr("attr_2", MetadataCodec.encodeValue("droids_you_are_looking_for"))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_2", MetadataCodec.encodeValue("droids_you_are_looking_for"))
                 .build();
 
         var update1 = TagUpdate.newBuilder()
@@ -312,16 +312,16 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(0, updatedTag.getAttrCount());
+        assertEquals(0, updatedTag.getAttrsCount());
     }
 
     @Test
     void clearAllAttr_controlledTags() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
-                .putAttr("attr_2", MetadataCodec.encodeValue("droids_you_are_looking_for"))
-                .putAttr("trac_controlled", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_2", MetadataCodec.encodeValue("droids_you_are_looking_for"))
+                .putAttrs("trac_controlled", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
         var update1 = TagUpdate.newBuilder()
@@ -330,10 +330,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("trac_controlled"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("trac_controlled"));
 
-        var attrValue = MetadataCodec.decodeValue(updatedTag.getAttrOrThrow("trac_controlled"));
+        var attrValue = MetadataCodec.decodeValue(updatedTag.getAttrsOrThrow("trac_controlled"));
         assertEquals("not_the_droids_you_are_looking_for", attrValue);
     }
 
@@ -350,10 +350,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(42, attrValue);
     }
 
@@ -361,7 +361,7 @@ class TagUpdateServiceTest {
     void createOrReplace_existing() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
                 .build();
 
         var update1 = TagUpdate.newBuilder()
@@ -372,10 +372,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(43, attrValue);
     }
 
@@ -392,10 +392,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(42, attrValue);
     }
 
@@ -403,7 +403,7 @@ class TagUpdateServiceTest {
     void createOrAppend_existing() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
                 .build();
 
         var update1 = TagUpdate.newBuilder()
@@ -414,10 +414,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(List.of(42L, 43L), attrValue);
     }
 
@@ -434,10 +434,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(42, attrValue);
 
         // Do not set an operation explicitly, should replace if attr already exists
@@ -448,10 +448,10 @@ class TagUpdateServiceTest {
 
         var updatedTag2 = TagUpdateService.applyTagUpdates(baseTag, List.of(update2));
 
-        assertEquals(1, updatedTag2.getAttrCount());
-        assertTrue(updatedTag2.containsAttr("attr_1"));
+        assertEquals(1, updatedTag2.getAttrsCount());
+        assertTrue(updatedTag2.containsAttrs("attr_1"));
 
-        var attrValue2 = MetadataCodec.decodeValue(updatedTag2.getAttrOrThrow("attr_1"));
+        var attrValue2 = MetadataCodec.decodeValue(updatedTag2.getAttrsOrThrow("attr_1"));
         assertEquals("the_droids_you_are_looking_for", attrValue2);
     }
 
@@ -474,12 +474,12 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1, update2));
 
-        assertEquals(2, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
-        assertTrue(updatedTag.containsAttr("attr_2"));
+        assertEquals(2, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
+        assertTrue(updatedTag.containsAttrs("attr_2"));
 
-        var attrValue1 = MetadataCodec.decodeIntegerValue(updatedTag.getAttrOrThrow("attr_1"));
-        var attrValue2 = MetadataCodec.decodeValue(updatedTag.getAttrOrThrow("attr_2"));
+        var attrValue1 = MetadataCodec.decodeIntegerValue(updatedTag.getAttrsOrThrow("attr_1"));
+        var attrValue2 = MetadataCodec.decodeValue(updatedTag.getAttrsOrThrow("attr_2"));
         assertEquals(42, attrValue1);
         assertEquals("the_droids_you_are_looking_for", attrValue2);
     }
@@ -488,7 +488,7 @@ class TagUpdateServiceTest {
     void sequencing_deleteRecreate() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
                 .build();
 
         var createOp = TagUpdate.newBuilder()
@@ -509,10 +509,10 @@ class TagUpdateServiceTest {
         // Applying delete then recreate in one operation should succeed
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(deleteOp, createOp));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(43, attrValue);
     }
 
@@ -535,10 +535,10 @@ class TagUpdateServiceTest {
         // Retry a single create op - should succeed
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(createOp));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeIntegerValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(42, attrValue);
     }
 
@@ -562,10 +562,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(createOp, appendOp));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(List.of(42L, 43L), attrValue);
     }
 
@@ -573,7 +573,7 @@ class TagUpdateServiceTest {
     void sequencing_appendMultiple() {
 
         var baseTag = Tag.newBuilder()
-                .putAttr("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
                 .build();
 
         var arrayValue = MetadataCodec.encodeArrayValue(List.of(43, 44), TypeSystem.descriptor(BasicType.INTEGER));
@@ -592,10 +592,10 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(appendOp1, appendOp2));
 
-        assertEquals(1, updatedTag.getAttrCount());
-        assertTrue(updatedTag.containsAttr("attr_1"));
+        assertEquals(1, updatedTag.getAttrsCount());
+        assertTrue(updatedTag.containsAttrs("attr_1"));
 
-        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrOrThrow("attr_1"));
+        var attrValue = MetadataCodec.decodeArrayValue(updatedTag.getAttrsOrThrow("attr_1"));
         assertEquals(List.of(42L, 43L, 44L, 45L), attrValue);
     }
 
@@ -616,7 +616,7 @@ class TagUpdateServiceTest {
 
         var updatedTag = TagUpdateService.applyTagUpdates(baseTag, List.of(update1));
 
-        var storedValue = updatedTag.getAttrOrThrow("attr_1");
+        var storedValue = updatedTag.getAttrsOrThrow("attr_1");
         assertTrue(storedValue.hasType());
         assertEquals(BasicType.INTEGER, storedValue.getType().getBasicType());
 
@@ -628,7 +628,7 @@ class TagUpdateServiceTest {
 
         var updatedTag2 = TagUpdateService.applyTagUpdates(updatedTag, List.of(update2));
 
-        var storedValue2 = updatedTag2.getAttrOrThrow("attr_1");
+        var storedValue2 = updatedTag2.getAttrsOrThrow("attr_1");
         assertTrue(storedValue2.hasType());
         assertEquals(BasicType.INTEGER, storedValue2.getType().getBasicType());
 
@@ -640,7 +640,7 @@ class TagUpdateServiceTest {
 
         var updatedTag3 = TagUpdateService.applyTagUpdates(updatedTag2, List.of(update3));
 
-        var storedValue3 = updatedTag3.getAttrOrThrow("attr_1");
+        var storedValue3 = updatedTag3.getAttrsOrThrow("attr_1");
         assertTrue(storedValue3.hasType());
         assertEquals(BasicType.ARRAY, storedValue3.getType().getBasicType());
         assertEquals(BasicType.INTEGER, storedValue3.getType().getArrayType().getBasicType());

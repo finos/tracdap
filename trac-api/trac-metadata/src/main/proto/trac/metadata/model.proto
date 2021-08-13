@@ -41,9 +41,9 @@ message ModelDefinition {
     string path = 4;
     string entryPoint = 5;
 
-    map<string, ModelParameter> param = 6;
-    map<string, TableDefinition> input = 7;
-    map<string, TableDefinition> output = 8;
+    map<string, ModelParameter> params = 6;
+    map<string, TableDefinition> inputs = 7;
+    map<string, TableDefinition> outputs = 8;
 
     bool overlay = 9;
     bool schemaUnchanged = 10;

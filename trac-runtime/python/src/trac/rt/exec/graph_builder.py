@@ -210,7 +210,7 @@ class GraphBuilder:
             return NodeId(node_name, namespace)
 
         # Input data should already be mapped to named inputs in the model context
-        input_ids = frozenset(map(node_id_for, model_def.input.keys()))
+        input_ids = frozenset(map(node_id_for, model_def.inputs.keys()))
 
         # Create the model node
         # Always add the prior graph root ID as a dependency
@@ -229,7 +229,7 @@ class GraphBuilder:
 
         model_node_map = {model_id: model_node}
 
-        for output_name in model_def.output:
+        for output_name in model_def.outputs:
 
             output_id = NodeId(output_name, namespace)
             output_node = KeyedItemNode(output_id, model_id, output_name)

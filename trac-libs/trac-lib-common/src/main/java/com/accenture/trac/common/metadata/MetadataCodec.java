@@ -229,7 +229,7 @@ public class MetadataCodec {
     public static <T> Value encodeArrayValue(List<T> arrayValue, TypeDescriptor arrayType) {
 
         var encodedArray = ArrayValue.newBuilder()
-                .addAllItem(arrayValue.stream()
+                .addAllItems(arrayValue.stream()
                 .map(x -> encodeValue(x, arrayType))
                 .collect(Collectors.toList()));
 
@@ -344,7 +344,7 @@ public class MetadataCodec {
         if (TypeSystem.basicType(value) != BasicType.ARRAY)
             throw new IllegalArgumentException("Value is not an array");
 
-        return value.getArrayValue().getItemList().stream()
+        return value.getArrayValue().getItemsList().stream()
                 .map(MetadataCodec::decodeValue)
                 .collect(Collectors.toList());
     }

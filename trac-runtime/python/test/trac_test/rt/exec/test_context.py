@@ -83,15 +83,17 @@ class _TestModel(_api.TracModel):
 
 
 _test_model_def = _api.ModelDefinition(  # noqa
+
     language="python",
     repository="trac_integrated",
+    repositoryVersion="",
+    path="",
     entryPoint=f"{_TestModel.__module__}.{_TestModel.__name__}",
 
-    path="",
-    repositoryVersion="",
-    input=_TestModel().define_inputs(),
-    output=_TestModel().define_outputs(),
-    param=_TestModel().define_parameters(),
+    params=_TestModel().define_parameters(),
+    inputs=_TestModel().define_inputs(),
+    outputs=_TestModel().define_outputs(),
+
     overlay=False,
     schemaUnchanged=False)
 
@@ -140,12 +142,12 @@ class TracContextTest(unittest.TestCase):
             "datetime_param": self.DATETIME_PARAM_VALUE
         }
 
-        customer_loans_schema = _test_model_def.input.get("customer_loans")
+        customer_loans_schema = _test_model_def.inputs.get("customer_loans")
         customer_loans_delta0 = _data.DataItem(pandas=self.LOANS_DATA)
         customer_loans_parts = {_data.DataPartKey.for_root(): [customer_loans_delta0]}
         customer_loans_view = _data.DataView(customer_loans_schema, customer_loans_parts)
 
-        profit_by_region_schema = _test_model_def.output.get("profit_by_region")
+        profit_by_region_schema = _test_model_def.outputs.get("profit_by_region")
         profit_by_region_view = _data.DataView(profit_by_region_schema, {})
 
         data_ctx = {
@@ -199,14 +201,14 @@ class TracContextTest(unittest.TestCase):
         table_schema = self.ctx.get_table_schema("customer_loans")
 
         self.assertIsInstance(table_schema, _api.TableDefinition)
-        self.assertEqual(len(table_schema.field), 5)
+        self.assertEqual(len(table_schema.fields), 5)
 
     def test_get_schema_for_output(self):
 
         table_schema = self.ctx.get_table_schema("profit_by_region")
 
         self.assertIsInstance(table_schema, _api.TableDefinition)
-        self.assertEqual(len(table_schema.field), 2)
+        self.assertEqual(len(table_schema.fields), 2)
 
     def test_get_pandas_table_ok(self):
 

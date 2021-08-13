@@ -245,14 +245,14 @@ class TracContextValidator:
 
         schema = self.__data_ctx[dataset_name].schema
 
-        if schema is None or not schema.field:
+        if schema is None or not schema.fields:
             self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
 
     def check_dataset_schema_not_defined(self, dataset_name: str):
 
         schema = self.__data_ctx[dataset_name].schema
 
-        if schema is not None and schema.field:
+        if schema is not None and schema.fields:
             self._report_error(f"Schema already defined for dataset {dataset_name} in the current context")
 
     def check_dataset_part_present(self, dataset_name: str, part_key: _data.DataPartKey):

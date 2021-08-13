@@ -18,7 +18,6 @@ package com.accenture.trac.svc.meta.api;
 
 import com.accenture.trac.api.*;
 import com.accenture.trac.metadata.*;
-import com.accenture.trac.metadata.search.*;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.services.MetadataReadService;
@@ -124,26 +123,26 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
-                .putAttr(searchAttr, encodeValue("the_droids_you_are_looking_for"))
+                .putAttrs(searchAttr, encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
         var tag2 = Tag.newBuilder()
                 .setDefinition(obj2)
-                .putAttr(searchAttr, encodeValue("not_the_droids_you_are_looking_for"))
+                .putAttrs(searchAttr, encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
         var save1 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(obj1)
-                .addAllTagUpdate(tagUpdatesForAttrs(tag1.getAttrMap()))
+                .addAllTagUpdates(tagUpdatesForAttrs(tag1.getAttrsMap()))
                 .build();
 
         var save2 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(obj2)
-                .addAllTagUpdate(tagUpdatesForAttrs(tag2.getAttrMap()))
+                .addAllTagUpdates(tagUpdatesForAttrs(tag2.getAttrsMap()))
                 .build();
 
         var id1 = writeApi.createObject(save1);
@@ -186,28 +185,28 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
-                .putAttr(searchAttr, encodeValue("the_droids_you_are_looking_for"))
-                .putAttr(searchAttr2, encodeValue("a_galaxy_far_far_away"))
+                .putAttrs(searchAttr, encodeValue("the_droids_you_are_looking_for"))
+                .putAttrs(searchAttr2, encodeValue("a_galaxy_far_far_away"))
                 .build();
 
         var tag2 = Tag.newBuilder()
                 .setDefinition(obj2)
-                .putAttr(searchAttr, encodeValue("not_the_droids_you_are_looking_for"))
-                .putAttr(searchAttr2, encodeValue("under_your_nose"))
+                .putAttrs(searchAttr, encodeValue("not_the_droids_you_are_looking_for"))
+                .putAttrs(searchAttr2, encodeValue("under_your_nose"))
                 .build();
 
         var save1 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(obj1)
-                .addAllTagUpdate(tagUpdatesForAttrs(tag1.getAttrMap()))
+                .addAllTagUpdates(tagUpdatesForAttrs(tag1.getAttrsMap()))
                 .build();
 
         var save2 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(obj2)
-                .addAllTagUpdate(tagUpdatesForAttrs(tag2.getAttrMap()))
+                .addAllTagUpdates(tagUpdatesForAttrs(tag2.getAttrsMap()))
                 .build();
 
         var id1 = writeApi.createObject(save1);
@@ -260,26 +259,26 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
-                .putAttr(searchAttr, encodeValue("the_droids_you_are_looking_for"))
+                .putAttrs(searchAttr, encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
         var tag2 = Tag.newBuilder()
                 .setDefinition(obj2)
-                .putAttr(searchAttr, encodeValue("not_the_droids_you_are_looking_for"))
+                .putAttrs(searchAttr, encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
         var save1 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setDefinition(obj1)
-                .addAllTagUpdate(tagUpdatesForAttrs(tag1.getAttrMap()))
+                .addAllTagUpdates(tagUpdatesForAttrs(tag1.getAttrsMap()))
                 .build();
 
         var save2 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setDefinition(obj2)
-                .addAllTagUpdate(tagUpdatesForAttrs(tag2.getAttrMap()))
+                .addAllTagUpdates(tagUpdatesForAttrs(tag2.getAttrsMap()))
                 .build();
 
         var id1 = writeApi.createObject(save1);
@@ -325,26 +324,26 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
         var tag1 = Tag.newBuilder()
                 .setDefinition(obj1)
-                .putAttr(attrToLookFor, encodeNativeObject(valueToLookFor))
+                .putAttrs(attrToLookFor, encodeNativeObject(valueToLookFor))
                 .build();
 
         var tag2 = Tag.newBuilder()
                 .setDefinition(obj2)
-                .putAttr(attrToLookFor, encodeNativeObject(valueNotToLookFor))
+                .putAttrs(attrToLookFor, encodeNativeObject(valueNotToLookFor))
                 .build();
 
         var save1 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(obj1)
-                .addAllTagUpdate(tagUpdatesForAttrs(tag1.getAttrMap()))
+                .addAllTagUpdates(tagUpdatesForAttrs(tag1.getAttrsMap()))
                 .build();
 
         var save2 = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(obj2)
-                .addAllTagUpdate(tagUpdatesForAttrs(tag2.getAttrMap()))
+                .addAllTagUpdates(tagUpdatesForAttrs(tag2.getAttrsMap()))
                 .build();
 
         var id1 = writeApi.createObject(save1);
@@ -387,7 +386,7 @@ abstract class MetadataSearchApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(obj1)
-                .addTagUpdate(TagUpdate.newBuilder()
+                .addTagUpdates(TagUpdate.newBuilder()
                         .setAttrName("as_of_attr_1")
                         .setValue(MetadataCodec.encodeValue("initial_value")))
                 .build();
@@ -406,7 +405,7 @@ abstract class MetadataSearchApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(selectorForTag(header2))
-                .addTagUpdate(TagUpdate.newBuilder()
+                .addTagUpdates(TagUpdate.newBuilder()
                         .setAttrName("as_of_attr_1")
                         .setOperation(TagOperation.REPLACE_ATTR)
                         .setValue(MetadataCodec.encodeValue("updated_value")))
@@ -462,7 +461,7 @@ abstract class MetadataSearchApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(v1Obj)
-                .addTagUpdate(TagUpdate.newBuilder()
+                .addTagUpdates(TagUpdate.newBuilder()
                         .setAttrName("api_prior_search_attr")
                         .setValue(MetadataCodec.encodeValue("initial_value")))
                 .build();
@@ -473,7 +472,7 @@ abstract class MetadataSearchApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(selectorForTag(v1t1Header))
-                .addTagUpdate(TagUpdate.newBuilder()
+                .addTagUpdates(TagUpdate.newBuilder()
                         .setAttrName("api_prior_search_attr")
                         .setValue(MetadataCodec.encodeValue("modified_value")))
                 .build();
@@ -485,7 +484,7 @@ abstract class MetadataSearchApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(selectorForTag(v1t2Header))
                 .setDefinition(v2Obj)
-                .addTagUpdate(TagUpdate.newBuilder()
+                .addTagUpdates(TagUpdate.newBuilder()
                         .setAttrName("api_prior_search_attr")
                         .setValue(MetadataCodec.encodeValue("modified_value")))
                 .build();

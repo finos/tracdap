@@ -49,7 +49,7 @@ message FieldDefinition {
 
 message TableDefinition {
 
-    repeated FieldDefinition field = 1;
+    repeated FieldDefinition fields = 1;
 }
 
 

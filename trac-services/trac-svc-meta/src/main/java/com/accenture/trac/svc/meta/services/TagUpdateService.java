@@ -85,7 +85,7 @@ public class TagUpdateService {
 
     private static Tag.Builder createOrReplaceAttr(Tag.Builder prior, TagUpdate update) {
 
-        if (prior.containsAttr(update.getAttrName()))
+        if (prior.containsAttrs(update.getAttrName()))
             return replaceAttr(prior, update);
         else
             return createAttr(prior, update);
@@ -93,7 +93,7 @@ public class TagUpdateService {
 
     private static Tag.Builder createOrAppendAttr(Tag.Builder prior, TagUpdate update) {
 
-        if (prior.containsAttr(update.getAttrName()))
+        if (prior.containsAttrs(update.getAttrName()))
             return appendAttr(prior, update);
         else
             return createAttr(prior, update);
@@ -103,7 +103,7 @@ public class TagUpdateService {
 
         requireAttrDoesNotExist(prior, update, CREATE_ALREADY_EXISTS, TagOperation.CREATE_ATTR);
 
-        return prior.putAttr(update.getAttrName(), normalizeValue(update.getValue()));
+        return prior.putAttrs(update.getAttrName(), normalizeValue(update.getValue()));
     }
 
     private static Tag.Builder replaceAttr(Tag.Builder prior, TagUpdate update) {
@@ -111,7 +111,7 @@ public class TagUpdateService {
         requireAttrExists(prior, update, REPLACE_DOES_NOT_EXIST, TagOperation.REPLACE_ATTR);
         requireTypeMatches(prior, update, REPLACE_WRONG_TYPE, TagOperation.REPLACE_ATTR);
 
-        return prior.putAttr(update.getAttrName(), normalizeValue(update.getValue()));
+        return prior.putAttrs(update.getAttrName(), normalizeValue(update.getValue()));
     }
 
     private static Tag.Builder appendAttr(Tag.Builder prior, TagUpdate update) {
@@ -119,15 +119,15 @@ public class TagUpdateService {
         requireAttrExists(prior, update, APPEND_DOES_NOT_EXIST, TagOperation.APPEND_ATTR);
         requireTypeMatches(prior, update, APPEND_WRONG_TYPE, TagOperation.APPEND_ATTR);
 
-        var priorValue = prior.getAttrOrThrow(update.getAttrName());
+        var priorValue = prior.getAttrsOrThrow(update.getAttrName());
 
         var priorArrayValue = TypeSystem.isPrimitive(priorValue)
-                ? ArrayValue.newBuilder().addItem(priorValue)
+                ? ArrayValue.newBuilder().addItems(priorValue)
                 : priorValue.getArrayValue().toBuilder();
 
         var valuesToAppend = TypeSystem.isPrimitive(update.getValue())
                 ? List.of(update.getValue())
-                : update.getValue().getArrayValue().getItemList();
+                : update.getValue().getArrayValue().getItemsList();
 
         var attrType = TypeDescriptor.newBuilder()
                 .setBasicType(BasicType.ARRAY)
@@ -138,23 +138,23 @@ public class TagUpdateService {
         var newValue = Value.newBuilder()
                 .setType(attrType)
                 .setArrayValue(priorArrayValue
-                .addAllItem(valuesToAppend))
+                .addAllItems(valuesToAppend))
                 .build();
 
-        return prior.putAttr(update.getAttrName(), newValue);
+        return prior.putAttrs(update.getAttrName(), newValue);
     }
 
     private static Tag.Builder deleteAttr(Tag.Builder prior, TagUpdate update) {
 
         requireAttrExists(prior, update, DELETE_DOES_NOT_EXIST, TagOperation.DELETE_ATTR);
 
-        return prior.removeAttr(update.getAttrName());
+        return prior.removeAttrs(update.getAttrName());
     }
 
     private static Tag.Builder clearAllAttr(Tag.Builder prior, TagUpdate update) {
 
         // Don't try to remove keys from the set we are iterating
-        var allAttrs = new HashSet<>(prior.getAttrMap().keySet());
+        var allAttrs = new HashSet<>(prior.getAttrsMap().keySet());
 
         var working = prior;
 
@@ -162,7 +162,7 @@ public class TagUpdateService {
 
             // Only clear regular attributes, not TRAC controlled ones
             if (!TRAC_RESERVED_IDENTIFIER.matcher(attrName).matches())
-                working = working.removeAttr(attrName);
+                working = working.removeAttrs(attrName);
         }
 
         return working;
@@ -230,7 +230,7 @@ public class TagUpdateService {
             Tag.Builder tag, TagUpdate update,
             String errorTemplate, TagOperation operation) {
 
-        if (tag.containsAttr(update.getAttrName())) {
+        if (tag.containsAttrs(update.getAttrName())) {
 
             var message = MessageFormat.format(errorTemplate,
                     operation.name(), update.getAttrName());
@@ -244,7 +244,7 @@ public class TagUpdateService {
             Tag.Builder tag, TagUpdate update,
             String errorTemplate, TagOperation operation) {
 
-        if (!tag.containsAttr(update.getAttrName())) {
+        if (!tag.containsAttrs(update.getAttrName())) {
 
             var message = MessageFormat.format(errorTemplate,
                     operation.name(), update.getAttrName());
@@ -258,7 +258,7 @@ public class TagUpdateService {
             Tag.Builder tag, TagUpdate update,
             String errorTemplate, TagOperation operation) {
 
-        var originalType = attrBasicType(tag.getAttrOrThrow(update.getAttrName()));
+        var originalType = attrBasicType(tag.getAttrsOrThrow(update.getAttrName()));
         var updateType = attrBasicType(update.getValue());
 
         if (originalType != updateType) {

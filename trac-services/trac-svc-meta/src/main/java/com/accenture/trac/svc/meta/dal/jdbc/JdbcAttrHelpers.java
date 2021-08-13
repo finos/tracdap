@@ -207,7 +207,7 @@ public class JdbcAttrHelpers {
                         .setBasicType(arrayBasicType));
 
         var arrayValue = ArrayValue.newBuilder()
-                .addAllItem(items);
+                .addAllItems(items);
 
         return Value.newBuilder()
                 .setType(typeDescriptor)

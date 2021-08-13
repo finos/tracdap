@@ -34,9 +34,9 @@ enum FlowNodeType {
 
 message FlowModelStub {
 
-  repeated string input = 1;
-  repeated string output = 2;
-  map<string, TypeDescriptor> parameter = 3;
+  map<string, TypeDescriptor> params = 1;
+  repeated string inputs = 2;
+  repeated string outputs = 3;
 }
 
 message FlowNode {
@@ -61,10 +61,10 @@ message FlowEdge {
 
 message FlowDefinition {
 
-  map<string, FlowNode> node = 1;
-  repeated FlowEdge edge = 2;
+  map<string, FlowNode> nodes = 1;
+  repeated FlowEdge edges = 2;
 
-  map<string, ModelParameter> param = 3;
-  map<string, TableDefinition> input = 4;
-  map<string, TableDefinition> output = 5;
+  map<string, ModelParameter> params = 3;
+  map<string, TableDefinition> inputs = 4;
+  map<string, TableDefinition> outputs = 5;
 }

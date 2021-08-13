@@ -129,22 +129,22 @@ public class TestData {
             .setStorageId("dummy_storage")
 
             .setSchema(TableDefinition.newBuilder()
-                .addField(FieldDefinition.newBuilder()
+                .addFields(FieldDefinition.newBuilder()
                         .setFieldName("transaction_id")
                         .setFieldType(BasicType.STRING)
                         .setFieldOrder(1)
                         .setBusinessKey(true))
-                .addField(FieldDefinition.newBuilder()
+                .addFields(FieldDefinition.newBuilder()
                         .setFieldName("customer_id")
                         .setFieldType(BasicType.STRING)
                         .setFieldOrder(2)
                         .setBusinessKey(true))
-                .addField(FieldDefinition.newBuilder()
+                .addFields(FieldDefinition.newBuilder()
                         .setFieldName("order_date")
                         .setFieldType(BasicType.DATE)
                         .setFieldOrder(3)
                         .setBusinessKey(true))
-                .addField(FieldDefinition.newBuilder()
+                .addFields(FieldDefinition.newBuilder()
                         .setFieldName("widgets_ordered")
                         .setFieldType(BasicType.INTEGER)
                         .setFieldOrder(4)
@@ -154,15 +154,15 @@ public class TestData {
 
     public static ObjectDefinition nextDataDef(ObjectDefinition origDef) {
 
-        var fieldName = "extra_field_" + (origDef.getData().getSchema().getFieldCount() + 1);
+        var fieldName = "extra_field_" + (origDef.getData().getSchema().getFieldsCount() + 1);
 
         return origDef.toBuilder()
                 .setData(origDef.getData()
                 .toBuilder()
                 .setSchema(origDef.getData().getSchema().toBuilder()
-                    .addField(FieldDefinition.newBuilder()
+                    .addFields(FieldDefinition.newBuilder()
                     .setFieldName(fieldName)
-                    .setFieldOrder(origDef.getData().getSchema().getFieldCount())
+                    .setFieldOrder(origDef.getData().getSchema().getFieldsCount())
                     .setFieldType(BasicType.FLOAT)
                     .setFieldLabel("We got an extra field!")
                     .setFormatCode("PERCENT"))))
@@ -219,13 +219,13 @@ public class TestData {
                 .setRepositoryVersion("trac-test-repo-1.2.3-RC4")
                 .setPath("src/main/python")
                 .setEntryPoint("trac_test.test1.SampleModel1")
-                .putParam("param1", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.STRING)).build())
-                .putParam("param2", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.INTEGER)).build())
-                .putInput("input1", TableDefinition.newBuilder()
-                        .addField(FieldDefinition.newBuilder()
+                .putParams("param1", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.STRING)).build())
+                .putParams("param2", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.INTEGER)).build())
+                .putInputs("input1", TableDefinition.newBuilder()
+                        .addFields(FieldDefinition.newBuilder()
                                 .setFieldName("field1")
                                 .setFieldType(BasicType.DATE))
-                        .addField(FieldDefinition.newBuilder()
+                        .addFields(FieldDefinition.newBuilder()
                                 .setFieldName("field2")
                                 .setBusinessKey(true)
                                 .setFieldType(BasicType.DECIMAL)
@@ -233,8 +233,8 @@ public class TestData {
                                 .setCategorical(true)
                                 .setFormatCode("GBP"))
                         .build())
-                .putOutput("output1", TableDefinition.newBuilder()
-                        .addField(FieldDefinition.newBuilder()
+                .putOutputs("output1", TableDefinition.newBuilder()
+                        .addFields(FieldDefinition.newBuilder()
                                 .setFieldName("checksum_field")
                                 .setFieldType(BasicType.DECIMAL))
                         .build()))
@@ -246,7 +246,7 @@ public class TestData {
         return origDef.toBuilder()
                 .setModel(origDef.getModel()
                 .toBuilder()
-                .putParam("param3", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.DATE)).build()))
+                .putParams("param3", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.DATE)).build()))
                 .build();
     }
 
@@ -255,13 +255,13 @@ public class TestData {
         return ObjectDefinition.newBuilder()
                 .setObjectType(ObjectType.FLOW)
                 .setFlow(FlowDefinition.newBuilder()
-                .putNode("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
-                .putNode("main_model", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE).build())
-                .putNode("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
-                .addEdge(FlowEdge.newBuilder()
+                .putNodes("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("main_model", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE).build())
+                .putNodes("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .addEdges(FlowEdge.newBuilder()
                         .setHead(FlowSocket.newBuilder().setNode("main_model").setSocket("input_1"))
                         .setTail(FlowSocket.newBuilder().setNode("input_1")))
-                .addEdge(FlowEdge.newBuilder()
+                .addEdges(FlowEdge.newBuilder()
                         .setHead(FlowSocket.newBuilder().setNode("output_1"))
                         .setTail(FlowSocket.newBuilder().setNode("main_model").setSocket("output_1"))))
                 .build();
@@ -328,8 +328,8 @@ public class TestData {
 
         var tag = Tag.newBuilder()
                 .setDefinition(definition)
-                .putAttr("dataset_key", MetadataCodec.encodeValue("widget_orders"))
-                .putAttr("widget_type", MetadataCodec.encodeValue("non_standard_widget"));
+                .putAttrs("dataset_key", MetadataCodec.encodeValue("widget_orders"))
+                .putAttrs("widget_type", MetadataCodec.encodeValue("non_standard_widget"));
 
         if (includeHeader) {
             var header = newHeader(definition.getObjectType());
@@ -363,7 +363,7 @@ public class TestData {
 
         var newTag = previous.toBuilder()
                 .setDefinition(obj)
-                .putAttr("extra_attr", Value.newBuilder()
+                .putAttrs("extra_attr", Value.newBuilder()
                         .setType(TypeSystem.descriptor(BasicType.STRING))
                         .setStringValue("A new descriptive value")
                         .build());
@@ -386,7 +386,7 @@ public class TestData {
     public static Tag nextTag(Tag previous, boolean updateTagVersion) {
 
         var updatedTag = previous.toBuilder()
-                .putAttr("extra_attr", Value.newBuilder()
+                .putAttrs("extra_attr", Value.newBuilder()
                 .setType(TypeSystem.descriptor(BasicType.STRING))
                 .setStringValue("A new descriptive value")
                 .build());
@@ -405,7 +405,7 @@ public class TestData {
                 TypeSystem.descriptor(BasicType.STRING));
 
         return tag.toBuilder()
-                .putAttr("data_classification", dataClassification)
+                .putAttrs("data_classification", dataClassification)
                 .build();
     }
 
