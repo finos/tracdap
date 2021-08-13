@@ -81,7 +81,7 @@ public class BaseMetadataApi {
 
             return writeService.createObject(tenant, objectType,
                     request.getDefinition(),
-                    request.getTagUpdateList(),
+                    request.getTagUpdatesList(),
                     apiTrustLevel);
         });
     }
@@ -102,7 +102,7 @@ public class BaseMetadataApi {
             return writeService.updateObject(tenant, objectType,
                     request.getPriorVersion(),
                     request.getDefinition(),
-                    request.getTagUpdateList(),
+                    request.getTagUpdatesList(),
                     apiTrustLevel);
         });
     }
@@ -115,7 +115,7 @@ public class BaseMetadataApi {
                     request.getTenant(),
                     request.getObjectType(),
                     request.getPriorVersion(),
-                    request.getTagUpdateList(),
+                    request.getTagUpdatesList(),
                     apiTrustLevel);
         });
     }
@@ -140,7 +140,7 @@ public class BaseMetadataApi {
                     request.getObjectType(),
                     request.getPriorVersion(),
                     request.getDefinition(),
-                    request.getTagUpdateList());
+                    request.getTagUpdatesList());
         });
     }
 

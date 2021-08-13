@@ -118,7 +118,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setDefinition(origObj)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
@@ -155,7 +155,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setDefinition(origObj)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
@@ -205,7 +205,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(v1Obj)
-                .addAllTagUpdate(v1TagUpdates)
+                .addAllTagUpdates(v1TagUpdates)
                 .build();
 
         var v1Header = writeApi.createObject(v1WriteRequest);
@@ -235,7 +235,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2TagUpdate)
+                .addTagUpdates(t2TagUpdate)
                 .build();
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
@@ -293,7 +293,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(v1Obj)
-                .addAllTagUpdate(v1TagUpdates)
+                .addAllTagUpdates(v1TagUpdates)
                 .build();
 
         var v1Header = writeApi.createObject(v1WriteRequest);
@@ -323,7 +323,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2TagUpdate)
+                .addTagUpdates(t2TagUpdate)
                 .build();
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
@@ -374,7 +374,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(v1Obj)
-                .addAllTagUpdate(v1TagUpdates)
+                .addAllTagUpdates(v1TagUpdates)
                 .build();
 
         var v1Header = writeApi.createObject(v1WriteRequest);
@@ -409,7 +409,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2TagUpdate)
+                .addTagUpdates(t2TagUpdate)
                 .build();
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
@@ -484,7 +484,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(v1Obj)
-                .addAllTagUpdate(v1TagUpdates)
+                .addAllTagUpdates(v1TagUpdates)
                 .build();
 
         var v1Header = writeApi.createObject(v1WriteRequest);
@@ -519,7 +519,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2TagUpdate)
+                .addTagUpdates(t2TagUpdate)
                 .build();
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
@@ -595,7 +595,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(v1Obj)
-                .addAllTagUpdate(v1TagUpdates)
+                .addAllTagUpdates(v1TagUpdates)
                 .build();
 
         var v1Header = writeApi.createObject(v1WriteRequest);
@@ -668,7 +668,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2TagUpdate)
+                .addTagUpdates(t2TagUpdate)
                 .build();
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
@@ -713,7 +713,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
                 .setDefinition(extraObj)
-                .addAllTagUpdate(extraTagUpdates)
+                .addAllTagUpdates(extraTagUpdates)
                 .build();
 
         var extraHeader = writeApi.createObject(extraWriteRequest);
@@ -729,7 +729,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(v1Obj)
-                .addAllTagUpdate(v1TagUpdates)
+                .addAllTagUpdates(v1TagUpdates)
                 .build();
 
         var v1Header = writeApi.createObject(v1WriteRequest);
@@ -805,7 +805,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2TagUpdate)
+                .addTagUpdates(t2TagUpdate)
                 .build();
 
         var t2Header = writeApi.updateTag(t2WriteRequest);
@@ -853,7 +853,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
                 .setDefinition(origObj)
-                .addAllTagUpdate(origTagUpdates)
+                .addAllTagUpdates(origTagUpdates)
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
@@ -911,7 +911,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.MODEL)
                 .setDefinition(origObj)
-                .addAllTagUpdate(origTagUpdates)
+                .addAllTagUpdates(origTagUpdates)
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
@@ -977,7 +977,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(origObj)
-                .addAllTagUpdate(origTagUpdates)
+                .addAllTagUpdates(origTagUpdates)
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);
@@ -1007,7 +1007,7 @@ abstract class MetadataReadApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setDefinition(origObj)
-                .addAllTagUpdate(origTagUpdates)
+                .addAllTagUpdates(origTagUpdates)
                 .build();
 
         var tagHeader = writeApi.createObject(writeRequest);

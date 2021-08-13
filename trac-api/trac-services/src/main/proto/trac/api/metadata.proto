@@ -538,7 +538,7 @@ message MetadataWriteRequest {
      * request to be successful. If the API call fails for any reason, none of
      * the requested tag updates will be applied.
      */
-    repeated metadata.TagUpdate tagUpdate = 5;
+    repeated metadata.TagUpdate tagUpdates = 5;
 };
 
 

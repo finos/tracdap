@@ -144,7 +144,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setDefinition(objToSave)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -162,7 +162,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setDefinition(objToSave)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         var tagHeader = saveApiCall.apply(writeRequest);
@@ -208,7 +208,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.FLOW)
                 .setDefinition(objToSave)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -246,7 +246,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.FLOW)
                 .setDefinition(invalidFlow)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -275,7 +275,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
                 .setDefinition(objToSave)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -304,7 +304,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
                 .setDefinition(objToSave)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
@@ -407,7 +407,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(objectType)
                 .setPriorVersion(v1Selector)
                 .setDefinition(v2Obj)
-                .addTagUpdate(v2AttrUpdate)
+                .addTagUpdates(v2AttrUpdate)
                 .build();
 
         var v2TagHeader = saveApiCall.apply(v2WriteRequest);
@@ -450,7 +450,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setDefinition(v1Obj)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         var v1IdResponse = trustedApi.createObject(v1WriteRequest);
@@ -742,7 +742,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.CUSTOM)
                 .setPriorVersion(v1Selector)
                 .setDefinition(v2Obj)
-                .addTagUpdate(tagUpdate)
+                .addTagUpdates(tagUpdate)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -772,7 +772,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.CUSTOM)
                 .setPriorVersion(v1Selector)
                 .setDefinition(v2Obj)
-                .addTagUpdate(tagUpdate)
+                .addTagUpdates(tagUpdate)
                 .build();
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
@@ -810,7 +810,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2Update)
+                .addTagUpdates(t2Update)
                 .build();
 
         var t2header = trustedApi.updateTag(t2WriteRequest);
@@ -851,7 +851,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(objectType)
                 .setPriorVersion(t2Selector)
-                .addTagUpdate(t3Update)
+                .addTagUpdates(t3Update)
                 .build();
 
         var t3Header = publicApi.updateTag(t3WriteRequest);
@@ -912,7 +912,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2Update)
+                .addTagUpdates(t2Update)
                 .build();
 
         var v1t2Header = trustedApi.updateTag(v1t2WriteRequest);
@@ -966,7 +966,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.FLOW)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2Update)
+                .addTagUpdates(t2Update)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -1004,7 +1004,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2Update)
+                .addTagUpdates(t2Update)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -1032,7 +1032,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2Update)
+                .addTagUpdates(t2Update)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -1062,7 +1062,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v2Selector)
-                .addTagUpdate(t2Update)
+                .addTagUpdates(t2Update)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -1092,7 +1092,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(t2Selector)
-                .addTagUpdate(t2Update)
+                .addTagUpdates(t2Update)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -1119,7 +1119,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2Update)
+                .addTagUpdates(t2Update)
                 .build();
 
         // Saving tag version 2 should succeed the first time
@@ -1152,7 +1152,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2Update)
+                .addTagUpdates(t2Update)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -1179,7 +1179,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.CUSTOM)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2Update)
+                .addTagUpdates(t2Update)
                 .build();
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
@@ -1219,7 +1219,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(preallocateSelector)
                 .setDefinition(newObject)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         var tagHeader = trustedApi.createPreallocatedObject(writeRequest);
@@ -1265,7 +1265,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(selector)
                 .setDefinition(newObject)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -1296,7 +1296,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(preallocateSelector)
                 .setDefinition(newObject)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         // The first save request should succeed
@@ -1334,7 +1334,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.MODEL)
                 .setPriorVersion(preallocateSelector)
                 .setDefinition(newObject)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -1371,7 +1371,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.MODEL)
                 .setPriorVersion(preallocateSelector)
                 .setDefinition(newObject)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -1385,7 +1385,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(preallocateSelector)
                 .setDefinition(newObject)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -1403,7 +1403,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(selector3)
                 .setDefinition(newObject)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -1446,7 +1446,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
                 .setDefinition(newObject)
-                .addAllTagUpdate(tagUpdates)
+                .addAllTagUpdates(tagUpdates)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
@@ -1483,7 +1483,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.DATA)
                 .setPriorVersion(v1Selector)
-                .addTagUpdate(t2TagUpdate)
+                .addTagUpdates(t2TagUpdate)
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
