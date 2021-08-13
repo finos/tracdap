@@ -99,7 +99,7 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
         var attrValue = objectOfType(attrType);
 
         var testTag = origTag.toBuilder()
-                .putAttr(attrName, MetadataCodec.encodeNativeObject(attrValue))
+                .putAttrs(attrName, MetadataCodec.encodeNativeObject(attrValue))
                 .build();
 
         var future = CompletableFuture.completedFuture(0)

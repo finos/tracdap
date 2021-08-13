@@ -179,7 +179,7 @@ class JdbcWriteBatchImpl {
         try (var stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
 
             for (var i = 0; i < tagPk.length; i++) {
-                for (var attr : parts.tag[i].getAttrMap().entrySet()) {
+                for (var attr : parts.tag[i].getAttrsMap().entrySet()) {
 
                     var attrRootValue = attr.getValue();
                     var attrType = attrBasicType(attrRootValue);
@@ -257,7 +257,7 @@ class JdbcWriteBatchImpl {
         if (TypeSystem.isPrimitive(rootValue))
             return List.of(rootValue);
 
-        return rootValue.getArrayValue().getItemList();
+        return rootValue.getArrayValue().getItemsList();
     }
 
     void closeObjectDefinition(Connection conn, short tenantId, long[] objectPk, ObjectParts parts) throws SQLException {

@@ -415,7 +415,7 @@ class JdbcReadBatchImpl {
         for (var i = 0; i < tagRecords.keys.length; i++) {
 
             tags[i] = Tag.newBuilder()
-                    .putAllAttr(attrs[i]);
+                    .putAllAttrs(attrs[i]);
         }
 
         return new JdbcBaseDal.KeyedItems<>(tagRecords.keys, tagRecords.versions, tagRecords.timestamps, tags);
@@ -439,7 +439,7 @@ class JdbcReadBatchImpl {
 
             tags[i] = Tag.newBuilder()
                     .setHeader(header)
-                    .putAllAttr(attrs[i]);
+                    .putAllAttrs(attrs[i]);
         }
 
         return new JdbcBaseDal.KeyedItems<>(headers.keys, tagRecords.versions, tagRecords.timestamps, tags);

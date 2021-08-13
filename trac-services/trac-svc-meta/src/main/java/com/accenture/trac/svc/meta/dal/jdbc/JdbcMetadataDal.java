@@ -598,7 +598,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         return Tag.newBuilder()
                 .setHeader(header)
                 .setDefinition(definition.item)
-                .putAllAttr(tagAttrs)
+                .putAllAttrs(tagAttrs)
                 .build();
     }
 

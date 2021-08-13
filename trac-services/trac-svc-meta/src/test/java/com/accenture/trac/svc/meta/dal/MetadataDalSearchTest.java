@@ -73,15 +73,15 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var def2 = TestData.dummyDataDef();
 
         var tag1 = TestData.dummyTag(def1, INCLUDE_HEADER)
-                .toBuilder().clearAttr()
-                .putAttr("rodent_type", encodeValue("bilge_rat"))
-                .putAttr("rodent_name", encodeValue("Ricky the Rat"))
+                .toBuilder().clearAttrs()
+                .putAttrs("rodent_type", encodeValue("bilge_rat"))
+                .putAttrs("rodent_name", encodeValue("Ricky the Rat"))
                 .build();
 
         var tag2 = TestData.dummyTag(def2, INCLUDE_HEADER)
-                .toBuilder().clearAttr()
-                .putAttr("rodent_type", encodeValue("house_mouse"))
-                .putAttr("rodent_name", encodeValue("Casandra McMouse"))
+                .toBuilder().clearAttrs()
+                .putAttrs("rodent_type", encodeValue("house_mouse"))
+                .putAttrs("rodent_name", encodeValue("Casandra McMouse"))
                 .build();
 
         var save = CompletableFuture.completedFuture(0)
@@ -342,7 +342,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Apply a marker attr to each tag and use a logical AND to filter items created in this test case
 
         testTags = testTags.stream().map(t -> t.toBuilder()
-            .putAttr(markerAttr, encodeValue("negative_test_marker"))
+            .putAttrs(markerAttr, encodeValue("negative_test_marker"))
             .build())
             .collect(Collectors.toList());
 
@@ -364,7 +364,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         // The not-equals operator should match everything not matched by the equality operator
         // It follows that missing attributes or attributes with a different type do match this operator
-        // Consistency can be expressed formally as {t : attr(t, A) != X} = {t : !( attr(t, A) = X )}
+        // Consistency can be expressed formally as {t : Attrs(t, A) != X} = {t : !( Attrs(t, A) = X )}
 
         // In this case we should match all but the first tag in the test set
         // For a single search term we are not concerned about order, so test the result as a set
@@ -397,7 +397,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Apply a marker attr to each tag and use a logical AND to filter items created in this test case
 
         testTags = testTags.stream().map(t -> t.toBuilder()
-                .putAttr(markerAttr, encodeValue("negative_test_marker"))
+                .putAttrs(markerAttr, encodeValue("negative_test_marker"))
                 .build())
                 .collect(Collectors.toList());
 
@@ -419,8 +419,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         // The not-equals operator should match everything not matched by the equality operator
         // This condition applies for multi-valued attrs the same as for regular attrs
-        // Consistency can be expressed formally as {t : attr(t, A) !in X} = {t : !( attr(t, A) in X )}
-        // Single-value attrs are also covered by this general definition, just with |attr(t, A)| = 1
+        // Consistency can be expressed formally as {t : Attrs(t, A) !in X} = {t : !( Attrs(t, A) in X )}
+        // Single-value attrs are also covered by this general definition, just with |Attrs(t, A)| = 1
 
         var searchResult = unwrap(dal.search(TestData.TEST_TENANT, searchParams));
         var searchResultSet = Set.copyOf(searchResult);
@@ -647,8 +647,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // Create a tag with a multi-valued attr
         var def = TestData.dummyDataDef();
         var tag = TestData.dummyTag(def, INCLUDE_HEADER)
-                .toBuilder().clearAttr()
-                .putAttr(attrToLookFor, MetadataCodec.encodeArrayValue(attrValues, TypeSystem.descriptor(basicType)))
+                .toBuilder().clearAttrs()
+                .putAttrs(attrToLookFor, MetadataCodec.encodeArrayValue(attrValues, TypeSystem.descriptor(basicType)))
                 .build();
 
         unwrap(dal.saveNewObject(TestData.TEST_TENANT, tag));
@@ -698,8 +698,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
             var tag = TestData.dummyTag(defs.get(i), INCLUDE_HEADER)
                     .toBuilder()
-                    .clearAttr()
-                    .putAttr(attrToLookFor, MetadataCodec.encodeNativeObject(attrValues.get(i)))
+                    .clearAttrs()
+                    .putAttrs(attrToLookFor, MetadataCodec.encodeNativeObject(attrValues.get(i)))
                     .build();
 
             tags.add(tag);
@@ -710,8 +710,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var attrValueWrongType = objectOfDifferentType(basicType);
         var tagWrongType = TestData.dummyTag(def4, INCLUDE_HEADER)
                 .toBuilder()
-                .clearAttr()
-                .putAttr(attrToLookFor, MetadataCodec.encodeNativeObject(attrValueWrongType))
+                .clearAttrs()
+                .putAttrs(attrToLookFor, MetadataCodec.encodeNativeObject(attrValueWrongType))
                 .build();
 
         tags.add(tagWrongType);
@@ -1294,15 +1294,15 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var v3Obj = nextDataDef(v2Obj);
 
         var v1Tag= dummyTag(v1Obj, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_prior_version_attr", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .putAttrs("dal_prior_version_attr", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
         var v2Tag = tagForNextObject(v1Tag, v2Obj, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_prior_version_attr", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .putAttrs("dal_prior_version_attr", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
         var v3Tag = tagForNextObject(v2Tag, v3Obj, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_prior_version_attr", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .putAttrs("dal_prior_version_attr", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
         unwrap(dal.saveNewObject(TEST_TENANT, v1Tag));
@@ -1344,15 +1344,15 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var v1Obj = dummyDataDef();
 
         var t1Tag= dummyTag(v1Obj, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_prior_tag_attr", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .putAttrs("dal_prior_tag_attr", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
         var t2Tag = nextTag(t1Tag, UPDATE_TAG_VERSION).toBuilder()
-                .putAttr("dal_prior_tag_attr", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .putAttrs("dal_prior_tag_attr", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
         var t3Tag = nextTag(t2Tag, UPDATE_TAG_VERSION).toBuilder()
-                .putAttr("dal_prior_tag_attr", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .putAttrs("dal_prior_tag_attr", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
         unwrap(dal.saveNewObject(TEST_TENANT, t1Tag));
@@ -1398,7 +1398,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         var extraObj = nextDataDef(dummyDataDef());
         var extraTag = TestData.dummyTag(extraObj, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_as_of_attr_1", MetadataCodec.encodeValue("initial_value"))
+                .putAttrs("dal_as_of_attr_1", MetadataCodec.encodeValue("initial_value"))
                 .build();
 
         dal.saveNewObject(TEST_TENANT, extraTag);
@@ -1408,7 +1408,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var obj1 = dummyDataDef();
 
         var v1Tag = TestData.dummyTag(obj1, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_as_of_attr_1", MetadataCodec.encodeValue("initial_value"))
+                .putAttrs("dal_as_of_attr_1", MetadataCodec.encodeValue("initial_value"))
                 .build();
 
         dal.saveNewObject(TEST_TENANT, v1Tag);
@@ -1425,7 +1425,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(v2Timestamp))
                 .setTagVersion(1)
                 .setTagTimestamp(MetadataCodec.encodeDatetime(v2Timestamp)))
-                .putAttr("dal_as_of_attr_1", MetadataCodec.encodeValue("updated_value"))
+                .putAttrs("dal_as_of_attr_1", MetadataCodec.encodeValue("updated_value"))
                 .build();
 
         dal.saveNewVersion(TEST_TENANT, v2Tag);
@@ -1473,7 +1473,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var v2Obj = nextDataDef(v1Obj);
 
         var v1t1Tag = dummyTag(v1Obj, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_as_of_attr_2", MetadataCodec.encodeValue("as_of_search_test"))
+                .putAttrs("dal_as_of_attr_2", MetadataCodec.encodeValue("as_of_search_test"))
                 .build();
 
         Thread.sleep(10);
@@ -1577,13 +1577,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var obj2 = nextDataDef(obj1);
 
         var obj1t1Tag = dummyTag(obj1, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
-                .putAttr("dal_as_of_attr_4", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .putAttrs("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
+                .putAttrs("dal_as_of_attr_4", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
         var obj2t1Tag = dummyTag(obj2, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
-                .putAttr("dal_as_of_attr_4", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .putAttrs("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
+                .putAttrs("dal_as_of_attr_4", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
         unwrap(dal.saveNewObject(TEST_TENANT, obj1t1Tag));
@@ -1594,13 +1594,13 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         Thread.sleep(10);
 
         var obj1t2Tag = nextTag(obj1t1Tag, UPDATE_TAG_VERSION).toBuilder()
-                .putAttr("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
-                .putAttr("dal_as_of_attr_4", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .putAttrs("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
+                .putAttrs("dal_as_of_attr_4", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
         var obj2t2Tag = nextTag(obj2t1Tag, UPDATE_TAG_VERSION).toBuilder()
-                .putAttr("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
-                .putAttr("dal_as_of_attr_4", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .putAttrs("dal_as_of_attr_3", MetadataCodec.encodeValue("as_of_search_test"))
+                .putAttrs("dal_as_of_attr_4", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
         unwrap(dal.saveNewTag(TEST_TENANT, obj1t2Tag));
@@ -1663,8 +1663,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var v3Obj = nextDataDef(v2Obj);
 
         var v1t1 = dummyTag(v1Obj, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
-                .putAttr("dal_combined_test_attr_2", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .putAttrs("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
+                .putAttrs("dal_combined_test_attr_2", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
         Thread.sleep(10);
@@ -1672,29 +1672,29 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // This version / tag will match all attrs
 
         var v1t2 = nextTag(v1t1, UPDATE_TAG_VERSION).toBuilder()
-                .putAttr("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
-                .putAttr("dal_combined_test_attr_2", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .putAttrs("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
+                .putAttrs("dal_combined_test_attr_2", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
         // This version / tag will also match all attrs and supersedes v1t2
 
         var v1t3 = nextTag(v1t2, UPDATE_TAG_VERSION).toBuilder()
-                .putAttr("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
-                .putAttr("dal_combined_test_attr_2", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .putAttrs("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
+                .putAttrs("dal_combined_test_attr_2", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
         Thread.sleep(10);
 
         var v2t1 = tagForNextObject(v1t2, v2Obj, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
-                .putAttr("dal_combined_test_attr_2", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .putAttrs("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
+                .putAttrs("dal_combined_test_attr_2", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
         Thread.sleep(10);
 
         var v1t4 = nextTag(v1t3, UPDATE_TAG_VERSION).toBuilder()
-                .putAttr("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
-                .putAttr("dal_combined_test_attr_2", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
+                .putAttrs("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
+                .putAttrs("dal_combined_test_attr_2", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
         Thread.sleep(10);
@@ -1702,8 +1702,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         // This version / tag will match all attrs but will be filtered out by as-of time
 
         var v3t1 = tagForNextObject(v2t1, v3Obj, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
-                .putAttr("dal_combined_test_attr_2", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
+                .putAttrs("dal_combined_test_attr_1", MetadataCodec.encodeValue("match_me"))
+                .putAttrs("dal_combined_test_attr_2", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
         // Save everything
@@ -1757,14 +1757,14 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var obj1 = dummyDataDef();
 
         var obj1Tag = TestData.dummyTag(obj1, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_search_ordering_test", MetadataCodec.encodeValue("some_value"))
+                .putAttrs("dal_search_ordering_test", MetadataCodec.encodeValue("some_value"))
                 .build();
 
         Thread.sleep(10);
 
         var obj2 = nextDataDef(obj1);
         var obj2Tag = TestData.dummyTag(obj2, INCLUDE_HEADER).toBuilder()
-                .putAttr("dal_search_ordering_test", MetadataCodec.encodeValue("some_value"))
+                .putAttrs("dal_search_ordering_test", MetadataCodec.encodeValue("some_value"))
                 .build();
 
         // Save objects in the wrong order to try to confuse the DAL
@@ -1801,8 +1801,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         return Tag.newBuilder()
                 .setHeader(TestData.newHeader(def.getObjectType()))
                 .setDefinition(def)
-                .putAttr(attrName, attrValue)
-                .putAttr("more_than_one_attr", encodeValue(true))
+                .putAttrs(attrName, attrValue)
+                .putAttrs("more_than_one_attr", encodeValue(true))
                 .build();
     }
 
@@ -1813,7 +1813,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .setDefinition(def);
 
         for (var i = 0; i < attrNames.size(); i++)
-            tag = tag.putAttr(attrNames.get(i), attrValues.get(i));
+            tag = tag.putAttrs(attrNames.get(i), attrValues.get(i));
 
         return tag.build();
     }

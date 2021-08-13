@@ -138,7 +138,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var objToSave = TestData.dummyDefinitionForType(objectType);
         var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrMap());
+        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -156,7 +156,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var objToSave = TestData.dummyDefinitionForType(objectType);
         var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrMap());
+        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -201,7 +201,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
         var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrMap());
+        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
         // Request to save a MODEL, even though the definition is for DATA
         var writeRequest = MetadataWriteRequest.newBuilder()
@@ -229,7 +229,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         // Create a flow with an invalid node graph, this should get picked up by the validation layer
 
         var brokenEdges = validFlow.getFlow().toBuilder()
-                .addEdge(FlowEdge.newBuilder()
+                .addEdges(FlowEdge.newBuilder()
                     .setHead(FlowSocket.newBuilder().setNode("another_absent_node").setSocket("missing_socket"))
                     .setTail(FlowSocket.newBuilder().setNode("node_totally_not_present")))
                 .build();
@@ -239,7 +239,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .build();
 
         var tagToSave = TestData.dummyTag(invalidFlow, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrMap());
+        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
 
         // Try to save the flow with a broken graph, should fail validation
         var writeRequest = MetadataWriteRequest.newBuilder()
@@ -265,10 +265,10 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var validTag = TestData.dummyTag(objToSave, TestData.NO_HEADER);
 
         var invalidTag = validTag.toBuilder()
-                .putAttr("${escape_key}", MetadataCodec.encodeValue(1.0))
+                .putAttrs("${escape_key}", MetadataCodec.encodeValue(1.0))
                 .build();
 
-        var tagUpdates = TestData.tagUpdatesForAttrs(invalidTag.getAttrMap());
+        var tagUpdates = TestData.tagUpdatesForAttrs(invalidTag.getAttrsMap());
 
         // Request to save a MODEL, even though the definition is for DATA
         var writeRequest = MetadataWriteRequest.newBuilder()
@@ -294,10 +294,10 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var validTag = TestData.dummyTag(objToSave, TestData.NO_HEADER);
 
         var invalidTag = validTag.toBuilder()
-                .putAttr("trac_anything_reserved", MetadataCodec.encodeValue(1.0))
+                .putAttrs("trac_anything_reserved", MetadataCodec.encodeValue(1.0))
                 .build();
 
-        var tagUpdates = TestData.tagUpdatesForAttrs(invalidTag.getAttrMap());
+        var tagUpdates = TestData.tagUpdatesForAttrs(invalidTag.getAttrsMap());
 
         // Request to save a MODEL, even though the definition is for DATA
         var writeRequest = MetadataWriteRequest.newBuilder()
@@ -420,8 +420,8 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var expectedTag = Tag.newBuilder()
                 .setHeader(v2TagHeader)
                 .setDefinition(v2Obj)
-                .putAllAttr(v1SavedTag.getAttrMap())
-                .putAttr(v2NewAttrName, v2NewAttrValue)
+                .putAllAttrs(v1SavedTag.getAttrsMap())
+                .putAttrs(v2NewAttrName, v2NewAttrValue)
                 .build();
 
         var readRequest = MetadataReadRequest.newBuilder()
@@ -444,7 +444,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var v1Obj = TestData.dummyDefinitionForType(objectType);
         var v1Tag = TestData.dummyTag(v1Obj, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(v1Tag.getAttrMap());
+        var tagUpdates = TestData.tagUpdatesForAttrs(v1Tag.getAttrsMap());
 
         var v1WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -697,7 +697,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var v2Schema = v1Schema
                 .toBuilder()
-                .addField(FieldDefinition.newBuilder()
+                .addFields(FieldDefinition.newBuilder()
                         .setFieldName("some_new_field")
                         .setFieldType(BasicType.STRING)
                         .setFieldOrder(-1));
@@ -822,7 +822,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var t2ExpectedTag = v1SavedTag.toBuilder()
                 .setHeader(t2header)
-                .putAttr(t2AttrName, t2Update.getValue())
+                .putAttrs(t2AttrName, t2Update.getValue())
                 .build();
 
         var t2MetadataReadRequest = MetadataReadRequest.newBuilder()
@@ -872,7 +872,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var t3ExpectedTag = t2SavedTag.toBuilder()
                 .setHeader(t3Header)
-                .putAttr(t3AttrName, t3Update.getValue())
+                .putAttrs(t3AttrName, t3Update.getValue())
                 .build();
 
         var t3SavedTag = readApi.readObject(t3MetadataReadRequest);
@@ -1212,7 +1212,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
         var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrMap());
+        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -1258,7 +1258,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
         var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrMap());
+        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -1289,7 +1289,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
         var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrMap());
+        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -1327,7 +1327,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.MODEL);
         var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrMap());
+        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -1362,7 +1362,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.MODEL);
         var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrMap());
+        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
 
         // Attempt one: object type matches definition, does not match selector
 
@@ -1439,7 +1439,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
         var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
-        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrMap());
+        var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
 
         var newVersionRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)

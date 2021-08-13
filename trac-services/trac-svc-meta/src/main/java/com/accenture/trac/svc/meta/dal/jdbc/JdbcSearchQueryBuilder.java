@@ -401,7 +401,7 @@ class JdbcSearchQueryBuilder {
 
     JdbcSearchQuery buildInTerm(JdbcSearchQuery baseQuery, SearchTerm searchTerm) {
 
-        var nItems = searchTerm.getSearchValue().getArrayValue().getItemCount();
+        var nItems = searchTerm.getSearchValue().getArrayValue().getItemsCount();
         var itemPlaceholders = String.join(", ", Collections.nCopies(nItems, "?"));
 
         var joinTemplate = "join tag_attr ta%1$d\n" +
@@ -417,7 +417,7 @@ class JdbcSearchQueryBuilder {
 
         // Condition for attr value
         var paramValueSetters = searchTerm.getSearchValue().getArrayValue()
-                .getItemList().stream().map(item -> wrapErrors((stmt, pIndex) ->
+                .getItemsList().stream().map(item -> wrapErrors((stmt, pIndex) ->
                 JdbcAttrHelpers.setAttrValue(stmt, pIndex, searchTerm.getAttrType(), item)));
 
         return buildSearchTermFromTemplates(baseQuery, searchTerm, joinTemplate, whereTemplate,
