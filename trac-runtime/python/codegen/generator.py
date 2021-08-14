@@ -257,7 +257,7 @@ class TracGenerator:
 
         # Strip multiple newlines from the end of the file
         while code.endswith("\n\n"):
-            code = code.removesuffix("\n")
+            code = code[:-1]
 
         return code
 
