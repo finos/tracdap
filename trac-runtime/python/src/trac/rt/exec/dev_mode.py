@@ -136,7 +136,7 @@ class DevModeTranslator:
 
                 snap += 1
                 x_stem = f"{x_orig_path.stem}-{snap}"
-                storage_path = str(x_orig_path.with_stem(x_stem))
+                storage_path = str(x_orig_path.parent.joinpath(x_stem))
 
             cls._log.info(f"Output for {data_key} will be snap version {snap}")
 
@@ -217,9 +217,9 @@ class DevModeTranslator:
             snap_index: int, delta_index: int, incarnation_index: int) \
             -> (meta.ObjectDefinition, meta.ObjectDefinition):
 
-        part_key = meta.DataDefinition.PartKey(
+        part_key = meta.PartKey(
             opaqueKey="part-root",
-            partType=meta.DataDefinition.PartType.PART_ROOT)
+            partType=meta.PartType.PART_ROOT)
 
         data_item_id = f"DATA:{data_id}:{part_key.opaqueKey}:{snap_index}:{delta_index}"
 

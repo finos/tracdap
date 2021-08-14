@@ -16,6 +16,7 @@ import pathlib
 import platform
 import sys
 import os
+import subprocess as sp
 
 import protoc
 
@@ -99,7 +100,8 @@ def main(argv):
             pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
 
             proto_files = list(find_proto_files(proto_location))
-            protoc.exec_protoc(platform_args(gen_trac_args, proto_files))
+            argv = platform_args(gen_trac_args, proto_files)
+            codegen_result = sp.run(executable=protoc.PROTOC_EXE, args=argv)
 
         else:
 
@@ -113,7 +115,20 @@ def main(argv):
             pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
 
             proto_files = list(find_proto_files(proto_location))
-            protoc.exec_protoc(platform_args(gen_proto_args, proto_files))
+            argv = platform_args(gen_proto_args, proto_files)
+            codegen_result = sp.run(executable=protoc.PROTOC_EXE, args=argv)
+
+    # We are not piping stdout/stderr
+    # Errors will show up as protoc runs instead
+    # No need to report again here
+
+    if codegen_result.returncode == 0:
+        print("Python codegen succeeded")
+        exit(0)
+
+    else:
+        print("Python codegen failed")
+        exit(codegen_result.returncode)
 
 
 if __name__ == "__main__":
