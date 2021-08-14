@@ -280,7 +280,7 @@ class TracGenerator:
         for enum_ctx, enum_desc in zip(nested_enums_ctx, descriptor.enum_type):
 
             nested_enum_name = f"{nested_scope}.{enum_desc.name}"
-            nested_enum = self.generate_enum(enum_ctx, enum_desc)
+            nested_enum = self.generate_enum(enum_ctx, enum_desc, nested_scope)
             nested_enums.append(nested_enum)
             self._known_enums[nested_enum_name] = enum_desc
 
@@ -351,10 +351,24 @@ class TracGenerator:
             .replace("{MEMBER_DEFAULT}", field_default) \
             .replace("{DOC_COMMENT}", doc_comment)
 
-    def generate_enum(self, ctx: LocationContext, descriptor: pb_desc.EnumDescriptorProto) -> str:
+    def generate_enum(
+            self, ctx: LocationContext,
+            descriptor: pb_desc.EnumDescriptorProto,
+            enum_scope: str = None) \
+            -> str:
 
         log_indent = self.INDENT_TEMPLATE * (ctx.indent + 1)
         self._log.info(f" [ ENUM ] {log_indent}-> {descriptor.name}")
+
+        # There is a problem constructing Python data classes for nested enums
+        # The default initializer is not available until the outer class is declared
+        # A solution is to create the enum at file scope with a _ prefix and alias it to create the nested version
+        # https://stackoverflow.com/a/54489183
+        if enum_scope:
+            scoped_name = f"{enum_scope}.{descriptor.name}"
+            err = f" [ ENUM ] {scoped_name}: Nested enums not currently supported"
+            self._log.error(err)
+            raise ECodeGeneration(err)
 
         filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
 
