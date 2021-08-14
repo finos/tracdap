@@ -53,14 +53,14 @@ message TableDefinition {
 }
 
 
+enum PartType {
+    PART_ROOT = 0;
+    PART_BY_RANGE = 1;
+    PART_BY_VALUE = 2;
+}
+
 
 message DataDefinition {
-
-    enum PartType {
-        PART_ROOT = 0;
-        PART_BY_RANGE = 1;
-        PART_BY_VALUE = 2;
-    }
 
     message PartKey {
 
