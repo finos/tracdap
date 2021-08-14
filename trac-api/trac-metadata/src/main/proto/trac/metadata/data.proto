@@ -60,17 +60,18 @@ enum PartType {
 }
 
 
+message PartKey {
+
+    string opaqueKey = 1;
+
+    PartType partType = 2;
+    repeated Value partValues = 3;
+    Value partRangeMin = 4;
+    Value partRangeMax = 5;
+}
+
+
 message DataDefinition {
-
-    message PartKey {
-
-        string opaqueKey = 1;
-
-        PartType partType = 2;
-        repeated Value partValues = 3;
-        Value partRangeMin = 4;
-        Value partRangeMax = 5;
-    }
 
     message Delta {
 
