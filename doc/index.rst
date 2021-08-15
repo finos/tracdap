@@ -1,0 +1,37 @@
+.. TRAC documentation master file, created by
+   sphinx-quickstart on Sat Aug 14 14:02:10 2021.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
+TRAC Platform Documentation |version|
+=====================================
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   metadata
+   platform_api
+   modelling_api
+
+
+:doc:`metadata`
+
+The TRAC metadata model underpins the operation of the platform
+
+:doc:`platform_api`
+
+Public API for building client apps on the TRAC platform.
+Available in gRPC, gRPC-Web and REST/JSON formats, also as a JavaScript API package.
+
+:doc:`modelling_api`
+
+Build models to run on the TRAC platform.
+
+
+Can't find what you're looking for?
+-----------------------------------
+
+* :ref:`modindex` lists all the code modules with auto-generated documentation
+* :ref:`genindex` is an index of individual methos and fields
+* :ref:`search` let's you search across all the TRAC documentation
