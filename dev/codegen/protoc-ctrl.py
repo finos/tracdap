@@ -21,8 +21,8 @@ import subprocess as sp
 import protoc
 
 # Paths are relative to the codegen folder
-proto_location = "../../../trac-api/trac-metadata/src/main/proto"
-output_location = "../generated"
+proto_location = "../../trac-api/trac-metadata/src/main/proto"
+output_location = "../../trac-runtime/python/generated"
 
 
 def find_proto_files(path):
