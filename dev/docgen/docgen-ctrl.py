@@ -33,6 +33,9 @@ ROOT_DIR = SCRIPT_DIR\
 BUILD_DIR = ROOT_DIR \
     .joinpath('build/doc')
 
+CODEGEN_SCRIPT = ROOT_DIR \
+    .joinpath('dev/codegen/protoc-ctrl.py')
+
 
 class DocGen:
 
@@ -77,7 +80,7 @@ class DocGen:
         self._log_target()
 
         codegen_exe = "python"
-        codegen_args = ["../codegen/protoc-ctrl.py", "api_doc", "--out", "build/doc/code/metadata"]
+        codegen_args = [str(CODEGEN_SCRIPT), "api_doc", "--out", "build/doc/code/metadata"]
         self._run_subprocess(codegen_exe, codegen_args, use_venv=True)
 
         sphinx_exe = 'sphinx-build'
