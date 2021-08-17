@@ -93,6 +93,7 @@ message TagHeader {
  *
  *  - Select an explicit version number
  *  - Select the latest available version
+ *  - Select the version that was live at specific point in time
  *
  * A selector for an explicit version number will always match that exact
  * version number. These "fixed" types of selector can be used to refer to
