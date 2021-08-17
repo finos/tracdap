@@ -74,7 +74,7 @@ def build_protoc_args(generator, output_location):
     else:
         trac_plugin = "protoc-gen-trac=./protoc-gen-trac.py"
 
-    if generator == "proto":
+    if generator == "python_proto":
 
         proto_args = [
             f"--proto_path={METADATA_PROTO_DIR.as_posix() +'/'}",
@@ -82,7 +82,7 @@ def build_protoc_args(generator, output_location):
             f"--python_out={output_location}"
         ]
 
-    elif generator == "runtime_python":
+    elif generator == "python_runtime":
 
         proto_args = [
             f"--proto_path={METADATA_PROTO_DIR.as_posix() +'/'}",
@@ -112,7 +112,7 @@ def cli_args():
     parser = argparse.ArgumentParser(description='TRAC code generator')
 
     parser.add_argument(
-        "generator", type=str, metavar="generator", choices=["proto", "runtime_python", "api_doc"],
+        "generator", type=str, metavar="generator", choices=["python_proto", "python_runtime", "api_doc"],
         help="The documentation targets to build")
 
     parser.add_argument(
