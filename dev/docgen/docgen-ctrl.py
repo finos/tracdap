@@ -124,12 +124,12 @@ class DocGen:
                 .joinpath(sp_exe)
 
         # On Linux/macOS, arg 0 is the name given to the process and is not actually passed to it!
-        # Windows just passes all the arguments to the process
+        # On winds arg 0 is the path to the binary
 
         if platform.system().lower().startswith("win"):
             args_ = [str(exe_)] + sp_args
         else:
-            args_ = sp_args
+            args_ = [sp_exe] + sp_args
 
         # Ready to run!
         return sp.run(executable=exe_, args=args_)
