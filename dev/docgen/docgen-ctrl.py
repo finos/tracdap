@@ -46,18 +46,8 @@ class DocGen:
     def clean(self):
 
         self._log_target()
-        self._log.info(f"* rm -r {BUILD_DIR}")
 
-        def rm_tree(pth):
-            if pth.exists():
-                for child in pth.iterdir():
-                    if child.is_file():
-                        child.unlink()
-                    else:
-                        rm_tree(child)
-                pth.rmdir()
-
-        rm_tree(BUILD_DIR)
+        self._rm_tree(BUILD_DIR)
 
     def all(self):
 
@@ -66,7 +56,6 @@ class DocGen:
         self.metadata()
         self.platform_api()
         self.runtime_python()
-        self.metadata()
 
         self.main()
 
@@ -80,17 +69,25 @@ class DocGen:
         sphinx_cfg = SCRIPT_DIR.joinpath('main')
         sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
 
-        self._log.info(f'* mkdir {sphinx_dst}')
-        sphinx_dst.mkdir(parents=True, exist_ok=True)
-
-        self._log.info(f'* {sphinx_exe} {" ".join(sphinx_args)}')
-        sphinx = self._run_subprocess(sphinx_exe, sphinx_args, use_venv=True)
-
-        if sphinx.returncode != 0:
-            raise sp.SubprocessError()
+        self._mkdir(sphinx_dst)
+        self._run_subprocess(sphinx_exe, sphinx_args, use_venv=True)
 
     def metadata(self):
-        pass
+
+        self._log_target()
+
+        codegen_exe = "python"
+        codegen_args = ["../codegen/protoc-ctrl.py", "api_doc", "--out", "build/doc/code/metadata"]
+        self._run_subprocess(codegen_exe, codegen_args, use_venv=True)
+
+        sphinx_exe = 'sphinx-build'
+        sphinx_src = SCRIPT_DIR.joinpath('metadata').resolve()
+        sphinx_dst = BUILD_DIR.joinpath('metadata').resolve()
+        sphinx_cfg = SCRIPT_DIR.joinpath('metadata')
+        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
+
+        self._mkdir(sphinx_dst)
+        self._run_subprocess(sphinx_exe, sphinx_args, use_venv=True)
 
     def platform_api(self):
         pass
@@ -108,8 +105,29 @@ class DocGen:
 
         self._log.info(f"Building target [{target_name}]")
 
-    @staticmethod
-    def _run_subprocess(sp_exe, sp_args, use_venv=False):
+    def _mkdir(self, target_dir):
+
+        self._log.info(f'* mkdir {target_dir}')
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+    def _rm_tree(self, target_dir, print_log=True):
+
+        if print_log:
+            self._log.info(f"* rm -r {BUILD_DIR}")
+
+        if target_dir.exists():
+
+            for child in target_dir.iterdir():
+                if child.is_file():
+                    child.unlink()
+                else:
+                    self._rm_tree(child, print_log=False)
+
+            target_dir.rmdir()
+
+    def _run_subprocess(self, sp_exe, sp_args, use_venv=False):
+
+        self._log.info(f'* {sp_exe} {" ".join(sp_args)}')
 
         # Binaries in the virtual env bin dir are not automatically available to sp.run (Windows 10, Python 3.9)
         # So, build the full path to the binary instead
@@ -137,7 +155,14 @@ class DocGen:
             args_ = [sp_exe] + sp_args
 
         # Ready to run!
-        return sp.run(executable=exe_, args=args_)
+        result = sp.run(executable=exe_, args=args_)
+
+        if result.returncode != 0:
+            err = f"{sp_exe} failed with exit code {result.returncode}"
+            self._log.error(err)
+            raise sp.SubprocessError(err)
+
+        return result
 
 
 def _find_targets(doc_gen: DocGen):
