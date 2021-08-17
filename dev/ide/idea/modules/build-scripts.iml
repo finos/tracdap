@@ -4,6 +4,7 @@
     <exclude-output />
     <content url="file://$MODULE_DIR$/../../dev">
       <sourceFolder url="file://$MODULE_DIR$/../../dev/codegen" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../../dev/docgen" isTestSource="false" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
