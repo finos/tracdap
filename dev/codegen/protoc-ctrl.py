@@ -72,7 +72,7 @@ def build_protoc_args(generator, output_location):
     if platform.system().lower().startswith("win"):
         trac_plugin = "protoc-gen-trac.py"
     else:
-        trac_plugin = "--plugin=protoc-gen-trac=./protoc-gen-trac.py"
+        trac_plugin = "protoc-gen-trac=./protoc-gen-trac.py"
 
     if generator == "proto":
 
