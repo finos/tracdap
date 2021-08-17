@@ -21,9 +21,13 @@ import platform
 import os
 
 
-ROOT_DIR = pathlib.Path(__file__).parent \
-    .joinpath("../..") \
+SCRIPT_DIR = pathlib.Path(__file__) \
+    .parent \
     .absolute() \
+    .resolve()
+
+ROOT_DIR = SCRIPT_DIR\
+    .joinpath("../..") \
     .resolve()
 
 BUILD_DIR = ROOT_DIR \
@@ -73,7 +77,8 @@ class DocGen:
         sphinx_exe = 'sphinx-build'
         sphinx_src = ROOT_DIR.joinpath('doc').resolve()
         sphinx_dst = BUILD_DIR.joinpath('main').resolve()
-        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', 'main']
+        sphinx_cfg = SCRIPT_DIR.joinpath('main')
+        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
 
         self._log.info(f'* mkdir {sphinx_dst}')
         sphinx_dst.mkdir(parents=True, exist_ok=True)
