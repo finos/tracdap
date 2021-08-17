@@ -18,7 +18,7 @@ import sys
 import logging
 import itertools as it
 
-import google.protobuf.compiler.plugin_pb2 as pb_plugin
+import google.protobuf.compiler.plugin_pb2 as pb_plugin  # noqa
 
 import generator as gen
 
@@ -27,8 +27,11 @@ class TracPlugin:
 
     def __init__(self, pb_request: pb_plugin.CodeGeneratorRequest):
 
-        logging.basicConfig(level=logging.DEBUG)
+        logging_format = f"%(levelname)s %(name)s: %(message)s"
+        logging.basicConfig(format=logging_format, level=logging.INFO)
         self._log = logging.getLogger(TracPlugin.__name__)
+
+        self._log.info(f"Options: {pb_request.parameter}")
 
         self._request = pb_request
 
@@ -36,7 +39,10 @@ class TracPlugin:
 
         try:
 
-            generator = gen.TracGenerator()
+            raw_options = self._request.parameter.split(";")
+            options = {o: True for o in raw_options}
+
+            generator = gen.TracGenerator(options)
             generated_response = pb_plugin.CodeGeneratorResponse()
 
             input_files = self._request.proto_file
@@ -73,7 +79,8 @@ class TracPlugin:
             error_response.error = str(e)
             return error_response
 
-    def expand_parent_packages(self, packages):
+    @staticmethod
+    def expand_parent_packages(packages):
 
         all_packages = set()
 

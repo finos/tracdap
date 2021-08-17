@@ -14,15 +14,32 @@
 
 import pathlib
 import platform
-import sys
-import os
 import subprocess as sp
+import argparse
+import logging
 
 import protoc
 
-# Paths are relative to the codegen folder
-proto_location = "../../trac-api/trac-metadata/src/main/proto"
-output_location = "../../trac-runtime/python/generated"
+
+SCRIPT_NAME = pathlib.Path(__file__).stem
+
+SCRIPT_DIR = pathlib.Path(__file__) \
+    .parent \
+    .absolute() \
+    .resolve()
+
+ROOT_DIR = SCRIPT_DIR \
+    .joinpath("../..") \
+    .resolve()
+
+METADATA_PROTO_DIR = ROOT_DIR \
+    .joinpath("trac-api/trac-metadata/src/main/proto")
+
+
+# Configure logging
+logging_format = f"%(levelname)s %(name)s: %(message)s"
+logging.basicConfig(format=logging_format, level=logging.INFO)
+_log = logging.getLogger(SCRIPT_NAME)
 
 
 def find_proto_files(path):
@@ -45,91 +62,95 @@ def platform_args(base_args, proto_files):
     # Windows just passes all the arguments to the process
 
     if platform.system().lower().startswith("win"):
-        return base_args + proto_files
+        return [protoc.PROTOC_EXE] + base_args + proto_files
     else:
         return ["protoc"] + base_args + proto_files
 
 
-# Context class to change directory for the lifetime of the codegen process
-class cd:
-
-    def __init__(self, new_path):
-        self.new_path = os.path.expanduser(new_path)
-
-    def __enter__(self):
-        self.saved_path = os.getcwd()
-        os.chdir(self.new_path)
-
-    def __exit__(self, etype, value, traceback):
-        os.chdir(self.saved_path)
-
-
-def main(argv):
-
-    gen_proto_args = [
-
-        "--plugin=python",
-        "--python_out={}/trac_gen/proto".format(output_location),
-        "--proto_path={}".format(proto_location)
-    ]
+def build_protoc_args(generator, output_location):
 
     if platform.system().lower().startswith("win"):
-        protoc_plugin = "--plugin=protoc-gen-trac.py"
+        trac_plugin = "protoc-gen-trac.py"
     else:
-        protoc_plugin = "--plugin=protoc-gen-trac=./protoc-gen-trac.py"
+        trac_plugin = "--plugin=protoc-gen-trac=./protoc-gen-trac.py"
 
-    gen_trac_args = [
+    if generator == "proto":
 
-        protoc_plugin,
-        "--trac_out={}/trac_gen/domain".format(output_location),
-        "--proto_path={}".format(proto_location)
-    ]
+        proto_args = [
+            f"--proto_path={METADATA_PROTO_DIR.as_posix() +'/'}",
+            f"--plugin=python",
+            f"--python_out={output_location}/trac_gen/proto"
+        ]
 
-    # Always run codegen from the codegen folder
+    elif generator == "runtime_python":
+
+        proto_args = [
+            f"--proto_path={METADATA_PROTO_DIR.as_posix() +'/'}",
+            f"--plugin={trac_plugin}",
+            f"--trac_out={output_location}",
+            # f"--trac_opt=flat_pack"
+        ]
+
+    elif generator == "api_doc":
+
+        proto_args = [
+            f"--proto_path={METADATA_PROTO_DIR}",
+            f"--plugin={trac_plugin}",
+            f"--trac_out={output_location}",
+            f"--trac_opt=flat_pack"
+        ]
+
+    else:
+
+        raise ValueError(f"Unknown generator [{generator}]")
+
+    return proto_args
+
+
+def cli_args():
+
+    parser = argparse.ArgumentParser(description='TRAC code generator')
+
+    parser.add_argument(
+        "generator", type=str, metavar="generator", choices=["proto", "runtime_python", "api_doc"],
+        help="The documentation targets to build")
+
+    parser.add_argument(
+        "--out", type=pathlib.Path,
+        help="Location where output files will be generated")
+
+    return parser.parse_args()
+
+
+def main():
+
+    script_args = cli_args()
+    output_dir = ROOT_DIR.joinpath(script_args.out)
+
+    proto_args = build_protoc_args(script_args.generator, output_dir)
+
+    proto_files = list(find_proto_files(METADATA_PROTO_DIR))
+    argv = platform_args(proto_args, proto_files)
+
+    # Make sure the output dir exists before running protoc
+    pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    # Always run protoc from the codegen folder
     # This makes finding the TRAC protoc plugin much easier
-    codegen_path = str(pathlib.Path(__file__).parent)
-    with cd(codegen_path):
-
-        if len(argv) > 1 and argv[1] == "--domain":
-
-            # TRAC domain classes generator adds init scripts for its own package hierarchy
-            # Since we nesting inside trac_gen/domain, add init files for those packages here
-
-            pathlib.Path(output_location).joinpath("trac_gen/domain").mkdir(parents=True, exist_ok=True)
-            pathlib.Path(output_location).joinpath("trac_gen/domain/__init__.py").touch(exist_ok=True)
-            pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
-
-            proto_files = list(find_proto_files(proto_location))
-            argv = platform_args(gen_trac_args, proto_files)
-            codegen_result = sp.run(executable=protoc.PROTOC_EXE, args=argv)
-
-        else:
-
-            # Native Python plugin does not create init scripts for its own package hierarchy
-            # Add them here instead
-
-            pathlib.Path(output_location).joinpath("trac_gen/proto/trac/metadata").mkdir(parents=True, exist_ok=True)
-            pathlib.Path(output_location).joinpath("trac_gen/proto/trac/metadata/__init__.py").touch(exist_ok=True)
-            pathlib.Path(output_location).joinpath("trac_gen/proto/trac/__init__.py").touch(exist_ok=True)
-            pathlib.Path(output_location).joinpath("trac_gen/proto/__init__.py").touch(exist_ok=True)
-            pathlib.Path(output_location).joinpath("trac_gen/__init__.py").touch(exist_ok=True)
-
-            proto_files = list(find_proto_files(proto_location))
-            argv = platform_args(gen_proto_args, proto_files)
-            codegen_result = sp.run(executable=protoc.PROTOC_EXE, args=argv)
+    result = sp.run(executable=protoc.PROTOC_EXE, args=argv, cwd=SCRIPT_DIR)
 
     # We are not piping stdout/stderr
-    # Errors will show up as protoc runs instead
+    # Logs and errors  will show up as protoc is running
     # No need to report again here
 
-    if codegen_result.returncode == 0:
-        print("Python codegen succeeded")
+    if result.returncode == 0:
+        _log.info("Codegen succeeded")
         exit(0)
 
     else:
-        print("Python codegen failed")
-        exit(codegen_result.returncode)
+        _log.error(f"Codegen failed with code {result.returncode}")
+        exit(result.returncode)
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main()
