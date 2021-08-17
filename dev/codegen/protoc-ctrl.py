@@ -79,7 +79,7 @@ def build_protoc_args(generator, output_location):
         proto_args = [
             f"--proto_path={METADATA_PROTO_DIR.as_posix() +'/'}",
             f"--plugin=python",
-            f"--python_out={output_location}/trac_gen/proto"
+            f"--python_out={output_location}"
         ]
 
     elif generator == "runtime_python":
