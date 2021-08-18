@@ -25,12 +25,12 @@
 #  limitations under the License.
 
 
-import typing as tp
-import inspect
+import typing as _tp
+import inspect as _inspect
 import trac.rt.metadata as _meta
 
 
-__field_def_params = inspect.signature(_meta.FieldDefinition.__init__).parameters
+__field_def_params = _inspect.signature(_meta.FieldDefinition.__init__).parameters
 
 
 class NamedParameter:
@@ -41,8 +41,8 @@ class NamedParameter:
 
 
 def define_parameters(
-        *params: tp.Union[NamedParameter, tp.List[NamedParameter]]) \
-        -> tp.Dict[str, _meta.ModelParameter]:
+        *params: _tp.Union[NamedParameter, _tp.List[NamedParameter]]) \
+        -> _tp.Dict[str, _meta.ModelParameter]:
 
     if len(params) == 1 and isinstance(params[0], list):
         return {p.paramName: p.param for p in params[0]}
@@ -52,9 +52,9 @@ def define_parameters(
 
 def define_parameter(
         param_name: str,
-        param_type: tp.Union[_meta.TypeDescriptor, _meta.BasicType],
+        param_type: _tp.Union[_meta.TypeDescriptor, _meta.BasicType],
         label: str,
-        default_value: tp.Optional[tp.Any] = None) \
+        default_value: _tp.Optional[_tp.Any] = None) \
         -> NamedParameter:
 
     if isinstance(param_type, _meta.TypeDescriptor):

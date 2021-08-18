@@ -24,82 +24,82 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import abc
-import typing as tp
-import logging
+import abc as _abc
+import typing as _tp
+import logging as _logging
 
 import trac.rt.metadata as _meta
 
-import pandas as pd
-import pyspark as pys
-import pyspark.sql as pyss
+import pandas as _pd
+import pyspark as _pys
+import pyspark.sql as _pyss
 
 
 class TracContext:
 
-    @abc.abstractmethod
-    def get_parameter(self, parameter_name: str) -> tp.Any:
+    @_abc.abstractmethod
+    def get_parameter(self, parameter_name: str) -> _tp.Any:
         pass
 
-    @abc.abstractmethod
+    @_abc.abstractmethod
     def get_table_schema(self, dataset_name: str) -> _meta.TableDefinition:
         pass
 
-    @abc.abstractmethod
-    def get_pandas_table(self, dataset_name: str) -> pd.DataFrame:
+    @_abc.abstractmethod
+    def get_pandas_table(self, dataset_name: str) -> _pd.DataFrame:
         pass
 
-    @abc.abstractmethod
-    def get_spark_table(self, dataset_name: str) -> pyss.DataFrame:
+    @_abc.abstractmethod
+    def get_spark_table(self, dataset_name: str) -> _pyss.DataFrame:
         pass
 
-    @abc.abstractmethod
-    def get_spark_table_rdd(self, dataset_name: str) -> pys.RDD:
+    @_abc.abstractmethod
+    def get_spark_table_rdd(self, dataset_name: str) -> _pys.RDD:
         pass
 
-    @abc.abstractmethod
+    @_abc.abstractmethod
     def put_table_schema(self, dataset_name: str, schema: _meta.TableDefinition):
         pass
 
-    @abc.abstractmethod
-    def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
+    @_abc.abstractmethod
+    def put_pandas_table(self, dataset_name: str, dataset: _pd.DataFrame):
         pass
 
-    @abc.abstractmethod
-    def put_spark_table(self, dataset_name: str, dataset: pyss.DataFrame):
+    @_abc.abstractmethod
+    def put_spark_table(self, dataset_name: str, dataset: _pyss.DataFrame):
         pass
 
-    @abc.abstractmethod
-    def put_spark_table_rdd(self, dataset_name: str, dataset: pys.RDD):
+    @_abc.abstractmethod
+    def put_spark_table_rdd(self, dataset_name: str, dataset: _pys.RDD):
         pass
 
-    @abc.abstractmethod
-    def get_spark_context(self) -> pys.SparkContext:
+    @_abc.abstractmethod
+    def get_spark_context(self) -> _pys.SparkContext:
         pass
 
-    @abc.abstractmethod
-    def get_spark_sql_context(self) -> pyss.SQLContext:
+    @_abc.abstractmethod
+    def get_spark_sql_context(self) -> _pyss.SQLContext:
         pass
 
-    @abc.abstractmethod
-    def log(self) -> logging.Logger:
+    @_abc.abstractmethod
+    def log(self) -> _logging.Logger:
         pass
 
 
 class TracModel:
 
-    @abc.abstractmethod
-    def define_parameters(self) -> tp.Dict[str, _meta.ModelParameter]:
+    @_abc.abstractmethod
+    def define_parameters(self) -> _tp.Dict[str, _meta.ModelParameter]:
         pass
 
-    @abc.abstractmethod
-    def define_inputs(self) -> tp.Dict[str, _meta.TableDefinition]:
+    @_abc.abstractmethod
+    def define_inputs(self) -> _tp.Dict[str, _meta.TableDefinition]:
         pass
 
-    @abc.abstractmethod
-    def define_outputs(self) -> tp.Dict[str, _meta.TableDefinition]:
+    @_abc.abstractmethod
+    def define_outputs(self) -> _tp.Dict[str, _meta.TableDefinition]:
         pass
 
-    @abc.abstractmethod
+    @_abc.abstractmethod
     def run_model(self, ctx: TracContext):
         pass
