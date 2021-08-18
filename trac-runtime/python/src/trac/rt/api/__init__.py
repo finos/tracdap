@@ -13,9 +13,11 @@
 #  limitations under the License.
 
 
-from trac.rt.metadata import *
-
 from .modelling import TracContext
 from .modelling import TracModel
 
 from .define_func import *
+
+# Make metadata classes available to client code when importing the API package
+# Remove this import when generating docs, so metadata classes are only documented once
+from trac.rt.metadata import *  # noqa DOCGEN_REMOVE

@@ -27,21 +27,22 @@
 
 import typing as tp
 import inspect
-from trac.rt.metadata import *
+import trac.rt.metadata as _meta
 
-__field_def_params = inspect.signature(FieldDefinition.__init__).parameters
+
+__field_def_params = inspect.signature(_meta.FieldDefinition.__init__).parameters
 
 
 class NamedParameter:
 
-    def __init__(self, param_name: str, param: ModelParameter):
+    def __init__(self, param_name: str, param: _meta.ModelParameter):
         self.paramName = param_name
         self.param = param
 
 
 def define_parameters(
         *params: tp.Union[NamedParameter, tp.List[NamedParameter]]) \
-        -> tp.Dict[str, ModelParameter]:
+        -> tp.Dict[str, _meta.ModelParameter]:
 
     if len(params) == 1 and isinstance(params[0], list):
         return {p.paramName: p.param for p in params[0]}
@@ -51,21 +52,21 @@ def define_parameters(
 
 def define_parameter(
         param_name: str,
-        param_type: tp.Union[TypeDescriptor, BasicType],
+        param_type: tp.Union[_meta.TypeDescriptor, _meta.BasicType],
         label: str,
         default_value: tp.Optional[tp.Any] = None) \
         -> NamedParameter:
 
-    if isinstance(param_type, TypeDescriptor):
+    if isinstance(param_type, _meta.TypeDescriptor):
         param_type_descriptor = param_type
     else:
-        param_type_descriptor = TypeDescriptor(param_type, None, None)
+        param_type_descriptor = _meta.TypeDescriptor(param_type, None, None)
 
-    return NamedParameter(param_name, ModelParameter(label, param_type_descriptor, default_value))
+    return NamedParameter(param_name, _meta.ModelParameter(label, param_type_descriptor, default_value))
 
 
-def define_table(*fields: FieldDefinition):
-    return TableDefinition([*fields])
+def define_table(*fields: _meta.FieldDefinition):
+    return _meta.TableDefinition([*fields])
 
 
 def define_field(*args, **kwargs):
@@ -93,7 +94,7 @@ def define_field(*args, **kwargs):
             kwargs[camel_name] = kwargs[arg_name]
             kwargs.pop(arg_name)
 
-    return FieldDefinition(*args, **kwargs)
+    return _meta.FieldDefinition(*args, **kwargs)
 
 
 P = define_parameter

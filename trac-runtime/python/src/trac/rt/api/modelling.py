@@ -28,8 +28,7 @@ import abc
 import typing as tp
 import logging
 
-from trac.rt.metadata import TableDefinition
-from trac.rt.metadata import ModelParameter
+import trac.rt.metadata as _meta
 
 import pandas as pd
 import pyspark as pys
@@ -43,7 +42,7 @@ class TracContext:
         pass
 
     @abc.abstractmethod
-    def get_table_schema(self, dataset_name: str) -> TableDefinition:
+    def get_table_schema(self, dataset_name: str) -> _meta.TableDefinition:
         pass
 
     @abc.abstractmethod
@@ -59,7 +58,7 @@ class TracContext:
         pass
 
     @abc.abstractmethod
-    def put_table_schema(self, dataset_name: str, schema: TableDefinition):
+    def put_table_schema(self, dataset_name: str, schema: _meta.TableDefinition):
         pass
 
     @abc.abstractmethod
@@ -90,15 +89,15 @@ class TracContext:
 class TracModel:
 
     @abc.abstractmethod
-    def define_parameters(self) -> tp.Dict[str, ModelParameter]:
+    def define_parameters(self) -> tp.Dict[str, _meta.ModelParameter]:
         pass
 
     @abc.abstractmethod
-    def define_inputs(self) -> tp.Dict[str, TableDefinition]:
+    def define_inputs(self) -> tp.Dict[str, _meta.TableDefinition]:
         pass
 
     @abc.abstractmethod
-    def define_outputs(self) -> tp.Dict[str, TableDefinition]:
+    def define_outputs(self) -> tp.Dict[str, _meta.TableDefinition]:
         pass
 
     @abc.abstractmethod
