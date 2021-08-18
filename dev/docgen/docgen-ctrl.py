@@ -18,6 +18,7 @@ import inspect
 import argparse
 import subprocess as sp
 import platform
+import shutil
 import os
 
 
@@ -96,7 +97,59 @@ class DocGen:
         pass
 
     def runtime_python(self):
-        pass
+
+        self._log_target()
+
+        runtime_src = ROOT_DIR.joinpath('trac-runtime/python/src')
+        doc_src = BUILD_DIR.joinpath("code/runtime_python")
+
+        # Set up the trac.rt package
+        self._mkdir(doc_src.joinpath("trac"))
+        self._touch(doc_src.joinpath("trac/__init__.py"))
+        self._mkdir(doc_src.joinpath("trac/rt"))
+        self._touch(doc_src.joinpath("trac/rt/__init__.py"))
+
+        # Copy only API packages / modules from the runtime library
+        api_modules = [
+            "trac/rt/api/",
+            "trac/rt/exceptions.py"]
+
+        for module in api_modules:
+
+            src_module = runtime_src.joinpath(module)
+            tgt_module = doc_src.joinpath(module)
+
+            if src_module.is_dir():
+                self._cp_tree(src_module, tgt_module)
+            else:
+                self._cp(src_module, tgt_module)
+
+        import fileinput
+
+        # We include the runtime metadata classes at global scope in the api package for convenience
+        # Having them show up in both places in the docs is confusing (for users, and the autoapi tool)!
+        # So, remove those imports from the API package before running Sphinx
+        for line in fileinput.input(doc_src.joinpath('trac/rt/api/__init__.py'), inplace=True):
+            if "DOCGEN_REMOVE" not in line:
+                print(line,)
+
+        # We also want the runtime metadata
+        # There is a separate mechanism for generating this and getting it into the library for packaging
+        # For doc gen, we generate a new copy and just move it to the right place
+        codegen_exe = "python"
+        codegen_args = [str(CODEGEN_SCRIPT), "python_runtime", "--out", "build/doc/code/runtime_python"]
+        self._run_subprocess(codegen_exe, codegen_args, use_venv=True)
+        self._mv(doc_src.joinpath('trac/metadata'), doc_src.joinpath('trac/rt/metadata'))
+
+        # Now everything is set up, run the Sphinx autoapi generator
+        sphinx_exe = 'sphinx-build'
+        sphinx_src = SCRIPT_DIR.joinpath('runtime_python').resolve()
+        sphinx_dst = BUILD_DIR.joinpath('runtime_python').resolve()
+        sphinx_cfg = SCRIPT_DIR.joinpath('runtime_python')
+        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
+
+        self._mkdir(sphinx_dst)
+        self._run_subprocess(sphinx_exe, sphinx_args, use_venv=True)
 
     def dist(self):
         pass
@@ -108,25 +161,40 @@ class DocGen:
 
         self._log.info(f"Building target [{target_name}]")
 
+    def _touch(self, tgt):
+
+        self._log.info(f'* touch {tgt}')
+        pathlib.Path(tgt).touch(644, exist_ok=True)
+
     def _mkdir(self, target_dir):
 
         self._log.info(f'* mkdir {target_dir}')
         target_dir.mkdir(parents=True, exist_ok=True)
 
-    def _rm_tree(self, target_dir, print_log=True):
+    def _cp(self, src, tgt):
 
-        if print_log:
-            self._log.info(f"* rm -r {BUILD_DIR}")
+        self._log.info(f"* cp {src} {tgt}")
+
+        shutil.copy2(src, tgt)
+
+    def _cp_tree(self, source_dir, target_dir):
+
+        self._log.info(f"* cp -R {source_dir} {target_dir}")
+
+        shutil.copytree(source_dir, target_dir, dirs_exist_ok=True)
+
+    def _mv(self, src, tgt):
+
+        self._log.info(f"* mv {src} {tgt}")
+
+        shutil.move(src, tgt)
+
+    def _rm_tree(self, target_dir):
+
+        self._log.info(f"* rm -r {target_dir}")
 
         if target_dir.exists():
-
-            for child in target_dir.iterdir():
-                if child.is_file():
-                    child.unlink()
-                else:
-                    self._rm_tree(child, print_log=False)
-
-            target_dir.rmdir()
+            shutil.rmtree(target_dir)
 
     def _run_subprocess(self, sp_exe, sp_args, use_venv=False):
 
