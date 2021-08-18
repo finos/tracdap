@@ -164,7 +164,10 @@ class DocGen:
     def _touch(self, tgt):
 
         self._log.info(f'* touch {tgt}')
-        pathlib.Path(tgt).touch(644, exist_ok=True)
+
+        tgt_path = pathlib.Path(tgt)
+        if not tgt_path.exists():
+            tgt_path.write_text("")
 
     def _mkdir(self, target_dir):
 
