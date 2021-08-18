@@ -129,9 +129,11 @@ class DocGen:
         # We include the runtime metadata classes at global scope in the api package for convenience
         # Having them show up in both places in the docs is confusing (for users, and the autoapi tool)!
         # So, remove those imports from the API package before running Sphinx
+        self._log.info("* fix docgen imports")
+
         for line in fileinput.input(doc_src.joinpath('trac/rt/api/__init__.py'), inplace=True):
             if "DOCGEN_REMOVE" not in line:
-                print(line,)
+                print(line, end="")
 
         # We also want the runtime metadata
         # There is a separate mechanism for generating this and getting it into the library for packaging
