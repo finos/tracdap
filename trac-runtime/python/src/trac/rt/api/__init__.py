@@ -13,8 +13,8 @@
 #  limitations under the License.
 
 
-from ._core_api import *
-from ._define_func import *
+from .core_api import *
+from .define_func import *
 
 # Make metadata classes available to client code when importing the API package
 # Remove this import when generating docs, so metadata classes are only documented once
