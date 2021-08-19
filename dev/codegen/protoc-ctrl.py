@@ -14,11 +14,14 @@
 
 import pathlib
 import platform
+import shutil
 import subprocess as sp
 import argparse
 import logging
+import tempfile
 
 import protoc
+import google.api  # noqa
 
 
 SCRIPT_NAME = pathlib.Path(__file__).stem
@@ -39,18 +42,53 @@ logging.basicConfig(format=logging_format, level=logging.INFO)
 _log = logging.getLogger(SCRIPT_NAME)
 
 
-def find_proto_files(path):
+class ProtoApiExtensions:
 
-    base_path = pathlib.Path(path)
+    # Provide some key extension protos from Google to handle web api annotations
+    # The googleapis package would have the venv root as its namespace, so we need to copy to a temp dir
 
-    for entry in base_path.iterdir():
+    def __init__(self):
+        self._temp_dir = tempfile.TemporaryDirectory()
+        self.temp_dir_name = ""
 
-        if entry.is_file() and entry.name.endswith(".proto"):
-            yield base_path.joinpath(entry.name)
+    def __enter__(self):
 
-        elif entry.is_dir():
-            for sub_entry in find_proto_files(base_path.joinpath(entry.name)):
-                yield sub_entry
+        self.temp_dir_name = self._temp_dir.__enter__()
+
+        # Core protos used by the protoc compiler itself
+        protoc_inc_src = pathlib.Path(protoc.PROTOC_INCLUDE_DIR)
+        protoc_inc_dst = pathlib.Path(self.temp_dir_name)
+
+        _log.info(f"Copying {protoc_inc_src} -> {protoc_inc_dst}")
+        shutil.copytree(protoc_inc_src, protoc_inc_dst, dirs_exist_ok=True)
+
+        # Google API protos for annotating web services
+        gapi_src = pathlib.Path(google.api.__file__).parent
+        gapi_dst = pathlib.Path(self.temp_dir_name).joinpath("google/api")
+
+        _log.info(f"Copying {gapi_src} -> {gapi_dst}")
+        shutil.copytree(gapi_src, gapi_dst, dirs_exist_ok=True)
+
+        return self.temp_dir_name
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._temp_dir.__exit__(exc_type, exc_val, exc_tb)
+
+
+def find_proto_files(proto_paths):
+
+    proto_path_list = proto_paths if isinstance(proto_paths, list) else [proto_paths]
+
+    for proto_path in proto_path_list:
+
+        for entry in proto_path.iterdir():
+
+            if entry.is_file() and entry.name.endswith(".proto"):
+                yield proto_path.joinpath(entry.name)
+
+            elif entry.is_dir():
+                for sub_entry in find_proto_files(proto_path.joinpath(entry.name)):
+                    yield sub_entry
 
 
 def platform_args(base_args, proto_files):
@@ -64,17 +102,18 @@ def platform_args(base_args, proto_files):
         return ["protoc"] + base_args + proto_files
 
 
-def build_protoc_args(generator, proto_path, output_location):
+def build_protoc_args(generator, proto_paths, output_location):
 
     if platform.system().lower().startswith("win"):
         trac_plugin = "protoc-gen-trac.py"
     else:
         trac_plugin = "protoc-gen-trac=./protoc-gen-trac.py"
 
+    proto_path_args = list(map(lambda pp: f"--proto_path={pp}", proto_paths))
+
     if generator == "python_proto":
 
         proto_args = [
-            f"--proto_path={proto_path}",
             f"--plugin=python",
             f"--python_out={output_location}"
         ]
@@ -82,7 +121,6 @@ def build_protoc_args(generator, proto_path, output_location):
     elif generator == "python_runtime":
 
         proto_args = [
-            f"--proto_path={proto_path}",
             f"--plugin={trac_plugin}",
             f"--trac_out={output_location}",
             # f"--trac_opt=flat_pack"
@@ -91,7 +129,6 @@ def build_protoc_args(generator, proto_path, output_location):
     elif generator == "api_doc":
 
         proto_args = [
-            f"--proto_path={proto_path}",
             f"--plugin={trac_plugin}",
             f"--trac_out={output_location}",
             f"--trac_opt=flat_pack"
@@ -101,7 +138,7 @@ def build_protoc_args(generator, proto_path, output_location):
 
         raise ValueError(f"Unknown generator [{generator}]")
 
-    return proto_args
+    return proto_path_args + proto_args
 
 
 def cli_args():
@@ -113,7 +150,7 @@ def cli_args():
         help="The documentation targets to build")
 
     parser.add_argument(
-        "--proto_path", type=pathlib.Path, required=True,
+        "--proto_path", type=pathlib.Path, required=True, nargs="+", action="extend", dest="proto_paths",
         help="Location of proto source files, relative to the repository root")
 
     parser.add_argument(
@@ -126,34 +163,42 @@ def cli_args():
 def main():
 
     script_args = cli_args()
-    proto_path = ROOT_DIR.joinpath(script_args.proto_path)
+    proto_paths = list(map(lambda pp: ROOT_DIR.joinpath(pp), script_args.proto_paths))
     output_dir = ROOT_DIR.joinpath(script_args.out)
 
-    protoc_args = build_protoc_args(script_args.generator, proto_path, output_dir)
-    protoc_files = list(find_proto_files(proto_path))
-    protoc_argv = platform_args(protoc_args, protoc_files)
+    # Provide some key extension protos from Google to handle web api annotations
+    with ProtoApiExtensions() as proto_ext_path:
 
-    newline = "\n"
-    _log.info(f"Running protoc: {newline.join(map(str, protoc_argv))}")
+        # Include all available proto paths when generating proto args, so they're available to protoc if referenced
+        all_proto_paths = proto_paths + [proto_ext_path]
+        protoc_args = build_protoc_args(script_args.generator, all_proto_paths, output_dir)
 
-    # Make sure the output dir exists before running protoc
-    pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
+        # Only look for files to generate that were explicitly specified
+        protoc_files = list(find_proto_files(proto_paths))
 
-    # Always run protoc from the codegen folder
-    # This makes finding the TRAC protoc plugin much easier
-    result = sp.run(executable=protoc.PROTOC_EXE, args=protoc_argv, cwd=SCRIPT_DIR)
+        protoc_argv = platform_args(protoc_args, protoc_files)
 
-    # We are not piping stdout/stderr
-    # Logs and errors  will show up as protoc is running
-    # No need to report again here
+        newline = "\n"
+        _log.info(f"Running protoc: {newline.join(map(str, protoc_argv))}")
 
-    if result.returncode == 0:
-        _log.info("Protoc succeeded")
-        exit(0)
+        # Make sure the output dir exists before running protoc
+        pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    else:
-        _log.error(f"Protoc failed with code {result.returncode}")
-        exit(result.returncode)
+        # Always run protoc from the codegen folder
+        # This makes finding the TRAC protoc plugin much easier
+        result = sp.run(executable=protoc.PROTOC_EXE, args=protoc_argv, cwd=SCRIPT_DIR)
+
+        # We are not piping stdout/stderr
+        # Logs and errors  will show up as protoc is running
+        # No need to report again here
+
+        if result.returncode == 0:
+            _log.info("Protoc succeeded")
+            exit(0)
+
+        else:
+            _log.error(f"Protoc failed with code {result.returncode}")
+            exit(result.returncode)
 
 
 if __name__ == "__main__":
