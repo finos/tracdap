@@ -31,25 +31,27 @@ class TracPlugin:
         logging.basicConfig(format=logging_format, level=logging.INFO)
         self._log = logging.getLogger(TracPlugin.__name__)
 
-        self._log.info(f"Options: {pb_request.parameter}")
-
         self._request = pb_request
+
+        options_str = self._request.parameter.split(";")
+        options_kv = map(lambda opt: opt.split("=", 1), options_str)
+        self._options = {opt[0]: opt[1] if len(opt) > 1 else True for opt in options_kv}
+
+        for k, v in self._options.items():
+            self._log.info(f"Option {k} = {v}")
 
     def generate(self):
 
         try:
 
-            raw_options = self._request.parameter.split(";")
-            options = {o: True for o in raw_options}
-
-            generator = gen.TracGenerator(options)
+            generator = gen.TracGenerator(self._options)
             generated_response = pb_plugin.CodeGeneratorResponse()
 
             input_files = self._request.proto_file
             input_files = filter(lambda f: f.name in self._request.file_to_generate, input_files)
             input_files = filter(lambda f: f.source_code_info.ByteSize() > 0, input_files)
 
-            sorted_files = sorted(input_files, key=lambda f: f.package)
+            sorted_files = input_files  # sorted(input_files, key=lambda f: f.package)
             packages = it.groupby(sorted_files, lambda f: f.package)
 
             for package, files in packages:

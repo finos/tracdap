@@ -218,7 +218,20 @@ class TracGenerator:
 
             output_files.append(package_init_file)
 
-        return output_files
+        package_filter = self._options.get("packages")
+
+        if package_filter is None or package == package_filter or package.startswith(package_filter + "."):
+            return output_files
+
+        elif package_filter.startswith(package + "."):
+
+            empty_init_file = pb_plugin.CodeGeneratorResponse.File()
+            empty_init_file.name = str(package_path.joinpath("__init__.py"))
+            empty_init_file.content = ""
+            return [empty_init_file]
+
+        else:
+            return []
 
     def generate_package_imports(self, descriptor: pb_desc.FileDescriptorProto) -> str:
 

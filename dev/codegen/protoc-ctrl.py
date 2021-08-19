@@ -102,7 +102,7 @@ def platform_args(base_args, proto_files):
         return ["protoc"] + base_args + proto_files
 
 
-def build_protoc_args(generator, proto_paths, output_location):
+def build_protoc_args(generator, proto_paths, output_location, packages):
 
     if platform.system().lower().startswith("win"):
         trac_plugin = "protoc-gen-trac.py"
@@ -110,6 +110,8 @@ def build_protoc_args(generator, proto_paths, output_location):
         trac_plugin = "protoc-gen-trac=./protoc-gen-trac.py"
 
     proto_path_args = list(map(lambda pp: f"--proto_path={pp}", proto_paths))
+
+    packages_option = "packages=" + ",".join(map(str, packages)) if packages else ""
 
     if generator == "python_proto":
 
@@ -123,15 +125,22 @@ def build_protoc_args(generator, proto_paths, output_location):
         proto_args = [
             f"--plugin={trac_plugin}",
             f"--trac_out={output_location}",
-            # f"--trac_opt=flat_pack"
         ]
 
+        if packages_option:
+            proto_args.append(f"--trac_opt={packages_option}")
+
     elif generator == "api_doc":
+
+        options = "--trac_opt=flat_pack"
+
+        if packages_option:
+            options += f";{packages_option}"
 
         proto_args = [
             f"--plugin={trac_plugin}",
             f"--trac_out={output_location}",
-            f"--trac_opt=flat_pack"
+            options
         ]
 
     else:
@@ -157,6 +166,10 @@ def cli_args():
         "--out", type=pathlib.Path, required=True,
         help="Location where output files will be generated, relative to the repository root")
 
+    parser.add_argument(
+        "--package", type=pathlib.Path, nargs="*", action="extend", dest="packages",
+        help="Filter packages to include in generated output (TRAC generator only, default = generate all packages)")
+
     return parser.parse_args()
 
 
@@ -165,13 +178,14 @@ def main():
     script_args = cli_args()
     proto_paths = list(map(lambda pp: ROOT_DIR.joinpath(pp), script_args.proto_paths))
     output_dir = ROOT_DIR.joinpath(script_args.out)
+    packages = script_args.packages
 
     # Provide some key extension protos from Google to handle web api annotations
     with ProtoApiExtensions() as proto_ext_path:
 
         # Include all available proto paths when generating proto args, so they're available to protoc if referenced
         all_proto_paths = proto_paths + [proto_ext_path]
-        protoc_args = build_protoc_args(script_args.generator, all_proto_paths, output_dir)
+        protoc_args = build_protoc_args(script_args.generator, all_proto_paths, output_dir, packages)
 
         # Only look for files to generate that were explicitly specified
         protoc_files = list(find_proto_files(proto_paths))
