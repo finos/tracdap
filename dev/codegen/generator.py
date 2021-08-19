@@ -116,6 +116,8 @@ class TracGenerator:
         '{ENUMS_CODE}'
         '\n'
         '{MESSAGES_CODE}'
+        '\n'
+        '{SERVICES_CODE}'
         '\n')
 
     FILE_HEADER = (
@@ -129,6 +131,15 @@ class TracGenerator:
 
     PKG_IMPORT = (
         'from .{MODULE} import *  # noqa\n')
+
+    ENUM_TEMPLATE = (
+        '{INDENT}class {CLASS_NAME}(_enum.Enum):'
+        '\n\n'
+        '{DOC_COMMENT}'
+        '{ENUM_VALUES}')
+
+    ENUM_VALUE_TEMPLATE = (
+        '{INDENT}{ENUM_VALUE_NAME} = {ENUM_VALUE_NUMBER}, {QUOTED_COMMENT}\n\n')
 
     DATA_CLASS_TEMPLATE = (
         '{INDENT}@_dc.dataclass\n'
@@ -144,14 +155,17 @@ class TracGenerator:
         '\n\n'
         '{DOC_COMMENT}')
 
-    ENUM_TEMPLATE = (
-        '{INDENT}class {CLASS_NAME}(_enum.Enum):'
-        '\n\n'
+    SERVICE_CLASS_TEMPLATE = (
+        '{INDENT}class {SERVICE_NAME}:\n'
+        '\n'
         '{DOC_COMMENT}'
-        '{ENUM_VALUES}')
+        '{METHODS}')
 
-    ENUM_VALUE_TEMPLATE = (
-        '{INDENT}{ENUM_VALUE_NAME} = {ENUM_VALUE_NUMBER}, {QUOTED_COMMENT}\n\n')
+    SERVICE_METHOD_TEMPLATE = (
+        '{INDENT}def {METHOD_NAME}(self, request: {REQUEST_TYPE}) -> {RESPONSE_TYPE}:\n'
+        '\n'
+        '{DOC_COMMENT}'
+        '{NEXT_INDENT}pass\n\n')
 
     PASS_TEMPLATE = (
         '{INDENT}pass\n\n')
@@ -177,10 +191,12 @@ class TracGenerator:
         self._log = logging.getLogger(TracGenerator.__name__)
         self._options = options or {}
 
-        self._enum_type_field = self.get_field_number(pb_desc.FileDescriptorProto, "enum_type")
-        self._message_type_field = self.get_field_number(pb_desc.FileDescriptorProto, "message_type")
-        self._message_field_field = self.get_field_number(pb_desc.DescriptorProto, "field")
-        self._enum_value_field = self.get_field_number(pb_desc.EnumDescriptorProto, "value")
+        self._desc_file_enum = self.get_field_number(pb_desc.FileDescriptorProto, "enum_type")
+        self._desc_file_message = self.get_field_number(pb_desc.FileDescriptorProto, "message_type")
+        self._desc_file_service = self.get_field_number(pb_desc.FileDescriptorProto, "service")
+        self._desc_enum_value = self.get_field_number(pb_desc.EnumDescriptorProto, "value")
+        self._desc_message_field = self.get_field_number(pb_desc.DescriptorProto, "field")
+        self._desc_service_method = self.get_field_number(pb_desc.ServiceDescriptorProto, "method")
 
     def build_type_map(self, proto_files: tp.List[pb_desc.FileDescriptorProto]) -> TYPE_INFO_MAP:
 
@@ -241,7 +257,7 @@ class TracGenerator:
             type_map: TYPE_INFO_MAP) \
             -> tp.List[pb_plugin.CodeGeneratorResponse.File]:
 
-        self._log.info(f" [ PKG  ] -> {package} ({len(files)} proto files)")
+        self._log.info(f" [ PKG   ] -> {package} ({len(files)} proto files)")
 
         flat_pack = "flat_pack" in self._options
         output_files = []
@@ -335,7 +351,7 @@ class TracGenerator:
             type_map: TYPE_INFO_MAP,
             include_header: bool = True) -> str:
 
-        self._log.info(f" [ FILE ] -> {descriptor.name}")
+        self._log.info(f" [ FILE  ] -> {descriptor.name}")
 
         file_header = ""
         std_imports = ""
@@ -364,23 +380,28 @@ class TracGenerator:
         pkg_imports = "".join(import_stmts) + "\n\n" if any(import_stmts) else ""
 
         # Generate enums
-        enum_ctx = self.index_sub_ctx(src_loc, self._enum_type_field, indent)
-        enums = list(it.starmap(self.generate_enum, zip(enum_ctx, descriptor.enum_type)))
+        enums_ctx = self.index_sub_ctx(src_loc, self._desc_file_enum, indent)
+        enums = []
 
-        # Generate data classes
-        dataclass_ctx = self.index_sub_ctx(
-            src_loc,
-            self._message_type_field,
-            indent)
+        for ctx, desc in zip(enums_ctx, descriptor.enum_type):
+            enum_ = self.generate_enum(ctx, desc, enum_scope=None)
+            enums.append(enum_)
 
-        dataclasses = list(map(
-            lambda message_type: self.generate_data_class(
-                descriptor.package,
-                descriptor.package,
-                next(dataclass_ctx),
-                message_type,
-                type_map),
-            descriptor.message_type))
+        # Generate messages
+        messages_ctx = self.index_sub_ctx(src_loc, self._desc_file_message, indent)
+        messages = []
+
+        for ctx, desc in zip(messages_ctx, descriptor.message_type):
+            message = self.generate_data_class(descriptor.package, descriptor.package, ctx, desc, type_map)
+            messages.append(message)
+
+        # Generate services
+        services_ctx = self.index_sub_ctx(src_loc, self._desc_file_service, indent)
+        services = []
+
+        for service_ctx, service_desc in zip(services_ctx, descriptor.service):
+            service = self.generate_service_class(descriptor.package, service_ctx, service_desc)
+            services.append(service)
 
         # Populate the template
         code = self.FILE_TEMPLATE \
@@ -389,23 +410,73 @@ class TracGenerator:
             .replace("{STD_IMPORTS}", std_imports) \
             .replace("{PKG_IMPORTS}", "".join(pkg_imports)) \
             .replace("{ENUMS_CODE}", "\n".join(enums)) \
-            .replace("{MESSAGES_CODE}", "\n".join(dataclasses))
+            .replace("{MESSAGES_CODE}", "\n".join(messages)) \
+            .replace("{SERVICES_CODE}", "\n".join(services))
 
         return code
+
+    def generate_service_class(
+            self, package: str, ctx: LocationContext,
+            descriptor: pb_desc.ServiceDescriptorProto) -> str:
+
+        log_indent = self.INDENT_TEMPLATE * (ctx.indent + 1)
+        self._log.info(f" [ SVC   ] {log_indent}-> {descriptor.name}")
+
+        filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
+
+        # Generate service-level documentation
+        raw_comment = self.comment_for_current_location(filtered_loc)
+        doc_comment = self.format_doc_comment(ctx, raw_comment, next_indent=True)
+
+        # Generate methods
+        methods_ctx = self.index_sub_ctx(filtered_loc, self._desc_service_method, ctx.indent + 1)
+        methods = []
+
+        for method_ctx, method_desc in zip(methods_ctx, descriptor.method):
+            method = self.generate_service_method(package, method_ctx, method_desc)
+            methods.append(method)
+
+        return self.SERVICE_CLASS_TEMPLATE \
+            .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
+            .replace("{SERVICE_NAME}", descriptor.name) \
+            .replace("{DOC_COMMENT}", doc_comment) \
+            .replace("{METHODS}", "".join(methods))
+
+    def generate_service_method(
+            self, package: str, ctx: LocationContext,
+            descriptor: pb_desc.MethodDescriptorProto) -> str:
+
+        filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
+
+        # Method request/response types
+        request_type = self.python_type_name(package, descriptor.input_type, make_relative=True)
+        response_type = self.python_type_name(package, descriptor.output_type, make_relative=True)
+
+        # Generate method-level documentation
+        raw_comment = self.comment_for_current_location(filtered_loc)
+        doc_comment = self.format_doc_comment(ctx, raw_comment, next_indent=True)
+
+        return self.SERVICE_METHOD_TEMPLATE \
+            .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
+            .replace("{NEXT_INDENT}", self.INDENT_TEMPLATE * (ctx.indent + 1)) \
+            .replace("{METHOD_NAME}", descriptor.name) \
+            .replace("{REQUEST_TYPE}", request_type) \
+            .replace("{RESPONSE_TYPE}", response_type) \
+            .replace("{DOC_COMMENT}", doc_comment)
 
     def generate_data_class(
             self, package: str, message_scope: str, ctx: LocationContext,
             descriptor: pb_desc.DescriptorProto, types: TYPE_INFO_MAP) -> str:
 
         log_indent = self.INDENT_TEMPLATE * (ctx.indent + 1)
-        self._log.info(f" [ MSG  ] {log_indent}-> {descriptor.name}")
+        self._log.info(f" [ MSG   ] {log_indent}-> {descriptor.name}")
 
         # Source location and scope for this message
         filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
         nested_scope = descriptor.name if message_scope is None else f"{message_scope}.{descriptor.name}"
 
         # Generate nested enums
-        nested_enums_ctx = self.index_sub_ctx(filtered_loc, self._enum_type_field, ctx.indent + 1)
+        nested_enums_ctx = self.index_sub_ctx(filtered_loc, self._desc_file_enum, ctx.indent + 1)
         nested_enums = []
 
         for enum_ctx, enum_desc in zip(nested_enums_ctx, descriptor.enum_type):
@@ -413,7 +484,7 @@ class TracGenerator:
             nested_enums.append(nested_enum)
 
         # Generate nested message classes
-        nested_types_ctx = self.index_sub_ctx(filtered_loc, self._message_type_field, ctx.indent + 1)
+        nested_types_ctx = self.index_sub_ctx(filtered_loc, self._desc_file_message, ctx.indent + 1)
         nested_types = []
 
         for sub_ctx, sub_desc in zip(nested_types_ctx, descriptor.nested_type):
@@ -449,7 +520,7 @@ class TracGenerator:
 
         members_ctx = self.index_sub_ctx(
             ctx.src_locations,
-            self._message_field_field,
+            self._desc_message_field,
             ctx.indent)
 
         members = list(map(lambda f: self.generate_data_member(
@@ -487,7 +558,7 @@ class TracGenerator:
             -> str:
 
         log_indent = self.INDENT_TEMPLATE * (ctx.indent + 1)
-        self._log.info(f" [ ENUM ] {log_indent}-> {descriptor.name}")
+        self._log.info(f" [ ENUM  ] {log_indent}-> {descriptor.name}")
 
         # There is a problem constructing Python data classes for nested enums
         # The default initializer is not available until the outer class is declared
@@ -495,7 +566,7 @@ class TracGenerator:
         # https://stackoverflow.com/a/54489183
         if enum_scope:
             scoped_name = f"{enum_scope}.{descriptor.name}"
-            err = f" [ ENUM ] {scoped_name}: Nested enums not currently supported"
+            err = f" [ ENUM  ] {scoped_name}: Nested enums not currently supported"
             self._log.error(err)
             raise ECodeGeneration(err)
 
@@ -508,7 +579,7 @@ class TracGenerator:
         # Generate enum values
         values_ctx = self.index_sub_ctx(
             filtered_loc,
-            self._enum_value_field,
+            self._desc_enum_value,
             ctx.indent + 1)
 
         values = list(map(lambda ev: self.generate_enum_value(
@@ -594,16 +665,7 @@ class TracGenerator:
         # Messages (classes) and enums use the type name declared in the field
         if field.type == field.Type.TYPE_MESSAGE or field.type == field.Type.TYPE_ENUM:
 
-            type_name = field.type_name
-            type_name = type_name[1:] if type_name.startswith(".") else type_name
-
-            if make_relative and type_name.startswith(package):
-                type_name = type_name[len(package) + 1]
-
-            # We are using deferred annotations, with from __future__ import annotations
-            # Type names no longer need to be quoted!
-
-            return type_name
+            return self.python_type_name(package, field.type_name, make_relative)
 
         # For built in types, use a static mapping of proto type names
         if field.type in self.PRIMITIVE_TYPE_MAPPING:
@@ -614,6 +676,19 @@ class TracGenerator:
         raise ECodeGeneration(
             "Unknown type in protobuf field descriptor: field = {}, type code = {}"
             .format(field.name, field.type))
+
+    @staticmethod
+    def python_type_name(package: str, proto_type_name: str, make_relative=False):
+
+        type_name = proto_type_name[1:] if proto_type_name.startswith(".") else proto_type_name
+
+        if make_relative and type_name.startswith(package):
+            type_name = type_name[len(package) + 1:]
+
+        # We are using deferred annotations, with from __future__ import annotations
+        # Type names no longer need to be quoted!
+
+        return type_name
 
     # Python defaults
 
