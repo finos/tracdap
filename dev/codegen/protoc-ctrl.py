@@ -42,6 +42,28 @@ logging.basicConfig(format=logging_format, level=logging.INFO)
 _log = logging.getLogger(SCRIPT_NAME)
 
 
+def _copytree(src, dst):
+
+    # In shutil.copytree, dir_exists_ok is only available from Python 3.8, but we need Python 3.7
+    # Codegen is part of the core build tools so needs to match supported Python versions of the TRAC runtime
+
+    src_dir = pathlib.Path(src)
+    dst_dir = pathlib.Path(dst)
+
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
+    for src_item in src_dir.iterdir():
+
+        rel_item = src_item.relative_to(src_dir)
+        dst_item = dst_dir.joinpath(rel_item)
+
+        if src_item.is_dir():
+            _copytree(src_item, dst_item)
+        else:
+            if not dst_item.exists() or src_item.stat().st_mtime > dst_item.stat().st_mtime:
+                shutil.copy2(src_item, dst_item)
+
+
 class ProtoApiExtensions:
 
     # Provide some key extension protos from Google to handle web api annotations
@@ -60,14 +82,14 @@ class ProtoApiExtensions:
         protoc_inc_dst = pathlib.Path(self.temp_dir_name)
 
         _log.info(f"Copying {protoc_inc_src} -> {protoc_inc_dst}")
-        shutil.copytree(protoc_inc_src, protoc_inc_dst, dirs_exist_ok=True)
+        _copytree(protoc_inc_src, protoc_inc_dst)
 
         # Google API protos for annotating web services
         gapi_src = pathlib.Path(google.api.__file__).parent
         gapi_dst = pathlib.Path(self.temp_dir_name).joinpath("google/api")
 
         _log.info(f"Copying {gapi_src} -> {gapi_dst}")
-        shutil.copytree(gapi_src, gapi_dst, dirs_exist_ok=True)
+        _copytree(gapi_src, gapi_dst)
 
         return self.temp_dir_name
 
