@@ -159,7 +159,7 @@ def cli_args():
         help="The documentation targets to build")
 
     parser.add_argument(
-        "--proto_path", type=pathlib.Path, required=True, nargs="+", action="extend", dest="proto_paths",
+        "--proto_path", type=pathlib.Path, required=True, action="append", dest="proto_paths",
         help="Location of proto source files, relative to the repository root")
 
     parser.add_argument(
@@ -167,7 +167,7 @@ def cli_args():
         help="Location where output files will be generated, relative to the repository root")
 
     parser.add_argument(
-        "--package", type=pathlib.Path, nargs="*", action="extend", dest="packages",
+        "--package", type=pathlib.Path, action="append", dest="packages",
         help="Filter packages to include in generated output (TRAC generator only, default = generate all packages)")
 
     return parser.parse_args()
