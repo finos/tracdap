@@ -81,7 +81,11 @@ class DocGen:
         self._log_target()
 
         codegen_exe = "python"
-        codegen_args = [str(CODEGEN_SCRIPT), "api_doc", "--out", "build/doc/code/metadata"]
+        codegen_args = [
+            str(CODEGEN_SCRIPT), "api_doc",
+            "--proto_path", "trac-api/trac-metadata/src/main/proto",
+            "--out", "build/doc/code/metadata"]
+
         self._run_subprocess(codegen_exe, codegen_args, use_venv=True)
 
         sphinx_exe = 'sphinx-build'
@@ -139,7 +143,11 @@ class DocGen:
         # There is a separate mechanism for generating this and getting it into the library for packaging
         # For doc gen, we generate a new copy and just move it to the right place
         codegen_exe = "python"
-        codegen_args = [str(CODEGEN_SCRIPT), "python_runtime", "--out", "build/doc/code/runtime_python"]
+        codegen_args = [
+            str(CODEGEN_SCRIPT), "python_runtime",
+            "--proto_path", "trac-api/trac-metadata/src/main/proto",
+            "--out", "build/doc/code/runtime_python"]
+
         self._run_subprocess(codegen_exe, codegen_args, use_venv=True)
         self._mv(doc_src.joinpath('trac/metadata'), doc_src.joinpath('trac/rt/metadata'))
 

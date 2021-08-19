@@ -32,9 +32,6 @@ ROOT_DIR = SCRIPT_DIR \
     .joinpath("../..") \
     .resolve()
 
-METADATA_PROTO_DIR = ROOT_DIR \
-    .joinpath("trac-api/trac-metadata/src/main/proto")
-
 
 # Configure logging
 logging_format = f"%(levelname)s %(name)s: %(message)s"
@@ -67,7 +64,7 @@ def platform_args(base_args, proto_files):
         return ["protoc"] + base_args + proto_files
 
 
-def build_protoc_args(generator, output_location):
+def build_protoc_args(generator, proto_path, output_location):
 
     if platform.system().lower().startswith("win"):
         trac_plugin = "protoc-gen-trac.py"
@@ -77,7 +74,7 @@ def build_protoc_args(generator, output_location):
     if generator == "python_proto":
 
         proto_args = [
-            f"--proto_path={METADATA_PROTO_DIR.as_posix() +'/'}",
+            f"--proto_path={proto_path}",
             f"--plugin=python",
             f"--python_out={output_location}"
         ]
@@ -85,7 +82,7 @@ def build_protoc_args(generator, output_location):
     elif generator == "python_runtime":
 
         proto_args = [
-            f"--proto_path={METADATA_PROTO_DIR.as_posix() +'/'}",
+            f"--proto_path={proto_path}",
             f"--plugin={trac_plugin}",
             f"--trac_out={output_location}",
             # f"--trac_opt=flat_pack"
@@ -94,7 +91,7 @@ def build_protoc_args(generator, output_location):
     elif generator == "api_doc":
 
         proto_args = [
-            f"--proto_path={METADATA_PROTO_DIR}",
+            f"--proto_path={proto_path}",
             f"--plugin={trac_plugin}",
             f"--trac_out={output_location}",
             f"--trac_opt=flat_pack"
@@ -116,8 +113,12 @@ def cli_args():
         help="The documentation targets to build")
 
     parser.add_argument(
-        "--out", type=pathlib.Path,
-        help="Location where output files will be generated")
+        "--proto_path", type=pathlib.Path, required=True,
+        help="Location of proto source files, relative to the repository root")
+
+    parser.add_argument(
+        "--out", type=pathlib.Path, required=True,
+        help="Location where output files will be generated, relative to the repository root")
 
     return parser.parse_args()
 
@@ -125,30 +126,33 @@ def cli_args():
 def main():
 
     script_args = cli_args()
+    proto_path = ROOT_DIR.joinpath(script_args.proto_path)
     output_dir = ROOT_DIR.joinpath(script_args.out)
 
-    proto_args = build_protoc_args(script_args.generator, output_dir)
+    protoc_args = build_protoc_args(script_args.generator, proto_path, output_dir)
+    protoc_files = list(find_proto_files(proto_path))
+    protoc_argv = platform_args(protoc_args, protoc_files)
 
-    proto_files = list(find_proto_files(METADATA_PROTO_DIR))
-    argv = platform_args(proto_args, proto_files)
+    newline = "\n"
+    _log.info(f"Running protoc: {newline.join(map(str, protoc_argv))}")
 
     # Make sure the output dir exists before running protoc
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     # Always run protoc from the codegen folder
     # This makes finding the TRAC protoc plugin much easier
-    result = sp.run(executable=protoc.PROTOC_EXE, args=argv, cwd=SCRIPT_DIR)
+    result = sp.run(executable=protoc.PROTOC_EXE, args=protoc_argv, cwd=SCRIPT_DIR)
 
     # We are not piping stdout/stderr
     # Logs and errors  will show up as protoc is running
     # No need to report again here
 
     if result.returncode == 0:
-        _log.info("Codegen succeeded")
+        _log.info("Protoc succeeded")
         exit(0)
 
     else:
-        _log.error(f"Codegen failed with code {result.returncode}")
+        _log.error(f"Protoc failed with code {result.returncode}")
         exit(result.returncode)
 
 
