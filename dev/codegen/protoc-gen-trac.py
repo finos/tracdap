@@ -45,6 +45,10 @@ class TracPlugin:
         try:
 
             generator = gen.TracGenerator(self._options)
+
+            # Build a static type map in a separate first pass
+            type_map = generator.build_type_map(self._request.proto_file)
+
             generated_response = pb_plugin.CodeGeneratorResponse()
 
             input_files = self._request.proto_file
@@ -59,7 +63,7 @@ class TracPlugin:
                 # Take files out of iter group, they may be used multiple times
                 files = list(files)
 
-                package_files = generator.generate_package(package, files)
+                package_files = generator.generate_package(package, files, type_map)
                 generated_response.file.extend(package_files)
 
             # Generate package-level files for empty packages
@@ -70,7 +74,7 @@ class TracPlugin:
 
             for package in all_packages:
                 if package not in proto_packages:
-                    package_files = generator.generate_package(package, [])
+                    package_files = generator.generate_package(package, [], type_map)
                     generated_response.file.extend(package_files)
 
             return generated_response

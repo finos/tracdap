@@ -14,11 +14,15 @@
 
 from __future__ import annotations
 
+import enum
+
 import itertools as it
 import re
 import typing as tp
 import pathlib
 import logging
+import dataclasses as dc
+import functools as fn
 
 import google.protobuf.descriptor_pb2 as pb_desc  # noqa
 import google.protobuf.compiler.plugin_pb2 as pb_plugin  # noqa
@@ -49,11 +53,28 @@ class ECodeGeneration(RuntimeError):
     pass
 
 
+class TypeClass(enum.Enum):
+    ENUM = 1
+    MESSAGE = 2
+    SERVICE = 3
+
+
+@dc.dataclass
+class TypeInfo:
+    typeClass: TypeClass
+    enum: pb_desc.EnumDescriptorProto = None
+    message: pb_desc.DescriptorProto = None
+    service: pb_desc.ServiceDescriptorProto = None
+
+
+TYPE_INFO_MAP = tp.Dict[str, TypeInfo]
+
+
 class TracGenerator:
     
     _FieldType = pb_desc.FieldDescriptorProto.Type
 
-    PROTO_TYPE_MAPPING = dict({
+    PRIMITIVE_TYPE_MAPPING = dict({
 
         _FieldType.TYPE_DOUBLE: float,
         _FieldType.TYPE_FLOAT: float,
@@ -161,10 +182,63 @@ class TracGenerator:
         self._message_field_field = self.get_field_number(pb_desc.DescriptorProto, "field")
         self._enum_value_field = self.get_field_number(pb_desc.EnumDescriptorProto, "value")
 
-        self._known_messages: tp.Dict[str, pb_desc.DescriptorProto] = {}
-        self._known_enums: tp.Dict[str, pb_desc.EnumDescriptorProto] = {}
+    def build_type_map(self, proto_files: tp.List[pb_desc.FileDescriptorProto]) -> TYPE_INFO_MAP:
 
-    def generate_package(self, package: str, files: tp.List[pb_desc.FileDescriptorProto]) \
+        # self._log.info("Building type map...")
+
+        return fn.reduce(self.build_type_map_for_file, proto_files, {})
+
+    def build_type_map_for_file(
+            self, types: TYPE_INFO_MAP,
+            proto_file: pb_desc.FileDescriptorProto) \
+            -> TYPE_INFO_MAP:
+
+        self._log.info(f" [ TYPES ] -> {proto_file.name}")
+
+        scope = proto_file.package + "." if proto_file.package else ""
+
+        local_types = fn.reduce(
+            fn.partial(self.build_type_map_for_message, scope),
+            proto_file.message_type, types)
+
+        for enum_type in proto_file.enum_type:
+            enum_type_name = f"{scope}{enum_type.name}"
+            enum_type_info = TypeInfo(TypeClass.ENUM, enum=enum_type)
+            local_types[enum_type_name] = enum_type_info
+
+        for service in proto_file.service:
+            service_name = f"{scope}{service.name}"
+            service_info = TypeInfo(TypeClass.SERVICE, service=service)
+            local_types[service_name] = service_info
+
+        return local_types
+
+    def build_type_map_for_message(
+            self, scope: str, types: TYPE_INFO_MAP,
+            proto_msg: pb_desc.DescriptorProto) \
+            -> TYPE_INFO_MAP:
+
+        inner_scope = f"{scope}{proto_msg.name}."
+
+        local_types = fn.reduce(
+            fn.partial(self.build_type_map_for_message, inner_scope),
+            proto_msg.nested_type, types)
+
+        for enum_type in proto_msg.enum_type:
+            enum_type_name = f"{inner_scope}{enum_type.name}"
+            enum_type_info = TypeInfo(TypeClass.ENUM, enum=enum_type)
+            local_types[enum_type_name] = enum_type_info
+
+        message_type_name = f"{scope}{proto_msg.name}"
+        message_type_info = TypeInfo(TypeClass.MESSAGE, message=proto_msg)
+        local_types[message_type_name] = message_type_info
+
+        return local_types
+
+    def generate_package(
+            self, package: str,
+            files: tp.List[pb_desc.FileDescriptorProto],
+            type_map: TYPE_INFO_MAP) \
             -> tp.List[pb_plugin.CodeGeneratorResponse.File]:
 
         self._log.info(f" [ PKG  ] -> {package} ({len(files)} proto files)")
@@ -180,7 +254,7 @@ class TracGenerator:
 
             # Run the generator to produce code for the Python module
             src_locations = file_descriptor.source_code_info.location
-            module_code = self.generate_file(src_locations, 0, file_descriptor, not flat_pack)
+            module_code = self.generate_file(src_locations, 0, file_descriptor, type_map, not flat_pack)
 
             if flat_pack and len(files) > 0:
 
@@ -258,6 +332,7 @@ class TracGenerator:
     def generate_file(
             self, src_loc, indent: int,
             descriptor: pb_desc.FileDescriptorProto,
+            type_map: TYPE_INFO_MAP,
             include_header: bool = True) -> str:
 
         self._log.info(f" [ FILE ] -> {descriptor.name}")
@@ -288,17 +363,24 @@ class TracGenerator:
 
         pkg_imports = "".join(import_stmts) + "\n\n" if any(import_stmts) else ""
 
-        # Record known types
-        self._known_enums.update({t.name: t for t in descriptor.enum_type})
-        self._known_messages.update({t.name: t for t in descriptor.message_type})
-
         # Generate enums
         enum_ctx = self.index_sub_ctx(src_loc, self._enum_type_field, indent)
         enums = list(it.starmap(self.generate_enum, zip(enum_ctx, descriptor.enum_type)))
 
         # Generate data classes
-        dataclass_ctx = self.index_sub_ctx(src_loc, self._message_type_field, indent)
-        dataclasses = list(it.starmap(self.generate_data_class, zip(dataclass_ctx, descriptor.message_type)))
+        dataclass_ctx = self.index_sub_ctx(
+            src_loc,
+            self._message_type_field,
+            indent)
+
+        dataclasses = list(map(
+            lambda message_type: self.generate_data_class(
+                descriptor.package,
+                descriptor.package,
+                next(dataclass_ctx),
+                message_type,
+                type_map),
+            descriptor.message_type))
 
         # Populate the template
         code = self.FILE_TEMPLATE \
@@ -312,9 +394,8 @@ class TracGenerator:
         return code
 
     def generate_data_class(
-            self, ctx: LocationContext,
-            descriptor: pb_desc.DescriptorProto,
-            message_scope: str = None) -> str:
+            self, package: str, message_scope: str, ctx: LocationContext,
+            descriptor: pb_desc.DescriptorProto, types: TYPE_INFO_MAP) -> str:
 
         log_indent = self.INDENT_TEMPLATE * (ctx.indent + 1)
         self._log.info(f" [ MSG  ] {log_indent}-> {descriptor.name}")
@@ -328,27 +409,21 @@ class TracGenerator:
         nested_enums = []
 
         for enum_ctx, enum_desc in zip(nested_enums_ctx, descriptor.enum_type):
-
-            nested_enum_name = f"{nested_scope}.{enum_desc.name}"
             nested_enum = self.generate_enum(enum_ctx, enum_desc, nested_scope)
             nested_enums.append(nested_enum)
-            self._known_enums[nested_enum_name] = enum_desc
 
         # Generate nested message classes
         nested_types_ctx = self.index_sub_ctx(filtered_loc, self._message_type_field, ctx.indent + 1)
         nested_types = []
 
         for sub_ctx, sub_desc in zip(nested_types_ctx, descriptor.nested_type):
-
             if not sub_desc.options.map_entry:
-                nested_type_name = f"{nested_scope}.{sub_desc.name}"
-                nested_type = self.generate_data_class(sub_ctx, sub_desc, nested_scope)
+                nested_type = self.generate_data_class(package, nested_scope, sub_ctx, sub_desc, types)
                 nested_types.append(nested_type)
-                self._known_messages[nested_type_name] = sub_desc
 
         # Generate data members - these may reference known message and enum types
         data_members_ctx = LocationContext(filtered_loc, ctx.src_loc_code, ctx.src_loc_index, ctx.indent + 1)
-        data_members = self.generate_data_members(data_members_ctx, descriptor)
+        data_members = self.generate_data_members(package, data_members_ctx, descriptor, types)
 
         # Generate comments
         raw_comment = self.comment_for_current_location(filtered_loc)
@@ -363,7 +438,10 @@ class TracGenerator:
             .replace("{NESTED_CLASSES}", "".join(nested_types)) \
             .replace("{DATA_MEMBERS}", data_members)
 
-    def generate_data_members(self, ctx: LocationContext, descriptor: pb_desc.DescriptorProto) -> str:
+    def generate_data_members(
+            self, package: str, ctx: LocationContext,
+            descriptor: pb_desc.DescriptorProto,
+            types: TYPE_INFO_MAP) -> str:
 
         # Generate a pass statement if the class has no members
         if not descriptor.field:
@@ -375,21 +453,22 @@ class TracGenerator:
             ctx.indent)
 
         members = list(map(lambda f: self.generate_data_member(
-            next(members_ctx), descriptor, f),
+            package, next(members_ctx), descriptor, f, types),
             descriptor.field))
 
         return "".join(members)
 
     def generate_data_member(
-            self, ctx: LocationContext,
+            self, package: str, ctx: LocationContext,
             message: pb_desc.DescriptorProto,
-            field: pb_desc.FieldDescriptorProto) \
+            field: pb_desc.FieldDescriptorProto,
+            types: TYPE_INFO_MAP) \
             -> str:
 
         filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
 
-        field_type = self.python_field_type(field, message)
-        field_default = self.python_default_value(field, message)
+        field_type = self.python_field_type(package, field, message)
+        field_default = self.python_default_value(package, field, message, types)
 
         raw_comment = self.comment_for_current_location(filtered_loc)
         doc_comment = self.format_doc_comment(ctx, raw_comment)
@@ -465,9 +544,12 @@ class TracGenerator:
 
     # Python type hints
 
-    def python_field_type(self, field: pb_desc.FieldDescriptorProto, message: pb_desc.DescriptorProto):
+    def python_field_type(
+            self, package: str,
+            field: pb_desc.FieldDescriptorProto,
+            message: pb_desc.DescriptorProto):
 
-        base_type = self.python_base_type(field)
+        base_type = self.python_base_type(package, field, make_relative=True)
 
         # Repeated fields are either lists or maps - these need special handling
         if field.label == field.Label.LABEL_REPEATED:
@@ -481,8 +563,8 @@ class TracGenerator:
             # If a nested type is found to be a map entry type, then generate a dict
             if nested_type is not None and nested_type.options.map_entry:
 
-                key_type = self.python_base_type(nested_type.field[0])
-                value_type = self.python_base_type(nested_type.field[1])
+                key_type = self.python_base_type(package, nested_type.field[0])
+                value_type = self.python_base_type(package, nested_type.field[1])
                 return f"_tp.Dict[{key_type}, {value_type}]"
 
             # Otherwise repeated fields are generated as lists
@@ -507,23 +589,26 @@ class TracGenerator:
         else:
             return base_type
 
-    def python_base_type(self, field: pb_desc.FieldDescriptorProto):
+    def python_base_type(self, package: str, field: pb_desc.FieldDescriptorProto, make_relative=False):
 
         # Messages (classes) and enums use the type name declared in the field
         if field.type == field.Type.TYPE_MESSAGE or field.type == field.Type.TYPE_ENUM:
 
             type_name = field.type_name
-            relative_name = type_name.replace(".trac.metadata.", "", 1)
+            type_name = type_name[1:] if type_name.startswith(".") else type_name
+
+            if make_relative and type_name.startswith(package):
+                type_name = type_name[len(package) + 1]
 
             # We are using deferred annotations, with from __future__ import annotations
             # Type names no longer need to be quoted!
 
-            return relative_name
+            return type_name
 
         # For built in types, use a static mapping of proto type names
-        if field.type in self.PROTO_TYPE_MAPPING:
+        if field.type in self.PRIMITIVE_TYPE_MAPPING:
 
-            return self.PROTO_TYPE_MAPPING[field.type].__name__
+            return self.PRIMITIVE_TYPE_MAPPING[field.type].__name__
 
         # Any unrecognised type is an error
         raise ECodeGeneration(
@@ -532,16 +617,21 @@ class TracGenerator:
 
     # Python defaults
 
-    def python_default_value(self, field: pb_desc.FieldDescriptorProto, message: pb_desc.DescriptorProto):
+    def python_default_value(
+            self, package: str,
+            field: pb_desc.FieldDescriptorProto,
+            message: pb_desc.DescriptorProto,
+            types: TYPE_INFO_MAP):
 
-        base_type = self.python_base_type(field)
+        type_name = self.python_base_type(package, field)
+        type_info = types.get(type_name)
 
         # Repeated fields are either lists or maps - these need special handling
         if field.label == field.Label.LABEL_REPEATED:
 
             # Look to see if the base type is a nested type defined in the same message as the field
             nested_type = next(filter(
-                lambda nt: base_type == f"{message.name}.{nt.name}",
+                lambda nt: type_name.endswith("{message.name}.{nt.name}"),
                 message.nested_type),
                 None)
 
@@ -561,7 +651,7 @@ class TracGenerator:
 
         # Enum fields are always set to a value (the enum' zero value)
         elif field.type == field.Type.TYPE_ENUM:
-            enum_type = self._known_enums[base_type]
+            enum_type = type_info.enum
             return f"{enum_type.name}.{enum_type.value[0].name}"
 
         # Assume everything else is a primitive
