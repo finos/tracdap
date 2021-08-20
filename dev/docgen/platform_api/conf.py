@@ -41,6 +41,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.napoleon',
+    'sphinx.ext.intersphinx',
     'autoapi.extension'
 ]
 
@@ -49,6 +50,10 @@ autoapi_dirs = [
 ]
 
 autodoc_typehints = 'description'
+
+intersphinx_mapping = {
+    'trac.metadata': ('../../../build/doc/metadata/html/', None)
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
