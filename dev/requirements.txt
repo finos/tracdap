@@ -8,5 +8,5 @@ googleapis-common-protos >= 1.53, < 2.0
 # Doc generation
 sphinx >= 4.1, < 5.0
 sphinx-autoapi >= 1.8.3, < 2.0
-sphinxcontrib-fulltoc >= 1.2 < 2.0
+sphinxcontrib-fulltoc >= 1.2, < 2.0
 cloud_sptheme >= 1.10, < 2.0
