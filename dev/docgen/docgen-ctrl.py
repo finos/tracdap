@@ -20,6 +20,7 @@ import subprocess as sp
 import platform
 import shutil
 import os
+import fileinput
 
 
 SCRIPT_DIR = pathlib.Path(__file__) \
@@ -118,8 +119,6 @@ class DocGen:
             else:
                 self._cp(src_module, tgt_module)
 
-        import fileinput
-
         # We include the runtime metadata classes at global scope in the api package for convenience
         # Having them show up in both places in the docs is confusing (for users, and the autoapi tool)!
         # So, remove those imports from the API package before running Sphinx
@@ -152,7 +151,18 @@ class DocGen:
         self._run_subprocess(sphinx_exe, sphinx_args, use_venv=True)
 
     def dist(self):
-        pass
+
+        self._log_target()
+
+        main_html = BUILD_DIR.joinpath("main/html").resolve()
+        main_dist = BUILD_DIR.joinpath("dist")
+
+        self._cp_tree(main_html, main_dist)
+
+        model_py_html = BUILD_DIR.joinpath("modelling_python/html")
+        model_py_dist = main_dist.joinpath("modelling/python")
+
+        self._cp_tree(model_py_html, model_py_dist)
 
     def _log_target(self):
 

@@ -82,7 +82,8 @@ index_doc = 'index'
 relbar_links = [("contents", "contents")]
 
 html_theme_options = {
-    'max_width': '90%'
+    'max_width': '90%',
+    'externalrefs': False
 }
 
 html_sidebars = {'**': ['globaltoc.html', 'searchbox.html']}
