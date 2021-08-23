@@ -8,5 +8,5 @@ Table Of Contents
     Front Page <index>
     metadata_model
     platform_api
-    modelling_api
+    modelling/index
     api_ref

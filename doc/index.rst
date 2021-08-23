@@ -16,7 +16,7 @@ The TRAC metadata model underpins the operation of the platform
 Public API for building client apps on the TRAC platform,
 available in gRPC, gRPC-Web and REST/JSON formats as well as a JavaScript API package
 
-:doc:`modelling_api`
+:doc:`modelling/index`
 
 Build models to run on the TRAC platform
 

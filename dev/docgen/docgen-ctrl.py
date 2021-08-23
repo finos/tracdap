@@ -31,6 +31,9 @@ ROOT_DIR = SCRIPT_DIR\
     .joinpath("../..") \
     .resolve()
 
+DOC_DIR = ROOT_DIR \
+    .joinpath("doc")
+
 BUILD_DIR = ROOT_DIR \
     .joinpath('build/doc')
 
@@ -57,7 +60,7 @@ class DocGen:
 
         self._log_target()
 
-        self.runtime_python()
+        self.modelling_python()
 
         self.main()
 
@@ -79,7 +82,7 @@ class DocGen:
         self._run_subprocess(codegen_exe, codegen_args, use_venv=True)
 
         sphinx_exe = 'sphinx-build'
-        sphinx_src = ROOT_DIR.joinpath('doc').resolve()
+        sphinx_src = DOC_DIR
         sphinx_dst = BUILD_DIR.joinpath('main').resolve()
         sphinx_cfg = SCRIPT_DIR.joinpath('main')
         sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
@@ -87,7 +90,7 @@ class DocGen:
         self._mkdir(sphinx_dst)
         self._run_subprocess(sphinx_exe, sphinx_args, use_venv=True)
 
-    def runtime_python(self):
+    def modelling_python(self):
 
         self._log_target()
 
@@ -140,9 +143,9 @@ class DocGen:
 
         # Now everything is set up, run the Sphinx autoapi generator
         sphinx_exe = 'sphinx-build'
-        sphinx_src = SCRIPT_DIR.joinpath('runtime_python').resolve()
-        sphinx_dst = BUILD_DIR.joinpath('runtime_python').resolve()
-        sphinx_cfg = SCRIPT_DIR.joinpath('runtime_python')
+        sphinx_src = DOC_DIR.joinpath('modelling/python').resolve()
+        sphinx_dst = BUILD_DIR.joinpath('modelling_python').resolve()
+        sphinx_cfg = SCRIPT_DIR.joinpath('modelling_python')
         sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
 
         self._mkdir(sphinx_dst)
