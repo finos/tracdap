@@ -32,39 +32,39 @@ import "trac/metadata/object.proto";
  * definition, intended for storing descriptive and informational data as well
  * as application-level metadata that is not part of the object definition model.
  * Here is an example of a set of tag attributes to illustrate some ways they can
- * be used:
+ * be used::
  *
- *     // A descriptive field intended for human users.
+ *     # A descriptive field intended for human users.
  *
  *     display_name: "Customer accounts for March 2020, corrected April 6th"
  *
- *     // A classification that can be used for searching or indexing.
- *     // Client applications can also use this to find datasets of a certain
- *     // type; typically an application will define a set of attributes that are
- *     // "structural", i.e. the application uses those attributes to decide which
- *     // objects to present for certain purposes.
+ *     # A classification that can be used for searching or indexing.
+ *     # Client applications can also use this to find datasets of a certain
+ *     # type; typically an application will define a set of attributes that are
+ *     # "structural", i.e. the application uses those attributes to decide which
+ *     # objects to present for certain purposes.
  *
  *     dataset_class: "customer_accounts"
  *
- *     // Properties of an item can be added as individual attributes so they can
- *     // be searched and displayed individually. This avoids the anti-pattern of
- *     // putting multiple attributes into a single name/label field:
- *     //    customer_accounts_mar20_scotland_commercial_approved
+ *     # Properties of an item can be added as individual attributes so they can
+ *     # be searched and displayed individually. This avoids the anti-pattern of
+ *     # putting multiple attributes into a single name/label field:
+ *     #    customer_accounts_mar20_scotland_commercial_approved
  *
  *     accounting_date: (DATE) 2020-03-31
  *     region: "Scotland"
  *     book: "commercial_property"
  *     figures_approved: (BOOLEAN) true
  *
- *     // Attributes can be multi-valued. This can be helpful for applying
- *     // regulatory classifiers, where multiple classifiers may apply to a
- *     // single item.
+ *     # Attributes can be multi-valued. This can be helpful for applying
+ *     # regulatory classifiers, where multiple classifiers may apply to a
+ *     # single item.
  *
  *     data_classification: ["confidential", "gdpr_pii", "audited"]
  *
- *     // TRAC records a number of "controlled" attributes, these are set by the
- *     // platform and cannot be modified directly through the metadata API.
- *     // Controlled attributes start with the prefix "trac_".
+ *     # TRAC records a number of "controlled" attributes, these are set by the
+ *     # platform and cannot be modified directly through the metadata API.
+ *     # Controlled attributes start with the prefix "trac_".
  *
  *     trac_create_time: (DATETIME) 2020-04-01 10:37:05
  *     trac_create_user_id: "jane.doe"
