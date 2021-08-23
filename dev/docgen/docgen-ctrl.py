@@ -57,47 +57,14 @@ class DocGen:
 
         self._log_target()
 
-        self.metadata()
-        self.platform_api()
         self.runtime_python()
 
         self.main()
 
     def main(self):
 
-        self._log_target()
-
-        sphinx_exe = 'sphinx-build'
-        sphinx_src = ROOT_DIR.joinpath('doc').resolve()
-        sphinx_dst = BUILD_DIR.joinpath('main').resolve()
-        sphinx_cfg = SCRIPT_DIR.joinpath('main')
-        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
-
-        self._mkdir(sphinx_dst)
-        self._run_subprocess(sphinx_exe, sphinx_args, use_venv=True)
-
-    def metadata(self):
-
-        self._log_target()
-
-        codegen_exe = "python"
-        codegen_args = [
-            str(CODEGEN_SCRIPT), "api_doc",
-            "--proto_path", "trac-api/trac-metadata/src/main/proto",
-            "--out", "build/doc/code/metadata"]
-
-        self._run_subprocess(codegen_exe, codegen_args, use_venv=True)
-
-        sphinx_exe = 'sphinx-build'
-        sphinx_src = SCRIPT_DIR.joinpath('metadata').resolve()
-        sphinx_dst = BUILD_DIR.joinpath('metadata').resolve()
-        sphinx_cfg = SCRIPT_DIR.joinpath('metadata')
-        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
-
-        self._mkdir(sphinx_dst)
-        self._run_subprocess(sphinx_exe, sphinx_args, use_venv=True)
-
-    def platform_api(self):
+        # Include generation of the core platform API (i.e. everything defined in the API .proto files)
+        # Do not include runtime packages, APIs in other languages or indexing of implementation code
 
         self._log_target()
 
@@ -107,14 +74,14 @@ class DocGen:
             "--proto_path", "trac-api/trac-services/src/main/proto",
             "--proto_path", "trac-api/trac-metadata/src/main/proto",
             "--out", "build/doc/code/platform_api",
-            "--package", "trac.api"]
+            "--package", "trac"]
 
         self._run_subprocess(codegen_exe, codegen_args, use_venv=True)
 
         sphinx_exe = 'sphinx-build'
-        sphinx_src = SCRIPT_DIR.joinpath('platform_api').resolve()
-        sphinx_dst = BUILD_DIR.joinpath('platform_api').resolve()
-        sphinx_cfg = SCRIPT_DIR.joinpath('platform_api')
+        sphinx_src = ROOT_DIR.joinpath('doc').resolve()
+        sphinx_dst = BUILD_DIR.joinpath('main').resolve()
+        sphinx_cfg = SCRIPT_DIR.joinpath('main')
         sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
 
         self._mkdir(sphinx_dst)

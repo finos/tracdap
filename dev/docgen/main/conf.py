@@ -39,10 +39,23 @@ release = '(dev-snapshot)'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
+    'sphinx.ext.napoleon',
+    'autoapi.extension',
+    
     'sphinxcontrib.fulltoc',
     'cloud_sptheme.ext.relbar_links'
 
 ]
+
+autoapi_dirs = [
+    '../build/doc/code/platform_api'
+]
+
+autodoc_typehints = 'description'
+autoapi_member_order = 'groupwise'
+autoapi_add_toctree_entry = False
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

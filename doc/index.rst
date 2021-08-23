@@ -7,7 +7,7 @@ TRAC Platform Documentation |version|
 =====================================
 
 
-:doc:`metadata`
+:doc:`metadata_model`
 
 The TRAC metadata model underpins the operation of the platform
 
