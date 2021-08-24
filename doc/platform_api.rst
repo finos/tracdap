@@ -1,6 +1,6 @@
 
-TRAC Platform API
-=================
+Platform API
+============
 
 TODO platform intro
 

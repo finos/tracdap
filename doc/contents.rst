@@ -5,7 +5,7 @@ Table Of Contents
 
 .. toctree::
 
-    Front Page <index>
+    index
     metadata_model
     platform_api
     modelling/index

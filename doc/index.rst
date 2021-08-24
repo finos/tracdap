@@ -1,10 +1,6 @@
-.. TRAC documentation master file, created by
-   sphinx-quickstart on Sat Aug 14 14:02:10 2021.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
 
-TRAC Platform |release|
-=======================
+Getting Started with TRAC
+=========================
 
 
 :doc:`metadata_model`

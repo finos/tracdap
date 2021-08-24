@@ -1,6 +1,6 @@
 
-TRAC Metadata Model
-===================
+Metadata Model
+==============
 
 TODO metadata intro
 
