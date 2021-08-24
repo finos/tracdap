@@ -21,6 +21,7 @@ import platform
 import shutil
 import os
 import fileinput
+import re
 
 
 SCRIPT_DIR = pathlib.Path(__file__) \
@@ -72,6 +73,8 @@ class DocGen:
 
         self._log_target()
 
+        version, release = self._get_trac_version()
+
         codegen_exe = "python"
         codegen_args = [
             str(CODEGEN_SCRIPT), "api_doc",
@@ -80,16 +83,18 @@ class DocGen:
             "--out", "build/doc/code/platform_api",
             "--package", "trac"]
 
-        self._run_subprocess(codegen_exe, codegen_args, use_venv=True)
+        self._run_subprocess(codegen_exe, codegen_args)
+
+        self._process_sphinx_conf(SCRIPT_DIR.joinpath("main/conf.py"))
 
         sphinx_exe = 'sphinx-build'
         sphinx_src = DOC_DIR
         sphinx_dst = BUILD_DIR.joinpath('main').resolve()
-        sphinx_cfg = SCRIPT_DIR.joinpath('main')
+        sphinx_cfg = BUILD_DIR.joinpath('sphinx').resolve()
         sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
 
         self._mkdir(sphinx_dst)
-        self._run_subprocess(sphinx_exe, sphinx_args, use_venv=True)
+        self._run_subprocess(sphinx_exe, sphinx_args)
 
     def modelling_python(self):
 
@@ -137,18 +142,20 @@ class DocGen:
             "--proto_path", "trac-api/trac-metadata/src/main/proto",
             "--out", "build/doc/code/runtime_python"]
 
-        self._run_subprocess(codegen_exe, codegen_args, use_venv=True)
+        self._run_subprocess(codegen_exe, codegen_args)
         self._mv(doc_src.joinpath('trac/metadata'), doc_src.joinpath('trac/rt/metadata'))
+
+        self._process_sphinx_conf(SCRIPT_DIR.joinpath("modelling_python/conf.py"))
 
         # Now everything is set up, run the Sphinx autoapi generator
         sphinx_exe = 'sphinx-build'
         sphinx_src = DOC_DIR.joinpath('modelling/python').resolve()
         sphinx_dst = BUILD_DIR.joinpath('modelling_python').resolve()
-        sphinx_cfg = SCRIPT_DIR.joinpath('modelling_python')
+        sphinx_cfg = BUILD_DIR.joinpath('sphinx').resolve()
         sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
 
         self._mkdir(sphinx_dst)
-        self._run_subprocess(sphinx_exe, sphinx_args, use_venv=True)
+        self._run_subprocess(sphinx_exe, sphinx_args)
 
     def dist(self):
 
@@ -170,6 +177,60 @@ class DocGen:
         target_name = target_frame.function
 
         self._log.info(f"Building target [{target_name}]")
+
+    def _process_sphinx_conf(self, conf_path):
+
+        dest_path = BUILD_DIR.joinpath("sphinx/conf.py")
+
+        self._rm_tree(BUILD_DIR.joinpath("sphinx"))
+        self._mkdir(BUILD_DIR.joinpath("sphinx"))
+        self._cp(conf_path, dest_path)
+
+        version, release = self._get_trac_version()
+
+        self._log.info("* Setting version / release in Sphinx config...")
+
+        for line in fileinput.input(dest_path, inplace=True):
+            if "{DOCGEN_VERSION}" in line:
+                print(line.replace("{DOCGEN_VERSION}", version), end="")
+            elif "{DOCGEN_RELEASE}" in line:
+                print(line.replace("{DOCGEN_RELEASE}", release), end="")
+            else:
+                print(line, end="")
+
+    def _get_trac_version(self):
+
+        if "_version" in self.__dict__ and "_release" in self.__dict__:
+            return getattr(self, "_version"), getattr(self, "_release")
+
+        self._log.info(f"Looking up version / release info...")
+
+        if platform.system().lower().startswith("win"):
+
+            version_script = ROOT_DIR.joinpath("dev/version.ps1")
+
+            version_exe = "powershell.exe"
+            version_args = [
+                "-ExecutionPolicy", "Bypass",
+                "-File", str(version_script)]
+
+        else:
+
+            version_exe = ROOT_DIR.joinpath("dev/version.sh")
+            version_args = []
+
+        version_result = self._run_subprocess(version_exe, version_args, capture_output=True, use_venv=False)
+        version_output = version_result.stdout.decode("utf-8").strip()
+        version = re.sub(r"[+-].+$", "", version_output)
+        release = re.sub(r"\+.+$", "+DEV", version_output)
+
+        self._log.info(f"TRAC version: {version}")
+        self._log.info(f"TRAC release: {release}")
+
+        self._version = version
+        self._release = release
+
+        return version, release
 
     def _touch(self, tgt):
 
@@ -209,7 +270,7 @@ class DocGen:
         if target_dir.exists():
             shutil.rmtree(target_dir)
 
-    def _run_subprocess(self, sp_exe, sp_args, use_venv=False):
+    def _run_subprocess(self, sp_exe, sp_args, use_venv=True, capture_output=False):
 
         self._log.info(f'* {sp_exe} {" ".join(sp_args)}')
 
@@ -217,15 +278,26 @@ class DocGen:
         # So, build the full path to the binary instead
 
         if not use_venv or 'VIRTUAL_ENV' not in os.environ:
-            exe_ = sp_exe
+
+            # Try to find sp_exe in the environment PATH
+            # Python will not do this automatically!!
+
+            path_env = os.environ["PATH"]
+            path_split = ";" if platform.system().lower().startswith("win") else ":"
+            path_dirs = path_env.split(path_split)
+
+            exe_paths = map(lambda p: pathlib.Path(p).joinpath(sp_exe), path_dirs)
+            exe_ = next(filter(lambda p: p.exists(), exe_paths))
 
         elif platform.system().lower().startswith("win"):
+
             exe_ = pathlib.Path(os.environ['VIRTUAL_ENV'])\
                 .joinpath('Scripts')\
                 .joinpath(sp_exe)\
                 .with_suffix(".exe")
 
         else:
+
             exe_ = pathlib.Path(os.environ['VIRTUAL_ENV']) \
                 .joinpath('bin') \
                 .joinpath(sp_exe)
@@ -239,7 +311,7 @@ class DocGen:
             args_ = [sp_exe] + sp_args
 
         # Ready to run!
-        result = sp.run(executable=exe_, args=args_)
+        result = sp.run(executable=exe_, args=args_, capture_output=capture_output)
 
         if result.returncode != 0:
             err = f"{sp_exe} failed with exit code {result.returncode}"

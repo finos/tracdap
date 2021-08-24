@@ -27,10 +27,10 @@ copyright = '2021, Accenture'
 author = 'Martin Traverse'
 
 # The point version, excluding any pre-release or build info
-version = '(dev-snapshot)'
+version = '{DOCGEN_VERSION}'
 
 # The full version, including alpha/beta/rc tags
-release = '(dev-snapshot)'
+release = '{DOCGEN_RELEASE}'
 
 
 # -- General configuration ---------------------------------------------------
