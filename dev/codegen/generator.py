@@ -790,18 +790,40 @@ class TracGenerator:
     def translate_comment_from_proto(
             self, ctx: LocationContext,
             comment: tp.Optional[str],
-            next_indent: bool = False) \
+            use_next_indent: bool = False) \
             -> tp.Optional[str]:
 
         if comment is None:
             return ""
 
-        indent = ctx.indent + 1 if next_indent else ctx.indent
+        indent = ctx.indent + 1 if use_next_indent else ctx.indent
+        next_indent = self.INDENT_TEMPLATE * (indent + 1)
 
         translated_comment = re.sub("^(\\*\n)|/", "", comment, count=1)
         translated_comment = re.sub("\n$", "", translated_comment)
         translated_comment = re.sub("^ ?", self.INDENT_TEMPLATE * indent, translated_comment)
         translated_comment = re.sub("\\n ?", "\n" + self.INDENT_TEMPLATE * indent, translated_comment)
+
+        # These two translations change the JavaDoc style @see annotation into RST .. seealso::
+        # This format is good for Python and the API docs which are generated from Python
+        # There may be some tweaking needed to make links between submodules work in the Python RT package
+
+        # Convert @see for methods into .. seealso:: :meth:
+        translated_comment = re.sub(
+            r"@see ((?:\w+\.)*)(\w+\.)(\w+)\(\)",
+            ".. seealso::\\n" + next_indent + ":meth:`\\2\\3 <\\1\\2\\3>`",
+            translated_comment, flags=re.IGNORECASE)
+
+        # Convert @see for classes into .. seealso:: :class:
+        translated_comment = re.sub(
+            r"@see ((?:\w+\.)*)(\w+)",
+            ".. seealso::\\n" + next_indent + ":class:`\\2 <\\1\\2>`",
+            translated_comment, flags=re.IGNORECASE)
+
+        # Group multiple seealso statements into a single block
+        translated_comment = re.sub(
+            r"(:class:.*)\n\s*\.\. seealso::\n", "\\1,\n",
+            translated_comment, flags=re.IGNORECASE)
 
         if translated_comment.strip() == "":
             return ""
