@@ -32,6 +32,9 @@ version = '{DOCGEN_VERSION}'
 # The full version, including alpha/beta/rc tags
 release = '{DOCGEN_RELEASE}'
 
+# This gets displayed as the root of the navigation path in the header / footer
+short_title = f"{project} {version}"
+
 
 # -- General configuration ---------------------------------------------------
 
@@ -87,6 +90,12 @@ html_theme_options = {
 }
 
 html_sidebars = {'**': ['globaltoc.html', 'searchbox.html']}
+
+html_show_sphinx = False
+
+html_context = {
+    'shorttitle': short_title
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
