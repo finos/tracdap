@@ -73,8 +73,6 @@ class DocGen:
 
         self._log_target()
 
-        version, release = self._get_trac_version()
-
         codegen_exe = "python"
         codegen_args = [
             str(CODEGEN_SCRIPT), "api_doc",
