@@ -9,7 +9,7 @@ storage:
 
     storageType: LOCAL_STORAGE
     storageConfig:
-      rootPath: doc/examples/models/python/data
+      rootPath: examples/models/python/data
 
 sparkSettings:
 
