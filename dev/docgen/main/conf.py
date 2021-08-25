@@ -42,6 +42,7 @@ short_title = f"{project} {version}"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    'sphinx.ext.autosectionlabel',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.napoleon',
@@ -51,6 +52,8 @@ extensions = [
     'cloud_sptheme.ext.relbar_links'
 
 ]
+
+autosectionlabel_prefix_document = True
 
 autoapi_dirs = [
     '../build/doc/code/platform_api'
