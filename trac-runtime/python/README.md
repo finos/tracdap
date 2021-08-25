@@ -75,7 +75,7 @@ Your IDE will be able to generate stubs for the model API (for PyCharm on Window
 press *ctrl + i*). Fill in the stubs to define your inputs, outputs and parameters,
 then you can add your model code in run_model().
 
-For model code examples, look at the [documented model examples for Python](../../doc/examples/models/python).
+For model code examples, look at the [documented model examples for Python](../../examples/models/python).
 We're running these models from CI, so they will work with a runtime built from
 the same version of the code.
 
