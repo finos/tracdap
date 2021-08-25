@@ -71,9 +71,8 @@ The four most common types of object show how a calculation run is expressed on 
    :height: 66px
 
 
-.. seealso::
-    :class:`ObjectType <trac.metadata.ObjectType>`,
-    :class:`ObjectDefinition <trac.metadata.ObjectDefinition>`
+For the full API reference on metadata objects, see the
+:class:`ObjectDefinition class reference <trac.metadata.ObjectDefinition>`.
 
 
 .. rst-class:: html-toggle
@@ -116,16 +115,79 @@ More object types
 Tags
 ----
 
-TODO
 
-.. seealso::
-    :class:`Tag <trac.metadata.Tag>`
+Tags are the core informational element of TRAC’s metadata model, they are used to describe, catalog and
+control objects. Every object has a tag and each tag refers to a single object, i.e. there is a one-to-one
+association.
+
+A tag is made up of:
+
+    * A header that identifies the tag and associated object
+    * A set of attributes (key-value pairs)
+    * The associated object definition
+
+
+
+A tag is a set of attributes (key-value pairs) associated with an object definition, intended for
+storing descriptive and informational data as well as application-level metadata that is not part
+of the object definition model. Here is an example of a set of tag attributes to illustrate some ways
+they can be used::
+
+    # A descriptive field intended for human users.
+
+    display_name: "Customer accounts for March 2020, corrected April 6th"
+
+    # A classification that can be used for searching or indexing.
+    # Client applications can also use this to find datasets of a certain
+    # type; typically an application will define a set of attributes that are
+    # "structural", i.e. the application uses those attributes to decide which
+    # objects to present for certain purposes.
+
+    dataset_class: "customer_accounts"
+
+    # Properties of an item can be added as individual attributes so they can
+    # be searched and displayed individually. This avoids the anti-pattern of
+    # putting multiple attributes into a single name/label field:
+    #    customer_accounts_mar20_scotland_commercial_approved
+
+    accounting_date: (DATE) 2020-03-31
+    region: "Scotland"
+    book: "commercial_property"
+    figures_approved: (BOOLEAN) true
+
+    # Attributes can be multi-valued. This can be helpful for applying
+    # regulatory classifiers, where multiple classifiers may apply to a
+    # single item.
+
+    data_classification: ["confidential", "gdpr_pii", "audited"]
+
+    # TRAC records a number of "controlled" attributes, these are set by the
+    # platform and cannot be modified directly through the metadata API.
+    # Controlled attributes start with the prefix "trac_".
+
+    trac_create_time: (DATETIME) 2020-04-01 10:37:05
+    trac_create_user_id: "jane.doe"
+    trac_create_user_name: "Jane Doe"
+
+For a discussion of how to search the metadata database, see :ref:`metadata_model:queries`.
+
+For the full API reference on metadata tags, see the :class:`Tag class reference <trac.metadata.Tag>`.
 
 
 Versioning
 ----------
 
-TODO
+Tags use immutable versioning in the same way as objects - each version of a tag is immutable and
+“updating” a tag means creating a new version with one or more modified attributes. Each version of
+an object has its own series of tags starting at tag version 1.
+
+As an example of this versioning, consider a partitioned dataset with daily account records. Version X of
+the dataset contains data up to a certain date and might have a tag saying it is signed off. A user/process
+then adds a new partition with the next day’s data, creating version X+1. In this case, object version X
+would still be signed off while version X+1 is awaiting approval. When version X+1 is approved, the tag for
+that version can be “updated”. The application could decide whether to show the most recent version of the
+data, or an earlier version that has the sign-off attribute set.
+
 
 .. seealso::
     :class:`TagHeader <trac.metadata.TagHeader>`
@@ -134,10 +196,35 @@ TODO
 Selectors
 ---------
 
-TODO
+A tag selector refers to a single object ID and identifies a specific object version and tag version for
+that object. They are used throughout the TRAC platform whenever an object is referenced, so it is always
+possible to specify versions using these selection criteria. The available criteria are:
 
-.. seealso::
-    :class:`TagSelector <trac.metadata.TagSelector>`
+    1.  | Select the latest available version
+        | - *Variable selector, will return a different result when an object or tag is updated to a new version*
+
+    2.  | Select a fixed version number
+        | - *Fixed selector, will always return the same result*
+
+    3.  | Select a previous point in time
+        | - *Fixed selector, will always return the same result*
+
+Selectors are used in API calls, for example reading a single object from the metadata API uses a tag selector.
+Sending API calls with selectors referring to a previous point in time allows client applications to display a
+consistent historical view of the platform.
+
+Selectors are also stored in the metadata model to express links between objects. For example, a job definition
+uses tag selectors to identify the inputs and models that will be used to execute the job. In the case of a
+job definition, the selectors are always stored as fixed selectors to indicate the precise object versions
+used; if the user submits a job requesting the latest version of a model or input, TRAC will convert that
+selector to a fixed selector before storing the job definition.
+
+Selectors refer to object and tag versions independently and there is no requirement to use the same selection
+criteria for both. A selector for objectVersion = 3 with latestTag = true is perfectly valid, this could be
+used for example to check the current sign-off state of a particular version of a model.
+
+For the API reference on tag selectors, see the
+:class:`TagSelector class reference <trac.metadata.TagSelector>`.
 
 
 Queries
