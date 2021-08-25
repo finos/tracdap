@@ -8,7 +8,7 @@ Modelling
 
   .. container:: link-block-icon
 
-    .. image:: ../_static/python-logo.svg
+    .. image:: ../_images/logo-python.svg
         :height: 50px
         :align: left
         :alt: Python logo
