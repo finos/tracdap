@@ -2,7 +2,7 @@
 <module type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
-    <content url="file://$MODULE_DIR$/../../doc/examples/models/python" />
+    <content url="file://$MODULE_DIR$/../../examples/models/python" />
     <orderEntry type="module" module-name="python-model-runtime" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>

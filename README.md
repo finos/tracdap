@@ -83,5 +83,5 @@ TRAC metadata structures and available API calls is part included in the API
 
 The TRAC APIs are available in both gRPC / proto (via the metadata service) and
 REST / json (via the platform gateway). You can use a regular REST client such
-as [Postman](https://www.postman.com/) to experiment with the REST API. Examples
-of REST / json API calls are available in doc/examples.
+as [Postman](https://www.postman.com/) to experiment with the REST API. Look in the
+examples folder for [examples of REST / json API calls](./examples/rest_calls).
