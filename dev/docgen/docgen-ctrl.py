@@ -200,6 +200,8 @@ class DocGen:
 
         test_file = model_py_dist.joinpath("hello.txt")
 
+        self._mkdir(model_py_dist)
+
         with open(test_file, "wt") as test_stream:
             test_stream.write("Hello world")
             test_stream.flush()
