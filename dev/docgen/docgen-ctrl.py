@@ -204,7 +204,7 @@ class DocGen:
         # Aug 2021: Running this script with dist_dir = build/doc/modules/.. causes a crash
         # Looks like a very weird bug, perhaps in Python itself? is "doc/modules" a magic string somewhere?
 
-        dist_dir = BUILD_DIR.joinpath("_modules/modules").resolve()
+        dist_dir = BUILD_DIR.joinpath("_static_modules/modules").resolve()
         self._dist_impl(dist_dir)
 
     def _dist_impl(self, dist_dir):

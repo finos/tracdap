@@ -160,5 +160,5 @@ html_context = {
 html_extra_path = []
 
 if ON_RTD:
-    modules_dir = ROOT_DIR.joinpath("build/doc/_modules")
+    modules_dir = ROOT_DIR.joinpath("build/doc/_static_modules")
     html_extra_path.append(modules_dir)
