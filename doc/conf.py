@@ -20,7 +20,71 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 import pathlib
+import platform
 import subprocess as sp
+import os
+import re
+
+ROOT_DIR = pathlib.Path(__file__) \
+    .parent \
+    .joinpath("..") \
+    .resolve()
+
+
+def get_version_and_release():
+
+    if platform.system().lower().startswith("win"):
+
+        version_script = ROOT_DIR.joinpath("dev/version.ps1")
+
+        version_exe = "powershell.exe"
+        version_args = [
+            version_exe,
+            "-ExecutionPolicy", "Bypass",
+            "-File", str(version_script)]
+
+    else:
+
+        version_exe = ROOT_DIR.joinpath("dev/version.sh")
+        version_args = []
+
+    # Try to find version_exe in the environment PATH
+    # Python will not do this automatically!!
+
+    path_env = os.environ["PATH"]
+    path_split = ";" if platform.system().lower().startswith("win") else ":"
+    path_dirs = path_env.split(path_split)
+
+    exe_paths = map(lambda p: pathlib.Path(p).joinpath(version_exe), path_dirs)
+    exe_path = next(filter(lambda p: p.exists(), exe_paths))
+
+    version_result = sp.run(executable=exe_path, args=version_args, capture_output=True)
+    version_output = version_result.stdout.decode("utf-8").strip()
+    version_ = re.sub(r"[+-].+$", "", version_output)
+    release_ = re.sub(r"\+.+$", " + DEV", version_output)
+
+    print(f"Detected version: {version_}")
+    print(f"Detected release: {release_}")
+
+    return version_, release_
+
+
+def run_main_codegen():
+
+    print("Running codegen for main doc target...")
+
+    docgen_script_path = ROOT_DIR.joinpath("dev/docgen/docgen-ctrl.py")
+    sp.run(["python", str(docgen_script_path), "main_codegen"])
+
+
+def config_init_hook(app, config):  # noqa
+
+    print("Running Sphinx config hook...")
+    run_main_codegen()
+
+
+def setup(app):
+    app.connect('config-inited', config_init_hook)
 
 
 # -- Project information -----------------------------------------------------
@@ -29,14 +93,12 @@ project = 'TRAC'
 copyright = '2021, Accenture'  # noqa
 author = 'Martin Traverse'
 
-# The point version, excluding any pre-release or build info
-version = '{DOCGEN_VERSION}'
-
-# The full version, including alpha/beta/rc tags
-release = '{DOCGEN_RELEASE}'
+v_, r_ = get_version_and_release()
+version = v_
+release = r_
 
 # This gets displayed as the root of the navigation path in the header / footer
-short_title = f"{project} {version}"
+short_title = f"{project} {release}"
 
 
 # -- General configuration ---------------------------------------------------
@@ -107,17 +169,3 @@ html_context = {
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 # html_static_path = ['_static']
-
-
-def config_init_hook(app, config):  # noqa
-
-    print("Running Sphinx config hook")
-
-    root_path = pathlib.Path(__file__).parent.parent
-    docgen_script_path = root_path.joinpath("dev/docgen/docgen-ctrl.py")
-
-    sp.run(["python", str(docgen_script_path), "codegen_main"])
-
-
-def setup(app):
-    app.connect('config-inited', config_init_hook)
