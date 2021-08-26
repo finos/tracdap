@@ -43,6 +43,8 @@ if ON_RTD:
         docgen.python_runtime_codegen()
         docgen.python_runtime_sphinx()
 
+        # In order to use html_extra_path to pick up modules,
+        # run dist_rtd before continuing the build
         docgen.dist_rtd()
 
     def copy_dependencies():
@@ -158,5 +160,5 @@ html_context = {
 html_extra_path = []
 
 if ON_RTD:
-    modules_dir = ROOT_DIR.joinpath("build/doc/modules")
+    modules_dir = ROOT_DIR.joinpath("build/doc/_modules")
     html_extra_path.append(modules_dir)

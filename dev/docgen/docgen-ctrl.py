@@ -201,7 +201,10 @@ class DocGen:
         # For RTD builds, copy modules to a folder that is configured in conf.py as html_extra_path
         # Sphinx will copy them under the final build tree
 
-        dist_dir = BUILD_DIR.joinpath("modules/modules").resolve()
+        # Aug 2021: Running this script with dist_dir = build/doc/modules/.. causes a crash
+        # Looks like a very weird bug, perhaps in Python itself? is "doc/modules" a magic string somewhere?
+
+        dist_dir = BUILD_DIR.joinpath("_modules/modules").resolve()
         self._dist_impl(dist_dir)
 
     def _dist_impl(self, dist_dir):
@@ -213,9 +216,12 @@ class DocGen:
         #
         # self._cp_tree(model_py_html, model_py_dist)
 
-        test_file = dist_dir.joinpath("index.html")
+        test_file = dist_dir.joinpath("index.html").resolve()
 
         self._mkdir(dist_dir)
+
+        print("made dir")
+        print(test_file)
 
         with open(test_file, "wt") as test_stream:
             test_stream.write("Hello world")
