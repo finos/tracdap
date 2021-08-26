@@ -43,9 +43,11 @@ if ON_RTD:
         docgen.python_runtime_codegen()
         docgen.python_runtime_sphinx()
 
+        docgen.dist_rtd()
+
     def copy_dependencies():
 
-        docgen.dist_rtd()
+        pass
 
     def config_init_hook(app, config):  # noqa
 
