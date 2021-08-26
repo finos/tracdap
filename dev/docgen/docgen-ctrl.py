@@ -191,7 +191,7 @@ class DocGen:
 
         # For local builds, dist by copying modules directly under the main html dir
 
-        dist_dir = BUILD_DIR.joinpath("main/html/modules").resolve()
+        dist_dir = BUILD_DIR.joinpath("main/html/modules")
         self._dist_impl(dist_dir)
 
     def dist_rtd(self):
@@ -204,7 +204,7 @@ class DocGen:
         # Aug 2021: Running this script with dist_dir = build/doc/modules/.. causes a crash
         # Looks like a very weird bug, perhaps in Python itself? is "doc/modules" a magic string somewhere?
 
-        dist_dir = BUILD_DIR.joinpath("_static_modules/modules").resolve()
+        dist_dir = BUILD_DIR.joinpath("dist/modules")
         self._dist_impl(dist_dir)
 
     def _dist_impl(self, dist_dir):
@@ -216,7 +216,7 @@ class DocGen:
         #
         # self._cp_tree(model_py_html, model_py_dist)
 
-        test_file = dist_dir.joinpath("index.html").resolve()
+        test_file = dist_dir.joinpath("index.html")
 
         self._mkdir(dist_dir)
 
