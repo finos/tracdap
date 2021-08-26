@@ -83,13 +83,13 @@ class DocGen:
 
         self._run_subprocess(codegen_exe, codegen_args)
 
-        self._process_sphinx_conf(SCRIPT_DIR.joinpath("main/conf.py"))
+        self._process_sphinx_conf(DOC_DIR.joinpath("conf.py"))
 
         sphinx_exe = 'sphinx-build'
         sphinx_src = DOC_DIR
         sphinx_dst = BUILD_DIR.joinpath('main').resolve()
-        sphinx_cfg = BUILD_DIR.joinpath('sphinx').resolve()
-        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
+        # sphinx_cfg = BUILD_DIR.joinpath('sphinx').resolve()
+        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}']  # , '-c', f"{sphinx_cfg}"]
 
         self._mkdir(sphinx_dst)
         self._run_subprocess(sphinx_exe, sphinx_args)
