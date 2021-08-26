@@ -223,14 +223,68 @@ Selectors refer to object and tag versions independently and there is no require
 criteria for both. A selector for objectVersion = 3 with latestTag = true is perfectly valid, this could be
 used for example to check the current sign-off state of a particular version of a model.
 
-For the API reference on tag selectors, see the
-:class:`TagSelector class reference <trac.metadata.TagSelector>`.
+For the full API reference on tag selectors, see the reference page for
+:class:`TagSelector <trac.metadata.TagSelector>`.
 
 
 Queries
 -------
 
-TODO
+The TRAC metadata can be searched using logical expressions to match against tag attributes. Version
+and/or timestamp information can also be included as search parameters. It is not possible to search the
+contents of an object definition; any properties of an object that are needed for searching must be set
+as tag attributes to make them available for metadata queries.
 
-.. seealso::
-    :class:`SearchParameters <trac.metadata.SearchParameters>`
+A search expression is a logical combination of search terms that can be built up as an expression tree.
+The logical operators available are AND, OR and NOT. A search term matches an individual attribute using
+one of the available search operators.
+
+
+.. list-table::
+    :header-rows: 1
+    :widths: 75 500
+
+    *
+        - Operator
+        - Meaning
+
+    *   - **EQ** ==
+        -   | Matches an attribute exactly. The attribute must be present and have the correct type and value.
+              If the attribute is multi-valued, EQ will match if any of the values match.
+            | *EQ may behave erratically for floating point attributes, using EQ, NE or IN with float values
+              is not recommended.*
+
+    *   - **NE** !=
+        -   The logical inverse of EQ, matches precisely when EQ does not match. If the search attribute is
+            not present, NE will match. If the search attribute is multi-value, NE will match only when none
+            of the values match.
+
+    *   - **IN**
+        -   attr IN [a, b, c] is equivalent to attr == a OR attr = b OR attr = c. If the attribute is multi-
+            valued, IN will match if any of the search values match any of the attribute values.
+
+    *   -
+            | **GT** >
+            | **GE** >=
+            | **LT** <
+            | **LE** <=
+
+        -   Ordered comparisons, for ordered data types only. The attribute must be present and the type must
+            match the search type (comparing an integer to a float, or a date to a date-time value will not match).
+            Ordered comparisons will never match if the search attribute is multi-valued.
+
+
+By default, only the latest versions of objects and tags are considered in a search. Even if a prior version
+of an object or tag version would have matched, that prior version is not considered. There are options in the
+search parameters to include prior versions, in which case all matching versions of an object or tag will be
+returned.
+
+All searches can optionally be run as-of a previous point in time, which will cause the search to ignore
+metadata generated after that time. These searches still have the option to include prior versions if
+required. Using this feature allows clients to show a consistent historical view of the platform for
+functionality that relies on metadata queries.
+
+For the full API reference on metadata searches, see the reference pages for
+:class:`SearchParameters <trac.metadata.SearchParameters>`
+and
+:meth:`TracMetadataApi.search() <trac.api.TracMetadataApi.search>`.
