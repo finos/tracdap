@@ -25,4 +25,4 @@ python:
 
 # Build the "main" set of documentation (this should really be "root" or "dist")
 sphinx:
-  configuration: dev/docgen/main/conf.py
+  configuration: doc/conf.py
