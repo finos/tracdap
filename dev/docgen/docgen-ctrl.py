@@ -194,7 +194,15 @@ class DocGen:
         model_py_html = BUILD_DIR.joinpath("modelling_python/html")
         model_py_dist = main_dist.joinpath("modelling/python")
 
-        self._cp_tree(model_py_html, model_py_dist)
+        self._log.info(f"PY dist: {model_py_dist}")
+
+        # self._cp_tree(model_py_html, model_py_dist)
+
+        test_file = model_py_dist.joinpath("hello.txt")
+
+        with open(test_file, "wt") as test_stream:
+            test_stream.write("Hello world")
+            test_stream.flush()
 
     def get_version_and_release(self):
 
