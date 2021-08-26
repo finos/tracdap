@@ -21,6 +21,7 @@
 
 import pathlib
 import subprocess as sp
+import platform
 import os
 import re
 
@@ -54,20 +55,40 @@ if ON_RTD:
 
 def rtd_get_version_and_release():
 
-    rtd_raw_version = os.environ["READTHEDOCS_VERSION"]
+    sp.run(["git", "fetch", "--tags"])
 
-    if rtd_raw_version == "latest":
-        return rtd_raw_version, "(dev latest)"
+    if platform.system().lower().startswith("win"):
 
-    version_tag_pattern = re.compile(r"v(\d.*)")
-    version_tag_match = version_tag_pattern.match(rtd_raw_version)
+        version_script = ROOT_DIR.joinpath("dev/version.ps1")
 
-    if not version_tag_match:
-        raise RuntimeError("Unexpected version format")
+        version_exe = "powershell.exe"
+        version_args = [
+            version_exe,
+            "-ExecutionPolicy", "Bypass",
+            "-File", str(version_script)]
 
-    full_release_number = version_tag_match.group(1)
-    version_ = re.sub(r"[+-].+$", "", full_release_number)
-    release_ = re.sub(r"\+.+$", " + DEV", full_release_number)
+    else:
+
+        version_exe = ROOT_DIR.joinpath("dev/version.sh")
+        version_args = []
+
+        # Try to find version_exe in the environment PATH
+        # Python will not do this automatically!!
+
+    path_env = os.environ["PATH"]
+    path_split = ";" if platform.system().lower().startswith("win") else ":"
+    path_dirs = path_env.split(path_split)
+
+    exe_paths = map(lambda p: pathlib.Path(p).joinpath(version_exe), path_dirs)
+    exe_path = next(filter(lambda p: p.exists(), exe_paths))
+
+    version_result = sp.run(executable=exe_path, args=version_args, capture_output=True)
+    version_output = version_result.stdout.decode("utf-8").strip()
+    version_ = re.sub(r"[+-].+$", "", version_output)
+    release_ = re.sub(r"\+.+$", " + DEV", version_output)
+
+    print(f"Detected version: {version_}")
+    print(f"Detected release: {release_}")
 
     return version_, release_
 
