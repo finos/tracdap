@@ -2,6 +2,9 @@
 Getting Started with TRAC
 =========================
 
+.. centered::
+    *A next-generation data and analytics platform for use in highly regulated environments*
+
 
 :doc:`metadata_model`
 
