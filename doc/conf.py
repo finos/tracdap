@@ -19,11 +19,14 @@
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+import pathlib
+import subprocess as sp
+
 
 # -- Project information -----------------------------------------------------
 
 project = 'TRAC'
-copyright = '2021, Accenture'
+copyright = '2021, Accenture'  # noqa
 author = 'Martin Traverse'
 
 # The point version, excluding any pre-release or build info
@@ -104,3 +107,17 @@ html_context = {
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 # html_static_path = ['_static']
+
+
+def config_init_hook(app, config):  # noqa
+
+    print("Running Sphinx config hook")
+
+    root_path = pathlib.Path(__file__).parent.parent
+    docgen_script_path = root_path.joinpath("dev/docgen/docgen-ctrl.py")
+
+    sp.run(["python", str(docgen_script_path), "codegen_main"])
+
+
+def setup(app):
+    app.connect('config-inited', config_init_hook)
