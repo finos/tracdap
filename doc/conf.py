@@ -150,6 +150,11 @@ html_context = {
 # so a file named "default.css" will overwrite the builtin "default.css".
 # html_static_path = ['_static']
 
-html_static_path = [
-    '../build/doc/modelling_python/html'
-]
+# For RTD builds, docgen.dist_rtd() copies modules to this folder that is set as html_extra_path
+# Sphinx will copy them under the final build tree
+
+html_extra_path = []
+
+if ON_RTD:
+    modules_dir = ROOT_DIR.joinpath("build/doc/modules")
+    html_extra_path.append(modules_dir)

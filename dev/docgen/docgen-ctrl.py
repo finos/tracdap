@@ -189,18 +189,33 @@ class DocGen:
 
         self._log_target()
 
-        main_dist = BUILD_DIR.joinpath("main/html").resolve()
+        # For local builds, dist by copying modules directly under the main html dir
 
-        model_py_html = BUILD_DIR.joinpath("modelling_python/html")
-        model_py_dist = main_dist.joinpath("modelling/python")
+        dist_dir = BUILD_DIR.joinpath("main/html/modules").resolve()
+        self._dist_impl(dist_dir)
 
-        self._log.info(f"PY dist: {model_py_dist}")
+    def dist_rtd(self):
 
+        self._log_target()
+
+        # For RTD builds, copy modules to a folder that is configured in conf.py as html_extra_path
+        # Sphinx will copy them under the final build tree
+
+        dist_dir = BUILD_DIR.joinpath("modules/modules").resolve()
+        self._dist_impl(dist_dir)
+
+    def _dist_impl(self, dist_dir):
+
+        # model_py_html = BUILD_DIR.joinpath("modelling_python/html")
+        # model_py_dist = BUILD_DIR.joinpath("_static/modelling/python")
+        #
+        # self._log.info(f"PY dist: {model_py_dist}")
+        #
         # self._cp_tree(model_py_html, model_py_dist)
 
-        test_file = model_py_dist.joinpath("hello.txt")
+        test_file = dist_dir.joinpath("hello.txt")
 
-        self._mkdir(model_py_dist)
+        self._mkdir(dist_dir)
 
         with open(test_file, "wt") as test_stream:
             test_stream.write("Hello world")
