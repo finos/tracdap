@@ -45,6 +45,19 @@ CODEGEN_SCRIPT = ROOT_DIR \
 
 class DocGen:
 
+    """
+
+    Control the build of documentation, including API auto documentation and content held in doc/.
+
+    This script is intended as a master control script for building documentation, running the targets
+    "clean all dist" will produce a full, clean build of the documentation under build/doc/main/html.
+
+    ReadTheDocs (RTD) uses an automated build system that starts by invoking Sphinx. So, the conf.py
+    file for the main Sphinx project includes calls back into this script when running on RTD. Calls
+    are made to the individual targets, excluding main_sphinx which is already being executed by RTD.
+
+    """
+
     def __init__(self):
 
         logging_format = f"%(asctime)s %(levelname)s %(name)s - %(message)s"
@@ -62,31 +75,21 @@ class DocGen:
 
         self._log_target()
 
-        self.modelling_python()
+        self.python_runtime_codegen()
+        self.main_codegen()
 
-        self.main()
+        self.python_runtime_sphinx()
+        self.main_sphinx()
 
     def main(self):
 
-        # Include generation of the core platform API (i.e. everything defined in the API .proto files)
-        # Do not include runtime packages, APIs in other languages or indexing of implementation code
-
-        self._log_target()
-
         self.main_codegen()
-
-        self._process_sphinx_conf(DOC_DIR.joinpath("conf.py"))
-
-        sphinx_exe = 'sphinx-build'
-        sphinx_src = DOC_DIR
-        sphinx_dst = BUILD_DIR.joinpath('main').resolve()
-        sphinx_cfg = BUILD_DIR.joinpath('sphinx').resolve()
-        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
-
-        self._mkdir(sphinx_dst)
-        self._run_subprocess(sphinx_exe, sphinx_args)
+        self.main_sphinx()
 
     def main_codegen(self):
+
+        # Include generation of the core platform API (i.e. everything defined in the API .proto files)
+        # Do not include runtime packages, APIs in other languages or indexing of implementation code
 
         self._log_target()
 
@@ -100,7 +103,26 @@ class DocGen:
 
         self._run_subprocess(codegen_exe, codegen_args)
 
-    def modelling_python(self):
+    def main_sphinx(self):
+
+        # Assume main_codegen has already been run, either by docgen or by sphinx
+
+        self._log_target()
+
+        sphinx_exe = 'sphinx-build'
+        sphinx_src = DOC_DIR
+        sphinx_dst = BUILD_DIR.joinpath('main').resolve()
+        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}']
+
+        self._mkdir(sphinx_dst)
+        self._run_subprocess(sphinx_exe, sphinx_args)
+
+    def python_runtime(self):
+
+        self.python_runtime_codegen()
+        self.python_runtime_sphinx()
+
+    def python_runtime_codegen(self):
 
         self._log_target()
 
@@ -149,14 +171,16 @@ class DocGen:
         self._run_subprocess(codegen_exe, codegen_args)
         self._mv(doc_src.joinpath('trac/metadata'), doc_src.joinpath('trac/rt/metadata'))
 
-        self._process_sphinx_conf(SCRIPT_DIR.joinpath("modelling_python/conf.py"))
+    def python_runtime_sphinx(self):
 
-        # Now everything is set up, run the Sphinx autoapi generator
+        # Assume python_runtime_codegen has already been run
+
+        self._log_target()
+
         sphinx_exe = 'sphinx-build'
         sphinx_src = DOC_DIR.joinpath('modelling/python').resolve()
         sphinx_dst = BUILD_DIR.joinpath('modelling_python').resolve()
-        sphinx_cfg = BUILD_DIR.joinpath('sphinx').resolve()
-        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
+        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}']
 
         self._mkdir(sphinx_dst)
         self._run_subprocess(sphinx_exe, sphinx_args)
@@ -165,44 +189,16 @@ class DocGen:
 
         self._log_target()
 
-        main_html = BUILD_DIR.joinpath("main/html").resolve()
-        main_dist = BUILD_DIR.joinpath("dist")
-
-        self._cp_tree(main_html, main_dist)
+        main_dist = BUILD_DIR.joinpath("main/html").resolve()
 
         model_py_html = BUILD_DIR.joinpath("modelling_python/html")
         model_py_dist = main_dist.joinpath("modelling/python")
 
         self._cp_tree(model_py_html, model_py_dist)
 
-    def _log_target(self):
+    def get_version_and_release(self):
 
-        target_frame = inspect.stack()[1]  # Calling function is frame index 1
-        target_name = target_frame.function
-
-        self._log.info(f"Building target [{target_name}]")
-
-    def _process_sphinx_conf(self, conf_path):
-
-        dest_path = BUILD_DIR.joinpath("sphinx/conf.py")
-
-        self._rm_tree(BUILD_DIR.joinpath("sphinx"))
-        self._mkdir(BUILD_DIR.joinpath("sphinx"))
-        self._cp(conf_path, dest_path)
-
-        version, release = self._get_trac_version()
-
-        self._log.info("* Setting version / release in Sphinx config...")
-
-        for line in fileinput.input(dest_path, inplace=True):
-            if "{DOCGEN_VERSION}" in line:
-                print(line.replace("{DOCGEN_VERSION}", version), end="")
-            elif "{DOCGEN_RELEASE}" in line:
-                print(line.replace("{DOCGEN_RELEASE}", release), end="")
-            else:
-                print(line, end="")
-
-    def _get_trac_version(self):
+        self._log_target()
 
         if "_version" in self.__dict__ and "_release" in self.__dict__:
             return getattr(self, "_version"), getattr(self, "_release")
@@ -231,10 +227,17 @@ class DocGen:
         self._log.info(f"TRAC version: {version}")
         self._log.info(f"TRAC release: {release}")
 
-        self._version = version
-        self._release = release
+        self._version = version  # noqa
+        self._release = release  # noqa
 
         return version, release
+
+    def _log_target(self):
+
+        target_frame = inspect.stack()[1]  # Calling function is frame index 1
+        target_name = target_frame.function
+
+        self._log.info(f"Building target [{target_name}]")
 
     def _touch(self, tgt):
 
@@ -333,15 +336,17 @@ def _find_targets(doc_gen: DocGen):
     return targets
 
 
-_doc_gen = DocGen()
-_targets = _find_targets(_doc_gen)
+if __name__ == "__main__":
 
-parser = argparse.ArgumentParser(description='Documentation generator')
-parser.add_argument(
-    'targets', type=str, metavar="target", choices=list(_targets.keys()), nargs='+',
-    help='The documentation targets to build')
+    _doc_gen = DocGen()
+    _targets = _find_targets(_doc_gen)
 
-args = parser.parse_args()
+    parser = argparse.ArgumentParser(description='Documentation generator')
+    parser.add_argument(
+        'targets', type=str, metavar="target", choices=list(_targets.keys()), nargs='+',
+        help='The documentation targets to build')
 
-for target in args.targets:
-    _targets[target].__call__()
+    args = parser.parse_args()
+
+    for target in args.targets:
+        _targets[target].__call__()

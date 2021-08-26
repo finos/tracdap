@@ -11,27 +11,41 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
-# Configuration file for the Sphinx documentation builder.
 #
-# This file only contains a selection of the most common options. For a full
-# list see the documentation:
-# https://www.sphinx-doc.org/en/master/usage/configuration.html
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
 
 import sphinx_rtd_theme
+import os
+
+import importlib.util
+docgen_spec = importlib.util.spec_from_file_location("docgen", "../../../dev/docgen/docgen-ctrl.py")
+docgen_module = importlib.util.module_from_spec(docgen_spec)
+docgen_spec.loader.exec_module(docgen_module)
+docgen = docgen_module.DocGen()  # noqa
+
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 
 
 # -- Project information -----------------------------------------------------
 
 project = 'TRAC Runtime (Python)'
-copyright = '2021, Accenture'
+copyright = '2021, Accenture'  # noqa
 author = 'Martin Traverse'
 
-# The point version, excluding any pre-release or build info
-version = '{DOCGEN_VERSION}'
-
-# The full version, including alpha/beta/rc tags
-release = '{DOCGEN_RELEASE}'
+v_, r_ = docgen.get_version_and_release()
+version = v_
+release = r_
 
 
 # -- General configuration ---------------------------------------------------

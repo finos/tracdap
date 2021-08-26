@@ -12,85 +12,53 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-
-# Configuration file for the Sphinx documentation builder.
-#
-# This file only contains a selection of the most common options. For a full
-# list see the documentation:
-# https://www.sphinx-doc.org/en/master/usage/configuration.html
-
 import pathlib
 import subprocess as sp
-import platform
 import os
-import re
+
+import importlib.util
+docgen_spec = importlib.util.spec_from_file_location("docgen", "../dev/docgen/docgen-ctrl.py")
+docgen_module = importlib.util.module_from_spec(docgen_spec)
+docgen_spec.loader.exec_module(docgen_module)
+docgen = docgen_module.DocGen()  # noqa
+
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 
 ROOT_DIR = pathlib.Path(__file__) \
     .parent \
     .joinpath("..") \
     .resolve()
 
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+DOCGEN_SCRIPT = str(ROOT_DIR.joinpath("dev/docgen/docgen-ctrl.py"))
 
+
+# Running on RTD, Sphinx build for the root docs is the main entry point
+# So, we need to call back into docgen to build all the other parts of the documentation
 
 if ON_RTD:
 
-    def run_main_codegen():
+    def build_dependencies():
 
-        print("Running codegen for main doc target...")
+        docgen.main_codegen()
+        docgen.python_runtime_codegen()
+        docgen.python_runtime_sphinx()
 
-        docgen_script_path = ROOT_DIR.joinpath("dev/docgen/docgen-ctrl.py")
-        sp.run(["python", str(docgen_script_path), "main_codegen"])
+    def copy_dependencies():
 
+        docgen.dist()
 
     def config_init_hook(app, config):  # noqa
 
-        print("Running Sphinx config hook...")
-        run_main_codegen()
+        build_dependencies()
 
+    def build_finished_hook(app, error):  # noqa
+
+        if not error:
+            copy_dependencies()
 
     def setup(app):
         app.connect('config-inited', config_init_hook)
-
-
-def rtd_get_version_and_release():
-
-    sp.run(["git", "fetch", "--tags"])
-
-    if platform.system().lower().startswith("win"):
-
-        version_script = ROOT_DIR.joinpath("dev/version.ps1")
-
-        version_exe = "powershell.exe"
-        version_args = [
-            version_exe,
-            "-ExecutionPolicy", "Bypass",
-            "-File", str(version_script)]
-
-    else:
-
-        version_exe = ROOT_DIR.joinpath("dev/version.sh")
-        version_args = []
-
-        # Try to find version_exe in the environment PATH
-        # Python will not do this automatically!!
-
-    path_env = os.environ["PATH"]
-    path_split = ";" if platform.system().lower().startswith("win") else ":"
-    path_dirs = path_env.split(path_split)
-
-    exe_paths = map(lambda p: pathlib.Path(p).joinpath(version_exe), path_dirs)
-    exe_path = next(filter(lambda p: p.exists(), exe_paths))
-
-    version_result = sp.run(executable=exe_path, args=version_args, capture_output=True)
-    version_output = version_result.stdout.decode("utf-8").strip()
-    version_ = re.sub(r"[+-].+$", "", version_output)
-    release_ = re.sub(r"\+.+$", " + DEV", version_output)
-
-    print(f"Detected version: {version_}")
-    print(f"Detected release: {release_}")
-
-    return version_, release_
+        app.connect('build-finished', build_finished_hook)
 
 
 # -- Project information -----------------------------------------------------
@@ -99,14 +67,15 @@ project = 'TRAC'
 copyright = '2021, Accenture'  # noqa
 author = 'Martin Traverse'
 
+# ReadTheDocs does not fetch tags by default and we need them to get version information
+# Only needed in the root config
 if ON_RTD:
-    v_, r_ = rtd_get_version_and_release()
-    version = v_
-    release = r_
+    sp.run(["git", "fetch", "--tags"])
 
-else:
-    version = "{DOCGEN_VERSION}"
-    release = "{DOCGEN_RELEASE}"
+v_, r_ = docgen.get_version_and_release()
+version = v_
+release = r_
+
 
 # This gets displayed as the root of the navigation path in the header / footer
 short_title = f"{project} {release}"
@@ -180,3 +149,7 @@ html_context = {
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 # html_static_path = ['_static']
+
+html_static_path = [
+    '../build/doc/modelling_python/html'
+]
