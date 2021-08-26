@@ -102,3 +102,12 @@ html_theme = 'sphinx_rtd_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
+
+if ON_RTD:
+
+    html_js_files = [
+        ('https://assets.readthedocs.org/static/javascript/readthedocs-doc-embed.js', {'async': 'async'})]
+
+    html_css_files = [
+        "https://assets.readthedocs.org/static/css/readthedocs-doc-embed.css"]
