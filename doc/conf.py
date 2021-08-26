@@ -20,7 +20,6 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 import pathlib
-import platform
 import subprocess as sp
 import os
 import re
@@ -30,61 +29,47 @@ ROOT_DIR = pathlib.Path(__file__) \
     .joinpath("..") \
     .resolve()
 
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 
-def get_version_and_release():
 
-    if platform.system().lower().startswith("win"):
+if ON_RTD:
 
-        version_script = ROOT_DIR.joinpath("dev/version.ps1")
+    def run_main_codegen():
 
-        version_exe = "powershell.exe"
-        version_args = [
-            version_exe,
-            "-ExecutionPolicy", "Bypass",
-            "-File", str(version_script)]
+        print("Running codegen for main doc target...")
 
-    else:
+        docgen_script_path = ROOT_DIR.joinpath("dev/docgen/docgen-ctrl.py")
+        sp.run(["python", str(docgen_script_path), "main_codegen"])
 
-        version_exe = ROOT_DIR.joinpath("dev/version.sh")
-        version_args = []
 
-    # Try to find version_exe in the environment PATH
-    # Python will not do this automatically!!
+    def config_init_hook(app, config):  # noqa
 
-    path_env = os.environ["PATH"]
-    path_split = ";" if platform.system().lower().startswith("win") else ":"
-    path_dirs = path_env.split(path_split)
+        print("Running Sphinx config hook...")
+        run_main_codegen()
 
-    exe_paths = map(lambda p: pathlib.Path(p).joinpath(version_exe), path_dirs)
-    exe_path = next(filter(lambda p: p.exists(), exe_paths))
 
-    version_result = sp.run(executable=exe_path, args=version_args, capture_output=True)
-    version_output = version_result.stdout.decode("utf-8").strip()
-    version_ = re.sub(r"[+-].+$", "", version_output)
-    release_ = re.sub(r"\+.+$", " + DEV", version_output)
+    def setup(app):
+        app.connect('config-inited', config_init_hook)
 
-    print(f"Detected version: {version_}")
-    print(f"Detected release: {release_}")
+
+def rtd_get_version_and_release():
+
+    rtd_raw_version = os.environ["READTHEDOCS_VERSION"]
+
+    if rtd_raw_version == "latest":
+        return rtd_raw_version, "(dev latest)"
+
+    version_tag_pattern = re.compile(r"v(\d.*)")
+    version_tag_match = version_tag_pattern.match(rtd_raw_version)
+
+    if not version_tag_match:
+        raise RuntimeError("Unexpected version format")
+
+    full_release_number = version_tag_match.group(1)
+    version_ = re.sub(r"[+-].+$", "", full_release_number)
+    release_ = re.sub(r"\+.+$", " + DEV", full_release_number)
 
     return version_, release_
-
-
-def run_main_codegen():
-
-    print("Running codegen for main doc target...")
-
-    docgen_script_path = ROOT_DIR.joinpath("dev/docgen/docgen-ctrl.py")
-    sp.run(["python", str(docgen_script_path), "main_codegen"])
-
-
-def config_init_hook(app, config):  # noqa
-
-    print("Running Sphinx config hook...")
-    run_main_codegen()
-
-
-def setup(app):
-    app.connect('config-inited', config_init_hook)
 
 
 # -- Project information -----------------------------------------------------
@@ -93,9 +78,14 @@ project = 'TRAC'
 copyright = '2021, Accenture'  # noqa
 author = 'Martin Traverse'
 
-v_, r_ = get_version_and_release()
-version = v_
-release = r_
+if ON_RTD:
+    v_, r_ = rtd_get_version_and_release()
+    version = v_
+    release = r_
+
+else:
+    version = "{DOCGEN_VERSION}"
+    release = "{DOCGEN_RELEASE}"
 
 # This gets displayed as the root of the navigation path in the header / footer
 short_title = f"{project} {release}"

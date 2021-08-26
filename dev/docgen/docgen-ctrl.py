@@ -73,23 +73,15 @@ class DocGen:
 
         self._log_target()
 
-        codegen_exe = "python"
-        codegen_args = [
-            str(CODEGEN_SCRIPT), "api_doc",
-            "--proto_path", "trac-api/trac-services/src/main/proto",
-            "--proto_path", "trac-api/trac-metadata/src/main/proto",
-            "--out", "build/doc/code/platform_api",
-            "--package", "trac"]
+        self.main_codegen()
 
-        # self._run_subprocess(codegen_exe, codegen_args)
-
-        # self._process_sphinx_conf(DOC_DIR.joinpath("conf.py"))
+        self._process_sphinx_conf(DOC_DIR.joinpath("conf.py"))
 
         sphinx_exe = 'sphinx-build'
         sphinx_src = DOC_DIR
         sphinx_dst = BUILD_DIR.joinpath('main').resolve()
-        # sphinx_cfg = BUILD_DIR.joinpath('sphinx').resolve()
-        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}']  # , '-c', f"{sphinx_cfg}"]
+        sphinx_cfg = BUILD_DIR.joinpath('sphinx').resolve()
+        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}', '-c', f"{sphinx_cfg}"]
 
         self._mkdir(sphinx_dst)
         self._run_subprocess(sphinx_exe, sphinx_args)
