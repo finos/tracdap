@@ -22,7 +22,7 @@ docgen_module = importlib.util.module_from_spec(docgen_spec)
 docgen_spec.loader.exec_module(docgen_module)
 docgen = docgen_module.DocGen()  # noqa
 
-ON_RTD = True  # os.environ.get('READTHEDOCS') == 'True'
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 
 ROOT_DIR = pathlib.Path(__file__) \
     .parent \
@@ -161,4 +161,4 @@ html_extra_path = []
 
 if ON_RTD:
     modules_dir = ROOT_DIR.joinpath("build/doc/dist")
-    html_extra_path.append(modules_dir)
+    html_extra_path.append(str(modules_dir))

@@ -201,31 +201,29 @@ class DocGen:
         # For RTD builds, copy modules to a folder that is configured in conf.py as html_extra_path
         # Sphinx will copy them under the final build tree
 
-        # Aug 2021: Running this script with dist_dir = build/doc/modules/.. causes a crash
-        # Looks like a very weird bug, perhaps in Python itself? is "doc/modules" a magic string somewhere?
-
         dist_dir = BUILD_DIR.joinpath("dist/modules")
         self._dist_impl(dist_dir)
 
     def _dist_impl(self, dist_dir):
 
-        # model_py_html = BUILD_DIR.joinpath("modelling_python/html")
-        # model_py_dist = BUILD_DIR.joinpath("_static/modelling/python")
+        model_py_html = BUILD_DIR.joinpath("modelling_python/html")
+        model_py_dist = dist_dir.joinpath("runtime/python")
+
+        self._log.info(f"PY dist: {model_py_dist}")
+        self._cp_tree(model_py_html, model_py_dist)
+
+        print("done")
+
+        # test_file = dist_dir.joinpath("index.html")
         #
-        # self._log.info(f"PY dist: {model_py_dist}")
+        # self._mkdir(dist_dir)
         #
-        # self._cp_tree(model_py_html, model_py_dist)
-
-        test_file = dist_dir.joinpath("index.html")
-
-        self._mkdir(dist_dir)
-
-        print("made dir")
-        print(test_file)
-
-        with open(test_file, "wt") as test_stream:
-            test_stream.write("Hello world")
-            test_stream.flush()
+        # print("made dir")
+        # print(test_file)
+        #
+        # with open(test_file, "wt") as test_stream:
+        #     test_stream.write("Hello world")
+        #     test_stream.flush()
 
     def get_version_and_release(self):
 
