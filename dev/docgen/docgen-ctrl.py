@@ -213,7 +213,7 @@ class DocGen:
         #
         # self._cp_tree(model_py_html, model_py_dist)
 
-        test_file = dist_dir.joinpath("hello.txt")
+        test_file = dist_dir.joinpath("index.html")
 
         self._mkdir(dist_dir)
 
