@@ -16,11 +16,11 @@ TODO: Intro to the model runtime for Python
 .. raw:: html
 
     <script type="text/javascript" >
+
         var script = document.createElement('script');
-        script.onload = function () {
-            //do stuff with the script
-        };
         script.src = "https://assets.readthedocs.org/static/javascript/readthedocs-doc-embed.js";
+        script.crossOrigin = 'anonymous';
 
         document.head.appendChild(script);
+
     </script>
