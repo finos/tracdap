@@ -186,4 +186,4 @@ jobs:
       - name: Run all docgen targets
         run: |
           cd dev/
-          python docgen/docgen-ctrl.py all dist
+          python docgen/docgen-ctrl.py all
