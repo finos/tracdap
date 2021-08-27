@@ -129,7 +129,7 @@ html_theme = 'cloud'
 master_doc = 'index'
 index_doc = 'index'
 
-relbar_links = [("contents", "contents")]
+relbar_links = [("home", "index")]
 
 html_theme_options = {
     'max_width': '80%',
