@@ -3,7 +3,7 @@ Platform API
 ============
 
 * A set of web APIs that client applications can use to talk to and control the TRAC platform
-* Built around the TRAC :doc:`metadata model <./metadata_model>` (object definitions and tags)
+* Built around the TRAC :doc:`metadata model <../overview/metadata_model>` (object definitions and tags)
 * Typical use cases include:
 
   - Bespoke GUI clients for your organisation or workflow (web and/or desktop)
@@ -18,7 +18,7 @@ For a ful listing of the services, methods and data structures in the platform A
 :doc:`platform API listing <./autoapi/trac/api/index>`.
 
 Before reading about the platform API, make sure you are familiar with the
-:doc:`metadata model <./metadata_model>`.
+:doc:`metadata model <../overview/metadata_model>`.
 
 Metadata API
 ------------

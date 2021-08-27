@@ -6,7 +6,7 @@ TODO metadata intro
 
 
 For a ful listing of all the data structures in the metadata model, refer to the
-:doc:`metadata listing <./autoapi/trac/metadata/index>`.
+:doc:`metadata listing <../autoapi/trac/metadata/index>`.
 
 
 Objects
@@ -54,19 +54,19 @@ The four most common types of object show how a calculation run is expressed on 
     Instead the metadata refers to location keys which are described in the platform configuration,
     so resource locations can be moved when the platform is migrated or re-deployed.*
 
-.. |icon-data| image:: _images/icon-data.png
+.. |icon-data| image:: ../_images/icon-data.png
    :width: 66px
    :height: 66px
 
-.. |icon-model| image:: _images/icon-model.png
+.. |icon-model| image:: ../_images/icon-model.png
    :width: 66px
    :height: 66px
 
-.. |icon-flow| image:: _images/icon-flow.png
+.. |icon-flow| image:: ../_images/icon-flow.png
    :width: 66px
    :height: 66px
 
-.. |icon-job| image:: _images/icon-job.png
+.. |icon-job| image:: ../_images/icon-job.png
    :width: 66px
    :height: 66px
 
@@ -100,15 +100,15 @@ More object types
       - |icon-storage|
       - Structural representation of the data schema, plus its physical storage location
 
-.. |icon-file| image:: _images/icon-file.png
+.. |icon-file| image:: ../_images/icon-file.png
    :width: 66px
    :height: 66px
 
-.. |icon-custom| image:: _images/icon-custom.png
+.. |icon-custom| image:: ../_images/icon-custom.png
    :width: 66px
    :height: 66px
 
-.. |icon-storage| image:: _images/icon-storage.png
+.. |icon-storage| image:: ../_images/icon-storage.png
    :width: 66px
    :height: 66px
 
@@ -169,7 +169,7 @@ they can be used::
     trac_create_user_id: "jane.doe"
     trac_create_user_name: "Jane Doe"
 
-For a discussion of how to search the metadata database, see :ref:`metadata_model:queries`.
+For a discussion of how to search the metadata database, see :ref:`overview/metadata_model:queries`.
 
 For the full API reference on metadata tags, see the :class:`Tag class reference <trac.metadata.Tag>`.
 

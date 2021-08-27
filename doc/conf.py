@@ -126,7 +126,7 @@ exclude_patterns = [
 
 html_theme = 'cloud'
 
-master_doc = 'contents'
+master_doc = 'index'
 index_doc = 'index'
 
 relbar_links = [("contents", "contents")]

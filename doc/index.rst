@@ -1,12 +1,23 @@
 
-Getting Started with TRAC
-=========================
+###########################
+TRAC Platform Documentation
+###########################
 
 .. centered::
     *A next-generation data and analytics platform for use in highly regulated environments*
 
 
-:doc:`metadata_model`
+.. toctree::
+    :hidden:
+
+    overview/index
+    app_dev/index
+    modelling/index
+    api_ref
+
+
+
+:doc:`overview/metadata_model`
 
 The TRAC metadata model underpins the operation of the platform
 
