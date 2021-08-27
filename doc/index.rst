@@ -11,8 +11,8 @@ TRAC Platform Documentation
     :hidden:
 
     overview/index
-    app_dev/index
     modelling/index
+    app_dev/index
     api_ref
 
 
