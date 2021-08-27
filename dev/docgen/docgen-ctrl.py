@@ -77,8 +77,6 @@ class DocGen:
 
         self.python_runtime_codegen()
         self.main_codegen()
-
-        self.python_runtime_sphinx()
         self.main_sphinx()
 
     def main(self):
@@ -116,11 +114,6 @@ class DocGen:
 
         self._mkdir(sphinx_dst)
         self._run_subprocess(sphinx_exe, sphinx_args)
-
-    def python_runtime(self):
-
-        self.python_runtime_codegen()
-        self.python_runtime_sphinx()
 
     def python_runtime_codegen(self):
 
@@ -170,60 +163,6 @@ class DocGen:
 
         self._run_subprocess(codegen_exe, codegen_args)
         self._mv(doc_src.joinpath('trac/metadata'), doc_src.joinpath('trac/rt/metadata'))
-
-    def python_runtime_sphinx(self):
-
-        # Assume python_runtime_codegen has already been run
-
-        self._log_target()
-
-        sphinx_exe = 'sphinx-build'
-        sphinx_src = DOC_DIR.joinpath('modelling/python').resolve()
-        sphinx_dst = BUILD_DIR.joinpath('modelling_python').resolve()
-        sphinx_args = ['-M', 'html', f'{sphinx_src}', f'{sphinx_dst}']
-
-        self._mkdir(sphinx_dst)
-        self._run_subprocess(sphinx_exe, sphinx_args)
-
-    def dist(self):
-
-        self._log_target()
-
-        # For local builds, dist by copying modules directly under the main html dir
-
-        dist_dir = BUILD_DIR.joinpath("main/html/modules")
-        self._dist_impl(dist_dir)
-
-    def dist_rtd(self):
-
-        self._log_target()
-
-        # For RTD builds, copy modules to a folder that is configured in conf.py as html_extra_path
-        # Sphinx will copy them under the final build tree
-
-        dist_dir = BUILD_DIR.joinpath("dist/modules")
-        self._dist_impl(dist_dir)
-
-    def _dist_impl(self, dist_dir):
-
-        model_py_html = BUILD_DIR.joinpath("modelling_python/html")
-        model_py_dist = dist_dir.joinpath("runtime/python")
-
-        self._log.info(f"PY dist: {model_py_dist}")
-        self._cp_tree(model_py_html, model_py_dist)
-
-        print("done")
-
-        # test_file = dist_dir.joinpath("index.html")
-        #
-        # self._mkdir(dist_dir)
-        #
-        # print("made dir")
-        # print(test_file)
-        #
-        # with open(test_file, "wt") as test_stream:
-        #     test_stream.write("Hello world")
-        #     test_stream.flush()
 
     def get_version_and_release(self):
 

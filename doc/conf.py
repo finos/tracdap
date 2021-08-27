@@ -41,11 +41,11 @@ if ON_RTD:
 
         docgen.main_codegen()
         docgen.python_runtime_codegen()
-        docgen.python_runtime_sphinx()
+        # docgen.python_runtime_sphinx()
 
         # In order to use html_extra_path to pick up modules,
         # run dist_rtd before continuing the build
-        docgen.dist_rtd()
+        # docgen.dist_rtd()
 
     def copy_dependencies():
 
@@ -105,7 +105,18 @@ extensions = [
 autosectionlabel_prefix_document = True
 
 autoapi_dirs = [
-    '../build/doc/code/platform_api'
+    '../build/doc/code/platform_api',
+    '../build/doc/code/runtime_python'
+]
+
+autoapi_options = [
+    'members',
+    'undoc-members',
+    # 'private-members',
+    'show-inheritance',
+    'show-module-summary',
+    'special-members',
+    'imported-members'
 ]
 
 autodoc_typehints = 'description'
@@ -119,7 +130,7 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = [
-    'modelling/*/*',
+    # 'modelling/*/*',
     '_templates'
 ]
 
