@@ -3,6 +3,11 @@ Modelling
 =========
 
 
+.. toctree::
+
+    tutorial/index
+    python/index
+
 
 .. container:: python-modelling-link-block
 
