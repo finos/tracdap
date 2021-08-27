@@ -41,28 +41,13 @@ if ON_RTD:
 
         docgen.main_codegen()
         docgen.python_runtime_codegen()
-        # docgen.python_runtime_sphinx()
-
-        # In order to use html_extra_path to pick up modules,
-        # run dist_rtd before continuing the build
-        # docgen.dist_rtd()
-
-    def copy_dependencies():
-
-        pass
 
     def config_init_hook(app, config):  # noqa
 
         build_dependencies()
 
-    def build_finished_hook(app, error):  # noqa
-
-        if not error:
-            copy_dependencies()
-
     def setup(app):
         app.connect('config-inited', config_init_hook)
-        app.connect('build-finished', build_finished_hook)
 
 
 # -- Project information -----------------------------------------------------
@@ -130,7 +115,6 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = [
-    # 'modelling/*/*',
     '_templates'
 ]
 
@@ -164,12 +148,3 @@ html_context = {
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 # html_static_path = ['_static']
-
-# For RTD builds, docgen.dist_rtd() copies modules to this folder that is set as html_extra_path
-# Sphinx will copy them under the final build tree
-
-html_extra_path = []
-
-if ON_RTD:
-    modules_dir = ROOT_DIR.joinpath("build/doc/dist")
-    html_extra_path.append(str(modules_dir))
