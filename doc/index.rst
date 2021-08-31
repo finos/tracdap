@@ -32,18 +32,19 @@ TRAC Platform Documentation
 .. panels::
     :column: col-lg-6 col-md-12 p-2 border-0
     :header: text-center pt-0 pb-1
-	:footer: text-center pt-0 pb-0
-    :body: text-left pt-0 pb-3
+    :footer: text-center pt-0 pb-3 border-0 bg-white
+    :body: text-left pt-0 pb-0
 
     **Learn about TRAC**
     ^^^^^^^^^^^^^^^^^^^^
 	
     Learn about the TRAC platform, starting with the metadata model.
 
+    +++
     .. link-button:: overview/metadata_model
         :type: ref
         :text: Platform overview
-        :classes: btn-outline-primary btn-block
+        :classes: btn-outline-primary btn-block stretched-link
 
     ---
 
@@ -52,6 +53,7 @@ TRAC Platform Documentation
 	
     Use the TRAC runtime APIs to build portable, self-documenting models.
 
+    +++
     .. link-button:: modelling/index
         :type: ref
         :text: Modelling
@@ -66,6 +68,7 @@ TRAC Platform Documentation
     
     *(Also relevant for system-to-system integration).*
 
+    +++
     .. link-button:: app_dev/index
         :type: ref
         :text: App development
