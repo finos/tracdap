@@ -8,7 +8,7 @@ TRAC Platform Documentation
 	
 
 .. note::
-	We are building the documentation for TRAC in tandem with the open source version of the
+	We are building the documentation for TRAC in parallel with the open source version of the
 	platform, both are in active deveopment. This documentaiton is presented in the hope that 
 	it will be useful before it is complete!
 	
@@ -28,23 +28,52 @@ TRAC Platform Documentation
 
 
 
-:doc:`overview/metadata_model`
 
-The TRAC metadata model underpins the operation of the platform
+.. panels::
+    :column: col-lg-6 col-md-12 p-2 border-0
+    :header: text-center pt-0 pb-1
+	:footer: text-center pt-0 pb-0
+    :body: text-left pt-0 pb-3
 
-:doc:`platform_api`
+    **Learn about TRAC**
+    ^^^^^^^^^^^^^^^^^^^^
+	
+    Learn about the TRAC platform, starting with the metadata model.
 
-Public API for building client apps on the TRAC platform,
-available in gRPC, gRPC-Web and REST/JSON formats as well as a JavaScript API package
+    .. link-button:: overview/metadata_model
+        :type: ref
+        :text: Platform overview
+        :classes: btn-outline-primary btn-block
 
-:doc:`modelling/index`
+    ---
 
-Build models to run on the TRAC platform
+    **Build and run models**
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+	
+    Use the TRAC runtime APIs to build portable, self-documenting models.
+
+    .. link-button:: modelling/index
+        :type: ref
+        :text: Modelling
+        :classes: btn-outline-primary btn-block stretched-link
+
+    ---
+
+    **Build applications and workflows**
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    
+    Connect web or desktop applications to the TRAC services and metadata catalog.
+    
+    *(Also relevant for system-to-system integration).*
+
+    .. link-button:: app_dev/index
+        :type: ref
+        :text: App development
+        :classes: btn-outline-primary btn-block stretched-link
 
 
 .. rubric:: Can't find what you're looking for?
 
-
+* :ref:`search` let's you search across all the TRAC documentation
 * :ref:`modindex` lists all the code modules with auto-generated documentation
 * :ref:`genindex` is an index of individual methos and fields
-* :ref:`search` let's you search across all the TRAC documentation

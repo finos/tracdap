@@ -82,6 +82,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'autoapi.extension',
     
+    'sphinx_panels',
     'sphinxcontrib.fulltoc',
     'cloud_sptheme.ext.relbar_links'
 
