@@ -190,7 +190,7 @@ class DocGen:
         version_result = self._run_subprocess(version_exe, version_args, capture_output=True, use_venv=False)
         version_output = version_result.stdout.decode("utf-8").strip()
         version = re.sub(r"[+-].+$", "", version_output)
-        release = re.sub(r"\+.+$", " + DEV", version_output)
+        release = re.sub(r".*\+.+$", "(latest dev)", version_output)
 
         self._log.info(f"TRAC version: {version}")
         self._log.info(f"TRAC release: {release}")
