@@ -5,6 +5,17 @@ TRAC Platform Documentation
 
 .. centered::
     *A next-generation data and analytics platform for use in highly regulated environments*
+	
+
+.. note::
+	We are building the documentation for TRAC in tandem with the open source version of the
+	platform, both are in active deveopment. This documentaiton is presented in the hope that 
+	it will be useful before it is complete!
+	
+	You can see the current development status and roadmap for the platform on the
+	`roadmap page <https://github.com/Accenture/trac/wiki/Development-Roadmap>`_.
+	If you have particular questions or issues, please raise a ticket on our
+	`issue tracker <https://github.com/Accenture/trac/issues>`_.
 
 
 .. toctree::
