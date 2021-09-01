@@ -42,8 +42,8 @@ data can often be discarded and recreated later if needed.
 Objects
 -------
 
-To begin with, let's look at four of the most common types of object. This will show how a calculation run
-is put together and some of the things that are then possible to do with it.
+To begin with, let's look at four of the most common types of object. This will be enough to see how a
+calculation job is put together and some of the things that are then possible to do with it.
 
 
 .. list-table::
@@ -183,40 +183,11 @@ based on metadata tags to control data retention.
 More object types
 """""""""""""""""
 
-.. list-table::
-    :header-rows: 1
-    :widths: 66 66 600
+.. seealso::
 
-    * -
-      -
-      - Metadata
-
-    * - **FILE**
-      - |icon-file|
-      - Structural representation of the data schema, plus its physical storage location
-
-    * - **CUSTOM**
-      - |icon-custom|
-      - A model schema, describing the inputs, outputs and parameters of a model
-
-    * - **STORAGE**
-      - |icon-storage|
-      - Structural representation of the data schema, plus its physical storage location
-
-.. |icon-file| image:: ../_images/icon-file.png
-   :width: 66px
-   :height: 66px
-
-.. |icon-custom| image:: ../_images/icon-custom.png
-   :width: 66px
-   :height: 66px
-
-.. |icon-storage| image:: ../_images/icon-storage.png
-   :width: 66px
-   :height: 66px
-
-For the full API reference on metadata objects, see the
-:class:`ObjectDefinition class reference <trac.metadata.ObjectDefinition>`.
+    For a comprehensive reference of metadata objects, see the metadata listings for
+    :class:`ObjectType<trac.metadata.ObjectType>` and
+    :class:`ObjectDefinition<trac.metadata.ObjectDefinition>`.
 
 
 Tags
