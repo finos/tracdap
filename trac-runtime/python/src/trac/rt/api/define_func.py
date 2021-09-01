@@ -11,21 +11,9 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-
 
 import typing as _tp
+import dataclasses as _dc
 import inspect as _inspect
 import trac.rt.metadata as _meta
 
@@ -33,11 +21,11 @@ import trac.rt.metadata as _meta
 __field_def_params = _inspect.signature(_meta.FieldDefinition.__init__).parameters
 
 
+@_dc.dataclass
 class NamedParameter:
 
-    def __init__(self, param_name: str, param: _meta.ModelParameter):
-        self.paramName = param_name
-        self.param = param
+    paramName: str
+    param: _meta.ModelParameter
 
 
 def define_parameters(
@@ -97,5 +85,11 @@ def define_field(*args, **kwargs):
     return _meta.FieldDefinition(*args, **kwargs)
 
 
-P = define_parameter
-F = define_field
+def P(*args, **kwargs):  # noqa
+    """Shorthand alias for :py:func:`define_parameter`"""
+    return define_parameter(*args, **kwargs)
+
+
+def F(*args, **kwargs):  # noqa
+    """Shorthand alias for :py:func:`define_field`"""
+    return define_field(*args, **kwargs)
