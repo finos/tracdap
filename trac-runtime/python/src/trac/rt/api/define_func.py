@@ -21,21 +21,26 @@ import trac.rt.metadata as _meta
 __field_def_params = _inspect.signature(_meta.FieldDefinition.__init__).parameters
 
 
-@_dc.dataclass
-class NamedParameter:
+_T = _tp.TypeVar("_T")
 
-    paramName: str
-    param: _meta.ModelParameter
+
+# Utility class for passing named items between define_ funcs
+# Using a private class avoids creating noise in the doc gen / doc comments
+@_dc.dataclass
+class _Named(_tp.Generic[_T]):
+
+    itemName: str
+    item: _T
 
 
 def define_parameters(
-        *params: _tp.Union[NamedParameter, _tp.List[NamedParameter]]) \
+        *params: _tp.Union[_Named[_meta.ModelParameter], _tp.List[_Named[_meta.ModelParameter]]]) \
         -> _tp.Dict[str, _meta.ModelParameter]:
 
     if len(params) == 1 and isinstance(params[0], list):
-        return {p.paramName: p.param for p in params[0]}
+        return {p.itemName: p.item for p in params[0]}
     else:
-        return {p.paramName: p.param for p in params}
+        return {p.itemName: p.item for p in params}
 
 
 def define_parameter(
@@ -43,14 +48,14 @@ def define_parameter(
         param_type: _tp.Union[_meta.TypeDescriptor, _meta.BasicType],
         label: str,
         default_value: _tp.Optional[_tp.Any] = None) \
-        -> NamedParameter:
+        -> _Named[_meta.ModelParameter]:
 
     if isinstance(param_type, _meta.TypeDescriptor):
         param_type_descriptor = param_type
     else:
         param_type_descriptor = _meta.TypeDescriptor(param_type, None, None)
 
-    return NamedParameter(param_name, _meta.ModelParameter(label, param_type_descriptor, default_value))
+    return _Named(param_name, _meta.ModelParameter(label, param_type_descriptor, default_value))
 
 
 def define_table(*fields: _meta.FieldDefinition):
