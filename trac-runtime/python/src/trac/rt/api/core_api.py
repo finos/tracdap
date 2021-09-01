@@ -59,7 +59,7 @@ class TracContext:
     All the context API methods are validated at runtime and will raise ERuntimeValidation if a model
     tries to access an unknown identifier or perform some other invalid operation.
 
-    .. seealso:: TracModel
+    .. seealso:: :py:class:`TracModel`
     """
 
     @_abc.abstractmethod
@@ -116,15 +116,18 @@ class TracModel:
     """
     Base class that model components inherit from to be recognised by the platform
 
-    The TracModel API is designed to be as simple and un-opinionated as possible.
-    Models inherit from TracModel and implement the :meth:run_model() method to provide their model logic.
-    :meth:run_model() has one parameter, a :class:TracContext object which is supplied to the model at
-    runtime, allowing it to access parameters, inputs and outputs.
+    The modelling API is designed to be as simple and un-opinionated as possible.
+    Models inherit from :py:class:`TracModel` and implement the :py:meth:`run_model` method to provide their
+    model logic. :py:meth:`run_model` has one parameter, a :class:`TracContext` object which is supplied to
+    the model at runtime, allowing it to access parameters, inputs and outputs.
 
-    Models must also as a minimum implement three methods to define their schema, :meth:define_parameters(),
-    :meth:define_inputs() and :meth:define_outputs(). The parameters, inputs and outputs that are
-    defined will be available in the context at runtime. The :py:mod:trac.api package includes a
-    number of helper functions to implement these methods in a clear and robust way.
+    Models must also as a minimum implement three methods to define the model schema,
+    :py:meth:`define_parameters()<TracModel.define_parameters>`,
+    :py:meth:`define_inputs()<TracModel.define_inputs>` and
+    :py:meth:`define_outputs()<TracModel.define_outputs>`.
+    The parameters, inputs and outputs that are defined will be available in the context at runtime.
+    The :py:mod:`trac.rt.api` package includes a number of helper functions to implement these methods in
+    a clear and robust way.
 
     While model components can largely do what they like, there are three rules that should be followed
     to ensure models are deterministic. These are:
@@ -135,9 +138,11 @@ class TracModel:
 
     Threading should never be needed in model code, Python only runs one execution thread at a time and TRAC
     already handles IO masking and model ordering. Both Pandas and PySpark provide compute concurrency.
-    Random numbers and time will be made available in the TracContext API in a future version of TRAC.
+    Random numbers and time will be made available in the :py:class:`TracContext` API in a future version of TRAC.
 
-    Models should also avoid system calls, or using the Python builtins exec() or eval().
+    Models should also avoid making system calls, or using the Python builtins exec() or eval().
+
+    .. seealso:: :py:class:`TracContext`
     """
 
     @_abc.abstractmethod
