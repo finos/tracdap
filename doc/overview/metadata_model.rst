@@ -10,7 +10,7 @@ traceable action [#tracable]_ known to the TRAC platform. It consists of two lay
         and jobs are all described by metadata objects. Each type of object has a metadata structure that is
         defined as part of the TRAC API.
 
-    *   Tags are used to index, control and describe objects, they are made up of key-value attributes.
+    *   Tags are used to index, describe and control objects, they are made up of key-value attributes.
         Some attributes are controlled by the platform, others can be set by client applications or
         edited by users.
 
@@ -146,9 +146,9 @@ Tags
 ----
 
 
-Tags are the core informational element of TRAC’s metadata model, they are used to describe, catalog and
-control objects. Every object has a tag and each tag refers to a single object, i.e. there is a one-to-one
-association.
+:class:`Tags<trac.metadata.Tag>` are the core informational element of TRAC’s metadata model, they are
+used to index, describe and control objects. Every object has a tag and each tag refers to a single object,
+i.e. there is a one-to-one association.
 
 A tag is made up of:
 
@@ -156,12 +156,10 @@ A tag is made up of:
     * A set of attributes (key-value pairs)
     * The associated object definition
 
+The object definition may sometimes be omitted, for example search results for metadata queries
+do not include the full object definition.
 
-
-A tag is a set of attributes (key-value pairs) associated with an object definition, intended for
-storing descriptive and informational data as well as application-level metadata that is not part
-of the object definition model. Here is an example of a set of tag attributes to illustrate some ways
-they can be used::
+Here is an example of a set of tag attributes to illustrate some ways they can be used::
 
     # A descriptive field intended for human users.
 
@@ -199,9 +197,11 @@ they can be used::
     trac_create_user_id: "jane.doe"
     trac_create_user_name: "Jane Doe"
 
-For a discussion of how to search the metadata database, see :ref:`overview/metadata_model:queries`.
-
-For the full API reference on metadata tags, see the :class:`Tag class reference <trac.metadata.Tag>`.
+Tag attributes are created and updated using :class:`TagUpdate<trac.metadata.TagUpdate>` operations.
+Tag updates are instructions to add, replace, append (for multi-valued attributes) or delete an attribute.
+These instructions can be supplied when an object is created or updated, in which case TRAC will fill
+in some attributes automatically (timestamp, sign-off state etc). It is also possible to update tags
+without changing the associated object, for example to reclassify a dataset or change a description.
 
 
 Versioning
@@ -226,9 +226,10 @@ data, or an earlier version that has the sign-off attribute set.
 Selectors
 ---------
 
-A tag selector refers to a single object ID and identifies a specific object version and tag version for
-that object. They are used throughout the TRAC platform whenever an object is referenced, so it is always
-possible to specify versions using these selection criteria. The available criteria are:
+A :class:`TagSelector <trac.metadata.TagSelector>` refers to a single object ID and identifies a specific
+object version and tag version for that object. They are used throughout the TRAC platform whenever an
+object is referenced, so it is always possible to specify versions using these selection criteria. The
+available criteria are:
 
     1.  | Select the latest available version
         | - *Variable selector, will return a different result when an object or tag is updated to a new version*
@@ -252,9 +253,6 @@ selector to a fixed selector before storing the job definition.
 Selectors refer to object and tag versions independently and there is no requirement to use the same selection
 criteria for both. A selector for objectVersion = 3 with latestTag = true is perfectly valid, this could be
 used for example to check the current sign-off state of a particular version of a model.
-
-For the full API reference on tag selectors, see the reference page for
-:class:`TagSelector <trac.metadata.TagSelector>`.
 
 
 Queries
@@ -315,6 +313,5 @@ required. Using this feature allows clients to show a consistent historical view
 functionality that relies on metadata queries.
 
 For the full API reference on metadata searches, see the reference pages for
-:class:`SearchParameters <trac.metadata.SearchParameters>`
-and
-:meth:`TracMetadataApi.search() <trac.api.TracMetadataApi.search>`.
+:class:`SearchParameters<trac.metadata.SearchParameters>` and
+:meth:`TracMetadataApi.search()<trac.api.TracMetadataApi.search>`.
