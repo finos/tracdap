@@ -2,11 +2,41 @@
 Metadata Model
 ==============
 
-TODO metadata intro
+
+The TRAC metadata model is a structured data model that records and catalogs every asset and
+traceable action [#tracable]_ known to the TRAC platform. It consists of two layers:
+
+    *   Objects are the structural element of the model, they represent assets and actions. Data, models
+        and jobs are all described by metadata objects. Each type of object has a metadata structure that is
+        defined as part of the TRAC API.
+
+    *   Tags are used to index, control and describe objects, they are made up of key-value attributes.
+        Some attributes are controlled by the platform, others can be set by client applications or
+        edited by users.
+
+Both objects and tags are versioned with an immutable, time-indexed version history, "updates" are performed
+by creating a new version of the object or tag with the required changes. Because of this, the TRAC metadata
+provides a fully consistent historical view of the platform for any previous point in time. It also provides
+a complete audit history that is both machine and human readable, with no manual effort.
+
+Where objects refer to external resources such as models and data, those resources are also immutable [#mutable]_.
+This is achieved using e.g. GitHub tags or Nexus binary versions for models, and data areas owned by TRAC with
+controlled write access for primary data. The combination of immutable metadata and immutable resources allows
+TRAC to recreate any previous calculation that has run on the platform. As a result, generated and intermediate
+data can often be discarded and recreated later if needed.
 
 
-For a ful listing of all the data structures in the metadata model, refer to the
-:doc:`metadata listing <../autoapi/trac/metadata/index>`.
+.. [#tracable]
+    *Traceable actions are actions that create assets, such as running jobs or data imports. Read-only
+    actions such as querying data or metadata searches are not currently recorded in the TRAC metadata.*
+
+.. [#mutable]
+    *TRAC objects can refer to mutable resources, however these cannot be used to build repeatable
+    calculation jobs or workflows. Typically mutable objects are used as a source for import jobs.*
+
+.. seealso::
+    For a comprehensive reference of data structures in the metadata model, see the
+    :doc:`metadata listing <../autoapi/trac/metadata/index>`.
 
 
 Objects
