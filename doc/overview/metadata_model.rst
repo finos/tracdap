@@ -42,7 +42,9 @@ data can often be discarded and recreated later if needed.
 Objects
 -------
 
-The four most common types of object show how a calculation run is expressed on the TRAC platform.
+To begin with, let's look at four of the most common types of object. This will show how a calculation run
+is put together and some of the things that are then possible to do with it.
+
 
 .. list-table::
     :header-rows: 1
@@ -69,14 +71,14 @@ The four most common types of object show how a calculation run is expressed on 
 
     * - **FLOW**
       - |icon-flow|
-      - Structural representation of the data schema, plus its physical storage location
-      - N/A
+      - A graph describing the calculation flow; inputs, outputs and models are nodes, edges represent data flow
+      - None, the flow is abstract and does not refer to specific data or models
       - Metadata is always immutable
 
     * - **JOB**
       - |icon-job|
-      - Structural representation of the data schema, plus its physical storage location
-      - N/A
+      - A job maps a target flow to the real datasets, models and parameters that will be used to execute it
+      - None, jobs refer to other metadata objects but not directly to external resources
       - Metadata is always immutable
 
 .. [#extref]
@@ -101,14 +103,85 @@ The four most common types of object show how a calculation run is expressed on 
    :height: 66px
 
 
-For the full API reference on metadata objects, see the
-:class:`ObjectDefinition class reference <trac.metadata.ObjectDefinition>`.
+Putting together a job
+""""""""""""""""""""""
+
+To run a job, first the calculation flow is selected from the list of available flows. (We assume that flows
+as well as data and models have been created, loaded into the platform and tagged for use). The flow object
+describes the inputs and model components that it needs to run and the outputs it will produce.
+
+The second step is to select the data and model objects that will be used for each node in the flow,
+as well as any required model parameters. The flow definition can include metadata search expressions
+for each required input and model that can be used to find all the relevant objects, set defaults and
+present available options in a UI. Of course, sometimes users may want to browse for specific items
+to include in the flow which is always possible, however including default search expressions in the
+flow definition can hugely simplify setting up common jobs. A similar mechanism is available for setting
+up default parameters.
+
+Once all the items that will go into the job have been chosen, the client creates a job definition with
+a map of all the requirements for the flow to the TRAC objects that will satisfy them. This job definition
+is sent to the TRAC orchestrator service where it is validated and executed. The TRAC platform fetches all
+the required resources (data and models) for each run, runs are isolated and stateless so they don't
+interfere with each other.
+
+All being well the run succeeds and produces new data objects as results. These data objects
+include a reference to the job that created them, so linage can be traced back (lineage covers multiple
+hops if those outputs are fed into another stage of processing).
 
 
-.. rst-class:: html-toggle
+Some useful features
+""""""""""""""""""""
+
+    -   **Automatic audit trail** - In TRAC the metadata is the audit trail, it is created automatically
+        for every asset and every job that runs on the platform. This provides an audit system that can be
+        easily understood by both humans and machines and is fully controlled and searchable.
+
+    -   **Guaranteed repeatability** - All the TRAC metadata and the resources they refer to are immutable,
+        so resubmitting an old job definition will create the same results as the original run. Output and
+        intermediate data can often be expunged and recreated later if needed (TRAC has a special function
+        to recreate expunged outputs automatically).
+
+    -   **Tweak and repeat** - Old jobs can be loaded up into the same tools used to create them originally,
+        because the metadata format is the same. They can then be edited and resubmitted with any desired
+        changes. Run last year's models with this year's data, or a series of what-if scenarios.
+        If the new data and models are not compatible, TRAC will explain exactly what the differences are.
+
+    -   **Parallel runs, parallel versions** - TRAC can execute as many parallel runs as the underlying compute
+        infrastructure will allow. Because the runs are isolated and stateless, multiple runs can use different
+        versions of the same model or the same dataset at the same time.
+
+    -   **Combine model versions** - It is even possible to load different versions of the same model code within
+        a single run. This can be useful to run challenger versions of individual components in a long model
+        chain, or if some model components are versioned independently. TRAC handles the complexity of loading
+        multiple versions of the same codebase into the executor process.
+
+    -   **Zero change risk** - Nothing is every destroyed on TRAC because everything is immutable. New models
+        and data can be imported an run alongside existing ones without damaging them. The "live" models and
+        "official" outputs are designated by tags and changing those tags is restricted by access policies.
+        Even if the production tags are altered incorrectly they can always be changed back to fix the error.
+
+
+The repeatability guarantee
+"""""""""""""""""""""""""""
+
+TRAC guarantees that repeating a run with the same inputs and models will always produce the same outputs.
+We account for multiple factors that cause non-deterministic model output: threading (don't use it!), random
+number generation, time, external calls and dynamic execution (these are disabled), language and library
+versions (these are recorded with the metadata).
+
+Of course its still possible for a determined and skilled programmer to write model code that breaks out of
+these restrictions and does something non-deterministic. It's also possible that with the passing of time,
+some runtime dependencies may break, for example if old versions of languages or libraries are no longer
+supported on your infrastructure.
+
+For the most critical data that must always be available, the bulletproof approach is to make sure that
+primary copies of your data are retained. However for less critical data it is fine to expunge datasets
+and rely on TRAC to recreate them if and when needed. TRAC allows configuration of data retention policies
+based on metadata tags to control data retention.
+
 
 More object types
-~~~~~~~~~~~~~~~~~
+"""""""""""""""""
 
 .. list-table::
     :header-rows: 1
@@ -141,6 +214,10 @@ More object types
 .. |icon-storage| image:: ../_images/icon-storage.png
    :width: 66px
    :height: 66px
+
+For the full API reference on metadata objects, see the
+:class:`ObjectDefinition class reference <trac.metadata.ObjectDefinition>`.
+
 
 Tags
 ----
@@ -206,6 +283,11 @@ without changing the associated object, for example to reclassify a dataset or c
 
 Versioning
 ----------
+
+Data "updates" on TRAC are handled by creating a sequence of immutable versions of a dataset. The next
+version of a dataset might add a delta, or provide an entirely new snapshot of the dataset, or add a
+new partition. In all cases, the original data files are left unaltered. TRAC ensures that versions of
+a dataset are backward compatible - fields can be added to the schema but never removed or changed.
 
 Tags use immutable versioning in the same way as objects - each version of a tag is immutable and
 “updating” a tag means creating a new version with one or more modified attributes. Each version of
