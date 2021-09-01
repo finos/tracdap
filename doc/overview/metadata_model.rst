@@ -155,10 +155,9 @@ Some useful features
         chain, or if some model components are versioned independently. TRAC handles the complexity of loading
         multiple versions of the same codebase into the executor process.
 
-    -   **Zero change risk** - Nothing is every destroyed on TRAC because everything is immutable. New models
-        and data can be imported an run alongside existing ones without damaging them. The "live" models and
+    -   **Zero change risk** - Nothing is ever destroyed on TRAC because everything is immutable. New models
+        and data can be imported and run alongside existing ones without damaging them. The "live" models and
         "official" outputs are designated by tags and changing those tags is restricted by access policies.
-        Even if the production tags are altered incorrectly they can always be changed back to fix the error.
 
 
 The repeatability guarantee
