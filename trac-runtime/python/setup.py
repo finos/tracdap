@@ -46,16 +46,15 @@ trac_rt_packages = setuptools.find_namespace_packages('src', include=['trac.*'])
 # Map the metadata packages to generated output locations
 trac_rt_package_dir = {
     '': 'src',
-    'trac.rt.metadata': 'generated/trac_gen/domain/trac/metadata',
-    'trac.rt.metadata.search': 'generated/trac_gen/domain/trac/metadata/search'
+    'trac.rt.metadata': 'generated/trac_gen/domain/trac/metadata'
 }
 
 # Runtime dependencies
 # Protoc is not required, it is only needed for codegen
 trac_rt_dependencies = [
-    'protobuf',
     'pandas',
-    'pyspark']
+    'pyspark',
+    'pyyaml']
 
 
 setuptools.setup(
@@ -63,9 +62,9 @@ setuptools.setup(
     version=trac_version,
     description='TRAC Model Runtime for Python',
     url='https://github.com/accenture/trac',
-    license='http://www.apache.org/licenses/LICENSE-2.0',
+    license='https://www.apache.org/licenses/LICENSE-2.0',
     platforms=['any'],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     packages=trac_rt_packages,
     package_dir=trac_rt_package_dir,
     namespace_packages=['trac'],
