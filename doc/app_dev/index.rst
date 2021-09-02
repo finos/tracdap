@@ -9,6 +9,7 @@ App Development
 
     ./web_api_package
     ./rest_examples
+    Platform API Listing </autoapi/trac/api/index>
 
 
 If you are building web apps for the TRAC platform, check out the :doc:`./web_api_package`.
