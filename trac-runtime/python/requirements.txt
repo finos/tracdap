@@ -7,7 +7,7 @@ pandas >= 1.0.0, < 2.0.0
 pyspark >= 2.4.0, < 3.1.0
 
 # Protobuf is required at runtime to parse/quote transmitted metadata
-protobuf >= 3.13.0, < 3.14.0
+protobuf >= 3.15, < 4.0
 
 # PyYAML is used to allow config supplied in YAML format
 pyyaml >= 5.3.0, < 6.0.0
