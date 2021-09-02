@@ -65,11 +65,29 @@ jobs:
         with:
           python-version: ${{ matrix.enviroment.PYTHON_VERSION }}
 
+      - name: PIP Upgrade
+        run: python -m pip install --upgrade pip
+
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+
+      # Use a venv so build tool dependencies don't get mixed with the main build
+      - name: Install dependencies for build tools
+        run: |
+          cd dev/
+          python -m venv venv/
+          . venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Protoc code generation
+        run: |
+          cd dev/
+          . venv/bin/activate
+          python codegen/protoc-ctrl.py python_runtime --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac_gen/domain
+          python codegen/protoc-ctrl.py python_proto --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac_gen/proto
 
       # PyPanDoc dependency is not managed correctly by PySpark 2.4 package
       # It needs to be installed explicitly first
@@ -87,12 +105,6 @@ jobs:
           pip install "pyspark ${{ matrix.enviroment.PYSPARK_VERSION }}"
           pip install "pandas ${{ matrix.enviroment.PANDAS_VERSION }}"
           pip install -r requirements.txt
-
-      - name: Protoc code generation
-        run: |
-          cd trac-runtime/python
-          python codegen/protoc-ctrl.py --domain
-          python codegen/protoc-ctrl.py --proto
 
       - name: Unit tests
         run: |
@@ -145,3 +157,33 @@ jobs:
         cd trac-api/packages/web
         npm run pbjs
         npm run pbts
+
+  documentation:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: PIP Upgrade
+        run: python -m pip install --upgrade pip
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies for build tools
+        run: |
+          cd dev/
+          pip install -r requirements.txt
+
+      - name: Run all docgen targets
+        run: |
+          cd dev/
+          python docgen/docgen-ctrl.py all

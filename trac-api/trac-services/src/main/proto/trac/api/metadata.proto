@@ -77,12 +77,12 @@ import "google/api/annotations.proto";
  * tenant code, for REST requests the tenant code is the first element of every
  * path.
  *
- * @see ObjectDefinition
- * @see Tag
- * @see TagHeader
- * @see TagSelector
- * @see TagUpdate
- * @see SearchParameters
+ * @see trac.metadata.ObjectDefinition
+ * @see trac.metadata.Tag
+ * @see trac.metadata.TagHeader
+ * @see trac.metadata.TagSelector
+ * @see trac.metadata.TagUpdate
+ * @see trac.metadata.SearchParameters
  */
 service TracMetadataApi {
 
@@ -109,10 +109,8 @@ service TracMetadataApi {
      * Error conditions include: Invalid request, unknown tenant, object type does
      * not match the supplied definition, validation failure.
      *
-     * @see MetadataWriteRequest
-     * @see ObjectDefinition
-     * @see Tag
-     * @see TagHeader
+     * @see trac.metadata.ObjectDefinition
+     * @see trac.metadata.TagUpdate
      */
     rpc createObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
@@ -148,10 +146,9 @@ service TracMetadataApi {
      * ID or version, wrong object type (not the same as the prior version), object
      * version is superseded.
      *
-     * @see MetadataWriteRequest
-     * @see ObjectDefinition
-     * @see Tag
-     * @see TagHeader
+     * @see trac.metadata.ObjectDefinition
+     * @see trac.metadata.TagSelector
+     * @see trac.metadata.TagUpdate
      */
     rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
@@ -178,10 +175,8 @@ service TracMetadataApi {
      * ID, object version or tag version, wrong object type (does not match what
      * is stored in TRAC), tag version is superseded.
      *
-     * @see MetadataWriteRequest
-     * @see ObjectDefinition
-     * @see Tag
-     * @see TagHeader
+     * @see trac.metadata.TagSelector
+     * @see trac.metadata.TagUpdate
      */
     rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
@@ -209,9 +204,7 @@ service TracMetadataApi {
      * tenant, unknown object ID, object type does not match ID, unknown object
      * version, unknown tag version.
      *
-     * @see MetadataReadRequest
-     * @see TagSelector
-     * @see Tag
+     * @see trac.metadata.TagSelector
      */
     rpc readObject(MetadataReadRequest) returns (metadata.Tag) {
         option (google.api.http) = {
@@ -241,10 +234,7 @@ service TracMetadataApi {
      * object version, unknown tag version. If there is an error for any of the
      * selectors the whole request will fail.
      *
-     * @see MetadataBatchRequest
-     * @see MetadataBatchResponse
-     * @see TagSelector
-     * @see Tag
+     * @see trac.metadata.TagSelector
      */
     rpc readBatch(MetadataBatchRequest) returns (MetadataBatchResponse) {
         option (google.api.http) = {
@@ -264,9 +254,7 @@ service TracMetadataApi {
      * REST calls the tenant is passed in the URL and searchParameters are supplied
      * as the request body.
      *
-     * @see MetadataSearchRequest
-     * @see MetadataSearchResponse
-     * @see SearchParameters
+     * @see trac.metadata.SearchParameters
      */
     rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
         option (google.api.http) = {
@@ -282,6 +270,8 @@ service TracMetadataApi {
      * objects as RESTFUL resources. For gRPC clients it is recommended to use
      * readObject instead and supply a TagSelector.
      *
+     * @see readObject
+     *
      * To use this call, supply a tenant code, object type, ID, object version
      * and tag version. The call will return a tag for the exact object version
      * and tag version specified, including the full object definition.
@@ -289,9 +279,6 @@ service TracMetadataApi {
      * Error conditions include: Invalid request, unknown tenant, unknown object
      * ID, object type does not match ID, unknown object version, unknown tag
      * version.
-     *
-     * @see MetadataReadRequest
-     * @see Tag
      */
     rpc getObject(MetadataGetRequest) returns (trac.metadata.Tag) {
         option (google.api.http) = {
@@ -306,15 +293,14 @@ service TracMetadataApi {
      * objects as RESTFUL resources. For gRPC clients it is recommended to use
      * readObject instead and supply a TagSelector.
      *
+     * @see readObject
+     *
      * To use this call, supply a tenant code, object type and ID. The call will
      * return the latest version of the object with its latest tag, including
      * the full object definition.
      *
      * Error conditions include: Invalid request, unknown tenant, unknown object
      * ID, object type does not match ID.
-     *
-     * @see MetadataReadRequest
-     * @see Tag
      */
     rpc getLatestObject(MetadataGetRequest) returns (trac.metadata.Tag) {
         option (google.api.http) = {
@@ -329,15 +315,14 @@ service TracMetadataApi {
      * objects as RESTFUL resources. For gRPC clients it is recommended to use
      * readObject instead and supply a TagSelector.
      *
+     * @see readObject
+     *
      * To use this call, supply a tenant code, object type, ID and version. The
       * call will return the latest tag for the specified version of the object,
      * including the full object definition.
      *
      * Error conditions include: Invalid request, unknown tenant, unknown object
      * ID, object type does not match ID, unknown object version.
-     *
-     * @see MetadataReadRequest
-     * @see Tag
      */
     rpc getLatestTag(MetadataGetRequest) returns (trac.metadata.Tag) {
         option (google.api.http) = {
@@ -369,7 +354,7 @@ service TrustedMetadataApi {
      * This call behaves identically to the equivalent public API call, without the
      * restriction on which types of object can be saved.
      *
-     * @see TracMetadataApi
+     * @see TracMetadataApi.createObject()
      */
     rpc createObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
@@ -385,7 +370,7 @@ service TrustedMetadataApi {
      * can be used with any type of object that supports versioning (currently DATA
      * and CUSTOM).
      *
-     * @see TracMetadataApi
+     * @see TracMetadataApi.updateObject()
      */
     rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
@@ -399,7 +384,7 @@ service TrustedMetadataApi {
      *
      * This call behaves identically to the equivalent public API call.
      *
-     * @see TracMetadataApi
+     * @see TracMetadataApi.updateTag()
      */
     rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
@@ -419,8 +404,6 @@ service TrustedMetadataApi {
      * match these two conditions. Orphan IDs are expected - if a component request
      * an ID and encounters an error before that ID is used, the orphan ID is just
      * ignored.
-     *
-     * @see MetadataWriteRequest
      */
     rpc preallocateId (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
@@ -440,8 +423,6 @@ service TrustedMetadataApi {
      * Error conditions include all the error conditions for saveNewObject().
      * Using a preallocated ID twice, attempting to save to an unknown ID or the
      * ID of another object that already exists are also errors.
-     *
-     * @see MetadataWriteRequest
      */
     rpc createPreallocatedObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
@@ -455,7 +436,7 @@ service TrustedMetadataApi {
      *
      * This call behaves identically to the equivalent public API call.
      *
-     * @see TracMetadataApi
+     * @see TracMetadataApi.readObject()
      */
     rpc readObject(MetadataReadRequest) returns (metadata.Tag) {
         option (google.api.http) = {
@@ -469,7 +450,7 @@ service TrustedMetadataApi {
      *
      * This call behaves identically to the equivalent public API call.
      *
-     * @see TracMetadataApi
+     * @see TracMetadataApi.readBatch()
      */
     rpc readBatch(MetadataBatchRequest) returns (MetadataBatchResponse) {
         option (google.api.http) = {
@@ -483,7 +464,7 @@ service TrustedMetadataApi {
      *
      * This call behaves identically to the equivalent public API call.
      *
-     * @see TracMetadataApi
+     * @see TracMetadataApi.search()
      */
     rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
         option (google.api.http) = {
@@ -497,8 +478,7 @@ service TrustedMetadataApi {
 /**
  * Request to create or update an object in the TRAC metadata store.
  *
- * @see MetadataPublicWriteApi
- * @see MetadataTrustedWriteApi
+ * @see TracMetadataApi
  */
 message MetadataWriteRequest {
 
@@ -509,8 +489,6 @@ message MetadataWriteRequest {
 
     /**
      * Object type for the requested operation, always required.
-     *
-     * @see ObjectType
      */
     metadata.ObjectType objectType = 2;
 
@@ -545,7 +523,7 @@ message MetadataWriteRequest {
 /**
  * Request to read an object from the TRAC metadata store.
  *
- * @see MetadataReadApi
+ * @see TracMetadataApi
  */
 message MetadataReadRequest {
 
@@ -558,7 +536,7 @@ message MetadataReadRequest {
 /**
  * Request to read a batch of objects from the TRAC metadata store.
  *
- * @see MetadataReadApi
+ * @see TracMetadataApi
  */
 message MetadataBatchRequest {
 
@@ -571,7 +549,7 @@ message MetadataBatchRequest {
 /**
  * Response to reading a batch of objects from the TRAC metadata store.
  *
- * @see MetadataReadApi
+ * @see TracMetadataApi
  */
 message MetadataBatchResponse {
 
@@ -582,7 +560,7 @@ message MetadataBatchResponse {
 /**
  * Request for a search against the TRAC metadata store.
  *
- * @see MetadataSearchApi
+ * @see TracMetadataApi
  */
 message MetadataSearchRequest {
 
@@ -595,7 +573,7 @@ message MetadataSearchRequest {
 /**
  * Response to a search against the TRAC metadata store.
  *
- * @see MetadataSearchApi
+ * @see TracMetadataApi
  */
 message MetadataSearchResponse {
 
@@ -606,7 +584,7 @@ message MetadataSearchResponse {
 /**
  * Request to get an object from the TRAC metadata store.
  *
- * @see MetadataReadApi
+ * @see TracMetadataApi
  */
 message MetadataGetRequest {
 

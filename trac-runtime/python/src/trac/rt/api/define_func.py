@@ -11,61 +11,55 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
+
+import typing as _tp
+import dataclasses as _dc
+import inspect as _inspect
+import trac.rt.metadata as _meta
 
 
-import typing as tp
-import inspect
-from trac.rt.metadata import *
-
-__field_def_params = inspect.signature(FieldDefinition.__init__).parameters
+__field_def_params = _inspect.signature(_meta.FieldDefinition.__init__).parameters
 
 
-class NamedParameter:
+_T = _tp.TypeVar("_T")
 
-    def __init__(self, param_name: str, param: ModelParameter):
-        self.paramName = param_name
-        self.param = param
+
+# Utility class for passing named items between define_ funcs
+# Using a private class avoids creating noise in the doc gen / doc comments
+@_dc.dataclass
+class _Named(_tp.Generic[_T]):
+
+    itemName: str
+    item: _T
 
 
 def define_parameters(
-        *params: tp.Union[NamedParameter, tp.List[NamedParameter]]) \
-        -> tp.Dict[str, ModelParameter]:
+        *params: _tp.Union[_Named[_meta.ModelParameter], _tp.List[_Named[_meta.ModelParameter]]]) \
+        -> _tp.Dict[str, _meta.ModelParameter]:
 
     if len(params) == 1 and isinstance(params[0], list):
-        return {p.paramName: p.param for p in params[0]}
+        return {p.itemName: p.item for p in params[0]}
     else:
-        return {p.paramName: p.param for p in params}
+        return {p.itemName: p.item for p in params}
 
 
 def define_parameter(
         param_name: str,
-        param_type: tp.Union[TypeDescriptor, BasicType],
+        param_type: _tp.Union[_meta.TypeDescriptor, _meta.BasicType],
         label: str,
-        default_value: tp.Optional[tp.Any] = None) \
-        -> NamedParameter:
+        default_value: _tp.Optional[_tp.Any] = None) \
+        -> _Named[_meta.ModelParameter]:
 
-    if isinstance(param_type, TypeDescriptor):
+    if isinstance(param_type, _meta.TypeDescriptor):
         param_type_descriptor = param_type
     else:
-        param_type_descriptor = TypeDescriptor(param_type, None, None)
+        param_type_descriptor = _meta.TypeDescriptor(param_type, None, None)
 
-    return NamedParameter(param_name, ModelParameter(label, param_type_descriptor, default_value))
+    return _Named(param_name, _meta.ModelParameter(label, param_type_descriptor, default_value))
 
 
-def define_table(*fields: FieldDefinition):
-    return TableDefinition([*fields])
+def define_table(*fields: _meta.FieldDefinition):
+    return _meta.TableDefinition([*fields])
 
 
 def define_field(*args, **kwargs):
@@ -93,8 +87,14 @@ def define_field(*args, **kwargs):
             kwargs[camel_name] = kwargs[arg_name]
             kwargs.pop(arg_name)
 
-    return FieldDefinition(*args, **kwargs)
+    return _meta.FieldDefinition(*args, **kwargs)
 
 
-P = define_parameter
-F = define_field
+def P(*args, **kwargs):  # noqa
+    """Shorthand alias for :py:func:`define_parameter`"""
+    return define_parameter(*args, **kwargs)
+
+
+def F(*args, **kwargs):  # noqa
+    """Shorthand alias for :py:func:`define_field`"""
+    return define_field(*args, **kwargs)

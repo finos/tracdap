@@ -1,15 +1,14 @@
 
-storageSettings:
-  defaultStorage: example_data
-  defaultFormat: CSV
-
 storage:
 
   example_data:
-
     storageType: LOCAL_STORAGE
     storageConfig:
       rootPath: examples/models/python/data
+
+storageSettings:
+  defaultStorage: example_data
+  defaultFormat: CSV
 
 sparkSettings:
 

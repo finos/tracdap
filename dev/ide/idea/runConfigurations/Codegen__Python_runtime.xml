@@ -1,18 +1,19 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Python Runtime: Codegen" type="PythonConfigurationType" factoryName="Python">
-    <module name="python-model-runtime" />
+  <configuration default="false" name="Codegen: Python runtime" type="PythonConfigurationType" factoryName="Python">
+    <module name="build-scripts" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
     </envs>
-    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/trac-runtime/python/codegen" />
+    <option name="SDK_HOME" value="$PROJECT_DIR$/dev/venv/Scripts/python.exe" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/dev/codegen" />
     <option name="IS_MODULE_SDK" value="true" />
     <option name="ADD_CONTENT_ROOTS" value="false" />
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/trac-runtime/python/codegen/protoc-ctrl.py" />
-    <option name="PARAMETERS" value="--domain" />
+    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/dev/codegen/protoc-ctrl.py" />
+    <option name="PARAMETERS" value="python_runtime --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac_gen/domain" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

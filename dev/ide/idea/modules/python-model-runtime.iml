@@ -3,9 +3,8 @@
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
     <content url="file://$MODULE_DIR$/../../trac-runtime/python">
-      <sourceFolder url="file://$MODULE_DIR$/../../trac-runtime/python/codegen" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/../../trac-runtime/python/generated" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/../../trac-runtime/python/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../../trac-runtime/python/generated" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/../../trac-runtime/python/test" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/../../trac-runtime/python/build" />
       <excludeFolder url="file://$MODULE_DIR$/../../trac-runtime/python/dist" />
