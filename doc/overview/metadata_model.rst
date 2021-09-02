@@ -254,25 +254,37 @@ without changing the associated object, for example to reclassify a dataset or c
 Versioning
 ----------
 
-Data "updates" on TRAC are handled by creating a sequence of immutable versions of a dataset. The next
-version of a dataset might add a delta, or provide an entirely new snapshot of the dataset, or add a
-new partition. In all cases, the original data files are left unaltered. TRAC ensures that versions of
-a dataset are backward compatible - fields can be added to the schema but never removed or changed.
+Versioning is supported for both objects and tags. For objects, versions are a series of immutable
+copies where TRAC guarantees compatibility and continuity between versions. The general principal
+for compatibility is that new versions will work in place of old versions (i.e. object versions are
+backwards-compatible, but the reverse is not necessarily true) and for continuity is that the object
+should describe the same resource. The exact requirements for these rules vary depending on object type.
 
-Tags use immutable versioning in the same way as objects - each version of a tag is immutable and
-“updating” a tag means creating a new version with one or more modified attributes. Each version of
-an object has its own series of tags starting at tag version 1.
+Of particular interest are data updates. In this case, updates can include (1) adding a delta to a
+dataset, (2) providing a new snapshot of a dataset (3) adding a partition or (4) updating a partition
+with a new snapshot or delta. A new version of the metadata object is created that refers to the new set
+of primary data files, including any that are unchanged from the previous version. For example if a delta
+is added, the new data definition would refer to all the files referenced in the previous version, plus
+the new delta.
 
-As an example of this versioning, consider a partitioned dataset with daily account records. Version X of
-the dataset contains data up to a certain date and might have a tag saying it is signed off. A user/process
-then adds a new partition with the next day’s data, creating version X+1. In this case, object version X
-would still be signed off while version X+1 is awaiting approval. When version X+1 is approved, the tag for
-that version can be “updated”. The application could decide whether to show the most recent version of the
-data, or an earlier version that has the sign-off attribute set.
+A series of tag versions is assigned to every object version. Let's illustrate this with an example::
 
+    v = 1, t = 1  # Initial creation of an object
+                  # Let's say it's a dataset containing customer data for some date T0
 
-.. seealso::
-    :class:`TagHeader <trac.metadata.TagHeader>`
+    v = 1, t = 2  # Add a tag attribute, extra_attr = "some_value"
+
+    v = 2, t = 1  # Corrections are applied to the data, so a new object version is created
+                  # By default the attributes from v=1, t=2 are copied to the new tag
+
+    v = 3, t = 1  # Data is added for a second day T1, in a separate partition
+
+    v = 2, t = 2  # The data for T0 is signed off and the policy service updates the sign-off tag
+                  # The tag applies to object version 2, which includes data for T0 with the corrections
+
+Object and tag versions are given numbers as shown here, they are also given timestamps which are
+recorded by the system when a new object or tag version is created. Either a version number or a
+timestamp can be used to uniquely identify versions for both objects and tags.
 
 
 Selectors
@@ -289,7 +301,7 @@ available criteria are:
     2.  | Select a fixed version number
         | - *Fixed selector, will always return the same result*
 
-    3.  | Select a previous point in time
+    3.  | Select the version for a previous point in time
         | - *Fixed selector, will always return the same result*
 
 Selectors are used in API calls, for example reading a single object from the metadata API uses a tag selector.
