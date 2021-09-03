@@ -15,7 +15,9 @@
 import pathlib
 import shutil
 import subprocess
+import fileinput
 import sys
+
 
 ROOT_PATH = pathlib.Path(__file__) \
     .parent \
@@ -28,8 +30,7 @@ COPY_FILES = [
     "pyproject.toml",
     "setup.cfg",
     "README.md",
-    "src",
-    "generated"
+    "src"
 ]
 
 
@@ -54,6 +55,25 @@ def copy_source_files():
             shutil.copy(source_path, target_path)
 
 
+def move_generated_into_src():
+
+    # For generated packages, the main source tree contains placeholders that import everything
+    # from the generated tree. We want to remove the placeholders and put the generated code into
+    # the main source tree
+
+    src_metadata_path = BUILD_PATH.joinpath("src/trac/rt/metadata")
+    generated_metadata_path = ROOT_PATH.joinpath("generated/trac/rt_gen/domain/trac/metadata")
+
+    shutil.rmtree(src_metadata_path)
+    shutil.copytree(generated_metadata_path, src_metadata_path)
+
+    # Remove references to rt_gen package in setup.cfg, since everything is now in place under src/
+
+    for line in fileinput.input(BUILD_PATH.joinpath("setup.cfg"), inplace=True):
+        if "rt_gen" not in line:
+            print(line, end='')
+
+
 def run_pypa_build():
 
     build_exe = sys.executable
@@ -61,11 +81,17 @@ def run_pypa_build():
 
     build_result = subprocess.run(executable=build_exe, args=build_args, cwd=BUILD_PATH)
 
+    if build_result.returncode != 0:
+        raise subprocess.SubprocessError(f"PyPA Build failed with exit code {build_result.returncode}")
+
 
 def main():
 
     reset_build_dir()
     copy_source_files()
+
+    move_generated_into_src()
+
     run_pypa_build()
 
 
