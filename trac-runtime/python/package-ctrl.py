@@ -16,7 +16,9 @@ import pathlib
 import shutil
 import subprocess
 import fileinput
+import platform
 import sys
+import packaging.version
 
 
 ROOT_PATH = pathlib.Path(__file__) \
@@ -74,6 +76,54 @@ def move_generated_into_src():
             print(line, end='')
 
 
+def set_trac_version():
+
+    if platform.system().lower().startswith("win"):
+        command = ['powershell', '-ExecutionPolicy', 'Bypass', '-File', '..\\..\\dev\\version.ps1']
+    else:
+        command = ['../../dev/version.sh']
+
+    process = subprocess.Popen(command, stdout=subprocess.PIPE)
+    output, err = process.communicate()
+    exit_code = process.wait()
+
+    if exit_code != 0:
+        raise subprocess.SubprocessError('Failed to get TRAC version')
+
+    raw_version = output.decode('utf-8').strip()
+
+    # Using Python's Version class normalises the version according to PEP440
+    trac_version = packaging.version.Version(raw_version)
+
+    # Set the version number used in the package metadata
+
+    # setup.cfg has file: and attr: for reading the version in from external sources
+    # attr: doesn't work with namespace packages, __version__ has to be in the root package
+    # file: works for the sdist build but is throwing an error for bdist_wheel, this could be a bug
+    # Writing the version directly into setup.cfg avoids both of these issues
+
+    for line in fileinput.input(BUILD_PATH.joinpath("setup.cfg"), inplace=True):
+        if line.startswith("version ="):
+            print(f"version = {str(trac_version)}")
+        else:
+            print(line, end="")
+
+    # Set the version number embedded into the package
+
+    embedded_version_file = BUILD_PATH.joinpath("src/trac/rt/_version.py")
+    embedded_header_copied = False
+
+    for line in fileinput.input(embedded_version_file, inplace=True):
+
+        if line.isspace() and not embedded_header_copied:
+            embedded_header_copied = True
+            print("")
+            print(f'__version__ = "{str(trac_version)}"')
+
+        if not embedded_header_copied:
+            print(line, end="")
+
+
 def run_pypa_build():
 
     build_exe = sys.executable
@@ -91,6 +141,7 @@ def main():
     copy_source_files()
 
     move_generated_into_src()
+    set_trac_version()
 
     run_pypa_build()
 
