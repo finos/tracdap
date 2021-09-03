@@ -123,7 +123,7 @@ jobs:
       - name: Build packages
         run: |
           cd trac-runtime/python
-          python setup.py sdist bdist_wheel
+          python -m build
 
   web_api:
 
