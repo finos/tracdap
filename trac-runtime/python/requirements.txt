@@ -12,5 +12,6 @@ protobuf >= 3.15, < 4.0
 # PyYAML is used to allow config supplied in YAML format
 pyyaml >= 5.3.0, < 6.0.0
 
-# Wheel required at build time for packaging
+# Tools for building and packaging
 wheel >= 0.35
+build >= 0.6
