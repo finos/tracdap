@@ -74,37 +74,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Use a venv so build tool dependencies don't get mixed with the main build
-      - name: Install dependencies for build tools
-        run: |
-          cd dev/
-          python -m venv venv/
-          . venv/bin/activate
-          pip install -r requirements.txt
-
-      - name: Protoc code generation
-        run: |
-          cd dev/
-          . venv/bin/activate
-          python codegen/protoc-ctrl.py python_runtime --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/domain
-          python codegen/protoc-ctrl.py python_proto --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/proto
-
       # PyPanDoc dependency is not managed correctly by PySpark 2.4 package
       # It needs to be installed explicitly first
       - name: Install pre-req dependencies
         if: ${{ matrix.enviroment.PYPANDOC }}
         run: |
-          cd trac-runtime/python
-          python -m pip install --upgrade pip
           pip install pypandoc
 
       - name: Install dependencies
         run: |
-          cd trac-runtime/python
-          python -m pip install --upgrade pip
           pip install "pyspark ${{ matrix.enviroment.PYSPARK_VERSION }}"
           pip install "pandas ${{ matrix.enviroment.PANDAS_VERSION }}"
+          cd trac-runtime/python
           pip install -r requirements.txt
+
+      - name: Protoc code generation
+        run: |
+          python dev/codegen/protoc-ctrl.py python_runtime --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/domain
+          python dev/codegen/protoc-ctrl.py python_proto --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/proto
 
       - name: Unit tests
         run: |
