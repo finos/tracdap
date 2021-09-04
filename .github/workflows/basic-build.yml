@@ -110,7 +110,7 @@ jobs:
       - name: Build packages
         run: |
           cd trac-runtime/python
-          python -m build
+          python package-ctrl.py
 
   web_api:
 
