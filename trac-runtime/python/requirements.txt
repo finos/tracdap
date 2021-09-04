@@ -3,8 +3,8 @@
 # Try to avoid supporting the 0.x series!
 pandas >= 1.0.0, < 2.0.0
 
-# Support PySpark series 2.4.x and 3.0.x
-pyspark >= 2.4.0, < 3.1.0
+# Support PySpark series 2.4.x, 3.0.x and 3.1.x
+pyspark >= 2.4.0, < 3.2.0
 
 # PyYAML is used to load config supplied in YAML format
 pyyaml >= 5.3.0, < 6.0.0
