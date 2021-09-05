@@ -1,6 +1,12 @@
-name: Basic Build
+name: Build and Test
 
-on: [push, pull_request]
+# Run the main build and test for all branch pushes and pull requests, do not repeat the build for tags
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+
 
 jobs:
 
@@ -27,6 +33,7 @@ jobs:
 
     - name: Unit Tests
       run: ./gradlew test
+
 
   python_runtime:
 
@@ -113,10 +120,6 @@ jobs:
           export PYTHONPATH=trac-runtime/python/test:$PYTHONPATH
           python -m unittest discover -s trac-runtime/python/test/trac_examples -t trac-runtime/python/test
 
-      - name: Build packages
-        run: |
-          cd trac-runtime/python
-          python package-ctrl.py
 
   web_api:
 
@@ -140,16 +143,12 @@ jobs:
         cd trac-api/packages/web
         npm install
 
-    - name: Set TRAC version
-      run: |
-        cd trac-api/packages/web
-        npm run tracVersion:posix
-
     - name: PBJS code generation
       run: |
         cd trac-api/packages/web
         npm run pbjs
         npm run pbts
+
 
   documentation:
 

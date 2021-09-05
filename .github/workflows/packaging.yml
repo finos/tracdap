@@ -1,0 +1,171 @@
+name: Packaging
+
+on:
+
+  # Build packages for pull requests, to make sure there are no packaging issues
+  pull_request:
+
+  # Re-run packaging jobs in main, to make sure there are no issues from the merge
+  push:
+    branches:
+      - main
+
+  # Build packages when releases are published on GitHub
+  # Use the release:publish event rather than looking at all tags
+  # Only release events will trigger the publishing jobs
+  release:
+    types:
+      - published
+
+  # Allow manual triggering of the packaging jobs
+  # This will not publish packages, but they will be available as workflow assets
+  workflow_dispatch:
+
+
+env:
+  PYTHON_VERSION: "3.9"
+  NODE_VERSION: "14.x"
+
+
+jobs:
+
+  python_runtime_package:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: PIP Upgrade
+        run: python -m pip install --upgrade pip
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install build environment dependencies
+        run: |
+          pip install -r dev/requirements.txt
+
+      - name: Protoc code generation
+        run: |
+          python dev/codegen/protoc-ctrl.py python_runtime --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/domain
+          python dev/codegen/protoc-ctrl.py python_proto --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/proto
+
+      - name: Build packages
+        run: |
+          cd trac-runtime/python
+          python package-ctrl.py
+
+      - name: Save artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: python_runtime_package
+          path: trac-runtime/python/build/dist
+          retention-days: 7
+
+
+  web_api_package:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          cd trac-api/packages/web
+          npm install
+
+      - name: Set TRAC version
+        run: |
+          cd trac-api/packages/web
+          npm run tracVersion:posix
+
+      - name: PBJS code generation
+        run: |
+          cd trac-api/packages/web
+          npm run pbjs
+          npm run pbts
+
+      - name: Create tarball
+        run: |
+          cd trac-api/packages/web
+          mkdir dist
+          cd dist
+          npm pack ..
+
+      - name: Save artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: web_api_package
+          path: trac-api/packages/web/dist
+          retention-days: 7
+
+
+  publish_to_github:
+
+    if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+
+    runs-on: ubuntu-latest
+
+    needs:
+      - python_runtime_package
+      - web_api_package
+
+    steps:
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Get TRAC version
+        id: trac-version
+        run: |
+          trac_version=`dev/version.sh`
+          echo "trac_version = ${trac_version}"
+          echo "::set-output name=trac_version::${trac_version}"
+
+      - name: Fetch Python runtime package
+        uses: actions/download-artifact@v2
+        with:
+          name: python_runtime_package
+          path: trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}/python_runtime_package
+
+      - name: Fetch web API package
+        uses: actions/download-artifact@v2
+        with:
+          name: web_api_package
+          path: trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}/web_api_package
+
+      - name: Build dist tarball
+        run: tar -cvzf trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}.tgz trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}/
+
+      - name: Publish release assets
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}.tgz
+          asset_name: trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}.tgz
+          asset_content_type: application/gzip

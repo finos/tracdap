@@ -1,10 +1,16 @@
 name: Integration Tests
 
 on:
+
+  # Integration tests always run on pull requests
+  pull_request:
+
+  # Re-run integration tests in main, to make sure there are no issues from the merge
   push:
     branches:
       - main
-  pull_request:
+
+  # Allow manual triggering of integration tests
   workflow_dispatch:
 
 
