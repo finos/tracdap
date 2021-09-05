@@ -26,7 +26,7 @@ jobs:
       run: ./gradlew build -x test
 
     - name: Unit Tests
-      run: ./gradlew test
+      run: ./gradlew testasdf
 
 
   python_runtime:
