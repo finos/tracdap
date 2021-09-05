@@ -1,15 +1,24 @@
 name: Packaging
 
 on:
-  push:
 
+  # Build packages for pull requests, to make sure there are no packaging issues
   pull_request:
 
+  # Re-run packaging jobs in main, to make sure there are no issues from the merge
+  push:
+    branches:
+      - main
+
+  # Build packages when releases are published on GitHub
+  # Use the release:publish event rather than looking at all tags
+  # Only release events will trigger the publishing jobs
   release:
     types:
       - published
 
   # Allow manual triggering of the packaging jobs
+  # This will not publish packages, but they will be available as workflow assets
   workflow_dispatch:
 
 
