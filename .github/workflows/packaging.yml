@@ -5,12 +5,12 @@ on:
 
   pull_request:
 
+  release:
+    types:
+      - created
+
   # Allow manual triggering of the packaging jobs
   workflow_dispatch:
-
-  workflow_run:
-    workflows: ["Build and Test"]
-    types: [completed]
 
 
 env:
@@ -45,13 +45,6 @@ jobs:
         run: |
           pip install -r dev/requirements.txt
 
-      - name: Set TRAC version
-        id: trac-version
-        run: |
-          trac_version=`dev/version.sh`
-          echo "trac_version = ${trac_version}"
-          echo "::set-output name=trac_version::${trac_version}"
-
       - name: Protoc code generation
         run: |
           python dev/codegen/protoc-ctrl.py python_runtime --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/domain
@@ -65,7 +58,7 @@ jobs:
       - name: Save artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: trac-packages-${{ steps.trac-version.outputs.trac_version }}
+          name: trac-packages
           path: trac-runtime/python/build/dist
           retention-days: 1
 
@@ -93,12 +86,7 @@ jobs:
           npm install
 
       - name: Set TRAC version
-        id: trac-version
-        run: |
-          trac_version=`dev/version.sh`
-          echo "trac_version = ${trac_version}"
-          echo "::set-output name=trac_version::${trac_version}"
-
+        run:
           cd trac-api/packages/web
           npm run tracVersion:posix
 
@@ -119,6 +107,45 @@ jobs:
       - name: Save artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: trac-packages-${{ steps.trac-version.outputs.trac_version }}
+          name: trac-packages
           path: trac-api/packages/web/dist
           retention-days: 1
+
+
+  publish_to_github:
+
+#    if: ${{ github.event.release.created }}
+
+    runs-on: ubuntu-latest
+
+    needs:
+      - python_runtime_package
+      - web_api_package
+
+    steps:
+
+      - name: Fetch all packages
+        uses: actions/download-artifact@v2
+        with:
+          name: trac-packages
+          path: dist/
+
+      - name: Get TRAC version
+        id: trac-version
+        run: |
+          trac_version=`dev/version.sh`
+          echo "trac_version = ${trac_version}"
+          echo "::set-output name=trac_version::${trac_version}"
+
+      - name: Build dist tarball
+        run: tar -cvzf trac-packages-${{ steps.trac-version.outputs.trac_version }} dist/
+
+#      - name: Upload
+#        uses: actions/upload-release-asset@v1.0.1
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        with:
+#          upload_url: ${{ github.event.release.upload_url }}
+#          asset_path: ./bin/oq
+#          asset_name: oq-${{ github.event.release.tag_name }}-linux-x86_64
+#          asset_content_type: application/gzip
