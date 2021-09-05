@@ -28,6 +28,7 @@ jobs:
     - name: Unit Tests
       run: ./gradlew test
 
+
   python_runtime:
 
     runs-on: ubuntu-latest
@@ -113,10 +114,6 @@ jobs:
           export PYTHONPATH=trac-runtime/python/test:$PYTHONPATH
           python -m unittest discover -s trac-runtime/python/test/trac_examples -t trac-runtime/python/test
 
-      - name: Build packages
-        run: |
-          cd trac-runtime/python
-          python package-ctrl.py
 
   web_api:
 
@@ -150,6 +147,7 @@ jobs:
         cd trac-api/packages/web
         npm run pbjs
         npm run pbts
+
 
   documentation:
 
