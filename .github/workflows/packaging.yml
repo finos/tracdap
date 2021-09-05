@@ -46,7 +46,9 @@ jobs:
           pip install -r dev/requirements.txt
 
       - name: Set TRAC version
-        run: export trac_version=`dev/version.sh`
+        run:
+          export trac_version=`dev/version.sh`
+          echo ::set-env name=trac_version::$trac_version
 
       - name: Protoc code generation
         run: |
@@ -90,9 +92,11 @@ jobs:
 
       - name: Set TRAC version
         run: |
-          export trac_version=`dev/version.sh`
           cd trac-api/packages/web
           npm run tracVersion:posix
+          export trac_version=`dev/version.sh`
+          echo ::set-env name=trac_version::$trac_version
+
 
       - name: PBJS code generation
         run: |
