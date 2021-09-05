@@ -2,6 +2,11 @@ name: Packaging
 
 on:
   push:
+    branches:
+      - '*'
+    tags:
+      - '*'
+
   pull_request:
 
   # Allow manual triggering of the packaging jobs
@@ -56,6 +61,54 @@ jobs:
       - name: Save artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: python-runtime
+          name: trac-python-runtime
           path: trac-runtime/python/build/dist
+          retention-days: 1
+
+
+  web_api_package:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          cd trac-api/packages/web
+          npm install
+
+      - name: Set TRAC version
+        run: |
+          cd trac-api/packages/web
+          npm run tracVersion:posix
+
+      - name: PBJS code generation
+        run: |
+          cd trac-api/packages/web
+          npm run pbjs
+          npm run pbts
+
+      - name: Create tarball
+        run: |
+          cd trac-api/packages/web
+          mkdir dist
+          cd dist
+          npm pack ..
+
+      - name: Save artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: trac-web-api
+          path: trac-api/packages/web/dist/*.tgz
           retention-days: 1

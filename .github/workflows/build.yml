@@ -137,11 +137,6 @@ jobs:
         cd trac-api/packages/web
         npm install
 
-    - name: Set TRAC version
-      run: |
-        cd trac-api/packages/web
-        npm run tracVersion:posix
-
     - name: PBJS code generation
       run: |
         cd trac-api/packages/web
