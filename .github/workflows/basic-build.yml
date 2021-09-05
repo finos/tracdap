@@ -46,10 +46,16 @@ jobs:
       matrix:
         enviroment:
 
-          - { ENV_NAME: "Latest: Python 3.9, PySpark 3.0.x, Pandas 1.x",
+          - { ENV_NAME: "Latest: Python 3.9, PySpark 3.1.x, Pandas >= 1.3",
               PYTHON_VERSION: "3.9",
+              PYSPARK_VERSION: ">= 3.1.0, < 3.2.0",
+              PANDAS_VERSION: ">= 1.3.0, < 2.0.0",
+              PYPANDOC: false }
+
+          - { ENV_NAME: "Middle: Python 3.8, PySpark 3.0.x, Pandas 1.1",
+              PYTHON_VERSION: "3.8",
               PYSPARK_VERSION: ">= 3.0.0, < 3.1.0",
-              PANDAS_VERSION: ">= 1.1.0, < 2.0.0",
+              PANDAS_VERSION: ">= 1.1.0, < 1.2.0",
               PYPANDOC: false }
 
           - { ENV_NAME: "Oldest: Python 3.7, PySpark 2.4.0, Pandas 1.0.0",
@@ -74,37 +80,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Use a venv so build tool dependencies don't get mixed with the main build
-      - name: Install dependencies for build tools
-        run: |
-          cd dev/
-          python -m venv venv/
-          . venv/bin/activate
-          pip install -r requirements.txt
-
-      - name: Protoc code generation
-        run: |
-          cd dev/
-          . venv/bin/activate
-          python codegen/protoc-ctrl.py python_runtime --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac_gen/domain
-          python codegen/protoc-ctrl.py python_proto --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac_gen/proto
-
       # PyPanDoc dependency is not managed correctly by PySpark 2.4 package
       # It needs to be installed explicitly first
       - name: Install pre-req dependencies
         if: ${{ matrix.enviroment.PYPANDOC }}
         run: |
-          cd trac-runtime/python
-          python -m pip install --upgrade pip
           pip install pypandoc
 
       - name: Install dependencies
         run: |
-          cd trac-runtime/python
-          python -m pip install --upgrade pip
           pip install "pyspark ${{ matrix.enviroment.PYSPARK_VERSION }}"
           pip install "pandas ${{ matrix.enviroment.PANDAS_VERSION }}"
+          cd trac-runtime/python
           pip install -r requirements.txt
+
+      - name: Protoc code generation
+        run: |
+          python dev/codegen/protoc-ctrl.py python_runtime --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/domain
+          python dev/codegen/protoc-ctrl.py python_proto --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/proto
 
       - name: Unit tests
         run: |
@@ -123,7 +116,7 @@ jobs:
       - name: Build packages
         run: |
           cd trac-runtime/python
-          python setup.py sdist bdist_wheel
+          python package-ctrl.py
 
   web_api:
 

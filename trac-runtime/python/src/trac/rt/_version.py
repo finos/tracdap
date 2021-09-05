@@ -1,4 +1,4 @@
-#  Copyright 2020 Accenture Global Solutions Limited
+#  Copyright 2021 Accenture Global Solutions Limited
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -12,4 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from ._version import __version__
+
+# Do not change the version here!
+# For package builds, the package-ctrl script will fill in the version
+# Otherwise the version should always be set to DEVELOPMENT
+
+__version__ = "DEVELOPMENT"
