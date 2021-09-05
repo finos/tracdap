@@ -113,7 +113,7 @@ jobs:
 
   publish_to_github:
 
-#    if: ${{ github.event.release.created }}
+    if: ${{ github.event.release.created }}
 
     runs-on: ubuntu-latest
 
