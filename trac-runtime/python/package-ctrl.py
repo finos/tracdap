@@ -57,6 +57,15 @@ def copy_source_files():
             shutil.copy(source_path, target_path)
 
 
+def copy_license():
+
+    # Copy the license file out of the project root
+
+    shutil.copy(
+        ROOT_PATH.joinpath("../../LICENSE"),
+        BUILD_PATH.joinpath("LICENSE"))
+
+
 def move_generated_into_src():
 
     # For generated packages, the main source tree contains placeholders that import everything
@@ -139,6 +148,7 @@ def main():
 
     reset_build_dir()
     copy_source_files()
+    copy_license()
 
     move_generated_into_src()
     set_trac_version()
