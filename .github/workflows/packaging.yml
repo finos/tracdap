@@ -86,7 +86,7 @@ jobs:
           npm install
 
       - name: Set TRAC version
-        run:
+        run: |
           cd trac-api/packages/web
           npm run tracVersion:posix
 
