@@ -46,9 +46,10 @@ jobs:
           pip install -r dev/requirements.txt
 
       - name: Set TRAC version
+        id: trac-version
         run:
           export trac_version=`dev/version.sh`
-          echo ::set-env name=trac_version::$trac_version
+          echo "::set-output name=trac_version::$trac_version"
 
       - name: Protoc code generation
         run: |
@@ -63,7 +64,7 @@ jobs:
       - name: Save artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: trac-packages-${{ env.trac_version }}
+          name: trac-packages-${{ steps.trac-version.outputs.trac_version }}
           path: trac-runtime/python/build/dist
           retention-days: 1
 
@@ -91,12 +92,12 @@ jobs:
           npm install
 
       - name: Set TRAC version
+        id: trac-version
         run: |
           cd trac-api/packages/web
           npm run tracVersion:posix
           export trac_version=`dev/version.sh`
-          echo ::set-env name=trac_version::$trac_version
-
+          echo "::set-output name=trac_version::$trac_version"
 
       - name: PBJS code generation
         run: |
@@ -114,6 +115,6 @@ jobs:
       - name: Save artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: trac-packages-${{ env.trac_version }}
+          name: trac-packages-${{ steps.trac-version.outputs.trac_version }}
           path: trac-api/packages/web/dist
           retention-days: 1
