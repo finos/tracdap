@@ -90,7 +90,6 @@ jobs:
           cd trac-api/packages/web
           npm run tracVersion:posix
 
-
       - name: PBJS code generation
         run: |
           cd trac-api/packages/web
@@ -123,6 +122,12 @@ jobs:
       - web_api_package
 
     steps:
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: Fetch all packages
         uses: actions/download-artifact@v2
