@@ -60,7 +60,7 @@ jobs:
         with:
           name: trac-packages
           path: trac-runtime/python/build/dist
-          retention-days: 1
+          retention-days: 7
 
 
   web_api_package:
@@ -108,7 +108,7 @@ jobs:
         with:
           name: trac-packages
           path: trac-api/packages/web/dist
-          retention-days: 1
+          retention-days: 7
 
 
   publish_to_github:
@@ -129,12 +129,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch all packages
-        uses: actions/download-artifact@v2
-        with:
-          name: trac-packages
-          path: dist/
-
       - name: Get TRAC version
         id: trac-version
         run: |
@@ -142,8 +136,14 @@ jobs:
           echo "trac_version = ${trac_version}"
           echo "::set-output name=trac_version::${trac_version}"
 
+      - name: Fetch all packages
+        uses: actions/download-artifact@v2
+        with:
+          name: trac-packages
+          path: trac-dist-packages-${{ steps.trac-version.outputs.trac_version }} ste/
+
       - name: Build dist tarball
-        run: tar -cvzf trac-dist-packages-${{ steps.trac-version.outputs.trac_version }} dist/
+        run: tar -cvzf trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}.tgz trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}/
 
       - name: Publish release assets
         uses: actions/upload-release-asset@v1.0.1
@@ -151,6 +151,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}
-          asset_name: trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}
+          asset_path: trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}.tgz
+          asset_name: trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}.tgz
           asset_content_type: application/gzip
