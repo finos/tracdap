@@ -15,6 +15,7 @@ on:
 
 env:
   PYTHON_VERSION: "3.9"
+  NODE_VERSION: "14.x"
 
 
 jobs:
@@ -44,6 +45,9 @@ jobs:
         run: |
           pip install -r dev/requirements.txt
 
+      - name: Set TRAC version
+        run: export trac_version=`dev/version.sh`
+
       - name: Protoc code generation
         run: |
           python dev/codegen/protoc-ctrl.py python_runtime --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/domain
@@ -57,7 +61,7 @@ jobs:
       - name: Save artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: trac-python-runtime
+          name: trac-packages-${{ env.trac_version }}
           path: trac-runtime/python/build/dist
           retention-days: 1
 
@@ -71,7 +75,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v1
         with:
-          node-version: 14.x
+          node-version: ${{ env.NODE_VERSION }}
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
@@ -86,6 +90,7 @@ jobs:
 
       - name: Set TRAC version
         run: |
+          export trac_version=`dev/version.sh`
           cd trac-api/packages/web
           npm run tracVersion:posix
 
@@ -105,6 +110,6 @@ jobs:
       - name: Save artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: trac-web-api
-          path: trac-api/packages/web/dist/*.tgz
+          name: trac-packages-${{ env.trac_version }}
+          path: trac-api/packages/web/dist
           retention-days: 1
