@@ -67,7 +67,7 @@ jobs:
       - name: Save artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: trac-packages
+          name: python_runtime_package
           path: trac-runtime/python/build/dist
           retention-days: 7
 
@@ -115,7 +115,7 @@ jobs:
       - name: Save artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: trac-packages
+          name: web_api_package
           path: trac-api/packages/web/dist
           retention-days: 7
 
@@ -145,11 +145,17 @@ jobs:
           echo "trac_version = ${trac_version}"
           echo "::set-output name=trac_version::${trac_version}"
 
-      - name: Fetch all packages
+      - name: Fetch Python runtime package
         uses: actions/download-artifact@v2
         with:
-          name: trac-packages
-          path: trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}/
+          name: python_runtime_package
+          path: trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}/python_runtime_package
+
+      - name: Fetch web API package
+        uses: actions/download-artifact@v2
+        with:
+          name: web_api_package
+          path: trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}/web_api_package
 
       - name: Build dist tarball
         run: tar -cvzf trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}.tgz trac-dist-packages-${{ steps.trac-version.outputs.trac_version }}/
