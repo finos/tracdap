@@ -7,7 +7,7 @@ on:
 
   release:
     types:
-      - created
+      - published
 
   # Allow manual triggering of the packaging jobs
   workflow_dispatch:
@@ -113,7 +113,7 @@ jobs:
 
   publish_to_github:
 
-    if: ${{ github.event.release.created }}
+    if: ${{ github.event.release.published }}
 
     runs-on: ubuntu-latest
 
