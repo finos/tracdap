@@ -49,8 +49,8 @@ jobs:
         id: trac-version
         run:
           trac_version=`dev/version.sh`
-          echo trac_version = $trac_version
-          echo "::set-output name=trac_version::$trac_version"
+          echo "trac_version = ${trac_version}"
+          echo "::set-output name=trac_version::${trac_version}"
 
       - name: Protoc code generation
         run: |
@@ -95,11 +95,13 @@ jobs:
       - name: Set TRAC version
         id: trac-version
         run: |
+          trac_version=`dev/version.sh`
+          echo "trac_version = ${trac_version}"
+          echo "::set-output name=trac_version::${trac_version}"
+
           cd trac-api/packages/web
           npm run tracVersion:posix
-          trac_version=`dev/version.sh`
-          echo trac_version = $trac_version
-          echo "::set-output name=trac_version::$trac_version"
+
 
       - name: PBJS code generation
         run: |
