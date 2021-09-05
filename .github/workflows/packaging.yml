@@ -113,7 +113,7 @@ jobs:
 
   publish_to_github:
 
-    if: ${{ github.event.release.published }}
+    if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
 
     runs-on: ubuntu-latest
 
