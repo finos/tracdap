@@ -6,10 +6,11 @@ The TRAC model runtime provides all the APIs needed to write models for the TRAC
 It includes an implementation of the runtime library that can be used as a development
 sandbox, so you can run and debug TRAC models right away from your favourite IDE or notebook.
 A number of tools are included to make it easy to plug in development data and other settings.
-
 When your models are ready they can be loaded into a real instance of TRAC for testing and
 eventual deployment.
 
+Documentation for the TRAC platform is available at
+[trac-platform.readthedocs.io](https://trac-platform.readthedocs.io).
 
 ## Requirements
 
@@ -17,7 +18,7 @@ The TRAC runtime for Python has these requirements:
 
 * Python: 3.7 or later
 * Pandas: 1.0 or later
-* PySpark 2.4.x or 3.0.x
+* PySpark 2.4.x, 3.0.x or 3.1.x
 
 Not every combination of versions will work, e.g. PySpark 3 requires Python 3.8.
 
@@ -59,23 +60,3 @@ available in our online documentation. The tutorials are based on
 [example models](https://github.com/Accenture/trac/tree/main/examples/models/python)
 in the TRAC GitHub repository. We run these examples as part of our CI, so they will always
 be in sync with the corresponding version of the runtime library.
-
-
-## Building the runtime from source
-
-This is not normally necessary for app development, but if you want to do it here are the commands.
-
-    cd trac-runtime/python
-    python -m venv ./venv
-    . venv/bin/activate     # For macOS or Linux
-    venv\Scripts\activate   # For Windows
-
-    pip install -r requirements.txt
-
-    python ../../dev/codegen/protoc-ctrl.py python_runtime \
-        --proto_path ../../trac-api/trac-metadata/src/main/proto \
-        --out generated/trac/rt_gen/domain
-
-    python package-ctrl.py dist
-
-The package will appear in the dist/ folder.
