@@ -48,7 +48,8 @@ jobs:
       - name: Set TRAC version
         id: trac-version
         run:
-          export trac_version=`dev/version.sh`
+          trac_version=`dev/version.sh`
+          echo trac_version = $trac_version
           echo "::set-output name=trac_version::$trac_version"
 
       - name: Protoc code generation
@@ -96,7 +97,8 @@ jobs:
         run: |
           cd trac-api/packages/web
           npm run tracVersion:posix
-          export trac_version=`dev/version.sh`
+          trac_version=`dev/version.sh`
+          echo trac_version = $trac_version
           echo "::set-output name=trac_version::$trac_version"
 
       - name: PBJS code generation
