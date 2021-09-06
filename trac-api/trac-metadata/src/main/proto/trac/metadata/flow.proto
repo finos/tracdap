@@ -65,6 +65,6 @@ message FlowDefinition {
   repeated FlowEdge edges = 2;
 
   map<string, ModelParameter> params = 3;
-  map<string, TableDefinition> inputs = 4;
-  map<string, TableDefinition> outputs = 5;
+  map<string, ModelInputSchema> inputs = 4;
+  map<string, ModelOutputSchema> outputs = 5;
 }
