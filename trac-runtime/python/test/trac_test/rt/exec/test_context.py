@@ -92,10 +92,7 @@ _test_model_def = _api.ModelDefinition(  # noqa
 
     params=_TestModel().define_parameters(),
     inputs=_TestModel().define_inputs(),
-    outputs=_TestModel().define_outputs(),
-
-    overlay=False,
-    schemaUnchanged=False)
+    outputs=_TestModel().define_outputs())
 
 
 class TracContextTest(unittest.TestCase):
