@@ -60,11 +60,21 @@ def define_parameter(
     return _Named(param_name, _meta.ModelParameter(label, param_type_descriptor, default_value))
 
 
-def define_table(*fields: _meta.FieldDefinition):
-    return _meta.TableDefinition([*fields])
+def define_input_table(*fields: _meta.FieldDefinition) -> _meta.ModelInputSchema:
+
+    table_def = _meta.TableDefinition([*fields])
+    schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE, table=table_def)
+    return _meta.ModelInputSchema(schema=schema_def)
 
 
-def define_field(*args, **kwargs):
+def define_output_table(*fields: _meta.FieldDefinition) -> _meta.ModelOutputSchema:
+
+    table_def = _meta.TableDefinition([*fields])
+    schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE, table=table_def)
+    return _meta.ModelOutputSchema(schema=schema_def)
+
+
+def define_field(*args, **kwargs) -> _meta.FieldDefinition:
 
     arg_names = list(kwargs.keys())
 
