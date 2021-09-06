@@ -121,11 +121,14 @@ message Tag {
     map<string, Value> attrs = 2;
 
     /**
-     * The object definition that the tag is associate with.
+     * The object definition that the tag is associated with.
+     *
+     * Sometimes the definition may be omitted, for example the results of a
+     * metadata search include only headers and attributes.
      *
      * @see ObjectDefinition
      */
-    ObjectDefinition definition = 3;
+    optional ObjectDefinition definition = 3;
 }
 
 
@@ -237,9 +240,9 @@ message TagUpdate {
      * Attribute value to use for this update.
      *
      * This field must be supplied for operations that use a value, otherwise it
-     * should be left blank.
+     * should be omitted.
      *
      * @see metadata.Value
      */
-    metadata.Value value = 3;
+    optional metadata.Value value = 3;
 }

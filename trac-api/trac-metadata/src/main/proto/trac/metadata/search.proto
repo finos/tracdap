@@ -245,8 +245,11 @@ message SearchParameters {
    *
    * If a zone offset is supplied as part of the timestamp, TRAC will apply the
    * offset to search across all metadata items in UTC.
+   *
+   * If this parameter is not supplied, the search will be executed as of the
+   * current time.
    */
-  DatetimeValue searchAsOf = 3;
+  optional DatetimeValue searchAsOf = 3;
 
   /**
    * Include prior versions of objects in the search.
