@@ -166,10 +166,7 @@ class DevModeTranslator:
 
             params={},
             inputs={},
-            outputs={},
-
-            overlay=False,
-            schemaUnchanged=False)
+            outputs={})
 
         loader = _repos.IntegratedModelLoader(cfg.RepositoryConfig(repoType="INTEGRATED", repoUrl=""))
         model_class = loader.load_model(skeleton_modeL_def)
@@ -188,10 +185,7 @@ class DevModeTranslator:
 
             params=model_params,
             inputs=model_inputs,
-            outputs=model_outputs,
-
-            overlay=False,
-            schemaUnchanged=False)
+            outputs=model_outputs)
 
         model_object = meta.ObjectDefinition(
             objectType=meta.ObjectType.MODEL,
