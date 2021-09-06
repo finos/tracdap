@@ -140,11 +140,11 @@ class TracModel:
         pass
 
     @_abc.abstractmethod
-    def define_inputs(self) -> _tp.Dict[str, _meta.ModelDataSchema]:
+    def define_inputs(self) -> _tp.Dict[str, _meta.ModelInputSchema]:
         pass
 
     @_abc.abstractmethod
-    def define_outputs(self) -> _tp.Dict[str, _meta.ModelDataSchema]:
+    def define_outputs(self) -> _tp.Dict[str, _meta.ModelOutputSchema]:
         pass
 
     @_abc.abstractmethod

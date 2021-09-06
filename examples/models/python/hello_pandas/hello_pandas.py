@@ -32,7 +32,7 @@ class HelloPandas(trac.TracModel):
                    label="Exclude defaulted loans from the calculation",
                    default_value=False))
 
-    def define_inputs(self) -> tp.Dict[str, trac.TableDefinition]:
+    def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
 
         customer_loans = trac.define_table(
             trac.F("id", trac.BasicType.STRING, label="Customer account ID", business_key=True),
@@ -43,7 +43,7 @@ class HelloPandas(trac.TracModel):
 
         return {"customer_loans": customer_loans}
 
-    def define_outputs(self) -> tp.Dict[str, trac.TableDefinition]:
+    def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
 
         profit_by_region = trac.define_table(
             trac.F("region", trac.BasicType.STRING, label="Customer home region", categorical=True),

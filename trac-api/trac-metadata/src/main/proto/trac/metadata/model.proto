@@ -38,19 +38,34 @@ message ModelParameter {
 
 
 /**
- * Describes the data schema of a model input or output
+ * Describes the data schema of a model input
  *
- * In many cases models define the entire schemas of their inputs and outputs, in which case
- * the model data schema is just a wrapper around a schema definition. This is what is
- * supported now.
+ * In many cases models define the entire schemas of their inputs, in which case the input
+ * schema is just a wrapper around a schema definition. This is what is supported now.
  *
- * There are other ways for models to describe data schemas. Dynamic schemas for inputs or
- * outputs (i.e. the schema is supplied / defined at runtime), pass-through schemas (output
- * X has the same schema as dynamic input Y) and pass-through-extend schemas (output X has
- * the schema of dynamic input Y, plus one or more new columns). These capabilities may be
+ * Other approaches are possible. Models can define dynamic inputs, in which case the input
+ * schema is provided at runtime and can be interrogated by the model code. Models may also
+ * define inputs with some required fields and a dynamic portion. For non-tabular inputs,
+ * other options may be required. These capabilities may be added in future releases.
+ */
+message ModelInputSchema {
+
+    SchemaDefinition schema = 1;
+}
+
+/**
+ * Describes the data schema of a model output
+ *
+ * In many cases models define the entire schemas of their outputs, in which case the output
+ * schema is just a wrapper around a schema definition. This is what is supported now.
+ *
+ * Other approaches are possible. Models can define dynamic outputs, in which case the model
+ * decides at runtime what the output schema will be. Pass-through schemas (output X has the
+ same schema as dynamic input Y) and pass-through-extend schemas (output X has the schema of
+ dynamic input Y, plus one or more new columns) can also be useful. These capabilities may be
  * added in future releases.
  */
-message ModelDataSchema {
+message ModelOutputSchema {
 
     SchemaDefinition schema = 1;
 }
@@ -68,6 +83,6 @@ message ModelDefinition {
     string entryPoint = 5;
 
     map<string, ModelParameter> params = 6;
-    map<string, ModelDataSchema> inputs = 7;
-    map<string, ModelDataSchema> outputs = 8;
+    map<string, ModelInputSchema> inputs = 7;
+    map<string, ModelOutputSchema> outputs = 8;
 }
