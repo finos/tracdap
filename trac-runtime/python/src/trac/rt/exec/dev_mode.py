@@ -160,8 +160,6 @@ class DevModeTranslator:
         skeleton_modeL_def = meta.ModelDefinition(  # noqa
             language="python",
             repository="trac_integrated",
-            repositoryVersion="",
-            path="",
             entryPoint=f"{model_class.__module__}.{model_class.__name__}",
 
             params={},
@@ -179,8 +177,6 @@ class DevModeTranslator:
         model_def = meta.ModelDefinition(  # noqa
             language="python",
             repository="trac_integrated",
-            repositoryVersion="",
-            path="",
             entryPoint=f"{model_class.__module__}.{model_class.__name__}",
 
             params=model_params,
@@ -231,7 +227,7 @@ class DevModeTranslator:
 
         data_def = meta.DataDefinition(parts={})
         data_def.storageId = str(storage_id)
-        data_def.schema = meta.TableDefinition()
+        data_def.schema = meta.SchemaDefinition(schemaType=meta.SchemaType.TABLE, table=meta.TableDefinition())
         data_def.parts[part_key.opaqueKey] = part
 
         storage_copy = meta.StorageCopy(

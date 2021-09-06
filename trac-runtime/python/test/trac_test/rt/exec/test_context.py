@@ -86,8 +86,6 @@ _test_model_def = _api.ModelDefinition(  # noqa
 
     language="python",
     repository="trac_integrated",
-    repositoryVersion="",
-    path="",
     entryPoint=f"{_TestModel.__module__}.{_TestModel.__name__}",
 
     params=_TestModel().define_parameters(),

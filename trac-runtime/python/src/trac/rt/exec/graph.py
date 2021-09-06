@@ -167,7 +167,7 @@ class KeyedItemNode(MappingNode):
 @dc.dataclass(frozen=True)
 class DataViewNode(MappingNode):
 
-    schema: meta.TableDefinition
+    schema: meta.SchemaDefinition
     root_item: NodeId
 
     def __post_init__(self):
