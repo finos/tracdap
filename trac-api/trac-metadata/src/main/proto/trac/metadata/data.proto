@@ -21,6 +21,7 @@ option java_package = "com.accenture.trac.metadata";
 option java_multiple_files = true;
 
 import "trac/metadata/type.proto";
+import "trac/metadata/object_id.proto";
 
 
 enum DataFormat {
@@ -53,6 +54,44 @@ message TableDefinition {
 }
 
 
+/**
+ * Enumeration of the available types of data schema
+ *
+ * Currently only table schemas are supported, other schema types may be added later.
+ *
+ * @see SchemaDefinition
+ */
+enum SchemaType {
+
+    SCHEMA_TYPE_NOT_SET = 0;
+    TABLE = 1;
+}
+
+/**
+ * A schema definition describes the schema of a dataset
+ *
+ * Schema definitions can be top level objects (a type of object definition),
+ * in which case they can be referred to by multiple data definitions. Alternatively
+ * they can be embedded in a data definition to create datasets with one-off schemas.
+ *
+ * A table schema describes the schema of a tabular data set. Other schema types may
+ * be added later, e.g. for matrices, tensors, curves, surfaces and structured datasets.
+ *
+ * @see DataDefinition
+ */
+message SchemaDefinition {
+
+    SchemaType schemaType = 1;
+
+    oneof schemaTypeDefinition {
+
+        TableDefinition table = 2;
+    }
+}
+
+
+
+
 enum PartType {
     PART_ROOT = 0;
     PART_BY_RANGE = 1;
@@ -73,6 +112,12 @@ message PartKey {
 
 message DataDefinition {
 
+    oneof schemaDefinition {
+
+        TagSelector schemaId = 1;
+        SchemaDefinition schema = 2;
+    }
+
     message Delta {
 
         uint32 deltaIndex = 1;
@@ -91,8 +136,7 @@ message DataDefinition {
         Snap snap = 2;
     }
 
-    TableDefinition schema = 1;
-    map<string, Part> parts = 2;
+    map<string, Part> parts = 3;
 
-    string storageId = 3;
+    string storageId = 4;
 }
