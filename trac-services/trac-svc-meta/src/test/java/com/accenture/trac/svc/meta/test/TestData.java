@@ -128,7 +128,9 @@ public class TestData {
             // Not needed yet to test metadata semantics in isolation
             .setStorageId("dummy_storage")
 
-            .setSchema(TableDefinition.newBuilder()
+            .setSchema(SchemaDefinition.newBuilder()
+                .setSchemaType(SchemaType.TABLE)
+                .setTable(TableDefinition.newBuilder()
                 .addFields(FieldDefinition.newBuilder()
                         .setFieldName("transaction_id")
                         .setFieldType(BasicType.STRING)
@@ -148,24 +150,27 @@ public class TestData {
                         .setFieldName("widgets_ordered")
                         .setFieldType(BasicType.INTEGER)
                         .setFieldOrder(4)
-                        .setBusinessKey(true))))
+                        .setBusinessKey(true)))))
             .build();
     }
 
     public static ObjectDefinition nextDataDef(ObjectDefinition origDef) {
 
-        var fieldName = "extra_field_" + (origDef.getData().getSchema().getFieldsCount() + 1);
+        var fieldName = "extra_field_" + (origDef.getData().getSchema().getTable().getFieldsCount() + 1);
+
+        var origTableSchema = origDef.getData().getSchema().getTable();
+        var newTableSchema = origTableSchema.toBuilder()
+                .addFields(FieldDefinition.newBuilder()
+                .setFieldName(fieldName)
+                .setFieldOrder(origTableSchema.getFieldsCount())
+                .setFieldType(BasicType.FLOAT)
+                .setFieldLabel("We got an extra field!")
+                .setFormatCode("PERCENT"));
 
         return origDef.toBuilder()
-                .setData(origDef.getData()
-                .toBuilder()
+                .setData(origDef.getData().toBuilder()
                 .setSchema(origDef.getData().getSchema().toBuilder()
-                    .addFields(FieldDefinition.newBuilder()
-                    .setFieldName(fieldName)
-                    .setFieldOrder(origDef.getData().getSchema().getFieldsCount())
-                    .setFieldType(BasicType.FLOAT)
-                    .setFieldLabel("We got an extra field!")
-                    .setFormatCode("PERCENT"))))
+                .setTable(newTableSchema)))
                 .build();
     }
 
@@ -221,7 +226,9 @@ public class TestData {
                 .setEntryPoint("trac_test.test1.SampleModel1")
                 .putParams("param1", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.STRING)).build())
                 .putParams("param2", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.INTEGER)).build())
-                .putInputs("input1", TableDefinition.newBuilder()
+                .putInputs("input1", ModelDataSchema.newBuilder()
+                        .setSchema(SchemaDefinition.newBuilder()
+                        .setTable(TableDefinition.newBuilder()
                         .addFields(FieldDefinition.newBuilder()
                                 .setFieldName("field1")
                                 .setFieldType(BasicType.DATE))
@@ -231,12 +238,14 @@ public class TestData {
                                 .setFieldType(BasicType.DECIMAL)
                                 .setFieldLabel("A display name")
                                 .setCategorical(true)
-                                .setFormatCode("GBP"))
+                                .setFormatCode("GBP"))))
                         .build())
-                .putOutputs("output1", TableDefinition.newBuilder()
+                .putOutputs("output1", ModelDataSchema.newBuilder()
+                        .setSchema(SchemaDefinition.newBuilder()
+                        .setTable(TableDefinition.newBuilder()
                         .addFields(FieldDefinition.newBuilder()
                                 .setFieldName("checksum_field")
-                                .setFieldType(BasicType.DECIMAL))
+                                .setFieldType(BasicType.DECIMAL))))
                         .build()))
                 .build();
     }
@@ -442,7 +451,7 @@ public class TestData {
                 return truncateMicrosecondPrecision(dateTime);
 
             default:
-                throw new RuntimeException("Test object not available for basic type " + basicType.toString());
+                throw new RuntimeException("Test object not available for basic type " + basicType);
         }
     }
 
@@ -467,7 +476,7 @@ public class TestData {
             case DATETIME: return ((OffsetDateTime) originalObject).plusHours(1);
 
             default:
-                throw new RuntimeException("Test object not available for basic type " + basicType.toString());
+                throw new RuntimeException("Test object not available for basic type " + basicType);
         }
     }
 

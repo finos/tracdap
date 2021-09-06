@@ -695,12 +695,12 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         // Create a V2 data definition that is invalid, use an explicit fieldOrder = -1
 
-        var v2Schema = v1Schema
-                .toBuilder()
+        var v2Schema = v1Schema.toBuilder()
+                .setTable(v1Schema.getTable().toBuilder()
                 .addFields(FieldDefinition.newBuilder()
                         .setFieldName("some_new_field")
                         .setFieldType(BasicType.STRING)
-                        .setFieldOrder(-1));
+                        .setFieldOrder(-1)));
 
         var v2Obj = v1SavedTag.getDefinition().toBuilder()
                 .setData(v1SavedTag.getDefinition().getData()
