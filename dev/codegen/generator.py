@@ -642,21 +642,17 @@ class TracGenerator:
             else:
                 return f"_tp.List[{base_type}]"
 
-        # Fields in a oneof group are always optional
+        # Fields explicitly marked optional in the proto are, of course, optional!
+        elif field.proto3_optional:
+            return f"_tp.Optional[{base_type}]"
+
+        # Fields in a oneof group are also optional
         # If no oneof group is set, oneof_index will have default value of 0
         # To check if this field is really set, use HasField()
         elif field.HasField('oneof_index'):
             return f"_tp.Optional[{base_type}]"
 
-        # Message fields are always optional and can be set to null
-        elif field.type == field.Type.TYPE_MESSAGE:
-            return f"_tp.Optional[{base_type}]"
-
-        # Enum fields are always set to a value (the enum' zero value)
-        elif field.type == field.Type.TYPE_ENUM:
-            return base_type
-
-        # Assume everything else is a primitive
+        # Everything else should be either a (non-optional) message, an enum or a primitive
         else:
             return base_type
 
