@@ -125,7 +125,7 @@ message TypeDescriptor {
     BasicType basicType = 1;
 
     /// For array types only, describe the type contained in the array.
-    TypeDescriptor arrayType = 2;
+    optional TypeDescriptor arrayType = 2;
 
     /**
      * For map types only, describe the type contained in the map.
@@ -136,7 +136,7 @@ message TypeDescriptor {
      * basicType = BASIC_TYPE_NOT_SET then the map is non-uniform, values must
      * be inspected individually to determine their type.
      */
-    TypeDescriptor mapType = 3;
+    optional TypeDescriptor mapType = 3;
 }
 
 
