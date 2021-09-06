@@ -88,7 +88,7 @@ _test_model_def = _api.ModelDefinition(  # noqa
     repository="trac_integrated",
     entryPoint=f"{_TestModel.__module__}.{_TestModel.__name__}",
 
-    params=_TestModel().define_parameters(),
+    parameters=_TestModel().define_parameters(),
     inputs=_TestModel().define_inputs(),
     outputs=_TestModel().define_outputs())
 

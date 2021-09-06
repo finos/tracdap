@@ -251,8 +251,8 @@ public class TestData {
                 .setPackage("trac-test-package")
                 .setVersion("trac-test-repo-1.2.3-RC4")
                 .setEntryPoint("trac_test.test1.SampleModel1")
-                .putParams("param1", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.STRING)).build())
-                .putParams("param2", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.INTEGER)).build())
+                .putParameters("param1", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.STRING)).build())
+                .putParameters("param2", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.INTEGER)).build())
                 .putInputs("input1", ModelInputSchema.newBuilder()
                         .setSchema(SchemaDefinition.newBuilder()
                         .setTable(TableSchema.newBuilder()
@@ -282,7 +282,7 @@ public class TestData {
         return origDef.toBuilder()
                 .setModel(origDef.getModel()
                 .toBuilder()
-                .putParams("param3", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.DATE)).build()))
+                .putParameters("param3", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.DATE)).build()))
                 .build();
     }
 

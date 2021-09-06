@@ -83,7 +83,7 @@ message ModelDefinition {
     string version = 5;
     string entryPoint = 6;
 
-    map<string, ModelParameter> params = 7;
+    map<string, ModelParameter> parameters = 7;
     map<string, ModelInputSchema> inputs = 8;
     map<string, ModelOutputSchema> outputs = 9;
 }

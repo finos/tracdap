@@ -162,7 +162,7 @@ class DevModeTranslator:
             repository="trac_integrated",
             entryPoint=f"{model_class.__module__}.{model_class.__name__}",
 
-            params={},
+            parameters={},
             inputs={},
             outputs={})
 
@@ -179,7 +179,7 @@ class DevModeTranslator:
             repository="trac_integrated",
             entryPoint=f"{model_class.__module__}.{model_class.__name__}",
 
-            params=model_params,
+            parameters=model_params,
             inputs=model_inputs,
             outputs=model_outputs)
 

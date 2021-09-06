@@ -38,7 +38,7 @@
                 "modelStub": {
                     "inputs": [ "initial_accounts", "economic_scenario" ],
                     "outputs": [ "simulated_accounts" ],
-                    "params": {
+                    "parameters": {
                         "number_of_months": { "basicType": "INTEGER" },
                         "include_promotions": { "basicType": "BOOLEAN" }
                     }
@@ -50,7 +50,7 @@
                 "modelStub": {
                     "inputs": [ "initial_accounts" ],
                     "outputs": [ "simulated_accounts" ],
-                    "params": {
+                    "parameters": {
                         "number_of_months": { "basicType": "INTEGER" },
                         "include_promotions": { "basicType": "BOOLEAN" }
                     }
