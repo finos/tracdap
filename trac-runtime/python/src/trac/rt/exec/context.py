@@ -84,7 +84,7 @@ class TracContextImpl(_api.TracContext):
 
         return self.__parameters[parameter_name]
 
-    def get_table_schema(self, dataset_name: str) -> _meta.TableDefinition:
+    def get_schema(self, dataset_name: str) -> _meta.SchemaDefinition:
 
         self.__val.check_dataset_name_not_null(dataset_name)
         self.__val.check_dataset_valid_identifier(dataset_name)
@@ -120,7 +120,7 @@ class TracContextImpl(_api.TracContext):
     def get_spark_table_rdd(self, dataset_name: str) -> pys.RDD:
         raise NotImplementedError()
 
-    def put_table_schema(self, dataset_name: str, schema: _meta.TableDefinition):
+    def put_schema(self, dataset_name: str, schema: _meta.SchemaDefinition):
         raise NotImplementedError()
 
     def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
@@ -245,14 +245,14 @@ class TracContextValidator:
 
         schema = self.__data_ctx[dataset_name].schema
 
-        if schema is None or not schema.fields:
+        if schema is None or not schema.table or not schema.table.fields:
             self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
 
     def check_dataset_schema_not_defined(self, dataset_name: str):
 
         schema = self.__data_ctx[dataset_name].schema
 
-        if schema is not None and schema.fields:
+        if schema is not None and (schema.table or schema.schemaType != _meta.SchemaType.SCHEMA_TYPE_NOT_SET):
             self._report_error(f"Schema already defined for dataset {dataset_name} in the current context")
 
     def check_dataset_part_present(self, dataset_name: str, part_key: _data.DataPartKey):

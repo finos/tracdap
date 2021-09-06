@@ -42,5 +42,5 @@ class DataPartKey:
 @dc.dataclass(frozen=True)
 class DataView:
 
-    schema: _meta.TableDefinition
+    schema: _meta.SchemaDefinition
     parts: tp.Dict[DataPartKey, tp.List[DataItem]]

@@ -59,9 +59,9 @@ class _TestModel(_api.TracModel):
                    label="A datetime param",
                    default_value=False))
 
-    def define_inputs(self) -> tp.Dict[str, _api.TableDefinition]:
+    def define_inputs(self) -> tp.Dict[str, _api.ModelInputSchema]:
 
-        customer_loans = _api.define_table(
+        customer_loans = _api.define_input_table(
             _api.F("id", _api.BasicType.STRING, label="Customer account ID", business_key=True),
             _api.F("loan_amount", _api.BasicType.DECIMAL, label="Principal loan amount", format_code="CCY:EUR"),
             _api.F("total_pymnt", _api.BasicType.DECIMAL, label="Total amount repaid", format_code="CCY:EUR"),
@@ -70,9 +70,9 @@ class _TestModel(_api.TracModel):
 
         return {"customer_loans": customer_loans}
 
-    def define_outputs(self) -> tp.Dict[str, _api.TableDefinition]:
+    def define_outputs(self) -> tp.Dict[str, _api.ModelOutputSchema]:
 
-        profit_by_region = _api.define_table(
+        profit_by_region = _api.define_output_table(
             _api.F("region", _api.BasicType.STRING, label="Customer home region", categorical=True),
             _api.F("gross_profit", _api.BasicType.DECIMAL, label="Total gross profit", format_code="CCY:USD"))
 
@@ -139,12 +139,12 @@ class TracContextTest(unittest.TestCase):
             "datetime_param": self.DATETIME_PARAM_VALUE
         }
 
-        customer_loans_schema = _test_model_def.inputs.get("customer_loans")
+        customer_loans_schema = _test_model_def.inputs.get("customer_loans").schema
         customer_loans_delta0 = _data.DataItem(pandas=self.LOANS_DATA)
         customer_loans_parts = {_data.DataPartKey.for_root(): [customer_loans_delta0]}
         customer_loans_view = _data.DataView(customer_loans_schema, customer_loans_parts)
 
-        profit_by_region_schema = _test_model_def.outputs.get("profit_by_region")
+        profit_by_region_schema = _test_model_def.outputs.get("profit_by_region").schema
         profit_by_region_view = _data.DataView(profit_by_region_schema, {})
 
         data_ctx = {
@@ -195,17 +195,21 @@ class TracContextTest(unittest.TestCase):
 
     def test_get_schema_ok(self):
 
-        table_schema = self.ctx.get_table_schema("customer_loans")
+        schema = self.ctx.get_schema("customer_loans")
 
-        self.assertIsInstance(table_schema, _api.TableDefinition)
-        self.assertEqual(len(table_schema.fields), 5)
+        self.assertIsInstance(schema, _api.SchemaDefinition)
+        self.assertEqual(schema.schemaType, _api.SchemaType.TABLE)
+        self.assertIsInstance(schema.table, _api.TableDefinition)
+        self.assertEqual(len(schema.table.fields), 5)
 
     def test_get_schema_for_output(self):
 
-        table_schema = self.ctx.get_table_schema("profit_by_region")
+        schema = self.ctx.get_schema("profit_by_region")
 
-        self.assertIsInstance(table_schema, _api.TableDefinition)
-        self.assertEqual(len(table_schema.fields), 2)
+        self.assertIsInstance(schema, _api.SchemaDefinition)
+        self.assertEqual(schema.schemaType, _api.SchemaType.TABLE)
+        self.assertIsInstance(schema.table, _api.TableDefinition)
+        self.assertEqual(len(schema.table.fields), 2)
 
     def test_get_pandas_table_ok(self):
 
@@ -229,7 +233,7 @@ class TracContextTest(unittest.TestCase):
 
     def test_get_dataset_name_is_null(self):
 
-        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_table_schema(None))  # noqa
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_schema(None))  # noqa
         self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_pandas_table(None))  # noqa
 
         # Add other get methods here as they are implemented, e.g. get_pyspark_table
@@ -238,14 +242,14 @@ class TracContextTest(unittest.TestCase):
 
         for identifier in self.INVALID_IDENTIFIERS:
 
-            self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_table_schema(identifier))
+            self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_schema(identifier))
             self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_pandas_table(identifier))
 
             # Add other get methods here as they are implemented, e.g. get_pyspark_table
 
     def test_get_dataset_unknown(self):
 
-        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_table_schema("unknown_dataset"))
+        self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_schema("unknown_dataset"))
         self.assertRaises(_ex.ERuntimeValidation, lambda: self.ctx.get_pandas_table("unknown_dataset"))
 
         # Add other get methods here as they are implemented, e.g. get_pyspark_table
