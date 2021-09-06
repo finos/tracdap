@@ -24,15 +24,41 @@ import "trac/metadata/type.proto";
 import "trac/metadata/data.proto";
 
 
+/**
+ * Describes an individual parameter of a model
+ */
 message ModelParameter {
 
     string label = 1;
 
     TypeDescriptor paramType = 2;
 
-    Value defaultValue = 3;
+    optional Value defaultValue = 3;
 }
 
+
+/**
+ * Describes the data schema of a model input or output
+ *
+ * In many cases models define the entire schemas of their inputs and outputs, in which case
+ * the model data schema is just a wrapper around a schema definition. This is what is
+ * supported now.
+ *
+ * There are other ways for models to describe data schemas. Dynamic schemas for inputs or
+ * outputs (i.e. the schema is supplied / defined at runtime), pass-through schemas (output
+ * X has the same schema as dynamic input Y) and pass-through-extend schemas (output X has
+ * the schema of dynamic input Y, plus one or more new columns). These capabilities may be
+ * added in future releases.
+ */
+message ModelDataSchema {
+
+    SchemaDefinition schema = 1;
+}
+
+
+/**
+ * Define a model for execution on the TRAC platform
+ */
 message ModelDefinition {
 
     string language = 1;
@@ -42,9 +68,6 @@ message ModelDefinition {
     string entryPoint = 5;
 
     map<string, ModelParameter> params = 6;
-    map<string, TableDefinition> inputs = 7;
-    map<string, TableDefinition> outputs = 8;
-
-    bool overlay = 9;
-    bool schemaUnchanged = 10;
+    map<string, ModelDataSchema> inputs = 7;
+    map<string, ModelDataSchema> outputs = 8;
 }
