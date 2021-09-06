@@ -160,16 +160,11 @@ class DevModeTranslator:
         skeleton_modeL_def = meta.ModelDefinition(  # noqa
             language="python",
             repository="trac_integrated",
-            repositoryVersion="",
-            path="",
             entryPoint=f"{model_class.__module__}.{model_class.__name__}",
 
-            params={},
+            parameters={},
             inputs={},
-            outputs={},
-
-            overlay=False,
-            schemaUnchanged=False)
+            outputs={})
 
         loader = _repos.IntegratedModelLoader(cfg.RepositoryConfig(repoType="INTEGRATED", repoUrl=""))
         model_class = loader.load_model(skeleton_modeL_def)
@@ -182,16 +177,11 @@ class DevModeTranslator:
         model_def = meta.ModelDefinition(  # noqa
             language="python",
             repository="trac_integrated",
-            repositoryVersion="",
-            path="",
             entryPoint=f"{model_class.__module__}.{model_class.__name__}",
 
-            params=model_params,
+            parameters=model_params,
             inputs=model_inputs,
-            outputs=model_outputs,
-
-            overlay=False,
-            schemaUnchanged=False)
+            outputs=model_outputs)
 
         model_object = meta.ObjectDefinition(
             objectType=meta.ObjectType.MODEL,
@@ -237,7 +227,7 @@ class DevModeTranslator:
 
         data_def = meta.DataDefinition(parts={})
         data_def.storageId = str(storage_id)
-        data_def.schema = meta.TableDefinition()
+        data_def.schema = meta.SchemaDefinition(schemaType=meta.SchemaType.TABLE, table=meta.TableSchema())
         data_def.parts[part_key.opaqueKey] = part
 
         storage_copy = meta.StorageCopy(

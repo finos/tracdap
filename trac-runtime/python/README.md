@@ -42,10 +42,10 @@ inheriting the TracModel base class, your IDE should be able to generate stubs f
         def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
             pass
 
-        def define_inputs(self) -> tp.Dict[str, trac.TableDefinition]:
+        def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
             pass
 
-        def define_outputs(self) -> tp.Dict[str, trac.TableDefinition]:
+        def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
             pass
 
         def run_model(self, ctx: trac.TracContext):

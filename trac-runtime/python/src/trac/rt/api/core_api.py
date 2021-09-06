@@ -57,7 +57,7 @@ class TracContext:
         pass
 
     @_abc.abstractmethod
-    def get_table_schema(self, dataset_name: str) -> _meta.TableDefinition:
+    def get_schema(self, dataset_name: str) -> _meta.SchemaDefinition:
         pass
 
     @_abc.abstractmethod
@@ -73,7 +73,7 @@ class TracContext:
         pass
 
     @_abc.abstractmethod
-    def put_table_schema(self, dataset_name: str, schema: _meta.TableDefinition):
+    def put_schema(self, dataset_name: str, schema: _meta.SchemaDefinition):
         pass
 
     @_abc.abstractmethod
@@ -140,11 +140,11 @@ class TracModel:
         pass
 
     @_abc.abstractmethod
-    def define_inputs(self) -> _tp.Dict[str, _meta.TableDefinition]:
+    def define_inputs(self) -> _tp.Dict[str, _meta.ModelInputSchema]:
         pass
 
     @_abc.abstractmethod
-    def define_outputs(self) -> _tp.Dict[str, _meta.TableDefinition]:
+    def define_outputs(self) -> _tp.Dict[str, _meta.ModelOutputSchema]:
         pass
 
     @_abc.abstractmethod

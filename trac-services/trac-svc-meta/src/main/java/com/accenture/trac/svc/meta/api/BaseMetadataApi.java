@@ -40,6 +40,7 @@ public class BaseMetadataApi {
     // Only a limited set of object types can be created directly by clients
     // Everything else can only be created by the trusted API, i.e. by other TRAC platform components
     public static final List<ObjectType> PUBLIC_TYPES = Arrays.asList(
+            ObjectType.SCHEMA,
             ObjectType.FLOW,
             ObjectType.CUSTOM);
 
@@ -109,15 +110,12 @@ public class BaseMetadataApi {
 
     void updateTag(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        apiWrapper.unaryCall(responseObserver, () -> {
-
-            return writeService.updateTag(
-                    request.getTenant(),
-                    request.getObjectType(),
-                    request.getPriorVersion(),
-                    request.getTagUpdatesList(),
-                    apiTrustLevel);
-        });
+        apiWrapper.unaryCall(responseObserver, () -> writeService.updateTag(
+                request.getTenant(),
+                request.getObjectType(),
+                request.getPriorVersion(),
+                request.getTagUpdatesList(),
+                apiTrustLevel));
     }
 
     void preallocateId(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
@@ -133,15 +131,12 @@ public class BaseMetadataApi {
 
     void createPreallocatedObject(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        apiWrapper.unaryCall(responseObserver, () -> {
-
-            return writeService.createPreallocatedObject(
-                    request.getTenant(),
-                    request.getObjectType(),
-                    request.getPriorVersion(),
-                    request.getDefinition(),
-                    request.getTagUpdatesList());
-        });
+        apiWrapper.unaryCall(responseObserver, () -> writeService.createPreallocatedObject(
+                request.getTenant(),
+                request.getObjectType(),
+                request.getPriorVersion(),
+                request.getDefinition(),
+                request.getTagUpdatesList()));
     }
 
     void readObject(MetadataReadRequest request, StreamObserver<Tag> response) {

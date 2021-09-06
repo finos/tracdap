@@ -32,9 +32,9 @@ class HelloPandas(trac.TracModel):
                    label="Exclude defaulted loans from the calculation",
                    default_value=False))
 
-    def define_inputs(self) -> tp.Dict[str, trac.TableDefinition]:
+    def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
 
-        customer_loans = trac.define_table(
+        customer_loans = trac.define_input_table(
             trac.F("id", trac.BasicType.STRING, label="Customer account ID", business_key=True),
             trac.F("loan_amount", trac.BasicType.DECIMAL, label="Principal loan amount", format_code="CCY:EUR"),
             trac.F("total_pymnt", trac.BasicType.DECIMAL, label="Total amount repaid", format_code="CCY:EUR"),
@@ -43,9 +43,9 @@ class HelloPandas(trac.TracModel):
 
         return {"customer_loans": customer_loans}
 
-    def define_outputs(self) -> tp.Dict[str, trac.TableDefinition]:
+    def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
 
-        profit_by_region = trac.define_table(
+        profit_by_region = trac.define_output_table(
             trac.F("region", trac.BasicType.STRING, label="Customer home region", categorical=True),
             trac.F("gross_profit", trac.BasicType.DECIMAL, label="Total gross profit", format_code="CCY:USD"))
 

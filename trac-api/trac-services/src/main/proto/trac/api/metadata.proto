@@ -495,9 +495,9 @@ message MetadataWriteRequest {
     /**
      * Prior object/tag version to use for update operations.
      *
-     * This field must be left blank for create operations.
+     * This field should be omitted when creating a new object.
      */
-    metadata.TagSelector priorVersion = 3;
+    optional metadata.TagSelector priorVersion = 3;
 
     /**
      * New object definition to save.
@@ -505,9 +505,9 @@ message MetadataWriteRequest {
      * A definition is required to create or update an object, for tag updates
      * the definition field should be left blank.
      *
-     * This field must be left blank for tag update operations (saveNew.
+     * This field should be omitted for tag update operations.
      */
-    metadata.ObjectDefinition definition = 4;
+    optional metadata.ObjectDefinition definition = 4;
 
     /**
      * Tag update operations to be applied.
@@ -592,6 +592,6 @@ message MetadataGetRequest {
 
     trac.metadata.ObjectType objectType = 2;
     string objectId = 3;
-    int32 objectVersion = 4;
-    int32 tagVersion = 5;
+    optional int32 objectVersion = 4;
+    optional int32 tagVersion = 5;
 };

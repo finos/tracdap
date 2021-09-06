@@ -32,7 +32,7 @@ import "trac/metadata/stoarge.proto";
 
 
 /**
- * Object definitions are the core structural element of TRAC's metadata model.
+ * Object definitions are the core structural element of TRAC's metadata model
  *
  * Definitions describe every object that is stored in the TRAC platform and there
  * is a one-to-one relation between definitions and objects. I.e. every dataset
@@ -74,5 +74,6 @@ message ObjectDefinition {
         FileDefinition file = 6;
         CustomDefinition custom = 7;
         StorageDefinition storage = 8;
+        SchemaDefinition schema = 9;
     }
 }

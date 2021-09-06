@@ -121,9 +121,8 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     }
 
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE, names = {
-            "FLOW",
-            "CUSTOM"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
+                names = {"SCHEMA", "FLOW", "CUSTOM"})
     void createObject_publicTypesOk(ObjectType objectType) {
 
         // All object types should be either in this test, or publicTypesNotAllowed
@@ -133,7 +132,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
-            names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "FLOW", "CUSTOM"})
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "SCHEMA", "FLOW", "CUSTOM"})
     void createObject_publicTypesNotAllowed(ObjectType objectType) {
 
         var objToSave = TestData.dummyDefinitionForType(objectType);
@@ -322,14 +321,16 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     // -----------------------------------------------------------------------------------------------------------------
 
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE, names = {"DATA", "CUSTOM"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
+                names = {"DATA", "SCHEMA", "CUSTOM"})
     void updateObject_trustedTypesOk(ObjectType objectType) {
 
         updateObject_ok(objectType, request -> trustedApi.updateObject(request));
     }
 
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE, names = {"CUSTOM"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
+                names = {"SCHEMA", "CUSTOM"})
     void updateObject_publicTypesOk(ObjectType objectType) {
 
         updateObject_ok(objectType, request -> publicApi.updateObject(request));
@@ -337,7 +338,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
-            names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "FLOW", "CUSTOM"})
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "SCHEMA", "FLOW", "CUSTOM"})
     void updateObject_publicTypesNotAllowed(ObjectType objectType) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
@@ -359,7 +360,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
-            names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "DATA", "CUSTOM"})
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "DATA", "SCHEMA", "CUSTOM"})
     void updateObject_versionsNotSupported(ObjectType objectType) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
@@ -695,12 +696,12 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         // Create a V2 data definition that is invalid, use an explicit fieldOrder = -1
 
-        var v2Schema = v1Schema
-                .toBuilder()
-                .addFields(FieldDefinition.newBuilder()
+        var v2Schema = v1Schema.toBuilder()
+                .setTable(v1Schema.getTable().toBuilder()
+                .addFields(FieldSchema.newBuilder()
                         .setFieldName("some_new_field")
                         .setFieldType(BasicType.STRING)
-                        .setFieldOrder(-1));
+                        .setFieldOrder(-1)));
 
         var v2Obj = v1SavedTag.getDefinition().toBuilder()
                 .setData(v1SavedTag.getDefinition().getData()

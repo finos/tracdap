@@ -222,7 +222,7 @@ def main():
 
         # Always run protoc from the codegen folder
         # This makes finding the TRAC protoc plugin much easier
-        result = sp.run(executable=protoc.PROTOC_EXE, args=protoc_argv, cwd=SCRIPT_DIR)
+        result = sp.run(executable=protoc.PROTOC_EXE, args=protoc_argv, cwd=SCRIPT_DIR, stdout=sp.PIPE)
 
         # We are not piping stdout/stderr
         # Logs and errors  will show up as protoc is running

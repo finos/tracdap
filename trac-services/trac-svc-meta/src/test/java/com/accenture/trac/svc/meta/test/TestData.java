@@ -57,6 +57,7 @@ public class TestData {
             case FILE: return dummyFileDef();
             case CUSTOM: return dummyCustomDef();
             case STORAGE: return dummyStorageDef();
+            case SCHEMA: return dummySchemaDef();
 
             default:
                 throw new RuntimeException("No dummy data available for object type " + objectType.name());
@@ -82,6 +83,7 @@ public class TestData {
             case MODEL: return nextModelDef(definition);
             case CUSTOM: return nextCustomDef(definition);
             case STORAGE: return nextStorageDef(definition);
+            case SCHEMA: return nextSchemaDef(definition);
 
             case FLOW:
             case JOB:
@@ -128,44 +130,73 @@ public class TestData {
             // Not needed yet to test metadata semantics in isolation
             .setStorageId("dummy_storage")
 
-            .setSchema(TableDefinition.newBuilder()
-                .addFields(FieldDefinition.newBuilder()
+            .setSchema(SchemaDefinition.newBuilder()
+                .setSchemaType(SchemaType.TABLE)
+                .setTable(TableSchema.newBuilder()
+                .addFields(FieldSchema.newBuilder()
                         .setFieldName("transaction_id")
                         .setFieldType(BasicType.STRING)
                         .setFieldOrder(1)
                         .setBusinessKey(true))
-                .addFields(FieldDefinition.newBuilder()
+                .addFields(FieldSchema.newBuilder()
                         .setFieldName("customer_id")
                         .setFieldType(BasicType.STRING)
                         .setFieldOrder(2)
                         .setBusinessKey(true))
-                .addFields(FieldDefinition.newBuilder()
+                .addFields(FieldSchema.newBuilder()
                         .setFieldName("order_date")
                         .setFieldType(BasicType.DATE)
                         .setFieldOrder(3)
                         .setBusinessKey(true))
-                .addFields(FieldDefinition.newBuilder()
+                .addFields(FieldSchema.newBuilder()
                         .setFieldName("widgets_ordered")
                         .setFieldType(BasicType.INTEGER)
                         .setFieldOrder(4)
-                        .setBusinessKey(true))))
+                        .setBusinessKey(true)))))
             .build();
     }
 
     public static ObjectDefinition nextDataDef(ObjectDefinition origDef) {
 
-        var fieldName = "extra_field_" + (origDef.getData().getSchema().getFieldsCount() + 1);
+        var newSchema = addFieldToSchema(origDef.getData().getSchema());
 
         return origDef.toBuilder()
-                .setData(origDef.getData()
-                .toBuilder()
-                .setSchema(origDef.getData().getSchema().toBuilder()
-                    .addFields(FieldDefinition.newBuilder()
-                    .setFieldName(fieldName)
-                    .setFieldOrder(origDef.getData().getSchema().getFieldsCount())
-                    .setFieldType(BasicType.FLOAT)
-                    .setFieldLabel("We got an extra field!")
-                    .setFormatCode("PERCENT"))))
+                .setData(origDef.getData().toBuilder()
+                .setSchema(newSchema))
+                .build();
+    }
+
+    public static ObjectDefinition dummySchemaDef() {
+
+        var dataDef = dummyDataDef();
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(dataDef.getData().getSchema())
+                .build();
+    }
+
+    public static ObjectDefinition nextSchemaDef(ObjectDefinition origDef) {
+
+        return origDef.toBuilder()
+                .setSchema(addFieldToSchema(origDef.getSchema()))
+                .build();
+    }
+
+    private static SchemaDefinition addFieldToSchema(SchemaDefinition origSchema) {
+
+        var fieldName = "extra_field_" + (origSchema.getTable().getFieldsCount() + 1);
+
+        var newTableSchema = origSchema.getTable().toBuilder()
+                .addFields(FieldSchema.newBuilder()
+                .setFieldName(fieldName)
+                .setFieldOrder(origSchema.getTable().getFieldsCount())
+                .setFieldType(BasicType.FLOAT)
+                .setFieldLabel("We got an extra field!")
+                .setFormatCode("PERCENT"));
+
+        return origSchema.toBuilder()
+                .setTable(newTableSchema)
                 .build();
     }
 
@@ -216,27 +247,32 @@ public class TestData {
                 .setModel(ModelDefinition.newBuilder()
                 .setLanguage("python")
                 .setRepository("trac-test-repo")
-                .setRepositoryVersion("trac-test-repo-1.2.3-RC4")
                 .setPath("src/main/python")
+                .setPackage("trac-test-package")
+                .setVersion("trac-test-repo-1.2.3-RC4")
                 .setEntryPoint("trac_test.test1.SampleModel1")
-                .putParams("param1", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.STRING)).build())
-                .putParams("param2", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.INTEGER)).build())
-                .putInputs("input1", TableDefinition.newBuilder()
-                        .addFields(FieldDefinition.newBuilder()
+                .putParameters("param1", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.STRING)).build())
+                .putParameters("param2", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.INTEGER)).build())
+                .putInputs("input1", ModelInputSchema.newBuilder()
+                        .setSchema(SchemaDefinition.newBuilder()
+                        .setTable(TableSchema.newBuilder()
+                        .addFields(FieldSchema.newBuilder()
                                 .setFieldName("field1")
                                 .setFieldType(BasicType.DATE))
-                        .addFields(FieldDefinition.newBuilder()
+                        .addFields(FieldSchema.newBuilder()
                                 .setFieldName("field2")
                                 .setBusinessKey(true)
                                 .setFieldType(BasicType.DECIMAL)
                                 .setFieldLabel("A display name")
                                 .setCategorical(true)
-                                .setFormatCode("GBP"))
+                                .setFormatCode("GBP"))))
                         .build())
-                .putOutputs("output1", TableDefinition.newBuilder()
-                        .addFields(FieldDefinition.newBuilder()
+                .putOutputs("output1", ModelOutputSchema.newBuilder()
+                        .setSchema(SchemaDefinition.newBuilder()
+                        .setTable(TableSchema.newBuilder()
+                        .addFields(FieldSchema.newBuilder()
                                 .setFieldName("checksum_field")
-                                .setFieldType(BasicType.DECIMAL))
+                                .setFieldType(BasicType.DECIMAL))))
                         .build()))
                 .build();
     }
@@ -246,7 +282,7 @@ public class TestData {
         return origDef.toBuilder()
                 .setModel(origDef.getModel()
                 .toBuilder()
-                .putParams("param3", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.DATE)).build()))
+                .putParameters("param3", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.DATE)).build()))
                 .build();
     }
 
@@ -442,7 +478,7 @@ public class TestData {
                 return truncateMicrosecondPrecision(dateTime);
 
             default:
-                throw new RuntimeException("Test object not available for basic type " + basicType.toString());
+                throw new RuntimeException("Test object not available for basic type " + basicType);
         }
     }
 
@@ -467,7 +503,7 @@ public class TestData {
             case DATETIME: return ((OffsetDateTime) originalObject).plusHours(1);
 
             default:
-                throw new RuntimeException("Test object not available for basic type " + basicType.toString());
+                throw new RuntimeException("Test object not available for basic type " + basicType);
         }
     }
 

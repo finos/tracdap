@@ -200,8 +200,10 @@ class LoadDataFunc(_LoadSaveDataFunc):
 
         if stat.file_type == _storage.FileType.FILE:
 
+            # Assumption that dataset is a table, and not some other schema type
+
             df = data_storage.read_pandas_table(
-                self.node.data_def.schema,
+                self.node.data_def.schema.table,
                 data_copy.storagePath, data_copy.storageFormat,
                 storage_options={})
 
@@ -231,15 +233,17 @@ class SaveDataFunc(_LoadSaveDataFunc):
         data_storage = self.storage.get_data_storage(data_copy.storageKey)
 
         # Make sure parent directory exists
-        parent_dir = pathlib.PurePath(data_copy.storagePath).parent
+        parent_dir = str(pathlib.PurePath(data_copy.storagePath).parent)
         file_storage.mkdir(parent_dir, recursive=True, exists_ok=True)
 
         # Item to be saved should exist in the current context, for now assume it is always Pandas
         data_item: _data.DataItem = ctx[self.node.data_item].result
         df = data_item.pandas
 
+        # Assumption that dataset is a table, and not some other schema type
+
         data_storage.write_pandas_table(
-            self.node.data_def.schema, df,
+            self.node.data_def.schema.table, df,
             data_copy.storagePath, data_copy.storageFormat,
             storage_options={}, overwrite=False)
 
@@ -262,8 +266,9 @@ class ModelFunc(NodeFunction):
             if nid.namespace == self.node.id.namespace}
 
         # Add empty data views to the local context to hold model outputs
+        # Assuming outputs are all defined with static schemas
         local_ctx.update({
-            output_name: _data.DataView(schema=self.node.model_def.outputs[output_name], parts={})
+            output_name: _data.DataView(schema=self.node.model_def.outputs[output_name].schema, parts={})
             for output_name in self.node.model_def.outputs})
 
         # Run the model against the mapped local context

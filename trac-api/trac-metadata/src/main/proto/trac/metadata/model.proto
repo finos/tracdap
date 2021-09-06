@@ -24,27 +24,66 @@ import "trac/metadata/type.proto";
 import "trac/metadata/data.proto";
 
 
+/**
+ * Describes an individual parameter of a model
+ */
 message ModelParameter {
 
     string label = 1;
 
     TypeDescriptor paramType = 2;
 
-    Value defaultValue = 3;
+    optional Value defaultValue = 3;
 }
 
+
+/**
+ * Describes the data schema of a model input
+ *
+ * In many cases models define the entire schemas of their inputs, in which case the input
+ * schema is just a wrapper around a schema definition. This is what is supported now.
+ *
+ * Other approaches are possible. Models can define dynamic inputs, in which case the input
+ * schema is provided at runtime and can be interrogated by the model code. Models may also
+ * define inputs with some required fields and a dynamic portion. For non-tabular inputs,
+ * other options may be required. These capabilities may be added in future releases.
+ */
+message ModelInputSchema {
+
+    SchemaDefinition schema = 1;
+}
+
+/**
+ * Describes the data schema of a model output
+ *
+ * In many cases models define the entire schemas of their outputs, in which case the output
+ * schema is just a wrapper around a schema definition. This is what is supported now.
+ *
+ * Other approaches are possible. Models can define dynamic outputs, in which case the model
+ * decides at runtime what the output schema will be. Pass-through schemas (output X has the
+ same schema as dynamic input Y) and pass-through-extend schemas (output X has the schema of
+ dynamic input Y, plus one or more new columns) can also be useful. These capabilities may be
+ * added in future releases.
+ */
+message ModelOutputSchema {
+
+    SchemaDefinition schema = 1;
+}
+
+
+/**
+ * Define a model for execution on the TRAC platform
+ */
 message ModelDefinition {
 
     string language = 1;
     string repository = 2;
-    string repositoryVersion = 3;
-    string path = 4;
-    string entryPoint = 5;
+    string path = 3;
+    string package = 4;
+    string version = 5;
+    string entryPoint = 6;
 
-    map<string, ModelParameter> params = 6;
-    map<string, TableDefinition> inputs = 7;
-    map<string, TableDefinition> outputs = 8;
-
-    bool overlay = 9;
-    bool schemaUnchanged = 10;
+    map<string, ModelParameter> parameters = 7;
+    map<string, ModelInputSchema> inputs = 8;
+    map<string, ModelOutputSchema> outputs = 9;
 }
