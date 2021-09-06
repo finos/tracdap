@@ -197,7 +197,7 @@ class TracContextTest(unittest.TestCase):
 
         self.assertIsInstance(schema, _api.SchemaDefinition)
         self.assertEqual(schema.schemaType, _api.SchemaType.TABLE)
-        self.assertIsInstance(schema.table, _api.TableDefinition)
+        self.assertIsInstance(schema.table, _api.TableSchema)
         self.assertEqual(len(schema.table.fields), 5)
 
     def test_get_schema_for_output(self):
@@ -206,7 +206,7 @@ class TracContextTest(unittest.TestCase):
 
         self.assertIsInstance(schema, _api.SchemaDefinition)
         self.assertEqual(schema.schemaType, _api.SchemaType.TABLE)
-        self.assertIsInstance(schema.table, _api.TableDefinition)
+        self.assertIsInstance(schema.table, _api.TableSchema)
         self.assertEqual(len(schema.table.fields), 2)
 
     def test_get_pandas_table_ok(self):

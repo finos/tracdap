@@ -227,7 +227,7 @@ class DevModeTranslator:
 
         data_def = meta.DataDefinition(parts={})
         data_def.storageId = str(storage_id)
-        data_def.schema = meta.SchemaDefinition(schemaType=meta.SchemaType.TABLE, table=meta.TableDefinition())
+        data_def.schema = meta.SchemaDefinition(schemaType=meta.SchemaType.TABLE, table=meta.TableSchema())
         data_def.parts[part_key.opaqueKey] = part
 
         storage_copy = meta.StorageCopy(

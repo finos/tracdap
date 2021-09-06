@@ -116,7 +116,7 @@ class IDataStorage:
 
     @abc.abstractmethod
     def read_pandas_table(
-            self, schema: _meta.TableDefinition,
+            self, schema: _meta.TableSchema,
             storage_path: str, storage_format: str,
             storage_options: tp.Dict[str, tp.Any]) \
             -> pd.DataFrame:
@@ -124,7 +124,7 @@ class IDataStorage:
 
     @abc.abstractmethod
     def write_pandas_table(
-            self, schema: _meta.TableDefinition, df: pd.DataFrame,
+            self, schema: _meta.TableSchema, df: pd.DataFrame,
             storage_path: str, storage_format: str,
             storage_options: tp.Dict[str, tp.Any],
             overwrite: bool = False):
@@ -195,23 +195,23 @@ class StorageManager:
 class _StorageFormat:
 
     @abc.abstractmethod
-    def read_pandas(self, src, schema: _meta.TableDefinition, options: dict) -> pd.DataFrame:
+    def read_pandas(self, src, schema: _meta.TableSchema, options: dict) -> pd.DataFrame:
         pass
 
     @abc.abstractmethod
-    def write_pandas(self, tgt, schema: _meta.TableDefinition, data: pd.DataFrame, options: dict):
+    def write_pandas(self, tgt, schema: _meta.TableSchema, data: pd.DataFrame, options: dict):
         pass
 
 
 class _CsvStorageFormat(_StorageFormat):
 
-    def read_pandas(self, src, schema: _meta.TableDefinition, options: dict):
+    def read_pandas(self, src, schema: _meta.TableSchema, options: dict):
 
         columns = list(map(lambda f: f.fieldName, schema.fields)) if schema.fields else None
 
         return pd.read_csv(src, usecols=columns, **options)
 
-    def write_pandas(self, tgt, schema: _meta.TableDefinition, data: pd.DataFrame, options: dict):
+    def write_pandas(self, tgt, schema: _meta.TableSchema, data: pd.DataFrame, options: dict):
 
         columns = list(map(lambda f: f.fieldName, schema.fields)) if schema.fields else None
 
@@ -236,7 +236,7 @@ class CommonDataStorage(IDataStorage):
         self.__pushdown_spark = pushdown_spark
 
     def read_pandas_table(
-            self, schema: _meta.TableDefinition,
+            self, schema: _meta.TableSchema,
             storage_path: str, storage_format: str,
             storage_options: tp.Dict[str, tp.Any]) \
             -> pd.DataFrame:
@@ -255,7 +255,7 @@ class CommonDataStorage(IDataStorage):
                 return format_impl.read_pandas(text_stream, schema, storage_options)
 
     def write_pandas_table(
-            self, schema: _meta.TableDefinition, df: pd.DataFrame,
+            self, schema: _meta.TableSchema, df: pd.DataFrame,
             storage_path: str, storage_format: str,
             storage_options: tp.Dict[str, tp.Any],
             overwrite: bool = False):
@@ -281,7 +281,7 @@ class CommonDataStorage(IDataStorage):
                 format_impl.write_pandas(text_stream, schema, df, storage_options)
 
     def read_spark_table(
-            self, schema: _meta.TableDefinition,
+            self, schema: _meta.TableSchema,
             storage_path: str, storage_format: str,
             storage_options: tp.Dict[str, tp.Any]) \
             -> object:

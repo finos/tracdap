@@ -20,7 +20,7 @@ import inspect as _inspect
 import trac.rt.metadata as _meta
 
 
-__field_def_params = _inspect.signature(_meta.FieldDefinition.__init__).parameters
+__field_def_params = _inspect.signature(_meta.FieldSchema.__init__).parameters
 
 
 _T = _tp.TypeVar("_T")
@@ -60,21 +60,21 @@ def define_parameter(
     return _Named(param_name, _meta.ModelParameter(label, param_type_descriptor, default_value))
 
 
-def define_input_table(*fields: _meta.FieldDefinition) -> _meta.ModelInputSchema:
+def define_input_table(*fields: _meta.FieldSchema) -> _meta.ModelInputSchema:
 
-    table_def = _meta.TableDefinition([*fields])
+    table_def = _meta.TableSchema([*fields])
     schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE, table=table_def)
     return _meta.ModelInputSchema(schema=schema_def)
 
 
-def define_output_table(*fields: _meta.FieldDefinition) -> _meta.ModelOutputSchema:
+def define_output_table(*fields: _meta.FieldSchema) -> _meta.ModelOutputSchema:
 
-    table_def = _meta.TableDefinition([*fields])
+    table_def = _meta.TableSchema([*fields])
     schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE, table=table_def)
     return _meta.ModelOutputSchema(schema=schema_def)
 
 
-def define_field(*args, **kwargs) -> _meta.FieldDefinition:
+def define_field(*args, **kwargs) -> _meta.FieldSchema:
 
     arg_names = list(kwargs.keys())
 
@@ -99,7 +99,7 @@ def define_field(*args, **kwargs) -> _meta.FieldDefinition:
             kwargs[camel_name] = kwargs[arg_name]
             kwargs.pop(arg_name)
 
-    return _meta.FieldDefinition(*args, **kwargs)
+    return _meta.FieldSchema(*args, **kwargs)
 
 
 def P(*args, **kwargs):  # noqa

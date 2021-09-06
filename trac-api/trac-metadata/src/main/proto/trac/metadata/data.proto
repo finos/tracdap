@@ -24,7 +24,20 @@ import "trac/metadata/type.proto";
 import "trac/metadata/object_id.proto";
 
 
-message FieldDefinition {
+/**
+ * Enumeration of the available types of data schema
+ *
+ * Currently only table schemas are supported, other schema types may be added later.
+ *
+ * @see SchemaDefinition
+ */
+enum SchemaType {
+
+    SCHEMA_TYPE_NOT_SET = 0;
+    TABLE = 1;
+}
+
+message FieldSchema {
 
     string fieldName = 1;
     sint32 fieldOrder = 2;
@@ -38,24 +51,11 @@ message FieldDefinition {
 }
 
 
-message TableDefinition {
+message TableSchema {
 
-    repeated FieldDefinition fields = 1;
+    repeated FieldSchema fields = 1;
 }
 
-
-/**
- * Enumeration of the available types of data schema
- *
- * Currently only table schemas are supported, other schema types may be added later.
- *
- * @see SchemaDefinition
- */
-enum SchemaType {
-
-    SCHEMA_TYPE_NOT_SET = 0;
-    TABLE = 1;
-}
 
 /**
  * A schema definition describes the schema of a dataset
@@ -75,7 +75,7 @@ message SchemaDefinition {
 
     oneof schemaTypeDefinition {
 
-        TableDefinition table = 2;
+        TableSchema table = 2;
     }
 }
 

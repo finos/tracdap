@@ -698,7 +698,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var v2Schema = v1Schema.toBuilder()
                 .setTable(v1Schema.getTable().toBuilder()
-                .addFields(FieldDefinition.newBuilder()
+                .addFields(FieldSchema.newBuilder()
                         .setFieldName("some_new_field")
                         .setFieldType(BasicType.STRING)
                         .setFieldOrder(-1)));
