@@ -24,16 +24,6 @@ import "trac/metadata/type.proto";
 import "trac/metadata/object_id.proto";
 
 
-enum DataFormat {
-    DATA_FORMAT_NOT_SET = 0;
-    CSV = 1;
-    PARQUET = 2;
-}
-
-message FormatSpec {
-
-}
-
 message FieldDefinition {
 
     string fieldName = 1;
@@ -44,9 +34,9 @@ message FieldDefinition {
     bool businessKey = 5;
     bool categorical = 6;
 
-    string formatCode = 7;
-    FormatSpec formatSpec = 8;
+    optional string formatCode = 7;
 }
+
 
 message TableDefinition {
 
