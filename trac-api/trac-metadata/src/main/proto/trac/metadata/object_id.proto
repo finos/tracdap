@@ -37,6 +37,7 @@ enum ObjectType {
   FILE = 5;
   CUSTOM = 6;
   STORAGE = 7;
+  SCHEMA = 8;
 }
 
 

@@ -57,6 +57,7 @@ public class TestData {
             case FILE: return dummyFileDef();
             case CUSTOM: return dummyCustomDef();
             case STORAGE: return dummyStorageDef();
+            case SCHEMA: return dummySchemaDef();
 
             default:
                 throw new RuntimeException("No dummy data available for object type " + objectType.name());
@@ -82,6 +83,7 @@ public class TestData {
             case MODEL: return nextModelDef(definition);
             case CUSTOM: return nextCustomDef(definition);
             case STORAGE: return nextStorageDef(definition);
+            case SCHEMA: return nextSchemaDef(definition);
 
             case FLOW:
             case JOB:
@@ -156,21 +158,45 @@ public class TestData {
 
     public static ObjectDefinition nextDataDef(ObjectDefinition origDef) {
 
-        var fieldName = "extra_field_" + (origDef.getData().getSchema().getTable().getFieldsCount() + 1);
+        var newSchema = addFieldToSchema(origDef.getData().getSchema());
 
-        var origTableSchema = origDef.getData().getSchema().getTable();
-        var newTableSchema = origTableSchema.toBuilder()
+        return origDef.toBuilder()
+                .setData(origDef.getData().toBuilder()
+                .setSchema(newSchema))
+                .build();
+    }
+
+    public static ObjectDefinition dummySchemaDef() {
+
+        var dataDef = dummyDataDef();
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(dataDef.getData().getSchema())
+                .build();
+    }
+
+    public static ObjectDefinition nextSchemaDef(ObjectDefinition origDef) {
+
+        return origDef.toBuilder()
+                .setSchema(addFieldToSchema(origDef.getSchema()))
+                .build();
+    }
+
+    private static SchemaDefinition addFieldToSchema(SchemaDefinition origSchema) {
+
+        var fieldName = "extra_field_" + (origSchema.getTable().getFieldsCount() + 1);
+
+        var newTableSchema = origSchema.getTable().toBuilder()
                 .addFields(FieldDefinition.newBuilder()
                 .setFieldName(fieldName)
-                .setFieldOrder(origTableSchema.getFieldsCount())
+                .setFieldOrder(origSchema.getTable().getFieldsCount())
                 .setFieldType(BasicType.FLOAT)
                 .setFieldLabel("We got an extra field!")
                 .setFormatCode("PERCENT"));
 
-        return origDef.toBuilder()
-                .setData(origDef.getData().toBuilder()
-                .setSchema(origDef.getData().getSchema().toBuilder()
-                .setTable(newTableSchema)))
+        return origSchema.toBuilder()
+                .setTable(newTableSchema)
                 .build();
     }
 

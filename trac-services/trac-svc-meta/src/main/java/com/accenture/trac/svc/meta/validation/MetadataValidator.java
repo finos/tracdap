@@ -31,6 +31,7 @@ public class MetadataValidator {
 
     private static final Set<ObjectType> VERSIONED_OBJECT_TYPES = Set.of(
             ObjectType.DATA,
+            ObjectType.SCHEMA,
             ObjectType.CUSTOM);
 
     private static final Map<ObjectDefinition.DefinitionCase, ObjectType> DEFINITION_TYPE_MAPPING = Map.of(
@@ -40,7 +41,8 @@ public class MetadataValidator {
             ObjectDefinition.DefinitionCase.JOB, ObjectType.JOB,
             ObjectDefinition.DefinitionCase.FILE, ObjectType.FILE,
             ObjectDefinition.DefinitionCase.CUSTOM, ObjectType.CUSTOM,
-            ObjectDefinition.DefinitionCase.STORAGE, ObjectType.STORAGE);
+            ObjectDefinition.DefinitionCase.STORAGE, ObjectType.STORAGE,
+            ObjectDefinition.DefinitionCase.SCHEMA, ObjectType.SCHEMA);
 
     private final List<String> validationErrors;
 
