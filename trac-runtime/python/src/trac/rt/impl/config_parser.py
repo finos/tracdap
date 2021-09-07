@@ -25,6 +25,7 @@ import trac.rt.impl.util as _util
 import pathlib
 import json
 import yaml
+import yaml.parser
 
 
 _T = tp.TypeVar('_T')
@@ -63,8 +64,10 @@ class ConfigParser(tp.Generic[_T]):
 
         if isinstance(config_file, str):
             config_path = pathlib.Path(config_file)
+
         elif isinstance(config_file, pathlib.Path):
             config_path = config_file
+
         else:
             config_file_type = type(config_file) if config_file is not None else "None"
             err = f"Attempt to load an invalid config file, expected a path, got {config_file_type}"
@@ -81,26 +84,51 @@ class ConfigParser(tp.Generic[_T]):
             self._log.error(msg)
             raise _ex.EConfigLoad(msg)
 
+        return self._parse_raw_config(config_path)
+
+    def _parse_raw_config(self, config_path: pathlib.Path):
+
         # Read in the raw config, use the file extension to decide which format to expect
 
-        with config_path.open('r') as config_stream:
+        try:
 
-            extension = config_path.suffix.lower()
+            with config_path.open('r') as config_stream:
 
-            if extension == ".yaml" or extension == ".yml":
-                config_dict = yaml.safe_load(config_stream)
+                extension = config_path.suffix.lower()
 
-            elif extension == ".json":
-                config_dict = json.load(config_stream)
+                if extension == ".yaml" or extension == ".yml":
+                    config_dict = yaml.safe_load(config_stream)
 
-            else:
-                msg = f"Format not recognised for config file [{config_path.name}]"
-                self._log.error(msg)
-                raise _ex.EConfigLoad(msg)
+                elif extension == ".json":
+                    config_dict = json.load(config_stream)
 
-            return config_dict
+                else:
+                    msg = f"Format not recognised for config file [{config_path.name}]"
+                    self._log.error(msg)
+                    raise _ex.EConfigLoad(msg)
+
+                return config_dict
+
+        except UnicodeDecodeError as e:
+            err = f"Contents of the config file is garbled and cannot be read ({str(e)})"
+            self._log.error(err)
+            raise _ex.EConfigParse(err) from e
+
+        except json.decoder.JSONDecodeError as e:
+            err = f"Config file contains invalid JSON ({str(e)})"
+            self._log.error(err)
+            raise _ex.EConfigParse(err) from e
+
+        except yaml.parser.ParserError as e:
+            err = f"Config file contains invalid YAML ({str(e)})"
+            self._log.error(err)
+            raise _ex.EConfigParse(err) from e
 
     def parse(self, config_dict: dict, config_file: str = None) -> _T:
+
+        # If config is empty, return a default (blank) config
+        if config_dict is None or len(config_dict) == 0:
+            return self._config_class()
 
         config = self._parse_value("", config_dict, self._config_class)
 
