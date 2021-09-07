@@ -161,10 +161,20 @@ class StorageManager:
 
     def create_storage(self, storage_key: str, storage_config: _cfg.StorageConfig):
 
+        if storage_config is None:
+            err = f"Missing config for storage key [{storage_key}]"
+            self.__log.error(err)
+            raise _ex.EStorageConfig(err)
+
         storage_type = storage_config.storageType
 
         file_impl = self.__file_impls.get(storage_type)
         data_impl = self.__data_impls.get(storage_type)
+
+        if file_impl is None or data_impl is None:
+            err = f"Storage type [{storage_type}] is not available"
+            self.__log.error(err)
+            raise _ex.EStorageConfig(err)
 
         file_storage = file_impl(storage_config)
         data_storage = data_impl(storage_config, file_storage)
