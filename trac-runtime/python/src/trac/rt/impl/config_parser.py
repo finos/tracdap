@@ -25,6 +25,7 @@ import trac.rt.impl.util as _util
 import pathlib
 import json
 import yaml
+import yaml.parser
 
 
 _T = tp.TypeVar('_T')
@@ -51,15 +52,27 @@ class ConfigParser(tp.Generic[_T]):
         self._config_class = config_class
         self._errors = []
 
-    def load_raw_config(self, config_file: str, config_file_name: str = None):
-
-        config_path = pathlib.Path(config_file)
-        extension = config_path.suffix.lower()
+    def load_raw_config(self, config_file: tp.Union[str, pathlib.Path], config_file_name: str = None):
 
         if config_file_name is not None:
-            self._log.info(f"Loading {config_file_name} config: {str(config_path)}")
+            self._log.info(f"Loading {config_file_name} config: {str(config_file)}")
         else:
-            self._log.info(f"Loading config file: {str(config_path)}")
+            self._log.info(f"Loading config file: {str(config_file)}")
+
+        # Construct a Path for config_file and make sure the file exists
+        # (For now, config must be on a locally mounted filesystem)
+
+        if isinstance(config_file, str):
+            config_path = pathlib.Path(config_file)
+
+        elif isinstance(config_file, pathlib.Path):
+            config_path = config_file
+
+        else:
+            config_file_type = type(config_file) if config_file is not None else "None"
+            err = f"Attempt to load an invalid config file, expected a path, got {config_file_type}"
+            self._log.error(err)
+            raise _ex.EConfigLoad(err)
 
         if not config_path.exists():
             msg = f"Config file not found: [{config_file}]"
@@ -71,22 +84,51 @@ class ConfigParser(tp.Generic[_T]):
             self._log.error(msg)
             raise _ex.EConfigLoad(msg)
 
-        with config_path.open('r') as config_stream:
+        return self._parse_raw_config(config_path)
 
-            if extension == ".yaml" or extension == ".yml":
-                config_dict = yaml.safe_load(config_stream)
+    def _parse_raw_config(self, config_path: pathlib.Path):
 
-            elif extension == ".json":
-                config_dict = json.load(config_stream)
+        # Read in the raw config, use the file extension to decide which format to expect
 
-            else:
-                msg = f"Format not recognised for config file [{config_path.name}]"
-                self._log.error(msg)
-                raise _ex.EConfigLoad(msg)
+        try:
 
-            return config_dict
+            with config_path.open('r') as config_stream:
+
+                extension = config_path.suffix.lower()
+
+                if extension == ".yaml" or extension == ".yml":
+                    config_dict = yaml.safe_load(config_stream)
+
+                elif extension == ".json":
+                    config_dict = json.load(config_stream)
+
+                else:
+                    msg = f"Format not recognised for config file [{config_path.name}]"
+                    self._log.error(msg)
+                    raise _ex.EConfigLoad(msg)
+
+                return config_dict
+
+        except UnicodeDecodeError as e:
+            err = f"Contents of the config file is garbled and cannot be read ({str(e)})"
+            self._log.error(err)
+            raise _ex.EConfigParse(err) from e
+
+        except json.decoder.JSONDecodeError as e:
+            err = f"Config file contains invalid JSON ({str(e)})"
+            self._log.error(err)
+            raise _ex.EConfigParse(err) from e
+
+        except yaml.parser.ParserError as e:
+            err = f"Config file contains invalid YAML ({str(e)})"
+            self._log.error(err)
+            raise _ex.EConfigParse(err) from e
 
     def parse(self, config_dict: dict, config_file: str = None) -> _T:
+
+        # If config is empty, return a default (blank) config
+        if config_dict is None or len(config_dict) == 0:
+            return self._config_class()
 
         config = self._parse_value("", config_dict, self._config_class)
 
@@ -201,7 +243,7 @@ class ConfigParser(tp.Generic[_T]):
                 self._error(location, message)
                 init_values.append(None)
 
-            elif param_name in raw_dict:
+            elif param_name in raw_dict and raw_dict[param_name] is not None:
                 param_value = self._parse_value(param_location, raw_dict[param_name], param_type)
                 init_values.append(param_value)
 
