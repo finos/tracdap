@@ -243,7 +243,7 @@ class ConfigParser(tp.Generic[_T]):
                 self._error(location, message)
                 init_values.append(None)
 
-            elif param_name in raw_dict:
+            elif param_name in raw_dict and raw_dict[param_name] is not None:
                 param_value = self._parse_value(param_location, raw_dict[param_name], param_type)
                 init_values.append(param_value)
 

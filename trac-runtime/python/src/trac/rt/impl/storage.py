@@ -24,6 +24,7 @@ import pandas as pd
 import trac.rt.metadata as _meta
 import trac.rt.config as _cfg
 import trac.rt.exceptions as _ex
+import trac.rt.impl.util as _util
 
 
 class FileType(enum.Enum):
@@ -151,6 +152,7 @@ class StorageManager:
 
     def __init__(self, sys_config: _cfg.SystemConfig):
 
+        self.__log = _util.logger_for_object(self)
         self.__file_storage: tp.Dict[str, IFileStorage] = dict()
         self.__data_storage: tp.Dict[str, IDataStorage] = dict()
 
@@ -176,6 +178,11 @@ class StorageManager:
 
     def get_file_storage(self, storage_key: str) -> IFileStorage:
 
+        if not self.has_file_storage(storage_key):
+            err = f"File storage is not configured for storage key [{storage_key}]"
+            self.__log.error(err)
+            raise _ex.EStorageConfig(err)
+
         return self.__file_storage[storage_key]
 
     def has_data_storage(self, storage_key: str) -> bool:
@@ -183,6 +190,11 @@ class StorageManager:
         return storage_key in self.__data_storage
 
     def get_data_storage(self, storage_key: str) -> IDataStorage:
+
+        if not self.has_data_storage(storage_key):
+            err = f"Data storage is not configured for storage key [{storage_key}]"
+            self.__log.error(err)
+            raise _ex.EStorageConfig(err)
 
         return self.__data_storage[storage_key]
 
