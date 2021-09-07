@@ -51,15 +51,25 @@ class ConfigParser(tp.Generic[_T]):
         self._config_class = config_class
         self._errors = []
 
-    def load_raw_config(self, config_file: str, config_file_name: str = None):
-
-        config_path = pathlib.Path(config_file)
-        extension = config_path.suffix.lower()
+    def load_raw_config(self, config_file: tp.Union[str, pathlib.Path], config_file_name: str = None):
 
         if config_file_name is not None:
-            self._log.info(f"Loading {config_file_name} config: {str(config_path)}")
+            self._log.info(f"Loading {config_file_name} config: {str(config_file)}")
         else:
-            self._log.info(f"Loading config file: {str(config_path)}")
+            self._log.info(f"Loading config file: {str(config_file)}")
+
+        # Construct a Path for config_file and make sure the file exists
+        # (For now, config must be on a locally mounted filesystem)
+
+        if isinstance(config_file, str):
+            config_path = pathlib.Path(config_file)
+        elif isinstance(config_file, pathlib.Path):
+            config_path = config_file
+        else:
+            config_file_type = type(config_file) if config_file is not None else "None"
+            err = f"Attempt to load an invalid config file, expected a path, got {config_file_type}"
+            self._log.error(err)
+            raise _ex.EConfigLoad(err)
 
         if not config_path.exists():
             msg = f"Config file not found: [{config_file}]"
@@ -71,7 +81,11 @@ class ConfigParser(tp.Generic[_T]):
             self._log.error(msg)
             raise _ex.EConfigLoad(msg)
 
+        # Read in the raw config, use the file extension to decide which format to expect
+
         with config_path.open('r') as config_stream:
+
+            extension = config_path.suffix.lower()
 
             if extension == ".yaml" or extension == ".yml":
                 config_dict = yaml.safe_load(config_stream)
