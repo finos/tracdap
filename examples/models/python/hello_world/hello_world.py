@@ -39,3 +39,8 @@ class HelloWorldModel(trac.TracModel):
 
         meaning_of_life = ctx.get_parameter("meaning_of_life")
         ctx.log().info(f"The meaning of life is {meaning_of_life}")
+
+
+if __name__ == "__main__":
+    import trac.rt.launch as launch
+    launch.launch_model(HelloWorldModel, "hello_world.yaml", "../sys_config.yaml")
