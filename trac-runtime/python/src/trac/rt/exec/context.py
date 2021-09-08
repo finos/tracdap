@@ -120,9 +120,6 @@ class TracContextImpl(_api.TracContext):
     def get_spark_table_rdd(self, dataset_name: str) -> pys.RDD:
         raise NotImplementedError()
 
-    def put_schema(self, dataset_name: str, schema: _meta.SchemaDefinition):
-        raise NotImplementedError()
-
     def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
 
         part_key = _data.DataPartKey.for_root()

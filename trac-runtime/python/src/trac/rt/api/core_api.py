@@ -82,12 +82,10 @@ class TracContext:
         and outputs in :py:meth:`TracModel.define_outputs`.
         Input and output names are case sensitive.
 
-        For inputs and outputs that are defined statically, :py:meth:`get_schema` will return the
-        schema as it was defined. This functionality is available now. :py:meth:`get_schema` is most
-        useful for dealing with dynamic inputs and outputs, which are not available in this release
-        of the runtime.
+        In the current version of the runtime all model inputs and outputs are defined statically,
+        :py:meth:`get_schema` will return the schema as it was defined.
 
-        Attempting to retrieve a schema for a dataset that is not defined as a model input or output
+        Attempting to retrieve the schema for a dataset that is not defined as a model input or output
         will result in a runtime validation error, even if that dataset exists in the job config and
         is used by other models.
 
@@ -145,13 +143,6 @@ class TracContext:
         pass
 
     @_abc.abstractmethod
-    def put_schema(self, dataset_name: str, schema: _meta.SchemaDefinition):
-
-        """Dynamic schemas are not supported in the current version of the runtime"""
-
-        pass
-
-    @_abc.abstractmethod
     def put_pandas_table(self, dataset_name: str, dataset: _pd.DataFrame):
 
         """
@@ -163,9 +154,7 @@ class TracContext:
 
         The supplied data must match the schema of the named output. Missing fields or fields
         of the wrong type will result in a data validation error. Extra fields will be discarded
-        with a warning. The schema of an output dataset can be checked using :py:meth:`get_schema`,
-        for statically defined outputs this will be the same schema supplied in :py:meth:`TracModel.define_outputs`.
-        Dynamic outputs are not available in this version of the runtime.
+        with a warning. The schema of an output dataset can be checked using :py:meth:`get_schema`.
 
         Each model output can only be saved once. Attempting to save the same output twice will
         cause a runtime validation error. Once an output has been saved, it can be retrieved by
