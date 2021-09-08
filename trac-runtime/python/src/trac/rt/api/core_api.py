@@ -54,50 +54,173 @@ class TracContext:
 
     @_abc.abstractmethod
     def get_parameter(self, parameter_name: str) -> _tp.Any:
+
+        """
+        Get the value of a model parameter
+
+        Model parameters defined in :py:meth:`TracModel.define_parameters` can be retrieved at runtime
+        by this method. Values are returned as native Python types. Parameter names are case sensitive.
+
+        Attempting to retrieve parameters not defined by the model will result in a runtime validation
+        error, even if those parameters are supplied in the job config and used by other models.
+
+        :param parameter_name: The name of the parameter to get
+        :return: The parameter value, as a native Python data type
+        :raises: :py:class:`ERuntimeValidation<trac.rt.exceptions.ERuntimeValidation>`
+        """
+
         pass
 
     @_abc.abstractmethod
     def get_schema(self, dataset_name: str) -> _meta.SchemaDefinition:
+
+        """
+        Get the schema of a model input or output
+
+        The schema of an input or output can be retrieved and examined at runtime using this method.
+        Inputs must be defined in :py:meth:`TracModel.define_inputs`
+        and outputs in :py:meth:`TracModel.define_outputs`.
+        Input and output names are case sensitive.
+
+        For inputs and outputs that are defined statically, :py:meth:`get_schema` will return the
+        schema as it was defined. This functionality is available now. :py:meth:`get_schema` is most
+        useful for dealing with dynamic inputs and outputs, which are not available in this release
+        of the runtime.
+
+        Attempting to retrieve a schema for a dataset that is not defined as a model input or output
+        will result in a runtime validation error, even if that dataset exists in the job config and
+        is used by other models.
+
+        :param dataset_name: The name of the input or output to get the schema for
+        :return: The schema definition for the named dataset
+        :rtype: :py:class:`SchemaDefinition<trac.rt.metadata.SchemaDefinition>`
+        :raises: :py:class:`ERuntimeValidation<trac.rt.exceptions.ERuntimeValidation>`
+        """
+
         pass
 
     @_abc.abstractmethod
     def get_pandas_table(self, dataset_name: str) -> _pd.DataFrame:
+
+        """
+        Get the data for a model input or output as a Pandas dataframe
+
+        The data for both inputs and outputs can be retrieved as a Pandas dataframe using this method.
+        Inputs must be defined in :py:meth:`TracModel.define_inputs`
+        and outputs in :py:meth:`TracModel.define_outputs`.
+        Input and output names are case sensitive.
+
+        The TRAC runtime will handle loading the data and assembling it into a Pandas dataframe.
+        This may happen before the model runs or when a dataset is requested. Models should take
+        care not to request very large datasets as Pandas tables, doing so is likely to cause a
+        memory overflow. Use :py:meth:`get_spark_table` instead to work with big data.
+
+        Model inputs are always available and can be queried by this method. Outputs are only available
+        after they have been saved to the context using :py:meth:`put_pandas_table` (or another
+        put_XXX_table method). Attempting to retrieve an output before it has been saved will cause a
+        runtime validation error.
+
+        Attempting to retrieve a dataset that is not defined as a model input or output will result
+        in a runtime validation error, even if that dataset exists in the job config and is used by
+        other models.
+
+        :param dataset_name: The name of the model input or output to get data for
+        :return: A pandas dataframe containing the data for the named dataset
+        :raises: :py:class:`ERuntimeValidation<trac.rt.exceptions.ERuntimeValidation>`
+        """
         pass
 
     @_abc.abstractmethod
     def get_spark_table(self, dataset_name: str) -> _pyss.DataFrame:
+
+        """Spark support is not available in the current version of the runtime"""
+
         pass
 
     @_abc.abstractmethod
     def get_spark_table_rdd(self, dataset_name: str) -> _pys.RDD:
+
+        """Spark support is not available in the current version of the runtime"""
+
         pass
 
     @_abc.abstractmethod
     def put_schema(self, dataset_name: str, schema: _meta.SchemaDefinition):
+
+        """Dynamic schemas are not supported in the current version of the runtime"""
+
         pass
 
     @_abc.abstractmethod
     def put_pandas_table(self, dataset_name: str, dataset: _pd.DataFrame):
+
+        """
+        Save the data for a model output as a Pandas dataframe
+
+        The data for model outputs can be saved as a Pandas dataframe using this method.
+        Outputs must be defined in :py:meth:`TracModel.define_outputs`.
+        Output names are case sensitive.
+
+        The supplied data must match the schema of the named output. Missing fields or fields
+        of the wrong type will result in a data validation error. Extra fields will be discarded
+        with a warning. The schema of an output dataset can be checked using :py:meth:`get_schema`,
+        for statically defined outputs this will be the same schema supplied in :py:meth:`TracModel.define_outputs`.
+        Dynamic outputs are not available in this version of the runtime.
+
+        Each model output can only be saved once. Attempting to save the same output twice will
+        cause a runtime validation error. Once an output has been saved, it can be retrieved by
+        calling :py:meth:`get_pandas_table` (or another get_XXX_table method). Attempting to save
+        a dataset that is not defined as a model output will also cause a runtime validation error.
+
+        :param dataset_name: The name of the model output to save data for
+        :param dataset: A pandas dataframe containing the data for the named dataset
+        :raises: :py:class:`ERuntimeValidation<trac.rt.exceptions.ERuntimeValidation>`,
+                 :py:class:`EDataValidation<trac.rt.exceptions.EDataValidation>`
+        """
+
         pass
 
     @_abc.abstractmethod
     def put_spark_table(self, dataset_name: str, dataset: _pyss.DataFrame):
+
+        """Spark support is not available in the current version of the runtime"""
+
         pass
 
     @_abc.abstractmethod
     def put_spark_table_rdd(self, dataset_name: str, dataset: _pys.RDD):
+
+        """Spark support is not available in the current version of the runtime"""
+
         pass
 
     @_abc.abstractmethod
     def get_spark_context(self) -> _pys.SparkContext:
+
+        """Spark support is not available in the current version of the runtime"""
+
         pass
 
     @_abc.abstractmethod
     def get_spark_sql_context(self) -> _pyss.SQLContext:
+
+        """Spark support is not available in the current version of the runtime"""
+
         pass
 
     @_abc.abstractmethod
     def log(self) -> _logging.Logger:
+
+        """
+        Get a Python logger that can be used for writing model logs
+
+        Logs written to this logger are recorded by TRAC. When models are run on the platform,
+        these logs are assembled and saved with the job outputs as a dataset, that can be queried
+        through the regular TRAC data and metadata APIs.
+
+        :return: A Python logger that can be used for writing model logs
+        """
+
         pass
 
 
