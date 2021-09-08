@@ -1,29 +1,25 @@
 # TRAC Web API
 
-*TRAC is a next-generation data and analytics platform for use in highly regulated environments*
+*A next-generation data and analytics platform for use in highly regulated environments*
+
+The TRAC web API provides a structured interface for developing web applications to run on the TRAC platform.
+It is based on the popular [protobuf.js](https://www.npmjs.com/package/protobufjs) framework and uses the
+highly optimised gRPC-Web protocol for transport. The package supports both JavaScript and TypeScript and 
+provides everything needed to communicate with the TRAC platform directly from a web browser, no additional
+development tooling, setup or middleware is required. Inline documentation is available for IDEs that support it.
+
+Documentation for the TRAC platform is available at
+[trac-platform.readthedocs.io](https://trac-platform.readthedocs.io).
 
 
-The TRAC web API provides a structured interface to develop web applications for the TRAC platform, based on the
-popular [protobuf.js](https://www.npmjs.com/package/protobufjs) framework and using the highly optimised gRPC-Web
-protocol for transport. Type information, auto-completion and inline documentation are made available for IDEs that
-support those features. The APIs for each service and the associated data model are described in the API definition
-files (.proto files):
+## Installing the web API package
 
-* [TRAC Services](https://github.com/accenture/trac/tree/main/trac-api/trac-services/src/main/proto/trac/api)
-* [TRAC Metadata](https://github.com/accenture/trac/tree/main/trac-api/trac-metadata/src/main/proto/trac/metadata)
+To install the web API package in your project:
 
-The web API is intended for building applications that will run entirely in the browser (i.e. served as statically
-compiled content) and communicate with the TRAC platform directly from there. It comes "batteries included", which is
-to say it should have everything you need to get going right away. We recommend using the web API package  for building
-front-end applications unless you have a good reason not to, as it is the simplest, most well-structured and
-best-documented option. 
+    npm install --save trac-web-api
 
 
 ## Using the web API in an application
-
-To install the web API in your project:
-
-    npm install --save trac-web-api
 
 Each of the TRAC services has a single public API class, which can be instantiated with just two lines of code.
 
@@ -43,15 +39,16 @@ Each of the TRAC services has a single public API class, which can be instantiat
 
         ...
 
-The methods available in each API can be called as JavaScript methods on the API class. They can be used with futures 
-or callbacks. Documentation for each method including type information for the request and response objects is included
-in the API package and should appear in auto-complete if your IDE supports it. Alternatively you can refer to the API
-definition files for the full documentation.
+
+The API methods can be called as JavaScript methods on the API classes, both futures and callbacks are supported.
 
 
         exampleSearchWithFutures(tenant, searchParams) {
 
-            const searchRequest = {tenant: tenant, searchParams: searchParams};
+            const searchRequest = {
+                tenant: tenant, 
+                searchParams: searchParams
+            };
 
             // API call using JavaScript futures
             return this.metaApi.search(searchRequest)
@@ -67,7 +64,10 @@ definition files for the full documentation.
 
         exampleSearcWithCallbacks(tenant, searchParams) {
 
-            const searchRequest = {tenant: tenant, searchParams: searchParams};
+            const searchRequest = {
+                tenant: tenant, 
+                searchParams: searchParams
+            };
 
             // API call using Node-style callbcks
             this.metaApi.search(searchRequest, (err, response) => {
@@ -83,21 +83,21 @@ definition files for the full documentation.
             });
         }
 
-         buildSearchParams() {
+        buildSearchParams() {
 
-            // An example of building a search object that could be used for the above calls
+            // An example search that could be used for the above calls
 
             const exampleSearchParams = {
 
                 objectType: trac.metadata.ObjectType.MODEL,
                 search: { logical: {
         
-                    operator: trac.metadata.search.LogicalOperator.AND,
+                    operator: trac.metadata.LogicalOperator.AND,
                     expr: [
                         { term: {
                             attrName: "model_type",
                             attrType: trac.metadata.BasicType.STRING,
-                            operator: trac.metadata.search.SearchOperator.EQ,
+                            operator: trac.metadata.SearchOperator.EQ,
                             searchValue: { 
                                 type: { basicType: trac.metadata.BasicType.STRING }, 
                                 stringValue: "acme_widget_model" 
@@ -106,7 +106,7 @@ definition files for the full documentation.
                         { term: {
                             attrName: "model_owner",
                             attrType: trac.metadata.BasicType.STRING,
-                            operator: trac.metadata.search.SearchOperator.EQ,
+                            operator: trac.metadata.SearchOperator.EQ,
                             searchValue: { 
                                 type: { basicType: trac.metadata.BasicType.STRING }, 
                                 stringValue: "wile.e.cyote" 
@@ -116,16 +116,19 @@ definition files for the full documentation.
                 }}
             }
 
-            const err = trac.metadata.search.SearchParameters.verify(exampleSearchParams);
+            const err = trac.metadata.SearchParameters.verify(exampleSearchParams);
 
             if (err)
                 throw err;
     
-            return trac.metadata.search.SearchParameters.create(exampleSearchParams);
+            return trac.metadata.SearchParameters.create(exampleSearchParams);
         }
 
-It may also be helpful to look at the documentation of [protobuf.js](https://www.npmjs.com/package/protobufjs),
-which is used to generate the TRAC API classes.
+To learn how to build applications on TRAC, check out the
+[application development section](https://trac-platform.readthedocs.io/en/stable/app_dev)
+in our online documentation. It may also be helpful to look at the documentation of
+[protobuf.js](https://www.npmjs.com/package/protobufjs),
+which is used to generate the TRAC API classes for the web API package.
 
 
 # Running a local instance of TRAC for development

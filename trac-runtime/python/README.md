@@ -23,7 +23,7 @@ The TRAC runtime for Python has these requirements:
 Not every combination of versions will work, e.g. PySpark 3 requires Python 3.8.
 
 
-## Writing TRAC Models
+## Installing the runtime
 
 The TRAC runtime package can be installed directly from PyPI:
 
@@ -31,6 +31,9 @@ The TRAC runtime package can be installed directly from PyPI:
 
 The TRAC runtime depends on Pandas and PySpark, so these libraries will be pulled in as 
 dependencies. If you want to target particular versions, install them explicitly first.
+
+
+## Writing a model
 
 Once the runtime is installed you can write your first TRAC model! Start by
 inheriting the TracModel base class, your IDE should be able to generate stubs for you:
@@ -60,3 +63,29 @@ available in our online documentation. The tutorials are based on
 [example models](https://github.com/Accenture/trac/tree/main/examples/models/python)
 in the TRAC GitHub repository. We run these examples as part of our CI, so they will always
 be in sync with the corresponding version of the runtime library.
+
+
+## Building the runtime from source
+
+This is not normally necessary for model development, but if you want to do it here are the commands.
+
+    cd trac-runtime/python
+
+    # Configure a Python environment
+
+    python -m venv ./venv
+    venv\Scripts\activate              # For Windows platforms
+    . venv/bin/activate                # For macOS or Linux
+    pip install -r requirements.txt
+
+    # Run the code generator
+
+    python ../../dev/codegen/protoc-ctrl.py python_runtime \
+        --proto_path trac-api/trac-metadata/src/main/proto \
+        --out trac-runtime/python/generated/trac/rt_gen/domain
+
+    # Build the Python package files
+
+    python ./package-ctrl.py
+    
+The package files will appear under build/dist
