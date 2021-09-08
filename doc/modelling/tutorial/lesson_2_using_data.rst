@@ -1,6 +1,6 @@
 
 #####################
-Lesson 3 - Using Data
+Lesson 2 - Using Data
 #####################
 
 .. literalinclude:: ../../../examples/models/python/hello_pandas/hello_pandas.py
