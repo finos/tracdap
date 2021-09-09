@@ -22,12 +22,12 @@ class SampleModel(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
-        return trac.define_parameters(
+        return trac.declare_parameters(
             trac.P("param1", trac.BasicType.INTEGER, label="A first parameter"))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
 
-        input1 = trac.define_input_table(
+        input1 = trac.declare_input_table(
             trac.F("field1", trac.BasicType.INTEGER, "Something about this field"),
             trac.F("field2", trac.BasicType.FLOAT, "Something about this other field"))
 
@@ -35,7 +35,7 @@ class SampleModel(trac.TracModel):
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
 
-        output1 = trac.define_output_table(
+        output1 = trac.declare_output_table(
             trac.F("field1", trac.BasicType.INTEGER, "Something about this field"),
             trac.F("field2", trac.BasicType.FLOAT, "Something about this other field"))
 
