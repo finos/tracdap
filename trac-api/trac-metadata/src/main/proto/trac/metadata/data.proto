@@ -42,7 +42,8 @@ message FieldSchema {
     string fieldName = 1;
     sint32 fieldOrder = 2;
     BasicType fieldType = 3;
-    string fieldLabel = 4;
+
+    string label = 4;
 
     bool businessKey = 5;
     bool categorical = 6;

@@ -59,7 +59,7 @@ def declare_parameters(
 def declare_parameter(
         param_name: str,
         param_type: _tp.Union[_meta.TypeDescriptor, _meta.BasicType],
-        param_label: str,
+        label: str,
         default_value: _tp.Optional[_tp.Any] = None) \
         -> _Named[_meta.ModelParameter]:
 
@@ -81,7 +81,7 @@ def declare_parameter(
 
     :param param_name: The parameter name, used to identify the parameter in code (must be a valid identifier)
     :param param_type: The parameter type, expressed in the TRAC type system
-    :param param_label: A descriptive label for the parameter (required)
+    :param label: A descriptive label for the parameter (required)
     :param default_value: A default value to use if no explicit value is supplied (optional)
     :return: A named model parameter, suitable for passing to :py:func:`declare_parameters`
     """
@@ -91,7 +91,7 @@ def declare_parameter(
     else:
         param_type_descriptor = _meta.TypeDescriptor(param_type, None, None)
 
-    return _Named(param_name, _meta.ModelParameter(param_label, param_type_descriptor, default_value))
+    return _Named(param_name, _meta.ModelParameter(param_type_descriptor, label, default_value))
 
 
 def declare_input_table(
@@ -150,30 +150,36 @@ def declare_output_table(
 
 def declare_field(
         field_name: str,
-        field_order: int,
         field_type: _meta.BasicType,
-        field_label: str,
+        label: str,
         business_key: bool = False,
         categorical: bool = False,
-        format_code: _tp.Optional[str] = None) \
+        format_code: _tp.Optional[str] = None,
+        field_order: _tp.Optional[int] = None) \
         -> _meta.FieldSchema:
 
     """
     Declare an individual field, for use in a model input or output schema
 
     Individual fields in a dataset can be declared using this method (or :py:func:`trac.F<F>`).
-    The name, order, type and label of a field are required parameters.
+    The name, type and label of a field are required parameters. The business_key and categorical
+    flags are false by default. Format code is optional.
+
+    If no field ordering is supplied, fields will automatically be assigned a contiguous ordering starting at 0.
+    In this case care must be taken when creating an updated version of a model, that the order of existing
+    fields is not disturbed. Adding fields to the end of a list is always safe.
+    If field orders are specified explicitly, the must for a contiguous ordering starting at 0.
 
     Declared fields should be passed to :py:func:`declare_input_table` or :py:func:`declare_output_table`,
     either individually or as a list, to create the full schema for an input or output.
 
     :param field_name: The field's name, used as the field identifier in code and queries (must be a valid identifier)
-    :param field_order: The field's order in the dataset it is a part of (ordering must use contiguous integers)
     :param field_type: The data type of the field, only primitive types are allowed
-    :param field_label: A descriptive label for the field (required)
+    :param label: A descriptive label for the field (required)
     :param business_key: Flag indicating whether this field is a business key for its dataset (default: False)
     :param categorical: Flag indicating whether this is a categorical field (default: False)
-    :param format_code: Optional code that can be interpreted by client applications to format the field
+    :param format_code: A code that can be interpreted by client applications to format the field (optional)
+    :param field_order: Explicit field ordering (optional)
     :return: A field schema, suitable for use in a schema definition
     """
 
@@ -181,7 +187,7 @@ def declare_field(
         field_name,
         field_order,
         field_type,
-        field_label,
+        label,
         businessKey=business_key,
         categorical=categorical,
         formatCode=format_code)

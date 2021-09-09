@@ -29,9 +29,9 @@ import "trac/metadata/data.proto";
  */
 message ModelParameter {
 
-    string label = 1;
+    TypeDescriptor paramType = 1;
 
-    TypeDescriptor paramType = 2;
+    string label = 2;
 
     optional Value defaultValue = 3;
 }
