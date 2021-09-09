@@ -1,6 +1,6 @@
 # TRAC Model Runtime for Python
 
-*A next-generation data and analytics platform for use in highly regulated environments*
+*TRAC is a next-generation data and analytics platform for use in highly regulated environments*
 
 The TRAC model runtime provides all the APIs needed to write models for the TRAC platform.
 It includes an implementation of the runtime library that can be used as a development

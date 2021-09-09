@@ -1,6 +1,6 @@
 # TRAC Web API
 
-*A next-generation data and analytics platform for use in highly regulated environments*
+*TRAC is a next-generation data and analytics platform for use in highly regulated environments*
 
 The TRAC web API provides a structured interface for developing web applications to run on the TRAC platform.
 It is based on the popular [protobuf.js](https://www.npmjs.com/package/protobufjs) framework and uses the
