@@ -249,16 +249,83 @@ class TracModel:
 
     @_abc.abstractmethod
     def define_parameters(self) -> _tp.Dict[str, _meta.ModelParameter]:
+
+        """
+        Define parameters that will be available to the model at runtime
+
+        Implement this method to define the model's parameters, every parameter that the
+        model uses must be defined. Models may choose to ignore some parameters,
+        it is ok to define parameters that are not always used.
+
+        To declare model parameters in code, always use the declare_* functions in the :py:mod:`trac.rt.api` package.
+        This will ensure parameters are defined in the correct format with all the required fields.
+        Parameters that are defined in the wrong format or with required fields missing
+        will result in a model validation failure.
+
+        :return: The full set of parameters that will be available to the model at runtime
+        """
+
         pass
 
     @_abc.abstractmethod
     def define_inputs(self) -> _tp.Dict[str, _meta.ModelInputSchema]:
+
+        """
+        Define data inputs that will be available to the model at runtime
+
+        Implement this method to define the model's inputs, every data input that the
+        model uses must be defined. Models may choose to ignore some inputs,
+        it is ok to define inputs that are not always used.
+
+        To declare model inputs in code, always use the declare_* functions in the :py:mod:`trac.rt.api` package.
+        This will ensure inputs are defined in the correct format with all the required fields.
+        Model inputs that are defined in the wrong format or with required fields missing
+        will result in a model validation failure.
+
+        :return: The full set of inputs that will be available to the model at runtime
+        """
+
         pass
 
     @_abc.abstractmethod
     def define_outputs(self) -> _tp.Dict[str, _meta.ModelOutputSchema]:
+
+        """
+        Define data outputs that will be produced by the model at runtime
+
+        Implement this method to define the model's outputs, every data output that the
+        model produces must be defined and every output that is defined must be
+        produced. If a model defines an output which is not produced, a runtime
+        validation error will be raised after the model completes.
+
+        To declare model outputs in code, always use the declare_* functions in the :py:mod:`trac.rt.api` package.
+        This will ensure outputs are defined in the correct format with all the required fields.
+        Model outputs that are defined in the wrong format or with required fields missing
+        will result in a model validation failure.
+
+        :return: The full set of outputs that will be produced by the model at runtime
+        """
+
         pass
 
     @_abc.abstractmethod
     def run_model(self, ctx: TracContext):
+
+        """
+        Entry point for running model code
+
+        Implement this method to provide the model logic. A :py:class:`TracContext` is provided
+        at runtime, which makes parameters and inputs available and provides a means to save outputs.
+        All the outputs defined in :py:meth:`define_outputs` must be saved before this method returns,
+        otherwise a runtime validation error will be raised.
+
+        Model code can raise exceptions, either in a controlled way by detecting error conditions and raising
+        errors explicitly, or in an uncontrolled way as a result of bugs in the model code. Exceptions may also
+        originate inside libraries the model code is using. If an exception escapes from :py:meth`run_model`
+        TRAC will mark the model as failed, the job that contains the model will also fail.
+
+        :param ctx: A context use to access model inputs, outputs and parameters
+                    and communicate with the TRAC platform
+        """
+
         pass
