@@ -26,8 +26,8 @@ dependencies. If you want to target particular versions, install them explicitly
 Writing a model
 ---------------
 
-To write a model, start by inheriting from the TracModel base class and implementing
-the abstract methods. Here is the Hello World example:
+To write a model, start by inheriting from the :py:class:`TracModel<trac.rt.api.TracModel>`
+base class and implementing the abstract methods. Here is the Hello World example:
 
 .. literalinclude:: ../../../examples/models/python/hello_world/hello_world.py
     :caption: examples/models/python/hello_world/hello_world.py
