@@ -35,16 +35,23 @@ import trac.rt.exec.dev_mode as _dev_mode
 class TracRuntime:
 
     def __init__(
-            self, sys_config_path: str, job_config_path: tp.Optional[str] = None,
-            dev_mode: bool = False, model_class: tp.Optional[api.TracModel.__class__] = None):
+            self,
+            sys_config_path: tp.Union[str, pathlib.Path],
+            job_config_path: tp.Optional[tp.Union[str, pathlib.Path]] = None,
+            trac_system_dir: tp.Optional[pathlib.Path] = None,
+            dev_mode: bool = False,
+            model_class: tp.Optional[api.TracModel.__class__] = None):
 
         trac_version = 'DEVELOPMENT VERSION'  # TODO: Bring in version from the version script
         python_version = sys.version.replace("\n", "")
         mode = "batch" if job_config_path else "service"
 
+        if not trac_system_dir:
+            trac_system_dir = pathlib.Path.cwd()
+
         print(f">>> TRAC Python Runtime {trac_version} starting in {mode} mode at {dt.datetime.now()}")
         print(f">>> Python installation: {python_version} ({sys.exec_prefix})")
-        print(f">>> Working directory: {pathlib.Path.cwd()}")
+        print(f">>> TRAC system directory: {trac_system_dir}")
         print(f">>> System config: {sys_config_path}")
 
         if job_config_path:
@@ -57,15 +64,18 @@ class TracRuntime:
         self._log = util.logger_for_object(self)
         self._log.info(f"TRAC Python Runtime {trac_version}")
 
-        self._sys_config_path = sys_config_path
-        self._sys_config: tp.Optional[config.SystemConfig] = None
+        self._sys_dir = trac_system_dir.absolute().resolve()
+        self._sys_config_path = self._sys_dir.joinpath(sys_config_path)
 
         if job_config_path:
+            self._job_config_path = self._sys_dir.joinpath(job_config_path)
             self._batch_mode = True
-            self._job_config_path = job_config_path
-            self._job_config: tp.Optional[config.JobConfig] = None
         else:
+            self._job_config_path = None
             self._batch_mode = False
+
+        self._sys_config: tp.Optional[config.SystemConfig] = None
+        self._job_config: tp.Optional[config.JobConfig] = None
 
         self._dev_mode = dev_mode
         self._model_class = model_class
@@ -116,7 +126,7 @@ class TracRuntime:
             if self._dev_mode:
 
                 job_config, sys_config = _dev_mode.DevModeTranslator.translate_dev_mode_config(
-                    self._job_config, self._sys_config, self._model_class)
+                    self._sys_dir, self._sys_config, self._job_config, self._model_class)
 
                 self._job_config = job_config
                 self._sys_config = sys_config
@@ -131,7 +141,7 @@ class TracRuntime:
             self._log.info("Starting the engine...")
 
             self._repos = repos.Repositories(self._sys_config)
-            self._storage = storage.StorageManager(self._sys_config)
+            self._storage = storage.StorageManager(self._sys_config, self._sys_dir)
 
             self._engine = engine.TracEngine(self._sys_config, self._repos, self._storage, batch_mode=self._batch_mode)
             self._system = actors.ActorSystem(self._engine, system_thread="engine")

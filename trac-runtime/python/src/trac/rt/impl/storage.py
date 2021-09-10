@@ -150,16 +150,18 @@ class StorageManager:
         cls.__file_impls[storage_type] = file_impl
         cls.__data_impls[storage_type] = data_impl
 
-    def __init__(self, sys_config: _cfg.SystemConfig):
+    def __init__(self, sys_config: _cfg.SystemConfig, trac_system_dir: pathlib.Path):
 
         self.__log = _util.logger_for_object(self)
         self.__file_storage: tp.Dict[str, IFileStorage] = dict()
         self.__data_storage: tp.Dict[str, IDataStorage] = dict()
 
-        for storage_key, storage_config in sys_config.storage.items():
-            self.create_storage(storage_key, storage_config)
+        storage_options = {"trac_system_dir": trac_system_dir}
 
-    def create_storage(self, storage_key: str, storage_config: _cfg.StorageConfig):
+        for storage_key, storage_config in sys_config.storage.items():
+            self.create_storage(storage_key, storage_config, storage_options)
+
+    def create_storage(self, storage_key: str, storage_config: _cfg.StorageConfig, storage_options: dict = None):
 
         if storage_config is None:
             err = f"Missing config for storage key [{storage_key}]"
@@ -176,7 +178,7 @@ class StorageManager:
             self.__log.error(err)
             raise _ex.EStorageConfig(err)
 
-        file_storage = file_impl(storage_config)
+        file_storage = file_impl(storage_config, storage_options)
         data_storage = data_impl(storage_config, file_storage)
 
         self.__file_storage[storage_key] = file_storage
@@ -250,8 +252,8 @@ class CommonDataStorage(IDataStorage):
             self, config: _cfg.StorageConfig, file_storage: IFileStorage,
             pushdown_pandas: bool = False, pushdown_spark: bool = False):
 
-        root_path = config.storageConfig.get("rootPath")  # TODO: Config / constants
-        self.__root_path = pathlib.Path(root_path).resolve(strict=True)
+        # TODO: How to handle root path in a generic way, re-using logic from underlying file storage
+        self.__root_path = file_storage._get_root()  # noqa
 
         self.__file_storage = file_storage
         self.__pushdown_pandas = pushdown_pandas
@@ -324,10 +326,39 @@ class CommonDataStorage(IDataStorage):
 
 class LocalFileStorage(IFileStorage):
 
-    def __init__(self, config: _cfg.StorageConfig):
+    def __init__(self, config: _cfg.StorageConfig, options: dict = None):
 
-        root_path = config.storageConfig.get("rootPath")  # TODO: Config / constants
-        self.__root_path = pathlib.Path(root_path).resolve(strict=True)
+        self._log = _util.logger_for_object(self)
+        self._options = options or {}
+
+        root_path_config = config.storageConfig.get("rootPath")  # TODO: Config / constants
+
+        if not root_path_config or root_path_config.isspace():
+            err = f"Storage root path not set"
+            self._log.error(err)
+            raise _ex.EStorageRequest(err)
+
+        supplied_root = pathlib.Path(root_path_config)
+
+        if supplied_root.is_absolute():
+            absolute_root = supplied_root
+
+        elif "trac_system_dir" in self._options:
+            absolute_root = pathlib.Path(self._options["trac_system_dir"]).joinpath(supplied_root).absolute()
+
+        else:
+            absolute_root = pathlib.Path(".").joinpath(root_path_config).absolute()
+
+        try:
+            self.__root_path = absolute_root.resolve(strict=True)
+
+        except FileNotFoundError as e:
+            err = f"Storage root path does not exist: [{absolute_root}]"
+            self._log.error(err)
+            raise _ex.EStorageRequest(err) from e
+
+    def _get_root(self):
+        return self.__root_path
 
     def exists(self, storage_path: str) -> bool:
 

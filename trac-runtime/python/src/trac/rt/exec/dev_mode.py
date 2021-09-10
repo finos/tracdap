@@ -35,8 +35,9 @@ class DevModeTranslator:
     @classmethod
     def translate_dev_mode_config(
             cls,
-            job_config: cfg.JobConfig,
+            sys_dir: pathlib.Path,
             sys_config: cfg.SystemConfig,
+            job_config: cfg.JobConfig,
             model_class: tp.Optional[api.TracModel.__class__]) \
             -> (cfg.JobConfig, cfg.SystemConfig):
 
@@ -71,7 +72,7 @@ class DevModeTranslator:
             storage_id = uuid.uuid4()
 
             data_obj, storage_obj = cls._process_job_io(
-                sys_config, data_key, data_value, data_id, storage_id,
+                sys_dir, sys_config, data_key, data_value, data_id, storage_id,
                 new_unique_file=not is_input)
 
             translated_objects[str(data_id)] = data_obj
@@ -98,7 +99,7 @@ class DevModeTranslator:
         return job_config, sys_config
 
     @classmethod
-    def _process_job_io(cls, sys_config, data_key, data_value, data_id, storage_id, new_unique_file=False):
+    def _process_job_io(cls, sys_dir, sys_config, data_key, data_value, data_id, storage_id, new_unique_file=False):
 
         if isinstance(data_value, str):
             storage_path = data_value
@@ -128,7 +129,7 @@ class DevModeTranslator:
 
         if new_unique_file:
 
-            x_storage_mgr = _storage.StorageManager(sys_config)
+            x_storage_mgr = _storage.StorageManager(sys_config, sys_dir)
             x_storage = x_storage_mgr.get_file_storage(storage_key)
             x_orig_path = pathlib.PurePath(storage_path)
 

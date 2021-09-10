@@ -23,8 +23,8 @@ class HelloWorldExample(unittest.TestCase):
 
     def test_hello_world(self):
 
-        job_config = 'examples/models/python/hello_world/hello_world.yaml'
-        sys_config = 'examples/models/python/sys_config.yaml'
+        job_config = 'hello_world.yaml'
+        sys_config = '../sys_config.yaml'
 
         spec = importlib.util.spec_from_file_location("hello_world", "examples/models/python/hello_world/hello_world.py")
         module = importlib.util.module_from_spec(spec)

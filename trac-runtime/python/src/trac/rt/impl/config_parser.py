@@ -124,7 +124,7 @@ class ConfigParser(tp.Generic[_T]):
             self._log.error(err)
             raise _ex.EConfigParse(err) from e
 
-    def parse(self, config_dict: dict, config_file: str = None) -> _T:
+    def parse(self, config_dict: dict, config_file: tp.Union[str, pathlib.Path] = None) -> _T:
 
         # If config is empty, return a default (blank) config
         if config_dict is None or len(config_dict) == 0:

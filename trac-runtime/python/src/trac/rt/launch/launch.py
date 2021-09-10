@@ -14,6 +14,10 @@
 
 from __future__ import annotations
 
+import inspect
+import pathlib
+import typing as _tp
+
 import trac.rt.api as api
 import trac.rt.exec.runtime as runtime
 
@@ -40,9 +44,24 @@ def launch_job(job_config: str, sys_config: str):
         rt.wait_for_shutdown()
 
 
-def launch_model(model_class: api.TracModel.__class__, job_config: str, sys_config: str):
+def launch_model(
+        model_class: api.TracModel.__class__,
+        job_config: _tp.Union[str, pathlib.Path],
+        sys_config: _tp.Union[str, pathlib.Path]):
 
-    runtime_instance = runtime.TracRuntime(sys_config, job_config, dev_mode=True, model_class=model_class)
+    model_file = inspect.getfile(model_class)
+    model_dir = pathlib.Path(model_file).parent
+
+    trac_system_dir = model_dir.joinpath(sys_config).parent.resolve()
+    model_sys_cfg = model_dir.joinpath(sys_config).resolve()
+    model_job_cfg = model_dir.joinpath(job_config).resolve()
+
+    runtime_instance = runtime.TracRuntime(
+        model_sys_cfg, model_job_cfg,
+        trac_system_dir=trac_system_dir,
+        dev_mode=True,
+        model_class=model_class)
+
     runtime_instance.pre_start()
 
     with runtime_instance as rt:

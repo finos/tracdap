@@ -23,8 +23,8 @@ class HelloPandasExample(unittest.TestCase):
 
     def test_hello_pandas(self):
 
-        job_config = 'examples/models/python/hello_pandas/hello_pandas.yaml'
-        sys_config = 'examples/models/python/sys_config.yaml'
+        job_config = 'hello_pandas.yaml'
+        sys_config = '../sys_config.yaml'
 
         spec = importlib.util.spec_from_file_location("hello_pandas", "examples/models/python/hello_pandas/hello_pandas.py")
         module = importlib.util.module_from_spec(spec)
