@@ -131,6 +131,7 @@ class DocGen:
         # Copy only API packages / modules from the runtime library
         api_modules = [
             "trac/rt/api/",
+            "trac/rt/launch/",
             "trac/rt/exceptions.py"]
 
         for module in api_modules:

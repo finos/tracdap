@@ -71,10 +71,11 @@ to be configured in the system config. We still need to supply a config file tho
 Run the model
 -------------
 
-The easiest way to launch a model during development is to call the TRAC launcher from inside
-the model script. Make sure to guard the launch by checking __name__ == "__main__", to prevent
-launching a local config when the model is deployed to the platform (TRAC will not allow this,
-but the model will fail to deploy)!
+The easiest way to launch a model during development is to call
+:py:meth:`launch_model()<trac.rt.launch.launch_model>`
+from the TRAC launch package. Make sure to guard the launch by checking __name__ == "__main__", to
+prevent launching a local config when the model is deployed to the platform (TRAC will not allow
+this, but the model will fail to deploy)!
 
 .. literalinclude:: ../../../examples/models/python/hello_world/hello_world.py
     :caption: examples/models/python/hello_world/hello_world.py
