@@ -16,23 +16,45 @@ to be created, updated and executed at any time without change risk to productio
 workflows, guaranteeing total repeatability, audit and control (TRAC).
 
 
+## Documentation and Packages
+
+Documentation for the TRAC platform is available on readthedocs.io:
+
+https://trac-platform.readthedocs.io/en/stable
+
+The following packages are available:
+
+* [Model runtime for Python](https://pypi.org/project/trac-runtime/) - 
+  Build models and test them in a development sandbox, ready to deploy to the platform
+
+* [Web API package](https://www.npmjs.com/package/trac-web-api) -
+  Build client apps in JavaScript or TypeScript using the TRAC platform APIs
+
 ## Development Status
 
-The current release series (0.1.x) is intended for reference and experimentation.
-It includes an implementation of the metadata API, which can be used to
-prototype client applications (e.g. web UIs) against the TRAC platform.
+[![Build and Test](https://github.com/Accenture/trac/actions/workflows/build.yml/badge.svg)](
+https://github.com/Accenture/trac/actions/workflows/build.yml)
+[![Integration Tests](https://github.com/Accenture/trac/actions/workflows/integration.yml/badge.svg)](
+https://github.com/Accenture/trac/actions/workflows/integration.yml)
+[![Packaging](https://github.com/Accenture/trac/actions/workflows/packaging.yml/badge.svg)](
+https://github.com/Accenture/trac/actions/workflows/packaging.yml)
 
-For the time being, TRAC's API calls and metadata structures are subject to
-change between versions, including between point versions. As the platform
-evolves these APIs and metadata structures will stabilise eventually forming
-a contract for the behaviour of the platform across versions. The expectation
-is that the APIs will be frozen for TRAC version 1.0, after which they may
+The current release series (0.2.x) is intended for reference and experimentation.
+It includes the metadata service, runtime engine for Python and a partial implementation
+of the platform Gateway. This release can be used to prototype client applications (e.g.
+web UIs) and to build and run models in a development sandbox.
+
+At the moment TRAC's API calls and metadata structures are subject to change between 
+versions, including between point versions. As the platform evolves these APIs will
+stabilise before eventually being frozen for TRAC version 1.0, after which they may 
 be added to but not removed or changed.
 
+For more information see the
+[development roadmap](https://github.com/Accenture/trac/wiki/Development-Roadmap).
 
 ## Building TRAC
 
-TRAC requires Java 11 or higher, you can download a suitable JDK from
+The core platform services require Java 11 or higher, you can download a suitable JDK from
 [AdoptOpenJDK](https://adoptopenjdk.net/).
 
 To build the TRAC platform, clone the repository and run this command
@@ -70,18 +92,8 @@ Once you have a database prepared you can start the TRAC services.
     gradlew :trac-svc-meta:run --args="--config etc/trac-devlocal.properties"
     gradlew :trac-gateway:run --args="--config etc/trac-devlocal-gateway.yaml"
 
-
-## Using the TRAC APIs
-
-TRAC version 0.1 provides the TRAC web API, which can be used for developing
-user-facing applications on the TRAC platform. Developer documentation on the
-TRAC metadata structures and available API calls is part included in the API
-.proto files:
-
-* [TRAC Metadata Definitions](./trac-api/trac-metadata/src/main/proto/trac/metadata)
-* [TRAC Service API Definitions](./trac-api/trac-services/src/main/proto/trac/api)
-
-The TRAC APIs are available in both gRPC / proto (via the metadata service) and
-REST / json (via the platform gateway). You can use a regular REST client such
-as [Postman](https://www.postman.com/) to experiment with the REST API. Look in the
-examples folder for [examples of REST / json API calls](./examples/rest_calls).
+To confirm the platform is working you can use the [example API calls](./examples/rest_calls)
+with a REST client such as [Postman](https://www.postman.com/). For more information on the
+platform APIs and how to use them to build applications, check out the
+[application development section](https://trac-platform.readthedocs.io/en/stable/app_dev)
+in the online documentation.
