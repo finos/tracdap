@@ -51,7 +51,7 @@ class ConfigParserTest(unittest.TestCase):
 
         parser = cfg_p.ConfigParser(cfg.JobConfig)
 
-        raw_config_path = PYTHON_EXAMPLES_DIR.joinpath("hello_pandas/hello_pandas.yaml")
+        raw_config_path = PYTHON_EXAMPLES_DIR.joinpath("using_data/using_data.yaml")
         raw_config = parser.load_raw_config(raw_config_path, "job")
         job_config = parser.parse(raw_config, raw_config_path.name)
 
