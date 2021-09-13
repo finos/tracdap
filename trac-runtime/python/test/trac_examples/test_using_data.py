@@ -19,17 +19,17 @@ import sys
 import trac.rt.launch as launch
 
 
-class HelloPandasExample(unittest.TestCase):
+class UsingDataExample(unittest.TestCase):
 
-    def test_hello_pandas(self):
+    def test_using_data(self):
 
-        job_config = 'hello_pandas.yaml'
+        job_config = 'using_data.yaml'
         sys_config = '../sys_config.yaml'
 
-        spec = importlib.util.spec_from_file_location("hello_pandas", "examples/models/python/hello_pandas/hello_pandas.py")
+        spec = importlib.util.spec_from_file_location("hello_pandas", "examples/models/python/using_data/using_data.py")
         module = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = module
         spec.loader.exec_module(module)
-        model_class = module.__dict__["HelloPandas"]
+        model_class = module.__dict__["UsingDataModel"]
 
         launch.launch_model(model_class, job_config, sys_config)

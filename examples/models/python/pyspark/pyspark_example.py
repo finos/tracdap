@@ -13,10 +13,11 @@
 #  limitations under the License.
 
 import trac.rt.api as trac
+import pyspark.sql.functions as f
 import typing as tp
 
 
-class HelloPandas(trac.TracModel):
+class PysparkExampleModel(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
@@ -57,31 +58,31 @@ class HelloPandas(trac.TracModel):
         default_weighting = ctx.get_parameter("default_weighting")
         filter_defaults = ctx.get_parameter("filter_defaults")
 
-        customer_loans = ctx.get_pandas_table("customer_loans")
+        customer_loans = ctx.get_spark_table("customer_loans")
 
         if filter_defaults:
-            customer_loans.loc[:, :] = customer_loans[customer_loans["loan_condition_cat"] == 0]
+            customer_loans = customer_loans.filter(f.col("loan_condition_cat") == 0)
 
-        customer_loans.loc[:, "gross_profit_unweighted"] = \
-            customer_loans["total_pymnt"] - \
-            customer_loans["loan_amount"]
+        customer_loans = customer_loans.withColumn(
+            "gross_profit_unweighted",
+            f.col("total_pymnt") - f.col("loan_amount"))
 
-        customer_loans.loc[:, "gross_profit_weighted"] = \
-            customer_loans["gross_profit_unweighted"] * \
-            customer_loans["loan_condition_cat"] \
-            .apply(lambda c: default_weighting if c > 0 else 1.0)
+        customer_loans = customer_loans.withColumn(
+            "gross_profit_weighted",
+            f.col("gross_profit_unweighted") *
+            f.when(f.col("loan_condition_cat") > 0, default_weighting).otherwise(1.0))
 
-        customer_loans.loc[:, "gross_profit"] = \
-            customer_loans["gross_profit_weighted"] \
-            .apply(lambda x: x * eur_usd_rate)
+        customer_loans = customer_loans.withColumn(
+            "gross_profit",
+            f.col("gross_profit_weighted") * eur_usd_rate)
 
         profit_by_region = customer_loans \
-            .groupby("region", as_index=False) \
-            .aggregate({"gross_profit": "sum"})
+            .groupBy("region") \
+            .agg(f.col("region"), f.sum(f.col("gross_profit")).alias("gross_profit"))
 
-        ctx.put_pandas_table("profit_by_region", profit_by_region)
+        ctx.put_spark_table("profit_by_region", profit_by_region)
 
 
 if __name__ == "__main__":
     import trac.rt.launch as launch
-    launch.launch_model(HelloPandas, "hello_pandas.yaml", "examples/sys_config.yaml")
+    launch.launch_model(PysparkExampleModel, "pyspark_example.yaml", "../sys_config.yaml")

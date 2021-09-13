@@ -3,14 +3,14 @@
 Lesson 2 - Using Data
 #####################
 
-.. literalinclude:: ../../../examples/models/python/hello_pandas/hello_pandas.py
-    :caption: hello_pandas.py
-    :name: hello_pandas.py
+.. literalinclude:: ../../../examples/models/python/using_data/using_data.py
+    :caption: using_data.py
+    :name: using_data.py
     :lines: 15-
 
-.. literalinclude:: ../../../examples/models/python/hello_pandas/hello_pandas.yaml
-    :caption: hello_pandas.yaml
-    :name: hello_pandas.yaml
+.. literalinclude:: ../../../examples/models/python/using_data/using_data.yaml
+    :caption: using_data.yaml
+    :name: using_data.yaml
     :lines: 2-
 
 .. literalinclude:: ../../../examples/models/python/sys_config.yaml
