@@ -21,16 +21,14 @@ class HelloWorldModel(trac.TracModel):
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
         return trac.declare_parameters(
-
-            trac.P("meaning_of_life", trac.BasicType.INTEGER,
-                   label="The answer to the ultimate question of life, the universe and everything"))
+            trac.P(
+                "meaning_of_life", trac.BasicType.INTEGER,
+                label="The answer to the ultimate question of life, the universe and everything"))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
-
         return {}
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
-
         return {}
 
     def run_model(self, ctx: trac.TracContext):
