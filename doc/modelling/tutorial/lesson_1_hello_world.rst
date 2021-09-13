@@ -132,7 +132,7 @@ this, but the model will fail to deploy)!
     :linenos:
     :lineno-start: 28
 
-TRAC will resolve the paths for the system and job config files in the following order:
+Paths for the system and job config files are resolved in the following order:
 
     1. If absolute paths are supplied, these take top priority
     2. Resolve relative to the current working directory
