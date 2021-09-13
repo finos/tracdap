@@ -82,11 +82,11 @@ this, but the model will fail to deploy)!
     :name: hello_world_py_launch
     :lines: 44-
 
-TRAC will resolve the paths for the system and job config files by looking in the following places:
+TRAC will resolve the paths for the system and job config files in the following order:
 
-    1. If absolute paths are supplied, these have top priority
-    2. The current working directory
-    3. The directory containing the model
+    1. If absolute paths are supplied, these take top priority
+    2. Resolve relative to the current working directory
+    3. Resolve relative to the directory containing the Python module of the model
 
 Now you should be able to run your model script and see the model output in the logs:
 
