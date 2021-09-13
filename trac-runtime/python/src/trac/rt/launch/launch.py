@@ -49,28 +49,6 @@ def _resolve_config_file(
         return pathlib.Path(config_path)
 
 
-def launch_cli():
-    pass
-
-
-def launch_session(sys_config: str):
-
-    runtime_instance = runtime.TracRuntime(sys_config, dev_mode=True)
-
-    with runtime_instance as rt:
-        rt.wait_for_shutdown()
-
-
-def launch_job(job_config: str, sys_config: str):
-
-    runtime_instance = runtime.TracRuntime(sys_config, job_config, dev_mode=True)
-    runtime_instance.pre_start()
-
-    with runtime_instance as rt:
-        rt.submit_batch()
-        rt.wait_for_shutdown()
-
-
 def launch_model(
         model_class: api.TracModel.__class__,
         job_config: _tp.Union[str, pathlib.Path],
