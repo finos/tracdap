@@ -131,6 +131,7 @@ class DocGen:
         # Copy only API packages / modules from the runtime library
         api_modules = [
             "trac/rt/api/",
+            "trac/rt/launch/",
             "trac/rt/exceptions.py"]
 
         for module in api_modules:
@@ -139,9 +140,11 @@ class DocGen:
             tgt_module = doc_src.joinpath(module)
 
             if src_module.is_dir():
-                self._cp_tree(src_module, tgt_module)
+                self._flatten_package(src_module, tgt_module)
             else:
                 self._cp(src_module, tgt_module)
+
+        # Note: DOCGEN_REMOVE is not strictly necessary for the trac.rt.api package after flattening
 
         # We include the runtime metadata classes at global scope in the api package for convenience
         # Having them show up in both places in the docs is confusing (for users, and the autoapi tool)!
@@ -245,6 +248,30 @@ class DocGen:
         if target_dir.exists():
             shutil.rmtree(target_dir)
 
+    def _flatten_package(self, src_package: pathlib.Path, tgt_package: pathlib.Path):
+
+        target_package_init = tgt_package.joinpath("__init__.py")
+
+        self._mkdir(tgt_package)
+        self._touch(target_package_init)
+
+        for module in src_package.iterdir():
+
+            if module.is_dir():
+                self._log.warning(f"Flatting sub-packages not supported, skipping {module}")
+                continue
+
+            # Skip __init__, __main__ and other special modules
+            if module.name.startswith("__"):
+                continue
+
+            module_content = module.read_text()
+
+            with open(target_package_init, "at") as target_stream:
+                target_stream.write(module_content)
+                target_stream.write("\n")
+                target_stream.flush()
+
     def _run_subprocess(self, sp_exe, sp_args, use_venv=True, capture_output=False):
 
         self._log.info(f'* {sp_exe} {" ".join(sp_args)}')
@@ -286,7 +313,7 @@ class DocGen:
             args_ = [sp_exe] + sp_args
 
         # Ready to run!
-        result = sp.run(executable=exe_, args=args_, capture_output=capture_output)
+        result = sp.run(executable=exe_, args=args_, stdout=sp.PIPE)
 
         if result.returncode != 0:
             err = f"{sp_exe} failed with exit code {result.returncode}"

@@ -4,7 +4,7 @@ storage:
   example_data:
     storageType: LOCAL_STORAGE
     storageConfig:
-      rootPath: examples/models/python/data
+      rootPath: ./data
 
 storageSettings:
   defaultStorage: example_data

@@ -29,7 +29,7 @@ class _TestModel(_api.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, _api.ModelParameter]:
 
-        return _api.define_parameters(
+        return _api.declare_parameters(
 
             _api.P("boolean_param", _api.BasicType.BOOLEAN,
                    label="A boolean param",
@@ -61,7 +61,7 @@ class _TestModel(_api.TracModel):
 
     def define_inputs(self) -> tp.Dict[str, _api.ModelInputSchema]:
 
-        customer_loans = _api.define_input_table(
+        customer_loans = _api.declare_input_table(
             _api.F("id", _api.BasicType.STRING, label="Customer account ID", business_key=True),
             _api.F("loan_amount", _api.BasicType.DECIMAL, label="Principal loan amount", format_code="CCY:EUR"),
             _api.F("total_pymnt", _api.BasicType.DECIMAL, label="Total amount repaid", format_code="CCY:EUR"),
@@ -72,7 +72,7 @@ class _TestModel(_api.TracModel):
 
     def define_outputs(self) -> tp.Dict[str, _api.ModelOutputSchema]:
 
-        profit_by_region = _api.define_output_table(
+        profit_by_region = _api.declare_output_table(
             _api.F("region", _api.BasicType.STRING, label="Customer home region", categorical=True),
             _api.F("gross_profit", _api.BasicType.DECIMAL, label="Total gross profit", format_code="CCY:USD"))
 

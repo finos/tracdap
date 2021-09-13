@@ -192,7 +192,7 @@ public class TestData {
                 .setFieldName(fieldName)
                 .setFieldOrder(origSchema.getTable().getFieldsCount())
                 .setFieldType(BasicType.FLOAT)
-                .setFieldLabel("We got an extra field!")
+                .setLabel("We got an extra field!")
                 .setFormatCode("PERCENT"));
 
         return origSchema.toBuilder()
@@ -261,9 +261,9 @@ public class TestData {
                                 .setFieldType(BasicType.DATE))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("field2")
-                                .setBusinessKey(true)
                                 .setFieldType(BasicType.DECIMAL)
-                                .setFieldLabel("A display name")
+                                .setLabel("A display name")
+                                .setBusinessKey(true)
                                 .setCategorical(true)
                                 .setFormatCode("GBP"))))
                         .build())

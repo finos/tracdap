@@ -97,7 +97,7 @@ class ProtoApiExtensions:
         self._temp_dir.__exit__(exc_type, exc_val, exc_tb)
 
 
-def find_proto_files(proto_paths):
+def find_proto_files(proto_paths, ignore_trusted=False):
 
     proto_path_list = proto_paths if isinstance(proto_paths, list) else [proto_paths]
 
@@ -105,11 +105,15 @@ def find_proto_files(proto_paths):
 
         for entry in proto_path.iterdir():
 
+            # Do not include trusted (private) parts of the API when generating for API docs
+            if ignore_trusted and "_trusted.proto" in entry.name:
+                continue
+
             if entry.is_file() and entry.name.endswith(".proto"):
                 yield proto_path.joinpath(entry.name)
 
             elif entry.is_dir():
-                for sub_entry in find_proto_files(proto_path.joinpath(entry.name)):
+                for sub_entry in find_proto_files(proto_path.joinpath(entry.name), ignore_trusted):
                     yield sub_entry
 
 
@@ -209,8 +213,13 @@ def main():
         all_proto_paths = proto_paths + [proto_ext_path]
         protoc_args = build_protoc_args(script_args.generator, all_proto_paths, output_dir, packages)
 
+        if script_args.generator == "api_doc":
+            ignore_trusted_api = True
+        else:
+            ignore_trusted_api = False
+
         # Only look for files to generate that were explicitly specified
-        protoc_files = list(find_proto_files(proto_paths))
+        protoc_files = list(find_proto_files(proto_paths, ignore_trusted_api))
 
         protoc_argv = platform_args(protoc_args, protoc_files)
 
