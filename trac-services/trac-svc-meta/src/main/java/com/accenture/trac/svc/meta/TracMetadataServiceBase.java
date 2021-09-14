@@ -16,13 +16,11 @@
 
 package com.accenture.trac.svc.meta;
 
-import com.accenture.trac.common.config.ConfigBootstrap;
 import com.accenture.trac.common.config.ConfigManager;
-import com.accenture.trac.common.config.StandardArgsProcessor;
 import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.exception.*;
+import com.accenture.trac.common.service.CommonServiceBase;
 import com.accenture.trac.common.util.InterfaceLogging;
-import com.accenture.trac.common.util.VersionInfo;
 import com.accenture.trac.svc.meta.api.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
@@ -43,7 +41,7 @@ import java.util.Properties;
 import java.util.concurrent.*;
 
 
-public class TracMetadataService {
+public class TracMetadataServiceBase extends CommonServiceBase {
 
     // This is a quick implementation of the service scaffold, it will need to be re-visited!
     // All the components are created in start()
@@ -75,75 +73,87 @@ public class TracMetadataService {
     private JdbcMetadataDal dal;
     private Server server;
 
-    TracMetadataService(ConfigManager configManager) {
+    public TracMetadataServiceBase(ConfigManager configManager) {
 
         this.log = LoggerFactory.getLogger(getClass());
 
         this.configManager = configManager;
     }
 
-    void start() throws IOException {
+    protected void doStartUp() {
 
-        var componentName = VersionInfo.getComponentName(TracMetadataService.class);
-        var componentVersion = VersionInfo.getComponentVersion(TracMetadataService.class);
-        log.info("{} {}", componentName, componentVersion);
-        log.info("Service is starting...");
+        try {
 
-        // Use the -db library to set up a datasource
-        // Handles different SQL dialects and authentication mechanisms etc.
-        var properties = configManager.loadRootProperties();
-        var dialect = JdbcSetup.getSqlDialect(properties, DB_CONFIG_ROOT);
-        dataSource = JdbcSetup.createDatasource(properties, DB_CONFIG_ROOT);
+            // Use the -db library to set up a datasource
+            // Handles different SQL dialects and authentication mechanisms etc.
+            var properties = configManager.loadRootProperties();
+            var dialect = JdbcSetup.getSqlDialect(properties, DB_CONFIG_ROOT);
+            dataSource = JdbcSetup.createDatasource(properties, DB_CONFIG_ROOT);
 
-        // Construct the DAL using a direct executor, as per the comments above
-        dal = new JdbcMetadataDal(dialect, dataSource, Runnable::run);
-        dal.startup();
+            // Construct the DAL using a direct executor, as per the comments above
+            dal = new JdbcMetadataDal(dialect, dataSource, Runnable::run);
+            dal.startup();
 
-        executor = createPrimaryExecutor(properties);
+            executor = createPrimaryExecutor(properties);
 
-        // Set up services and APIs
-        var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
+            // Set up services and APIs
+            var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
 
-        var readService = new MetadataReadService(dalWithLogging);
-        var writeService = new MetadataWriteService(dalWithLogging);
-        var searchService = new MetadataSearchService(dalWithLogging);
+            var readService = new MetadataReadService(dalWithLogging);
+            var writeService = new MetadataWriteService(dalWithLogging);
+            var searchService = new MetadataSearchService(dalWithLogging);
 
-        var publicApi = new TracMetadataApi(readService, writeService, searchService);
-        var trustedApi = new TrustedMetadataApi(readService, writeService, searchService);
+            var publicApi = new TracMetadataApi(readService, writeService, searchService);
+            var trustedApi = new TrustedMetadataApi(readService, writeService, searchService);
 
-        // Create the main server
+            // Create the main server
 
-        var servicePort = readConfigInt(properties, PORT_CONFIG_KEY, null);
+            var servicePort = readConfigInt(properties, PORT_CONFIG_KEY, null);
 
-        this.server = ServerBuilder
-                .forPort(servicePort)
-                .addService(publicApi)
-                .addService(trustedApi)
-                .executor(executor)
-                .build();
+            this.server = ServerBuilder
+                    .forPort(servicePort)
+                    .addService(publicApi)
+                    .addService(trustedApi)
+                    .executor(executor)
+                    .build();
 
-        // Register a shutdown hook, so SIGTERM triggers a clean shutdown
-        var mainThread = Thread.currentThread();
+            // Good to go, let's start!
+            server.start();
 
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+        }
+        catch (IOException e) {
 
-            try {
-                log.info("Shutdown request received");
+            // Wrap startup errors in an EStartup
+            throw new EStartup(e.getMessage(), e);
+        }
+    }
 
-                this.stop();
-                mainThread.join();
+    protected int doShutDown() {
 
-                log.info("Normal shutdown complete");
-                System.out.println("Normal shutdown complete");
-            }
-            catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+        try {
 
-        }, "shutdown"));
+            var shutdownTimeout = getShutdownTimeout();
 
-        // Good to go, let's start!
-        server.start();
+            // Request the server shutdown first, this will stop new connections being accepted
+            // Wait for the server to drain
+            // Once there are no active requests, clean up internal resources
+
+            server.shutdown();
+            server.awaitTermination(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
+
+            executor.shutdown();
+            dal.shutdown();
+
+            JdbcSetup.destroyDatasource(dataSource);
+
+            return 0;
+        }
+        catch (InterruptedException e) {
+
+            Thread.currentThread().interrupt();
+
+            return -1;
+        }
     }
 
     ExecutorService createPrimaryExecutor(Properties properties) {
@@ -224,83 +234,8 @@ public class TracMetadataService {
         }
     }
 
-    void stop() {
-
-        try {
-            log.info("TRAC Metadata service is going down");
-
-            // Request the server shutdown first, this will stop new connections being accepted
-            // Wait for the server to drain
-            // Once there are no active requests, clean up internal resources
-
-            server.shutdown();
-            server.awaitTermination(30, TimeUnit.SECONDS);
-
-            executor.shutdown();
-            dal.shutdown();
-
-            JdbcSetup.destroyDatasource(dataSource);
-
-            System.out.println("TRAC Metadata service will exit normally");
-            log.info("TRAC Metadata service will exit normally");
-        }
-        catch (InterruptedException e) {
-
-            System.err.println("TRAC Metadata service was interrupted during shutdown");
-            log.warn("TRAC Metadata service was interrupted during shutdown");
-
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    void blockUntilShutdown() throws InterruptedException {
-
-        try {
-            log.info("TRAC Metadata service is up on port " + server.getPort());
-
-            server.awaitTermination();
-
-            System.out.println("Going down in main");
-
-            log.info("TRAC Metadata service is going down");
-        }
-        catch (InterruptedException e) {
-
-            System.out.println("Going down in main int");
-
-            log.info("TRAC Metadata service has been interrupted");
-            throw e;
-        }
-    }
-
-
     public static void main(String[] args) {
 
-        try {
-
-            var config = ConfigBootstrap.useCommandLine(TracMetadataService.class, args);
-            var service = new TracMetadataService(config);
-            service.start();
-            service.blockUntilShutdown();
-
-            System.exit(0);
-        }
-        catch (EStartup e) {
-
-            if (e.isQuiet())
-                System.exit(e.getExitCode());
-
-            System.err.println("The service failed to start: " + e.getMessage());
-            e.printStackTrace(System.err);
-
-            System.exit(e.getExitCode());
-        }
-        catch (Exception e) {
-
-            System.err.println("There was an unexpected error on the main thread: " + e.getMessage());
-            e.printStackTrace(System.err);
-
-            System.exit(-1);
-        }
+        CommonServiceBase.svcMain(TracMetadataServiceBase.class, args);
     }
 }

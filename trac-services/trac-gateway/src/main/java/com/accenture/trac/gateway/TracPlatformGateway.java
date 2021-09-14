@@ -16,10 +16,9 @@
 
 package com.accenture.trac.gateway;
 
-import com.accenture.trac.common.config.ConfigBootstrap;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.exception.EStartup;
-import com.accenture.trac.common.util.VersionInfo;
+import com.accenture.trac.common.service.CommonServiceBase;
 import com.accenture.trac.gateway.config.*;
 import com.accenture.trac.gateway.config.helpers.ConfigTranslator;
 import com.accenture.trac.gateway.exec.Route;
@@ -32,11 +31,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.LoggerContext;
-import org.apache.logging.log4j.core.config.Configurator;
-import org.apache.logging.log4j.core.impl.Log4jContextFactory;
-import org.apache.logging.log4j.core.util.DefaultShutdownCallbackRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,10 +38,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 
-public class TracPlatformGateway {
+public class TracPlatformGateway extends CommonServiceBase {
 
     /*
      * This version of the gateway provides some basic structures, including a configurable router component
@@ -74,17 +69,7 @@ public class TracPlatformGateway {
         this.configManager = configManager;
     }
 
-    public void start() {
-
-        // Do not register a shutdown hook unless explicitly requested
-        start(false);
-    }
-
-    public void start(boolean registerShutdownHook) {
-
-        var componentName = VersionInfo.getComponentName(TracPlatformGateway.class);
-        var componentVersion = VersionInfo.getComponentVersion(TracPlatformGateway.class);
-        log.info("{} {}", componentName, componentVersion);
+    public void doStartUp() throws InterruptedException {
 
         GatewayConfig gatewayConfig;
         short proxyPort;
@@ -134,32 +119,16 @@ public class TracPlatformGateway {
 
             // Block until the server channel is ready - it's just easier this way!
             // The sync call will rethrow any errors, so they can be handled before leaving the start() method
+
             startupFuture.sync();
+
+            var socket = startupFuture.channel().localAddress();
+            log.info("Server socket open: {}", socket);
 
             // No need to keep a reference to the server channel
             // Shutdown is managed using the event loop groups
-
-            // If requested, install a shutdown handler for a graceful exit
-            // This is needed when running a real server instance, but not when running embedded tests
-            if (registerShutdownHook) {
-                var shutdownThread = new Thread(this::jvmShutdownHook, "shutdown");
-                Runtime.getRuntime().addShutdownHook(shutdownThread);
-            }
-
-            // Keep the logging system active while shutdown hooks are running
-            disableLog4jShutdownHook();
-
-            log.info("Gateway server is up and running");
-        }
-        catch (InterruptedException e) {
-
-            log.error("Startup sequence was interrupted");
-            Thread.currentThread().interrupt();
         }
         catch (Exception e) {
-
-            var errorMessage = "Gateway server failed to start: " + e.getMessage();
-            log.error(errorMessage, e);
 
             if (workerGroup != null)
                 workerGroup.shutdownGracefully();
@@ -167,131 +136,56 @@ public class TracPlatformGateway {
             if (bossGroup != null)
                 bossGroup.shutdownGracefully();
 
-            throw new EStartup(e.getMessage(), e);
+            // The call to startupFuture.sync can throw error types that are not RuntimeException
+            // Java should not allow this, but it happens!
+            // Wrap any other error types in an EStartup, so as not to confuse top level error handling
+
+            if (Set.of(RuntimeException.class, InterruptedException.class).contains(e.getClass()))
+                throw e;
+            else
+                throw new EStartup(e.getMessage(), e);
         }
     }
 
-    public int stop() {
-
-        log.info("Gateway server is stopping...");
-
-        var shutdownStartTime = Instant.now();
-        var bossShutdown = bossGroup.shutdownGracefully();
-        var workerShutdown = workerGroup.shutdownGracefully();
+    protected int doShutDown() {
 
         // Prevent interruption for the duration of the shutdown timeout
         // If someone really wants to kill the process in that time, they can send a hard kill signal
 
-        bossShutdown.awaitUninterruptibly(DEFAULT_SHUTDOWN_TIMEOUT.getSeconds(), TimeUnit.SECONDS);
+        var shutdownTimeout = getShutdownTimeout();
+        var shutdownStartTime = Instant.now();
+
+        log.info("Closing the gateway to new connections...");
+
+        var bossShutdown = bossGroup.shutdownGracefully();
+        bossShutdown.awaitUninterruptibly(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
+
+        if (!bossShutdown.isSuccess()) {
+
+            log.error("Gateway shutdown did not complete successfully in the allotted time");
+            return -1;
+        }
+
+        log.info("Waiting for existing connections to clear...");
 
         var shutdownElapsedTime = Duration.between(shutdownStartTime, Instant.now());
-        var shutdownTimeRemaining = DEFAULT_SHUTDOWN_TIMEOUT.minus(shutdownElapsedTime);
+        var shutdownTimeRemaining = shutdownTimeout.minus(shutdownElapsedTime);
 
+        var workerShutdown = workerGroup.shutdownGracefully();
         workerShutdown.awaitUninterruptibly(shutdownTimeRemaining.getSeconds(), TimeUnit.SECONDS);
 
-        int exitCode;
+        if (!workerShutdown.isSuccess()) {
 
-        if (bossShutdown.isSuccess() && workerShutdown.isSuccess()) {
-
-            log.info("Gateway server has gone down cleanly");
-            System.out.println("Gateway server has gone down cleanly");
-
-            // Setting exit code 0 means the process will finish successfully,
-            // even if the shutdown was triggered by an interrupt signal
-
-            exitCode = 0;
-        }
-        else {
-
-            log.error("Gateway server shutdown did not complete in the allotted time");
-            System.out.println("Gateway server shutdown did not complete in the allotted time");
-
-            exitCode = -1;
+            log.error("Gateway shutdown did not complete successfully in the allotted time");
+            return -1;
         }
 
-        // The logging system can be shut down now that the shutdown hook has completed
-        explicitLog4jShutdown();
-
-        // Do not forcibly exit the JVM inside stop()
-        // Exit code can be checked by embedded tests when the JVM will continue running
-        return exitCode;
-    }
-
-    private void disableLog4jShutdownHook() {
-
-        // The default logging configuration disables logging in a shutdown hook
-        // The logging system goes down when shutdown is initiated and messages in the shutdown sequence are lost
-        // Removing the logging shutdown hook allows closing messages to go to the logs as normal
-
-        // This is an internal API in Log4j, there is a config setting available
-        // This approach means admins with custom logging configs don't need to know about shutdown hooks
-        // Anyway we would need to use the internal API to explicitly close the context
-
-        try {
-            var logFactory = (Log4jContextFactory) LogManager.getFactory();
-            ((DefaultShutdownCallbackRegistry) logFactory.getShutdownCallbackRegistry()).stop();
-        }
-        catch (Exception e) {
-
-            // In case disabling the shutdown hook doesn't work, do not interrupt the startup sequence
-            // As a backup, final shutdown messages are written to stdout / stderr
-
-            log.warn("Logging shutdown hook is active (shutdown messages may be lost)");
-        }
-    }
-
-    private void explicitLog4jShutdown() {
-
-        // Since the logging shutdown hook is disabled, provide a way to explicitly shut down the logging system
-        // Especially important for custom configurations connecting to external logging services or databases
-        // In the event that disabling the shutdown hook did not work, this method will do nothing
-
-        var logContext = LogManager.getContext();
-
-        if (logContext instanceof LoggerContext)
-            Configurator.shutdown((LoggerContext) logContext);
-    }
-
-    private void jvmShutdownHook() {
-
-        log.info("Shutdown request received");
-
-        var exitCode = this.stop();
-
-        // Calling System.exit from inside a shutdown hook can lead to undefined behavior (often JVM hangs)
-        // This is because it calls back into the shutdown handlers
-
-        // Runtime.halt will stop the JVM immediately without calling back into shutdown hooks
-        // At this point everything is either stopped or has failed to stop
-        // So, it should be ok to use Runtime.halt and report the exit code
-
-        Runtime.getRuntime().halt(exitCode);
+        log.info("All gateway connections are closed");
+        return 0;
     }
 
     public static void main(String[] args) {
 
-        try {
-
-            var config = ConfigBootstrap.useCommandLine(TracPlatformGateway.class, args);
-            var gateway = new TracPlatformGateway(config);
-            gateway.start(true);
-        }
-        catch (EStartup e) {
-
-            if (e.isQuiet())
-                System.exit(e.getExitCode());
-
-            System.err.println("The service failed to start: " + e.getMessage());
-            e.printStackTrace(System.err);
-
-            System.exit(e.getExitCode());
-        }
-        catch (Exception e) {
-
-            System.err.println("There was an unexpected error on the main thread: " + e.getMessage());
-            e.printStackTrace(System.err);
-
-            System.exit(-1);
-        }
+        CommonServiceBase.svcMain(TracPlatformGateway.class, args);
     }
 }
