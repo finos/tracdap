@@ -118,28 +118,21 @@ public class TracPlatformGateway extends CommonServiceBase {
             // Block until the server channel is ready - it's just easier this way!
             // The sync call will rethrow any errors, so they can be handled before leaving the start() method
 
-            startupFuture.await(startupTimeout.getSeconds(), TimeUnit.SECONDS);
+            startupFuture.await();
 
             if (startupFuture.isSuccess()) {
 
                 var socket = startupFuture.channel().localAddress();
                 log.info("Server socket open: {}", socket);
             }
-            else if (startupFuture.isDone()) {
+            else {
 
-                var message = "";
                 var cause = startupFuture.cause();
+                var message = "Server socket could not be opened: " + cause.getMessage();
+                log.error(message);
 
                 throw new EStartup(message, cause);
             }
-            else {
-
-                var message = "";
-
-                throw new EStartup(message);
-            }
-
-
 
             // No need to keep a reference to the server channel
             // Shutdown is managed using the event loop groups
