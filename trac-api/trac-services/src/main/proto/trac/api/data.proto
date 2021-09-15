@@ -1,0 +1,153 @@
+/*
+ * Copyright 2020 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+package trac.api;
+
+option java_package = "com.accenture.trac.api";
+option java_multiple_files = true;
+
+import "trac/metadata/object_id.proto";
+import "trac/metadata/data.proto";
+import "trac/metadata/object.proto";
+import "trac/metadata/tag.proto";
+import "trac/metadata/search.proto";
+
+import "google/api/annotations.proto";
+
+
+service TracDataApi {
+
+  rpc createData (stream DataWriteRequest) returns (stream DataWriteResponse);
+
+  rpc updateData (stream DataWriteRequest) returns (stream DataWriteResponse);
+
+  rpc readData (DataReadRequest) returns (stream DataReadResponse);
+
+  rpc queryData (DataQueryRequest) returns  (stream DataReadResponse);
+
+
+  rpc createFile (stream DataWriteRequest) returns (stream DataWriteResponse);
+
+  rpc updateFile (stream DataWriteRequest) returns (stream DataWriteResponse);
+
+  rpc readFile (stream DataReadRequest) returns (stream DataReadResponse);
+
+
+
+
+
+
+  rpc createDatasetUnary (DataWriteRequest) returns (DataWriteResponse);
+
+  rpc updateDatasetUnary (DataWriteRequest) returns (DataWriteResponse);
+
+
+
+
+  rpc getDataset (DataGetRequest) returns (stream DataGetResponse) {
+    option (google.api.http) = {
+      get: "/{tenant}/DATA/{objectId}/versions/{objectVersion}"
+      response_body: "content"
+    };
+  }
+
+  rpc getFile (DataGetRequest) returns (stream DataGetResponse) {
+    option (google.api.http) = {
+      get: "/{tenant}/FILE/{objectId}/versions/{objectVersion}"
+      response_body: "content"
+    };
+  }
+
+
+
+}
+
+
+message DataWriteRequest {
+
+  string tenant = 1;
+
+  optional metadata.TagSelector priorVersion = 2;
+
+  repeated metadata.TagUpdate tagUpdates = 3;
+
+
+  oneof schemaDefinition {
+    metadata.TagSelector schemaId = 4;
+    metadata.SchemaDefinition schema = 5;
+  }
+
+  // Alternative to schemaId or schema, supply schema updates to e.g. add one column
+  reserved 6;
+  reserved "schemaUpdates";
+
+  bool discreteSchema = 7;
+
+  string format = 8;
+  string encoding = 9;
+
+  metadata.PartKey part = 10;
+
+  bytes content = 1000;
+}
+
+message DataWriteResponse {
+
+  uint32 size = 1;
+  bool finished = 2;
+}
+
+
+
+
+message DataReadRequest {
+
+  string tenant = 1;
+  metadata.TagSelector selector = 2;
+
+  string format = 3;
+  string encoding = 4;
+
+  metadata.PartKey part = 5;
+  optional uint64 offset = 6;
+  optional uint32 limit = 7;
+}
+
+message DataReadResponse {
+
+  bytes content = 1000;
+}
+
+
+
+
+
+
+message DataQueryRequest {
+
+}
+
+
+
+message DataGetRequest {
+
+}
+
+message DataGetResponse {
+
+  bytes content = 1;
+}
