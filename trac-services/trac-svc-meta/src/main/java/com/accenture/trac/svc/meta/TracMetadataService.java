@@ -41,7 +41,7 @@ import java.util.Properties;
 import java.util.concurrent.*;
 
 
-public class TracMetadataServiceBase extends CommonServiceBase {
+public class TracMetadataService extends CommonServiceBase {
 
     // This is a quick implementation of the service scaffold, it will need to be re-visited!
     // All the components are created in start()
@@ -73,7 +73,7 @@ public class TracMetadataServiceBase extends CommonServiceBase {
     private JdbcMetadataDal dal;
     private Server server;
 
-    public TracMetadataServiceBase(ConfigManager configManager) {
+    public TracMetadataService(ConfigManager configManager) {
 
         this.log = LoggerFactory.getLogger(getClass());
 
@@ -236,6 +236,6 @@ public class TracMetadataServiceBase extends CommonServiceBase {
 
     public static void main(String[] args) {
 
-        CommonServiceBase.svcMain(TracMetadataServiceBase.class, args);
+        CommonServiceBase.svcMain(TracMetadataService.class, args);
     }
 }
