@@ -36,7 +36,6 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -54,8 +53,6 @@ public class TracPlatformGateway extends CommonServiceBase {
      * components are complete.
      */
 
-    private static final Duration DEFAULT_SHUTDOWN_TIMEOUT = Duration.of(10, ChronoUnit.SECONDS);
-
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final ConfigManager configManager;
@@ -69,7 +66,8 @@ public class TracPlatformGateway extends CommonServiceBase {
         this.configManager = configManager;
     }
 
-    public void doStartUp() throws InterruptedException {
+    @Override
+    protected void doStartup(Duration startupTimeout) throws InterruptedException {
 
         GatewayConfig gatewayConfig;
         short proxyPort;
@@ -120,10 +118,28 @@ public class TracPlatformGateway extends CommonServiceBase {
             // Block until the server channel is ready - it's just easier this way!
             // The sync call will rethrow any errors, so they can be handled before leaving the start() method
 
-            startupFuture.sync();
+            startupFuture.await(startupTimeout.getSeconds(), TimeUnit.SECONDS);
 
-            var socket = startupFuture.channel().localAddress();
-            log.info("Server socket open: {}", socket);
+            if (startupFuture.isSuccess()) {
+
+                var socket = startupFuture.channel().localAddress();
+                log.info("Server socket open: {}", socket);
+            }
+            else if (startupFuture.isDone()) {
+
+                var message = "";
+                var cause = startupFuture.cause();
+
+                throw new EStartup(message, cause);
+            }
+            else {
+
+                var message = "";
+
+                throw new EStartup(message);
+            }
+
+
 
             // No need to keep a reference to the server channel
             // Shutdown is managed using the event loop groups
@@ -147,18 +163,15 @@ public class TracPlatformGateway extends CommonServiceBase {
         }
     }
 
-    protected int doShutDown() {
+    @Override
+    protected int doShutdown(Duration shutdownTimeout) throws InterruptedException {
 
-        // Prevent interruption for the duration of the shutdown timeout
-        // If someone really wants to kill the process in that time, they can send a hard kill signal
-
-        var shutdownTimeout = getShutdownTimeout();
         var shutdownStartTime = Instant.now();
 
         log.info("Closing the gateway to new connections...");
 
         var bossShutdown = bossGroup.shutdownGracefully();
-        bossShutdown.awaitUninterruptibly(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
+        bossShutdown.await(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
 
         if (!bossShutdown.isSuccess()) {
 
@@ -172,7 +185,7 @@ public class TracPlatformGateway extends CommonServiceBase {
         var shutdownTimeRemaining = shutdownTimeout.minus(shutdownElapsedTime);
 
         var workerShutdown = workerGroup.shutdownGracefully();
-        workerShutdown.awaitUninterruptibly(shutdownTimeRemaining.getSeconds(), TimeUnit.SECONDS);
+        workerShutdown.await(shutdownTimeRemaining.getSeconds(), TimeUnit.SECONDS);
 
         if (!workerShutdown.isSuccess()) {
 

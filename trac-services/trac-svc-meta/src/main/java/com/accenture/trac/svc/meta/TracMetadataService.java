@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Properties;
 import java.util.concurrent.*;
 
@@ -80,7 +81,8 @@ public class TracMetadataService extends CommonServiceBase {
         this.configManager = configManager;
     }
 
-    protected void doStartUp() {
+    @Override
+    protected void doStartup(Duration startupTimeout) {
 
         try {
 
@@ -128,32 +130,25 @@ public class TracMetadataService extends CommonServiceBase {
         }
     }
 
-    protected int doShutDown() {
+    @Override
+    protected int doShutdown(Duration shutdownTimeout) throws InterruptedException {
 
-        try {
+        // Request the server shutdown first, this will stop new connections being accepted
+        // Wait for the server to drain
+        // Once there are no active requests, clean up internal resources
 
-            var shutdownTimeout = getShutdownTimeout();
+        server.shutdown();
+        server.awaitTermination(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
 
-            // Request the server shutdown first, this will stop new connections being accepted
-            // Wait for the server to drain
-            // Once there are no active requests, clean up internal resources
+        if (!server.isTerminated())
+            server.shutdownNow();
 
-            server.shutdown();
-            server.awaitTermination(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
+        dal.shutdown();
+        executor.shutdown();
 
-            executor.shutdown();
-            dal.shutdown();
+        JdbcSetup.destroyDatasource(dataSource);
 
-            JdbcSetup.destroyDatasource(dataSource);
-
-            return 0;
-        }
-        catch (InterruptedException e) {
-
-            Thread.currentThread().interrupt();
-
-            return -1;
-        }
+        return 0;
     }
 
     ExecutorService createPrimaryExecutor(Properties properties) {
