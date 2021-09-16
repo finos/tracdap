@@ -23,21 +23,13 @@ ext {
     grpc_version = '1.40.1'
     gapi_version = '2.5.0'
 
-    // Apache Commons Components
-    commons_cli_version = "1.4"
-
-    // JDBC Connection pool
-    hikari_cp_version = '3.4.5'
-
-    // Logging
-    slf4j_version = '1.7.30'
-    log4j_version = '2.13.3'
-
-    // Config
-    snakeyaml_version = '1.29'
-
     // @Generated annotation is required by gRPC generated code
     javax_annotation_version = '1.3.2'
+
+
+    // Data technologies
+    arrow_version = '5.0.0'
+
 
     // SQL (JDBC) drivers
     h2_version = '1.4.200'
@@ -46,6 +38,21 @@ ext {
     postgresql_version = '42.2.16'
     sqlserver_version = '8.4.1.jre11'
     oracle_version = '19.7.0.0'
+
+    // JDBC Connection pool
+    hikari_cp_version = '3.4.5'
+
+
+    // Config
+    snakeyaml_version = '1.29'
+
+    // Apache Commons Components
+    commons_cli_version = "1.4"
+
+    // Logging
+    slf4j_version = '1.7.30'
+    log4j_version = '2.13.3'
+
 
     // Flyway (database deploy tool)
     flyway_version = '7.1.0'

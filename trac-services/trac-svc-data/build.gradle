@@ -43,6 +43,10 @@ dependencies {
     implementation group: 'io.netty', name: 'netty-handler-proxy', version: "$netty_version"
     implementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
 
+    // Apache Arrow data framework
+    implementation group: 'org.apache.arrow<', name: 'arrow-vector', version: "$arrow_version"
+    implementation group: 'org.apache.arrow<', name: 'arrow-memory-netty', version: "$arrow_version"
+
     // CLI library for processing startup args (part of the .config package)
     implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"
 
