@@ -1,0 +1,185 @@
+/*
+ * Copyright 2020 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+package trac.api;
+
+option java_package = "com.accenture.trac.api";
+option java_multiple_files = true;
+
+import "trac/metadata/object_id.proto";
+import "trac/metadata/data.proto";
+import "trac/metadata/object.proto";
+import "trac/metadata/tag.proto";
+import "trac/metadata/search.proto";
+
+import "google/api/annotations.proto";
+
+
+/**
+ * Experimental design of the data API, for discussion and review
+ */
+service TracDataApi {
+
+  /**
+   * Create a new dataset by supplying both schema and data
+   *
+   * Request object mirrors MetadataWriteRequest for supplying tags
+   * Request also includes schema, format options and the data stream
+   *
+   * Requires client-streaming, not yet available in gRPC-Web.
+   * First message includes all metadata, subsequent are data stream only.
+   */
+  rpc createData (stream DataWriteRequest) returns (stream DataWriteResponse);
+
+  /**
+   * To support web clients where client-streaming is not available.
+   * The same as createData(), but the data stream is sent as a single blob.
+   */
+  rpc createDataUnary (DataWriteRequest) returns (DataWriteResponse);
+
+  /**
+   * Update a dataset by supplying a data update (and optional schema update)
+   *
+   * Mirrors MetadataWriteRequest for specifying prior version and updating tags
+   */
+  rpc updateData (stream DataWriteRequest) returns (stream DataWriteResponse);
+
+  /**
+   * To support web clients where client-streaming is not available.
+   * The same as updateData(), but the data stream is sent as a single blob.
+   */
+  rpc updateDataUnary (DataWriteRequest) returns (DataWriteResponse);
+
+  /**
+   * Read the contents of a dataset (in whole or in part)
+   *
+   * Mirrors metadata API for object selection.
+   *
+   * Data can be request in any format supported by the data service
+   * The data stream will be translated and returned in that format
+   *
+   * Options available for pagination (offset/limit) and data parts.
+   * Parts are retrieved for the version of the object that is selected.
+   *
+   * Data is returned in a stream, server-streaming is supported in gRPC-Web.
+   */
+  rpc readData (DataReadRequest) returns (stream DataReadResponse);
+
+
+  /// Upload a new file into TRAC
+  rpc createFile (stream DataWriteRequest) returns (stream DataWriteResponse);
+
+  /// Upload a new version of an existing file into TRAC
+  rpc updateFile (stream DataWriteRequest) returns (stream DataWriteResponse);
+
+  /// Download a file that has been stored in TRAC
+  rpc readFile (DataReadRequest) returns (stream DataReadResponse);
+
+
+  /// Download a dataset in a form that can be mapped to an HTTP GET request
+  rpc getData (DataGetRequest) returns (stream DataGetResponse) {
+    option (google.api.http) = {
+      get: "/{tenant}/DATA/{objectId}/versions/{objectVersion}"
+      response_body: "content"
+    };
+  }
+
+  /// Download a file in a form that can be mapped to an HTTP GET request
+  rpc getFile (DataGetRequest) returns (stream DataGetResponse) {
+    option (google.api.http) = {
+      get: "/{tenant}/FILE/{objectId}/versions/{objectVersion}"
+      response_body: "content"
+    };
+  }
+
+}
+
+
+message DataWriteRequest {
+
+  string tenant = 1;
+
+  optional metadata.TagSelector priorVersion = 2;
+
+  repeated metadata.TagUpdate tagUpdates = 3;
+
+
+  oneof schemaDefinition {
+    metadata.TagSelector schemaId = 4;
+    metadata.SchemaDefinition schema = 5;
+  }
+
+  // Alternative to schemaId or schema, supply schema updates to e.g. add one column
+  reserved 6;
+  reserved "schemaUpdates";
+
+  bool discreteSchema = 7;
+
+  string format = 8;
+  string encoding = 9;
+  map<string, string> options = 10;
+
+  metadata.PartKey part = 11;
+
+  bytes content = 1000;
+}
+
+message DataWriteResponse {
+
+  uint32 size = 1;
+  bool finished = 2;
+}
+
+message DataReadRequest {
+
+  string tenant = 1;
+  metadata.TagSelector selector = 2;
+
+  string format = 3;
+  string encoding = 4;
+
+  metadata.PartKey part = 5;
+  optional uint64 offset = 6;
+  optional uint32 limit = 7;
+}
+
+message DataReadResponse {
+
+  uint32 size = 1;
+  bool finished = 2;
+
+  bytes content = 1000;
+}
+
+message DataGetRequest {
+
+  string tenant = 1;
+  string objectId = 2;
+  optional int32 objectVersion = 3;
+
+  string format = 4;
+  string encoding = 5;
+
+  metadata.PartKey part = 6;
+  optional uint64 offset = 7;
+  optional uint32 limit = 8;
+}
+
+message DataGetResponse {
+
+  bytes content = 1;
+}
