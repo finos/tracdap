@@ -35,8 +35,10 @@ dependencies {
     // Config reading
     implementation group: 'org.yaml', name: 'snakeyaml', version: "$snakeyaml_version"
 
-    // Logging
-    implementation group: 'org.slf4j', name: 'slf4j-api', version: "$slf4j_version"
+    // Logging facade is an API dependency
+    api group: 'org.slf4j', name: 'slf4j-api', version: "$slf4j_version"
+
+    // Logging implementation is accessed directly in lib-common
     implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: "$log4j_version"
     implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: "$log4j_version"
     implementation group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: "$log4j_version"
