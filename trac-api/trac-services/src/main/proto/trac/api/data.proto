@@ -49,7 +49,7 @@ service TracDataApi {
    * To support web clients where client-streaming is not available.
    * The same as createData(), but the data stream is sent as a single blob.
    */
-  rpc createData_unary (DataWriteRequest) returns (DataWriteResponse);
+  rpc createDataUnary (DataWriteRequest) returns (DataWriteResponse);
 
   /**
    * Update a dataset by supplying a data update (and optional schema update)
@@ -62,7 +62,7 @@ service TracDataApi {
    * To support web clients where client-streaming is not available.
    * The same as updateData(), but the data stream is sent as a single blob.
    */
-  rpc updateData_unary (DataWriteRequest) returns (DataWriteResponse);
+  rpc updateDataUnary (DataWriteRequest) returns (DataWriteResponse);
 
   /**
    * Read the contents of a dataset (in whole or in part)
