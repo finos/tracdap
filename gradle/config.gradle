@@ -16,6 +16,8 @@
 
 ext {
 
+    guava_version = '30.1.1-jre'
+
     netty_version = '4.1.68.Final'
 
     // Proto / gRPC (use a consistent set of versions, as defined by gRPC)
