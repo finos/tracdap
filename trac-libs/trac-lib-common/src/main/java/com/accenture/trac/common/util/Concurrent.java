@@ -130,17 +130,17 @@ public class Concurrent {
     public static <T>
     Flow.Subscriber<T> grpcStreamSubscriber(StreamObserver<T> grpcObserver) {
 
-        return new GrpcStreamPublisher<>(grpcObserver);
+        return new GrpcStreamSubscriber<>(grpcObserver);
     }
 
-    static class GrpcStreamPublisher<T> implements Flow.Subscriber<T> {
+    static class GrpcStreamSubscriber<T> implements Flow.Subscriber<T> {
 
         private final StreamObserver<T> grpcObserver;
 
         private final AtomicBoolean subscribed = new AtomicBoolean(false);
         private Flow.Subscription subscription;
 
-        public GrpcStreamPublisher(StreamObserver<T> grpcObserver) {
+        public GrpcStreamSubscriber(StreamObserver<T> grpcObserver) {
             this.grpcObserver = grpcObserver;
         }
 
