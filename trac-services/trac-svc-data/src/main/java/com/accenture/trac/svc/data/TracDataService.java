@@ -20,6 +20,8 @@ import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.service.CommonServiceBase;
 import com.accenture.trac.svc.data.api.TracDataApi;
+import com.accenture.trac.svc.data.service.DataReadService;
+import com.accenture.trac.svc.data.service.DataWriteService;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -55,7 +57,10 @@ public class TracDataService extends CommonServiceBase {
 
         try {
 
-            var publicApi = new TracDataApi();
+            var dataReadSvc = new DataReadService();
+            var dataWriteSvc = new DataWriteService();
+
+            var publicApi = new TracDataApi(dataReadSvc, dataWriteSvc);
 
             // Create the main server
 

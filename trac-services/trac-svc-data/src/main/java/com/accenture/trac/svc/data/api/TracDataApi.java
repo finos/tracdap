@@ -26,8 +26,13 @@ import io.grpc.stub.StreamObserver;
 
 public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
-    private final DataReadService readService = new DataReadService();
-    private final DataWriteService writeService = new DataWriteService();
+    private final DataReadService readService;
+    private final DataWriteService writeService;
+
+    public TracDataApi(DataReadService readService, DataWriteService writeService) {
+        this.readService = readService;
+        this.writeService = writeService;
+    }
 
     @Override
     public StreamObserver<DataWriteRequest> createData(StreamObserver<DataWriteResponse> responseObserver) {
