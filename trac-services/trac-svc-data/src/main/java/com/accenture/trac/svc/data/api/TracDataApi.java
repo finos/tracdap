@@ -17,10 +17,17 @@
 package com.accenture.trac.svc.data.api;
 
 import com.accenture.trac.api.*;
+import com.accenture.trac.common.util.Bytes;
+import com.accenture.trac.common.util.Concurrent;
+import com.accenture.trac.svc.data.service.DataReadService;
+import com.accenture.trac.svc.data.service.DataWriteService;
 import io.grpc.stub.StreamObserver;
 
 
 public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
+
+    private final DataReadService readService = new DataReadService();
+    private final DataWriteService writeService = new DataWriteService();
 
     @Override
     public StreamObserver<DataWriteRequest> createData(StreamObserver<DataWriteResponse> responseObserver) {
@@ -59,7 +66,18 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     @Override
     public void readFile(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
-        super.readFile(request, responseObserver);
+
+        var dataStream = readService.readFile();
+
+        var responseStream = Concurrent.map(dataStream, chunk ->
+                DataReadResponse.newBuilder()
+                .setSize(chunk.readableBytes())
+                .setContent(Bytes.toProtoBytes(chunk))
+                .build());
+
+        var responsePublisher = Concurrent.grpcStreamSubscriber(responseObserver);
+
+        responseStream.subscribe(responsePublisher);
     }
 
     @Override
@@ -71,4 +89,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     public void getFile(DataGetRequest request, StreamObserver<DataGetResponse> responseObserver) {
         super.getFile(request, responseObserver);
     }
+
+
 }
