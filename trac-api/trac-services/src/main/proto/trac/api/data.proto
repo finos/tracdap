@@ -43,7 +43,7 @@ service TracDataApi {
    * Requires client-streaming, not yet available in gRPC-Web.
    * First message includes all metadata, subsequent are data stream only.
    */
-  rpc createData (stream DataWriteRequest) returns (stream DataWriteResponse);
+  rpc createData (stream DataWriteRequest) returns (DataWriteResponse);
 
   /**
    * To support web clients where client-streaming is not available.
@@ -56,7 +56,7 @@ service TracDataApi {
    *
    * Mirrors MetadataWriteRequest for specifying prior version and updating tags
    */
-  rpc updateData (stream DataWriteRequest) returns (stream DataWriteResponse);
+  rpc updateData (stream DataWriteRequest) returns (DataWriteResponse);
 
   /**
    * To support web clients where client-streaming is not available.
@@ -81,10 +81,10 @@ service TracDataApi {
 
 
   /// Upload a new file into TRAC
-  rpc createFile (stream DataWriteRequest) returns (stream DataWriteResponse);
+  rpc createFile (stream DataWriteRequest) returns (DataWriteResponse);
 
   /// Upload a new version of an existing file into TRAC
-  rpc updateFile (stream DataWriteRequest) returns (stream DataWriteResponse);
+  rpc updateFile (stream DataWriteRequest) returns (DataWriteResponse);
 
   /// Download a file that has been stored in TRAC
   rpc readFile (DataReadRequest) returns (stream DataReadResponse);
@@ -141,7 +141,6 @@ message DataWriteRequest {
 message DataWriteResponse {
 
   uint32 size = 1;
-  bool finished = 2;
 }
 
 message DataReadRequest {
