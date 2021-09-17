@@ -19,6 +19,7 @@ package com.accenture.trac.common.util;
 import com.accenture.trac.common.exception.ETracInternal;
 import io.grpc.stub.StreamObserver;
 
+import java.util.Iterator;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -33,31 +34,29 @@ public class Concurrent {
 
         return new Flow.Publisher<>() {
 
-            private Stream<T> sourceStream = source;
-
-            private Flow.Subscriber<? super T> subscriber = null;
-            private Flow.Subscription subscription = null;
+            private final Iterator<T> sourceItr = source.iterator();
+            private boolean completeSent = false;
 
             @Override
             public void subscribe(Flow.Subscriber<? super T> subscriber) {
 
-                subscription = new Flow.Subscription() {
+                var subscription = new Flow.Subscription() {
 
                     @Override
                     public void request(long n) {
 
-                        var batch = sourceStream.limit(n);
-                        sourceStream = sourceStream.skip(n);
+                        for (int i = 0; i < n && sourceItr.hasNext(); i++)
+                            subscriber.onNext(sourceItr.next());
 
-                        batch.forEach(subscriber::onNext);
-
-                        if (sourceStream.findFirst().isEmpty())
+                        if (!sourceItr.hasNext() && !completeSent) {
                             subscriber.onComplete();
+                            completeSent = true;
+                        }
                     }
 
                     @Override
                     public void cancel() {
-                        sourceStream.close();
+                        // pass
                     }
                 };
 
