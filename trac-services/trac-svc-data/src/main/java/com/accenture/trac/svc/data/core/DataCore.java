@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class DataCore {
-
+/*
 
     public interface DataShape<IR> {
 
@@ -146,7 +146,7 @@ public class DataCore {
         }
 
         @Override
-        public void onError() {
+        public void onError(Throwable error) {
 
         }
 
@@ -187,5 +187,5 @@ public class DataCore {
         public void onCompleted() {
 
         }
-    }
+    }*/
 }
