@@ -38,12 +38,15 @@ dependencies {
 
     api project(':trac-api-metadata')
 
-    // Protoc generates code using the 'Generated' annotation from this package
-    api group: 'javax.annotation', name: 'javax.annotation-api', version: "$javax_annotation_version"
-
     // Core services API uses gRPC / Protobuf stubs
     api group: 'io.grpc', name: 'grpc-stub', version: "$grpc_version"
     api group: 'io.grpc', name: 'grpc-protobuf', version: "$grpc_version"
+
+    // gRPC has a dependency on Guava - make sure we get the right version
+    api group: 'com.google.guava', name: 'guava', version: "$guava_version"
+
+    // Protoc generates code using the 'Generated' annotation from this package
+    api group: 'javax.annotation', name: 'javax.annotation-api', version: "$javax_annotation_version"
 
     // Google APIs framework for REST APIs
     implementation group: 'com.google.api.grpc', name: 'proto-google-common-protos', version: "$gapi_version"
