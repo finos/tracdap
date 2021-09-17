@@ -17,9 +17,13 @@
 package com.accenture.trac.common.util;
 
 import com.accenture.trac.common.exception.ETracInternal;
+import io.grpc.stub.CallStreamObserver;
 import io.grpc.stub.StreamObserver;
+import io.netty.util.concurrent.CompleteFuture;
 
 import java.util.Iterator;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -172,4 +176,122 @@ public class Concurrent {
             grpcObserver.onCompleted();
         }
     }
+
+
+
+    public static <T>
+    Flow.Processor<T, T> hub() {
+
+        return new HubProcessor<>();
+    }
+
+    public static <T>
+    CompletionStage<T> first(Flow.Publisher<T> publisher) {
+
+        var firstFuture = new CompletableFuture<T>();
+
+        var subscriber = new FirstFutureSubscriber<>(firstFuture);
+        publisher.subscribe(subscriber);
+
+        return firstFuture;
+    }
+
+    public static class FirstFutureSubscriber<T> implements Flow.Subscriber<T> {
+
+        private final CompletableFuture<T> firstFuture;
+
+        public FirstFutureSubscriber(CompletableFuture<T> firstFuture) {
+            this.firstFuture = firstFuture;
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            subscription.request(1);
+        }
+
+        @Override
+        public void onNext(T item) {
+            firstFuture.complete(item);
+        }
+
+        @Override
+        public void onError(Throwable error) {
+            if (!firstFuture.isDone())
+                firstFuture.completeExceptionally(error);
+        }
+
+        @Override
+        public void onComplete() {
+            if (!firstFuture.isDone())
+                firstFuture.completeExceptionally(new ETracInternal("No data on stream"));  // TODO: Error
+        }
+    }
+
+    public static <T>
+    StreamObserver<T> grpcStreamPublisher(Flow.Subscriber<T> subscriber) {
+
+        var subscription = new Flow.Subscription() {
+
+            @Override
+            public void request(long n) {
+
+            }
+
+            @Override
+            public void cancel() {
+
+            }
+        };
+
+        subscriber.onSubscribe(subscription);
+
+        return new StreamObserver<>() {
+
+            @Override
+            public void onNext(T value) {
+                subscriber.onNext(value);
+            }
+
+            @Override
+            public void onError(Throwable error) {
+                subscriber.onError(error);
+            }
+
+            @Override
+            public void onCompleted() {
+                subscriber.onComplete();
+            }
+        };
+    }
+
+
+    static class HubProcessor<T> implements Flow.Processor<T, T> {
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super T> subscriber) {
+
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+
+        }
+
+        @Override
+        public void onNext(T item) {
+
+        }
+
+        @Override
+        public void onError(Throwable throwable) {
+
+        }
+
+        @Override
+        public void onComplete() {
+
+        }
+    }
+
+
 }

@@ -140,7 +140,9 @@ message DataWriteRequest {
 
 message DataWriteResponse {
 
-  uint32 size = 1;
+  metadata.TagHeader header = 1;
+
+  uint32 size = 2;
 }
 
 message DataReadRequest {

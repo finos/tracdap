@@ -25,12 +25,26 @@ import com.accenture.trac.metadata.*;
 import io.netty.buffer.ByteBuf;
 import org.apache.arrow.vector.VectorSchemaRoot;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
 
 public class DataWriteService {
+
+
+
+    public CompletionStage<TagHeader> createFile() {
+
+        return CompletableFuture.failedFuture(new Exception("Not implemented yet"));
+    }
+
+
+
+
+
 /*
 
     private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaApi;

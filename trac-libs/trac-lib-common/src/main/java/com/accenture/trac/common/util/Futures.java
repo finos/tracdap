@@ -18,11 +18,14 @@ package com.accenture.trac.common.util;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.MoreExecutors;
+import io.grpc.stub.StreamObserver;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 
 
 public class Futures {
@@ -63,5 +66,32 @@ public class Futures {
         });
 
         return javaFuture;
+    }
+
+    public static <T>
+    BiConsumer<T, Throwable> grpcResultHandler(StreamObserver<T> grpcObserver) {
+
+        return new GrpcResultHandler<>(grpcObserver);
+    }
+
+    public static class GrpcResultHandler<T> implements BiConsumer<T, Throwable> {
+
+        private final StreamObserver<T> grpcObserver;
+
+        public GrpcResultHandler(StreamObserver<T> grpcObserver) {
+            this.grpcObserver = grpcObserver;
+        }
+
+        @Override
+        public void accept(T result, Throwable error) {
+
+            if (error != null) {
+                grpcObserver.onError(error);
+            }
+            else {
+                grpcObserver.onNext(result);
+                grpcObserver.onCompleted();
+            }
+        }
     }
 }
