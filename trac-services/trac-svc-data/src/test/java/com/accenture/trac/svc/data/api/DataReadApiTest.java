@@ -58,12 +58,11 @@ public class DataReadApiTest {
 
         var publicApiImpl =  new TracDataApi(readService, writeService);
 
-        var log = LoggerFactory.getLogger(getClass());
-
         // Create a server, add service, start, and register for automatic graceful shutdown.
         grpcCleanup.register(InProcessServerBuilder
                 .forName(serverName)
                 .directExecutor()
+                .addService(publicApiImpl)
                 .build()
                 .start());
 
