@@ -67,31 +67,4 @@ public class Futures {
 
         return javaFuture;
     }
-
-    public static <T>
-    BiConsumer<T, Throwable> grpcResultHandler(StreamObserver<T> grpcObserver) {
-
-        return new GrpcResultHandler<>(grpcObserver);
-    }
-
-    public static class GrpcResultHandler<T> implements BiConsumer<T, Throwable> {
-
-        private final StreamObserver<T> grpcObserver;
-
-        public GrpcResultHandler(StreamObserver<T> grpcObserver) {
-            this.grpcObserver = grpcObserver;
-        }
-
-        @Override
-        public void accept(T result, Throwable error) {
-
-            if (error != null) {
-                grpcObserver.onError(error);
-            }
-            else {
-                grpcObserver.onNext(result);
-                grpcObserver.onCompleted();
-            }
-        }
-    }
 }

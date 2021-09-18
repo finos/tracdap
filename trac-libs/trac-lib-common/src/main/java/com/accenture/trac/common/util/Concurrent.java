@@ -17,21 +17,16 @@
 package com.accenture.trac.common.util;
 
 import com.accenture.trac.common.exception.ETracInternal;
-import io.grpc.stub.CallStreamObserver;
-import io.grpc.stub.StreamObserver;
-import io.netty.util.concurrent.CompleteFuture;
 
 import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
 
 public class Concurrent {
-
 
     public static <T>
     Flow.Publisher<T> javaStreamPublisher(Stream<T> source) {
@@ -130,54 +125,6 @@ public class Concurrent {
         };
     }
 
-    public static <T>
-    Flow.Subscriber<T> grpcStreamSubscriber(StreamObserver<T> grpcObserver) {
-
-        return new GrpcStreamSubscriber<>(grpcObserver);
-    }
-
-    static class GrpcStreamSubscriber<T> implements Flow.Subscriber<T> {
-
-        private final StreamObserver<T> grpcObserver;
-
-        private final AtomicBoolean subscribed = new AtomicBoolean(false);
-        private Flow.Subscription subscription;
-
-        public GrpcStreamSubscriber(StreamObserver<T> grpcObserver) {
-            this.grpcObserver = grpcObserver;
-        }
-
-        @Override
-        public void onSubscribe(Flow.Subscription subscription) {
-
-            var subscribedOk = this.subscribed.compareAndSet(false, true);
-
-            if (!subscribedOk)
-                throw new ETracInternal("Multiple subscriptions on gRPC observer wrapper");
-
-            this.subscription = subscription;
-            subscription.request(1);
-        }
-
-        @Override
-        public void onNext(T item) {
-            grpcObserver.onNext(item);
-            subscription.request(1);
-        }
-
-        @Override
-        public void onError(Throwable error) {
-            subscription.cancel();
-            grpcObserver.onError(error);
-        }
-
-        @Override
-        public void onComplete() {
-            grpcObserver.onCompleted();
-        }
-    }
-
-
 
     public static <T>
     Flow.Processor<T, T> hub() {
@@ -226,44 +173,6 @@ public class Concurrent {
                 firstFuture.completeExceptionally(new ETracInternal("No data on stream"));  // TODO: Error
         }
     }
-
-    public static <T>
-    StreamObserver<T> grpcStreamPublisher(Flow.Subscriber<T> subscriber) {
-
-        var subscription = new Flow.Subscription() {
-
-            @Override
-            public void request(long n) {
-
-            }
-
-            @Override
-            public void cancel() {
-
-            }
-        };
-
-        subscriber.onSubscribe(subscription);
-
-        return new StreamObserver<>() {
-
-            @Override
-            public void onNext(T value) {
-                subscriber.onNext(value);
-            }
-
-            @Override
-            public void onError(Throwable error) {
-                subscriber.onError(error);
-            }
-
-            @Override
-            public void onCompleted() {
-                subscriber.onComplete();
-            }
-        };
-    }
-
 
     static class HubProcessor<T> implements Flow.Processor<T, T> {
 

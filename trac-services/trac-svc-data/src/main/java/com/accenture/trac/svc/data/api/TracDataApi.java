@@ -19,13 +19,20 @@ package com.accenture.trac.svc.data.api;
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.util.Bytes;
 import com.accenture.trac.common.util.Concurrent;
-import com.accenture.trac.common.util.Futures;
+import com.accenture.trac.common.util.GrpcStreams;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
+
+import io.grpc.*;
+import io.grpc.Metadata;
 import io.grpc.stub.StreamObserver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final DataReadService readService;
     private final DataWriteService writeService;
@@ -75,10 +82,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 .setHeader(th)
                 .build());
 
-        response.whenComplete(Futures.grpcResultHandler(responseObserver));
+        response.whenComplete(GrpcStreams.resultHandler(responseObserver));
 
-
-        return Concurrent.grpcStreamPublisher(requestHub);
+        return GrpcStreams.relay(requestHub);
     }
 
     @Override
@@ -91,15 +97,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         var dataStream = readService.readFile();
 
-        var responseStream = Concurrent.map(dataStream, chunk ->
+        var response = Concurrent.map(dataStream, chunk ->
                 DataReadResponse.newBuilder()
                 .setSize(chunk.readableBytes())
                 .setContent(Bytes.toProtoBytes(chunk))
                 .build());
 
-        var responseSubscriber = Concurrent.grpcStreamSubscriber(responseObserver);
-
-        responseStream.subscribe(responseSubscriber);
+        response.subscribe(GrpcStreams.relay(responseObserver));
     }
 
     @Override
