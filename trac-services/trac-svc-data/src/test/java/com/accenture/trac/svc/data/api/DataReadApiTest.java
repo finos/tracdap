@@ -58,11 +58,35 @@ public class DataReadApiTest {
 
         var publicApiImpl =  new TracDataApi(readService, writeService);
 
+        var log = LoggerFactory.getLogger(getClass());
+
+        var interceptor = new ServerInterceptor() {
+
+            @Override
+            public <ReqT, RespT>
+            ServerCall.Listener<ReqT> interceptCall(
+                    ServerCall<ReqT, RespT> call,
+                    Metadata headers,
+                    ServerCallHandler<ReqT, RespT> next) {
+
+                log.info("Intercepted!");
+
+                return new ForwardingServerCallListener.SimpleForwardingServerCallListener<>(
+                        next.startCall(call, headers)) {
+
+
+                };
+            }
+        };
+
+        //   ServerInterceptors.
+        var interc = ServerInterceptors.intercept(publicApiImpl, interceptor);
+
         // Create a server, add service, start, and register for automatic graceful shutdown.
         grpcCleanup.register(InProcessServerBuilder
                 .forName(serverName)
                 .directExecutor()
-                .addService(publicApiImpl)
+                .addService(interc)
                 .build()
                 .start());
 
