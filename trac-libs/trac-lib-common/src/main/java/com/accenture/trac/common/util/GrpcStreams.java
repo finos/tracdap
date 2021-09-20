@@ -17,11 +17,14 @@
 package com.accenture.trac.common.util;
 
 import com.accenture.trac.common.exception.ETracInternal;
+import com.accenture.trac.common.exception.EUnexpected;
 import io.grpc.stub.StreamObserver;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+
 
 public class GrpcStreams {
 
@@ -29,6 +32,12 @@ public class GrpcStreams {
     BiConsumer<T, Throwable> resultHandler(StreamObserver<T> grpcObserver) {
 
         return new GrpcResultHandler<>(grpcObserver);
+    }
+
+    public static <T>
+    StreamObserver<T> resultObserver(CompletableFuture<T> result) {
+
+        return new GrpcResultObserver<>(result);
     }
 
     public static <T>
@@ -62,6 +71,52 @@ public class GrpcStreams {
                 grpcObserver.onNext(result);
                 grpcObserver.onCompleted();
             }
+        }
+    }
+
+    public static class GrpcResultObserver<T> implements StreamObserver<T> {
+
+        private final CompletableFuture<T> result;
+
+        public GrpcResultObserver(CompletableFuture<T> result) {
+
+            // Raise an error on the processing thread if the result is already set
+
+            if (result.isDone())
+                throw new EUnexpected();
+
+            this.result = result;
+        }
+
+        @Override
+        public void onNext(T value) {
+
+            var resultSet = result.complete(value);
+
+            // Raise an error on the processing thread if the result is already set
+
+            if (!resultSet)
+                throw new EUnexpected();
+        }
+
+        @Override
+        public void onError(Throwable error) {
+
+            var errorSet = result.completeExceptionally(error);
+
+            // Raise an error on the processing thread if the result is already set
+
+            if (!errorSet)
+                throw new EUnexpected();
+        }
+
+        @Override
+        public void onCompleted() {
+
+            // Raise an error on the processing thread if a result has not been set
+
+            if (!result.isDone())
+                throw new EUnexpected();
         }
     }
 
