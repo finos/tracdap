@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.core;
+package com.accenture.trac.common.storage;
 
 import java.time.Instant;
 import java.util.Optional;
