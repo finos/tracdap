@@ -23,9 +23,8 @@ import com.accenture.trac.common.util.GrpcStreams;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
 
-import io.grpc.*;
-import io.grpc.Metadata;
 import io.grpc.stub.StreamObserver;
+import io.netty.buffer.Unpooled;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,9 +72,10 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var requestHub = Concurrent.<DataWriteRequest>hub();
         var firstMessage = Concurrent.first(requestHub);
 
-        var dataStream = Concurrent.map(requestHub, DataWriteRequest::getContent);
+        var protoDataStream = Concurrent.map(requestHub, DataWriteRequest::getContent);
+        var contentStream = Concurrent.map(protoDataStream, bs -> Unpooled.wrappedBuffer(bs.asReadOnlyByteBuffer()));
 
-        var tagHeader = firstMessage.thenCompose(msg -> writeService.createFile());
+        var tagHeader = firstMessage.thenCompose(msg -> writeService.createFile(contentStream));
 
         var response = tagHeader.thenApply(th ->
                 DataWriteResponse.newBuilder()
