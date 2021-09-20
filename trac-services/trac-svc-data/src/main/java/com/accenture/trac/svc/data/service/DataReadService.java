@@ -16,10 +16,14 @@
 
 package com.accenture.trac.svc.data.service;
 
+import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
+import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.common.util.Concurrent;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
@@ -28,6 +32,19 @@ import java.util.stream.Stream;
 
 
 public class DataReadService {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
+    private final StorageManager storageManager;
+    private final TrustedMetadataApiFutureStub metaApi;
+
+    public DataReadService(
+            StorageManager storageManager,
+            TrustedMetadataApiFutureStub metaApi) {
+
+        this.storageManager = storageManager;
+        this.metaApi = metaApi;
+    }
 
     public Flow.Publisher<ByteBuf> readFile() {
 

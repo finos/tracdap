@@ -16,9 +16,12 @@
 
 package com.accenture.trac.svc.data;
 
+import com.accenture.trac.api.TracMetadataApiGrpc;
+import com.accenture.trac.api.TrustedMetadataApiGrpc;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.service.CommonServiceBase;
+import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.svc.data.api.TracDataApi;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
@@ -57,8 +60,13 @@ public class TracDataService extends CommonServiceBase {
 
         try {
 
-            var dataReadSvc = new DataReadService();
-            var dataWriteSvc = new DataWriteService();
+            var storage = new StorageManager();
+            storage.initStoragePlugins();
+
+            var metaApi = (TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub) null;
+
+            var dataReadSvc = new DataReadService(storage, metaApi);
+            var dataWriteSvc = new DataWriteService(storage, metaApi);
 
             var publicApi = new TracDataApi(dataReadSvc, dataWriteSvc);
 

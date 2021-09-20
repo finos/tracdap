@@ -18,12 +18,17 @@ package com.accenture.trac.svc.data.service;
 
 
 import com.accenture.trac.api.MetadataWriteRequest;
-import com.accenture.trac.api.TrustedMetadataApiGrpc;
+import com.accenture.trac.api.TracMetadataApiGrpc;
+import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
+import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.metadata.*;
 
+import com.google.protobuf.ByteString;
 import io.netty.buffer.ByteBuf;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -34,9 +39,24 @@ import java.util.stream.Stream;
 
 public class DataWriteService {
 
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
+    private final StorageManager storageManager;
+    private final TrustedMetadataApiFutureStub metaApi;
+
+    public DataWriteService(
+            StorageManager storageManager,
+            TrustedMetadataApiFutureStub metaApi) {
+
+        this.storageManager = storageManager;
+        this.metaApi = metaApi;
+    }
+
+    public CompletionStage<TagHeader> createFile(Flow.Publisher<ByteBuf> contentStream) {
 
 
-    public CompletionStage<TagHeader> createFile() {
+
+        log.info("In service method, throwing the error...");
 
         return CompletableFuture.failedFuture(new Exception("Not implemented yet"));
     }
