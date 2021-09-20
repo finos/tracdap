@@ -16,27 +16,30 @@
 
 package com.accenture.trac.svc.data.api;
 
-import com.accenture.trac.api.DataReadRequest;
-import com.accenture.trac.api.DataWriteRequest;
-import com.accenture.trac.api.DataWriteResponse;
-import com.accenture.trac.api.TracDataApiGrpc;
+import com.accenture.trac.api.*;
 
+import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.common.util.Concurrent;
+import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.common.util.GrpcStreams;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
 import com.google.protobuf.ByteString;
 import io.grpc.*;
+import io.grpc.Metadata;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.testing.GrpcCleanupRule;
 
 import org.junit.Rule;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
 
@@ -45,16 +48,26 @@ public class DataReadApiTest {
     @Rule
     public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
 
+    private static StorageManager storage;
+
     private TracDataApiGrpc.TracDataApiBlockingStub dataApi;
     private TracDataApiGrpc.TracDataApiStub dataApiStreams;
+
+    @BeforeAll
+    public static void setupClass() throws Exception {
+        storage = new StorageManager();
+        storage.initStoragePlugins();
+    }
 
     @BeforeEach
     public void setup() throws Exception {
 
         var serverName = InProcessServerBuilder.generateName();
 
-        var readService = new DataReadService();
-        var writeService = new DataWriteService();
+        var metaApi = (TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub) null;
+
+        var readService = new DataReadService(storage, metaApi);
+        var writeService = new DataWriteService(storage, metaApi);
 
         var publicApiImpl =  new TracDataApi(readService, writeService);
 
@@ -121,15 +134,18 @@ public class DataReadApiTest {
     }
 
     @Test
-    public void test2() {
+    public void test2() throws Exception {
 
        var messages = Stream.of(DataWriteRequest.newBuilder().build());
-       var request = Concurrent.javaStreamPublisher(messages);
+       var requestStream = Concurrent.javaStreamPublisher(messages);
+       var response = new CompletableFuture<DataWriteResponse>();
 
-       var response = Concurrent.<DataWriteResponse>hub();
-       var responseGrpc = GrpcStreams.relay(response);
-
+       var responseGrpc = GrpcStreams.resultObserver(response);
        var requestGrpc = dataApiStreams.createFile(responseGrpc);
-       request.subscribe(GrpcStreams.relay(requestGrpc));
+       requestStream.subscribe(GrpcStreams.relay(requestGrpc));
+
+       var result = response.get();
+       Assertions.assertNotNull(result);
+       Assertions.assertTrue(result.getSize() > 0);
     }
 }
