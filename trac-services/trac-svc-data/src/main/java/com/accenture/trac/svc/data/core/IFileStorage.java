@@ -17,24 +17,29 @@
 package com.accenture.trac.svc.data.core;
 
 import io.netty.buffer.ByteBuf;
+
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
 
 public interface IFileStorage {
 
-    boolean exists(String storagePath);
+    interface FileWriter extends Flow.Subscriber<ByteBuf> {}
+    interface FileReader extends Flow.Publisher<ByteBuf> {}
 
-    long size(String storagePath);
+    CompletionStage<Boolean> exists(String storagePath);
 
-    void stat(String storagePath);
+    CompletionStage<Long> size(String storagePath);
 
-    void ls(String storagePath);
+    CompletionStage<FileStat> stat(String storagePath);
 
-    void mkdir(String storagePath, boolean recursive, boolean existsOk);
+    CompletionStage<Void> ls(String storagePath);
 
-    void rm(String storagePath, boolean recursive);
+    CompletionStage<Void> mkdir(String storagePath, boolean recursive, boolean existsOk);
 
-    Flow.Subscriber<ByteBuf> reader(String storagePath);
+    CompletionStage<Void> rm(String storagePath, boolean recursive);
 
-    Flow.Publisher<ByteBuf> writer(String storagePath);
+    FileWriter reader(String storagePath);
+
+    FileReader writer(String storagePath);
 }
