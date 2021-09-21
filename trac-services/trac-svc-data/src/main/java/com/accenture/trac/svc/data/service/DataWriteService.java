@@ -16,148 +16,53 @@
 
 package com.accenture.trac.svc.data.service;
 
-
-import com.accenture.trac.api.MetadataWriteRequest;
-import com.accenture.trac.api.TracMetadataApiGrpc;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
-import com.accenture.trac.common.storage.StorageManager;
-import com.accenture.trac.common.util.Futures;
+import com.accenture.trac.common.eventloop.IExecutionContext;
+import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.metadata.*;
 
-import com.google.protobuf.ByteString;
 import io.netty.buffer.ByteBuf;
-import org.apache.arrow.vector.VectorSchemaRoot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
-import java.util.function.Function;
-import java.util.stream.Stream;
 
 
 public class DataWriteService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final StorageManager storageManager;
+    private final IStorageManager storageManager;
     private final TrustedMetadataApiFutureStub metaApi;
 
     public DataWriteService(
-            StorageManager storageManager,
+            IStorageManager storageManager,
             TrustedMetadataApiFutureStub metaApi) {
 
         this.storageManager = storageManager;
         this.metaApi = metaApi;
     }
 
-    public CompletionStage<TagHeader> createFile(Flow.Publisher<ByteBuf> contentStream) {
+    public CompletionStage<Long> createFile(
+            Flow.Publisher<ByteBuf> contentStream,
+            IExecutionContext execContext) {
 
+        log.info("In service method...");
 
+        var storage = storageManager.getFileStorage("DUMMY_STORAGE");
+        var storagePath = UUID.randomUUID() + ".txt";
 
-        log.info("In service method, throwing the error...");
+        var signal = new CompletableFuture<Long>();
+        var writer = storage.writer(storagePath, signal, execContext);
+        contentStream.subscribe(writer);
 
-        return CompletableFuture.failedFuture(new Exception("Not implemented yet"));
+        return signal.thenApply(nBytes -> nBytes);  // TagHeader.newBuilder().build());
+
+//        return CompletableFuture.failedFuture(new Exception("Not implemented yet"));
     }
-
-
-
-
-
-/*
-
-    private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaApi;
-
-    public DataWriteService() {
-
-    }
-
-    public void createData(
-
-            // Optional<TagSelector>
-
-            Flow.Publisher<ByteBuf> content
-    ) {
-
-        var preallocateRequest = MetadataWriteRequest.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .build();
-
-        var objectHeader = Futures.javaFuture(metaApi.preallocateId(preallocateRequest));
-
-        var dataDef = objectHeader.thenApply(this::newDataDefinition);
-
-
-    }
-
-    public Flow.Processor<ByteBuf, Object> createFile() {
-
-        var preallocateRequest = MetadataWriteRequest.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .build();
-
-        var objectHeader = Futures.javaFuture(metaApi.preallocateId(preallocateRequest));
-
-        var fileDef = objectHeader.thenApply(this::newFileDefinition);
-
-
-    }
-
-
-
-    public Flow.Publisher<ByteBuf> readFile() {
-
-    }
-
-
-    private DataDefinition newDataDefinition(TagHeader header) {
-
-        return DataDefinition.newBuilder()
-                .build();
-    }
-
-    private FileDefinition newFileDefinition(TagHeader header) {
-
-        return FileDefinition.newBuilder()
-                .build();
-    }
-
-    private <IR> Flow.Publisher<IR> toIR(Stream<ByteBuf> content) {
-
-    }
-
-    private <IR> Flow.Publisher<ByteBuf> fromIR(Stream<IR> ir) {
-
-    }
-
-
-    class DataContext<IR> {
-
-
-
-    }
-
-
-    class FileDataContext extends DataContext<ByteBuf> {
-
-
-    }
-
-
-    class TableDataContext extends DataContext<VectorSchemaRoot> {
-
-    }
-
-
-    // private IFileStorage.
-
-
-
-
-
-*/
-
 
 
 }

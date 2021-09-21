@@ -16,9 +16,9 @@
 
 package com.accenture.trac.svc.data;
 
-import com.accenture.trac.api.TracMetadataApiGrpc;
 import com.accenture.trac.api.TrustedMetadataApiGrpc;
 import com.accenture.trac.common.config.ConfigManager;
+import com.accenture.trac.common.eventloop.ExecutionRegister;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.service.CommonServiceBase;
 import com.accenture.trac.common.storage.StorageManager;
@@ -27,7 +27,10 @@ import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.grpc.Server;
-import io.grpc.ServerBuilder;
+import io.grpc.netty.NettyServerBuilder;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,6 +63,11 @@ public class TracDataService extends CommonServiceBase {
 
         try {
 
+            var channelType = NioServerSocketChannel.class;
+            var bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
+            var workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
+            var execRegister = new ExecutionRegister(workerGroup);
+
             var storage = new StorageManager();
             storage.initStoragePlugins();
 
@@ -72,12 +80,16 @@ public class TracDataService extends CommonServiceBase {
 
             // Create the main server
 
-            var executor = createPrimaryExecutor();
-
-            this.server = ServerBuilder
+            this.server = NettyServerBuilder
                     .forPort(DATA_SERVICE_PORT)
                     .addService(publicApi)
-                    .executor(executor)
+
+                    .channelType(channelType)
+                    .bossEventLoopGroup(bossGroup)
+                    .workerEventLoopGroup(workerGroup)
+                    .directExecutor()
+                    .intercept(execRegister.registerExecContext())
+
                     .build();
 
             // Good to go, let's start!
@@ -102,31 +114,7 @@ public class TracDataService extends CommonServiceBase {
         return -1;
     }
 
-    private ExecutorService createPrimaryExecutor() {
 
-        // TODO: Review executor settings
-
-        var HEADROOM_THREADS = 1;
-        var HEADROOM_THREADS_TIMEOUT = 60;
-        var HEADROOM_THREADS_TIMEOUT_UNIT = TimeUnit.SECONDS;
-
-        var threadFactory = new ThreadFactoryBuilder()
-                .setNameFormat("worker-%d")
-                .setPriority(Thread.NORM_PRIORITY)
-                .build();
-
-        var overflowQueue = new ArrayBlockingQueue<Runnable>(OVERFLOW_SIZE);
-
-        var executor = new ThreadPoolExecutor(
-                WORKER_POOL_SIZE, WORKER_POOL_SIZE + HEADROOM_THREADS,
-                HEADROOM_THREADS_TIMEOUT, HEADROOM_THREADS_TIMEOUT_UNIT,
-                overflowQueue, threadFactory);
-
-        executor.prestartAllCoreThreads();
-        executor.allowCoreThreadTimeOut(false);
-
-        return executor;
-    }
 
     public static void main(String[] args) {
 

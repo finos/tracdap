@@ -382,5 +382,50 @@ public class Concurrent {
         }
     }
 
+    public static <T>
+    Flow.Publisher<T> publishOn(Flow.Publisher<T> publisher, ExecutorService executor) {
 
+        var relay = new EventLoopProcessor<T>(executor);
+        publisher.subscribe(relay);
+
+        return relay;
+    }
+
+    private static class EventLoopProcessor<T> implements Flow.Processor<T, T> {
+
+        private final ExecutorService executor;
+
+        private Flow.Subscriber<? super T> target;
+        private Flow.Subscription sourceSubscription;
+
+        EventLoopProcessor(ExecutorService executor) {
+            this.executor = executor;
+        }
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super T> subscriber) {
+            this.target = subscriber;
+            executor.execute(() -> target.onSubscribe(sourceSubscription));
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            this.sourceSubscription = subscription;
+        }
+
+        @Override
+        public void onNext(T message) {
+            executor.execute(() -> target.onNext(message));
+        }
+
+        @Override
+        public void onError(Throwable error) {
+            executor.execute(() -> target.onError(error));
+        }
+
+        @Override
+        public void onComplete() {
+            executor.execute(target::onComplete);
+        }
+    }
 }

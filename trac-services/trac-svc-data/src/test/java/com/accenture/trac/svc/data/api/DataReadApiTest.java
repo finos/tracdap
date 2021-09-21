@@ -17,29 +17,27 @@
 package com.accenture.trac.svc.data.api;
 
 import com.accenture.trac.api.*;
-
+import com.accenture.trac.common.eventloop.ExecutionRegister;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.common.util.Concurrent;
-import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.common.util.GrpcStreams;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
+
 import com.google.protobuf.ByteString;
-import io.grpc.*;
-import io.grpc.Metadata;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.testing.GrpcCleanupRule;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.concurrent.DefaultThreadFactory;
 
 import org.junit.Rule;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
 
@@ -64,47 +62,25 @@ public class DataReadApiTest {
 
         var serverName = InProcessServerBuilder.generateName();
 
+        var workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
+        var execRegister = new ExecutionRegister(workerGroup);
+
         var metaApi = (TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub) null;
 
         var readService = new DataReadService(storage, metaApi);
         var writeService = new DataWriteService(storage, metaApi);
-
         var publicApiImpl =  new TracDataApi(readService, writeService);
 
-        var log = LoggerFactory.getLogger(getClass());
-
-        var interceptor = new ServerInterceptor() {
-
-            @Override
-            public <ReqT, RespT>
-            ServerCall.Listener<ReqT> interceptCall(
-                    ServerCall<ReqT, RespT> call,
-                    Metadata headers,
-                    ServerCallHandler<ReqT, RespT> next) {
-
-                log.info("Intercepted!");
-
-                return new ForwardingServerCallListener.SimpleForwardingServerCallListener<>(
-                        next.startCall(call, headers)) {
-
-
-                };
-            }
-        };
-
-        //   ServerInterceptors.
-        var interc = ServerInterceptors.intercept(publicApiImpl, interceptor);
-
-        // Create a server, add service, start, and register for automatic graceful shutdown.
-        grpcCleanup.register(InProcessServerBuilder
-                .forName(serverName)
-                .directExecutor()
-                .addService(interc)
+        grpcCleanup.register(InProcessServerBuilder.forName(serverName)
+                .addService(publicApiImpl)
+                .executor(workerGroup)
+                .intercept(execRegister.registerExecContext())
                 .build()
                 .start());
 
+        // Create a client channel and register for automatic graceful shutdown.
+
         dataApi = TracDataApiGrpc.newBlockingStub(
-                // Create a client channel and register for automatic graceful shutdown.
                 grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
 
         dataApiStreams = TracDataApiGrpc.newStub(
@@ -136,16 +112,19 @@ public class DataReadApiTest {
     @Test
     public void test2() throws Exception {
 
-       var messages = Stream.of(DataWriteRequest.newBuilder().build());
-       var requestStream = Concurrent.javaStreamPublisher(messages);
-       var response = new CompletableFuture<DataWriteResponse>();
+        var content = ByteString.copyFromUtf8("Hello world!\n");
+        var message = DataWriteRequest.newBuilder().setContent(content).build();
 
-       var responseGrpc = GrpcStreams.resultObserver(response);
-       var requestGrpc = dataApiStreams.createFile(responseGrpc);
-       requestStream.subscribe(GrpcStreams.relay(requestGrpc));
+        var messages = Stream.of(message);
+        var requestStream = Concurrent.javaStreamPublisher(messages);
+        var response = new CompletableFuture<DataWriteResponse>();
 
-       var result = response.get();
-       Assertions.assertNotNull(result);
-       Assertions.assertTrue(result.getSize() > 0);
+        var responseGrpc = GrpcStreams.resultObserver(response);
+        var requestGrpc = dataApiStreams.createFile(responseGrpc);
+        requestStream.subscribe(GrpcStreams.relay(requestGrpc));
+
+        var result = response.get();
+        Assertions.assertNotNull(result);
+        Assertions.assertTrue(result.getSize() > 0);
     }
 }

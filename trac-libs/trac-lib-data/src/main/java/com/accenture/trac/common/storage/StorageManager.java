@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.ServiceLoader;
 
 
-public class StorageManager {
+public class StorageManager implements IStorageManager {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -42,7 +42,7 @@ public class StorageManager {
 
         for (var plugin: availablePlugins) {
 
-            var discoveryMsg = String.format("Config plugin: [%s] (protocols: %s)",
+            var discoveryMsg = String.format("Storage plugin: [%s] (protocols: %s)",
                     plugin.name(),
                     String.join(", ", plugin.protocols()));
 
@@ -51,5 +51,14 @@ public class StorageManager {
             for (var protocol : plugin.protocols())
                 plugins.put(protocol, plugin);
         }
+    }
+
+    @Override
+    public IFileStorage getFileStorage(String storageKey) {
+
+        var protocol = "file";
+        var plugin = plugins.get(protocol);
+
+        return plugin.createFileStorage();
     }
 }

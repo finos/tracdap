@@ -16,16 +16,15 @@
 
 package com.accenture.trac.common.storage;
 
+import com.accenture.trac.common.eventloop.IExecutionContext;
 import io.netty.buffer.ByteBuf;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
 
 public interface IFileStorage {
-
-    interface FileWriter extends Flow.Subscriber<ByteBuf> {}
-    interface FileReader extends Flow.Publisher<ByteBuf> {}
 
     CompletionStage<Boolean> exists(String storagePath);
 
@@ -39,7 +38,12 @@ public interface IFileStorage {
 
     CompletionStage<Void> rm(String storagePath, boolean recursive);
 
-    FileWriter reader(String storagePath);
+    Flow.Publisher<ByteBuf> reader(
+            String storagePath,
+            IExecutionContext execContext);
 
-    FileReader writer(String storagePath);
+    Flow.Subscriber<ByteBuf> writer(
+            String storagePath,
+            CompletableFuture<Long> signal,
+            IExecutionContext execContext);
 }

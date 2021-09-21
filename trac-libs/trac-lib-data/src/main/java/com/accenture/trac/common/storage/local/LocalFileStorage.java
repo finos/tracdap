@@ -16,10 +16,13 @@
 
 package com.accenture.trac.common.storage.local;
 
+import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EStorageRequest;
 import com.accenture.trac.common.storage.FileStat;
 import com.accenture.trac.common.storage.IFileStorage;
+
+import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +34,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Flow;
 
 
 public class LocalFileStorage implements IFileStorage {
@@ -139,12 +143,18 @@ public class LocalFileStorage implements IFileStorage {
     }
 
     @Override
-    public FileWriter reader(String storagePath) {
+    public Flow.Publisher<ByteBuf> reader(String storagePath, IExecutionContext execContext) {
         return null;
     }
 
     @Override
-    public FileReader writer(String storagePath) {
-        return null;
+    public Flow.Subscriber<ByteBuf> writer(
+            String storagePath,
+            CompletableFuture<Long> signal,
+            IExecutionContext execContext) {
+
+        var absolutePath = rootPath.resolve(storagePath);
+
+        return new LocalFileWriter(absolutePath, signal, execContext.eventLoopExecutor());
     }
 }

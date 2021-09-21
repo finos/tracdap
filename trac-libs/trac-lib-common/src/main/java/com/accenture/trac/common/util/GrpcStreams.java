@@ -18,7 +18,12 @@ package com.accenture.trac.common.util;
 
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
+import io.grpc.Status;
+import io.grpc.StatusException;
+import io.grpc.StatusRuntimeException;
+import io.grpc.stub.MetadataUtils;
 import io.grpc.stub.StreamObserver;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
@@ -65,7 +70,23 @@ public class GrpcStreams {
         public void accept(T result, Throwable error) {
 
             if (error != null) {
-                grpcObserver.onError(error);
+
+                LoggerFactory.getLogger(getClass()).error("Error escaped processing", error);
+
+                if (error instanceof StatusRuntimeException || error instanceof StatusException)
+                    grpcObserver.onError(error);
+                else {
+
+                    var statusCode = Status.Code.INTERNAL;
+
+                    var errorMessage = error.getMessage();
+
+                    var status = Status.fromCode(statusCode)
+                            .withDescription(errorMessage)
+                            .withCause(error);
+
+                    grpcObserver.onError(status.asRuntimeException());
+                }
             }
             else {
                 grpcObserver.onNext(result);

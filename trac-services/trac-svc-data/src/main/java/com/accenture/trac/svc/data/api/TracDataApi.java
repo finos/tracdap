@@ -17,9 +17,11 @@
 package com.accenture.trac.svc.data.api;
 
 import com.accenture.trac.api.*;
+import com.accenture.trac.common.eventloop.ExecutionContext;
 import com.accenture.trac.common.util.Bytes;
 import com.accenture.trac.common.util.Concurrent;
 import com.accenture.trac.common.util.GrpcStreams;
+import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
 
@@ -69,17 +71,20 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public StreamObserver<DataWriteRequest> createFile(StreamObserver<DataWriteResponse> responseObserver) {
 
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+
         var requestHub = Concurrent.<DataWriteRequest>hub();
         var firstMessage = Concurrent.first(requestHub);
 
         var protoDataStream = Concurrent.map(requestHub, DataWriteRequest::getContent);
         var contentStream = Concurrent.map(protoDataStream, bs -> Unpooled.wrappedBuffer(bs.asReadOnlyByteBuffer()));
 
-        var tagHeader = firstMessage.thenCompose(msg -> writeService.createFile(contentStream));
+        var bytesWritten = firstMessage.thenCompose(msg -> writeService.createFile(contentStream, execCtx));
 
-        var response = tagHeader.thenApply(th ->
+        var response = bytesWritten.thenApply(bw ->
                 DataWriteResponse.newBuilder()
-                .setHeader(th)
+                .setHeader(TagHeader.newBuilder())
+                .setSize((int) (long) bw)
                 .build());
 
         response.whenComplete(GrpcStreams.resultHandler(responseObserver));
@@ -94,6 +99,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     @Override
     public void readFile(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
+
+        log.info("In read call");
 
         var dataStream = readService.readFile();
 
