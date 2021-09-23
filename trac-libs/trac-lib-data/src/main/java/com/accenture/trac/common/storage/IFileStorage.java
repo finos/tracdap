@@ -34,7 +34,7 @@ public interface IFileStorage {
 
     CompletionStage<Void> ls(String storagePath);
 
-    CompletionStage<Void> mkdir(String storagePath, boolean recursive, boolean existsOk);
+    CompletionStage<Void> mkdir(String storagePath, boolean recursive);
 
     CompletionStage<Void> rm(String storagePath, boolean recursive);
 
