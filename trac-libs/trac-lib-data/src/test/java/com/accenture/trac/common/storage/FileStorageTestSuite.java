@@ -111,21 +111,28 @@ public class FileStorageTestSuite {
 
     <T> void testBadPaths(Function<String, CompletionStage<T>> testMethod) {
 
-        var invalidPathResult = testMethod.apply("£$ N'`¬$£>.)_£\"+%");
         var escapingPathResult = testMethod.apply("../");
 
         var absolutePathResult = OS.WINDOWS.isCurrentOs()
                 ? testMethod.apply("C:\\Windows")
                 : testMethod.apply("/bin");
 
-        waitFor(TEST_TIMEOUT,
-            invalidPathResult,
-            escapingPathResult,
-            absolutePathResult);
+        // \0 and / are the two characters that are always illegal in posix filenames
+        // But / will be interpreted as a separator
+        // There are several illegal characters for filenames on Windows!
 
-        Assertions.assertThrows(ETracInternal.class, () -> result(invalidPathResult));
+        var invalidPathResult = OS.WINDOWS.isCurrentOs()
+                ? testMethod.apply("£$ N'`¬$£>.)_£\"+%")
+                : testMethod.apply("nul\0char");
+
+        waitFor(TEST_TIMEOUT,
+            escapingPathResult,
+            absolutePathResult,
+            invalidPathResult);
+
         Assertions.assertThrows(ETracInternal.class, () -> result(escapingPathResult));
         Assertions.assertThrows(ETracInternal.class, () -> result(absolutePathResult));
+        Assertions.assertThrows(ETracInternal.class, () -> result(invalidPathResult));
     }
 
     private static void waitFor(Duration timeout, CompletionStage<?>... tasks) {
