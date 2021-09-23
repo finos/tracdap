@@ -32,15 +32,13 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
 import org.junit.Rule;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.*;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 
+@Disabled
 public class DataReadApiTest {
 
     @Rule
@@ -52,7 +50,7 @@ public class DataReadApiTest {
     private TracDataApiGrpc.TracDataApiStub dataApiStreams;
 
     @BeforeAll
-    public static void setupClass() throws Exception {
+    public static void setupClass() {
         storage = new StorageManager();
         storage.initStoragePlugins();
     }
