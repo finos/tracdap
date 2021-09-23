@@ -103,6 +103,18 @@ public class LocalFileStorage implements IFileStorage {
 
             var size = Files.size(absolutePath);
 
+            // Size operation for non-regular files can still succeed
+            // So, add an explicit check for directories (and other non-regular files)
+            if (!Files.isRegularFile(absolutePath)) {
+
+                var err = String.format(
+                        "Requested storage path is not a regular file: %s %s [%s]",
+                        storageKey, SIZE_OPERATION, storagePath);
+
+                log.error(err);
+                throw new EStorageRequest(err);
+            }
+
             return CompletableFuture.completedFuture(size);
         }
         catch (Exception e) {
@@ -182,8 +194,6 @@ public class LocalFileStorage implements IFileStorage {
 
             var relativePath = Path.of(storagePath);
 
-            log.info("{}", relativePath);
-
             if (relativePath.isAbsolute()) {
 
                 var err = String.format(
@@ -236,7 +246,7 @@ public class LocalFileStorage implements IFileStorage {
         if (e instanceof ETrac)
             return CompletableFuture.failedFuture(e);
 
-        if (e instanceof FileNotFoundException) {
+        if (e instanceof NoSuchFileException) {
 
             var err = String.format(
                     "File not found in storage layer: %s %s [%s]",

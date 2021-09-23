@@ -17,11 +17,14 @@
 package com.accenture.trac.common.storage;
 
 import com.accenture.trac.common.eventloop.IExecutionContext;
+import com.accenture.trac.common.exception.EStorageRequest;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
 import com.accenture.trac.common.util.Concurrent;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
 import io.netty.util.concurrent.UnorderedThreadPoolEventExecutor;
 
 import org.junit.jupiter.api.Assertions;
@@ -43,6 +46,16 @@ import java.util.stream.Stream;
 
 public class FileStorageTestSuite {
 
+    /* >>> Generic tests for IFileStorage
+
+    These tests are implemented purely in terms of the IFileStorage interface. E.g. to test the "exists" method,
+    a directory is created using IFileStorage.exists(). This test suite can be run for any storage implementation.
+    Valid storage implementations must pass this test suite.
+
+    Storage implementations may also wish to supply their own tests that use native APIs to set up and control
+    tests. This can allow for finer grained control, particularly when testing corner cases and error conditions.
+     */
+
     public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
 
     IFileStorage storage;
@@ -60,11 +73,16 @@ public class FileStorageTestSuite {
         execContext = () -> new UnorderedThreadPoolEventExecutor(1);
     }
 
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // EXISTS
+    // -----------------------------------------------------------------------------------------------------------------
+
+
     @Test
-    void testExists_forDir() throws Exception {
+    void testExists_dir() throws Exception {
 
         var prepare = storage.mkdir("test_dir", false);
-
         var dirPresent = prepare.thenCompose(x -> storage.exists("test_dir"));
         var dirNotPresent = prepare.thenCompose(x -> storage.exists("other_dir"));
 
@@ -75,10 +93,9 @@ public class FileStorageTestSuite {
     }
 
     @Test
-    void testExists_forFile() throws Exception {
+    void testExists_file() throws Exception {
 
         var prepare = makeSmallFile("test_file.txt");
-
         var filePresent = prepare.thenCompose(x -> storage.exists("test_file.txt"));
         var fileNotPresent = prepare.thenCompose(x -> storage.exists("other_file.txt"));
 
@@ -86,6 +103,17 @@ public class FileStorageTestSuite {
 
         Assertions.assertTrue(result(filePresent));
         Assertions.assertFalse(result(fileNotPresent));
+    }
+
+    @Test
+    void testExists_emptyFile() throws Exception {
+
+        var prepare = makeFile("test_file.txt", Unpooled.EMPTY_BUFFER);
+        var emptyFileExist = prepare.thenCompose(x -> storage.exists("test_file.txt"));
+
+        waitFor(TEST_TIMEOUT, emptyFileExist);
+
+        Assertions.assertTrue(result(emptyFileExist));
     }
 
     @Test
@@ -100,12 +128,87 @@ public class FileStorageTestSuite {
         failForStorageRoot(storage::exists);
     }
 
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // SIZE
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @Test
+    void testSize_ok() throws Exception {
+
+        var content = ByteBufUtil.encodeString(
+                ByteBufAllocator.DEFAULT,
+                CharBuffer.wrap("Content of a certain size\n"),
+                StandardCharsets.UTF_8);
+
+        var expectedSize = content.readableBytes();
+        var prepare = makeFile("test_file.txt", content);
+        var size = prepare.thenCompose(x -> storage.size("test_file.txt"));
+
+        waitFor(TEST_TIMEOUT, size);
+
+        Assertions.assertEquals(expectedSize, result(size));
+    }
+
+    @Test
+    void testSize_emptyFile() throws Exception {
+
+        var prepare = makeFile("test_file.txt", Unpooled.EMPTY_BUFFER);
+        var size = prepare.thenCompose(x -> storage.size("test_file.txt"));
+
+        waitFor(TEST_TIMEOUT, size);
+
+        Assertions.assertEquals(0, result(size));
+    }
+
+    @Test
+    void testSize_dir() {
+
+        var prepare = storage.mkdir("test_dir", false);
+        var size = prepare.thenCompose(x -> storage.size("test_dir"));
+
+        waitFor(TEST_TIMEOUT, size);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> result(size));
+
+    }
+
+    @Test
+    void testSize_missing() {
+
+        var size = storage.size("missing_file.txt");
+
+        waitFor(TEST_TIMEOUT, size);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> result(size));
+    }
+
+    @Test
+    void testSize_badPaths() {
+
+        testBadPaths(storage::size);
+    }
+
+    @Test
+    void testSize_storageRoot() {
+
+        failForStorageRoot(storage::size);
+    }
+
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // COMMON TESTS (tests applied to several storage calls)
+    // -----------------------------------------------------------------------------------------------------------------
+
+
     <T> void failForStorageRoot(Function<String, CompletionStage<T>> testMethod) {
 
         var storageRootResult = testMethod.apply(".");
 
         waitFor(TEST_TIMEOUT, storageRootResult);
 
+        // TODO: Should this be EStorageRequest?
         Assertions.assertThrows(ETracInternal.class, () -> result(storageRootResult));
     }
 
@@ -122,7 +225,7 @@ public class FileStorageTestSuite {
         // There are several illegal characters for filenames on Windows!
 
         var invalidPathResult = OS.WINDOWS.isCurrentOs()
-                ? testMethod.apply("£$ N'`¬$£>.)_£\"+%")
+                ? testMethod.apply("£$ N'`¬$£>.)_£\"+\n%")
                 : testMethod.apply("nul\0char");
 
         waitFor(TEST_TIMEOUT,
@@ -133,6 +236,31 @@ public class FileStorageTestSuite {
         Assertions.assertThrows(ETracInternal.class, () -> result(escapingPathResult));
         Assertions.assertThrows(ETracInternal.class, () -> result(absolutePathResult));
         Assertions.assertThrows(ETracInternal.class, () -> result(invalidPathResult));
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // HELPERS
+    // -----------------------------------------------------------------------------------------------------------------
+
+    private CompletableFuture<Long> makeFile(String storagePath, ByteBuf content) {
+
+        var signal = new CompletableFuture<Long>();
+        var writer = storage.writer(storagePath, signal, execContext);
+
+        Concurrent.javaStreamPublisher(Stream.of(content)).subscribe(writer);
+
+        return signal;
+    }
+
+    private CompletableFuture<Long> makeSmallFile(String storagePath) {
+
+        var content = ByteBufUtil.encodeString(
+                ByteBufAllocator.DEFAULT,
+                CharBuffer.wrap("Small file test content\n"),
+                StandardCharsets.UTF_8);
+
+        return makeFile(storagePath, content);
     }
 
     private static void waitFor(Duration timeout, CompletionStage<?>... tasks) {
@@ -184,21 +312,5 @@ public class FileStorageTestSuite {
             throw (cause instanceof Exception) ? (Exception) cause : e;
         }
     }
-
-    private CompletableFuture<Long> makeSmallFile(String storagePath) {
-
-        var content = ByteBufUtil.encodeString(
-                ByteBufAllocator.DEFAULT,
-                CharBuffer.wrap("Small file test content\n"),
-                StandardCharsets.UTF_8);
-
-        var signal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, signal, execContext);
-
-        Concurrent.javaStreamPublisher(Stream.of(content)).subscribe(writer);
-
-        return signal;
-    }
-
 
 }
