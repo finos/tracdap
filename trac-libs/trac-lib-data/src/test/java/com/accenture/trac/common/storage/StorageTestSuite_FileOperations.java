@@ -29,6 +29,7 @@ import io.netty.util.concurrent.UnorderedThreadPoolEventExecutor;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,6 +38,7 @@ import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.*;
@@ -199,9 +201,200 @@ public class StorageTestSuite_FileOperations {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Test
-    void testStat() {
+    void testStat_fileOk() throws Exception {
 
+        // Simple case - stat a file
+
+        var content = ByteBufUtil.encodeString(
+                ByteBufAllocator.DEFAULT,
+                CharBuffer.wrap("Sample content for stat call\n"),
+                StandardCharsets.UTF_8);
+
+        var expectedSize = content.readableBytes();
+        var prepare = storage
+                .mkdir("some_dir", false)
+                .thenCompose(x -> makeFile("some_dir/test_file.txt", content));
+
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var stat = storage.stat("some_dir/test_file.txt");
+        waitFor(TEST_TIMEOUT, stat);
+
+        var statResult = result(stat);
+
+        Assertions.assertEquals("some_dir/test_file.txt", statResult.storagePath);
+        Assertions.assertEquals("test_file.txt", statResult.fileName);
+        Assertions.assertEquals(FileType.FILE, statResult.fileType);
+        Assertions.assertEquals(expectedSize, statResult.size);
+    }
+
+    @Test
+    void testStat_fileCTime() throws Exception {
+
+        // For cloud storage buckets, it is likely that mtime is tracked but ctime is overwritten on updates
+        // In this case, storage implementations may return a null ctime
+        // If ctime is returned, then it must be valid
+
+        var testStart = Instant.now();
+
+        var prepare = makeSmallFile("test_file.txt");
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var stat = storage.stat("test_file.txt");
+        waitFor(TEST_TIMEOUT, stat);
+
+        var testFinish = Instant.now();
+
+        var statResult = result(stat);
+        Assertions.assertTrue(statResult.ctime == null || statResult.ctime.isAfter(testStart));
+        Assertions.assertTrue(statResult.ctime == null || statResult.ctime.isBefore(testFinish));
+    }
+
+    @Test
+    void testStat_fileMTime() throws Exception {
+
+        // All storage implementations must implement mtime for files
+
+        var testStart = Instant.now();
+
+        var prepare = makeSmallFile("test_file.txt");
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var stat = storage.stat("test_file.txt");
+        waitFor(TEST_TIMEOUT, stat);
+
+        var testFinish = Instant.now();
+
+        var statResult = result(stat);
+
+        Assertions.assertTrue(statResult.mtime.isAfter(testStart));
+        Assertions.assertTrue(statResult.mtime.isBefore(testFinish));
+    }
+
+    @Test
+    void testStat_fileATime() {
+
+        // For cloud storage implementations, file atime may not be available
+        // So, allow implementations to return a null atime
+        // If an atime is returned for files, then it must be valid
+
+        // TODO: requires file reader implementation
         Assertions.fail();
+    }
+
+    @Test
+    void testStat_dirOk() throws Exception {
+
+        var prepare = storage.mkdir("some_dir/test_dir", true);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var stat = storage.stat("some_dir/test_dir");
+        waitFor(TEST_TIMEOUT, stat);
+
+        var statResult = result(stat);
+
+        Assertions.assertEquals("some_dir/test_dir", statResult.storagePath);
+        Assertions.assertEquals("test_dir", statResult.fileName);
+        Assertions.assertEquals(FileType.DIRECTORY, statResult.fileType);
+
+        // Size field is not meaningful for directories, implementations should set it to either 0 or -1
+        Assertions.assertTrue(statResult.size <= 0);
+    }
+
+    @Test
+    void testStat_dirCTime() throws Exception {
+
+        // ctime, mtime and atime for dirs is unlikely to be supported in cloud storage buckets
+        // So, all of these fields are optional in stat responses for directories
+
+        var testStart = Instant.now();
+
+        var prepare = storage.mkdir("some_dir/test_dir", true);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var stat = storage.stat("some_dir/test_dir");
+        waitFor(TEST_TIMEOUT, stat);
+
+        var testFinish = Instant.now();
+
+        var statResult = result(stat);
+        Assertions.assertTrue(statResult.ctime == null || statResult.ctime.isAfter(testStart));
+        Assertions.assertTrue(statResult.ctime == null || statResult.ctime.isBefore(testFinish));
+    }
+
+    @Test
+    void testStat_dirMTime() throws Exception {
+
+        // ctime, mtime and atime for dirs is unlikely to be supported in cloud storage buckets
+        // So, all of these fields are optional in stat responses for directories
+
+        var prepare1 = storage.mkdir("some_dir/test_dir", true);
+        waitFor(TEST_TIMEOUT, prepare1);
+
+        // "Modify" the directory by adding a file to it
+
+        var testStart = Instant.now();
+
+        var prepare2 = makeSmallFile("some_dir/test_dir/a_file.txt");
+        waitFor(TEST_TIMEOUT, prepare2);
+
+        var stat = storage.stat("some_dir/test_dir");
+        waitFor(TEST_TIMEOUT, stat);
+
+        var testFinish = Instant.now();
+
+        var statResult = result(stat);
+        Assertions.assertTrue(statResult.mtime == null || statResult.mtime.isAfter(testStart));
+        Assertions.assertTrue(statResult.mtime == null || statResult.mtime.isBefore(testFinish));
+    }
+
+    @Test
+    void testStat_dirATime() throws Exception {
+
+        // ctime, mtime and atime for dirs is unlikely to be supported in cloud storage buckets
+        // So, all of these fields are optional in stat responses for directories
+
+        var prepare1 = storage
+                .mkdir("some_dir/test_dir", true)
+                .thenCompose(x -> makeSmallFile("some_dir/test_dir/a_file.txt"));
+        waitFor(TEST_TIMEOUT, prepare1);
+
+        // Access the directory by running "ls" on it
+
+        var testStart = Instant.now();
+
+        var prepare2 = storage.ls("some_dir/test_dir");
+        waitFor(TEST_TIMEOUT, prepare2);
+
+        var stat = storage.stat("some_dir/test_dir");
+        waitFor(TEST_TIMEOUT, stat);
+
+        var testFinish = Instant.now();
+
+        var statResult = result(stat);
+        Assertions.assertTrue(statResult.atime == null || statResult.atime.isAfter(testStart));
+        Assertions.assertTrue(statResult.atime == null || statResult.atime.isBefore(testFinish));
+    }
+
+    @Test
+    void testStat_missing() {
+
+        var stat = storage.stat("does_not_exist.dat");
+        waitFor(TEST_TIMEOUT, stat);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> result(stat));
+    }
+
+    @Test
+    void testStat_badPaths() {
+
+        testBadPaths(storage::stat);
+    }
+
+    @Test
+    void testStat_storageRoot() {
+
+        failForStorageRoot(storage::stat);
     }
 
 
