@@ -44,7 +44,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 
-public class FileStorageTestSuite {
+public class StorageTestSuite_FileOperations {
 
     /* >>> Generic tests for IFileStorage
 
