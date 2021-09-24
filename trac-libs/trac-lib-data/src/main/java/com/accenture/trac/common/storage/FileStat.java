@@ -22,12 +22,16 @@ import java.util.Optional;
 public class FileStat {
 
     public FileStat(
-            FileType fileType, long size,
+            String storagePath,
+            String fileName, FileType fileType, long size,
             Instant ctime, Instant mtime, Instant atime,
             Integer uid, Integer gid, Integer mode) {
 
+        this.storagePath = storagePath;
+        this.fileName = fileName;
         this.fileType = fileType;
         this.size = size;
+
         this.ctime = ctime;
         this.mtime = mtime;
         this.atime = atime;
@@ -36,6 +40,8 @@ public class FileStat {
         this.mode = Optional.ofNullable(mode);
     }
 
+    public final String storagePath;
+    public final String fileName;
     public final FileType fileType;
     public final long size;
 
