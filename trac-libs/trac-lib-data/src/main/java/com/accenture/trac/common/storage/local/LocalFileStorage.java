@@ -19,6 +19,7 @@ package com.accenture.trac.common.storage.local;
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.exception.*;
 import com.accenture.trac.common.storage.FileStat;
+import com.accenture.trac.common.storage.FileType;
 import com.accenture.trac.common.storage.IFileStorage;
 
 import io.netty.buffer.ByteBuf;
@@ -27,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +58,7 @@ public class LocalFileStorage implements IFileStorage {
             Map.entry(IOException.class, "An IO error occurred in the storage layer: %s %s [%s]"));
 
     private static final String SIZE_OF_DIR_ERROR = "Size operation is not available for directories: %s %s [%s]";
-
+    private static final String STAT_NOT_FILE_OR_DIR_ERROR = "Object is not a file or directory: %s %s [%s]";
     private static final String RM_DIR_RECURSIVE_ERROR =
             "Regular delete operation not available for directories (use recursive delete): %s %s [%s]";
 
@@ -137,7 +139,38 @@ public class LocalFileStorage implements IFileStorage {
     @Override
     public CompletionStage<FileStat> stat(String storagePath) {
 
-        throw new RuntimeException("Not implemented yet");
+        try {
+            var absolutePath = resolvePath(storagePath, false, STAT_OPERATION);
+
+            // FileStat does not currently include permissions
+            // If/when they are added, there are attribute view classes that do include them
+            // We'd need to check for Windows / Posix and choose an attribute view type accordingly
+
+            var attrViewType = BasicFileAttributeView.class;
+            var attrView = Files.getFileAttributeView(absolutePath, attrViewType);
+            var attrs = attrView.readAttributes();
+
+            if (!attrs.isRegularFile() && !attrs.isDirectory())
+                return errorResult(STAT_NOT_FILE_OR_DIR_ERROR, storagePath, STAT_OPERATION);
+
+            var fileName = absolutePath.getFileName().toString();
+            var fileType = attrs.isRegularFile() ? FileType.FILE : FileType.DIRECTORY;
+            var size = attrs.size();
+
+            var ctime = attrs.creationTime().toInstant();
+            var mtime = attrs.lastModifiedTime().toInstant();
+            var atime = attrs.lastAccessTime().toInstant();
+
+            var stat = new FileStat(
+                    storagePath, fileName, fileType, size,
+                    ctime, mtime, atime);
+
+            return CompletableFuture.completedFuture(stat);
+        }
+        catch (Exception e) {
+
+            return handleIOException(e, storagePath, STAT_OPERATION);
+        }
     }
 
     @Override

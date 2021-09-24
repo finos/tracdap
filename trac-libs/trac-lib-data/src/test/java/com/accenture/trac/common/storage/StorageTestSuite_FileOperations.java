@@ -237,11 +237,18 @@ public class StorageTestSuite_FileOperations {
 
         var testStart = Instant.now();
 
+        // For local storage, the test calls may complete faster than the resolution of the clock!
+        // So, sleep for 1 ms to let some time elapse
+
+        Thread.sleep(1);  // Let time elapse before/after the test calls
+
         var prepare = makeSmallFile("test_file.txt");
         waitFor(TEST_TIMEOUT, prepare);
 
         var stat = storage.stat("test_file.txt");
         waitFor(TEST_TIMEOUT, stat);
+
+        Thread.sleep(1);  // Let time elapse before/after the test calls
 
         var testFinish = Instant.now();
 
@@ -257,11 +264,15 @@ public class StorageTestSuite_FileOperations {
 
         var testStart = Instant.now();
 
+        Thread.sleep(1);  // Let time elapse before/after the test calls
+
         var prepare = makeSmallFile("test_file.txt");
         waitFor(TEST_TIMEOUT, prepare);
 
         var stat = storage.stat("test_file.txt");
         waitFor(TEST_TIMEOUT, stat);
+
+        Thread.sleep(1);  // Let time elapse before/after the test calls
 
         var testFinish = Instant.now();
 
@@ -309,11 +320,15 @@ public class StorageTestSuite_FileOperations {
 
         var testStart = Instant.now();
 
+        Thread.sleep(1);  // Let time elapse before/after the test calls
+
         var prepare = storage.mkdir("some_dir/test_dir", true);
         waitFor(TEST_TIMEOUT, prepare);
 
         var stat = storage.stat("some_dir/test_dir");
         waitFor(TEST_TIMEOUT, stat);
+
+        Thread.sleep(1);  // Let time elapse before/after the test calls
 
         var testFinish = Instant.now();
 
@@ -335,11 +350,15 @@ public class StorageTestSuite_FileOperations {
 
         var testStart = Instant.now();
 
+        Thread.sleep(1);  // Let time elapse before/after the test calls
+
         var prepare2 = makeSmallFile("some_dir/test_dir/a_file.txt");
         waitFor(TEST_TIMEOUT, prepare2);
 
         var stat = storage.stat("some_dir/test_dir");
         waitFor(TEST_TIMEOUT, stat);
+
+        Thread.sleep(1);  // Let time elapse before/after the test calls
 
         var testFinish = Instant.now();
 
@@ -363,11 +382,15 @@ public class StorageTestSuite_FileOperations {
 
         var testStart = Instant.now();
 
+        Thread.sleep(1);  // Let time elapse before/after the test calls
+
         var prepare2 = storage.ls("some_dir/test_dir");
         waitFor(TEST_TIMEOUT, prepare2);
 
         var stat = storage.stat("some_dir/test_dir");
         waitFor(TEST_TIMEOUT, stat);
+
+        Thread.sleep(1);  // Let time elapse before/after the test calls
 
         var testFinish = Instant.now();
 
