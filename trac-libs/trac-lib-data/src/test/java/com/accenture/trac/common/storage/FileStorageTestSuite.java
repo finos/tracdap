@@ -221,9 +221,145 @@ public class FileStorageTestSuite {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Test
-    void testMkdir() {
+    void testMkdir_ok() throws Exception {
 
-        Assertions.fail();
+        // Simplest case - create a single directory
+
+        var mkdir = storage.mkdir("test_dir", false);
+        waitFor(TEST_TIMEOUT, mkdir);
+
+        Assertions.assertDoesNotThrow(() -> result(mkdir));
+
+        // Creating a single child dir when the parent already exists
+
+        var childDir = storage.mkdir("test_dir/child", false);
+        waitFor(TEST_TIMEOUT, childDir);
+
+        Assertions.assertDoesNotThrow(() -> result(childDir));
+
+        var dirExists = storage.exists("test_dir");
+        var childExists = storage.exists("test_dir/child");
+        waitFor(TEST_TIMEOUT, dirExists, childExists);
+
+        Assertions.assertTrue(result(dirExists));
+        Assertions.assertTrue(result(childExists));
+    }
+
+    @Test
+    void testMkdir_dirExists() {
+
+        // mkdir with recursive = false should throw EStorageRequest if dir already exists
+
+        var prepare = storage.mkdir("test_dir", false);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var mkdir = storage.mkdir("test_dir", false);
+        waitFor(TEST_TIMEOUT, mkdir);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> result(mkdir));
+    }
+
+    @Test
+    void testMkdir_fileExists() {
+
+        // mkdir should always fail if requested dir already exists and is a file
+
+        var prepare = makeSmallFile("test_dir");
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var mkdir = storage.mkdir("test_dir", false);
+        waitFor(TEST_TIMEOUT, mkdir);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> result(mkdir));
+    }
+
+    @Test
+    void testMkdir_missingParent() throws Exception {
+
+        // With recursive = false, mkdir with a missing parent should fail
+        // Neither parent nor child dir should be created
+
+        var childDir = storage.mkdir("test_dir/child", false);
+        waitFor(TEST_TIMEOUT, childDir);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> result(childDir));
+
+        var dirExists = storage.exists("test_dir");
+        var childExists = storage.exists("test_dir/child");
+        waitFor(TEST_TIMEOUT, dirExists, childExists);
+
+        Assertions.assertFalse(result(dirExists));
+        Assertions.assertFalse(result(childExists));
+    }
+
+    @Test
+    void testMkdir_recursiveOk() throws Exception {
+
+        // mkdir, recursive = true, create parent and child dir in a single call
+
+        var mkdir = storage.mkdir("test_dir/child", true);
+        waitFor(TEST_TIMEOUT, mkdir);
+
+        Assertions.assertDoesNotThrow(() -> result(mkdir));
+
+        var dirExists = storage.exists("test_dir");
+        var childExists = storage.exists("test_dir/child");
+        waitFor(TEST_TIMEOUT, dirExists, childExists);
+
+        Assertions.assertTrue(result(dirExists));
+        Assertions.assertTrue(result(childExists));
+    }
+
+    @Test
+    void testMkdir_recursiveDirExists() throws Exception {
+
+        // mkdir, when recursive = true it is not an error if the target dir already exists
+
+        var prepare = storage.mkdir("test_dir/child", true);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var mkdir = storage.mkdir("test_dir/child", true);
+        waitFor(TEST_TIMEOUT, mkdir);
+
+        Assertions.assertDoesNotThrow(() -> result(mkdir));
+
+        var dirExists = storage.exists("test_dir");
+        var childExists = storage.exists("test_dir/child");
+        waitFor(TEST_TIMEOUT, dirExists, childExists);
+
+        Assertions.assertTrue(result(dirExists));
+        Assertions.assertTrue(result(childExists));
+    }
+
+    @Test
+    void testMkdir_recursiveFileExists() {
+
+        // mkdir should always fail if requested dir already exists and is a file
+
+        var prepare = storage
+                .mkdir("test_dir", false)
+                .thenCompose(x -> makeSmallFile("test_dir/child"));
+
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var mkdir = storage.mkdir("test_dir/child", false);
+        waitFor(TEST_TIMEOUT, mkdir);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> result(mkdir));
+    }
+
+    @Test
+    void testMkdir_badPaths() {
+
+        testBadPaths(storagePath -> storage.mkdir(storagePath, false));
+        testBadPaths(storagePath -> storage.mkdir(storagePath, true));
+    }
+
+    @Test
+    void testMkdir_storageRoot() {
+
+        failForStorageRoot(storagePath -> storage.mkdir(storagePath, false));
+        failForStorageRoot(storagePath -> storage.mkdir(storagePath, true));
     }
 
 
