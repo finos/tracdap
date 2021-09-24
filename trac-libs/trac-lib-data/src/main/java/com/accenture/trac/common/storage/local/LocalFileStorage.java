@@ -25,9 +25,11 @@ import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
@@ -43,6 +45,22 @@ public class LocalFileStorage implements IFileStorage {
     protected static final String RM_OPERATION = "rm";
     protected static final String WRITE_OPERATION = "write";
     protected static final String READ_OPERATION = "read";
+
+    private static final List<Map.Entry<Class<? extends Exception>, String>> ERROR_MAP = List.of(
+            Map.entry(NoSuchFileException.class, "File not found in storage layer: %s %s [%s]"),
+            Map.entry(FileAlreadyExistsException.class, "File already exists in storage layer: %s %s [%s]"),
+            Map.entry(DirectoryNotEmptyException.class, "Directory is not empty in storage layer: %s %s [%s]"),
+            Map.entry(AccessDeniedException.class, "Access denied in storage layer: %s %s [%s]"),
+            Map.entry(SecurityException.class, "Access denied in storage layer: %s %s [%s]"),
+            // IOException must be last in the list, not to obscure most specific exceptions
+            Map.entry(IOException.class, "An IO error occurred in the storage layer: %s %s [%s]"));
+
+    private static final String SIZE_OF_DIR_ERROR = "Size operation is not available for directories: %s %s [%s]";
+
+    private static final String RM_DIR_RECURSIVE_ERROR =
+            "Regular delete operation not available for directories (use recursive delete): %s %s [%s]";
+
+    private static final String UNKNOWN_ERROR = "An unexpected error occurred in the storage layer: %s %s [%s]";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -105,15 +123,8 @@ public class LocalFileStorage implements IFileStorage {
 
             // Size operation for non-regular files can still succeed
             // So, add an explicit check for directories (and other non-regular files)
-            if (!Files.isRegularFile(absolutePath)) {
-
-                var err = String.format(
-                        "Requested storage path is not a regular file: %s %s [%s]",
-                        storageKey, SIZE_OPERATION, storagePath);
-
-                log.error(err);
-                throw new EStorageRequest(err);
-            }
+            if (!Files.isRegularFile(absolutePath))
+                return errorResult(SIZE_OF_DIR_ERROR, storagePath, SIZE_OPERATION);
 
             return CompletableFuture.completedFuture(size);
         }
@@ -159,7 +170,48 @@ public class LocalFileStorage implements IFileStorage {
     @Override
     public CompletionStage<Void> rm(String storagePath, boolean recursive) {
 
-        throw new RuntimeException("Not implemented yet");
+        try {
+            var absolutePath = resolvePath(storagePath, false, RM_OPERATION);
+
+            if (recursive) {
+
+                Files.walkFileTree(absolutePath, new SimpleFileVisitor<>() {
+
+                    @Override
+                    public FileVisitResult visitFile(
+                            Path file,
+                            BasicFileAttributes attrs) throws IOException {
+
+                        Files.delete(file);
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult postVisitDirectory(
+                            Path dir, IOException exc) throws IOException {
+
+                        if (exc != null) throw exc;
+
+                        Files.delete(dir);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+            }
+            else {
+
+                // Do not allow rm on a directory with the recursive flag set
+                if (Files.isDirectory(absolutePath))
+                    return errorResult(RM_DIR_RECURSIVE_ERROR, storagePath, RM_OPERATION);
+
+                Files.delete(absolutePath);
+            }
+
+            return CompletableFuture.completedFuture(null);
+        }
+        catch (Exception e) {
+
+            return handleIOException(e, storagePath, RM_OPERATION);
+        }
     }
 
     @Override
@@ -243,65 +295,42 @@ public class LocalFileStorage implements IFileStorage {
 
     private <T> CompletableFuture<T> handleIOException(Exception e, String storagePath, String operationName) {
 
+        // Error of type ETrac means the error is already handled
         if (e instanceof ETrac)
             return CompletableFuture.failedFuture(e);
 
-        if (e instanceof NoSuchFileException) {
+        // Look in the map of error types to see if e is an expected exception
+        for (var error : ERROR_MAP) {
 
-            var err = String.format(
-                    "File not found in storage layer: %s %s [%s]",
-                    storageKey, operationName, storagePath);
+            var errorClass = error.getKey();
 
-            log.error(err);
-            log.error(e.getMessage(), e);
+            if (errorClass.isInstance(e)) {
 
-            return CompletableFuture.failedFuture(new EStorageRequest(err, e));
+                var errorMessageTemplate = error.getValue();
+                return errorResult(e, errorMessageTemplate, storagePath, operationName);
+            }
         }
 
-        if (e instanceof FileAlreadyExistsException) {
-
-            var err = String.format(
-                    "File already exists in storage layer: %s %s [%s]",
-                    storageKey, operationName, storagePath);
-
-            log.error(err);
-            log.error(e.getMessage(), e);
-
-            return CompletableFuture.failedFuture(new EStorageRequest(err, e));
-        }
-
-        if (e instanceof AccessDeniedException || e instanceof SecurityException) {
-
-            var err = String.format(
-                    "Access denied in storage layer: %s %s [%s]",
-                    storageKey, operationName, storagePath);
-
-            log.error(err);
-            log.error(e.getMessage(), e);
-
-            return CompletableFuture.failedFuture(new EStorageAccess(err, e));
-        }
-
-        if (e instanceof IOException) {
-
-            var err = String.format(
-                    "An IO error occurred in the storage layer: %s %s [%s]",
-                    storageKey, operationName, storagePath);
-
-            log.error(err);
-            log.error(e.getMessage(), e);
-
-            return CompletableFuture.failedFuture(new EStorageCommunication(err, e));
-        }
-
-        var err = String.format(
-                "An unexpected error occurred in the storage layer: %s %s [%s]",
-                storageKey, operationName, storagePath);
-
-        log.error(err);
-        log.error(e.getMessage(), e);
-
-        return CompletableFuture.failedFuture(new ETracInternal(err, e));
+        // Last fallback - report an unknown error in the storage layer
+        return errorResult(e, UNKNOWN_ERROR, storagePath, operationName);
     }
 
+    private <T> CompletableFuture<T> errorResult(Exception e, String errorTemplate, String path, String operation) {
+
+        var errorMessage = String.format(errorTemplate, storageKey, operation, path);
+
+        log.error(errorMessage);
+        log.error(e.getMessage(), e);
+
+        return CompletableFuture.failedFuture(new EStorageRequest(errorMessage, e));
+    }
+
+    private <T> CompletableFuture<T> errorResult(String errorTemplate, String path, String operation) {
+
+        var errorMessage = String.format(errorTemplate, storageKey, operation, path);
+
+        log.error(errorMessage);
+
+        return CompletableFuture.failedFuture(new EStorageRequest(errorMessage));
+    }
 }
