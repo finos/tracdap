@@ -24,8 +24,7 @@ public class FileStat {
     public FileStat(
             String storagePath,
             String fileName, FileType fileType, long size,
-            Instant ctime, Instant mtime, Instant atime,
-            Integer uid, Integer gid, Integer mode) {
+            Instant ctime, Instant mtime, Instant atime) {
 
         this.storagePath = storagePath;
         this.fileName = fileName;
@@ -35,9 +34,6 @@ public class FileStat {
         this.ctime = ctime;
         this.mtime = mtime;
         this.atime = atime;
-        this.uid = Optional.ofNullable(uid);
-        this.gid = Optional.ofNullable(gid);
-        this.mode = Optional.ofNullable(mode);
     }
 
     public final String storagePath;
@@ -48,8 +44,4 @@ public class FileStat {
     public final Instant ctime;
     public final Instant mtime;
     public final Instant atime;
-
-    public final Optional<Integer> uid;
-    public final Optional<Integer> gid;
-    public final Optional<Integer> mode;
 }
