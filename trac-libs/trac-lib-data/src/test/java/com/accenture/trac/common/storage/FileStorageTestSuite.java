@@ -368,9 +368,138 @@ public class FileStorageTestSuite {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Test
-    void testRm() {
+    void testRm_ok() throws Exception {
 
-        Assertions.fail();
+        // Simplest case - create one file and delete it
+
+        var prepare = makeSmallFile("test_file.txt");
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var rm = storage.rm("test_file.txt", false);
+        waitFor(TEST_TIMEOUT, rm);
+
+        Assertions.assertDoesNotThrow(() -> result(rm));
+
+        // File should be gone
+
+        var exists = storage.exists("test_file.txt");
+        waitFor(TEST_TIMEOUT, exists);
+        Assertions.assertFalse(result(exists));
+    }
+
+    @Test
+    void testRm_dir() throws Exception {
+
+        // Calling rm on a directory with recursive = false is a bad request, even if the dir is empty
+
+        var prepare = storage.mkdir("test_dir", false);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var rm = storage.rm("test_dir", false);
+        waitFor(TEST_TIMEOUT, rm);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> result(rm));
+
+        // Dir should still exist because rm has failed
+
+        var exists = storage.exists("test_dir");
+        waitFor(TEST_TIMEOUT, exists);
+        Assertions.assertTrue(result(exists));
+    }
+
+    @Test
+    void testRm_missing() {
+
+        // Try to delete a path that does not exist
+
+        var rm = storage.rm("missing_path", false);
+        waitFor(TEST_TIMEOUT, rm);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> result(rm));
+    }
+
+    @Test
+    void testRm_recursive() throws Exception {
+
+        // Delete one whole dir tree
+        // Sibling dir tree should be unaffected
+
+        var prepare = storage
+                .mkdir("test_dir/child_1", true)
+                .thenCompose(x -> makeSmallFile("test_dir/child_1/file_a.txt"))
+                .thenCompose(x -> makeSmallFile("test_dir/child_1/file_b.txt"))
+                .thenCompose(x -> storage.mkdir("test_dir/child_2", true))
+                .thenCompose(x -> makeSmallFile("test_dir/child_2/file_a.txt"));
+
+        waitFor(TEST_TIMEOUT.multipliedBy(2), prepare);  // Allow extra time for multiple operations
+
+        var rm = storage.rm("test_dir/child_1", true);
+        waitFor(TEST_TIMEOUT, rm);
+
+        Assertions.assertDoesNotThrow(() -> result(rm));
+
+        var exists1 = storage.exists("test_dir/child_1");
+        var exists2 = storage.exists("test_dir/child_2");
+        var size2a = storage.size("test_dir/child_2/file_a.txt");
+        waitFor(TEST_TIMEOUT, exists1, exists2, size2a);
+
+        Assertions.assertFalse(result(exists1));
+        Assertions.assertTrue(result(exists2));
+        Assertions.assertTrue(result(size2a) > 0);
+    }
+
+    @Test
+    void testRm_recursiveFile() throws Exception {
+
+        // Calling rm for a single file with recursive = true is not an error
+        // The recursive delete should just remove that individual file
+
+        var prepare = storage
+                .mkdir("test_dir", false)
+                .thenCompose(x -> makeSmallFile("test_dir/file_a.txt"))
+                .thenCompose(x -> makeSmallFile("test_dir/file_b.txt"));
+
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var rm = storage.rm("test_dir/file_a.txt", true);
+        waitFor(TEST_TIMEOUT, rm);
+
+        Assertions.assertDoesNotThrow(() -> result(rm));
+
+        var existsA = storage.exists("test_dir/file_a.txt");
+        var existsB = storage.exists("test_dir/file_b.txt");
+        waitFor(TEST_TIMEOUT, existsA, existsB);
+
+        Assertions.assertFalse(result(existsA));
+        Assertions.assertTrue(result(existsB));
+    }
+
+    @Test
+    void testRm_recursiveMissing() {
+
+        // Try to delete a path that does not exist, should fail regardless of recursive = true
+
+        var prepare = storage.mkdir("test_dir", false);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var rm = storage.rm("test_dir/child", true);
+        waitFor(TEST_TIMEOUT, rm);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> result(rm));
+    }
+
+    @Test
+    void testRm_badPaths() {
+
+        testBadPaths(storagePath -> storage.rm(storagePath, false));
+        testBadPaths(storagePath -> storage.rm(storagePath, true));
+    }
+
+    @Test
+    void testRm_storageRoot() {
+
+        failForStorageRoot(storagePath -> storage.rm(storagePath, false));
+        failForStorageRoot(storagePath -> storage.rm(storagePath, true));
     }
 
 
