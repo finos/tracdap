@@ -36,9 +36,12 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.stream.Collectors;
 
 
 public class LocalFileStorage implements IFileStorage {
+
+    protected static final String BACKSLASH = "/";
 
     protected static final String EXISTS_OPERATION = "exists";
     protected static final String SIZE_OPERATION = "size";
@@ -112,7 +115,8 @@ public class LocalFileStorage implements IFileStorage {
         }
         catch (Exception e) {
 
-            return handleIOException(e, EXISTS_OPERATION, storagePath);
+            var eStorage = handleIOException(e, EXISTS_OPERATION, storagePath);
+            return CompletableFuture.failedFuture(eStorage);
         }
     }
 
@@ -127,13 +131,14 @@ public class LocalFileStorage implements IFileStorage {
             // Size operation for non-regular files can still succeed
             // So, add an explicit check for directories (and other non-regular files)
             if (!Files.isRegularFile(absolutePath))
-                return errorResult(SIZE_OF_DIR_ERROR, storagePath, SIZE_OPERATION);
+                throw errorResult(SIZE_OF_DIR_ERROR, storagePath, SIZE_OPERATION);
 
             return CompletableFuture.completedFuture(size);
         }
         catch (Exception e) {
 
-            return handleIOException(e, storagePath, SIZE_OPERATION);
+            var eStorage = handleIOException(e, storagePath, SIZE_OPERATION);
+            return CompletableFuture.failedFuture(eStorage);
         }
     }
 
@@ -142,17 +147,60 @@ public class LocalFileStorage implements IFileStorage {
 
         try {
             var absolutePath = resolvePath(storagePath, false, STAT_OPERATION);
+            var fileStat = buildFileStat(absolutePath, storagePath, STAT_OPERATION);
 
-            // FileStat does not currently include permissions
-            // If/when they are added, there are attribute view classes that do include them
-            // We'd need to check for Windows / Posix and choose an attribute view type accordingly
+            return CompletableFuture.completedFuture(fileStat);
+        }
+        catch (Exception e) {
+
+            var eStorage = handleIOException(e, storagePath, STAT_OPERATION);
+            return CompletableFuture.failedFuture(eStorage);
+        }
+    }
+
+    @Override
+    public CompletionStage<DirStat> ls(String storagePath) {
+
+        try {
+            var absolutePath = resolvePath(storagePath, true, LS_OPERATION);
+
+            try (var paths = Files.list(absolutePath)) {
+
+                var entries = paths
+                        .map(p -> buildFileStat(p, rootPath.relativize(p).toString(), LS_OPERATION))
+                        .collect(Collectors.toList());
+
+                var dirStat = new DirStat(entries);
+
+                return CompletableFuture.completedFuture(dirStat);
+            }
+        }
+        catch (Exception e) {
+
+            var eStorage = handleIOException(e, storagePath, LS_OPERATION);
+            return CompletableFuture.failedFuture(eStorage);
+        }
+    }
+
+    private FileStat buildFileStat(Path absolutePath, String storagePath, String operationName) {
+
+        // FileStat does not currently include permissions
+        // If/when they are added, there are attribute view classes that do include them
+        // We'd need to check for Windows / Posix and choose an attribute view type accordingly
+
+        try {
+
+            var separator = FileSystems.getDefault().getSeparator();
+            var storagePathWithBackslash = separator.equals(BACKSLASH)
+                    ? storagePath
+                    : storagePath.replace(separator, BACKSLASH);
 
             var attrViewType = BasicFileAttributeView.class;
             var attrView = Files.getFileAttributeView(absolutePath, attrViewType);
             var attrs = attrView.readAttributes();
 
             if (!attrs.isRegularFile() && !attrs.isDirectory())
-                return errorResult(STAT_NOT_FILE_OR_DIR_ERROR, storagePath, STAT_OPERATION);
+                throw errorResult(STAT_NOT_FILE_OR_DIR_ERROR, storagePath, STAT_OPERATION);
 
             var fileName = absolutePath.getFileName().toString();
             var fileType = attrs.isRegularFile() ? FileType.FILE : FileType.DIRECTORY;
@@ -162,24 +210,15 @@ public class LocalFileStorage implements IFileStorage {
             var mtime = attrs.lastModifiedTime().toInstant();
             var atime = attrs.lastAccessTime().toInstant();
 
-            var stat = new FileStat(
-                    storagePath, fileName, fileType, size,
+            return new FileStat(
+                    storagePathWithBackslash,
+                    fileName, fileType, size,
                     ctime, mtime, atime);
-
-            return CompletableFuture.completedFuture(stat);
         }
-        catch (Exception e) {
+        catch (IOException e) {
 
-            return handleIOException(e, storagePath, STAT_OPERATION);
+            throw handleIOException(e, storagePath, operationName);
         }
-    }
-
-    @Override
-    public CompletionStage<DirStat> ls(String storagePath) {
-
-        var absolutePath = resolvePath(storagePath, true,  LS_OPERATION);
-
-        throw new RuntimeException("Not implemented yet");
     }
 
     @Override
@@ -197,7 +236,8 @@ public class LocalFileStorage implements IFileStorage {
         }
         catch (Exception e) {
 
-            return handleIOException(e, storagePath, MKDIR_OPERATION);
+            var eStorage = handleIOException(e, storagePath, MKDIR_OPERATION);
+            return CompletableFuture.failedFuture(eStorage);
         }
     }
 
@@ -235,7 +275,7 @@ public class LocalFileStorage implements IFileStorage {
 
                 // Do not allow rm on a directory with the recursive flag set
                 if (Files.isDirectory(absolutePath))
-                    return errorResult(RM_DIR_RECURSIVE_ERROR, storagePath, RM_OPERATION);
+                    throw errorResult(RM_DIR_RECURSIVE_ERROR, storagePath, RM_OPERATION);
 
                 Files.delete(absolutePath);
             }
@@ -244,7 +284,8 @@ public class LocalFileStorage implements IFileStorage {
         }
         catch (Exception e) {
 
-            return handleIOException(e, storagePath, RM_OPERATION);
+            var eStorage = handleIOException(e, storagePath, RM_OPERATION);
+            return CompletableFuture.failedFuture(eStorage);
         }
     }
 
@@ -327,11 +368,11 @@ public class LocalFileStorage implements IFileStorage {
         }
     }
 
-    private <T> CompletableFuture<T> handleIOException(Exception e, String storagePath, String operationName) {
+    private ETrac handleIOException(Exception e, String storagePath, String operationName) {
 
         // Error of type ETrac means the error is already handled
         if (e instanceof ETrac)
-            return CompletableFuture.failedFuture(e);
+            return (ETrac) e;
 
         // Look in the map of error types to see if e is an expected exception
         for (var error : ERROR_MAP) {
@@ -349,22 +390,22 @@ public class LocalFileStorage implements IFileStorage {
         return errorResult(e, UNKNOWN_ERROR, storagePath, operationName);
     }
 
-    private <T> CompletableFuture<T> errorResult(Exception e, String errorTemplate, String path, String operation) {
+    private EStorage errorResult(Exception e, String errorTemplate, String path, String operation) {
 
         var errorMessage = String.format(errorTemplate, storageKey, operation, path);
 
         log.error(errorMessage);
         log.error(e.getMessage(), e);
 
-        return CompletableFuture.failedFuture(new EStorageRequest(errorMessage, e));
+        return new EStorageRequest(errorMessage, e);
     }
 
-    private <T> CompletableFuture<T> errorResult(String errorTemplate, String path, String operation) {
+    private EStorage errorResult(String errorTemplate, String path, String operation) {
 
         var errorMessage = String.format(errorTemplate, storageKey, operation, path);
 
         log.error(errorMessage);
 
-        return CompletableFuture.failedFuture(new EStorageRequest(errorMessage));
+        return new EStorageRequest(errorMessage);
     }
 }
