@@ -24,6 +24,7 @@ import com.accenture.trac.common.storage.FileType;
 import com.accenture.trac.common.storage.IFileStorage;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -291,7 +292,12 @@ public class LocalFileStorage implements IFileStorage {
 
     @Override
     public Flow.Publisher<ByteBuf> reader(String storagePath, IExecutionContext execContext) {
-        return null;
+
+        var absolutePath = resolvePath(storagePath, false, WRITE_OPERATION);
+
+        return new LocalFileReader(
+                absolutePath, ByteBufAllocator.DEFAULT,
+                execContext.eventLoopExecutor());
     }
 
     @Override
@@ -302,7 +308,9 @@ public class LocalFileStorage implements IFileStorage {
 
         var absolutePath = resolvePath(storagePath, false, WRITE_OPERATION);
 
-        return new LocalFileWriter(absolutePath, signal, execContext.eventLoopExecutor());
+        return new LocalFileWriter(
+                absolutePath, signal,
+                execContext.eventLoopExecutor());
     }
 
     private Path resolvePath(String storagePath, boolean allowRootDir, String operationName) {
