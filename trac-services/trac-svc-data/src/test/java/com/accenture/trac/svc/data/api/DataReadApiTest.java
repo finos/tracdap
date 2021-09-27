@@ -114,7 +114,7 @@ public class DataReadApiTest {
         var message = DataWriteRequest.newBuilder().setContent(content).build();
 
         var messages = Stream.of(message);
-        var requestStream = Concurrent.javaStreamPublisher(messages);
+        var requestStream = Concurrent.publish(messages);
         var response = new CompletableFuture<DataWriteResponse>();
 
         var responseGrpc = GrpcStreams.resultObserver(response);

@@ -41,7 +41,7 @@ public class StorageTestHelpers {
         var signal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, signal, execContext);
 
-        Concurrent.javaStreamPublisher(Stream.of(content)).subscribe(writer);
+        Concurrent.publish(Stream.of(content)).subscribe(writer);
 
         return signal;
     }

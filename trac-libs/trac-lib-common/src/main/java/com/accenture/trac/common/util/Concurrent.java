@@ -17,10 +17,10 @@
 package com.accenture.trac.common.util;
 
 import com.accenture.trac.common.exception.ETracInternal;
-import com.accenture.trac.common.exception.EUnexpected;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -29,102 +29,42 @@ import java.util.stream.Stream;
 public class Concurrent {
 
     public static <T>
-    Flow.Publisher<T> javaStreamPublisher(Stream<T> source) {
+    Flow.Publisher<T> publish(List<T> source) {
 
-        return new Flow.Publisher<>() {
+        return new SourcePublisher<>(source);
+    }
 
-            private final Iterator<T> sourceItr = source.iterator();
-            private boolean completeSent = false;
+    public static <T>
+    Flow.Publisher<T> publish(Stream<T> source) {
 
-            @Override
-            public void subscribe(Flow.Subscriber<? super T> subscriber) {
-
-                var subscription = new Flow.Subscription() {
-
-                    @Override
-                    public void request(long n) {
-
-                        for (int i = 0; i < n && sourceItr.hasNext(); i++)
-                            subscriber.onNext(sourceItr.next());
-
-                        if (!sourceItr.hasNext() && !completeSent) {
-                            subscriber.onComplete();
-                            completeSent = true;
-                        }
-                    }
-
-                    @Override
-                    public void cancel() {
-                        // pass
-                    }
-                };
-
-                subscriber.onSubscribe(subscription);
-            }
-        };
+        return new SourcePublisher<>(source);
     }
 
     public static <T, U>
     Flow.Publisher<U> map(Flow.Publisher<T> source, Function<T, U> mapping) {
 
-        return new Flow.Processor<T, U>() {
-
-            private Flow.Subscriber<? super U> subscriber = null;
-            private Flow.Subscription sourceSubscription = null;
-
-            @Override
-            public void subscribe(Flow.Subscriber<? super U> subscriber) {
-
-                source.subscribe(this);
-
-                var targetSubscription = new Flow.Subscription() {
-
-                    @Override
-                    public void request(long n) {
-                        sourceSubscription.request(n);
-                    }
-
-                    @Override
-                    public void cancel() {
-                        sourceSubscription.cancel();
-                    }
-                };
-
-                this.subscriber = subscriber;
-                subscriber.onSubscribe(targetSubscription);
-            }
-
-            @Override
-            public void onSubscribe(Flow.Subscription subscription) {
-                this.sourceSubscription = subscription;
-            }
-
-            @Override
-            public void onNext(T item) {
-
-                try {
-                    var mappedItem = mapping.apply(item);
-                    subscriber.onNext(mappedItem);
-                }
-                catch (Throwable e) {
-                    subscriber.onError(e);
-                }
-            }
-
-            @Override
-            public void onError(Throwable throwable) {
-
-                sourceSubscription.cancel();
-                subscriber.onError(throwable);
-            }
-
-            @Override
-            public void onComplete() {
-                subscriber.onComplete();
-            }
-        };
+        return new MapProcessor<>(source, mapping);
     }
 
+    public static <T>
+    CompletionStage<T> reduce(Flow.Publisher<T> source, BiFunction<T, T, T> func) {
+
+        var result = new CompletableFuture<T>();
+        var reduce = new ReduceProcessor<>(func, result, Function.identity());
+        source.subscribe(reduce);
+
+        return result;
+    }
+
+    public static<T, U>
+    CompletionStage<U> fold(Flow.Publisher<T> source, BiFunction<U, T, U> func, U acc) {
+
+        var result = new CompletableFuture<U>();
+        var fold = new ReduceProcessor<>(func, result, acc);
+        source.subscribe(fold);
+
+        return result;
+    }
 
     public static <T>
     Flow.Processor<T, T> hub() {
@@ -142,6 +82,210 @@ public class Concurrent {
 
         return firstFuture;
     }
+
+    public static <T>
+    CompletionStage<List<T>> toList(Flow.Publisher<T> source) {
+
+        return fold(source, (xs, x) -> {xs.add(x); return xs;}, new ArrayList<>());
+    }
+
+    public static <T>
+    Flow.Publisher<T> publishOn(Flow.Publisher<T> publisher, ExecutorService executor) {
+
+        var relay = new EventLoopProcessor<T>(executor);
+        publisher.subscribe(relay);
+
+        return relay;
+    }
+
+
+    public static class SourcePublisher<T> implements Flow.Publisher<T> {
+
+        private final Iterator<T> source;
+        private final AutoCloseable closeable;
+        private boolean done = false;
+
+        public SourcePublisher(Iterable<T> source) {
+            this.source = source.iterator();
+            this.closeable = null;
+        }
+
+        public SourcePublisher(Stream<T> source) {
+            this.source = source.iterator();
+            this.closeable = source;
+        }
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super T> subscriber) {
+
+            var subscription = new Flow.Subscription() {
+
+                @Override
+                public void request(long n) {
+
+                    try {
+
+                        for (int i = 0; i < n && source.hasNext(); i++)
+                            subscriber.onNext(source.next());
+
+                        if (!source.hasNext() && !done) {
+                            subscriber.onComplete();
+                            done = true;
+                        }
+                    }
+                    catch (Exception e) {
+                        subscriber.onError(e);
+                        done = true;
+                    }
+                }
+
+                @Override
+                public void cancel() {
+
+                    if (closeable != null) try {
+                        closeable.close();
+                    }
+                    catch (Exception e) {
+                        throw new ETracInternal(e.getMessage(), e);
+                    }
+                }
+            };
+
+            subscriber.onSubscribe(subscription);
+        }
+    }
+
+
+
+    public static class MapProcessor<T, U> implements Flow.Processor<T, U> {
+
+        private final Flow.Publisher<T> source;
+        private final Function<T, U> mapping;
+
+        private Flow.Subscriber<? super U> subscriber = null;
+        private Flow.Subscription sourceSubscription = null;
+
+        public MapProcessor(Flow.Publisher<T> source, Function<T, U> mapping) {
+            this.source = source;
+            this.mapping = mapping;
+        }
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super U> subscriber) {
+
+            source.subscribe(this);
+
+            var targetSubscription = new Flow.Subscription() {
+
+                @Override
+                public void request(long n) {
+                    sourceSubscription.request(n);
+                }
+
+                @Override
+                public void cancel() {
+                    sourceSubscription.cancel();
+                }
+            };
+
+            this.subscriber = subscriber;
+            subscriber.onSubscribe(targetSubscription);
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            this.sourceSubscription = subscription;
+        }
+
+        @Override
+        public void onNext(T item) {
+
+            try {
+                var mappedItem = mapping.apply(item);
+                subscriber.onNext(mappedItem);
+            }
+            catch (Throwable e) {
+                subscriber.onError(e);
+            }
+        }
+
+        @Override
+        public void onError(Throwable throwable) {
+
+            sourceSubscription.cancel();
+            subscriber.onError(throwable);
+        }
+
+        @Override
+        public void onComplete() {
+            subscriber.onComplete();
+        }
+    }
+
+
+    public static class ReduceProcessor<T, U> implements Flow.Subscriber<T> {
+
+        private final BiFunction<U, T, U> func;
+        private final CompletableFuture<U> result;
+
+        private Flow.Subscription subscription;
+        private Function<T, U> initFunc;
+        private U acc;
+
+        public ReduceProcessor(
+                BiFunction<U, T, U> func,
+                CompletableFuture<U> result,
+                U acc) {
+
+            this.func = func;
+            this.result = result;
+
+            this.initFunc = null;
+            this.acc = acc;
+        }
+
+        public ReduceProcessor(
+                BiFunction<U, T, U> func,
+                CompletableFuture<U> result,
+                Function<T, U> initFunc) {
+
+            this.func = func;
+            this.result = result;
+
+            this.initFunc = initFunc;
+            this.acc = null;
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            this.subscription = subscription;
+            subscription.request(1);
+        }
+
+        @Override
+        public void onNext(T x) {
+
+            if (initFunc != null) {
+                acc = initFunc.apply(x);
+                initFunc = null;
+            }
+            else
+                acc = func.apply(acc, x);
+
+            subscription.request(1);
+        }
+
+        @Override
+        public void onError(Throwable error) {
+            result.completeExceptionally(error);
+        }
+
+        @Override
+        public void onComplete() {
+            result.complete(acc);
+        }
+    }
+
 
     public static class FirstFutureSubscriber<T> implements Flow.Subscriber<T> {
 
@@ -380,15 +524,6 @@ public class Concurrent {
             int receiveIndex;
             boolean completeFlag;
         }
-    }
-
-    public static <T>
-    Flow.Publisher<T> publishOn(Flow.Publisher<T> publisher, ExecutorService executor) {
-
-        var relay = new EventLoopProcessor<T>(executor);
-        publisher.subscribe(relay);
-
-        return relay;
     }
 
     private static class EventLoopProcessor<T> implements Flow.Processor<T, T> {

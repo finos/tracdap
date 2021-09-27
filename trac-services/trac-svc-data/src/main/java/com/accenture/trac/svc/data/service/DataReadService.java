@@ -51,6 +51,6 @@ public class DataReadService {
         var allocator = ByteBufAllocator.DEFAULT;
         var content = ByteBufUtil.encodeString(allocator, CharBuffer.wrap("Hello World!"), StandardCharsets.UTF_8);
 
-        return Concurrent.javaStreamPublisher(Stream.of(content));
+        return Concurrent.publish(Stream.of(content));
     }
 }
