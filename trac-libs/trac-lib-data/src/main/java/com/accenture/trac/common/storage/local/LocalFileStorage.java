@@ -18,6 +18,7 @@ package com.accenture.trac.common.storage.local;
 
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.exception.*;
+import com.accenture.trac.common.storage.DirStat;
 import com.accenture.trac.common.storage.FileStat;
 import com.accenture.trac.common.storage.FileType;
 import com.accenture.trac.common.storage.IFileStorage;
@@ -174,7 +175,7 @@ public class LocalFileStorage implements IFileStorage {
     }
 
     @Override
-    public CompletionStage<Void> ls(String storagePath) {
+    public CompletionStage<DirStat> ls(String storagePath) {
 
         var absolutePath = resolvePath(storagePath, true,  LS_OPERATION);
 

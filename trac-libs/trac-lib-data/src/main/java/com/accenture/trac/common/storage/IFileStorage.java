@@ -32,7 +32,7 @@ public interface IFileStorage {
 
     CompletionStage<FileStat> stat(String storagePath);
 
-    CompletionStage<Void> ls(String storagePath);
+    CompletionStage<DirStat> ls(String storagePath);
 
     CompletionStage<Void> mkdir(String storagePath, boolean recursive);
 
