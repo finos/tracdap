@@ -20,10 +20,7 @@ import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
 import com.accenture.trac.common.util.Concurrent;
 
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.EmptyByteBuf;
-import io.netty.buffer.Unpooled;
+import io.netty.buffer.*;
 import io.netty.util.concurrent.UnorderedThreadPoolEventExecutor;
 
 import org.junit.jupiter.api.Assertions;
@@ -70,7 +67,7 @@ public class StorageTestSuite_FileReadWrite {
     }
 
     @Test
-    void roundTrip_ok() {
+    void roundTrip_ok() throws Exception {
 
         var storagePath = "haiku.txt";
 
@@ -86,15 +83,21 @@ public class StorageTestSuite_FileReadWrite {
 
         var writeSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writeSignal, execContext);
-        Concurrent.javaStreamPublisher(Stream.of(original)).subscribe(writer);
+        Concurrent.publish(Stream.of(original)).subscribe(writer);
 
         waitFor(TEST_TIMEOUT, writeSignal);
 
-        var reader = storage.reader(storagePath, execContext);
-        var roundTrip = Concurrent
-                .javaPublisherStream(reader)
-                .reduce(new EmptyByteBuf(ByteBufAllocator.DEFAULT), Unpooled::wrappedBuffer);
+        // Make sure the write operation did not report an error before trying to read
+        Assertions.assertDoesNotThrow(() -> result(writeSignal));
 
+        var reader = storage.reader(storagePath, execContext);
+        var readResult = Concurrent.fold(
+                reader, Unpooled::wrappedBuffer,
+                (ByteBuf) new EmptyByteBuf(ByteBufAllocator.DEFAULT));
+
+        waitFor(TEST_TIMEOUT, readResult);
+
+        var roundTrip = result(readResult);
         var roundTripHaiku = roundTrip.readCharSequence(
                 roundTrip.readableBytes(),
                 StandardCharsets.UTF_8);
