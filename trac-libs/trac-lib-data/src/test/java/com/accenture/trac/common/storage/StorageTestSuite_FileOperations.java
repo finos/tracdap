@@ -32,6 +32,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
+import static com.accenture.trac.common.storage.StorageTestHelpers.*;
 
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
@@ -47,7 +48,7 @@ import java.util.stream.Stream;
 
 public class StorageTestSuite_FileOperations {
 
-    /* >>> Generic tests for IFileStorage
+    /* >>> Generic tests for IFileStorage - file system operations
 
     These tests are implemented purely in terms of the IFileStorage interface. E.g. to test the "exists" method,
     a directory is created using IFileStorage.exists(). This test suite can be run for any storage implementation.
@@ -95,7 +96,7 @@ public class StorageTestSuite_FileOperations {
     @Test
     void testExists_file() throws Exception {
 
-        var prepare = makeSmallFile("test_file.txt");
+        var prepare = makeSmallFile("test_file.txt", storage, execContext);
         var filePresent = prepare.thenCompose(x -> storage.exists("test_file.txt"));
         var fileNotPresent = prepare.thenCompose(x -> storage.exists("other_file.txt"));
 
@@ -108,7 +109,7 @@ public class StorageTestSuite_FileOperations {
     @Test
     void testExists_emptyFile() throws Exception {
 
-        var prepare = makeFile("test_file.txt", Unpooled.EMPTY_BUFFER);
+        var prepare = makeFile("test_file.txt", Unpooled.EMPTY_BUFFER, storage, execContext);
         var emptyFileExist = prepare.thenCompose(x -> storage.exists("test_file.txt"));
 
         waitFor(TEST_TIMEOUT, emptyFileExist);
@@ -142,7 +143,7 @@ public class StorageTestSuite_FileOperations {
                 StandardCharsets.UTF_8);
 
         var expectedSize = content.readableBytes();
-        var prepare = makeFile("test_file.txt", content);
+        var prepare = makeFile("test_file.txt", content, storage, execContext);
         var size = prepare.thenCompose(x -> storage.size("test_file.txt"));
 
         waitFor(TEST_TIMEOUT, size);
@@ -153,7 +154,7 @@ public class StorageTestSuite_FileOperations {
     @Test
     void testSize_emptyFile() throws Exception {
 
-        var prepare = makeFile("test_file.txt", Unpooled.EMPTY_BUFFER);
+        var prepare = makeFile("test_file.txt", Unpooled.EMPTY_BUFFER, storage, execContext);
         var size = prepare.thenCompose(x -> storage.size("test_file.txt"));
 
         waitFor(TEST_TIMEOUT, size);
@@ -212,7 +213,7 @@ public class StorageTestSuite_FileOperations {
         var expectedSize = content.readableBytes();
         var prepare = storage
                 .mkdir("some_dir", false)
-                .thenCompose(x -> makeFile("some_dir/test_file.txt", content));
+                .thenCompose(x -> makeFile("some_dir/test_file.txt", content, storage, execContext));
 
         waitFor(TEST_TIMEOUT, prepare);
 
@@ -241,7 +242,7 @@ public class StorageTestSuite_FileOperations {
 
         Thread.sleep(1);  // Let time elapse before/after the test calls
 
-        var prepare = makeSmallFile("test_file.txt");
+        var prepare = makeSmallFile("test_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
         var stat = storage.stat("test_file.txt");
@@ -265,7 +266,7 @@ public class StorageTestSuite_FileOperations {
 
         Thread.sleep(1);  // Let time elapse before/after the test calls
 
-        var prepare = makeSmallFile("test_file.txt");
+        var prepare = makeSmallFile("test_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
         var stat = storage.stat("test_file.txt");
@@ -351,7 +352,7 @@ public class StorageTestSuite_FileOperations {
 
         Thread.sleep(1);  // Let time elapse before/after the test calls
 
-        var prepare2 = makeSmallFile("some_dir/test_dir/a_file.txt");
+        var prepare2 = makeSmallFile("some_dir/test_dir/a_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare2);
 
         var stat = storage.stat("some_dir/test_dir");
@@ -374,7 +375,7 @@ public class StorageTestSuite_FileOperations {
 
         var prepare1 = storage
                 .mkdir("some_dir/test_dir", true)
-                .thenCompose(x -> makeSmallFile("some_dir/test_dir/a_file.txt"));
+                .thenCompose(x -> makeSmallFile("some_dir/test_dir/a_file.txt", storage, execContext));
         waitFor(TEST_TIMEOUT, prepare1);
 
         // Access the directory by running "ls" on it
@@ -431,7 +432,7 @@ public class StorageTestSuite_FileOperations {
 
         var prepare = storage.mkdir("test_dir", false)
                 .thenCompose(x -> storage.mkdir("test_dir/child_1", false))
-                .thenCompose(x -> makeSmallFile("test_dir/child_2.txt"));
+                .thenCompose(x -> makeSmallFile("test_dir/child_2.txt", storage, execContext));
         waitFor(TEST_TIMEOUT, prepare);
 
         var ls = storage.ls("test_dir");
@@ -461,7 +462,7 @@ public class StorageTestSuite_FileOperations {
 
         var prepare = storage.mkdir("test_dir", false)
                 .thenCompose(x -> storage.mkdir("test_dir/child_1.dat", false))
-                .thenCompose(x -> makeSmallFile("test_dir/child_2_file"));
+                .thenCompose(x -> makeSmallFile("test_dir/child_2_file", storage, execContext));
         waitFor(TEST_TIMEOUT, prepare);
 
         var ls = storage.ls("test_dir");
@@ -489,7 +490,7 @@ public class StorageTestSuite_FileOperations {
         // Storage path should be accepted with or without trailing slash
 
         var prepare = storage.mkdir("test_dir", false)
-                .thenCompose(x -> makeSmallFile("test_dir/some_file.txt"));
+                .thenCompose(x -> makeSmallFile("test_dir/some_file.txt", storage, execContext));
         waitFor(TEST_TIMEOUT, prepare);
 
         var ls1 = storage.ls("test_dir");
@@ -509,7 +510,7 @@ public class StorageTestSuite_FileOperations {
         // Ls is one operation that is allowed on the storage root!
 
         var prepare = storage.mkdir("test_dir", false)
-                .thenCompose(x -> makeSmallFile("test_file.txt"));
+                .thenCompose(x -> makeSmallFile("test_file.txt", storage, execContext));
         waitFor(TEST_TIMEOUT, prepare);
 
         var ls = storage.ls(".");
@@ -536,7 +537,7 @@ public class StorageTestSuite_FileOperations {
 
         // Attempt to call ls on a file is an error
 
-        var prepare = makeSmallFile("test_file");
+        var prepare = makeSmallFile("test_file", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
         var ls = storage.ls("test_file");
@@ -611,7 +612,7 @@ public class StorageTestSuite_FileOperations {
 
         // mkdir should always fail if requested dir already exists and is a file
 
-        var prepare = makeSmallFile("test_dir");
+        var prepare = makeSmallFile("test_dir", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
         var mkdir = storage.mkdir("test_dir", false);
@@ -685,7 +686,7 @@ public class StorageTestSuite_FileOperations {
 
         var prepare = storage
                 .mkdir("test_dir", false)
-                .thenCompose(x -> makeSmallFile("test_dir/child"));
+                .thenCompose(x -> makeSmallFile("test_dir/child", storage, execContext));
 
         waitFor(TEST_TIMEOUT, prepare);
 
@@ -719,7 +720,7 @@ public class StorageTestSuite_FileOperations {
 
         // Simplest case - create one file and delete it
 
-        var prepare = makeSmallFile("test_file.txt");
+        var prepare = makeSmallFile("test_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
         var rm = storage.rm("test_file.txt", false);
@@ -773,10 +774,10 @@ public class StorageTestSuite_FileOperations {
 
         var prepare = storage
                 .mkdir("test_dir/child_1", true)
-                .thenCompose(x -> makeSmallFile("test_dir/child_1/file_a.txt"))
-                .thenCompose(x -> makeSmallFile("test_dir/child_1/file_b.txt"))
+                .thenCompose(x -> makeSmallFile("test_dir/child_1/file_a.txt", storage, execContext))
+                .thenCompose(x -> makeSmallFile("test_dir/child_1/file_b.txt", storage, execContext))
                 .thenCompose(x -> storage.mkdir("test_dir/child_2", true))
-                .thenCompose(x -> makeSmallFile("test_dir/child_2/file_a.txt"));
+                .thenCompose(x -> makeSmallFile("test_dir/child_2/file_a.txt", storage, execContext));
 
         waitFor(TEST_TIMEOUT.multipliedBy(2), prepare);  // Allow extra time for multiple operations
 
@@ -803,8 +804,8 @@ public class StorageTestSuite_FileOperations {
 
         var prepare = storage
                 .mkdir("test_dir", false)
-                .thenCompose(x -> makeSmallFile("test_dir/file_a.txt"))
-                .thenCompose(x -> makeSmallFile("test_dir/file_b.txt"));
+                .thenCompose(x -> makeSmallFile("test_dir/file_a.txt", storage, execContext))
+                .thenCompose(x -> makeSmallFile("test_dir/file_b.txt", storage, execContext));
 
         waitFor(TEST_TIMEOUT, prepare);
 
@@ -889,81 +890,6 @@ public class StorageTestSuite_FileOperations {
         Assertions.assertThrows(ETracInternal.class, () -> result(escapingPathResult));
         Assertions.assertThrows(ETracInternal.class, () -> result(absolutePathResult));
         Assertions.assertThrows(ETracInternal.class, () -> result(invalidPathResult));
-    }
-
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // HELPERS
-    // -----------------------------------------------------------------------------------------------------------------
-
-    private CompletableFuture<Long> makeFile(String storagePath, ByteBuf content) {
-
-        var signal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, signal, execContext);
-
-        Concurrent.javaStreamPublisher(Stream.of(content)).subscribe(writer);
-
-        return signal;
-    }
-
-    private CompletableFuture<Long> makeSmallFile(String storagePath) {
-
-        var content = ByteBufUtil.encodeString(
-                ByteBufAllocator.DEFAULT,
-                CharBuffer.wrap("Small file test content\n"),
-                StandardCharsets.UTF_8);
-
-        return makeFile(storagePath, content);
-    }
-
-    private static void waitFor(Duration timeout, CompletionStage<?>... tasks) {
-
-        waitFor(timeout, Arrays.asList(tasks));
-
-        var latch = new CountDownLatch(tasks.length);
-
-        for (var task: tasks)
-            task.whenComplete((result, error) -> latch.countDown());
-
-        try {
-            var complete = latch.await(timeout.getSeconds(), TimeUnit.SECONDS);
-
-            if (!complete)
-                throw new RuntimeException("Test timed out");
-        }
-        catch (InterruptedException e) {
-            throw new RuntimeException("Test interrupted", e);
-        }
-    }
-
-    private static void waitFor(Duration timeout, List<CompletionStage<?>> tasks) {
-
-        var latch = new CountDownLatch(tasks.size());
-
-        for (var task: tasks)
-            task.whenComplete((result, error) -> latch.countDown());
-
-        try {
-            var complete = latch.await(timeout.getSeconds(), TimeUnit.SECONDS);
-
-            if (!complete)
-                throw new RuntimeException("Test timed out");
-        }
-        catch (InterruptedException e) {
-            throw new RuntimeException("Test interrupted", e);
-        }
-    }
-
-    private static <T> T result(CompletionStage<T> task) throws Exception {
-
-        try {
-            return task.toCompletableFuture().get(0, TimeUnit.SECONDS);
-        }
-        catch (ExecutionException e) {
-
-            var cause = e.getCause();
-            throw (cause instanceof Exception) ? (Exception) cause : e;
-        }
     }
 
 }
