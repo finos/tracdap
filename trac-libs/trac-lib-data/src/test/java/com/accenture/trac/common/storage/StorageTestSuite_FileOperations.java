@@ -29,7 +29,6 @@ import io.netty.util.concurrent.UnorderedThreadPoolEventExecutor;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
@@ -426,9 +425,141 @@ public class StorageTestSuite_FileOperations {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Test
-    void testLs() {
+    void testLs_ok() throws Exception {
 
-        Assertions.fail();
+        // Simple listing, dir containing one file and one sub dir
+
+        var prepare = storage.mkdir("test_dir", false)
+                .thenCompose(x -> storage.mkdir("test_dir/child_1", false))
+                .thenCompose(x -> makeSmallFile("test_dir/child_2.txt"));
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var ls = storage.ls("test_dir");
+        waitFor(TEST_TIMEOUT, ls);
+
+        var dirStat = result(ls);
+
+        Assertions.assertEquals(2, dirStat.entries.size());
+
+        var child1 = dirStat.entries.stream().filter(e -> e.fileName.equals("child_1")).findFirst();
+        var child2 = dirStat.entries.stream().filter(e -> e.fileName.equals("child_2.txt")).findFirst();
+
+        Assertions.assertTrue(child1.isPresent());
+        Assertions.assertEquals("test_dir/child_1", child1.get().storagePath);
+        Assertions.assertEquals(FileType.DIRECTORY, child1.get().fileType);
+
+        Assertions.assertTrue(child2.isPresent());
+        Assertions.assertEquals("test_dir/child_2.txt", child2.get().storagePath);
+        Assertions.assertEquals(FileType.FILE, child2.get().fileType);
+    }
+
+    @Test
+    void testLs_extensions() throws Exception {
+
+        // Corner case - dir with an extension, file without extension
+
+
+        var prepare = storage.mkdir("test_dir", false)
+                .thenCompose(x -> storage.mkdir("test_dir/child_1.dat", false))
+                .thenCompose(x -> makeSmallFile("test_dir/child_2_file"));
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var ls = storage.ls("test_dir");
+        waitFor(TEST_TIMEOUT, ls);
+
+        var dirStat = result(ls);
+
+        Assertions.assertEquals(2, dirStat.entries.size());
+
+        var child1 = dirStat.entries.stream().filter(e -> e.fileName.equals("child_1.dat")).findFirst();
+        var child2 = dirStat.entries.stream().filter(e -> e.fileName.equals("child_2_file")).findFirst();
+
+        Assertions.assertTrue(child1.isPresent());
+        Assertions.assertEquals("test_dir/child_1.dat", child1.get().storagePath);
+        Assertions.assertEquals(FileType.DIRECTORY, child1.get().fileType);
+
+        Assertions.assertTrue(child2.isPresent());
+        Assertions.assertEquals("test_dir/child_2_file", child2.get().storagePath);
+        Assertions.assertEquals(FileType.FILE, child2.get().fileType);
+    }
+
+    @Test
+    void testLs_trailingSlash() throws Exception {
+
+        // Storage path should be accepted with or without trailing slash
+
+        var prepare = storage.mkdir("test_dir", false)
+                .thenCompose(x -> makeSmallFile("test_dir/some_file.txt"));
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var ls1 = storage.ls("test_dir");
+        var ls2 = storage.ls("test_dir/");
+        waitFor(TEST_TIMEOUT, ls1, ls2);
+
+        var dirStat1 = result(ls1);
+        var dirStat2 = result(ls2);
+
+        Assertions.assertEquals(1, dirStat1.entries.size());
+        Assertions.assertEquals(1, dirStat2.entries.size());
+    }
+
+    @Test
+    void testLs_storageRootAllowed() throws Exception {
+
+        // Ls is one operation that is allowed on the storage root!
+
+        var prepare = storage.mkdir("test_dir", false)
+                .thenCompose(x -> makeSmallFile("test_file.txt"));
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var ls = storage.ls(".");
+        waitFor(TEST_TIMEOUT, ls);
+
+        var dirStat = result(ls);
+
+        Assertions.assertEquals(2, dirStat.entries.size());
+
+        var child1 = dirStat.entries.stream().filter(e -> e.fileName.equals("test_dir")).findFirst();
+        var child2 = dirStat.entries.stream().filter(e -> e.fileName.equals("test_file.txt")).findFirst();
+
+        Assertions.assertTrue(child1.isPresent());
+        Assertions.assertEquals("test_dir", child1.get().storagePath);
+        Assertions.assertEquals(FileType.DIRECTORY, child1.get().fileType);
+
+        Assertions.assertTrue(child2.isPresent());
+        Assertions.assertEquals("test_file.txt", child2.get().storagePath);
+        Assertions.assertEquals(FileType.FILE, child2.get().fileType);
+    }
+
+    @Test
+    void testLs_file() {
+
+        // Attempt to call ls on a file is an error
+
+        var prepare = makeSmallFile("test_file");
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var ls = storage.ls("test_file");
+        waitFor(TEST_TIMEOUT, ls);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> result(ls));
+    }
+
+    @Test
+    void testLs_missing() {
+
+        // Ls on a missing path is an error condition
+
+        var ls = storage.ls("dir_does_not_exist/");
+        waitFor(TEST_TIMEOUT, ls);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> result(ls));
+    }
+
+    @Test
+    void testLs_badPaths() {
+
+        testBadPaths(storage::ls);
     }
 
 
