@@ -250,7 +250,11 @@ public class LocalFileStorage implements IFileStorage {
 
             var fileName = absolutePath.getFileName().toString();
             var fileType = attrs.isRegularFile() ? FileType.FILE : FileType.DIRECTORY;
-            var size = attrs.size();
+
+            // Do not report a size for directories, behavior for doing so is wildly inconsistent!
+            var size = attrs.isRegularFile()
+                ? attrs.size()
+                : 0;
 
             var ctime = attrs.creationTime().toInstant();
             var mtime = attrs.lastModifiedTime().toInstant();
