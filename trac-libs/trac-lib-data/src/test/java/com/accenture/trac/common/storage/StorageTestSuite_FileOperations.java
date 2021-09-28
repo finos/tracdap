@@ -21,21 +21,24 @@ import com.accenture.trac.common.exception.EStorageRequest;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
 import com.accenture.trac.common.util.Concurrent;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.Unpooled;
+import io.netty.buffer.*;
 import io.netty.util.concurrent.UnorderedThreadPoolEventExecutor;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIf;
+import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static com.accenture.trac.common.storage.StorageTestHelpers.*;
 
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -249,7 +252,6 @@ public class StorageTestSuite_FileOperations {
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(1);  // Let time elapse before/after the test calls
-
         var testFinish = Instant.now();
 
         var statResult = result(stat);
@@ -263,7 +265,6 @@ public class StorageTestSuite_FileOperations {
         // All storage implementations must implement mtime for files
 
         var testStart = Instant.now();
-
         Thread.sleep(1);  // Let time elapse before/after the test calls
 
         var prepare = makeSmallFile("test_file.txt", storage, execContext);
@@ -273,7 +274,6 @@ public class StorageTestSuite_FileOperations {
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(1);  // Let time elapse before/after the test calls
-
         var testFinish = Instant.now();
 
         var statResult = result(stat);
@@ -282,15 +282,47 @@ public class StorageTestSuite_FileOperations {
         Assertions.assertTrue(statResult.mtime.isBefore(testFinish));
     }
 
-    @Test
-    void testStat_fileATime() {
+    @Test  @DisabledOnOs(OS.WINDOWS)
+    void testStat_fileATime() throws Exception {
 
         // For cloud storage implementations, file atime may not be available
         // So, allow implementations to return a null atime
         // If an atime is returned for files, then it must be valid
 
-        // TODO: requires file reader implementation
-        Assertions.fail();
+        // NTFS does not handle atime reliably for this test. From the docs:
+
+        //      NTFS delays updates to the last access time for a file by up to one hour after the last access.
+        //      NTFS also permits last access time updates to be disabled.
+        //      Last access time is not updated on NTFS volumes by default.
+
+        // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfiletime?redirectedfrom=MSDN
+
+        // On FAT32, atime is limited to an access date, i.e. one-day resolution
+
+        var prepare = makeSmallFile("test_file.txt", storage, execContext);
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var testStart = Instant.now();
+        Thread.sleep(1);  // Let time elapse before/after the test calls
+
+        var reader = storage.reader("test_file.txt", execContext);
+        var collect = Concurrent.fold(
+                reader, Unpooled::wrappedBuffer,
+                (ByteBuf) new EmptyByteBuf(ByteBufAllocator.DEFAULT));
+
+        waitFor(TEST_TIMEOUT, collect);
+        collect.toCompletableFuture().get().release();
+
+        var stat = storage.stat("test_file.txt");
+        waitFor(TEST_TIMEOUT, stat);
+
+        Thread.sleep(1);  // Let time elapse before/after the test calls
+        var testFinish = Instant.now();
+
+        var statResult = result(stat);
+
+        Assertions.assertTrue(statResult.atime == null || statResult.atime.isAfter(testStart));
+        Assertions.assertTrue(statResult.atime == null || statResult.atime.isBefore(testFinish));
     }
 
     @Test
@@ -319,7 +351,6 @@ public class StorageTestSuite_FileOperations {
         // So, all of these fields are optional in stat responses for directories
 
         var testStart = Instant.now();
-
         Thread.sleep(1);  // Let time elapse before/after the test calls
 
         var prepare = storage.mkdir("some_dir/test_dir", true);
@@ -329,7 +360,6 @@ public class StorageTestSuite_FileOperations {
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(1);  // Let time elapse before/after the test calls
-
         var testFinish = Instant.now();
 
         var statResult = result(stat);
@@ -349,7 +379,6 @@ public class StorageTestSuite_FileOperations {
         // "Modify" the directory by adding a file to it
 
         var testStart = Instant.now();
-
         Thread.sleep(1);  // Let time elapse before/after the test calls
 
         var prepare2 = makeSmallFile("some_dir/test_dir/a_file.txt", storage, execContext);
@@ -359,7 +388,6 @@ public class StorageTestSuite_FileOperations {
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(1);  // Let time elapse before/after the test calls
-
         var testFinish = Instant.now();
 
         var statResult = result(stat);
@@ -381,7 +409,6 @@ public class StorageTestSuite_FileOperations {
         // Access the directory by running "ls" on it
 
         var testStart = Instant.now();
-
         Thread.sleep(1);  // Let time elapse before/after the test calls
 
         var prepare2 = storage.ls("some_dir/test_dir");
@@ -391,7 +418,6 @@ public class StorageTestSuite_FileOperations {
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(1);  // Let time elapse before/after the test calls
-
         var testFinish = Instant.now();
 
         var statResult = result(stat);

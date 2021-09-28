@@ -42,16 +42,16 @@ import java.util.stream.Collectors;
 
 public class LocalFileStorage implements IFileStorage {
 
-    protected static final String BACKSLASH = "/";
+    private static final String BACKSLASH = "/";
 
-    protected static final String EXISTS_OPERATION = "exists";
-    protected static final String SIZE_OPERATION = "size";
-    protected static final String STAT_OPERATION = "stat";
-    protected static final String LS_OPERATION = "ls";
-    protected static final String MKDIR_OPERATION = "mkdir";
-    protected static final String RM_OPERATION = "rm";
-    protected static final String WRITE_OPERATION = "write";
-    protected static final String READ_OPERATION = "read";
+    private static final String EXISTS_OPERATION = "exists";
+    private static final String SIZE_OPERATION = "size";
+    private static final String STAT_OPERATION = "stat";
+    private static final String LS_OPERATION = "ls";
+    private static final String MKDIR_OPERATION = "mkdir";
+    private static final String RM_OPERATION = "rm";
+    private static final String WRITE_OPERATION = "write";
+    private static final String READ_OPERATION = "read";
 
     private static final List<Map.Entry<Class<? extends Exception>, String>> ERROR_MAP = List.of(
             Map.entry(NoSuchFileException.class, "File not found in storage layer: %s %s [%s]"),
@@ -101,6 +101,38 @@ public class LocalFileStorage implements IFileStorage {
 
             log.error(err);
             throw new EStartup(err);
+        }
+
+        logFsInfo();
+    }
+
+    private void logFsInfo() {
+
+        try {
+            var fileStore = Files.getFileStore(rootPath);
+
+            log.info("Storage path: [{}]", rootPath);
+            log.info("Storage volume: [{}] ({}{})",
+                    fileStore.name(), fileStore.type(),
+                    fileStore.isReadOnly() ? ", read-only" : "");
+
+            var ONE_GIB = 1024 * 1024 * 1024;
+            var totalCapacity = (double) fileStore.getTotalSpace() / ONE_GIB;
+            var usableCapacity = (double) fileStore.getUsableSpace() / ONE_GIB;
+
+            log.info("Storage capacity: total = {} GiB, free usable = {} GiB, block size = {} B",
+                    String.format("%.1f", totalCapacity),
+                    String.format("%.1f", usableCapacity),
+                    fileStore.getBlockSize());
+        }
+        catch (IOException e) {
+
+            var err = String.format(
+                    "File store information not readable for storage root: %s [%s]",
+                    storageKey, rootPath);
+
+            log.error(err, e);
+            throw new EStartup(err, e);
         }
     }
 
@@ -183,6 +215,20 @@ public class LocalFileStorage implements IFileStorage {
         }
     }
 
+    // A note on atime in Windows file systems.
+
+    // Atime on FAT is limited to one-day resolution
+    // NTFS does not handle atime reliably for this test. From the docs:
+
+    //      NTFS delays updates to the last access time for a file by up to one hour after the last access.
+    //      NTFS also permits last access time updates to be disabled.
+    //      Last access time is not updated on NTFS volumes by default.
+
+    // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfiletime?redirectedfrom=MSDN
+
+    // In spite of these quirks, the available atime information on Windows may still be useful for housekeeping,
+    // however it will cause problems for tasks that rely on precise timing and during testing.
+
     private FileStat buildFileStat(Path absolutePath, String storagePath, String operationName) {
 
         // FileStat does not currently include permissions
@@ -196,9 +242,8 @@ public class LocalFileStorage implements IFileStorage {
                     ? storagePath
                     : storagePath.replace(separator, BACKSLASH);
 
-            var attrViewType = BasicFileAttributeView.class;
-            var attrView = Files.getFileAttributeView(absolutePath, attrViewType);
-            var attrs = attrView.readAttributes();
+            var attrType = BasicFileAttributes.class;
+            var attrs = Files.readAttributes(absolutePath, attrType);
 
             if (!attrs.isRegularFile() && !attrs.isDirectory())
                 throw errorResult(STAT_NOT_FILE_OR_DIR_ERROR, storagePath, STAT_OPERATION);
@@ -293,7 +338,7 @@ public class LocalFileStorage implements IFileStorage {
     @Override
     public Flow.Publisher<ByteBuf> reader(String storagePath, IExecutionContext execContext) {
 
-        var absolutePath = resolvePath(storagePath, false, WRITE_OPERATION);
+        var absolutePath = resolvePath(storagePath, false, READ_OPERATION);
 
         return new LocalFileReader(
                 absolutePath, ByteBufAllocator.DEFAULT,
