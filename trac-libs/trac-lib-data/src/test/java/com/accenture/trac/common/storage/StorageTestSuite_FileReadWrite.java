@@ -17,6 +17,8 @@
 package com.accenture.trac.common.storage;
 
 import com.accenture.trac.common.eventloop.IExecutionContext;
+import com.accenture.trac.common.exception.EStorageRequest;
+import com.accenture.trac.common.exception.EStorageValidation;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
 import com.accenture.trac.common.util.Concurrent;
 
@@ -26,6 +28,7 @@ import io.netty.util.concurrent.UnorderedThreadPoolEventExecutor;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import static com.accenture.trac.common.storage.StorageTestHelpers.*;
 
@@ -112,9 +115,30 @@ public class StorageTestSuite_FileReadWrite {
     }
 
     @Test
-    void roundTrip_empty() {
+    void roundTrip_empty() throws Exception {
 
-        Assertions.fail();
+        var storagePath = "empty.dat";
+        var original = new EmptyByteBuf(ByteBufAllocator.DEFAULT);
+
+        var writeSignal = new CompletableFuture<Long>();
+        var writer = storage.writer(storagePath, writeSignal, execContext);
+        Concurrent.publish(Stream.of(original)).subscribe(writer);
+
+        waitFor(TEST_TIMEOUT, writeSignal);
+
+        // Make sure the write operation did not report an error before trying to read
+        Assertions.assertDoesNotThrow(() -> result(writeSignal));
+
+        var reader = storage.reader(storagePath, execContext);
+        var readResult = Concurrent.fold(
+                reader, Unpooled::wrappedBuffer,
+                (ByteBuf) new EmptyByteBuf(ByteBufAllocator.DEFAULT));
+
+        waitFor(TEST_TIMEOUT, readResult);
+
+        var roundTrip = result(readResult);
+
+        Assertions.assertEquals(0, roundTrip.readableBytes());
     }
 
 
@@ -128,55 +152,160 @@ public class StorageTestSuite_FileReadWrite {
     @Test
     void testWrite_missingDir() {
 
-        Assertions.fail();
+        var storagePath = "missing_dir/some_file.txt";
+        var content = ByteBufUtil.encodeString(
+                ByteBufAllocator.DEFAULT,
+                CharBuffer.wrap("Some content"),
+                StandardCharsets.UTF_8);
+
+        var contentStream = Concurrent.publish(Stream.of(content));
+
+        var writeSignal = new CompletableFuture<Long>();
+        var writer = storage.writer(storagePath, writeSignal, execContext);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> {
+
+            contentStream.subscribe(writer);
+            waitFor(TEST_TIMEOUT, writeSignal);
+            result(writeSignal);
+        });
     }
 
     @Test
-    void testWrite_alreadyExists() {
+    void testWrite_alreadyExists() throws Exception {
 
-        Assertions.fail();
+        var storagePath = "some_file.txt";
+        var content = ByteBufUtil.encodeString(
+                ByteBufAllocator.DEFAULT,
+                CharBuffer.wrap("Some content"),
+                StandardCharsets.UTF_8);
+
+        var contentStream = Concurrent.publish(Stream.of(content));
+        var writeSignal = new CompletableFuture<Long>();
+        var writer = storage.writer(storagePath, writeSignal, execContext);
+        contentStream.subscribe(writer);
+
+        waitFor(TEST_TIMEOUT, writeSignal);
+
+        var exists = storage.exists(storagePath);
+        waitFor(TEST_TIMEOUT, exists);
+
+        Assertions.assertTrue(result(exists));
+
+        var contentStream2 = Concurrent.publish(Stream.of(content));
+        var writeSignal2 = new CompletableFuture<Long>();
+        var writer2 = storage.writer(storagePath, writeSignal2, execContext);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> {
+
+            contentStream2.subscribe(writer2);
+            waitFor(TEST_TIMEOUT, writeSignal);
+            result(writeSignal2);
+        });
     }
 
     @Test
     void roundWrite_badPaths() {
 
-        Assertions.fail();
+        var absolutePath = OS.WINDOWS.isCurrentOs()
+                ? "C:\\Temp\\blah.txt"
+                : "/tmp/blah.txt";
+
+        // \0 and / are the two characters that are always illegal in posix filenames
+        // But / will be interpreted as a separator
+        // There are several illegal characters for filenames on Windows!
+
+        var invalidPath = OS.WINDOWS.isCurrentOs()
+                ? "£$ N'`¬$£>.)_£\"+\n%"
+                : "nul\0char";
+
+        var writeSignal1 = new CompletableFuture<Long>();
+        Assertions.assertThrows(EStorageValidation.class, () ->
+                storage.writer(absolutePath, writeSignal1, execContext));
+
+        var writeSignal2 = new CompletableFuture<Long>();
+        Assertions.assertThrows(EStorageValidation.class, () ->
+                storage.writer(invalidPath, writeSignal2, execContext));
     }
 
     @Test
     void testWrite_storageRoot() {
 
-        Assertions.fail();
+        var storagePath = ".";
+
+        var writeSignal = new CompletableFuture<Long>();
+
+        Assertions.assertThrows(EStorageValidation.class, () ->
+                storage.writer(storagePath, writeSignal, execContext));
     }
 
     @Test
     void testWrite_outsideRoot() {
 
-        Assertions.fail();
+        var storagePath = "../any_file.txt";
+
+        var writeSignal = new CompletableFuture<Long>();
+
+        Assertions.assertThrows(EStorageValidation.class, () ->
+                storage.writer(storagePath, writeSignal, execContext));
     }
 
     @Test
     void testRead_missing() {
 
-        Assertions.fail();
+        var storagePath = "missing_file.txt";
+
+        var reader = storage.reader(storagePath, execContext);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> {
+
+            var readResult = Concurrent.fold(
+                    reader, Unpooled::wrappedBuffer,
+                    (ByteBuf) new EmptyByteBuf(ByteBufAllocator.DEFAULT));
+
+            waitFor(TEST_TIMEOUT, readResult);
+            result(readResult);
+        });
     }
 
     @Test
     void testRead_badPaths() {
 
-        Assertions.fail();
+        var absolutePath = OS.WINDOWS.isCurrentOs()
+                ? "C:\\Temp\\blah.txt"
+                : "/tmp/blah.txt";
+
+        // \0 and / are the two characters that are always illegal in posix filenames
+        // But / will be interpreted as a separator
+        // There are several illegal characters for filenames on Windows!
+
+        var invalidPath = OS.WINDOWS.isCurrentOs()
+                ? "£$ N'`¬$£>.)_£\"+\n%"
+                : "nul\0char";
+
+        Assertions.assertThrows(EStorageValidation.class, () ->
+                storage.reader(absolutePath, execContext));
+
+        Assertions.assertThrows(EStorageValidation.class, () ->
+                storage.reader(invalidPath, execContext));
     }
 
     @Test
     void testRead_storageRoot() {
 
-        Assertions.fail();
+        var storagePath = ".";
+
+        Assertions.assertThrows(EStorageValidation.class, () ->
+                storage.reader(storagePath, execContext));
     }
 
     @Test
     void testRead_outsideRoot() {
 
-        Assertions.fail();
+        var storagePath = "../some_file.txt";
+
+        Assertions.assertThrows(EStorageValidation.class, () ->
+                storage.reader(storagePath, execContext));
     }
 
 
