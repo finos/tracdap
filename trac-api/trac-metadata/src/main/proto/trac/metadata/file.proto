@@ -20,18 +20,17 @@ package trac.metadata;
 option java_package = "com.accenture.trac.metadata";
 option java_multiple_files = true;
 
+import "trac/metadata/object_id.proto";
 import "trac/metadata/type.proto";
 
 
 message FileDefinition {
 
-  repeated string storage = 1;
-  map<string, Value> storageInfo = 2;
-  string storagePath = 3;
+  string name = 1;
+  string extension = 2;
+  string mimeType = 3;
+  uint64 size = 4;
 
-  string name = 4;
-  string extension = 5;
-  uint64 size = 6;
-
-  string mimeType = 7;
+  TagSelector storageId = 5;
+  string dataItem = 6;
 }

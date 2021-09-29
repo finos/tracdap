@@ -326,12 +326,16 @@ public class TestData {
         return ObjectDefinition.newBuilder()
                 .setObjectType(ObjectType.FILE)
                 .setFile(FileDefinition.newBuilder()
-                .addStorage("test-storage")
-                .setStoragePath("<preallocated_id>/contents/magic_template.xlsx")
                 .setName("magic_template")
                 .setExtension("docx")
+                .setMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 .setSize(45285)
-                .setMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .setStorageId(TagSelector.newBuilder()
+                    .setObjectType(ObjectType.STORAGE)
+                    .setObjectId(UUID.randomUUID().toString())
+                    .setLatestObject(true)
+                    .setLatestTag(true))
+                .setDataItem("file/FILE_ID/version-1"))
                 .build();
     }
 
