@@ -31,7 +31,7 @@ import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
-import static com.accenture.trac.common.storage.StorageTestHelpers.*;
+import static com.accenture.trac.test.storage.StorageTestHelpers.*;
 
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
@@ -84,8 +84,8 @@ public class StorageTestSuite_FileOperations {
 
         waitFor(TEST_TIMEOUT, dirPresent, dirNotPresent);
 
-        Assertions.assertTrue(result(dirPresent));
-        Assertions.assertFalse(result(dirNotPresent));
+        Assertions.assertTrue(resultOf(dirPresent));
+        Assertions.assertFalse(resultOf(dirNotPresent));
     }
 
     @Test
@@ -97,8 +97,8 @@ public class StorageTestSuite_FileOperations {
 
         waitFor(TEST_TIMEOUT, filePresent, fileNotPresent);
 
-        Assertions.assertTrue(result(filePresent));
-        Assertions.assertFalse(result(fileNotPresent));
+        Assertions.assertTrue(resultOf(filePresent));
+        Assertions.assertFalse(resultOf(fileNotPresent));
     }
 
     @Test
@@ -109,7 +109,7 @@ public class StorageTestSuite_FileOperations {
 
         waitFor(TEST_TIMEOUT, emptyFileExist);
 
-        Assertions.assertTrue(result(emptyFileExist));
+        Assertions.assertTrue(resultOf(emptyFileExist));
     }
 
     @Test
@@ -143,7 +143,7 @@ public class StorageTestSuite_FileOperations {
 
         waitFor(TEST_TIMEOUT, size);
 
-        Assertions.assertEquals(expectedSize, result(size));
+        Assertions.assertEquals(expectedSize, resultOf(size));
     }
 
     @Test
@@ -154,7 +154,7 @@ public class StorageTestSuite_FileOperations {
 
         waitFor(TEST_TIMEOUT, size);
 
-        Assertions.assertEquals(0, result(size));
+        Assertions.assertEquals(0, resultOf(size));
     }
 
     @Test
@@ -165,7 +165,7 @@ public class StorageTestSuite_FileOperations {
 
         waitFor(TEST_TIMEOUT, size);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> result(size));
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(size));
     }
 
     @Test
@@ -175,7 +175,7 @@ public class StorageTestSuite_FileOperations {
 
         waitFor(TEST_TIMEOUT, size);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> result(size));
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(size));
     }
 
     @Test
@@ -215,7 +215,7 @@ public class StorageTestSuite_FileOperations {
         var stat = storage.stat("some_dir/test_file.txt");
         waitFor(TEST_TIMEOUT, stat);
 
-        var statResult = result(stat);
+        var statResult = resultOf(stat);
 
         Assertions.assertEquals("some_dir/test_file.txt", statResult.storagePath);
         Assertions.assertEquals("test_file.txt", statResult.fileName);
@@ -246,7 +246,7 @@ public class StorageTestSuite_FileOperations {
         Thread.sleep(100);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
-        var statResult = result(stat);
+        var statResult = resultOf(stat);
         Assertions.assertTrue(statResult.ctime == null || statResult.ctime.isAfter(testStart));
         Assertions.assertTrue(statResult.ctime == null || statResult.ctime.isBefore(testFinish));
     }
@@ -268,7 +268,7 @@ public class StorageTestSuite_FileOperations {
         Thread.sleep(100);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
-        var statResult = result(stat);
+        var statResult = resultOf(stat);
 
         Assertions.assertTrue(statResult.mtime.isAfter(testStart));
         Assertions.assertTrue(statResult.mtime.isBefore(testFinish));
@@ -311,7 +311,7 @@ public class StorageTestSuite_FileOperations {
         Thread.sleep(100);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
-        var statResult = result(stat);
+        var statResult = resultOf(stat);
 
         Assertions.assertTrue(statResult.atime == null || statResult.atime.isAfter(testStart));
         Assertions.assertTrue(statResult.atime == null || statResult.atime.isBefore(testFinish));
@@ -326,7 +326,7 @@ public class StorageTestSuite_FileOperations {
         var stat = storage.stat("some_dir/test_dir");
         waitFor(TEST_TIMEOUT, stat);
 
-        var statResult = result(stat);
+        var statResult = resultOf(stat);
 
         Assertions.assertEquals("some_dir/test_dir", statResult.storagePath);
         Assertions.assertEquals("test_dir", statResult.fileName);
@@ -354,7 +354,7 @@ public class StorageTestSuite_FileOperations {
         Thread.sleep(100);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
-        var statResult = result(stat);
+        var statResult = resultOf(stat);
         Assertions.assertTrue(statResult.ctime == null || statResult.ctime.isAfter(testStart));
         Assertions.assertTrue(statResult.ctime == null || statResult.ctime.isBefore(testFinish));
     }
@@ -382,7 +382,7 @@ public class StorageTestSuite_FileOperations {
         Thread.sleep(100);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
-        var statResult = result(stat);
+        var statResult = resultOf(stat);
         Assertions.assertTrue(statResult.mtime == null || statResult.mtime.isAfter(testStart));
         Assertions.assertTrue(statResult.mtime == null || statResult.mtime.isBefore(testFinish));
     }
@@ -412,7 +412,7 @@ public class StorageTestSuite_FileOperations {
         Thread.sleep(100);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
-        var statResult = result(stat);
+        var statResult = resultOf(stat);
         Assertions.assertTrue(statResult.atime == null || statResult.atime.isAfter(testStart));
         Assertions.assertTrue(statResult.atime == null || statResult.atime.isBefore(testFinish));
     }
@@ -423,7 +423,7 @@ public class StorageTestSuite_FileOperations {
         var stat = storage.stat("does_not_exist.dat");
         waitFor(TEST_TIMEOUT, stat);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> result(stat));
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(stat));
     }
 
     @Test
@@ -456,7 +456,7 @@ public class StorageTestSuite_FileOperations {
         var ls = storage.ls("test_dir");
         waitFor(TEST_TIMEOUT, ls);
 
-        var dirStat = result(ls);
+        var dirStat = resultOf(ls);
 
         Assertions.assertEquals(2, dirStat.entries.size());
 
@@ -486,7 +486,7 @@ public class StorageTestSuite_FileOperations {
         var ls = storage.ls("test_dir");
         waitFor(TEST_TIMEOUT, ls);
 
-        var dirStat = result(ls);
+        var dirStat = resultOf(ls);
 
         Assertions.assertEquals(2, dirStat.entries.size());
 
@@ -515,8 +515,8 @@ public class StorageTestSuite_FileOperations {
         var ls2 = storage.ls("test_dir/");
         waitFor(TEST_TIMEOUT, ls1, ls2);
 
-        var dirStat1 = result(ls1);
-        var dirStat2 = result(ls2);
+        var dirStat1 = resultOf(ls1);
+        var dirStat2 = resultOf(ls2);
 
         Assertions.assertEquals(1, dirStat1.entries.size());
         Assertions.assertEquals(1, dirStat2.entries.size());
@@ -534,7 +534,7 @@ public class StorageTestSuite_FileOperations {
         var ls = storage.ls(".");
         waitFor(TEST_TIMEOUT, ls);
 
-        var dirStat = result(ls);
+        var dirStat = resultOf(ls);
 
         Assertions.assertEquals(2, dirStat.entries.size());
 
@@ -561,7 +561,7 @@ public class StorageTestSuite_FileOperations {
         var ls = storage.ls("test_file");
         waitFor(TEST_TIMEOUT, ls);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> result(ls));
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(ls));
     }
 
     @Test
@@ -572,7 +572,7 @@ public class StorageTestSuite_FileOperations {
         var ls = storage.ls("dir_does_not_exist/");
         waitFor(TEST_TIMEOUT, ls);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> result(ls));
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(ls));
     }
 
     @Test
@@ -594,21 +594,21 @@ public class StorageTestSuite_FileOperations {
         var mkdir = storage.mkdir("test_dir", false);
         waitFor(TEST_TIMEOUT, mkdir);
 
-        Assertions.assertDoesNotThrow(() -> result(mkdir));
+        Assertions.assertDoesNotThrow(() -> resultOf(mkdir));
 
         // Creating a single child dir when the parent already exists
 
         var childDir = storage.mkdir("test_dir/child", false);
         waitFor(TEST_TIMEOUT, childDir);
 
-        Assertions.assertDoesNotThrow(() -> result(childDir));
+        Assertions.assertDoesNotThrow(() -> resultOf(childDir));
 
         var dirExists = storage.exists("test_dir");
         var childExists = storage.exists("test_dir/child");
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
-        Assertions.assertTrue(result(dirExists));
-        Assertions.assertTrue(result(childExists));
+        Assertions.assertTrue(resultOf(dirExists));
+        Assertions.assertTrue(resultOf(childExists));
     }
 
     @Test
@@ -622,7 +622,7 @@ public class StorageTestSuite_FileOperations {
         var mkdir = storage.mkdir("test_dir", false);
         waitFor(TEST_TIMEOUT, mkdir);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> result(mkdir));
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(mkdir));
     }
 
     @Test
@@ -636,7 +636,7 @@ public class StorageTestSuite_FileOperations {
         var mkdir = storage.mkdir("test_dir", false);
         waitFor(TEST_TIMEOUT, mkdir);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> result(mkdir));
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(mkdir));
     }
 
     @Test
@@ -648,14 +648,14 @@ public class StorageTestSuite_FileOperations {
         var childDir = storage.mkdir("test_dir/child", false);
         waitFor(TEST_TIMEOUT, childDir);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> result(childDir));
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(childDir));
 
         var dirExists = storage.exists("test_dir");
         var childExists = storage.exists("test_dir/child");
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
-        Assertions.assertFalse(result(dirExists));
-        Assertions.assertFalse(result(childExists));
+        Assertions.assertFalse(resultOf(dirExists));
+        Assertions.assertFalse(resultOf(childExists));
     }
 
     @Test
@@ -666,14 +666,14 @@ public class StorageTestSuite_FileOperations {
         var mkdir = storage.mkdir("test_dir/child", true);
         waitFor(TEST_TIMEOUT, mkdir);
 
-        Assertions.assertDoesNotThrow(() -> result(mkdir));
+        Assertions.assertDoesNotThrow(() -> resultOf(mkdir));
 
         var dirExists = storage.exists("test_dir");
         var childExists = storage.exists("test_dir/child");
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
-        Assertions.assertTrue(result(dirExists));
-        Assertions.assertTrue(result(childExists));
+        Assertions.assertTrue(resultOf(dirExists));
+        Assertions.assertTrue(resultOf(childExists));
     }
 
     @Test
@@ -687,14 +687,14 @@ public class StorageTestSuite_FileOperations {
         var mkdir = storage.mkdir("test_dir/child", true);
         waitFor(TEST_TIMEOUT, mkdir);
 
-        Assertions.assertDoesNotThrow(() -> result(mkdir));
+        Assertions.assertDoesNotThrow(() -> resultOf(mkdir));
 
         var dirExists = storage.exists("test_dir");
         var childExists = storage.exists("test_dir/child");
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
-        Assertions.assertTrue(result(dirExists));
-        Assertions.assertTrue(result(childExists));
+        Assertions.assertTrue(resultOf(dirExists));
+        Assertions.assertTrue(resultOf(childExists));
     }
 
     @Test
@@ -711,7 +711,7 @@ public class StorageTestSuite_FileOperations {
         var mkdir = storage.mkdir("test_dir/child", false);
         waitFor(TEST_TIMEOUT, mkdir);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> result(mkdir));
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(mkdir));
     }
 
     @Test
@@ -744,13 +744,13 @@ public class StorageTestSuite_FileOperations {
         var rm = storage.rm("test_file.txt", false);
         waitFor(TEST_TIMEOUT, rm);
 
-        Assertions.assertDoesNotThrow(() -> result(rm));
+        Assertions.assertDoesNotThrow(() -> resultOf(rm));
 
         // File should be gone
 
         var exists = storage.exists("test_file.txt");
         waitFor(TEST_TIMEOUT, exists);
-        Assertions.assertFalse(result(exists));
+        Assertions.assertFalse(resultOf(exists));
     }
 
     @Test
@@ -764,13 +764,13 @@ public class StorageTestSuite_FileOperations {
         var rm = storage.rm("test_dir", false);
         waitFor(TEST_TIMEOUT, rm);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> result(rm));
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(rm));
 
         // Dir should still exist because rm has failed
 
         var exists = storage.exists("test_dir");
         waitFor(TEST_TIMEOUT, exists);
-        Assertions.assertTrue(result(exists));
+        Assertions.assertTrue(resultOf(exists));
     }
 
     @Test
@@ -781,7 +781,7 @@ public class StorageTestSuite_FileOperations {
         var rm = storage.rm("missing_path", false);
         waitFor(TEST_TIMEOUT, rm);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> result(rm));
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(rm));
     }
 
     @Test
@@ -802,16 +802,16 @@ public class StorageTestSuite_FileOperations {
         var rm = storage.rm("test_dir/child_1", true);
         waitFor(TEST_TIMEOUT, rm);
 
-        Assertions.assertDoesNotThrow(() -> result(rm));
+        Assertions.assertDoesNotThrow(() -> resultOf(rm));
 
         var exists1 = storage.exists("test_dir/child_1");
         var exists2 = storage.exists("test_dir/child_2");
         var size2a = storage.size("test_dir/child_2/file_a.txt");
         waitFor(TEST_TIMEOUT, exists1, exists2, size2a);
 
-        Assertions.assertFalse(result(exists1));
-        Assertions.assertTrue(result(exists2));
-        Assertions.assertTrue(result(size2a) > 0);
+        Assertions.assertFalse(resultOf(exists1));
+        Assertions.assertTrue(resultOf(exists2));
+        Assertions.assertTrue(resultOf(size2a) > 0);
     }
 
     @Test
@@ -830,14 +830,14 @@ public class StorageTestSuite_FileOperations {
         var rm = storage.rm("test_dir/file_a.txt", true);
         waitFor(TEST_TIMEOUT, rm);
 
-        Assertions.assertDoesNotThrow(() -> result(rm));
+        Assertions.assertDoesNotThrow(() -> resultOf(rm));
 
         var existsA = storage.exists("test_dir/file_a.txt");
         var existsB = storage.exists("test_dir/file_b.txt");
         waitFor(TEST_TIMEOUT, existsA, existsB);
 
-        Assertions.assertFalse(result(existsA));
-        Assertions.assertTrue(result(existsB));
+        Assertions.assertFalse(resultOf(existsA));
+        Assertions.assertTrue(resultOf(existsB));
     }
 
     @Test
@@ -851,7 +851,7 @@ public class StorageTestSuite_FileOperations {
         var rm = storage.rm("test_dir/child", true);
         waitFor(TEST_TIMEOUT, rm);
 
-        Assertions.assertThrows(EStorageRequest.class, () -> result(rm));
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(rm));
     }
 
     @Test
@@ -881,7 +881,7 @@ public class StorageTestSuite_FileOperations {
         waitFor(TEST_TIMEOUT, storageRootResult);
 
         // TODO: Should this be EStorageRequest?
-        Assertions.assertThrows(ETracInternal.class, () -> result(storageRootResult));
+        Assertions.assertThrows(ETracInternal.class, () -> resultOf(storageRootResult));
     }
 
     <T> void testBadPaths(Function<String, CompletionStage<T>> testMethod) {
@@ -905,9 +905,9 @@ public class StorageTestSuite_FileOperations {
             absolutePathResult,
             invalidPathResult);
 
-        Assertions.assertThrows(ETracInternal.class, () -> result(escapingPathResult));
-        Assertions.assertThrows(ETracInternal.class, () -> result(absolutePathResult));
-        Assertions.assertThrows(ETracInternal.class, () -> result(invalidPathResult));
+        Assertions.assertThrows(ETracInternal.class, () -> resultOf(escapingPathResult));
+        Assertions.assertThrows(ETracInternal.class, () -> resultOf(absolutePathResult));
+        Assertions.assertThrows(ETracInternal.class, () -> resultOf(invalidPathResult));
     }
 
 }

@@ -30,7 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
-import static com.accenture.trac.common.storage.StorageTestHelpers.*;
+import static com.accenture.trac.test.storage.StorageTestHelpers.*;
 
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
@@ -91,7 +91,7 @@ public class StorageTestSuite_FileReadWrite {
         waitFor(TEST_TIMEOUT, writeSignal);
 
         // Make sure the write operation did not report an error before trying to read
-        Assertions.assertDoesNotThrow(() -> result(writeSignal));
+        Assertions.assertDoesNotThrow(() -> resultOf(writeSignal));
 
         var reader = storage.reader(storagePath, execContext);
         var readResult = Concurrent.fold(
@@ -100,7 +100,7 @@ public class StorageTestSuite_FileReadWrite {
 
         waitFor(TEST_TIMEOUT, readResult);
 
-        var roundTrip = result(readResult);
+        var roundTrip = resultOf(readResult);
         var roundTripHaiku = roundTrip.readCharSequence(
                 roundTrip.readableBytes(),
                 StandardCharsets.UTF_8);
@@ -127,7 +127,7 @@ public class StorageTestSuite_FileReadWrite {
         waitFor(TEST_TIMEOUT, writeSignal);
 
         // Make sure the write operation did not report an error before trying to read
-        Assertions.assertDoesNotThrow(() -> result(writeSignal));
+        Assertions.assertDoesNotThrow(() -> resultOf(writeSignal));
 
         var reader = storage.reader(storagePath, execContext);
         var readResult = Concurrent.fold(
@@ -136,7 +136,7 @@ public class StorageTestSuite_FileReadWrite {
 
         waitFor(TEST_TIMEOUT, readResult);
 
-        var roundTrip = result(readResult);
+        var roundTrip = resultOf(readResult);
 
         Assertions.assertEquals(0, roundTrip.readableBytes());
     }
@@ -167,7 +167,7 @@ public class StorageTestSuite_FileReadWrite {
 
             contentStream.subscribe(writer);
             waitFor(TEST_TIMEOUT, writeSignal);
-            result(writeSignal);
+            resultOf(writeSignal);
         });
     }
 
@@ -190,7 +190,7 @@ public class StorageTestSuite_FileReadWrite {
         var exists = storage.exists(storagePath);
         waitFor(TEST_TIMEOUT, exists);
 
-        Assertions.assertTrue(result(exists));
+        Assertions.assertTrue(resultOf(exists));
 
         var contentStream2 = Concurrent.publish(Stream.of(content));
         var writeSignal2 = new CompletableFuture<Long>();
@@ -200,7 +200,7 @@ public class StorageTestSuite_FileReadWrite {
 
             contentStream2.subscribe(writer2);
             waitFor(TEST_TIMEOUT, writeSignal);
-            result(writeSignal2);
+            resultOf(writeSignal2);
         });
     }
 
@@ -264,7 +264,7 @@ public class StorageTestSuite_FileReadWrite {
                     (ByteBuf) new EmptyByteBuf(ByteBufAllocator.DEFAULT));
 
             waitFor(TEST_TIMEOUT, readResult);
-            result(readResult);
+            resultOf(readResult);
         });
     }
 

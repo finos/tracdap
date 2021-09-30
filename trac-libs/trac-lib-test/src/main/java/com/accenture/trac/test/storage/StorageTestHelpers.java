@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.storage;
+package com.accenture.trac.test.storage;
 
 import com.accenture.trac.common.eventloop.IExecutionContext;
+import com.accenture.trac.common.storage.IFileStorage;
 import com.accenture.trac.common.util.Concurrent;
 
 import io.netty.buffer.ByteBuf;
@@ -34,7 +35,7 @@ import java.util.stream.Stream;
 
 public class StorageTestHelpers {
 
-    static CompletableFuture<Long> makeFile(
+    public static CompletableFuture<Long> makeFile(
             String storagePath, ByteBuf content,
             IFileStorage storage, IExecutionContext execContext) {
 
@@ -46,7 +47,7 @@ public class StorageTestHelpers {
         return signal;
     }
 
-    static CompletableFuture<Long> makeSmallFile(
+    public static CompletableFuture<Long> makeSmallFile(
             String storagePath,
             IFileStorage storage,
             IExecutionContext execContext) {
@@ -59,27 +60,12 @@ public class StorageTestHelpers {
         return makeFile(storagePath, content, storage, execContext);
     }
 
-    static void waitFor(Duration timeout, CompletionStage<?>... tasks) {
+    public static void waitFor(Duration timeout, CompletionStage<?>... tasks) {
 
         waitFor(timeout, Arrays.asList(tasks));
-
-        var latch = new CountDownLatch(tasks.length);
-
-        for (var task: tasks)
-            task.whenComplete((result, error) -> latch.countDown());
-
-        try {
-            var complete = latch.await(timeout.getSeconds(), TimeUnit.SECONDS);
-
-            if (!complete)
-                throw new RuntimeException("Test timed out");
-        }
-        catch (InterruptedException e) {
-            throw new RuntimeException("Test interrupted", e);
-        }
     }
 
-    static void waitFor(Duration timeout, List<CompletionStage<?>> tasks) {
+    public static void waitFor(Duration timeout, List<CompletionStage<?>> tasks) {
 
         var latch = new CountDownLatch(tasks.size());
 
@@ -97,7 +83,7 @@ public class StorageTestHelpers {
         }
     }
 
-    static <T> T result(CompletionStage<T> task) throws Exception {
+    public static <T> T resultOf(CompletionStage<T> task) throws Exception {
 
         try {
             return task.toCompletableFuture().get(0, TimeUnit.SECONDS);
