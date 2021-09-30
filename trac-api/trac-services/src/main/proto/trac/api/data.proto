@@ -22,6 +22,7 @@ option java_multiple_files = true;
 
 import "trac/metadata/object_id.proto";
 import "trac/metadata/data.proto";
+import "trac/metadata/file.proto";
 import "trac/metadata/object.proto";
 import "trac/metadata/tag.proto";
 import "trac/metadata/search.proto";
@@ -81,13 +82,13 @@ service TracDataApi {
 
 
   /// Upload a new file into TRAC
-  rpc createFile (stream DataWriteRequest) returns (DataWriteResponse);
+  rpc createFile (stream FileWriteRequest) returns (metadata.TagHeader);
 
   /// Upload a new version of an existing file into TRAC
-  rpc updateFile (stream DataWriteRequest) returns (DataWriteResponse);
+  rpc updateFile (stream FileWriteRequest) returns (metadata.TagHeader);
 
   /// Download a file that has been stored in TRAC
-  rpc readFile (DataReadRequest) returns (stream DataReadResponse);
+  rpc readFile (FileReadRequest) returns (stream FileReadResponse);
 
 
   /// Download a dataset in a form that can be mapped to an HTTP GET request
@@ -165,6 +166,38 @@ message DataReadResponse {
 
   bytes content = 1000;
 }
+
+
+message FileWriteRequest {
+
+  string tenant = 1;
+
+  optional metadata.TagSelector priorVersion = 2;
+  repeated metadata.TagUpdate tagUpdates = 3;
+
+  string name = 4;
+  string extension = 5;
+  string mimeType = 6;
+  optional uint64 size = 7;
+
+  bytes content = 1000;
+}
+
+message FileReadRequest {
+
+  string tenant = 1;
+  metadata.TagSelector selector = 2;
+}
+
+message FileReadResponse {
+
+  optional metadata.Tag fileTag = 1;
+  optional metadata.FileDefinition fileDefinition = 2;
+
+  bytes content = 1000;
+}
+
+
 
 message DataGetRequest {
 
