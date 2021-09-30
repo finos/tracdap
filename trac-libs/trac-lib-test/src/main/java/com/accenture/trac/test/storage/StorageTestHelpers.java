@@ -59,39 +59,4 @@ public class StorageTestHelpers {
 
         return makeFile(storagePath, content, storage, execContext);
     }
-
-    public static void waitFor(Duration timeout, CompletionStage<?>... tasks) {
-
-        waitFor(timeout, Arrays.asList(tasks));
-    }
-
-    public static void waitFor(Duration timeout, List<CompletionStage<?>> tasks) {
-
-        var latch = new CountDownLatch(tasks.size());
-
-        for (var task: tasks)
-            task.whenComplete((result, error) -> latch.countDown());
-
-        try {
-            var complete = latch.await(timeout.getSeconds(), TimeUnit.SECONDS);
-
-            if (!complete)
-                throw new RuntimeException("Test timed out");
-        }
-        catch (InterruptedException e) {
-            throw new RuntimeException("Test interrupted", e);
-        }
-    }
-
-    public static <T> T resultOf(CompletionStage<T> task) throws Exception {
-
-        try {
-            return task.toCompletableFuture().get(0, TimeUnit.SECONDS);
-        }
-        catch (ExecutionException e) {
-
-            var cause = e.getCause();
-            throw (cause instanceof Exception) ? (Exception) cause : e;
-        }
-    }
 }
