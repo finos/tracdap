@@ -34,6 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.function.BiFunction;
 
 
 public class DataWriteService {
@@ -51,26 +52,57 @@ public class DataWriteService {
         this.metaApi = metaApi;
     }
 
-    public CompletionStage<Long> createFile(
+    public CompletionStage<TagHeader> createFile(
+            String tenant,
             Flow.Publisher<ByteBuf> contentStream,
             IExecutionContext execContext) {
 
         log.info("In service method...");
 
-        var defs = new DefSet(null, null);
+        var defs = new DefSet();
 
         var preallocateRequest = MetadataWriteRequest.newBuilder()
+            .setTenant(tenant)
             .setObjectType(ObjectType.FILE)
             .build();
 
-        CompletableFuture.completedFuture(null)
+        return CompletableFuture.completedFuture(null)
+
+                // Call meta svc to preallocate file object ID
                 .thenApply(x -> metaApi.preallocateId(preallocateRequest))
                 .thenCompose(Futures::javaFuture)
-                .thenApply(x -> buildDefinitions())
-                .thenAccept(defs_ -> {defs.file = defs_.file; defs.storage = defs_.storage;})
-                .thenCompose(x -> writeDataItem(defs.storage, defs.file.getDataItem(), contentStream, execContext));
+                .thenAccept(fileId -> {defs.fileId = fileId;})
 
-        return CompletableFuture.failedFuture(new Exception("Not implemented yet"));
+                // Build initial definition objects
+                .thenApply(x -> buildDefinitions(defs.fileId))
+                .thenAccept(defs_ -> {
+                    defs.file = defs_.file;
+                    defs.storage = defs_.storage; })
+
+                // Write file content stream to the storage layer
+                .thenCompose(x -> writeDataItem(
+                    defs.storage,
+                    defs.file.getDataItem(),
+                    contentStream, execContext))
+
+                // Record size from storage in file definition
+                .thenAccept(size -> defs.file =
+                        defs.file.toBuilder()
+                        .setSize(size)
+                        .build())
+
+                // Save storage metadata
+                .thenCompose(x -> createObject(
+                        tenant, ObjectType.STORAGE, defs.storage,
+                        ObjectDefinition.Builder::setStorage))
+
+                // Record storage ID in file definition
+                .thenAccept(storageHeader -> {})
+
+                // Save file metadata
+                .thenCompose(x -> createPreallocated(
+                        tenant, defs.fileId, defs.file,
+                        ObjectDefinition.Builder::setFile));
     }
 
     private CompletionStage<Long> writeDataItem(
@@ -91,14 +123,55 @@ public class DataWriteService {
         return signal;
     }
 
+    private <TDef> CompletionStage<TagHeader> createObject(
+            String tenant, ObjectType objectType, TDef def,
+            BiFunction<ObjectDefinition.Builder, TDef, ObjectDefinition.Builder> objSetter) {
 
-    private DefSet buildDefinitions() {
+        var objBuilder = ObjectDefinition.newBuilder().setObjectType(objectType);
+        var obj = objSetter.apply(objBuilder, def);
+
+        var request = MetadataWriteRequest.newBuilder()
+                .setTenant(tenant)
+                .setObjectType(objectType)
+                .setDefinition(obj)
+                // TODO: tag updates
+                .build();
+
+        return Futures.javaFuture(metaApi.createObject(request));
+    }
+
+    private <TDef> CompletionStage<TagHeader> createPreallocated(
+            String tenant, TagHeader objectHeader, TDef def,
+            BiFunction<ObjectDefinition.Builder, TDef, ObjectDefinition.Builder> objSetter) {
+
+        var objectType = objectHeader.getObjectType();
+        var objBuilder = ObjectDefinition.newBuilder().setObjectType(objectType);
+        var obj = objSetter.apply(objBuilder, def);
+
+        var preallocated = TagSelector.newBuilder()
+                .setObjectType(objectType)
+                .setObjectId(objectHeader.getObjectId())
+                .setObjectVersion(objectHeader.getObjectVersion())
+                .setTagVersion(objectHeader.getTagVersion());
+
+        var request = MetadataWriteRequest.newBuilder()
+                .setTenant(tenant)
+                .setObjectType(objectType)
+                .setPriorVersion(preallocated)
+                .setDefinition(obj)
+                // TODO: tag updates
+                .build();
+
+        return Futures.javaFuture(metaApi.createPreallocatedObject(request));
+    }
+
+
+    private DefSet buildDefinitions(TagHeader fileHeader) {
 
         var FILE_DATA_ITEM_TEMPLATE = "file/%s/version-%d";
         var FILE_STORAGE_PATH_TEMPLATE = "file/%s/version-%d/%s";
 
-        var storageId = UUID.randomUUID();
-        var fileId = UUID.randomUUID();
+        var fileId = UUID.fromString(fileHeader.getObjectId());
         var fileVersion = 1;
 
         var dataItem = String.format(FILE_DATA_ITEM_TEMPLATE, fileId, fileVersion);
@@ -109,16 +182,11 @@ public class DataWriteService {
                 : "";
         var fileType = "";
 
+        // Size and storage ID omitted, will be set later
         var fileDef = FileDefinition.newBuilder()
                 .setName(fileName)
                 .setExtension(extension)
                 .setMimeType(fileType)
-                .setSize(0)   // TODO: Size
-                .setStorageId(TagSelector.newBuilder()
-                    .setObjectType(ObjectType.STORAGE)
-                    .setObjectId(storageId.toString())
-                    .setLatestObject(true)
-                    .setLatestTag(true))
                 .setDataItem(dataItem)
                 .build();
 
@@ -148,15 +216,16 @@ public class DataWriteService {
         var storageDef = StorageDefinition.newBuilder()
                 .putDataItems(dataItem, storageItem).build();
 
-        return new DefSet(fileDef, storageDef);
+        var defSet = new DefSet();
+        defSet.file = fileDef;
+        defSet.storage = storageDef;
+
+        return defSet;
     }
 
     private static class DefSet {
 
-        DefSet(FileDefinition file, StorageDefinition storage) {
-            this.file = file;
-            this.storage = storage;
-        }
+        TagHeader fileId;
 
         FileDefinition file;
         StorageDefinition storage;

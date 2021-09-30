@@ -25,6 +25,7 @@ import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
 
+import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import io.netty.buffer.Unpooled;
 import org.slf4j.Logger;
@@ -69,44 +70,40 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     }
 
     @Override
-    public StreamObserver<DataWriteRequest> createFile(StreamObserver<DataWriteResponse> responseObserver) {
+    public StreamObserver<FileWriteRequest> createFile(StreamObserver<TagHeader> responseObserver) {
 
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
 
-        var requestHub = Concurrent.<DataWriteRequest>hub();
+        var requestHub = Concurrent.<FileWriteRequest>hub();
         var firstMessage = Concurrent.first(requestHub);
 
-        var protoDataStream = Concurrent.map(requestHub, DataWriteRequest::getContent);
-        var contentStream = Concurrent.map(protoDataStream, bs -> Unpooled.wrappedBuffer(bs.asReadOnlyByteBuffer()));
+        var protoContent = Concurrent.map(requestHub, FileWriteRequest::getContent);
+        var nioContent = Concurrent.map(protoContent, ByteString::asReadOnlyByteBuffer);
+        var byteBufContent = Concurrent.map(nioContent, Unpooled::wrappedBuffer);
 
-        var bytesWritten = firstMessage.thenCompose(msg -> writeService.createFile(contentStream, execCtx));
+        var fileObjectHeader = firstMessage.thenCompose(msg -> writeService.createFile(
+                msg.getTenant(),
+                byteBufContent, execCtx));
 
-        var response = bytesWritten.thenApply(bw ->
-                DataWriteResponse.newBuilder()
-                .setHeader(TagHeader.newBuilder())
-                .setSize((int) (long) bw)
-                .build());
-
-        response.whenComplete(GrpcStreams.resultHandler(responseObserver));
+        fileObjectHeader.whenComplete(GrpcStreams.resultHandler(responseObserver));
 
         return GrpcStreams.relay(requestHub);
     }
 
     @Override
-    public StreamObserver<DataWriteRequest> updateFile(StreamObserver<DataWriteResponse> responseObserver) {
+    public StreamObserver<FileWriteRequest> updateFile(StreamObserver<TagHeader> responseObserver) {
         return super.updateFile(responseObserver);
     }
 
     @Override
-    public void readFile(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
+    public void readFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
         log.info("In read call");
 
         var dataStream = readService.readFile();
 
         var response = Concurrent.map(dataStream, chunk ->
-                DataReadResponse.newBuilder()
-                .setSize(chunk.readableBytes())
+                FileReadResponse.newBuilder()
                 .setContent(Bytes.toProtoBytes(chunk))
                 .build());
 

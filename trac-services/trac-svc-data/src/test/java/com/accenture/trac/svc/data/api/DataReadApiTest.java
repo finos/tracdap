@@ -21,13 +21,17 @@ import com.accenture.trac.common.eventloop.ExecutionRegister;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.common.util.Concurrent;
 import com.accenture.trac.common.util.GrpcStreams;
+import com.accenture.trac.metadata.ObjectType;
+import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
 
 import com.google.protobuf.ByteString;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
+import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.testing.GrpcCleanupRule;
+import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
@@ -45,6 +49,8 @@ public class DataReadApiTest {
     public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
 
     private static StorageManager storage;
+
+    private TracMetadataApiGrpc.TracMetadataApiBlockingStub metaApi;
 
     private TracDataApiGrpc.TracDataApiBlockingStub dataApi;
     private TracDataApiGrpc.TracDataApiStub dataApiStreams;
@@ -81,6 +87,14 @@ public class DataReadApiTest {
         dataApi = TracDataApiGrpc.newBlockingStub(
                 grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
 
+
+        TracMetadataApiGrpc.newFutureStub(NettyChannelBuilder
+                .forAddress("", 1233)
+                .directExecutor()
+                .eventLoopGroup(null)
+                .withOption(ChannelOption.ALLOCATOR, null)
+                .build());
+
         dataApiStreams = TracDataApiGrpc.newStub(
                 grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
 
@@ -89,21 +103,18 @@ public class DataReadApiTest {
     @Test
     public void test1() {
 
-        var request = DataReadRequest.newBuilder().build();
+        var request = FileReadRequest.newBuilder().build();
         var responseStream = dataApi.readFile(request);
 
         var fileContent = ByteString.EMPTY;
-        var fileSize = 0;
 
         while (responseStream.hasNext()) {
 
             var responseMsg = responseStream.next();
 
             fileContent = fileContent.concat(responseMsg.getContent());
-            fileSize += responseMsg.getSize();
         }
 
-        Assertions.assertTrue(fileSize > 0);
         Assertions.assertEquals("Hello World!", fileContent.toStringUtf8());
     }
 
@@ -111,11 +122,16 @@ public class DataReadApiTest {
     public void test2() throws Exception {
 
         var content = ByteString.copyFromUtf8("Hello world!\n");
-        var message = DataWriteRequest.newBuilder().setContent(content).build();
+        var writeRequest = FileWriteRequest.newBuilder()
+                .setName("test_file.txt")
+                .setExtension("txt")
+                .setMimeType("text/plain")
+                .setContent(content)
+                .build();
 
-        var messages = Stream.of(message);
+        var messages = Stream.of(writeRequest);
         var requestStream = Concurrent.publish(messages);
-        var response = new CompletableFuture<DataWriteResponse>();
+        var response = new CompletableFuture<TagHeader>();
 
         var responseGrpc = GrpcStreams.resultObserver(response);
         var requestGrpc = dataApiStreams.createFile(responseGrpc);
@@ -123,6 +139,11 @@ public class DataReadApiTest {
 
         var result = response.get();
         Assertions.assertNotNull(result);
-        Assertions.assertTrue(result.getSize() > 0);
+        Assertions.assertEquals(ObjectType.FILE, result.getObjectType());
+        Assertions.assertNotNull(result.getObjectId());
+        Assertions.assertEquals(1, result.getObjectVersion());
+        Assertions.assertEquals(1, result.getTagVersion());
+
+        // TODO: Read metadata and confirm name, ext, type, size
     }
 }
