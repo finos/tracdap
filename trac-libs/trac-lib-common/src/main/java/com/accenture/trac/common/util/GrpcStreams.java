@@ -21,13 +21,13 @@ import com.accenture.trac.common.exception.EUnexpected;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
-import io.grpc.stub.MetadataUtils;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 
 
@@ -40,9 +40,9 @@ public class GrpcStreams {
     }
 
     public static <T>
-    StreamObserver<T> resultObserver(CompletableFuture<T> result) {
+    StreamObserver<T> unaryResult(CompletableFuture<T> result) {
 
-        return new GrpcResultObserver<>(result);
+        return new UnaryResultObserver<>(result);
     }
 
     public static <T>
@@ -95,48 +95,59 @@ public class GrpcStreams {
         }
     }
 
-    public static class GrpcResultObserver<T> implements StreamObserver<T> {
+    public static class UnaryResultObserver<T> implements StreamObserver<T> {
 
-        private final CompletableFuture<T> result;
+        private final CompletableFuture<T> resultFuture;
+        private final AtomicReference<T> resultBuffer;
 
-        public GrpcResultObserver(CompletableFuture<T> result) {
+        public UnaryResultObserver(CompletableFuture<T> result) {
 
             // Raise an error on the processing thread if the result is already set
 
             if (result.isDone())
                 throw new EUnexpected();
 
-            this.result = result;
+            this.resultFuture = result;
+            this.resultBuffer = new AtomicReference<>(null);
         }
 
         @Override
-        public void onNext(T value) {
+        public void onNext(T resultValue) {
 
-            var resultSet = result.complete(value);
+            var bufferedOk = resultBuffer.compareAndSet(null, resultValue);
 
-            // Raise an error on the processing thread if the result is already set
+            // Raise an error on the processing thread if a result has already been received
 
-            if (!resultSet)
+            if (!bufferedOk)
                 throw new EUnexpected();
         }
 
         @Override
         public void onError(Throwable error) {
 
-            var errorSet = result.completeExceptionally(error);
+            var errorOk = resultFuture.completeExceptionally(error);
 
             // Raise an error on the processing thread if the result is already set
 
-            if (!errorSet)
+            if (!errorOk)
                 throw new EUnexpected();
         }
 
         @Override
         public void onCompleted() {
 
-            // Raise an error on the processing thread if a result has not been set
+            var resultValue = resultBuffer.get();
 
-            if (!result.isDone())
+            // Raise an error if no result has been recorded via onNext
+
+            if (resultValue == null)
+                throw new EUnexpected();
+
+            var resultOk = resultFuture.complete(resultValue);
+
+            // Raise an error if the result Future has already been completed
+
+            if (!resultOk)
                 throw new EUnexpected();
         }
     }
