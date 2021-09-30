@@ -58,7 +58,7 @@ import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.*;
 import static com.accenture.trac.test.storage.StorageTestHelpers.readFile;
 
 
-public class DataReadApiTest {
+public class DataApiTest_File {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
