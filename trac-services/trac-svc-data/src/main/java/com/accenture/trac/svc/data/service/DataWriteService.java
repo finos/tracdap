@@ -87,9 +87,9 @@ public class DataWriteService {
 
                 // Record size from storage in file definition
                 .thenAccept(size -> defs.file =
-                        defs.file.toBuilder()
-                        .setSize(size)
-                        .build())
+                    defs.file.toBuilder()
+                    .setSize(size)
+                    .build())
 
                 // Save storage metadata
                 .thenCompose(x -> createObject(
@@ -97,7 +97,10 @@ public class DataWriteService {
                         ObjectDefinition.Builder::setStorage))
 
                 // Record storage ID in file definition
-                .thenAccept(storageHeader -> {})
+                .thenAccept(storageHeader -> defs.file =
+                    defs.file.toBuilder()
+                    .setStorageId(selectorForLatest(storageHeader))
+                    .build())
 
                 // Save file metadata
                 .thenCompose(x -> createPreallocated(
@@ -148,21 +151,42 @@ public class DataWriteService {
         var objBuilder = ObjectDefinition.newBuilder().setObjectType(objectType);
         var obj = objSetter.apply(objBuilder, def);
 
-        var preallocated = TagSelector.newBuilder()
-                .setObjectType(objectType)
-                .setObjectId(objectHeader.getObjectId())
-                .setObjectVersion(objectHeader.getObjectVersion())
-                .setTagVersion(objectHeader.getTagVersion());
-
         var request = MetadataWriteRequest.newBuilder()
                 .setTenant(tenant)
                 .setObjectType(objectType)
-                .setPriorVersion(preallocated)
+                .setPriorVersion(selectorFor(objectHeader))
                 .setDefinition(obj)
                 // TODO: tag updates
                 .build();
 
         return Futures.javaFuture(metaApi.createPreallocatedObject(request));
+    }
+
+    private static TagSelector selectorFor(TagHeader header) {
+        return selectorFor(header, false, false);
+    }
+
+    private static TagSelector selectorForLatest(TagHeader header) {
+        return selectorFor(header, true, true);
+    }
+
+    private static TagSelector selectorFor(TagHeader header, boolean latestObject, boolean latestTag) {
+
+        var selector = TagSelector.newBuilder()
+                .setObjectType(header.getObjectType())
+                .setObjectId(header.getObjectId());
+
+        if (latestObject)
+            selector.setLatestObject(true);
+        else
+            selector.setObjectVersion(header.getObjectVersion());
+
+        if (latestTag)
+            selector.setLatestTag(true);
+        else
+            selector.setTagVersion(header.getTagVersion());
+
+        return selector.build();
     }
 
 
