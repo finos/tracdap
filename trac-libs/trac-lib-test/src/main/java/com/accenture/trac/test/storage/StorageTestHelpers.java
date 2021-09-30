@@ -20,15 +20,10 @@ import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.storage.IFileStorage;
 import com.accenture.trac.common.util.Concurrent;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.*;
 
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.*;
 import java.util.stream.Stream;
 
@@ -58,5 +53,17 @@ public class StorageTestHelpers {
                 StandardCharsets.UTF_8);
 
         return makeFile(storagePath, content, storage, execContext);
+    }
+
+    public static CompletionStage<ByteBuf> readFile(
+            String storagePath,
+            IFileStorage storage,
+            IExecutionContext execContext) {
+
+        var reader = storage.reader(storagePath, execContext);
+
+        return Concurrent.fold(
+                reader, Unpooled::wrappedBuffer,
+                new EmptyByteBuf(ByteBufAllocator.DEFAULT));
     }
 }
