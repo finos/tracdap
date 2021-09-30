@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Accenture Global Solutions Limited
+ * Copyright 2021 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,5 @@ apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 dependencies {
 
     api project(':trac-lib-common')
-
-    testImplementation project(':trac-lib-test')
+    api project(':trac-lib-data')
 }

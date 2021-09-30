@@ -48,6 +48,8 @@ dependencies {
     implementation group: 'org.apache.arrow', name: 'arrow-vector', version: "$arrow_version"
     implementation group: 'org.apache.arrow', name: 'arrow-memory-netty', version: "$arrow_version"
 
+    testImplementation project(':trac-lib-test')
+
     // Migration support for JUnit 4 Rules, provided by gRPC for managing test service instances
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-migrationsupport', version: "$junit_version"
 
