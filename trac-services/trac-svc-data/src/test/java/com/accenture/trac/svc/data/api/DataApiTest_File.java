@@ -21,6 +21,7 @@ import com.accenture.trac.common.eventloop.ExecutionRegister;
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.common.util.Concurrent;
+import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.common.util.GrpcStreams;
 import com.accenture.trac.metadata.ObjectDefinition;
 import com.accenture.trac.metadata.ObjectType;
@@ -32,10 +33,8 @@ import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
-import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.testing.GrpcCleanupRule;
-import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
@@ -69,10 +68,8 @@ public class DataApiTest_File {
     private static StorageManager storage;
     private IExecutionContext execContext;
 
-    private TracMetadataApiGrpc.TracMetadataApiBlockingStub metaApi;
-
-    private TracDataApiGrpc.TracDataApiBlockingStub dataApi;
-    private TracDataApiGrpc.TracDataApiStub dataApiStreams;
+    private TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaApi;
+    private TracDataApiGrpc.TracDataApiStub dataApi;
 
     @BeforeAll
     public static void setupClass() {
@@ -83,18 +80,28 @@ public class DataApiTest_File {
     @BeforeEach
     public void setup() throws Exception {
 
-        var serverName = InProcessServerBuilder.generateName();
+        var metaSvcName = InProcessServerBuilder.generateName();
+
+        grpcCleanup.register(InProcessServerBuilder.forName(metaSvcName)
+                .directExecutor()
+                .build()
+                .start());
+
+        metaApi = TrustedMetadataApiGrpc.newFutureStub(grpcCleanup.register(
+                InProcessChannelBuilder.forName(metaSvcName)
+                .directExecutor()
+                .build()));
+
+        var dataSvcName = InProcessServerBuilder.generateName();
 
         var workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
         var execRegister = new ExecutionRegister(workerGroup);
-
-        var metaApi = (TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub) null;
 
         var readService = new DataReadService(storage, metaApi);
         var writeService = new DataWriteService(storage, metaApi);
         var publicApiImpl =  new TracDataApi(readService, writeService);
 
-        grpcCleanup.register(InProcessServerBuilder.forName(serverName)
+        grpcCleanup.register(InProcessServerBuilder.forName(dataSvcName)
                 .addService(publicApiImpl)
                 .executor(workerGroup)
                 .intercept(execRegister.registerExecContext())
@@ -103,19 +110,10 @@ public class DataApiTest_File {
 
         // Create a client channel and register for automatic graceful shutdown.
 
-        dataApi = TracDataApiGrpc.newBlockingStub(
-                grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
-
-
-        TracMetadataApiGrpc.newFutureStub(NettyChannelBuilder
-                .forAddress("", 1233)
+        dataApi = TracDataApiGrpc.newStub(grpcCleanup.register(
+                InProcessChannelBuilder.forName(dataSvcName)
                 .directExecutor()
-                .eventLoopGroup(null)
-                .withOption(ChannelOption.ALLOCATOR, null)
-                .build());
-
-        dataApiStreams = TracDataApiGrpc.newStub(
-                grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
+                .build()));
 
     }
 
@@ -192,7 +190,7 @@ public class DataApiTest_File {
         // Set up a request stream and client streaming call, wait for the call to complete
 
         var createFileRequest = fileWriteRequest(content, dataInChunkZero);
-        var createFile = clientStreaming(dataApiStreams::createFile, createFileRequest);
+        var createFile = clientStreaming(dataApi::createFile, createFileRequest);
 
         waitFor(TEST_TIMEOUT, createFile);
         var objHeader = resultOf(createFile);
@@ -252,7 +250,7 @@ public class DataApiTest_File {
         var readByteStream = Concurrent.map(readResponse, FileReadResponse::getContent);
         var readBytes = Concurrent.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
 
-        serverStreaming(dataApiStreams::readFile, readRequest, readResponse);
+        serverStreaming(dataApi::readFile, readRequest, readResponse);
 
         waitFor(TEST_TIMEOUT, readResponse0, readBytes);
         var roundTripTag = resultOf(readResponse0).getFileTag();
@@ -333,14 +331,19 @@ public class DataApiTest_File {
     private <TDef>
     TDef fetchDefinition(
             String tenant, TagSelector selector,
-            Function<ObjectDefinition, TDef> defTypeFunc) {
+            Function<ObjectDefinition, TDef> defTypeFunc)
+            throws Exception {
 
-        var tag = metaApi.readObject(MetadataReadRequest.newBuilder()
+        var tagGrpc = metaApi.readObject(MetadataReadRequest.newBuilder()
                 .setTenant(tenant)
                 .setSelector(selector)
                 .build());
 
-        var objDef = tag.getDefinition();
+        var tag = Futures.javaFuture(tagGrpc);
+
+        waitFor(TEST_TIMEOUT, tag);
+
+        var objDef = resultOf(tag).getDefinition();
 
         return defTypeFunc.apply(objDef);
     }
