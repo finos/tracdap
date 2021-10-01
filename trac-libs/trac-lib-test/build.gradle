@@ -25,5 +25,15 @@ apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 dependencies {
 
     api project(':trac-lib-common')
+    api project(':trac-lib-db')
     api project(':trac-lib-data')
+
+    implementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: "$junit_version"
+    implementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: "$junit_version"
+
+    // Tests need the ability to spin up instances of the TRAC services to test against
+
+    implementation project(':trac-svc-meta')
+    implementation project(':trac-svc-data')
+    implementation project(':trac-gateway')
 }

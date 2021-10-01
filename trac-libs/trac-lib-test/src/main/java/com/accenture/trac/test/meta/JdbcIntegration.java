@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Accenture Global Solutions Limited
+ * Copyright 2021 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,64 +14,57 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.meta.test;
+package com.accenture.trac.test.meta;
 
+import com.accenture.trac.common.config.ConfigManager;
+import com.accenture.trac.common.config.StandardArgs;
 import com.accenture.trac.common.db.JdbcSetup;
+import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.util.InterfaceLogging;
 import com.accenture.trac.common.db.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
 
+import com.accenture.trac.test.meta.IDalTestable;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.*;
 
 import javax.sql.DataSource;
-import java.nio.charset.StandardCharsets;
-import java.util.Properties;
-import java.util.Scanner;
-import java.util.UUID;
-
-import static com.accenture.trac.svc.meta.test.TestData.TEST_TENANT;
+import java.nio.file.Paths;
 
 
-public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback, AfterAllCallback {
+public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback, AfterAllCallback {
 
-    private static final String JDBC_URL_TEMPLATE = "mem:%s;DB_CLOSE_DELAY=-1";
+    private static final String TRAC_CONFIG_FILE = "TRAC_CONFIG_FILE";
+    private static final String TRAC_KEYSTORE_KEY = "TRAC_KEYSTORE_KEY";
 
+    private JdbcDialect dialect;
     private DataSource source;
     private JdbcMetadataDal dal;
 
     @Override
-    public void beforeAll(ExtensionContext context) throws Exception {
+    public void beforeAll(ExtensionContext context) {
 
-        var dbId = UUID.randomUUID();
-        var jdbcUrl = String.format(JDBC_URL_TEMPLATE, dbId);
+        // Method for getting standard args from environment instead of command line
+        // It may be useful to have this in StandardArgsProcessor
 
-        var props = new Properties();
-        props.setProperty("unit.jdbcUrl", jdbcUrl);
-        props.setProperty("unit.dialect", "H2");
-        props.setProperty("unit.h2.user", "trac");
-        props.setProperty("unit.h2.pass", "trac");
-        props.setProperty("unit.pool.size", "1");
+        var env = System.getenv();
+        var workingDir = Paths.get(".").toAbsolutePath().normalize();
+        var configFile = env.get(TRAC_CONFIG_FILE);
+        var keystoreKey = env.get(TRAC_KEYSTORE_KEY);
 
-        source = JdbcSetup.createDatasource(props, "unit");
+        if (configFile == null || configFile.isBlank())
+            throw new EStartup("Missing environment variable for integration testing: " + TRAC_CONFIG_FILE);
 
-        var inputStream = JdbcUnit.class.getResourceAsStream("/h2/001__trac_metadata.ddl");
-        var scanner = new Scanner(inputStream, StandardCharsets.UTF_8.name()).useDelimiter("\\A");
-        var deployScript = scanner.next();
+        var integrationArgs = new StandardArgs(workingDir, configFile, keystoreKey);
+        var configManager = new ConfigManager(integrationArgs);
+        configManager.initConfigPlugins();
+        configManager.initLogging();
 
-        try (var conn = source.getConnection(); var stmt = conn.createStatement()) {
+        var rootProperties = configManager.loadRootProperties();
 
-            System.out.println("SQL >>> Deploying database schema");
-
-            for (var deployCommand : deployScript.split(";"))
-                if (!deployCommand.isBlank()) {
-                    System.out.println("SQL >>>\n\n" + deployCommand.strip() + "\n");
-                    stmt.execute(deployCommand);
-                }
-
-            stmt.execute(String.format("insert into tenant (tenant_id, tenant_code) values (1, '%s')", TEST_TENANT));
-        }
+        dialect = JdbcSetup.getSqlDialect(rootProperties, "trac.svc.meta.db.sql");
+        source = JdbcSetup.createDatasource(rootProperties, "trac.svc.meta.db.sql");
     }
 
     @Override
@@ -82,7 +75,7 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
         if (testClass.isEmpty() || !IDalTestable.class.isAssignableFrom(testClass.get()))
             Assertions.fail("JUnit extension for DAL testing requires the test class to implement IDalTestable");
 
-        var dal = new JdbcMetadataDal(JdbcDialect.H2, source, Runnable::run);
+        var dal = new JdbcMetadataDal(dialect, source, Runnable::run);
         dal.startup();
 
         this.dal = dal;

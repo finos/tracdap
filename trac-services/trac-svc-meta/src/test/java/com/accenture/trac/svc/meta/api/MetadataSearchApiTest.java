@@ -23,11 +23,11 @@ import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.services.MetadataReadService;
 import com.accenture.trac.svc.meta.services.MetadataSearchService;
 import com.accenture.trac.svc.meta.services.MetadataWriteService;
-import com.accenture.trac.svc.meta.test.IDalTestable;
+import com.accenture.trac.test.meta.IDalTestable;
 
-import com.accenture.trac.svc.meta.test.JdbcIntegration;
-import com.accenture.trac.svc.meta.test.JdbcUnit;
-import com.accenture.trac.svc.meta.test.TestData;
+import com.accenture.trac.test.meta.JdbcIntegration;
+import com.accenture.trac.test.meta.JdbcUnit;
+import com.accenture.trac.test.meta.TestData;
 
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -46,7 +46,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import static com.accenture.trac.common.metadata.MetadataCodec.encodeNativeObject;
 import static com.accenture.trac.common.metadata.MetadataCodec.encodeValue;
-import static com.accenture.trac.svc.meta.test.TestData.*;
+import static com.accenture.trac.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 

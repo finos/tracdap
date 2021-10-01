@@ -19,11 +19,11 @@ package com.accenture.trac.svc.meta.dal;
 import com.accenture.trac.metadata.*;
 import com.accenture.trac.common.metadata.TypeSystem;
 import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.svc.meta.test.IDalTestable;
-import com.accenture.trac.svc.meta.test.JdbcUnit;
-import com.accenture.trac.svc.meta.test.JdbcIntegration;
+import com.accenture.trac.test.meta.IDalTestable;
+import com.accenture.trac.test.meta.JdbcUnit;
+import com.accenture.trac.test.meta.JdbcIntegration;
 
-import com.accenture.trac.svc.meta.test.TestData;
+import com.accenture.trac.test.meta.TestData;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,7 +41,7 @@ import java.util.stream.Collectors;
 
 import static com.accenture.trac.common.metadata.MetadataCodec.encodeArrayValue;
 import static com.accenture.trac.common.metadata.MetadataCodec.encodeValue;
-import static com.accenture.trac.svc.meta.test.TestData.*;
+import static com.accenture.trac.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 

@@ -20,15 +20,15 @@ import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.svc.meta.exception.EDuplicateItem;
 import com.accenture.trac.svc.meta.exception.EMissingItem;
 import com.accenture.trac.svc.meta.exception.EWrongItemType;
-import static com.accenture.trac.svc.meta.test.TestData.*;
+import static com.accenture.trac.test.meta.TestData.*;
 
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import com.accenture.trac.svc.meta.test.IDalTestable;
-import com.accenture.trac.svc.meta.test.JdbcUnit;
-import com.accenture.trac.svc.meta.test.JdbcIntegration;
+import com.accenture.trac.test.meta.IDalTestable;
+import com.accenture.trac.test.meta.JdbcUnit;
+import com.accenture.trac.test.meta.JdbcIntegration;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
