@@ -19,7 +19,6 @@ package com.accenture.trac.deploy.metadb;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.config.StandardArgs;
 import com.accenture.trac.common.config.StandardArgsProcessor;
-import com.accenture.trac.common.db.JdbcDialect;
 import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.exception.EStartup;
 
@@ -37,11 +36,11 @@ import java.util.List;
 
 public class DeployMetaDB {
 
+    public final static String DEPLOY_SCHEMA_TASK_NAME = "deploy_schema";
+    public final static String ADD_TENANT_TASK_NAME = "add_tenant";
+
     private final static String DB_CONFIG_ROOT = "trac.svc.meta.db.sql";
     private final static String SCHEMA_LOCATION = "classpath:%s";
-
-    private final static String DEPLOY_SCHEMA_TASK_NAME = "deploy_schema";
-    private final static String ADD_TENANT_TASK_NAME = "add_tenant";
 
     private final static List<StandardArgs.Task> METADB_TASKS = List.of(
             StandardArgs.task(DEPLOY_SCHEMA_TASK_NAME, null, "Deploy/update metadata database with the latest physical schema"),
