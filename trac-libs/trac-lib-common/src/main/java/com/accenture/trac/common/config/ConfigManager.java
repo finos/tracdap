@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.net.URI;
 import java.nio.file.InvalidPathException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
@@ -301,18 +300,21 @@ public class ConfigManager {
             if (args.getConfigFile() == null || args.getConfigFile().isBlank())
                 throw new EStartup("URL for root config file is missing or blank");
 
-            var suppliedUri = URI.create(args.getConfigFile());
-            var suppliedScheme = suppliedUri.getScheme();
+            var configUrl = URI.create(args.getConfigFile());
+            var configProtocol = configUrl.getScheme();
 
             // Special handling if the config URI is for a file
             // In this case, it may be relative to the process working dir
-            if (suppliedScheme == null || suppliedScheme.isBlank() || suppliedScheme.equals("file")) {
+            if (configProtocol == null || configProtocol.isBlank() || configProtocol.equals("file")) {
 
-                Path configPath = args.getWorkingDir().resolve(args.getConfigFile());
+                if (configUrl.isAbsolute())
+                    return configUrl;
+
+                var configPath = args.getWorkingDir().resolve(configUrl.getPath());
                 return configPath.toUri();
             }
 
-            return suppliedUri;
+            return configUrl;
         }
         catch (IllegalArgumentException e) {
 
