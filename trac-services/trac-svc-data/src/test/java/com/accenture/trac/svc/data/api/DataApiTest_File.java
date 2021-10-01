@@ -17,22 +17,28 @@
 package com.accenture.trac.svc.data.api;
 
 import com.accenture.trac.api.*;
+import com.accenture.trac.common.config.ConfigBootstrap;
+import com.accenture.trac.common.config.StandardArgs;
 import com.accenture.trac.common.eventloop.ExecutionRegister;
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.common.util.Concurrent;
 import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.common.util.GrpcStreams;
+import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.metadata.ObjectDefinition;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
 
+import com.accenture.trac.svc.meta.TracMetadataService;
+import com.accenture.trac.test.config.ConfigHelpers;
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
+import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.testing.GrpcCleanupRule;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -40,10 +46,13 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 
 import org.junit.Rule;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
@@ -59,37 +68,66 @@ import static com.accenture.trac.test.storage.StorageTestHelpers.readFile;
 
 public class DataApiTest_File {
 
+    private static final String TRAC_UNIT_CONFIG = "config/trac-unit.properties";
+    private static final short METADATA_SVC_PORT = 8081;
     private static final String TEST_TENANT = "ACME_CORP";
     private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+
+    @TempDir
+    static Path tempDir;
+    static TracMetadataService metaSvc;
+
+    @BeforeAll
+    static void setupClass() throws Exception {
+
+        var substitutions = Map.of("${TRAC_RUN_DIR}", tempDir.toString().replace("\\", "\\\\"));
+
+        var configPath = ConfigHelpers.prepareConfig(
+                TRAC_UNIT_CONFIG, tempDir,
+                substitutions);
+
+        var keystoreKey = "";  // not yet used
+
+        var testConfig = ConfigBootstrap.useConfigFile(
+                TracMetadataService.class, tempDir,
+                configPath.toString(), keystoreKey);
+
+        var deploy_schema_task = StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK_NAME, "", "");
+        var add_tenant_task = StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, TEST_TENANT, "");
+        var deployDb = new DeployMetaDB(testConfig);
+        deployDb.runDeployment(List.of(deploy_schema_task, add_tenant_task));
+
+        metaSvc = new TracMetadataService(testConfig);
+        metaSvc.start();
+    }
+
+    @AfterAll
+    static void teardownClass() {
+
+        metaSvc.stop();
+    }
+
+
 
     @Rule
     public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
 
-    private static StorageManager storage;
+    private StorageManager storage;
     private IExecutionContext execContext;
 
     private TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaApi;
     private TracDataApiGrpc.TracDataApiStub dataApi;
 
-    @BeforeAll
-    public static void setupClass() {
-        storage = new StorageManager();
-        storage.initStoragePlugins();
-    }
-
     @BeforeEach
     public void setup() throws Exception {
 
-        var metaSvcName = InProcessServerBuilder.generateName();
-
-        grpcCleanup.register(InProcessServerBuilder.forName(metaSvcName)
-                .directExecutor()
-                .build()
-                .start());
+        storage = new StorageManager();
+        storage.initStoragePlugins();
 
         metaApi = TrustedMetadataApiGrpc.newFutureStub(grpcCleanup.register(
-                InProcessChannelBuilder.forName(metaSvcName)
+                NettyChannelBuilder.forAddress("localhost", METADATA_SVC_PORT)
                 .directExecutor()
+                .usePlaintext()
                 .build()));
 
         var dataSvcName = InProcessServerBuilder.generateName();
