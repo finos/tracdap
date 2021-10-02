@@ -20,11 +20,11 @@ import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.nio.channels.*;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Flow;
 
@@ -44,6 +44,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
     private Flow.Subscription subscription;
     private AsynchronousFileChannel channel;
+    private ChunkWriteHandler writeHandler;
 
     private int chunksPending;
     private long bytesWritten;
@@ -74,49 +75,37 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             this.subscription = subscription;
 
-            channel = AsynchronousFileChannel.open(absolutePath, Set.of(WRITE, CREATE_NEW), executor);
+            this.channel = AsynchronousFileChannel.open(absolutePath, Set.of(WRITE, CREATE_NEW), executor);
+            this.writeHandler = new ChunkWriteHandler();
+
+            log.info("File channel open for writing: [{}]", absolutePath);
 
             subscription.request(2);
         }
-        catch (IOException e) {
+        catch (Exception e) {
 
-            throw errors.handleException(e, storagePath, WRITE_OPERATION);
+            subscription.cancel();
+
+            var eStorage = errors.handleException(e, storagePath, WRITE_OPERATION);
+            signal.completeExceptionally(eStorage);
         }
     }
 
     @Override
     public void onNext(ByteBuf chunk) {
 
-        chunksPending += 1;
+        try {
 
-        channel.write(chunk.nioBuffer(), 0, chunk, new CompletionHandler<>() {
+            chunksPending += 1;
+            channel.write(chunk.nioBuffer(), 0, chunk, writeHandler);
+        }
+        catch (Exception e) {
 
-            @Override
-            public void completed(Integer nBytes, ByteBuf chunk) {
+            subscription.cancel();
 
-                chunk.release();
-                chunksPending -= 1;
-                bytesWritten += nBytes;
-
-                // TODO: proper logic!
-
-                if (gotComplete && chunksPending == 0)
-                    signal.complete(bytesWritten);
-                else
-                    subscription.request(1);
-            }
-
-            @Override
-            public void failed(Throwable error, ByteBuf chunk) {
-
-                chunk.release();
-                chunksPending -= 1;
-                gotError = true;
-
-                subscription.cancel();
-                signal.completeExceptionally(error);  // TODO: Wrap error
-            }
-        });
+            var eStorage = errors.handleException(e, storagePath, WRITE_OPERATION);
+            signal.completeExceptionally(eStorage);
+        }
     }
 
     @Override
@@ -124,8 +113,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
         gotError = true;
 
-        subscription.cancel();
-        signal.completeExceptionally(error);  // TODO: Wrap error
+        doOnError(error);
     }
 
     @Override
@@ -134,6 +122,93 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
         gotComplete = true;
 
         if (chunksPending == 0 && !gotError)
+            doOnComplete();
+    }
+
+    private class ChunkWriteHandler implements CompletionHandler<Integer, ByteBuf> {
+
+        @Override
+        public void completed(Integer nBytes, ByteBuf chunk) {
+
+            var releaseOk = chunk.release();
+
+            if (!releaseOk && chunk.capacity() > 0)
+                log.warn("Chunk buffer was not released (this could indicate a memory leak)");
+
+            chunksPending -= 1;
+            bytesWritten += nBytes;
+
+            if (gotComplete) {
+                if (chunksPending == 0 && !gotError)
+                    doOnComplete();
+            }
+            else
+                if (!gotError)
+                    subscription.request(1);
+        }
+
+        @Override
+        public void failed(Throwable error, ByteBuf chunk) {
+
+            var releaseOk = chunk.release();
+
+            if (!releaseOk && chunk.capacity() > 0)
+                log.warn("Chunk buffer was not released (this could indicate a memory leak)");
+
+            chunksPending -= 1;
+            gotError = true;
+
+            doOnError(error);
+        }
+    }
+
+    private void doOnComplete() {
+
+        try {
+
+            log.info("Write operation complete: {} bytes written [{}]", bytesWritten, absolutePath);
+
+            channel.close();
+
+            log.info("File channel closed: [{}]", absolutePath);
+
             signal.complete(bytesWritten);
+        }
+        catch (Exception e) {
+
+            log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
+
+            var eStorage = errors.handleException(e, storagePath, WRITE_OPERATION);
+            signal.completeExceptionally(eStorage);
+        }
+    }
+
+    private void doOnError(Throwable throwable) {
+
+        var error = throwable instanceof Exception
+                ? (Exception) throwable
+                : new ExecutionException(throwable);
+
+        try {
+
+            log.error("Write operation failed: {} [{}]", throwable.getMessage(), absolutePath, throwable);
+
+            subscription.cancel();
+            channel.close();
+
+            log.info("File channel closed: [{}]", absolutePath);
+
+            var eStorage = errors.handleException(error, storagePath, WRITE_OPERATION);
+            signal.completeExceptionally(eStorage);
+        }
+        catch (Exception e) {
+
+            log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
+
+            // Report the original error back up the chain, not the secondary error that occurred on close
+
+            var eStorage = errors.handleException(error, storagePath, WRITE_OPERATION);
+            signal.completeExceptionally(eStorage);
+        }
     }
 }
