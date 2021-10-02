@@ -127,6 +127,12 @@ public class StorageTestSuite_FileReadWrite {
     }
 
     @Test
+    void roundTrip_heterogeneous() {
+
+        Assertions.fail();
+    }
+
+    @Test
     void roundTrip_empty() throws Exception {
 
         var storagePath = "empty.dat";
