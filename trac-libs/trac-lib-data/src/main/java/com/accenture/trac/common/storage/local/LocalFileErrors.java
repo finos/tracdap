@@ -163,14 +163,14 @@ public class LocalFileErrors {
         }
     }
 
-    ETrac exception(ExplicitError error, Exception exception, String path, String operation) {
+    private ETrac exception(ExplicitError error, Exception exception, String path, String operation) {
 
         try {
 
             var messageTemplate = ERROR_MESSAGE_MAP.get(error);
             var message = String.format(messageTemplate, storageKey, operation, path);
 
-            log.error(message);
+            log.error(message, exception);
 
             var err = EXCEPTION_CONSTRUCTOR_MAP.get(error);
 
@@ -185,8 +185,7 @@ public class LocalFileErrors {
         }
     }
 
-
-
+    // Look up all the exception constructors at startup, avoid weird reflection errors at runtime!
 
     private static final Map<ExplicitError, Constructor<? extends ETrac>> EXPLICIT_CONSTRUCTOR_MAP =
             Arrays.stream(ExplicitError.values())
