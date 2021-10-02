@@ -34,7 +34,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.accenture.trac.common.storage.local.LocalFileErrors.ExplicitError.DUPLICATE_SUBSCRIPTION;
 import static com.accenture.trac.common.storage.local.LocalFileStorage.READ_OPERATION;
-import static com.accenture.trac.common.storage.local.LocalFileStorage.WRITE_OPERATION;
 import static java.nio.file.StandardOpenOption.*;
 
 
@@ -335,7 +334,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
             log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
 
-            var eStorage = errors.handleException(e, storagePath, WRITE_OPERATION);
+            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
             subscriber.onError(eStorage);
         }
     }
@@ -358,7 +357,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
             // If the cancel results in an error closing the file, do send the onError message
 
-            var eStorage = errors.handleException(e, storagePath, WRITE_OPERATION);
+            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
             subscriber.onError(eStorage);
         }
     }
@@ -377,7 +376,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
             log.info("File channel closed: [{}]", absolutePath);
 
-            var eStorage = errors.handleException(error, storagePath, WRITE_OPERATION);
+            var eStorage = errors.handleException(error, storagePath, READ_OPERATION);
             subscriber.onError(eStorage);
         }
         catch (Exception e) {
@@ -386,7 +385,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
             // Report the original error back up the chain, not the secondary error that occurred on close
 
-            var eStorage = errors.handleException(e, storagePath, WRITE_OPERATION);
+            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
             subscriber.onError(eStorage);
         }
     }

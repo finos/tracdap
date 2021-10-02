@@ -31,7 +31,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.accenture.trac.common.storage.local.LocalFileErrors.ExplicitError.DUPLICATE_SUBSCRIPTION;
-import static com.accenture.trac.common.storage.local.LocalFileStorage.READ_OPERATION;
 import static com.accenture.trac.common.storage.local.LocalFileStorage.WRITE_OPERATION;
 import static java.nio.file.StandardOpenOption.*;
 
@@ -104,7 +103,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
                 // According to Java API docs, errors in subscribe() should be reported as IllegalStateException
                 // https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
 
-                var eStorage = errors.explicit(DUPLICATE_SUBSCRIPTION, storagePath, READ_OPERATION);
+                var eStorage = errors.explicit(DUPLICATE_SUBSCRIPTION, storagePath, WRITE_OPERATION);
                 var eFlowState = new IllegalStateException(eStorage.getMessage(), eStorage);
 
                 // TODO: report duplicate subscription
@@ -271,7 +270,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             else
                 // For errors after termination, put a warning in the log
-                log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, error);
+                log.warn("Write operation is terminated but further errors occurred: [{}]", absolutePath, error);
         }
     }
 
@@ -302,7 +301,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             else
                 // For errors after termination, put a warning in the log
-                log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, e);
+                log.warn("Write operation is terminated but further errors occurred: [{}]", absolutePath, e);
         }
     }
 
@@ -323,7 +322,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             else
                 // For errors after termination, put a warning in the log
-                log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, e);
+                log.warn("Write operation is terminated but further errors occurred: [{}]", absolutePath, e);
         }
     }
 
