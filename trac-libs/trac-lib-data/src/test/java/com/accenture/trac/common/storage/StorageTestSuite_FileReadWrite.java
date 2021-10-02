@@ -18,7 +18,7 @@ package com.accenture.trac.common.storage;
 
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.exception.EStorageRequest;
-import com.accenture.trac.common.exception.EStorageValidation;
+import com.accenture.trac.common.exception.EValidationGap;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
 import com.accenture.trac.common.util.Concurrent;
 
@@ -222,11 +222,11 @@ public class StorageTestSuite_FileReadWrite {
                 : "nul\0char";
 
         var writeSignal1 = new CompletableFuture<Long>();
-        Assertions.assertThrows(EStorageValidation.class, () ->
+        Assertions.assertThrows(EValidationGap.class, () ->
                 storage.writer(absolutePath, writeSignal1, execContext));
 
         var writeSignal2 = new CompletableFuture<Long>();
-        Assertions.assertThrows(EStorageValidation.class, () ->
+        Assertions.assertThrows(EValidationGap.class, () ->
                 storage.writer(invalidPath, writeSignal2, execContext));
     }
 
@@ -237,7 +237,7 @@ public class StorageTestSuite_FileReadWrite {
 
         var writeSignal = new CompletableFuture<Long>();
 
-        Assertions.assertThrows(EStorageValidation.class, () ->
+        Assertions.assertThrows(EValidationGap.class, () ->
                 storage.writer(storagePath, writeSignal, execContext));
     }
 
@@ -248,7 +248,7 @@ public class StorageTestSuite_FileReadWrite {
 
         var writeSignal = new CompletableFuture<Long>();
 
-        Assertions.assertThrows(EStorageValidation.class, () ->
+        Assertions.assertThrows(EValidationGap.class, () ->
                 storage.writer(storagePath, writeSignal, execContext));
     }
 
@@ -285,10 +285,10 @@ public class StorageTestSuite_FileReadWrite {
                 ? "£$ N'`¬$£>.)_£\"+\n%"
                 : "nul\0char";
 
-        Assertions.assertThrows(EStorageValidation.class, () ->
+        Assertions.assertThrows(EValidationGap.class, () ->
                 storage.reader(absolutePath, execContext));
 
-        Assertions.assertThrows(EStorageValidation.class, () ->
+        Assertions.assertThrows(EValidationGap.class, () ->
                 storage.reader(invalidPath, execContext));
     }
 
@@ -297,7 +297,7 @@ public class StorageTestSuite_FileReadWrite {
 
         var storagePath = ".";
 
-        Assertions.assertThrows(EStorageValidation.class, () ->
+        Assertions.assertThrows(EValidationGap.class, () ->
                 storage.reader(storagePath, execContext));
     }
 
@@ -306,7 +306,7 @@ public class StorageTestSuite_FileReadWrite {
 
         var storagePath = "../some_file.txt";
 
-        Assertions.assertThrows(EStorageValidation.class, () ->
+        Assertions.assertThrows(EValidationGap.class, () ->
                 storage.reader(storagePath, execContext));
     }
 
