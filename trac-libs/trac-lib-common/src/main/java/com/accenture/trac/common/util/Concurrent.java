@@ -17,6 +17,7 @@
 package com.accenture.trac.common.util;
 
 import com.accenture.trac.common.exception.ETracInternal;
+import io.netty.util.concurrent.OrderedEventExecutor;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -90,7 +91,7 @@ public class Concurrent {
     }
 
     public static <T>
-    Flow.Publisher<T> publishOn(Flow.Publisher<T> publisher, ExecutorService executor) {
+    Flow.Publisher<T> onEventLoop(Flow.Publisher<T> publisher, OrderedEventExecutor executor) {
 
         var relay = new EventLoopProcessor<T>(executor);
         publisher.subscribe(relay);
@@ -277,7 +278,9 @@ public class Concurrent {
 
         @Override
         public void onError(Throwable error) {
-            result.completeExceptionally(error);
+
+            var unwrapped = unwrapConcurrentError(error);
+            result.completeExceptionally(unwrapped);
         }
 
         @Override
@@ -311,7 +314,7 @@ public class Concurrent {
         @Override
         public void onError(Throwable error) {
             if (!firstFuture.isDone())
-                firstFuture.completeExceptionally(error);
+                firstFuture.completeExceptionally(error);  // TODO: Error
         }
 
         @Override
@@ -528,12 +531,12 @@ public class Concurrent {
 
     private static class EventLoopProcessor<T> implements Flow.Processor<T, T> {
 
-        private final ExecutorService executor;
+        private final OrderedEventExecutor executor;
 
         private Flow.Subscriber<? super T> target;
         private Flow.Subscription sourceSubscription;
 
-        EventLoopProcessor(ExecutorService executor) {
+        EventLoopProcessor(OrderedEventExecutor executor) {
             this.executor = executor;
         }
 
@@ -563,4 +566,25 @@ public class Concurrent {
             executor.execute(target::onComplete);
         }
     }
+
+
+    // Exceptions that are wrappers for errors that occurred during stream processing
+    // These exceptions are unwrapped when a stream is resolved, i.e. their semantic value is discarded
+    // Wrapper exceptions where the semantic value should be retained are not in this list
+    // E.g. cancellation may be caused by an error, but the semantic value of cancellation is retained
+
+    private static Throwable unwrapConcurrentError(Throwable error) {
+
+        if (error.getCause() != null)
+            for (var wrapping : WRAPPED_CONCURRENT_EXCEPTIONS)
+                if (wrapping.isInstance(error))
+                    return error.getCause();
+
+        return error;
+    }
+
+    private static final List<Class<? extends Exception>> WRAPPED_CONCURRENT_EXCEPTIONS = List.of(
+            ExecutionException.class,
+            CompletionException.class,
+            IllegalStateException.class);
 }
