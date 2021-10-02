@@ -16,14 +16,17 @@
 
 package com.accenture.trac.common.storage;
 
+import com.accenture.trac.common.eventloop.ExecutionContext;
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.exception.EStorageRequest;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
 import com.accenture.trac.common.util.Concurrent;
-import io.netty.buffer.*;
-import io.netty.util.concurrent.UnorderedThreadPoolEventExecutor;
 
+import io.netty.buffer.*;
+import io.netty.util.concurrent.DefaultEventExecutor;
+
+import io.netty.util.concurrent.DefaultThreadFactory;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +44,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.*;
 import java.util.function.Function;
+
 
 public class StorageTestSuite_FileOperations {
 
@@ -68,7 +72,7 @@ public class StorageTestSuite_FileOperations {
         // TODO: Abstract mechanism for obtaining storage impl using config
 
         storage = new LocalFileStorage("TEST_STORAGE", storageDir.toString());
-        execContext = () -> new UnorderedThreadPoolEventExecutor(1);
+        execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
     }
 
 

@@ -41,7 +41,7 @@ public class LocalFileErrors {
         STORAGE_PATH_IS_ROOT,
         STORAGE_PATH_INVALID,
 
-        // Explicit errors in operations
+        // Explicit errors file in operations
         SIZE_OF_DIR,
         STAT_NOT_FILE_OR_DIR,
         RM_DIR_NOT_RECURSIVE,
@@ -54,6 +54,9 @@ public class LocalFileErrors {
         ACCESS_DENIED_EXCEPTION,
         SECURITY_EXCEPTION,
         IO_EXCEPTION,
+
+        // Errors in stream (Flow pub/sub) implementation
+        DUPLICATE_SUBSCRIPTION,
 
         // Unhandled / unexpected error
         UNKNOWN_ERROR
@@ -88,6 +91,8 @@ public class LocalFileErrors {
             Map.entry(SECURITY_EXCEPTION, "Access denied in storage layer: %s %s [%s]"),
             Map.entry(IO_EXCEPTION, "An IO error occurred in the storage layer: %s %s [%s]"),
 
+            Map.entry(DUPLICATE_SUBSCRIPTION, "Duplicate subscription detected in the storage layer: %s %s [%s]"),
+
             Map.entry(UNKNOWN_ERROR, "An unexpected error occurred in the storage layer: %s %s [%s]"));
 
     private static final Map<ExplicitError, Class<? extends ETrac>> ERROR_TYPE_MAP = Map.ofEntries(
@@ -108,6 +113,8 @@ public class LocalFileErrors {
             Map.entry(ACCESS_DENIED_EXCEPTION, EStorageAccess.class),
             Map.entry(SECURITY_EXCEPTION, EStorageAccess.class),
             Map.entry(IO_EXCEPTION, EStorage.class),
+
+            Map.entry(DUPLICATE_SUBSCRIPTION, ETracInternal.class),
 
             Map.entry(UNKNOWN_ERROR, ETracInternal.class));
 

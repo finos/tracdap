@@ -16,6 +16,7 @@
 
 package com.accenture.trac.common.storage;
 
+import com.accenture.trac.common.eventloop.ExecutionContext;
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.exception.EStorageRequest;
 import com.accenture.trac.common.exception.EValidationGap;
@@ -23,7 +24,9 @@ import com.accenture.trac.common.storage.local.LocalFileStorage;
 import com.accenture.trac.common.util.Concurrent;
 
 import io.netty.buffer.*;
-import io.netty.util.concurrent.UnorderedThreadPoolEventExecutor;
+import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.DefaultEventExecutor;
+import io.netty.util.concurrent.DefaultThreadFactory;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,12 +36,18 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static com.accenture.trac.test.storage.StorageTestHelpers.*;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Random;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 
 
@@ -55,6 +64,7 @@ public class StorageTestSuite_FileReadWrite {
      */
 
     public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+    public static final Duration ASYNC_DELAY = Duration.ofSeconds(1);
 
     IFileStorage storage;
     IExecutionContext execContext;
@@ -68,7 +78,7 @@ public class StorageTestSuite_FileReadWrite {
         // TODO: Abstract mechanism for obtaining storage impl using config
 
         storage = new LocalFileStorage("TEST_STORAGE", storageDir.toString());
-        execContext = () -> new UnorderedThreadPoolEventExecutor(1);
+        execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
     }
 
     @Test
@@ -151,6 +161,9 @@ public class StorageTestSuite_FileReadWrite {
     // Functional error tests can be set up and verified entirely using the storage API
     // All back ends should behave consistently for these tests
 
+    // Errors are checked using resultOf(), which unwraps stream state errors
+    // This exposes the functional cause of errors in the stream, which will be EStorage (or ETrac) errors
+
     @Test
     void testWrite_missingDir() {
 
@@ -207,7 +220,7 @@ public class StorageTestSuite_FileReadWrite {
     }
 
     @Test
-    void roundWrite_badPaths() {
+    void testWrite_badPaths() {
 
         var absolutePath = OS.WINDOWS.isCurrentOs()
                 ? "C:\\Temp\\blah.txt"
@@ -322,6 +335,10 @@ public class StorageTestSuite_FileReadWrite {
         It is difficult to verify this using the abstracted storage API!
         These tests look for common symptoms of resource leaks that may catch some common errors
 
+        Error states in the streams are checked directly by mocking/spying on the Java Flow API
+        E.g. Illegal state and cancellation exceptions are checked explicitly
+        This is different from the functional tests, which unwrap stream state errors to look for EStorage errors
+
         Using the storage API it is not possible to simulate errors that occur in the storage back end
         E.g. loss of connection to a storage service or disk full during a write operation
 
@@ -331,9 +348,38 @@ public class StorageTestSuite_FileReadWrite {
      */
 
     @Test
-    void testWrite_notStarted() {
+    void testWrite_notStarted() throws Exception {
 
-        Assertions.fail();
+        var storagePath = "some_file.dat";
+
+        var writeSignal = new CompletableFuture<Long>();
+        var writer = storage.writer(storagePath, writeSignal, execContext);
+
+        var subscription = new Flow.Subscription() {
+
+            @Override
+            public void request(long n) {
+
+            }
+
+            @Override
+            public void cancel() {
+
+            }
+        };
+
+        writer.onSubscribe(subscription);
+        writer.onError(new RuntimeException("Dummy error"));
+        waitFor(TEST_TIMEOUT, writeSignal);
+
+        // writeSignal.can
+
+        Assertions.assertThrows(CancellationException.class, () -> resultOf(writeSignal));
+
+        var exists = storage.exists(storagePath);
+        waitFor(TEST_TIMEOUT, exists);
+
+        Assertions.assertFalse(resultOf(exists));
     }
 
     @Test
@@ -355,21 +401,315 @@ public class StorageTestSuite_FileReadWrite {
     }
 
     @Test
-    void testRead_notStarted() {
+    void testRead_requestUpfront() {
 
-        Assertions.fail();
+        var storagePath = "some_file.dat";
+
+        // Create a file big enough that it needs many chunks to read
+
+        var originalBytes = new byte[10 * 1024 * 1024];
+        var originalContent = ByteBufAllocator.DEFAULT.directBuffer(10000);
+
+        var random = new Random();
+        random.nextBytes(originalBytes);
+        originalContent.writeBytes(originalBytes);
+
+        var write = makeFile(storagePath, originalContent, storage, execContext);
+        waitFor(TEST_TIMEOUT, write);
+
+        // request a million chunks - way more than needed
+        // Actual chunks received will depend on the storage implementation
+        // These are intended as some common sense bounds
+
+        var CHUNKS_TO_REQUEST = 1000000;
+        var MIN_CHUNKS_EXPECTED = 10;          // implies a min chunk size of 1 MiB
+        var MAX_CHUNKS_EXPECTED = 40 * 1024;   // implies a max chunk size of 256 B
+
+        Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
+        AtomicLong bytesRead = new AtomicLong(0);
+
+        // Request all the chunks in one go as soon as onSubscribe is received
+        doAnswer(invocation -> {
+            Flow.Subscription subscription = invocation.getArgument(0);
+            subscription.request(CHUNKS_TO_REQUEST);
+            return null;
+        }).when(subscriber).onSubscribe(any(Flow.Subscription.class));
+
+        // Count up the bytes received and release buffers
+        doAnswer(invocation -> {
+            ByteBuf chunk = invocation.getArgument(0);
+            bytesRead.addAndGet(chunk.readableBytes());
+            chunk.release();
+            return null;
+        }).when(subscriber).onNext(any(ByteBuf.class));
+
+        // Create a reader and read using the mocked subscriber
+
+        var reader = storage.reader(storagePath, execContext);
+        reader.subscribe(subscriber);
+
+        // onSubscribe should be received right away
+        verify(subscriber, times(1)).onSubscribe(any(Flow.Subscription.class));
+
+        // The stream should be read until complete
+        verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onComplete();
+
+        // Chunks received - there should be more than one
+        verify(subscriber, atLeast(MIN_CHUNKS_EXPECTED)).onNext(any(ByteBuf.class));
+        verify(subscriber, atMost(MAX_CHUNKS_EXPECTED)).onNext(any(ByteBuf.class));
+
+        // No errors
+        verify(subscriber, never()).onError(any());
     }
 
     @Test
-    void testRead_cancelAndRetry() {
+    void testRead_neverSubscribe() throws Exception {
 
-        Assertions.fail();
+        var storagePath = "some_file.txt";
+        makeSmallFile(storagePath, storage, execContext);
+
+        // Create a reader but do not subscribe to it
+        // Reader should not try to access the file
+
+        var reader = storage.reader(storagePath, execContext);
+
+        // Use another reader to read the file - should be ok
+        var content = readFile(storagePath, storage, execContext);
+        waitFor(TEST_TIMEOUT, content);
+        Assertions.assertTrue(resultOf(content).readableBytes() > 0);
+        resultOf(content).release();
+
+        // Delete the file
+        var rm = storage.rm(storagePath, false);
+        waitFor(TEST_TIMEOUT, rm);
+
+        // Now try subscribing to the reader - should result in an illegal state exception
+        Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
+        reader.subscribe(subscriber);
+
+        verify(subscriber, never()).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, times(1)).onError(any(IllegalStateException.class));
     }
 
     @Test
-    void testRead_cancelAndDelete() {
+    void testRead_subscribeTwice() throws Exception {
 
-        Assertions.fail();
+        var storagePath = "some_file.txt";
+        makeSmallFile(storagePath, storage, execContext);
+
+        // Two subscribers that just record their subscriptions
+
+        CompletableFuture<Flow.Subscription> subscription1 = new CompletableFuture<>();
+        Flow.Subscriber<ByteBuf> subscriber1 = unchecked(mock(Flow.Subscriber.class));
+        doAnswer(invocation -> subscription1.complete(invocation.getArgument(0)))
+            .when(subscriber1).onSubscribe(any(Flow.Subscription.class));
+        // Also discard bytes from onNext, since some will be read
+        doAnswer(invocation -> ReferenceCountUtil.release(invocation.getArgument(0)))
+            .when(subscriber1).onNext(any(ByteBuf.class));
+
+        CompletableFuture<Flow.Subscription> subscription2 = new CompletableFuture<>();
+        Flow.Subscriber<ByteBuf> subscriber2 = unchecked(mock(Flow.Subscriber.class));
+        doAnswer(invocation -> subscription2.complete(invocation.getArgument(0)))
+            .when(subscriber2).onSubscribe(any(Flow.Subscription.class));
+
+        var reader = storage.reader(storagePath, execContext);
+        reader.subscribe(subscriber1);
+        reader.subscribe(subscriber2);
+
+        // First subscription should receive onSubscribe as normal
+        // Second should receive onError with an illegal state exception
+        // As per: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
+
+        verify(subscriber1, times(1)).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber2, times(1)).onError(any(IllegalStateException.class));
+
+        // Subscription 1 should still work as normal when data is requested
+
+        subscription1.get().request(2);
+        Thread.sleep(ASYNC_DELAY.toMillis());
+
+        verify(subscriber1, times(1)).onNext(any(ByteBuf.class));
+        verify(subscriber1, times(1)).onComplete();
+
+        // Subscription 2 should not receive any further signals
+
+        verify(subscriber2, never()).onSubscribe(any());
+        verify(subscriber2, never()).onNext(any());
+        verify(subscriber2, never()).onComplete();
+    }
+
+    @Test
+    void testRead_cancelImmediately() throws Exception {
+
+        var storagePath = "some_file.txt";
+        makeSmallFile(storagePath, storage, execContext);
+
+        // A subscriber that cancels as soon as it receives onSubscribe
+
+        Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
+        doAnswer(invocation -> {
+
+            var subscription = (Flow.Subscription) invocation.getArgument(0);
+            subscription.cancel();
+
+            return null;
+
+        }).when(subscriber).onSubscribe(any(Flow.Subscription.class));
+
+        // Read using the mocked subscriber
+        // No error should be thrown as a result of the cancel
+
+        var reader = storage.reader(storagePath, execContext);
+        reader.subscribe(subscriber);
+
+        // Expected sequence of calls into the subscriber
+        //  - One call into onSubscribe, when the subscriber was subscribed
+        //  - Nothing else, because we cancelled before making any requests
+
+        Thread.sleep(ASYNC_DELAY.toMillis());
+
+        verify(subscriber, times(1)).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, never()).onNext(any());
+        verify(subscriber, never()).onComplete();
+        verify(subscriber, never()).onError(any());
+    }
+
+    @Test
+    void testRead_cancelAndRetry() throws Exception {
+
+        var storagePath = "some_file.dat";
+
+        // Create a file big enough that it can't be read in a single chunk
+
+        var originalBytes = new byte[10000];
+        var originalContent = ByteBufAllocator.DEFAULT.directBuffer(10000);
+
+        var random = new Random();
+        random.nextBytes(originalBytes);
+        originalContent.writeBytes(originalBytes);
+
+        makeFile(storagePath, originalContent, storage, execContext);
+
+        // A subscriber that will read one chunk and then cancel the subscription
+
+        Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
+        CompletableFuture<Flow.Subscription> subscription = new CompletableFuture<>();
+        doAnswer(invocation -> {
+
+            // Request 2 chunks, but we'll cancel when we get the first one
+            subscription.complete(invocation.getArgument(0));
+            subscription.get().request(2);
+            return null;
+
+        }).when(subscriber).onSubscribe(any(Flow.Subscription.class));
+        doAnswer(invocation -> {
+
+            ReferenceCountUtil.release(invocation.getArgument(0));
+            subscription.get().cancel();
+            return null;
+
+        }).when(subscriber).onNext(any(ByteBuf.class));
+
+        // Create a reader and read using the mocked subscriber
+
+        var reader = storage.reader(storagePath, execContext);
+        reader.subscribe(subscriber);
+
+        // Expected sequence of calls into the subscriber
+        //  - One call into onSubscribe, we request 2 chunks
+        //  - One call into onNext, then we cancel the subscription
+        //  - No further calls to onNext, no calls to onComplete or onError
+
+        Thread.sleep(ASYNC_DELAY.toMillis());
+
+        verify(subscriber, times(1)).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, times(1)).onNext(any());
+        verify(subscriber, never()).onComplete();
+        verify(subscriber, never()).onError(any());
+
+        // Now do a regular read and make sure the whole content comes back
+
+        var retryRead = readFile(storagePath, storage, execContext);
+
+        waitFor(TEST_TIMEOUT, retryRead);
+        var content = resultOf(retryRead);
+
+        var bytes = new byte[content.readableBytes()];
+        content.readBytes(bytes);
+        content.release();
+
+        Assertions.assertArrayEquals(originalBytes, bytes);
+    }
+
+    @Test
+    void testRead_cancelAndDelete() throws Exception {
+
+        var storagePath = "some_file.dat";
+
+        // Create a file big enough that it can't be read in a single chunk
+
+        var originalBytes = new byte[10000];
+        var originalContent = ByteBufAllocator.DEFAULT.directBuffer(10000);
+
+        var random = new Random();
+        random.nextBytes(originalBytes);
+        originalContent.writeBytes(originalBytes);
+
+        makeFile(storagePath, originalContent, storage, execContext);
+
+        // A subscriber that will read one chunk and then cancel the subscription
+
+        Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
+        CompletableFuture<Flow.Subscription> subscription = new CompletableFuture<>();
+        doAnswer(invocation -> {
+
+            // Request 2 chunks, but we'll cancel when we get the first one
+            subscription.complete(invocation.getArgument(0));
+            subscription.get().request(2);
+            return null;
+
+        }).when(subscriber).onSubscribe(any(Flow.Subscription.class));
+        doAnswer(invocation -> {
+
+            ReferenceCountUtil.release(invocation.getArgument(0));
+            subscription.get().cancel();
+            return null;
+
+        }).when(subscriber).onNext(any(ByteBuf.class));
+
+        // Create a reader and read using the mocked subscriber
+
+        var reader = storage.reader(storagePath, execContext);
+        reader.subscribe(subscriber);
+
+        // Expected sequence of calls into the subscriber
+        //  - One call into onSubscribe, we request 2 chunks
+        //  - One call into onNext, then we cancel the subscription
+        //  - No further calls to onNext, no calls to onComplete or onError
+
+        Thread.sleep(ASYNC_DELAY.toMillis());
+
+        verify(subscriber, times(1)).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, times(1)).onNext(any());
+        verify(subscriber, never()).onComplete();
+        verify(subscriber, never()).onError(any());
+
+        // Now delete the file
+
+        var rm = storage.rm(storagePath, false);
+
+        waitFor(TEST_TIMEOUT, rm);
+
+        var exists = storage.exists(storagePath);
+
+        waitFor(TEST_TIMEOUT, exists);
+        Assertions.assertFalse(resultOf(exists));
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T unchecked(Object unchecked) {
+
+        return (T) unchecked;
     }
 
 }

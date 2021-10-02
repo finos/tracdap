@@ -19,22 +19,28 @@ package com.accenture.trac.common.storage.local;
 import com.accenture.trac.common.exception.EUnexpected;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.util.concurrent.OrderedEventExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.CompletionHandler;
 import java.nio.file.Path;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import static com.accenture.trac.common.storage.local.LocalFileErrors.ExplicitError.DUPLICATE_SUBSCRIPTION;
 import static com.accenture.trac.common.storage.local.LocalFileStorage.READ_OPERATION;
+import static com.accenture.trac.common.storage.local.LocalFileStorage.WRITE_OPERATION;
 import static java.nio.file.StandardOpenOption.*;
 
 
 public class LocalFileReader implements Flow.Publisher<ByteBuf> {
+
+    private static final int DEFAULT_CHUNK_SIZE = 4096;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
     private final LocalFileErrors errors;
@@ -42,24 +48,24 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
     private final Path absolutePath;
     private final ByteBufAllocator allocator;
-    private final ExecutorService executor;
+    private final OrderedEventExecutor executor;
 
-    private final ReadSubscription subscription;
-    private final ReadHandler handler;
-
-    private AsynchronousFileChannel channel;
+    private final AtomicBoolean subscriberSet;
     private Flow.Subscriber<? super ByteBuf> subscriber;
 
-    private int chunkSize = 4096;  // TODO: Size
+    private AsynchronousFileChannel channel;
+    private ChunkReadHandler readHandler;
+
     private int chunksPending;
     private long bytesRead;
     private boolean gotComplete;
+    private boolean gotCancel;
     private boolean gotError;
 
     LocalFileReader(
             String storageKey, String storagePath,
             Path absolutePath, ByteBufAllocator allocator,
-            ExecutorService executor) {
+            OrderedEventExecutor executor) {
 
         this.errors = new LocalFileErrors(log, storageKey);
         this.storagePath = storagePath;
@@ -68,12 +74,13 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         this.allocator = allocator;
         this.executor = executor;
 
-        this.subscription = new ReadSubscription();
-        this.handler = new ReadHandler();
+        this.subscriberSet = new AtomicBoolean(false);
+        this.subscriber = null;
 
         chunksPending = 0;
         bytesRead = 0;
         gotComplete = false;
+        gotCancel = false;
         gotError = false;
     }
 
@@ -82,14 +89,37 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
         try {
 
-            channel = AsynchronousFileChannel.open(absolutePath, Set.of(READ), executor);
+            // This method can be called externally
+            // Avoid concurrency issues - use atomic boolean CAS to ensure the method is only called once
+            // No other processing has started at this point
+
+            var subscribeOk =  subscriberSet.compareAndSet(false, true);
+
+            if (!subscribeOk) {
+
+                // According to Java API docs, errors in subscribe() should be reported as IllegalStateException
+                // https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
+
+                var eStorage = errors.explicit(DUPLICATE_SUBSCRIPTION, storagePath, READ_OPERATION);
+                var eFlowState = new IllegalStateException(eStorage.getMessage(), eStorage);
+                subscriber.onError(eFlowState);
+                return;
+            }
 
             this.subscriber = subscriber;
-            subscriber.onSubscribe(subscription);
-        }
-        catch (IOException e) {
 
-            throw errors.handleException(e, storagePath, READ_OPERATION);
+            this.channel = AsynchronousFileChannel.open(absolutePath, Set.of(READ), executor);
+            this.readHandler = new ChunkReadHandler();
+
+            log.info("File channel open for reading: [{}]", absolutePath);
+
+            subscriber.onSubscribe(new ReadSubscription());
+        }
+        catch (Exception e) {
+
+            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
+            var eFlowState = new IllegalStateException(eStorage.getMessage(), eStorage);
+            subscriber.onError(eFlowState);
         }
     }
 
@@ -98,60 +128,256 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         @Override
         public void request(long n) {
 
-            var buffer = allocator.ioBuffer(chunkSize);
+            // This method can be called externally
+            // Avoid concurrency issues - ensure all calls are processed in the ordered event loop
 
-            if (buffer.nioBufferCount() != 1)
-                throw new EUnexpected();
+            if (!executor.inEventLoop()) {
+                executor.submit(() -> request(n));
+                return;
+            }
 
-            var nio = buffer.nioBuffer(0, chunkSize);
+            var alreadyReading = (chunksPending > 0);
+            chunksPending += n;
 
-            channel.read(nio, bytesRead, buffer, handler);
+            // Do not trigger a read if the read operation has finished for any reason
+            // Also do not trigger if there are chunks already being read
+
+            if (!(gotComplete || gotError || gotCancel))
+                if (!alreadyReading)
+                    readChunk();
         }
 
         @Override
         public void cancel() {
 
-            doClose();
+            // This method can be called externally
+            // Avoid concurrency issues - ensure all calls are processed in the ordered event loop
+
+            if (!executor.inEventLoop()) {
+                executor.submit(this::cancel);
+                return;
+            }
+
+            // Do not run onCancel twice, or if the read operation has already finished for any reason
+
+            var alreadyCancelled = gotCancel;
+            gotCancel = true;
+
+            if (!(gotComplete || gotError || alreadyCancelled))
+                doCancel();
         }
     }
 
-    private class ReadHandler implements CompletionHandler<Integer, ByteBuf> {
+    private class ChunkReadHandler implements CompletionHandler<Integer, ByteBuf> {
 
         @Override
         public void completed(Integer nBytes, ByteBuf buffer) {
 
-            if (nBytes >= 0) {
-                bytesRead += nBytes;
-                buffer.writerIndex(nBytes);
-                subscriber.onNext(buffer);
+            chunksPending -= 1;
+
+            // Check if the read is already failed or cancelled
+            // If so, release the buffer and do not send any further signals
+            if (gotError || gotCancel) {
+
+                releaseBuffer(buffer);
             }
+
+            // nBytes read < 0 indicates the read is complete
+            else if (nBytes < 0) {
+
+                // Buffer contains no data so can be released immediately
+                releaseBuffer(buffer);
+
+                // Make sure not to send multiple onComplete signals
+                // E.g. if multiple chunks have been requested past the end of the file
+
+                var alreadyComplete = gotComplete;
+                gotComplete = true;
+
+                if (!(gotError || gotCancel || alreadyComplete))
+                    doComplete();
+            }
+
+            // Otherwise, this is a normal read
+            // Count the bytes and send them on their journey!
             else {
-                doClose();
-                subscriber.onComplete();
+
+                bytesRead += nBytes;
+                gotChunk(buffer, nBytes);
             }
         }
 
         @Override
         public void failed(Throwable error, ByteBuf buffer) {
 
-            try {
-                doClose();
-                //buffer.
-            }
-            finally {
-                subscriber.onError(error);
-            }
+            chunksPending -= 1;
+
+            // Buffer contains no data so can be released immediately
+            releaseBuffer(buffer);
+
+            // Async close exception is sent for operations that were in progress when the channel was closed
+            // If the close happened because of a complete or cancel event,
+            // then it is safe to ignore these errors
+
+            if (error instanceof AsynchronousCloseException)
+                if (gotComplete || gotCancel)
+                    return;
+
+            // Make sure not to send multiple onError signals
+
+            var alreadyFailed = gotError;
+            gotError = true;
+
+            if (!gotComplete || gotCancel || alreadyFailed)
+                handleError(error);
+
+            else
+                // For errors after termination, put a warning in the log
+                log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, error);
         }
     }
 
-    private void doClose() {
+    private void readChunk() {
 
         try {
+
+            var buffer = allocator.ioBuffer(DEFAULT_CHUNK_SIZE);
+
+            if (buffer.nioBufferCount() != 1)
+                throw new EUnexpected();
+
+            var nio = buffer.nioBuffer(0, DEFAULT_CHUNK_SIZE);
+
+            channel.read(nio, bytesRead, buffer, readHandler);
+        }
+        catch (Exception e) {
+
+            var alreadyGotError = gotError;
+            gotError = true;
+
+            // Only report errors to the subscriber if there is no previous termination signal
+            if (!(gotComplete || gotCancel || alreadyGotError))
+                handleError(e);
+
+            else
+                // For errors after termination, put a warning in the log
+                log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, e);
+        }
+
+    }
+
+    private void gotChunk(ByteBuf buffer, int nBytes) {
+
+        try {
+
+            // Trigger the next read operation immediately
+            // Possibly the subscriber is going to do processing in onNext
+
+            if (chunksPending > 0)
+                readChunk();
+
+            // The channel wrote into the underlying nio ByteBuffer
+            // Update the Netty ByteBuf to match the number of bytes received
+
+            buffer.writerIndex(nBytes);
+
+            // Signal the subscriber
+
+            subscriber.onNext(buffer);
+        }
+        catch (Exception e) {
+
+            var alreadyGotError = gotError;
+            gotError = true;
+
+            // Only report errors to the subscriber if there is no previous termination signal
+            if (!(gotComplete || gotCancel || alreadyGotError))
+                handleError(e);
+
+            else
+                // For errors after termination, put a warning in the log
+                log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, e);
+        }
+    }
+
+    private void doComplete() {
+
+        try {
+
+            log.info("Read operation complete: {} bytes read [{}]", bytesRead, absolutePath);
+
             channel.close();
+
+            log.info("File channel closed: [{}]", absolutePath);
+
+            subscriber.onComplete();
         }
-        catch (IOException e) {
-            // TODO
+        catch (Exception e) {
+
+            log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
+
+            var eStorage = errors.handleException(e, storagePath, WRITE_OPERATION);
+            subscriber.onError(eStorage);
         }
+    }
+
+    private void doCancel() {
+
+        try {
+
+            log.info("Read operation cancelled: [{}]",  absolutePath);
+
+            channel.close();
+
+            log.info("File channel closed: [{}]", absolutePath);
+
+            // Do not send any signal to the subscriber for a clean cancel
+        }
+        catch (Exception e) {
+
+            log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
+
+            // If the cancel results in an error closing the file, do send the onError message
+
+            var eStorage = errors.handleException(e, storagePath, WRITE_OPERATION);
+            subscriber.onError(eStorage);
+        }
+    }
+
+    private void handleError(Throwable throwable) {
+
+        var error = throwable instanceof Exception
+                ? (Exception) throwable
+                : new ExecutionException(throwable);
+
+        try {
+
+            log.error("Read operation failed: {} [{}]", throwable.getMessage(), absolutePath, throwable);
+
+            channel.close();
+
+            log.info("File channel closed: [{}]", absolutePath);
+
+            var eStorage = errors.handleException(error, storagePath, WRITE_OPERATION);
+            subscriber.onError(eStorage);
+        }
+        catch (Exception e) {
+
+            log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
+
+            // Report the original error back up the chain, not the secondary error that occurred on close
+
+            var eStorage = errors.handleException(e, storagePath, WRITE_OPERATION);
+            subscriber.onError(eStorage);
+        }
+    }
+
+    private void releaseBuffer(ByteBuf buffer) {
+
+        var releaseOk = buffer.release();
+
+        if (!releaseOk && buffer.capacity() > 0)
+            log.warn("Chunk buffer was not released (this could indicate a memory leak)");
     }
 
 }
