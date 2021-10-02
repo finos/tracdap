@@ -16,8 +16,6 @@
 
 package com.accenture.trac.common.storage.local;
 
-import com.accenture.trac.common.exception.EStorage;
-
 import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,12 +28,15 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Flow;
 
+import static com.accenture.trac.common.storage.local.LocalFileStorage.WRITE_OPERATION;
 import static java.nio.file.StandardOpenOption.*;
 
 
 public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
+    private final LocalFileErrors errors;
+    private final String storagePath;
 
     private final Path absolutePath;
     private final CompletableFuture<Long> signal;
@@ -49,7 +50,13 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     private boolean gotComplete;
     private boolean gotError;
 
-    LocalFileWriter(Path absolutePath, CompletableFuture<Long> signal, ExecutorService executor) {
+    LocalFileWriter(
+            String storageKey, String storagePath,
+            Path absolutePath, CompletableFuture<Long> signal, ExecutorService executor) {
+
+        this.errors = new LocalFileErrors(log, storageKey);
+        this.storagePath = storagePath;
+
         this.absolutePath = absolutePath;
         this.signal = signal;
         this.executor = executor;
@@ -73,7 +80,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
         }
         catch (IOException e) {
 
-            throw new EStorage("", e);  // TODO: Error
+            throw errors.handleException(e, storagePath, WRITE_OPERATION);
         }
     }
 

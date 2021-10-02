@@ -30,14 +30,13 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
+
+import static com.accenture.trac.common.storage.local.LocalFileErrors.ExplicitError.*;
 
 
 public class LocalFileStorage implements IFileStorage {
@@ -50,31 +49,18 @@ public class LocalFileStorage implements IFileStorage {
     private static final String LS_OPERATION = "ls";
     private static final String MKDIR_OPERATION = "mkdir";
     private static final String RM_OPERATION = "rm";
-    private static final String WRITE_OPERATION = "write";
-    private static final String READ_OPERATION = "read";
-
-    private static final List<Map.Entry<Class<? extends Exception>, String>> ERROR_MAP = List.of(
-            Map.entry(NoSuchFileException.class, "File not found in storage layer: %s %s [%s]"),
-            Map.entry(FileAlreadyExistsException.class, "File already exists in storage layer: %s %s [%s]"),
-            Map.entry(DirectoryNotEmptyException.class, "Directory is not empty in storage layer: %s %s [%s]"),
-            Map.entry(AccessDeniedException.class, "Access denied in storage layer: %s %s [%s]"),
-            Map.entry(SecurityException.class, "Access denied in storage layer: %s %s [%s]"),
-            // IOException must be last in the list, not to obscure most specific exceptions
-            Map.entry(IOException.class, "An IO error occurred in the storage layer: %s %s [%s]"));
-
-    private static final String SIZE_OF_DIR_ERROR = "Size operation is not available for directories: %s %s [%s]";
-    private static final String STAT_NOT_FILE_OR_DIR_ERROR = "Object is not a file or directory: %s %s [%s]";
-    private static final String RM_DIR_RECURSIVE_ERROR =
-            "Regular delete operation not available for directories (use recursive delete): %s %s [%s]";
-
-    private static final String UNKNOWN_ERROR = "An unexpected error occurred in the storage layer: %s %s [%s]";
+    static final String WRITE_OPERATION = "write";
+    static final String READ_OPERATION = "read";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
+    private final LocalFileErrors errors;
 
     private final String storageKey;
     private final Path rootPath;
 
     public LocalFileStorage(String storageKey, String storageRootPath) {
+
+        this.errors = new LocalFileErrors(log, storageKey);
 
         this.storageKey = storageKey;
         this.rootPath = Paths.get(storageRootPath)
@@ -148,7 +134,7 @@ public class LocalFileStorage implements IFileStorage {
         }
         catch (Exception e) {
 
-            var eStorage = handleIOException(e, EXISTS_OPERATION, storagePath);
+            var eStorage = errors.handleException(e, EXISTS_OPERATION, storagePath);
             return CompletableFuture.failedFuture(eStorage);
         }
     }
@@ -164,13 +150,13 @@ public class LocalFileStorage implements IFileStorage {
             // Size operation for non-regular files can still succeed
             // So, add an explicit check for directories (and other non-regular files)
             if (!Files.isRegularFile(absolutePath))
-                throw errorResult(SIZE_OF_DIR_ERROR, storagePath, SIZE_OPERATION);
+                throw errors.explicit(SIZE_OF_DIR, storagePath, SIZE_OPERATION);
 
             return CompletableFuture.completedFuture(size);
         }
         catch (Exception e) {
 
-            var eStorage = handleIOException(e, storagePath, SIZE_OPERATION);
+            var eStorage = errors.handleException(e, storagePath, SIZE_OPERATION);
             return CompletableFuture.failedFuture(eStorage);
         }
     }
@@ -186,7 +172,7 @@ public class LocalFileStorage implements IFileStorage {
         }
         catch (Exception e) {
 
-            var eStorage = handleIOException(e, storagePath, STAT_OPERATION);
+            var eStorage = errors.handleException(e, storagePath, STAT_OPERATION);
             return CompletableFuture.failedFuture(eStorage);
         }
     }
@@ -210,7 +196,7 @@ public class LocalFileStorage implements IFileStorage {
         }
         catch (Exception e) {
 
-            var eStorage = handleIOException(e, storagePath, LS_OPERATION);
+            var eStorage = errors.handleException(e, storagePath, LS_OPERATION);
             return CompletableFuture.failedFuture(eStorage);
         }
     }
@@ -246,7 +232,7 @@ public class LocalFileStorage implements IFileStorage {
             var attrs = Files.readAttributes(absolutePath, attrType);
 
             if (!attrs.isRegularFile() && !attrs.isDirectory())
-                throw errorResult(STAT_NOT_FILE_OR_DIR_ERROR, storagePath, STAT_OPERATION);
+                throw errors.explicit(STAT_NOT_FILE_OR_DIR, storagePath, STAT_OPERATION);
 
             var fileName = absolutePath.getFileName().toString();
             var fileType = attrs.isRegularFile() ? FileType.FILE : FileType.DIRECTORY;
@@ -267,7 +253,7 @@ public class LocalFileStorage implements IFileStorage {
         }
         catch (IOException e) {
 
-            throw handleIOException(e, storagePath, operationName);
+            throw errors.handleException(e, storagePath, operationName);
         }
     }
 
@@ -286,7 +272,7 @@ public class LocalFileStorage implements IFileStorage {
         }
         catch (Exception e) {
 
-            var eStorage = handleIOException(e, storagePath, MKDIR_OPERATION);
+            var eStorage = errors.handleException(e, storagePath, MKDIR_OPERATION);
             return CompletableFuture.failedFuture(eStorage);
         }
     }
@@ -325,7 +311,7 @@ public class LocalFileStorage implements IFileStorage {
 
                 // Do not allow rm on a directory with the recursive flag set
                 if (Files.isDirectory(absolutePath))
-                    throw errorResult(RM_DIR_RECURSIVE_ERROR, storagePath, RM_OPERATION);
+                    throw errors.explicit(RM_DIR_NOT_RECURSIVE, storagePath, RM_OPERATION);
 
                 Files.delete(absolutePath);
             }
@@ -334,7 +320,7 @@ public class LocalFileStorage implements IFileStorage {
         }
         catch (Exception e) {
 
-            var eStorage = handleIOException(e, storagePath, RM_OPERATION);
+            var eStorage = errors.handleException(e, storagePath, RM_OPERATION);
             return CompletableFuture.failedFuture(eStorage);
         }
     }
@@ -345,6 +331,7 @@ public class LocalFileStorage implements IFileStorage {
         var absolutePath = resolvePath(storagePath, false, READ_OPERATION);
 
         return new LocalFileReader(
+                storageKey, storagePath,
                 absolutePath, ByteBufAllocator.DEFAULT,
                 execContext.eventLoopExecutor());
     }
@@ -358,6 +345,7 @@ public class LocalFileStorage implements IFileStorage {
         var absolutePath = resolvePath(storagePath, false, WRITE_OPERATION);
 
         return new LocalFileWriter(
+                storageKey, storagePath,
                 absolutePath, signal,
                 execContext.eventLoopExecutor());
     }
@@ -366,103 +354,28 @@ public class LocalFileStorage implements IFileStorage {
 
         try {
 
-            if (storagePath == null || storagePath.isBlank()) {
-
-                var err = String.format(
-                        "Requested storage path is null or blank: %s %s [%s]",
-                        storageKey, operationName, storagePath);
-
-                log.error(err);
-                throw new EValidationGap(err);
-            }
+            if (storagePath == null || storagePath.isBlank())
+                throw errors.explicit(STORAGE_PATH_NULL_OR_BLANK, storagePath, operationName);
 
             var relativePath = Path.of(storagePath);
 
-            if (relativePath.isAbsolute()) {
-
-                var err = String.format(
-                        "Requested storage path is not a relative path: %s %s [%s]",
-                        storageKey, operationName, storagePath);
-
-                log.error(err);
-                throw new EValidationGap(err);
-            }
+            if (relativePath.isAbsolute())
+                throw errors.explicit(STORAGE_PATH_NOT_RELATIVE, storagePath, operationName);
 
             var absolutePath = rootPath.resolve(storagePath).normalize();
 
-            if (absolutePath.getNameCount() < rootPath.getNameCount() || !absolutePath.startsWith(rootPath)) {
+            if (absolutePath.getNameCount() < rootPath.getNameCount() || !absolutePath.startsWith(rootPath))
+                throw errors.explicit(STORAGE_PATH_OUTSIDE_ROOT, storagePath, operationName);
 
-                var err = String.format(
-                        "Requested storage path is outside the storage root directory: %s %s [%s]",
-                        storageKey, operationName, storagePath);
 
-                log.error(err);
-                throw new EValidationGap(err);
-            }
-
-            if (absolutePath.equals(rootPath) && !allowRootDir) {
-
-                var err = String.format(
-                        "Requested operation not allowed on the storage root directory: %s %s [%s]",
-                        storageKey, operationName, storagePath);
-
-                log.error(err);
-                throw new EValidationGap(err);
-
-            }
+            if (absolutePath.equals(rootPath) && !allowRootDir)
+                throw errors.explicit(STORAGE_PATH_IS_ROOT, storagePath, operationName);
 
             return absolutePath;
         }
         catch (InvalidPathException e) {
 
-            var err = String.format(
-                    "Requested storage path is invalid: %s %s [%s]",
-                    storageKey, operationName, storagePath);
-
-            log.error(err, e);
-            throw new EValidationGap(err);
-
+            throw errors.explicit(STORAGE_PATH_INVALID, storagePath, operationName);
         }
-    }
-
-    private ETrac handleIOException(Exception e, String storagePath, String operationName) {
-
-        // Error of type ETrac means the error is already handled
-        if (e instanceof ETrac)
-            return (ETrac) e;
-
-        // Look in the map of error types to see if e is an expected exception
-        for (var error : ERROR_MAP) {
-
-            var errorClass = error.getKey();
-
-            if (errorClass.isInstance(e)) {
-
-                var errorMessageTemplate = error.getValue();
-                return errorResult(e, errorMessageTemplate, storagePath, operationName);
-            }
-        }
-
-        // Last fallback - report an unknown error in the storage layer
-        return errorResult(e, UNKNOWN_ERROR, storagePath, operationName);
-    }
-
-    private EStorage errorResult(Exception e, String errorTemplate, String path, String operation) {
-
-        var errorMessage = String.format(errorTemplate, storageKey, operation, path);
-
-        log.error(errorMessage);
-        log.error(e.getMessage(), e);
-
-        return new EStorageRequest(errorMessage, e);
-    }
-
-    private EStorage errorResult(String errorTemplate, String path, String operation) {
-
-        var errorMessage = String.format(errorTemplate, storageKey, operation, path);
-
-        log.error(errorMessage);
-
-        return new EStorageRequest(errorMessage);
     }
 }

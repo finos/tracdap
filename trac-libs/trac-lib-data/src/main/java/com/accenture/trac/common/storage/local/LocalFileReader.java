@@ -16,7 +16,6 @@
 
 package com.accenture.trac.common.storage.local;
 
-import com.accenture.trac.common.exception.EStorage;
 import com.accenture.trac.common.exception.EUnexpected;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -31,12 +30,15 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Flow;
 
+import static com.accenture.trac.common.storage.local.LocalFileStorage.READ_OPERATION;
 import static java.nio.file.StandardOpenOption.*;
 
 
 public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
+    private final LocalFileErrors errors;
+    private final String storagePath;
 
     private final Path absolutePath;
     private final ByteBufAllocator allocator;
@@ -54,7 +56,13 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
     private boolean gotComplete;
     private boolean gotError;
 
-    LocalFileReader(Path absolutePath, ByteBufAllocator allocator, ExecutorService executor) {
+    LocalFileReader(
+            String storageKey, String storagePath,
+            Path absolutePath, ByteBufAllocator allocator,
+            ExecutorService executor) {
+
+        this.errors = new LocalFileErrors(log, storageKey);
+        this.storagePath = storagePath;
 
         this.absolutePath = absolutePath;
         this.allocator = allocator;
@@ -81,7 +89,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         }
         catch (IOException e) {
 
-            throw new EStorage("", e);  // TODO: Error
+            throw errors.handleException(e, storagePath, READ_OPERATION);
         }
     }
 
