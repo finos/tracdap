@@ -84,16 +84,23 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         gotError = false;
     }
 
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // PUBLISHER INTERFACE
+    // -----------------------------------------------------------------------------------------------------------------
+
+    // These public methods can all be called externally and may be called on different threads
+
+
     @Override
     public void subscribe(Flow.Subscriber<? super ByteBuf> subscriber) {
 
         try {
 
-            // This method can be called externally
             // Avoid concurrency issues - use atomic boolean CAS to ensure the method is only called once
             // No other processing has started at this point
 
-            var subscribeOk =  subscriberSet.compareAndSet(false, true);
+            var subscribeOk = subscriberSet.compareAndSet(false, true);
 
             if (!subscribeOk) {
 
@@ -128,7 +135,6 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         @Override
         public void request(long n) {
 
-            // This method can be called externally
             // Avoid concurrency issues - ensure all calls are processed in the ordered event loop
 
             if (!executor.inEventLoop()) {
@@ -150,7 +156,6 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         @Override
         public void cancel() {
 
-            // This method can be called externally
             // Avoid concurrency issues - ensure all calls are processed in the ordered event loop
 
             if (!executor.inEventLoop()) {
@@ -168,25 +173,38 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         }
     }
 
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // PRIVATE IMPLEMENTATION
+    // -----------------------------------------------------------------------------------------------------------------
+
+    // These methods are only ever called on the ordered event executor
+
+
     private class ChunkReadHandler implements CompletionHandler<Integer, ByteBuf> {
 
         @Override
-        public void completed(Integer nBytes, ByteBuf buffer) {
+        public void completed(Integer nBytes, ByteBuf chunk) {
+
+            // Update counts
 
             chunksPending -= 1;
+
+            if (nBytes > 0)
+                bytesRead += nBytes;
 
             // Check if the read is already failed or cancelled
             // If so, release the buffer and do not send any further signals
             if (gotError || gotCancel) {
 
-                releaseBuffer(buffer);
+                releaseBuffer(chunk);
             }
 
             // nBytes read < 0 indicates the read is complete
             else if (nBytes < 0) {
 
                 // Buffer contains no data so can be released immediately
-                releaseBuffer(buffer);
+                releaseBuffer(chunk);
 
                 // Make sure not to send multiple onComplete signals
                 // E.g. if multiple chunks have been requested past the end of the file
@@ -202,18 +220,17 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             // Count the bytes and send them on their journey!
             else {
 
-                bytesRead += nBytes;
-                gotChunk(buffer, nBytes);
+                gotChunk(chunk, nBytes);
             }
         }
 
         @Override
-        public void failed(Throwable error, ByteBuf buffer) {
+        public void failed(Throwable error, ByteBuf chunk) {
 
             chunksPending -= 1;
 
             // Buffer contains no data so can be released immediately
-            releaseBuffer(buffer);
+            releaseBuffer(chunk);
 
             // Async close exception is sent for operations that were in progress when the channel was closed
             // If the close happened because of a complete or cancel event,
@@ -241,14 +258,14 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
         try {
 
-            var buffer = allocator.ioBuffer(DEFAULT_CHUNK_SIZE);
+            var chunk = allocator.ioBuffer(DEFAULT_CHUNK_SIZE);
 
-            if (buffer.nioBufferCount() != 1)
+            if (chunk.nioBufferCount() != 1)
                 throw new EUnexpected();
 
-            var nio = buffer.nioBuffer(0, DEFAULT_CHUNK_SIZE);
+            var nioChunk = chunk.nioBuffer(0, DEFAULT_CHUNK_SIZE);
 
-            channel.read(nio, bytesRead, buffer, readHandler);
+            channel.read(nioChunk, bytesRead, chunk, readHandler);
         }
         catch (Exception e) {
 
@@ -266,7 +283,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
     }
 
-    private void gotChunk(ByteBuf buffer, int nBytes) {
+    private void gotChunk(ByteBuf chunk, int nBytes) {
 
         try {
 
@@ -279,13 +296,15 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             // The channel wrote into the underlying nio ByteBuffer
             // Update the Netty ByteBuf to match the number of bytes received
 
-            buffer.writerIndex(nBytes);
+            chunk.writerIndex(nBytes);
 
             // Signal the subscriber
 
-            subscriber.onNext(buffer);
+            subscriber.onNext(chunk);
         }
         catch (Exception e) {
+
+            releaseBuffer(chunk);
 
             var alreadyGotError = gotError;
             gotError = true;
