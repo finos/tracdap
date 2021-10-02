@@ -18,8 +18,8 @@ package com.accenture.trac.common.eventloop;
 
 import com.accenture.trac.common.exception.ETracInternal;
 import io.grpc.*;
-import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.EventExecutorGroup;
+import io.netty.util.concurrent.OrderedEventExecutor;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentMap;
 public class ExecutionRegister {
 
     private final EventExecutorGroup executorGroup;
-    private final ConcurrentMap<String, EventExecutor> executors;
+    private final ConcurrentMap<String, OrderedEventExecutor> executors;
 
     public ExecutionRegister(EventExecutorGroup executorGroup) {
         this.executorGroup = executorGroup;
@@ -51,12 +51,12 @@ public class ExecutionRegister {
         return new ExecutionContext(executor);
     }
 
-    private EventExecutor registerEventLoopKey(String eventLoopKey) {
+    private OrderedEventExecutor registerEventLoopKey(String eventLoopKey) {
 
         for (var eventExec : executorGroup) {
-            if (eventExec.inEventLoop()) {
-                executors.putIfAbsent(eventLoopKey, eventExec);
-                return eventExec;
+            if (eventExec.inEventLoop() && eventExec instanceof OrderedEventExecutor) {
+                executors.putIfAbsent(eventLoopKey, (OrderedEventExecutor) eventExec);
+                return (OrderedEventExecutor) eventExec;
             }
         }
 
@@ -72,8 +72,8 @@ public class ExecutionRegister {
                 Metadata headers,
                 ServerCallHandler<ReqT, RespT> next) {
 
-
             var execCtx = execContextForThread();
+
             var grpcCtx = Context.current();
             var newCtx = grpcCtx.withValue(ExecutionContext.EXEC_CONTEXT_KEY, execCtx);
             var priorCtx = newCtx.attach();

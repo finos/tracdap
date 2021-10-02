@@ -18,6 +18,7 @@ package com.accenture.trac.common.eventloop;
 
 import io.grpc.*;
 import io.netty.util.concurrent.EventExecutor;
+import io.netty.util.concurrent.OrderedEventExecutor;
 
 import javax.annotation.Nullable;
 import java.util.concurrent.Executor;
@@ -26,14 +27,14 @@ public class ExecutionContext implements IExecutionContext {
 
     public static final Context.Key<IExecutionContext> EXEC_CONTEXT_KEY = Context.key("TRAC_EXEC_CONTEXT");
 
-    private final EventExecutor eventLoopExecutor;
+    private final OrderedEventExecutor eventLoopExecutor;
 
-    public ExecutionContext(EventExecutor eventLoopExecutor) {
+    public ExecutionContext(OrderedEventExecutor eventLoopExecutor) {
         this.eventLoopExecutor = eventLoopExecutor;
     }
 
     @Override
-    public EventExecutor eventLoopExecutor() {
+    public OrderedEventExecutor eventLoopExecutor() {
         return eventLoopExecutor;
     }
 

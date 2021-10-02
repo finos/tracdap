@@ -16,9 +16,10 @@
 
 package com.accenture.trac.common.eventloop;
 
-import io.netty.util.concurrent.EventExecutor;
+import io.netty.util.concurrent.OrderedEventExecutor;
+
 
 public interface IExecutionContext {
 
-    EventExecutor eventLoopExecutor();
+    OrderedEventExecutor eventLoopExecutor();
 }
