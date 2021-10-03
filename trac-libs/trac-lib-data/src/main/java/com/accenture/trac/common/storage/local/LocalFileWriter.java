@@ -16,7 +16,6 @@
 
 package com.accenture.trac.common.storage.local;
 
-import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.concurrent.OrderedEventExecutor;
@@ -55,7 +54,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     private long bytesWritten;
     private boolean gotComplete;
     private boolean gotError;
-    private boolean gotCancel;
+    private final boolean gotCancel;
 
     LocalFileWriter(
             String storageKey, String storagePath,
@@ -90,31 +89,32 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
 
+        // Avoid concurrency issues - use atomic boolean CAS to ensure the method is only called once
+        // No other processing has started at this point
+
+        var subscribeOk = subscriptionSet.compareAndSet(false, true);
+
+        if (!subscribeOk) {
+
+            // According to Java API docs, errors in subscribe() should be reported as IllegalStateException
+            // The completion signal is already being used to report on the existing, valid subscription
+            // So, the duplicate subscription can't be reported there
+            // Our only option is to throw directly from this method
+
+            // According to the Java API docs, behavior is not guaranteed when onSubscribe throws
+            // Still, it seems likely to break the pipeline for the new subscription, which is what we want
+
+            // https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
+
+            var eStorage = errors.explicit(DUPLICATE_SUBSCRIPTION, storagePath, WRITE_OPERATION);
+            throw new IllegalStateException(eStorage.getMessage(), eStorage);
+        }
+
+        // At this point it is certain there is only one subscription
+        // The method is still running on the calling thread though
+        // That is ok so long as the publisher is well-behaved and doesn't send anything until onSubscribe() completes
+
         try {
-
-            // This method can be called externally
-            // Avoid concurrency issues - use atomic boolean CAS to ensure the method is only called once
-            // No other processing has started at this point
-
-            var subscribeOk = subscriptionSet.compareAndSet(false, true);
-
-            if (!subscribeOk) {
-
-                // According to Java API docs, errors in subscribe() should be reported as IllegalStateException
-                // https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
-
-                var eStorage = errors.explicit(DUPLICATE_SUBSCRIPTION, storagePath, WRITE_OPERATION);
-                var eFlowState = new IllegalStateException(eStorage.getMessage(), eStorage);
-
-                // TODO: report duplicate subscription
-                //subscriber.onError(eFlowState);
-                return;
-            }
-
-//            signal.whenComplete((result, err) -> {
-//                if (err instanceof CancellationException)
-//                    onCancel();
-//            });
 
             this.subscription = subscription;
 
@@ -187,10 +187,6 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
             handleError(error, false);
     }
 
-//    public void onCancel() {
-//
-//    }
-
 
     // -----------------------------------------------------------------------------------------------------------------
     // PRIVATE IMPLEMENTATION
@@ -218,7 +214,8 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
             // If so, do not send any further signals
             if (gotError || gotCancel) {
 
-                return;
+                if (log.isDebugEnabled())
+                    log.debug("Ignoring chunks, write operation is failed or terminated: [{}]", absolutePath);
             }
 
             // If the full content of the buffer was not written, this is an error
@@ -226,8 +223,8 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
                 gotError = true;
 
-                if (!(gotComplete || gotCancel))
-                    handleError(new ETracInternal(""), true);  // TODO: error
+                var error = errors.chunkNotFullyWritten(bytesExpected, nBytes);
+                handleError(error, true);
             }
 
             // If onComplete has been sent and there are no chunks pending, then the operation is complete

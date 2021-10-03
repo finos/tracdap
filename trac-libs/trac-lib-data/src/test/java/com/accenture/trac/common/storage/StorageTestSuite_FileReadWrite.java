@@ -45,11 +45,11 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
@@ -383,50 +383,103 @@ public class StorageTestSuite_FileReadWrite {
      */
 
     @Test
-    void testWrite_neverSubscribe() throws Exception {
+    void testWrite_chunksReleased() {
 
-        var storagePath = "some_file.dat";
+        // Writer takes ownership of chunks when it receives them
+        // This test makes sure they are being released after they have been written
+
+        var storagePath = "test_file.dat";
+
+        var bytes = List.of(
+                new byte[3],
+                new byte[10000],
+                new byte[42],
+                new byte[4097],
+                new byte[1],
+                new byte[2000]);
+
+        var random = new Random();
+        bytes.forEach(random::nextBytes);
+
+        var chunks = bytes.stream().map(bs ->
+                ByteBufAllocator.DEFAULT
+                .directBuffer(bs.length)
+                .writeBytes(bs))
+                .collect(Collectors.toList());
 
         var writeSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writeSignal, execContext);
+        Concurrent.publish(chunks).subscribe(writer);
 
-        var subscription = new Flow.Subscription() {
-
-            @Override
-            public void request(long n) {
-
-            }
-
-            @Override
-            public void cancel() {
-
-            }
-        };
-
-        writer.onSubscribe(subscription);
-        writer.onError(new RuntimeException("Dummy error"));
         waitFor(TEST_TIMEOUT, writeSignal);
 
-        // writeSignal.can
+        Assertions.assertDoesNotThrow(() -> resultOf(writeSignal));
 
-        Assertions.assertThrows(CancellationException.class, () -> resultOf(writeSignal));
-
-        var exists = storage.exists(storagePath);
-        waitFor(TEST_TIMEOUT, exists);
-
-        Assertions.assertFalse(resultOf(exists));
+        for (var chunk : chunks)
+            Assertions.assertEquals(0, chunk.refCnt());
     }
 
     @Test
-    void testWrite_subscribeTwice() {
+    void testWrite_subscribeNever() throws Exception {
 
-        Assertions.fail();
+        // Set up a dir in storage
+
+        var mkdir = storage.mkdir("some_dir", false);
+        waitFor(TEST_TIMEOUT, mkdir);
+
+        var dirExists = storage.exists("some_dir");
+        waitFor(TEST_TIMEOUT, dirExists);
+        Assertions.assertTrue(resultOf(dirExists));
+
+        // Prepare a writer to write a file inside the new dir
+
+        var storagePath = "some_dir/some_file.txt";
+        var writeSignal = new CompletableFuture<Long>();
+        storage.writer(storagePath, writeSignal, execContext);
+
+        // Allow some time in case the writer is going to do anything
+        Thread.sleep(ASYNC_DELAY.toMillis());
+
+        // File should not have been created as onSubscribe has not been called
+        var fileExists = storage.exists(storagePath);
+        waitFor(TEST_TIMEOUT, fileExists);
+        Assertions.assertFalse(resultOf(fileExists));
     }
 
     @Test
-    void testWrite_nextBeforeSubscribe() {
+    void testWrite_subscribeTwice() throws Exception {
 
-        Assertions.fail();
+        var storagePath = "test_file.dat";
+
+        var bytes = new byte[10000];
+        new Random().nextBytes(bytes);
+        var chunk = Unpooled.wrappedBuffer(bytes);
+
+        var writerSignal = new CompletableFuture<Long>();
+        var writer = storage.writer(storagePath, writerSignal, execContext);
+
+        // First subscription to the writer, everything should proceed normally
+
+        var subscription1 = mock(Flow.Subscription.class);
+        writer.onSubscribe(subscription1);
+        verify(subscription1, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+
+        // Second subscription to the writer, should throw illegal state
+
+        var subscription2 = mock(Flow.Subscription.class);
+        Assertions.assertThrows(IllegalStateException.class, () -> writer.onSubscribe(subscription2));
+
+        // First subscription should be unaffected, write operation should complete normally on subscription 1
+
+        writer.onNext(chunk);
+        writer.onComplete();
+        waitFor(TEST_TIMEOUT, writerSignal);
+        Assertions.assertDoesNotThrow(() -> resultOf(writerSignal));
+
+        // File should now be visible in storage
+        var size = storage.size(storagePath);
+        waitFor(TEST_TIMEOUT, size);
+        Assertions.assertEquals(bytes.length, resultOf(size));
     }
 
     @Test
@@ -528,18 +581,6 @@ public class StorageTestSuite_FileReadWrite {
         waitFor(TEST_TIMEOUT, exists);
 
         Assertions.assertFalse(resultOf(exists));
-    }
-
-    @Test
-    void testWrite_errorThenNext() {
-
-        Assertions.fail();
-    }
-
-    @Test
-    void testWrite_errorThenComplete() {
-
-        Assertions.fail();
     }
 
     @Test
@@ -659,7 +700,7 @@ public class StorageTestSuite_FileReadWrite {
     }
 
     @Test
-    void testRead_neverSubscribe() throws Exception {
+    void testRead_subscribeLate() throws Exception {
 
         var storagePath = "some_file.txt";
         makeSmallFile(storagePath, storage, execContext);

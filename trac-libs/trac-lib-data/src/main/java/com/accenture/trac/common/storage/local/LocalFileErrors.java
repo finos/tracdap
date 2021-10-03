@@ -59,7 +59,10 @@ public class LocalFileErrors {
         DUPLICATE_SUBSCRIPTION,
 
         // Unhandled / unexpected error
-        UNKNOWN_ERROR
+        UNKNOWN_ERROR,
+
+        // These errors have special parameterization for their error messages
+        CHUNK_NOT_FULLY_WRITTEN,
     }
 
     private static final List<Map.Entry<Class<? extends Exception>, ExplicitError>> EXCEPTION_CLASS_MAP = List.of(
@@ -93,7 +96,9 @@ public class LocalFileErrors {
 
             Map.entry(DUPLICATE_SUBSCRIPTION, "Duplicate subscription detected in the storage layer: %s %s [%s]"),
 
-            Map.entry(UNKNOWN_ERROR, "An unexpected error occurred in the storage layer: %s %s [%s]"));
+            Map.entry(UNKNOWN_ERROR, "An unexpected error occurred in the storage layer: %s %s [%s]"),
+
+            Map.entry(CHUNK_NOT_FULLY_WRITTEN, "Chunk was not fully written, chunk size = %d B, written = %d B"));
 
     private static final Map<ExplicitError, Class<? extends ETrac>> ERROR_TYPE_MAP = Map.ofEntries(
             Map.entry(STORAGE_PATH_NULL_OR_BLANK, EValidationGap.class),
@@ -116,7 +121,9 @@ public class LocalFileErrors {
 
             Map.entry(DUPLICATE_SUBSCRIPTION, ETracInternal.class),
 
-            Map.entry(UNKNOWN_ERROR, ETracInternal.class));
+            Map.entry(UNKNOWN_ERROR, ETracInternal.class),
+
+            Map.entry(CHUNK_NOT_FULLY_WRITTEN, EStorageCommunication.class));
 
     private final Logger log;
     private final String storageKey;
@@ -170,7 +177,7 @@ public class LocalFileErrors {
         }
     }
 
-    private ETrac exception(ExplicitError error, Throwable exception, String path, String operation) {
+    ETrac exception(ExplicitError error, Throwable exception, String path, String operation) {
 
         try {
 
@@ -182,6 +189,28 @@ public class LocalFileErrors {
             var err = EXCEPTION_CONSTRUCTOR_MAP.get(error);
 
             return err.newInstance(message, exception);
+        }
+        catch (
+                InstantiationException |
+                IllegalAccessException |
+                InvocationTargetException e) {
+
+            return new EUnexpected(e);
+        }
+    }
+
+    ETrac chunkNotFullyWritten(int chunkBytes, int writtenBytes) {
+
+        try {
+
+            var messageTemplate = ERROR_MESSAGE_MAP.get(CHUNK_NOT_FULLY_WRITTEN);
+            var message = String.format(messageTemplate, chunkBytes, writtenBytes);log.error(message);
+
+            log.error(message);
+
+            var err = EXPLICIT_CONSTRUCTOR_MAP.get(CHUNK_NOT_FULLY_WRITTEN);
+
+            return err.newInstance(message);
         }
         catch (
                 InstantiationException |
