@@ -126,7 +126,7 @@ public class LocalFileErrors {
         this.storageKey = storageKey;
     }
 
-    ETrac handleException(Exception e, String storagePath, String operationName) {
+    ETrac handleException(Throwable e, String storagePath, String operationName) {
 
         // Error of type ETrac means the error is already handled
         if (e instanceof ETrac)
@@ -170,7 +170,7 @@ public class LocalFileErrors {
         }
     }
 
-    private ETrac exception(ExplicitError error, Exception exception, String path, String operation) {
+    private ETrac exception(ExplicitError error, Throwable exception, String path, String operation) {
 
         try {
 
