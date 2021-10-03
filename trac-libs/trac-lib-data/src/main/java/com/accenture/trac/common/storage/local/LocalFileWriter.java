@@ -123,7 +123,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             log.info("File channel open for writing: [{}]", absolutePath);
 
-            subscription.request(2);
+            subscription.request(1);
         }
         catch (Exception e) {
 
