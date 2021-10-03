@@ -43,11 +43,13 @@ import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
@@ -81,8 +83,13 @@ public class StorageTestSuite_FileReadWrite {
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
     }
 
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Round trips
+    // -----------------------------------------------------------------------------------------------------------------
+
     @Test
-    void roundTrip_ok() throws Exception {
+    void roundTrip_basic() throws Exception {
 
         var storagePath = "haiku.txt";
 
@@ -91,56 +98,62 @@ public class StorageTestSuite_FileReadWrite {
                 "For a short while it persists,\n" +
                 "then returns unscathed!";
 
-        var original = ByteBufUtil.encodeString(
-                ByteBufAllocator.DEFAULT,
-                CharBuffer.wrap(haiku),
-                StandardCharsets.UTF_8);
+        var haikuBytes = haiku.getBytes(StandardCharsets.UTF_8);
 
-        var writeSignal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, writeSignal, execContext);
-        Concurrent.publish(Stream.of(original)).subscribe(writer);
-
-        waitFor(TEST_TIMEOUT, writeSignal);
-
-        // Make sure the write operation did not report an error before trying to read
-        Assertions.assertDoesNotThrow(() -> resultOf(writeSignal));
-
-        var reader = storage.reader(storagePath, execContext);
-        var readResult = Concurrent.fold(
-                reader, Unpooled::wrappedBuffer,
-                (ByteBuf) new EmptyByteBuf(ByteBufAllocator.DEFAULT));
-
-        waitFor(TEST_TIMEOUT, readResult);
-
-        var roundTrip = resultOf(readResult);
-        var roundTripHaiku = roundTrip.readCharSequence(
-                roundTrip.readableBytes(),
-                StandardCharsets.UTF_8);
-
-        Assertions.assertEquals(haiku, roundTripHaiku);
+        roundTripTest(storagePath, List.of(haikuBytes));
     }
 
     @Test
-    void roundTrip_large() {
+    void roundTrip_large() throws Exception {
 
-        Assertions.fail();
+        var storagePath = "test_file.dat";
+
+        var bytes = new byte[10 * 1024 * 1024];  // One 10 M chunk
+
+        var random = new Random();
+        random.nextBytes(bytes);
+
+        roundTripTest(storagePath, List.of(bytes));
     }
 
     @Test
-    void roundTrip_heterogeneous() {
+    void roundTrip_heterogeneous() throws Exception {
 
-        Assertions.fail();
+        var storagePath = "test_file.dat";
+
+        var bytes = List.of(  // Selection of different size chunks
+                new byte[3],
+                new byte[10000],
+                new byte[42],
+                new byte[4097],
+                new byte[1],
+                new byte[2000]);
+
+        var random = new Random();
+        bytes.forEach(random::nextBytes);
+
+        roundTripTest(storagePath, bytes);
     }
 
     @Test
     void roundTrip_empty() throws Exception {
 
         var storagePath = "empty.dat";
-        var original = new EmptyByteBuf(ByteBufAllocator.DEFAULT);
+        var emptyBytes = new byte[0];
+
+        roundTripTest(storagePath, List.of(emptyBytes));
+    }
+
+    private void roundTripTest(String storagePath, List<byte[]> originalBytes) throws Exception {
+
+        var originalBuffers = originalBytes.stream().map(bytes ->
+                ByteBufAllocator.DEFAULT
+                .directBuffer(bytes.length)
+                .writeBytes(bytes));
 
         var writeSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writeSignal, execContext);
-        Concurrent.publish(Stream.of(original)).subscribe(writer);
+        Concurrent.publish(originalBuffers).subscribe(writer);
 
         waitFor(TEST_TIMEOUT, writeSignal);
 
@@ -154,9 +167,25 @@ public class StorageTestSuite_FileReadWrite {
 
         waitFor(TEST_TIMEOUT, readResult);
 
-        var roundTrip = resultOf(readResult);
+        var roundTripBuffer = resultOf(readResult);
+        var roundTripContent = copyBytes(roundTripBuffer);
 
-        Assertions.assertEquals(0, roundTrip.readableBytes());
+        // Create a new ByteBuf for the original data
+        // The writer will have released the buffers it received
+        var originalBuffer = Unpooled.wrappedBuffer(originalBytes.toArray(byte[][]::new));
+        var originalContent = copyBytes(originalBuffer);
+
+        Assertions.assertArrayEquals(originalContent, roundTripContent);
+
+        originalBuffer.release();
+        roundTripBuffer.release();
+    }
+
+    private byte[] copyBytes(ByteBuf buf) {
+
+        byte[] bs = new byte[buf.readableBytes()];
+        buf.readBytes(bs);
+        return bs;
     }
 
 
