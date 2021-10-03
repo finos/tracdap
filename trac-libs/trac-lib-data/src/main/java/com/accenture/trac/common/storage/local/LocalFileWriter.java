@@ -347,20 +347,16 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
         }
     }
 
-    private void handleError(Throwable throwable, boolean internalError) {
-
-        var error = throwable instanceof Exception
-                ? (Exception) throwable
-                : new ExecutionException(throwable);
+    private void handleError(Throwable error, boolean internalError) {
 
         try {
 
             if (internalError) {
-                log.error("Write operation failed: {} [{}]", throwable.getMessage(), absolutePath, throwable);
+                log.error("Write operation failed: {} [{}]", error.getMessage(), absolutePath, error);
                 subscription.cancel();
             }
             else
-                log.error("Write operation stopped due to an error: {} [{}]", throwable.getMessage(), absolutePath, throwable);
+                log.error("Write operation stopped due to an error: {} [{}]", error.getMessage(), absolutePath, error);
 
             channel.close();
 
@@ -369,8 +365,11 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             log.info("File channel closed: [{}]", absolutePath);
 
-            var eStorage = errors.handleException(error, storagePath, WRITE_OPERATION);
-            signal.completeExceptionally(eStorage);
+            var eWrapped = internalError
+                ? errors.handleException(error, storagePath, WRITE_OPERATION)
+                : wrapExternalError(error);
+
+            signal.completeExceptionally(eWrapped);
         }
         catch (Exception e) {
 
@@ -378,9 +377,20 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             // Report the original error back up the chain, not the secondary error that occurred on close
 
-            var eStorage = errors.handleException(error, storagePath, WRITE_OPERATION);
-            signal.completeExceptionally(eStorage);
+            var eWrapped = internalError
+                    ? errors.handleException(error, storagePath, WRITE_OPERATION)
+                    : wrapExternalError(error);
+
+            signal.completeExceptionally(eWrapped);
         }
+    }
+
+    private Exception wrapExternalError(Throwable error) {
+
+        if (error instanceof CompletionException)
+            return (CompletionException) error;
+        else
+            return new CompletionException(error.getMessage(), error);
     }
 
     private void releaseBuffer(ByteBuf buffer) {
