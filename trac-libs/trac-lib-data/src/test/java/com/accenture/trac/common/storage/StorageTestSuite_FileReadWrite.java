@@ -47,9 +47,9 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
@@ -383,7 +383,7 @@ public class StorageTestSuite_FileReadWrite {
      */
 
     @Test
-    void testWrite_notStarted() throws Exception {
+    void testWrite_neverSubscribe() throws Exception {
 
         var storagePath = "some_file.dat";
 
@@ -418,21 +418,182 @@ public class StorageTestSuite_FileReadWrite {
     }
 
     @Test
-    void testWrite_failImmediately() {
+    void testWrite_subscribeTwice() {
 
         Assertions.fail();
     }
 
     @Test
-    void testWrite_failAfterWriting() {
+    void testWrite_nextBeforeSubscribe() {
 
         Assertions.fail();
     }
 
     @Test
-    void testWrite_failAndRetry() {
+    void testWrite_errorImmediately() throws Exception {
+
+        var storagePath = "test_file.dat";
+
+        var writerSignal = new CompletableFuture<Long>();
+        var writer = storage.writer(storagePath, writerSignal, execContext);
+
+        // Subscribe to the writer, it should call subscription.request()
+        // Request call may be immediate or async
+
+        var subscription = mock(Flow.Subscription.class);
+        writer.onSubscribe(subscription);
+
+        verify(subscription, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+
+        // Send an error without calling onNext
+        // The writer should clean up and notify failure using the writer signal
+
+        writer.onError(new TestException());
+        waitFor(TEST_TIMEOUT, writerSignal);
+
+        // After onError, writer should not have called cancel() (this would be redundant)
+        verify(subscription, never()).cancel();
+
+        // For errors received externally via onError(),
+        // The writer should wrap the error with a completion error and use the wrapped error as the result signal
+        Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal));
+
+        // The wrapped exception should be what was received in onError
+        try {
+            resultOf(writerSignal);
+        }
+        catch (CompletionException e) {
+            Assertions.assertTrue(e.getCause() instanceof TestException);
+        }
+
+        // If there is a partially written file,
+        // the writer should remove it as part of the error cleanup
+
+        var exists = storage.exists(storagePath);
+        waitFor(TEST_TIMEOUT, exists);
+
+        Assertions.assertFalse(resultOf(exists));
+    }
+
+    @Test
+    void testWrite_errorAfterChunk() throws Exception {
+
+        var storagePath = "test_file.dat";
+
+        var bytes0 = new byte[10000];
+        new Random().nextBytes(bytes0);
+        var chunk0 = Unpooled.wrappedBuffer(bytes0);
+
+        var writerSignal = new CompletableFuture<Long>();
+        var writer = storage.writer(storagePath, writerSignal, execContext);
+
+        // Subscribe to the writer, it should call subscription.request()
+        // Request call may be immediate or async
+
+        var subscription = mock(Flow.Subscription.class);
+        writer.onSubscribe(subscription);
+
+        verify(subscription, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+
+        // Send one chunk to the writer
+
+        writer.onNext(chunk0);
+        Thread.sleep(ASYNC_DELAY.toMillis());
+
+        // Send an error
+        // The writer should clean up and notify failure using the writer signal
+
+        writer.onError(new TestException());
+        waitFor(TEST_TIMEOUT, writerSignal);
+
+        // After onError, writer should not have called cancel() (this would be redundant)
+        verify(subscription, never()).cancel();
+
+        // For errors received externally via onError(),
+        // The writer should wrap the error with a completion error and use the wrapped error as the result signal
+        Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal));
+
+        // The wrapped exception should be what was received in onError
+        try {
+            resultOf(writerSignal);
+        }
+        catch (CompletionException e) {
+            Assertions.assertTrue(e.getCause() instanceof TestException);
+        }
+
+        // If there is a partially written file,
+        // the writer should remove it as part of the error cleanup
+
+        var exists = storage.exists(storagePath);
+        waitFor(TEST_TIMEOUT, exists);
+
+        Assertions.assertFalse(resultOf(exists));
+    }
+
+    @Test
+    void testWrite_errorThenNext() {
 
         Assertions.fail();
+    }
+
+    @Test
+    void testWrite_errorThenComplete() {
+
+        Assertions.fail();
+    }
+
+    @Test
+    void testWrite_errorThenRetry() throws Exception {
+
+        var storagePath = "test_file.dat";
+        var dataSize = 10000;
+
+        var bytes = new byte[dataSize];
+        new Random().nextBytes(bytes);
+
+        // Set up a writer and send it a chunk
+        var writerSignal1 = new CompletableFuture<Long>();
+        var writer1 = storage.writer(storagePath, writerSignal1, execContext);
+        var subscription1 = mock(Flow.Subscription.class);
+        var chunk1 = Unpooled.wrappedBuffer(bytes);
+
+        writer1.onSubscribe(subscription1);
+        verify(subscription1, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+        writer1.onNext(chunk1);
+
+        // Give the writer some time for the chunk to be written to disk
+        Thread.sleep(ASYNC_DELAY.toMillis());
+
+        // Send the onError() message and make sure the writer signal reports the failure
+        writer1.onError(new TestException());
+        waitFor(TEST_TIMEOUT, writerSignal1);
+        Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal1));
+
+        // File should not exist in storage after an aborted write
+        var exists1 = storage.exists(storagePath);
+        waitFor(TEST_TIMEOUT, exists1);
+        Assertions.assertFalse(resultOf(exists1));
+
+        // Set up a second writer to retry the same operation
+        // This time, send the chunk and an onComplete() message
+        var writerSignal2 = new CompletableFuture<Long>();
+        var writer2 = storage.writer(storagePath, writerSignal2, execContext);
+        var subscription2 = mock(Flow.Subscription.class);
+        var chunk2 = Unpooled.wrappedBuffer(bytes);
+
+        writer2.onSubscribe(subscription2);
+        verify(subscription2, timeout(ASYNC_DELAY.toMillis())).request(anyLong());
+        writer2.onNext(chunk2);
+        writer2.onComplete();
+
+        // Wait for the second operation, which should succeed
+        waitFor(TEST_TIMEOUT, writerSignal2);
+        Assertions.assertDoesNotThrow(() -> resultOf(writerSignal2));
+
+        // File should now be visible in storage
+        var size2 = storage.size(storagePath);
+        waitFor(TEST_TIMEOUT, size2);
+        Assertions.assertEquals(dataSize, resultOf(size2));
     }
 
     @Test
@@ -745,6 +906,11 @@ public class StorageTestSuite_FileReadWrite {
     private <T> T unchecked(Object unchecked) {
 
         return (T) unchecked;
+    }
+
+    private static class TestException extends RuntimeException {
+
+        TestException() { super("Test error handling"); }
     }
 
 }
