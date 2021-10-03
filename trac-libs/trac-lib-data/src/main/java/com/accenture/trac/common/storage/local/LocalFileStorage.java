@@ -126,7 +126,7 @@ public class LocalFileStorage implements IFileStorage {
     public CompletionStage<Boolean> exists(String storagePath) {
 
         try {
-            var absolutePath = resolvePath(storagePath, false, EXISTS_OPERATION);
+            var absolutePath = resolvePath(storagePath, true, EXISTS_OPERATION);
 
             var exists = Files.exists(absolutePath);
 
@@ -143,7 +143,7 @@ public class LocalFileStorage implements IFileStorage {
     public CompletableFuture<Long> size(String storagePath) {
 
         try {
-            var absolutePath = resolvePath(storagePath, false, SIZE_OPERATION);
+            var absolutePath = resolvePath(storagePath, true, SIZE_OPERATION);
 
             var size = Files.size(absolutePath);
 
@@ -165,7 +165,7 @@ public class LocalFileStorage implements IFileStorage {
     public CompletionStage<FileStat> stat(String storagePath) {
 
         try {
-            var absolutePath = resolvePath(storagePath, false, STAT_OPERATION);
+            var absolutePath = resolvePath(storagePath, true, STAT_OPERATION);
             var fileStat = buildFileStat(absolutePath, storagePath, STAT_OPERATION);
 
             return CompletableFuture.completedFuture(fileStat);
@@ -234,7 +234,10 @@ public class LocalFileStorage implements IFileStorage {
             if (!attrs.isRegularFile() && !attrs.isDirectory())
                 throw errors.explicit(STAT_NOT_FILE_OR_DIR, storagePath, STAT_OPERATION);
 
-            var fileName = absolutePath.getFileName().toString();
+            // Special handling for the root directory - do not return the name of the storage root folder!
+            var fileName = absolutePath.equals(rootPath)
+                ?   "." : absolutePath.getFileName().toString();
+
             var fileType = attrs.isRegularFile() ? FileType.FILE : FileType.DIRECTORY;
 
             // Do not report a size for directories, behavior for doing so is wildly inconsistent!

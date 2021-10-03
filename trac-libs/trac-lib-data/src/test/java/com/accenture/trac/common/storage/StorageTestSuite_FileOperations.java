@@ -84,8 +84,10 @@ public class StorageTestSuite_FileOperations {
     void testExists_dir() throws Exception {
 
         var prepare = storage.mkdir("test_dir", false);
-        var dirPresent = prepare.thenCompose(x -> storage.exists("test_dir"));
-        var dirNotPresent = prepare.thenCompose(x -> storage.exists("other_dir"));
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var dirPresent = storage.exists("test_dir");
+        var dirNotPresent = storage.exists("other_dir");
 
         waitFor(TEST_TIMEOUT, dirPresent, dirNotPresent);
 
@@ -97,8 +99,10 @@ public class StorageTestSuite_FileOperations {
     void testExists_file() throws Exception {
 
         var prepare = makeSmallFile("test_file.txt", storage, execContext);
-        var filePresent = prepare.thenCompose(x -> storage.exists("test_file.txt"));
-        var fileNotPresent = prepare.thenCompose(x -> storage.exists("other_file.txt"));
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var filePresent = storage.exists("test_file.txt");
+        var fileNotPresent = storage.exists("other_file.txt");
 
         waitFor(TEST_TIMEOUT, filePresent, fileNotPresent);
 
@@ -110,7 +114,9 @@ public class StorageTestSuite_FileOperations {
     void testExists_emptyFile() throws Exception {
 
         var prepare = makeFile("test_file.txt", Unpooled.EMPTY_BUFFER, storage, execContext);
-        var emptyFileExist = prepare.thenCompose(x -> storage.exists("test_file.txt"));
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var emptyFileExist = storage.exists("test_file.txt");
 
         waitFor(TEST_TIMEOUT, emptyFileExist);
 
@@ -118,15 +124,21 @@ public class StorageTestSuite_FileOperations {
     }
 
     @Test
-    void testExists_badPaths() {
+    void testExists_storageRoot() throws Exception {
 
-        testBadPaths(storage::exists);
+        // Storage root should always exist
+
+        var exists = storage.exists(".");
+
+        waitFor(TEST_TIMEOUT, exists);
+
+        Assertions.assertTrue(resultOf(exists));
     }
 
     @Test
-    void testExists_storageRoot() {
+    void testExists_badPaths() {
 
-        failForStorageRoot(storage::exists);
+        testBadPaths(storage::exists);
     }
 
 
@@ -144,7 +156,9 @@ public class StorageTestSuite_FileOperations {
 
         var expectedSize = content.readableBytes();
         var prepare = makeFile("test_file.txt", content, storage, execContext);
-        var size = prepare.thenCompose(x -> storage.size("test_file.txt"));
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var size = storage.size("test_file.txt");
 
         waitFor(TEST_TIMEOUT, size);
 
@@ -155,7 +169,9 @@ public class StorageTestSuite_FileOperations {
     void testSize_emptyFile() throws Exception {
 
         var prepare = makeFile("test_file.txt", Unpooled.EMPTY_BUFFER, storage, execContext);
-        var size = prepare.thenCompose(x -> storage.size("test_file.txt"));
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var size =  storage.size("test_file.txt");
 
         waitFor(TEST_TIMEOUT, size);
 
@@ -166,7 +182,9 @@ public class StorageTestSuite_FileOperations {
     void testSize_dir() {
 
         var prepare = storage.mkdir("test_dir", false);
-        var size = prepare.thenCompose(x -> storage.size("test_dir"));
+        waitFor(TEST_TIMEOUT, prepare);
+
+        var size = storage.size("test_dir");
 
         waitFor(TEST_TIMEOUT, size);
 
@@ -184,15 +202,21 @@ public class StorageTestSuite_FileOperations {
     }
 
     @Test
-    void testSize_badPaths() {
+    void testSize_storageRoot() {
 
-        testBadPaths(storage::size);
+        // Storage root is a directory, size operation should fail with EStorageRequest
+
+        var size = storage.size(".");
+
+        waitFor(TEST_TIMEOUT, size);
+
+        Assertions.assertThrows(EStorageRequest.class, () -> resultOf(size));
     }
 
     @Test
-    void testSize_storageRoot() {
+    void testSize_badPaths() {
 
-        failForStorageRoot(storage::size);
+        testBadPaths(storage::size);
     }
 
 
@@ -337,8 +361,8 @@ public class StorageTestSuite_FileOperations {
         Assertions.assertEquals("test_dir", statResult.fileName);
         Assertions.assertEquals(FileType.DIRECTORY, statResult.fileType);
 
-        // Size field is not meaningful for directories, implementations should set it to either 0 or -1
-        Assertions.assertTrue(statResult.size <= 0);
+        // Size field for directories should always be set to 0
+        Assertions.assertEquals(0, statResult.size);
     }
 
     @Test
@@ -423,6 +447,23 @@ public class StorageTestSuite_FileOperations {
     }
 
     @Test
+    void testStat_storageRoot() throws Exception {
+
+        var rootStat = storage.stat(".");
+
+        waitFor(TEST_TIMEOUT, rootStat);
+
+        var statResult = resultOf(rootStat);
+
+        Assertions.assertEquals(".", statResult.storagePath);
+        Assertions.assertEquals(".", statResult.fileName);
+        Assertions.assertEquals(FileType.DIRECTORY, statResult.fileType);
+
+        // Size field for directories should always be set to 0
+        Assertions.assertEquals(0, statResult.size);
+    }
+
+    @Test
     void testStat_missing() {
 
         var stat = storage.stat("does_not_exist.dat");
@@ -435,12 +476,6 @@ public class StorageTestSuite_FileOperations {
     void testStat_badPaths() {
 
         testBadPaths(storage::stat);
-    }
-
-    @Test
-    void testStat_storageRoot() {
-
-        failForStorageRoot(storage::stat);
     }
 
 
