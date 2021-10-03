@@ -19,10 +19,8 @@ package com.accenture.trac.test.concurrent;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+
 
 public class ConcurrentTestHelpers {
 
@@ -51,10 +49,35 @@ public class ConcurrentTestHelpers {
 
     public static <T> T resultOf(CompletionStage<T> task) throws Exception {
 
+        var taskFuture = task.toCompletableFuture();
+
+        if (!taskFuture.isDone())
+            throw new RuntimeException("Result of task is not ready");
+
+        // Calling join() will always wrap errors with CompletionError
+        // We want to get the exception that was originally used to complete the task
+
+        // The original error can be checked using whenComplete()
+        // If the original error was in fact a CompletionError, then throw that
+        // If join() is wrapping another error, unwrap it and throw the original cause
+
+        var isAlreadyWrapped = new CompletableFuture<Boolean>();
+
+        taskFuture.whenComplete((result, error) -> {
+
+            if (error instanceof CompletionException)
+                isAlreadyWrapped.complete(true);
+            else
+                isAlreadyWrapped.complete(false);
+        });
+
         try {
-            return task.toCompletableFuture().get(0, TimeUnit.SECONDS);
+            return task.toCompletableFuture().join();
         }
-        catch (ExecutionException e) {
+        catch (CompletionException e) {
+
+            if (isAlreadyWrapped.get())
+                throw e;
 
             var cause = e.getCause();
             throw (cause instanceof Exception) ? (Exception) cause : e;
