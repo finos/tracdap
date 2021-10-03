@@ -106,7 +106,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             // https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
 
-            var eStorage = errors.explicit(DUPLICATE_SUBSCRIPTION, storagePath, WRITE_OPERATION);
+            var eStorage = errors.explicitError(DUPLICATE_SUBSCRIPTION, storagePath, WRITE_OPERATION);
             throw new IllegalStateException(eStorage.getMessage(), eStorage);
         }
 
@@ -346,14 +346,18 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
     private void handleError(Throwable error, boolean internalError) {
 
+        var eWrapped = internalError
+                ? errors.handleException(error, storagePath, WRITE_OPERATION)
+                : wrapExternalError(error);
+
         try {
 
             if (internalError) {
-                log.error("Write operation failed: {} [{}]", error.getMessage(), absolutePath, error);
+                log.error("Write operation failed: {} [{}]", error.getMessage(), absolutePath, eWrapped);
                 subscription.cancel();
             }
             else
-                log.error("Write operation stopped due to an error: {} [{}]", error.getMessage(), absolutePath, error);
+                log.error("Write operation stopped due to an error: {} [{}]", error.getMessage(), absolutePath, eWrapped);
 
             channel.close();
 
@@ -362,10 +366,6 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             log.info("File channel closed: [{}]", absolutePath);
 
-            var eWrapped = internalError
-                ? errors.handleException(error, storagePath, WRITE_OPERATION)
-                : wrapExternalError(error);
-
             signal.completeExceptionally(eWrapped);
         }
         catch (Exception e) {
@@ -373,10 +373,6 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
             log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
 
             // Report the original error back up the chain, not the secondary error that occurred on close
-
-            var eWrapped = internalError
-                    ? errors.handleException(error, storagePath, WRITE_OPERATION)
-                    : wrapExternalError(error);
 
             signal.completeExceptionally(eWrapped);
         }

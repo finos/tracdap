@@ -155,18 +155,19 @@ public class LocalFileErrors {
         return exception(UNKNOWN_ERROR, e, storagePath, operationName);
     }
 
-    ETrac explicit(ExplicitError error, String path, String operation) {
+    ETrac explicitError(ExplicitError error, String path, String operation) {
 
         try {
 
             var messageTemplate = ERROR_MESSAGE_MAP.get(error);
             var message = String.format(messageTemplate, storageKey, operation, path);
 
-            log.error(message);
+            var errType = EXPLICIT_CONSTRUCTOR_MAP.get(error);
+            var err = errType.newInstance(message);
 
-            var err = EXPLICIT_CONSTRUCTOR_MAP.get(error);
+            log.error(message, err);
 
-            return err.newInstance(message);
+            return err;
         }
         catch (
                 InstantiationException |
@@ -177,18 +178,19 @@ public class LocalFileErrors {
         }
     }
 
-    ETrac exception(ExplicitError error, Throwable exception, String path, String operation) {
+    ETrac exception(ExplicitError error, Throwable cause, String path, String operation) {
 
         try {
 
             var messageTemplate = ERROR_MESSAGE_MAP.get(error);
             var message = String.format(messageTemplate, storageKey, operation, path);
 
-            log.error(message, exception);
+            var errType = EXCEPTION_CONSTRUCTOR_MAP.get(error);
+            var err = errType.newInstance(message, cause);
 
-            var err = EXCEPTION_CONSTRUCTOR_MAP.get(error);
+            log.error(message, err);
 
-            return err.newInstance(message, exception);
+            return err;
         }
         catch (
                 InstantiationException |
@@ -206,11 +208,12 @@ public class LocalFileErrors {
             var messageTemplate = ERROR_MESSAGE_MAP.get(CHUNK_NOT_FULLY_WRITTEN);
             var message = String.format(messageTemplate, chunkBytes, writtenBytes);log.error(message);
 
-            log.error(message);
+            var errType = EXPLICIT_CONSTRUCTOR_MAP.get(CHUNK_NOT_FULLY_WRITTEN);
+            var err = errType.newInstance(message);
 
-            var err = EXPLICIT_CONSTRUCTOR_MAP.get(CHUNK_NOT_FULLY_WRITTEN);
+            log.error(message, err);
 
-            return err.newInstance(message);
+            return err;
         }
         catch (
                 InstantiationException |

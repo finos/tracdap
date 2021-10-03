@@ -150,7 +150,7 @@ public class LocalFileStorage implements IFileStorage {
             // Size operation for non-regular files can still succeed
             // So, add an explicit check for directories (and other non-regular files)
             if (!Files.isRegularFile(absolutePath))
-                throw errors.explicit(SIZE_OF_DIR, storagePath, SIZE_OPERATION);
+                throw errors.explicitError(SIZE_OF_DIR, storagePath, SIZE_OPERATION);
 
             return CompletableFuture.completedFuture(size);
         }
@@ -232,7 +232,7 @@ public class LocalFileStorage implements IFileStorage {
             var attrs = Files.readAttributes(absolutePath, attrType);
 
             if (!attrs.isRegularFile() && !attrs.isDirectory())
-                throw errors.explicit(STAT_NOT_FILE_OR_DIR, storagePath, STAT_OPERATION);
+                throw errors.explicitError(STAT_NOT_FILE_OR_DIR, storagePath, STAT_OPERATION);
 
             // Special handling for the root directory - do not return the name of the storage root folder!
             var fileName = absolutePath.equals(rootPath)
@@ -314,7 +314,7 @@ public class LocalFileStorage implements IFileStorage {
 
                 // Do not allow rm on a directory with the recursive flag set
                 if (Files.isDirectory(absolutePath))
-                    throw errors.explicit(RM_DIR_NOT_RECURSIVE, storagePath, RM_OPERATION);
+                    throw errors.explicitError(RM_DIR_NOT_RECURSIVE, storagePath, RM_OPERATION);
 
                 Files.delete(absolutePath);
             }
@@ -358,27 +358,27 @@ public class LocalFileStorage implements IFileStorage {
         try {
 
             if (storagePath == null || storagePath.isBlank())
-                throw errors.explicit(STORAGE_PATH_NULL_OR_BLANK, storagePath, operationName);
+                throw errors.explicitError(STORAGE_PATH_NULL_OR_BLANK, storagePath, operationName);
 
             var relativePath = Path.of(storagePath);
 
             if (relativePath.isAbsolute())
-                throw errors.explicit(STORAGE_PATH_NOT_RELATIVE, storagePath, operationName);
+                throw errors.explicitError(STORAGE_PATH_NOT_RELATIVE, storagePath, operationName);
 
             var absolutePath = rootPath.resolve(storagePath).normalize();
 
             if (absolutePath.getNameCount() < rootPath.getNameCount() || !absolutePath.startsWith(rootPath))
-                throw errors.explicit(STORAGE_PATH_OUTSIDE_ROOT, storagePath, operationName);
+                throw errors.explicitError(STORAGE_PATH_OUTSIDE_ROOT, storagePath, operationName);
 
 
             if (absolutePath.equals(rootPath) && !allowRootDir)
-                throw errors.explicit(STORAGE_PATH_IS_ROOT, storagePath, operationName);
+                throw errors.explicitError(STORAGE_PATH_IS_ROOT, storagePath, operationName);
 
             return absolutePath;
         }
         catch (InvalidPathException e) {
 
-            throw errors.explicit(STORAGE_PATH_INVALID, storagePath, operationName);
+            throw errors.explicitError(STORAGE_PATH_INVALID, storagePath, operationName);
         }
     }
 }
