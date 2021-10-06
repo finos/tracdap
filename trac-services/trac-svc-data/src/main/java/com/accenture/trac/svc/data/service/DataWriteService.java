@@ -118,12 +118,14 @@ public class DataWriteService {
 
         var storage = storageManager.getFileStorage(copy.getStorageKey());
         var storagePath = copy.getStoragePath();
+        var storageDir = storagePath.substring(0, storagePath.lastIndexOf("/"));  // TODO: Can this be cleaner?
 
         var signal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, signal, execContext);
-        contentStream.subscribe(writer);
 
-        return signal;
+        return storage.mkdir(storageDir, true)
+                .thenAccept(x -> contentStream.subscribe(writer))
+                .thenCompose(x -> signal);
     }
 
     private <TDef> CompletionStage<TagHeader> createObject(
@@ -215,7 +217,7 @@ public class DataWriteService {
                 .build();
 
         var storagePath = String.format(FILE_STORAGE_PATH_TEMPLATE, fileId, fileVersion, fileName);
-        var storageKey = "DUMMY_STORAGE";  // TODO: Where to store
+        var storageKey = "UNIT_TEST_STORAGE";  // TODO: Where to store
         var storageTimestamp = MetadataCodec
                 .encodeDatetime(Instant.now()  // TODO: timestamp
                 .atOffset(ZoneOffset.UTC));
