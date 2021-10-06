@@ -90,6 +90,8 @@ public class StorageManager implements IStorageManager {
 
                 backend.fileInstances.add(instance);
             }
+
+            storage.put(storageKey, backend);
         }
     }
 
