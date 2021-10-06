@@ -20,10 +20,13 @@ import java.util.List;
 
 public class StorageConfig {
 
-    List<StorageInstanceConfig> instances;
+    private List<StorageInstanceConfig> instances = List.of();
 
     public List<StorageInstanceConfig> getInstances() {
+        return instances;
+    }
 
-        return this.instances;
+    public void setInstances(List<StorageInstanceConfig> instances) {
+        this.instances = instances;
     }
 }

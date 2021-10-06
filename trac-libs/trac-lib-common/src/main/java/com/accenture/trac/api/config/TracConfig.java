@@ -16,5 +16,15 @@
 
 package com.accenture.trac.api.config;
 
-public class TracServicesConfig {
+public class TracConfig {
+
+    private ServicesConfig services;
+
+    public ServicesConfig getServices() {
+        return services;
+    }
+
+    public void setServices(ServicesConfig services) {
+        this.services = services;
+    }
 }

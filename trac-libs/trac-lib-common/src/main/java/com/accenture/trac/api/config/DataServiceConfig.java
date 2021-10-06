@@ -16,5 +16,27 @@
 
 package com.accenture.trac.api.config;
 
+import java.util.Map;
+
 public class DataServiceConfig {
+
+    private short port;
+
+    private Map<String, StorageConfig> storage = Map.of();
+
+    public short getPort() {
+        return port;
+    }
+
+    public void setPort(short port) {
+        this.port = port;
+    }
+
+    public Map<String, StorageConfig> getStorage() {
+        return storage;
+    }
+
+    public void setStorage(Map<String, StorageConfig> storage) {
+        this.storage = storage;
+    }
 }

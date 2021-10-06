@@ -16,27 +16,15 @@
 
 package com.accenture.trac.api.config;
 
-import java.util.Map;
+public class ServicesConfig {
 
+    private DataServiceConfig data;
 
-public class StorageInstanceConfig {
-
-    String storageType;
-    Map<String, String> storageProps = Map.of();
-
-    public String getStorageType() {
-        return storageType;
+    public DataServiceConfig getData() {
+        return data;
     }
 
-    public void setStorageType(String storageType) {
-        this.storageType = storageType;
-    }
-
-    public Map<String, String> getStorageProps() {
-        return storageProps;
-    }
-
-    public void setStorageProps(Map<String, String> storageProps) {
-        this.storageProps = storageProps;
+    public void setData(DataServiceConfig data) {
+        this.data = data;
     }
 }
