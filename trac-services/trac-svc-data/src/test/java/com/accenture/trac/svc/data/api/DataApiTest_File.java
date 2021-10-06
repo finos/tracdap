@@ -17,6 +17,7 @@
 package com.accenture.trac.svc.data.api;
 
 import com.accenture.trac.api.*;
+import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.config.ConfigBootstrap;
 import com.accenture.trac.common.config.StandardArgs;
 import com.accenture.trac.common.eventloop.ExecutionRegister;
@@ -29,6 +30,7 @@ import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.metadata.ObjectDefinition;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagSelector;
+import com.accenture.trac.svc.data.TracDataService;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
 
@@ -49,6 +51,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -69,27 +72,30 @@ import static com.accenture.trac.test.storage.StorageTestHelpers.readFile;
 public class DataApiTest_File {
 
     private static final String TRAC_UNIT_CONFIG = "config/trac-unit.properties";
-    private static final short METADATA_SVC_PORT = 8081;
+    private static final String TRAC_UNIT_CONFIG_YAML = "config/trac-unit.yaml";
     private static final String TEST_TENANT = "ACME_CORP";
+    private static final short METADATA_SVC_PORT = 8081;
+    private static final String STORAGE_ROOT_DIR = "unit_test_storage";
+
     private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
 
     @TempDir
-    static Path tempDir;
+    static Path staticTempDir;
     static TracMetadataService metaSvc;
 
     @BeforeAll
     static void setupClass() throws Exception {
 
-        var substitutions = Map.of("${TRAC_RUN_DIR}", tempDir.toString().replace("\\", "\\\\"));
+        var substitutions = Map.of("${TRAC_RUN_DIR}", staticTempDir.toString().replace("\\", "\\\\"));
 
         var configPath = ConfigHelpers.prepareConfig(
-                TRAC_UNIT_CONFIG, tempDir,
+                TRAC_UNIT_CONFIG, staticTempDir,
                 substitutions);
 
         var keystoreKey = "";  // not yet used
 
         var testConfig = ConfigBootstrap.useConfigFile(
-                TracMetadataService.class, tempDir,
+                TracMetadataService.class, staticTempDir,
                 configPath.toString(), keystoreKey);
 
         var deploy_schema_task = StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK_NAME, "", "");
@@ -110,19 +116,41 @@ public class DataApiTest_File {
 
 
     @Rule
-    public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
+    final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
 
-    private StorageManager storage;
-    private IExecutionContext execContext;
+    @TempDir
+    Path tempDir;
 
-    private TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaApi;
-    private TracDataApiGrpc.TracDataApiStub dataApi;
+    StorageManager storage;
+    IExecutionContext execContext;
+
+    TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaApi;
+    TracDataApiGrpc.TracDataApiStub dataApi;
 
     @BeforeEach
-    public void setup() throws Exception {
+    void setup() throws Exception {
+
+        // Create storage root dir referenced in config
+        Files.createDirectory(tempDir.resolve(STORAGE_ROOT_DIR));
+
+        var substitutions = Map.of("${TRAC_RUN_DIR}", tempDir.toString().replace("\\", "\\\\"));
+
+        var configPath = ConfigHelpers.prepareConfig(
+                TRAC_UNIT_CONFIG_YAML, tempDir,
+                substitutions);
+
+        var keystoreKey = "";  // not yet used
+
+        var configManager = ConfigBootstrap.useConfigFile(
+                TracDataService.class, tempDir,
+                configPath.toString(), keystoreKey);
+
+        var rootConfig = configManager.loadRootConfig(RootConfig.class);
+        var dataSvcConfig = rootConfig.getTrac().getServices().getData();
 
         storage = new StorageManager();
         storage.initStoragePlugins();
+        storage.initStorage(dataSvcConfig.getStorage());
 
         metaApi = TrustedMetadataApiGrpc.newFutureStub(grpcCleanup.register(
                 NettyChannelBuilder.forAddress("localhost", METADATA_SVC_PORT)
