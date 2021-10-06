@@ -1,0 +1,48 @@
+# Copyright 2021 Accenture Global Solutions Limited
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+config:
+  logging.url: trac-logging.xml
+
+  keystore:
+    type: PKCS12
+    url: trac-unit.pfx
+
+
+trac:
+  services:
+
+#    meta:
+#      port: 8081
+#
+#      dalType: JDBC
+#      daLProps:
+#        dialect: H2
+#        jdbcUrl: ${TRAC_RUN_DIR}/trac.meta
+#        h2.user: trac
+#        h2.pass: trac
+#        h2.schema: public
+#        pool.size: 10
+#        pool.overflow: 5
+
+    data:
+      port: 8082
+
+      storage:
+
+        UNIT_TEST_STORAGE:
+          instances:
+            - storageType: LOCAL
+              storageProps:
+                rootDir: ${TRAC_RUN_DIR}/unit_test_storage
