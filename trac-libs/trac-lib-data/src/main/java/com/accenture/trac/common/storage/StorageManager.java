@@ -16,6 +16,7 @@
 
 package com.accenture.trac.common.storage;
 
+import com.accenture.trac.api.config.StorageConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +51,24 @@ public class StorageManager implements IStorageManager {
 
             for (var protocol : plugin.protocols())
                 plugins.put(protocol, plugin);
+        }
+    }
+
+    public void initStorage(Map<String, StorageConfig> storageConfigMap) {
+
+        for (var store: storageConfigMap.entrySet()) {
+
+            var storageKey = store.getKey();
+            var storageConfig = store.getValue();
+
+            for (var instance : storageConfig.getInstances()) {
+
+                var instanceScheme = instance.getStorageType();
+                var instanceProps = instance.getStorageProps();
+
+                var plugin = plugins.get(instanceScheme);
+                plugin.createFileStorage(instanceScheme, instanceProps);
+            }
         }
     }
 

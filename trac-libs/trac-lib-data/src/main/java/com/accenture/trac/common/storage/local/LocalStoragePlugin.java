@@ -27,6 +27,8 @@ public class LocalStoragePlugin implements IStoragePlugin {
     private static final String PLUGIN_NAME = "LOCAL_STORAGE";
     private static final List<String> PROTOCOLS = List.of("file");
 
+    public static final String CONFIG_ROOT_DIR = "rootDir";
+
     private static final String DEV_STORAGE_KEY = "STORAGE1";
     private static final String DEV_ROOT = "C:\\Temp\\TRAC";
 

@@ -31,12 +31,14 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 
 import static com.accenture.trac.common.storage.local.LocalFileErrors.ExplicitError.*;
+import static com.accenture.trac.common.storage.local.LocalStoragePlugin.CONFIG_ROOT_DIR;
 
 
 public class LocalFileStorage implements IFileStorage {
@@ -58,12 +60,14 @@ public class LocalFileStorage implements IFileStorage {
     private final String storageKey;
     private final Path rootPath;
 
-    public LocalFileStorage(String storageKey, String storageRootPath) {
+    public LocalFileStorage(String storageKey, Properties storageProps) {
 
         this.errors = new LocalFileErrors(log, storageKey);
 
+        var rootDirProp = storageProps.getProperty(CONFIG_ROOT_DIR);  // TODO: Config helpers
+
         this.storageKey = storageKey;
-        this.rootPath = Paths.get(storageRootPath)
+        this.rootPath = Paths.get(rootDirProp)
                 .toAbsolutePath()
                 .normalize();
 
