@@ -17,7 +17,10 @@
 package com.accenture.trac.svc.data;
 
 import com.accenture.trac.api.TrustedMetadataApiGrpc;
+import com.accenture.trac.api.config.DataServiceConfig;
+import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.config.ConfigManager;
+import com.accenture.trac.common.eventloop.ExecutionContext;
 import com.accenture.trac.common.eventloop.ExecutionRegister;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.service.CommonServiceBase;
@@ -25,29 +28,24 @@ import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.svc.data.api.TracDataApi;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.grpc.Server;
+
+import io.grpc.*;
+import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.NettyServerBuilder;
+import io.netty.channel.EventLoop;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 
 public class TracDataService extends CommonServiceBase {
-
-    private static final short DATA_SERVICE_PORT = 8082;
-
-    private static final int WORKER_POOL_SIZE = 6;
-    private static final int OVERFLOW_SIZE = 10;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -61,17 +59,72 @@ public class TracDataService extends CommonServiceBase {
     @Override
     protected void doStartup(Duration startupTimeout) {
 
+        RootConfig rootConfig;
+        DataServiceConfig dataSvcConfig;
+
+        try {
+            log.info("Loading TRAC platform config...");
+
+            rootConfig = configManager.loadRootConfig(RootConfig.class);
+            dataSvcConfig = rootConfig.getTrac().getServices().getData();
+
+            // TODO: Config validation
+
+            log.info("Config looks ok");
+        }
+        catch (Exception e) {
+
+            var errorMessage = "There was an error loading the platform config: " + e.getMessage();
+            log.error(errorMessage, e);
+            throw new EStartup(errorMessage, e);
+        }
+
         try {
 
             var channelType = NioServerSocketChannel.class;
+            var clientChannelType = NioSocketChannel.class;
             var bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
             var workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
             var execRegister = new ExecutionRegister(workerGroup);
 
             var storage = new StorageManager();
             storage.initStoragePlugins();
+            storage.initStorage(dataSvcConfig.getStorage());
 
-            var metaApi = (TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub) null;
+            var clientChannelBuilder = NettyChannelBuilder.forAddress("localhost", 1234)  // TODO: Meta svc config
+                    .channelType(clientChannelType)
+                    .eventLoopGroup(workerGroup)
+                    .directExecutor()
+                    .usePlaintext();
+
+            var baseChannel = clientChannelBuilder.build();
+
+            var clientChannel = ClientInterceptors.intercept(baseChannel, new ClientInterceptor() {
+
+                @Override public <ReqT, RespT>
+                ClientCall<ReqT, RespT> interceptCall(
+                        MethodDescriptor<ReqT, RespT> method,
+                        CallOptions callOptions,
+                        Channel baseChannel) {
+
+                    var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+                    var eventLoop = (EventLoop) execCtx.eventLoopExecutor();
+
+                    if (eventLoop == null) {
+
+                        // TODO: Warnings
+                        return baseChannel.newCall(method, callOptions);
+                    }
+
+                    var channel = clientChannelBuilder
+                            .eventLoopGroup(eventLoop)
+                            .build();
+
+                    return channel.newCall(method, callOptions);
+                }
+            });
+
+            var metaApi = TrustedMetadataApiGrpc.newFutureStub(clientChannel);
 
             var dataReadSvc = new DataReadService(storage, metaApi);
             var dataWriteSvc = new DataWriteService(storage, metaApi);
@@ -81,7 +134,7 @@ public class TracDataService extends CommonServiceBase {
             // Create the main server
 
             this.server = NettyServerBuilder
-                    .forPort(DATA_SERVICE_PORT)
+                    .forPort(dataSvcConfig.getPort())
                     .addService(publicApi)
 
                     .channelType(channelType)
@@ -94,6 +147,8 @@ public class TracDataService extends CommonServiceBase {
 
             // Good to go, let's start!
             server.start();
+
+            server.getPort();
         }
         catch (IOException e) {
 
