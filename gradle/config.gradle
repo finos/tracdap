@@ -66,6 +66,6 @@ ext {
 
     // Test dependencies
 
-    junit_version = '5.7.0'
+    junit_version = '5.8.1'
     mockito_version = '3.12.4'
 }
