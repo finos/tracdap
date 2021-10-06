@@ -16,21 +16,20 @@
 
 package com.accenture.trac.common.storage.local;
 
+import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.storage.IFileStorage;
 import com.accenture.trac.common.storage.IStoragePlugin;
 
 import java.util.List;
+import java.util.Properties;
 
 
 public class LocalStoragePlugin implements IStoragePlugin {
 
     private static final String PLUGIN_NAME = "LOCAL_STORAGE";
-    private static final List<String> PROTOCOLS = List.of("file");
+    private static final List<String> PROTOCOLS = List.of("LOCAL");
 
     public static final String CONFIG_ROOT_DIR = "rootDir";
-
-    private static final String DEV_STORAGE_KEY = "STORAGE1";
-    private static final String DEV_ROOT = "C:\\Temp\\TRAC";
 
     @Override
     public String name() {
@@ -43,7 +42,13 @@ public class LocalStoragePlugin implements IStoragePlugin {
     }
 
     @Override
-    public IFileStorage createFileStorage() {
-        return new LocalFileStorage(DEV_STORAGE_KEY, DEV_ROOT);
+    public IFileStorage createFileStorage(String storageKey, String protocol, Properties config) {
+
+        if ("LOCAL".equals(protocol)) {
+            return new LocalFileStorage(storageKey, config);
+        }
+
+        throw new EUnexpected();
+
     }
 }

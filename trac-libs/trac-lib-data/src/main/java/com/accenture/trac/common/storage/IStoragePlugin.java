@@ -17,6 +17,7 @@
 package com.accenture.trac.common.storage;
 
 import java.util.List;
+import java.util.Properties;
 
 
 /**
@@ -55,5 +56,5 @@ public interface IStoragePlugin {
     String name();
     List<String> protocols();
 
-    IFileStorage createFileStorage();
+    IFileStorage createFileStorage(String storageKey, String protocol, Properties config);
 }

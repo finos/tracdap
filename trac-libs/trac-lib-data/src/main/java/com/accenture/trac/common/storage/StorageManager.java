@@ -17,12 +17,12 @@
 package com.accenture.trac.common.storage;
 
 import com.accenture.trac.api.config.StorageConfig;
+import com.accenture.trac.common.exception.EStartup;
+import com.accenture.trac.common.exception.EStorageConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.ServiceLoader;
+import java.util.*;
 
 
 public class StorageManager implements IStorageManager {
@@ -30,9 +30,11 @@ public class StorageManager implements IStorageManager {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final Map<String, IStoragePlugin> plugins;
+    private final Map<String, StorageBackend> storage;
 
     public StorageManager() {
         this.plugins = new HashMap<>();
+        this.storage = new HashMap<>();
     }
 
     public void initStoragePlugins() {
@@ -56,18 +58,37 @@ public class StorageManager implements IStorageManager {
 
     public void initStorage(Map<String, StorageConfig> storageConfigMap) {
 
+        log.info("Configuring storage...");
+
         for (var store: storageConfigMap.entrySet()) {
 
             var storageKey = store.getKey();
-            var storageConfig = store.getValue();
+            var config = store.getValue();
+            var backend = new StorageBackend();
 
-            for (var instance : storageConfig.getInstances()) {
+            for (var instanceConfig : config.getInstances()) {
 
-                var instanceScheme = instance.getStorageType();
-                var instanceProps = instance.getStorageProps();
+                var protocol = instanceConfig.getStorageType();
+                var rawProps = instanceConfig.getStorageProps();
+                var props = new Properties();
+                props.putAll(rawProps);
 
-                var plugin = plugins.get(instanceScheme);
-                plugin.createFileStorage(instanceScheme, instanceProps);
+                log.info("Attach storage: [{}] (protocol: {})", storageKey, protocol);
+
+                var plugin = plugins.get(protocol);
+
+                if (plugin == null) {
+
+                    var message = String.format("No plugin found to support storage protocol [%s]", protocol);
+                    var error = new EStartup(message);
+
+                    log.error(message, error);
+                    throw error;
+                }
+
+                var instance = plugin.createFileStorage(storageKey, protocol, props);
+
+                backend.fileInstances.add(instance);
             }
         }
     }
@@ -75,9 +96,28 @@ public class StorageManager implements IStorageManager {
     @Override
     public IFileStorage getFileStorage(String storageKey) {
 
-        var protocol = "file";
-        var plugin = plugins.get(protocol);
+        // TODO: Full implementation for selecting the storage backend
 
-        return plugin.createFileStorage();
+        // Full implementation should consider multiple instances, locations etc.
+        // Also handle selection between data and file storage
+
+        var store = this.storage.get(storageKey);
+
+        if (store == null) {
+            throw new EStorageConfig("Storage not configured for storage key: " + storageKey);
+        }
+
+        var instance = store.fileInstances.get(0);
+
+        if (instance == null) {
+            throw new EStorageConfig("Storage not configured for storage key: " + storageKey);
+        }
+
+        return instance;
+    }
+
+    private static class StorageBackend {
+
+        List<IFileStorage> fileInstances = new ArrayList<>();
     }
 }
