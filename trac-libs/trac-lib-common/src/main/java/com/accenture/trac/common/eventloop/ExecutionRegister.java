@@ -74,16 +74,11 @@ public class ExecutionRegister {
 
             var execCtx = execContextForThread();
 
-            var grpcCtx = Context.current();
-            var newCtx = grpcCtx.withValue(ExecutionContext.EXEC_CONTEXT_KEY, execCtx);
-            var priorCtx = newCtx.attach();
+            var grpcCtx = Context
+                    .current()
+                    .withValue(ExecutionContext.EXEC_CONTEXT_KEY, execCtx);
 
-            try {
-                return next.startCall(call, headers);
-            }
-            finally {
-                newCtx.detach(priorCtx);
-            }
+            return Contexts.interceptCall(grpcCtx, call, headers, next);
         }
     }
 }
