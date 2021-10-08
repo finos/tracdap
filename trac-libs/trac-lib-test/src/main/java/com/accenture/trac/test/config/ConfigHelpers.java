@@ -16,6 +16,8 @@
 
 package com.accenture.trac.test.config;
 
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.FileSystems;
@@ -37,6 +39,8 @@ public class ConfigHelpers {
                 .getClassLoader()
                 .getResource(routConfig);
 
+        LoggerFactory.getLogger(ConfigHelpers.class).info("Root config url: {}", rootConfigUrl);
+
         if (rootConfigUrl == null) {
             var err = String.format("Config resource not found: [%s]", routConfig);
             throw new RuntimeException(err);
@@ -50,6 +54,8 @@ public class ConfigHelpers {
 
         var sourceDir = Paths.get(rootConfigPath).getParent();
         var targetRootFile = targetDir.resolve(Paths.get(rootConfigPath).getFileName());
+
+        LoggerFactory.getLogger(ConfigHelpers.class).info("Source dir path: {}", sourceDir);
 
         ConfigHelpers.copyConfigDir(sourceDir, targetDir);
         ConfigHelpers.setConfigVars(targetRootFile, substitutions);
