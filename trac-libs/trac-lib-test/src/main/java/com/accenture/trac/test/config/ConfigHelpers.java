@@ -62,7 +62,7 @@ public class ConfigHelpers {
         try (var sourceFiles = Files.walk(sourceDir)) {
 
             sourceFiles
-                .filter(sourceFile -> !sourceFile.equals(sourceDir))
+                .filter(sourceFile -> !Files.isDirectory(sourceFile))
                 .forEach(sourceFile -> { try {
 
                     var targetFile = targetDir.resolve(sourceFile.getFileName());
