@@ -44,7 +44,10 @@ public class Concurrent {
     public static <T, U>
     Flow.Publisher<U> map(Flow.Publisher<T> source, Function<T, U> mapping) {
 
-        return new MapProcessor<>(source, mapping);
+        var map = new MapProcessor<>(mapping);
+        source.subscribe(map);
+
+        return map;
     }
 
     public static <T>
@@ -160,21 +163,17 @@ public class Concurrent {
 
     public static class MapProcessor<T, U> implements Flow.Processor<T, U> {
 
-        private final Flow.Publisher<T> source;
         private final Function<T, U> mapping;
 
         private Flow.Subscriber<? super U> subscriber = null;
         private Flow.Subscription sourceSubscription = null;
 
-        public MapProcessor(Flow.Publisher<T> source, Function<T, U> mapping) {
-            this.source = source;
+        public MapProcessor(Function<T, U> mapping) {
             this.mapping = mapping;
         }
 
         @Override
         public void subscribe(Flow.Subscriber<? super U> subscriber) {
-
-            source.subscribe(this);
 
             var targetSubscription = new Flow.Subscription() {
 
@@ -339,7 +338,7 @@ public class Concurrent {
 
         HubProcessor(Consumer<T> releaseFunc) {
 
-            this.targets = new HashMap<>();
+            this.targets = new ConcurrentHashMap<>();
             this.messageBuffer = new LinkedList<>();
             this.releaseFunc = releaseFunc;
 
@@ -480,6 +479,8 @@ public class Concurrent {
                 sourceSubscription.request(state.requestIndex - sourceRequestIndex);
                 sourceRequestIndex = state.requestIndex;
             }
+
+            dispatchMessages();
         }
 
         private void cancelTargetSubscription(Flow.Subscriber<? super T> target) {
