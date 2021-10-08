@@ -16,6 +16,7 @@
 
 package com.accenture.trac.common.util;
 
+import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.exception.ETracInternal;
 import io.netty.util.concurrent.OrderedEventExecutor;
 
@@ -71,9 +72,9 @@ public class Concurrent {
     }
 
     public static <T>
-    Flow.Processor<T, T> hub() {
+    Flow.Processor<T, T> hub(IExecutionContext execCtx) {
 
-        return new HubProcessor<>();
+        return new HubProcessor<>(execCtx.eventLoopExecutor());
     }
 
     public static <T>
@@ -330,25 +331,27 @@ public class Concurrent {
 
         private final LinkedList<T> messageBuffer;
         private final Consumer<T> releaseFunc;
+        private final OrderedEventExecutor eventLoop;
 
         private long messageBufferStart;
         private long messageBufferEnd;
         private long sourceRequestIndex;
         private boolean completeFlag;
 
-        HubProcessor(Consumer<T> releaseFunc) {
+        HubProcessor(OrderedEventExecutor eventLoop, Consumer<T> releaseFunc) {
 
             this.targets = new ConcurrentHashMap<>();
             this.messageBuffer = new LinkedList<>();
             this.releaseFunc = releaseFunc;
+            this.eventLoop = eventLoop;
 
             messageBufferStart = 0;
             messageBufferEnd = 0;
             sourceRequestIndex = 0;
         }
 
-        HubProcessor() {
-            this(null);
+        HubProcessor(OrderedEventExecutor eventLoop) {
+            this(eventLoop, null);
         }
 
         @Override
@@ -390,7 +393,7 @@ public class Concurrent {
             messageBuffer.add(message);
             messageBufferEnd++;
 
-            dispatchMessages();
+            eventLoop.submit(this::dispatchMessages);
         }
 
         @Override
@@ -407,7 +410,7 @@ public class Concurrent {
 
             completeFlag = true;
 
-            dispatchMessages();
+            eventLoop.submit(this::dispatchMessages);
         }
 
         private void dispatchMessages() {
@@ -480,7 +483,7 @@ public class Concurrent {
                 sourceRequestIndex = state.requestIndex;
             }
 
-            dispatchMessages();
+            eventLoop.submit(this::dispatchMessages);
         }
 
         private void cancelTargetSubscription(Flow.Subscriber<? super T> target) {

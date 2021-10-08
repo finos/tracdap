@@ -16,9 +16,16 @@
 
 package com.accenture.trac.svc.data.service;
 
+import com.accenture.trac.api.MetadataReadRequest;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
+import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.common.util.Concurrent;
+import com.accenture.trac.common.util.Futures;
+import com.accenture.trac.metadata.FileDefinition;
+import com.accenture.trac.metadata.StorageDefinition;
+import com.accenture.trac.metadata.Tag;
+import com.accenture.trac.metadata.TagSelector;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
@@ -27,6 +34,8 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.stream.Stream;
 
@@ -46,11 +55,67 @@ public class DataReadService {
         this.metaApi = metaApi;
     }
 
-    public Flow.Publisher<ByteBuf> readFile() {
+    public Flow.Publisher<ByteBuf> readFile(String tenant, TagSelector selector, IExecutionContext execCtx) {
 
         var allocator = ByteBufAllocator.DEFAULT;
-        var content = ByteBufUtil.encodeString(allocator, CharBuffer.wrap("Hello World!"), StandardCharsets.UTF_8);
 
-        return Concurrent.publish(Stream.of(content));
+        var response = Concurrent.<ByteBuf>hub(execCtx);
+        var state = new RequestState();
+
+        CompletableFuture.completedFuture(null)
+
+                .thenCompose(x -> readMetadata(tenant, selector))
+                .thenAccept(obj -> state.file = obj.getDefinition().getFile())
+
+                .thenCompose(x -> readMetadata(tenant, state.file.getStorageId()))
+                .thenAccept(obj -> state.storage = obj.getDefinition().getStorage())
+
+                .thenApply(x -> readFile(state.file, state.storage, execCtx))
+                .thenAccept(byteStream -> byteStream.subscribe(response))
+
+                .exceptionally(error -> {
+
+                    log.error(error.getMessage(), error);
+
+                    response.onSubscribe(new Flow.Subscription() {
+                        @Override public void request(long n) {}
+
+                        @Override public void cancel() {}
+                    });
+
+                    response.onError(error);
+
+                    return null;
+                });
+
+        return response;
     }
+
+    private CompletionStage<Tag> readMetadata(String tenant, TagSelector selector) {
+
+        var metaRequest = MetadataReadRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(selector)
+                .build();
+
+        return Futures.javaFuture(metaApi.readObject(metaRequest));
+    }
+
+    private Flow.Publisher<ByteBuf> readFile(
+            FileDefinition fileDef, StorageDefinition storageDef,
+            IExecutionContext execCtx) {
+
+        var dataItem = fileDef.getDataItem();
+        var storageItem = storageDef.getDataItemsOrThrow(dataItem);
+
+        var incarnation = storageItem.getIncarnations(0);
+        var copy = incarnation.getCopies(0);
+
+        var storageKey = copy.getStorageKey();
+        var storagePath = copy.getStoragePath();
+
+        var storage = storageManager.getFileStorage(storageKey);
+        return storage.reader(storagePath, execCtx);
+    }
+
 }

@@ -20,6 +20,7 @@ import com.accenture.trac.api.*;
 import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.config.ConfigBootstrap;
 import com.accenture.trac.common.config.StandardArgs;
+import com.accenture.trac.common.eventloop.ExecutionContext;
 import com.accenture.trac.common.eventloop.ExecutionRegister;
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.storage.StorageManager;
@@ -44,6 +45,7 @@ import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.testing.GrpcCleanupRule;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
 import org.junit.Rule;
@@ -151,6 +153,8 @@ public class DataApiTest_File {
         storage = new StorageManager();
         storage.initStoragePlugins();
         storage.initStorage(dataSvcConfig.getStorage());
+
+        execContext = new ExecutionContext(new DefaultEventExecutor());
 
         metaApi = TrustedMetadataApiGrpc.newFutureStub(grpcCleanup.register(
                 NettyChannelBuilder.forAddress("localhost", METADATA_SVC_PORT)
@@ -311,7 +315,7 @@ public class DataApiTest_File {
                 .setSelector(selectorFor(objHeader))
                 .build();
 
-        var readResponse = Concurrent.<FileReadResponse>hub();
+        var readResponse = Concurrent.<FileReadResponse>hub(execContext);
         var readResponse0 = Concurrent.first(readResponse);
         var readByteStream = Concurrent.map(readResponse, FileReadResponse::getContent);
         var readBytes = Concurrent.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
@@ -361,7 +365,7 @@ public class DataApiTest_File {
             BiConsumer<TReq, StreamObserver<TResp>> grpcMethod,
             TReq request) {
 
-        var response = Concurrent.<TResp>hub();
+        var response = Concurrent.<TResp>hub(execContext);
         var responseGrpc = GrpcStreams.relay(response);
 
         grpcMethod.accept(request, responseGrpc);

@@ -74,8 +74,10 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
 
-        var requestHub = Concurrent.<FileWriteRequest>hub();
+        var requestHub = Concurrent.<FileWriteRequest>hub(execCtx);
         var firstMessage = Concurrent.first(requestHub);
+
+        // TODO: Validation - firstMessage.thenApply(validationFunc);
 
         var protoContent = Concurrent.map(requestHub, FileWriteRequest::getContent);
         var nioContent = Concurrent.map(protoContent, ByteString::asReadOnlyByteBuffer);
@@ -98,9 +100,17 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void readFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        log.info("Got ctx: {}", execCtx);
+
+        // TODO: Validation
+
         log.info("In read call");
 
-        var dataStream = readService.readFile();
+        var tenant = request.getTenant();
+        var selector = request.getSelector();
+
+        var dataStream = readService.readFile(tenant, selector, execCtx);
 
         var response = Concurrent.map(dataStream, chunk ->
                 FileReadResponse.newBuilder()

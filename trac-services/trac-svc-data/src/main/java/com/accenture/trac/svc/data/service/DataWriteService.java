@@ -59,7 +59,7 @@ public class DataWriteService {
 
         log.info("In service method...");
 
-        var defs = new DefSet();
+        var defs = new RequestState();
 
         var preallocateRequest = MetadataWriteRequest.newBuilder()
             .setTenant(tenant)
@@ -120,12 +120,13 @@ public class DataWriteService {
         var storagePath = copy.getStoragePath();
         var storageDir = storagePath.substring(0, storagePath.lastIndexOf("/"));  // TODO: Can this be cleaner?
 
-        var signal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, signal, execContext);
+        return storage.mkdir(storageDir, true).thenCompose(x -> {
 
-        return storage.mkdir(storageDir, true)
-                .thenAccept(x -> contentStream.subscribe(writer))
-                .thenCompose(x -> signal);
+            var signal = new CompletableFuture<Long>();
+            var writer = storage.writer(storagePath, signal, execContext);
+            contentStream.subscribe(writer);
+            return signal;
+        });
     }
 
     private <TDef> CompletionStage<TagHeader> createObject(
@@ -192,7 +193,7 @@ public class DataWriteService {
     }
 
 
-    private DefSet buildDefinitions(TagHeader fileHeader) {
+    private RequestState buildDefinitions(TagHeader fileHeader) {
 
         var FILE_DATA_ITEM_TEMPLATE = "file/%s/version-%d";
         var FILE_STORAGE_PATH_TEMPLATE = "file/%s/version-%d/%s";
@@ -242,20 +243,11 @@ public class DataWriteService {
         var storageDef = StorageDefinition.newBuilder()
                 .putDataItems(dataItem, storageItem).build();
 
-        var defSet = new DefSet();
+        var defSet = new RequestState();
         defSet.file = fileDef;
         defSet.storage = storageDef;
 
         return defSet;
     }
-
-    private static class DefSet {
-
-        TagHeader fileId;
-
-        FileDefinition file;
-        StorageDefinition storage;
-    }
-
 
 }
