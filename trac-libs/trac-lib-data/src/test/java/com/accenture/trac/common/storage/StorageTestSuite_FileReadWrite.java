@@ -21,6 +21,7 @@ import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.exception.EStorageRequest;
 import com.accenture.trac.common.exception.EValidationGap;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
+import com.accenture.trac.common.storage.local.LocalStoragePlugin;
 import com.accenture.trac.common.util.Concurrent;
 
 import io.netty.buffer.*;
@@ -44,6 +45,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -79,7 +81,10 @@ public class StorageTestSuite_FileReadWrite {
 
         // TODO: Abstract mechanism for obtaining storage impl using config
 
-        storage = new LocalFileStorage("TEST_STORAGE", storageDir.toString());
+        var storageProps = new Properties();
+        storageProps.put(LocalStoragePlugin.CONFIG_ROOT_DIR, storageDir.toString());
+
+        storage = new LocalFileStorage("TEST_STORAGE", storageProps);
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
     }
 
