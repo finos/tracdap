@@ -16,59 +16,124 @@
 
 package com.accenture.trac.test.config;
 
+import com.accenture.trac.common.exception.EUnexpected;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URL;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 import java.util.Map;
+import java.util.jar.JarFile;
+
 
 public class ConfigHelpers {
 
     private static final String BACKSLASH = "/";
 
     public static URL prepareConfig(
-            String routConfig, Path targetDir,
+            String rootConfigFile, Path targetDir,
             Map<String, String> substitutions)
             throws Exception {
 
+        // URL of config file resource in JAR or on file system
+
         var rootConfigUrl = ConfigHelpers.class
                 .getClassLoader()
-                .getResource(routConfig);
-
-        LoggerFactory.getLogger(ConfigHelpers.class).info("Root config url: {}", rootConfigUrl);
+                .getResource(rootConfigFile);
 
         if (rootConfigUrl == null) {
-            var err = String.format("Config resource not found: [%s]", routConfig);
+            var err = String.format("Config resource not found: [%s]", rootConfigFile);
             throw new RuntimeException(err);
         }
 
-        var rootConfigPath = rootConfigUrl.getPath();
+        // Root item to copy - can be a directory
+
+        var rootConfigDir = rootConfigFile.contains("/")
+                ? rootConfigFile.substring(0, rootConfigFile.lastIndexOf("/") + 1)
+                : rootConfigFile;
+
         var pathSeparator = FileSystems.getDefault().getSeparator();
 
-        if (rootConfigUrl.getPath().startsWith(BACKSLASH) && !BACKSLASH.equals(pathSeparator))
-            rootConfigPath = rootConfigPath.substring(1);
+        // Copy config resources, either from JAR or FS depending on test configuration
 
-        var sourceDir = Paths.get(rootConfigPath).getParent();
-        var targetRootFile = targetDir.resolve(Paths.get(rootConfigPath).getFileName());
+        if (rootConfigUrl.getProtocol().equals("jar")) {
 
-        LoggerFactory.getLogger(ConfigHelpers.class).info("Source dir path: {}", sourceDir);
+            var resourcePath = ConfigHelpers.class
+                    .getProtectionDomain()
+                    .getCodeSource()
+                    .getLocation()
+                    .getPath();
 
-        ConfigHelpers.copyConfigDir(sourceDir, targetDir);
+            if (resourcePath.startsWith(BACKSLASH) && !BACKSLASH.equals(pathSeparator))
+                resourcePath = resourcePath.substring(1);
+
+            ConfigHelpers.copyConfigFromJar(resourcePath, rootConfigDir, targetDir);
+
+        }
+        else {
+
+            var rootConfigPath = rootConfigUrl.getPath();
+
+            if (rootConfigPath.startsWith(BACKSLASH) && !BACKSLASH.equals(pathSeparator))
+                rootConfigPath = rootConfigPath.substring(1);
+
+            var sourceDir = Paths.get(rootConfigPath).getParent();
+            var targetConfigDir = targetDir.resolve(rootConfigDir);
+            Files.createDirectories(targetConfigDir);
+            ConfigHelpers.copyConfigDir(sourceDir, targetConfigDir);
+        }
+
+        // Apply config substitutions
+
+        var targetRootFile = targetDir.resolve(rootConfigFile);
         ConfigHelpers.setConfigVars(targetRootFile, substitutions);
+
+        // URL of the root file in the target location
 
         return targetRootFile.toUri().toURL();
     }
+
+    public static void copyConfigFromJar(String jarPath, String rootConfigPath, Path targetDir) throws IOException {
+
+        try (var jar = new JarFile(jarPath)) {
+        for (var entries = jar.entries(); entries.hasMoreElements(); ) {
+
+            var entry = entries.nextElement();
+            var name = entry.getName();
+
+            if (!name.startsWith(rootConfigPath))
+                continue;
+
+            if (entry.isDirectory())
+                Files.createDirectory(targetDir.resolve(name));
+
+            else {
+                try (var stream = jar.getInputStream(entry)) {
+
+                    var size = entry.getSize();
+                    var bytes = new byte[(int) size];
+                    var sizeRead = stream.read(bytes);
+
+                    if (sizeRead != size)
+                        throw new EUnexpected();
+
+                    Files.write(targetDir.resolve(name), bytes);
+                }
+            }
+
+        } }
+    }
+
 
     public static void copyConfigDir(Path sourceDir, Path targetDir) throws IOException {
 
         try (var sourceFiles = Files.walk(sourceDir)) {
 
             sourceFiles
-                .filter(sourceFile -> !Files.isDirectory(sourceFile))
+
+                // Do not try to create the root of targetDir, which already exists
+                .filter(sourceFile -> !sourceFile.equals(sourceDir))
+
                 .forEach(sourceFile -> { try {
 
                     var targetFile = targetDir.resolve(sourceFile.getFileName());
