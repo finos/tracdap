@@ -44,6 +44,7 @@ import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.testing.GrpcCleanupRule;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -51,6 +52,8 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 import org.junit.Rule;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -61,6 +64,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -123,11 +127,14 @@ public class DataApiTest_File {
     @TempDir
     Path tempDir;
 
+    EventLoopGroup workerGroup;
     StorageManager storage;
     IExecutionContext execContext;
 
     TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaApi;
     TracDataApiGrpc.TracDataApiStub dataApi;
+
+    boolean rapidFire;
 
     @BeforeEach
     void setup() throws Exception {
@@ -164,7 +171,7 @@ public class DataApiTest_File {
 
         var dataSvcName = InProcessServerBuilder.generateName();
 
-        var workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
+        workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
         var execRegister = new ExecutionRegister(workerGroup);
 
         var readService = new DataReadService(storage, metaApi);
@@ -185,6 +192,30 @@ public class DataApiTest_File {
                 .directExecutor()
                 .build()));
 
+        rapidFire = false;
+    }
+
+    @AfterEach
+    void teardown() {
+
+        var shutdown = workerGroup.shutdownGracefully();
+
+        if (rapidFire) {
+
+            // Do not wait for event loop shutdown when running rapid fire tests
+            // This gives greater chance of exposing errors, also takes less time!
+
+            Futures.javaFuture(shutdown).exceptionally(err -> {
+
+                var log = LoggerFactory.getLogger(getClass());
+                log.error(err.getMessage(), err);
+                return null;
+            });
+        }
+        else {
+
+            waitFor(TEST_TIMEOUT, Futures.javaFuture(shutdown));
+        }
     }
 
     @Test
@@ -253,6 +284,15 @@ public class DataApiTest_File {
 
         roundTripTest(content, true);
         roundTripTest(content, false);
+    }
+
+    @RepeatedTest(1000) @Tag("slow")
+    void rapidFireTest() throws Exception {
+
+        // TODO: Put this in a separate test class, separate out setup
+
+        rapidFire = true;
+        testRoundTrip_heterogeneousChunks();
     }
 
     private void roundTripTest(List<byte[]> content, boolean dataInChunkZero) throws Exception {
