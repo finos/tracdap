@@ -357,6 +357,8 @@ public class Concurrent {
         @Override
         public void subscribe(Flow.Subscriber<? super T> subscriber) {
 
+            // todo: guard
+
             var subscription = new HubSubscription(subscriber);
             var state = new HubTargetState();
             state.subscription = subscription;
@@ -368,6 +370,8 @@ public class Concurrent {
 
         @Override
         public void onSubscribe(Flow.Subscription subscription) {
+
+            // todo: guard
 
             if (sourceSubscription != null)
                 throw new ETracInternal("Hub processor subscribed to multiple upstream sources");
@@ -390,27 +394,37 @@ public class Concurrent {
         @Override
         public void onNext(T message) {
 
-            messageBuffer.add(message);
-            messageBufferEnd++;
+            eventLoop.submit(() -> {
 
-            eventLoop.submit(this::dispatchMessages);
+                messageBuffer.add(message);
+                messageBufferEnd++;
+
+                dispatchMessages();
+            });
         }
 
         @Override
         public void onError(Throwable error) {
 
-            clearBuffer();
+            eventLoop.submit(() -> {
 
-            for (var subscriber: targets.keySet())
-                subscriber.onError(error);
+                clearBuffer();
+
+                // todo: wrap completion error
+
+                for (var subscriber: targets.keySet())
+                    subscriber.onError(error);
+            });
         }
 
         @Override
         public void onComplete() {
 
-            completeFlag = true;
+            eventLoop.submit(() -> {
 
-            eventLoop.submit(this::dispatchMessages);
+                completeFlag = true;
+                dispatchMessages();
+            });
         }
 
         private void dispatchMessages() {
