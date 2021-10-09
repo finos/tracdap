@@ -341,6 +341,7 @@ public class Concurrent {
         HubProcessor(OrderedEventExecutor eventLoop, Consumer<T> releaseFunc) {
 
             this.targets = new ConcurrentHashMap<>();
+
             this.messageBuffer = new LinkedList<>();
             this.releaseFunc = releaseFunc;
             this.eventLoop = eventLoop;
@@ -357,15 +358,41 @@ public class Concurrent {
         @Override
         public void subscribe(Flow.Subscriber<? super T> subscriber) {
 
-            // todo: guard
-
             var subscription = new HubSubscription(subscriber);
             var state = new HubTargetState();
             state.subscription = subscription;
 
-            targets.put(subscriber, state);
+            // Concurrent check - ensure each subscriber is only subscribed once
+            // Targets is a concurrent map
+
+            var priorState = targets.putIfAbsent(subscriber, state);
+
+            if (priorState != null) {
+                var err = new IllegalStateException("Duplicate subscription in hub processor (this is a bug)");
+                subscriber.onError(err);
+                return;
+            }
 
             subscriber.onSubscribe(subscription);
+        }
+
+        private class HubSubscription implements Flow.Subscription {
+
+            private final Flow.Subscriber<? super T> target;
+
+            private HubSubscription(Flow.Subscriber<? super T> target) {
+                this.target = target;
+            }
+
+            @Override
+            public void request(long n) {
+                eventLoop.submit(() -> requestTargetMessages(target, n));
+            }
+
+            @Override
+            public void cancel() {
+                eventLoop.submit(() -> cancelTargetSubscription(target));
+            }
         }
 
         @Override
@@ -497,7 +524,7 @@ public class Concurrent {
                 sourceRequestIndex = state.requestIndex;
             }
 
-            eventLoop.submit(this::dispatchMessages);
+            dispatchMessages();
         }
 
         private void cancelTargetSubscription(Flow.Subscriber<? super T> target) {
@@ -517,25 +544,6 @@ public class Concurrent {
 
             messageBuffer.clear();
             messageBufferStart = messageBufferEnd;
-        }
-
-        private class HubSubscription implements Flow.Subscription {
-
-            private final Flow.Subscriber<? super T> target;
-
-            private HubSubscription(Flow.Subscriber<? super T> target) {
-                this.target = target;
-            }
-
-            @Override
-            public void request(long n) {
-                requestTargetMessages(target, n);
-            }
-
-            @Override
-            public void cancel() {
-                cancelTargetSubscription(target);
-            }
         }
 
         private static class HubTargetState {
