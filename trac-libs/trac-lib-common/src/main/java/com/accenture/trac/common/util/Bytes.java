@@ -20,42 +20,61 @@ import com.accenture.trac.common.exception.EUnexpected;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 
 import java.util.Arrays;
 
 
 public class Bytes {
 
+    // Currently, it is not possible to do zero-copy between Netty and gRPC
+    // https://github.com/grpc/grpc-java/issues/1054
+
+    // Incoming data has already been copied to create the ByteString
+    // Outgoing data needs to be copied before giving to gRPC
+    // Because writing to the wire is asynchronous and there is no way to callback for release
+
+    public static ByteBuf fromProtoBytes(ByteString bs) {
+
+        return Unpooled.wrappedBuffer(bs.asReadOnlyByteBuffer());
+    }
+
     public static ByteString toProtoBytes(ByteBuf buf) {
 
-        if (buf.nioBufferCount() == 1) {
+        try {
 
-            var nioBuffer = buf.nioBuffer();
-            return UnsafeByteOperations.unsafeWrap(nioBuffer);
+            if (buf.nioBufferCount() == 1) {
+
+                var nioBuffer = buf.nioBuffer();
+                return ByteString.copyFrom(nioBuffer);
+            }
+
+            if (buf.nioBufferCount() > 1) {
+
+                var nioBuffers = buf.nioBuffers();
+
+                var byteStream = Arrays.stream(nioBuffers)
+                        .map(ByteString::copyFrom)
+                        .reduce(ByteString::concat);
+
+                if (byteStream.isEmpty())
+                    throw new EUnexpected();
+
+                return byteStream.get();
+            }
+
+            if (buf.hasArray()) {
+
+                return UnsafeByteOperations.unsafeWrap(buf.array());
+            }
+
+            var bufCopy = new byte[buf.readableBytes()];
+            buf.readBytes(bufCopy);
+
+            return UnsafeByteOperations.unsafeWrap(bufCopy);
         }
-
-        if (buf.nioBufferCount() > 1) {
-
-            var nioBuffers = buf.nioBuffers();
-
-            var byteStream = Arrays.stream(nioBuffers)
-                    .map(UnsafeByteOperations::unsafeWrap)
-                    .reduce(ByteString::concat);
-
-            if (byteStream.isEmpty())
-                throw new EUnexpected();
-
-            return byteStream.get();
+        finally {
+            buf.release();
         }
-
-        if (buf.hasArray()) {
-
-            return UnsafeByteOperations.unsafeWrap(buf.array());
-        }
-
-        var bufCopy = new byte[buf.readableBytes()];
-        buf.readBytes(bufCopy);
-
-        return UnsafeByteOperations.unsafeWrap(bufCopy);
     }
 }

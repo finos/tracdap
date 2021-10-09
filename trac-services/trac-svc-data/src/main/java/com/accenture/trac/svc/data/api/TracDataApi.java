@@ -80,8 +80,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         // TODO: Validation - firstMessage.thenApply(validationFunc);
 
         var protoContent = Concurrent.map(requestHub, FileWriteRequest::getContent);
-        var nioContent = Concurrent.map(protoContent, ByteString::asReadOnlyByteBuffer);
-        var byteBufContent = Concurrent.map(nioContent, Unpooled::wrappedBuffer);
+        var byteBufContent = Concurrent.map(protoContent, Bytes::fromProtoBytes);
 
         var fileObjectHeader = firstMessage.thenCompose(msg -> writeService.createFile(
                 msg.getTenant(),
