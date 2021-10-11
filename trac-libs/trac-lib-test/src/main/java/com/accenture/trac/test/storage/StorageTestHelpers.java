@@ -63,7 +63,7 @@ public class StorageTestHelpers {
         var reader = storage.reader(storagePath, execContext);
 
         return Concurrent.fold(
-                reader, Unpooled::wrappedBuffer,
-                new EmptyByteBuf(ByteBufAllocator.DEFAULT));
+                reader, (composite, buf) -> ((CompositeByteBuf) composite).addComponent(true, buf),
+                ByteBufAllocator.DEFAULT.compositeBuffer());
     }
 }

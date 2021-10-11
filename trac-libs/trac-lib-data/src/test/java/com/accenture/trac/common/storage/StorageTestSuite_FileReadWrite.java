@@ -167,8 +167,8 @@ public class StorageTestSuite_FileReadWrite {
 
         var reader = storage.reader(storagePath, execContext);
         var readResult = Concurrent.fold(
-                reader, Unpooled::wrappedBuffer,
-                (ByteBuf) new EmptyByteBuf(ByteBufAllocator.DEFAULT));
+                reader, (composite, buf) -> composite.addComponent(true, buf),
+                ByteBufAllocator.DEFAULT.compositeBuffer());
 
         waitFor(TEST_TIMEOUT, readResult);
 
@@ -315,8 +315,8 @@ public class StorageTestSuite_FileReadWrite {
         Assertions.assertThrows(EStorageRequest.class, () -> {
 
             var readResult = Concurrent.fold(
-                    reader, Unpooled::wrappedBuffer,
-                    (ByteBuf) new EmptyByteBuf(ByteBufAllocator.DEFAULT));
+                    reader, (composite, buf) -> composite.addComponent(true, buf),
+                    ByteBufAllocator.DEFAULT.compositeBuffer());
 
             waitFor(TEST_TIMEOUT, readResult);
             resultOf(readResult);

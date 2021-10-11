@@ -333,8 +333,8 @@ public class StorageTestSuite_FileOperations {
 
         var reader = storage.reader("test_file.txt", execContext);
         var collect = Concurrent.fold(
-                reader, Unpooled::wrappedBuffer,
-                (ByteBuf) new EmptyByteBuf(ByteBufAllocator.DEFAULT));
+                reader, (composite, buf) -> composite.addComponent(true, buf),
+                ByteBufAllocator.DEFAULT.compositeBuffer());
 
         waitFor(TEST_TIMEOUT, collect);
         collect.toCompletableFuture().get().release();
