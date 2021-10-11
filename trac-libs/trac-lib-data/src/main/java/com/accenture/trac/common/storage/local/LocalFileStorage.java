@@ -130,6 +130,8 @@ public class LocalFileStorage implements IFileStorage {
     public CompletionStage<Boolean> exists(String storagePath) {
 
         try {
+            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, EXISTS_OPERATION, storagePath);
+
             var absolutePath = resolvePath(storagePath, true, EXISTS_OPERATION);
 
             var exists = Files.exists(absolutePath);
@@ -147,6 +149,8 @@ public class LocalFileStorage implements IFileStorage {
     public CompletableFuture<Long> size(String storagePath) {
 
         try {
+            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, SIZE_OPERATION, storagePath);
+
             var absolutePath = resolvePath(storagePath, true, SIZE_OPERATION);
 
             var size = Files.size(absolutePath);
@@ -169,6 +173,8 @@ public class LocalFileStorage implements IFileStorage {
     public CompletionStage<FileStat> stat(String storagePath) {
 
         try {
+            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, STAT_OPERATION, storagePath);
+
             var absolutePath = resolvePath(storagePath, true, STAT_OPERATION);
             var fileStat = buildFileStat(absolutePath, storagePath, STAT_OPERATION);
 
@@ -185,6 +191,8 @@ public class LocalFileStorage implements IFileStorage {
     public CompletionStage<DirStat> ls(String storagePath) {
 
         try {
+            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, LS_OPERATION, storagePath);
+
             var absolutePath = resolvePath(storagePath, true, LS_OPERATION);
 
             try (var paths = Files.list(absolutePath)) {
@@ -268,6 +276,8 @@ public class LocalFileStorage implements IFileStorage {
     public CompletionStage<Void> mkdir(String storagePath, boolean recursive) {
 
         try {
+            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, MKDIR_OPERATION, storagePath);
+
             var absolutePath = resolvePath(storagePath, false, MKDIR_OPERATION);
 
             if (recursive)
@@ -288,6 +298,8 @@ public class LocalFileStorage implements IFileStorage {
     public CompletionStage<Void> rm(String storagePath, boolean recursive) {
 
         try {
+            log.info("STORAGE OPERATION: {} {} [{}]", storageKey, RM_OPERATION, storagePath);
+
             var absolutePath = resolvePath(storagePath, false, RM_OPERATION);
 
             if (recursive) {
@@ -335,6 +347,8 @@ public class LocalFileStorage implements IFileStorage {
     @Override
     public Flow.Publisher<ByteBuf> reader(String storagePath, IExecutionContext execContext) {
 
+        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, READ_OPERATION, storagePath);
+
         var absolutePath = resolvePath(storagePath, false, READ_OPERATION);
 
         return new LocalFileReader(
@@ -348,6 +362,8 @@ public class LocalFileStorage implements IFileStorage {
             String storagePath,
             CompletableFuture<Long> signal,
             IExecutionContext execContext) {
+
+        log.info("STORAGE OPERATION: {} {} [{}]", storageKey, WRITE_OPERATION, storagePath);
 
         var absolutePath = resolvePath(storagePath, false, WRITE_OPERATION);
 
