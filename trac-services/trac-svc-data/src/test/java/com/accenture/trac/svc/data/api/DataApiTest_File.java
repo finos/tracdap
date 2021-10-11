@@ -171,7 +171,7 @@ public class DataApiTest_File {
 
         var dataSvcName = InProcessServerBuilder.generateName();
 
-        workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
+        workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("data-svc"));
         var execRegister = new ExecutionRegister(workerGroup);
 
         var readService = new DataReadService(storage, metaApi);
@@ -368,7 +368,7 @@ public class DataApiTest_File {
 
         // TODO: Compare tag / definition
 
-        Assertions.assertEquals(originalBytes, roundTripBytes);
+        Assertions.assertArrayEquals(originalBytes.toByteArray(), roundTripBytes.toByteArray());
     }
 
     private Flow.Publisher<FileWriteRequest>
