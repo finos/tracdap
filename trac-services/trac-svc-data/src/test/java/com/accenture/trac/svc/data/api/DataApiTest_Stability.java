@@ -17,54 +17,24 @@
 package com.accenture.trac.svc.data.api;
 
 import com.accenture.trac.api.*;
-import com.accenture.trac.api.config.RootConfig;
-import com.accenture.trac.common.config.ConfigBootstrap;
-import com.accenture.trac.common.config.StandardArgs;
-import com.accenture.trac.common.eventloop.ExecutionContext;
-import com.accenture.trac.common.eventloop.ExecutionRegister;
-import com.accenture.trac.common.eventloop.IExecutionContext;
-import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.common.util.Concurrent;
 import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.common.util.GrpcStreams;
-import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.metadata.ObjectDefinition;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagSelector;
-import com.accenture.trac.svc.data.TracDataService;
-import com.accenture.trac.svc.data.service.DataReadService;
-import com.accenture.trac.svc.data.service.DataWriteService;
 
-import com.accenture.trac.svc.meta.TracMetadataService;
-import com.accenture.trac.test.config.ConfigHelpers;
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
-import io.grpc.inprocess.InProcessChannelBuilder;
-import io.grpc.inprocess.InProcessServerBuilder;
-import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
-import io.grpc.testing.GrpcCleanupRule;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.util.concurrent.DefaultEventExecutor;
-import io.netty.util.concurrent.DefaultThreadFactory;
 
-import org.junit.Rule;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -75,147 +45,13 @@ import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.*;
 import static com.accenture.trac.test.storage.StorageTestHelpers.readFile;
 
 
-public class DataApiTest_Stability {
+@Tag("slow")
+public class DataApiTest_Stability extends DataApiTest_Base {
 
-    private static final String TRAC_UNIT_CONFIG = "config/trac-unit.properties";
-    private static final String TRAC_UNIT_CONFIG_YAML = "config/trac-unit.yaml";
-    private static final String TEST_TENANT = "ACME_CORP";
-    private static final short METADATA_SVC_PORT = 8081;
-    private static final String STORAGE_ROOT_DIR = "unit_test_storage";
-
-    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
-
-    @TempDir
-    static Path staticTempDir;
-    static TracMetadataService metaSvc;
-
-    @BeforeAll
-    static void setupClass() throws Exception {
-
-        var substitutions = Map.of("${TRAC_RUN_DIR}", staticTempDir.toString().replace("\\", "\\\\"));
-
-        var configPath = ConfigHelpers.prepareConfig(
-                TRAC_UNIT_CONFIG, staticTempDir,
-                substitutions);
-
-        var keystoreKey = "";  // not yet used
-
-        var testConfig = ConfigBootstrap.useConfigFile(
-                TracMetadataService.class, staticTempDir,
-                configPath.toString(), keystoreKey);
-
-        var deploy_schema_task = StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK_NAME, "", "");
-        var add_tenant_task = StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, TEST_TENANT, "");
-        var deployDb = new DeployMetaDB(testConfig);
-        deployDb.runDeployment(List.of(deploy_schema_task, add_tenant_task));
-
-        metaSvc = new TracMetadataService(testConfig);
-        metaSvc.start();
-    }
-
-    @AfterAll
-    static void teardownClass() {
-
-        metaSvc.stop();
-    }
-
-
-
-    @Rule
-    final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
-
-    @TempDir
-    Path tempDir;
-
-    EventLoopGroup workerGroup;
-    StorageManager storage;
-    IExecutionContext execContext;
-
-    TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaApi;
-    TracDataApiGrpc.TracDataApiStub dataApi;
-
-    boolean rapidFire;
-
-    @BeforeEach
-    void setup() throws Exception {
-
-        // Create storage root dir referenced in config
-        Files.createDirectory(tempDir.resolve(STORAGE_ROOT_DIR));
-
-        var substitutions = Map.of("${TRAC_RUN_DIR}", tempDir.toString().replace("\\", "\\\\"));
-
-        var configPath = ConfigHelpers.prepareConfig(
-                TRAC_UNIT_CONFIG_YAML, tempDir,
-                substitutions);
-
-        var keystoreKey = "";  // not yet used
-
-        var configManager = ConfigBootstrap.useConfigFile(
-                TracDataService.class, tempDir,
-                configPath.toString(), keystoreKey);
-
-        var rootConfig = configManager.loadRootConfig(RootConfig.class);
-        var dataSvcConfig = rootConfig.getTrac().getServices().getData();
-
-        storage = new StorageManager();
-        storage.initStoragePlugins();
-        storage.initStorage(dataSvcConfig.getStorage());
-
-        execContext = new ExecutionContext(new DefaultEventExecutor());
-
-        metaApi = TrustedMetadataApiGrpc.newFutureStub(grpcCleanup.register(
-                NettyChannelBuilder.forAddress("localhost", METADATA_SVC_PORT)
-                .directExecutor()
-                .usePlaintext()
-                .build()));
-
-        var dataSvcName = InProcessServerBuilder.generateName();
-
-        workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("data-svc"));
-        var execRegister = new ExecutionRegister(workerGroup);
-
-        var readService = new DataReadService(storage, metaApi);
-        var writeService = new DataWriteService(storage, metaApi);
-        var publicApiImpl =  new TracDataApi(readService, writeService);
-
-        grpcCleanup.register(InProcessServerBuilder.forName(dataSvcName)
-                .addService(publicApiImpl)
-                .executor(workerGroup)
-                .intercept(execRegister.registerExecContext())
-                .build()
-                .start());
-
-        // Create a client channel and register for automatic graceful shutdown.
-
-        dataApi = TracDataApiGrpc.newStub(grpcCleanup.register(
-                InProcessChannelBuilder.forName(dataSvcName)
-                .directExecutor()
-                .build()));
-
-        rapidFire = false;
-    }
-
-    @AfterEach
-    void teardown() {
-
-        var shutdown = workerGroup.shutdownGracefully();
-
-        if (rapidFire) {
-
-            // Do not wait for event loop shutdown when running rapid fire tests
-            // This gives greater chance of exposing errors, also takes less time!
-
-            Futures.javaFuture(shutdown).exceptionally(err -> {
-
-                var log = LoggerFactory.getLogger(getClass());
-                log.error(err.getMessage(), err);
-                return null;
-            });
-        }
-        else {
-
-            waitFor(TEST_TIMEOUT, Futures.javaFuture(shutdown));
-        }
+    // Do not wait for shutdown to complete before proceeding to the next test
+    @Override
+    protected boolean isRapidFire() {
+        return true;
     }
 
     @Test
@@ -286,12 +122,9 @@ public class DataApiTest_Stability {
         roundTripTest(content, false);
     }
 
-    @RepeatedTest(1000) @Tag("slow")
+    @RepeatedTest(1000)
     void rapidFireTest() throws Exception {
 
-        // TODO: Put this in a separate test class, separate out setup
-
-        rapidFire = true;
         testRoundTrip_heterogeneousChunks();
     }
 
@@ -300,7 +133,7 @@ public class DataApiTest_Stability {
         // Set up a request stream and client streaming call, wait for the call to complete
 
         var createFileRequest = fileWriteRequest(content, dataInChunkZero);
-        var createFile = clientStreaming(dataApi::createFile, createFileRequest);
+        var createFile = clientStreaming(dataClient::createFile, createFileRequest);
 
         waitFor(TEST_TIMEOUT, createFile);
         var objHeader = resultOf(createFile);
@@ -360,7 +193,7 @@ public class DataApiTest_Stability {
         var readByteStream = Concurrent.map(readResponse, FileReadResponse::getContent);
         var readBytes = Concurrent.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
 
-        serverStreaming(dataApi::readFile, readRequest, readResponse);
+        serverStreaming(dataClient::readFile, readRequest, readResponse);
 
         waitFor(TEST_TIMEOUT, readResponse0, readBytes);
         var roundTripTag = resultOf(readResponse0).getFileTag();
@@ -368,7 +201,7 @@ public class DataApiTest_Stability {
 
         // TODO: Compare tag / definition
 
-        Assertions.assertArrayEquals(originalBytes.toByteArray(), roundTripBytes.toByteArray());
+        Assertions.assertEquals(originalBytes, roundTripBytes);
     }
 
     private Flow.Publisher<FileWriteRequest>
@@ -444,7 +277,7 @@ public class DataApiTest_Stability {
             Function<ObjectDefinition, TDef> defTypeFunc)
             throws Exception {
 
-        var tagGrpc = metaApi.readObject(MetadataReadRequest.newBuilder()
+        var tagGrpc = metaClient.readObject(MetadataReadRequest.newBuilder()
                 .setTenant(tenant)
                 .setSelector(selector)
                 .build());

@@ -16,8 +16,18 @@
 
 package com.accenture.trac.svc.data.api;
 
-public class DataApiTest_File {
+import org.junit.jupiter.api.Test;
 
+
+public class DataApiTest_File extends DataApiTest_Base {
+
+    @Override
+    protected boolean isRapidFire() {
+        return false;
+    }
+
+
+    @Test
     void testCreateFile_dataOk() {}
 
     void testCreateFile_metadataOk() {}
