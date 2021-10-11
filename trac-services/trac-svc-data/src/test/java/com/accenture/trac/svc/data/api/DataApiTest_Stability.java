@@ -75,7 +75,7 @@ import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.*;
 import static com.accenture.trac.test.storage.StorageTestHelpers.readFile;
 
 
-public class DataApiTest_File {
+public class DataApiTest_Stability {
 
     private static final String TRAC_UNIT_CONFIG = "config/trac-unit.properties";
     private static final String TRAC_UNIT_CONFIG_YAML = "config/trac-unit.yaml";
