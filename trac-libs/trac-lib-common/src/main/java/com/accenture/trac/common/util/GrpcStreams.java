@@ -22,6 +22,7 @@ import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
@@ -154,6 +155,8 @@ public class GrpcStreams {
 
     public static class GrpcStreamSubscriber<T> implements Flow.Subscriber<T> {
 
+        private final Logger log = LoggerFactory.getLogger(getClass());
+
         private final StreamObserver<T> grpcObserver;
 
         private final AtomicBoolean subscribed = new AtomicBoolean(false);
@@ -183,20 +186,27 @@ public class GrpcStreams {
 
         @Override
         public void onError(Throwable error) {
+
+            log.error("gRPC outbound stream failed: {}", error.getMessage(), error);
+
             subscription.cancel();
             grpcObserver.onError(error);
         }
 
         @Override
         public void onComplete() {
+
+            log.error("gRPC outbound stream complete");
+
             grpcObserver.onCompleted();
         }
     }
 
     public static class GrpcStreamPublisher<T> implements StreamObserver<T> {
 
+        private final Logger log = LoggerFactory.getLogger(getClass());
+
         private final Flow.Subscriber<T> subscriber;
-        private final Flow.Subscription subscription;
 
         public static class Subscription implements Flow.Subscription {
             @Override public void request(long n) {}
@@ -204,10 +214,11 @@ public class GrpcStreams {
         }
 
         public GrpcStreamPublisher(Flow.Subscriber<T> subscriber) {
-            this.subscriber = subscriber;
-            this.subscription = new Subscription();
 
-            subscriber.onSubscribe(this.subscription);
+            this.subscriber = subscriber;
+
+            var subscription = new Subscription();
+            subscriber.onSubscribe(subscription);
         }
 
         @Override
@@ -217,11 +228,17 @@ public class GrpcStreams {
 
         @Override
         public void onError(Throwable error) {
+
+            log.error("gRPC inbound stream failed: {}", error.getMessage(), error);
+
             subscriber.onError(error);
         }
 
         @Override
         public void onCompleted() {
+
+            log.error("gRPC inbound stream complete");
+
             subscriber.onComplete();
         }
     }
