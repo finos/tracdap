@@ -187,7 +187,7 @@ public class GrpcStreams {
         @Override
         public void onError(Throwable error) {
 
-            log.error("gRPC outbound stream failed: {}", error.getMessage(), error);
+            log.error("gRPC inbound stream failed: {}", error.getMessage(), error);
 
             subscription.cancel();
             grpcObserver.onError(error);
@@ -196,7 +196,7 @@ public class GrpcStreams {
         @Override
         public void onComplete() {
 
-            log.error("gRPC outbound stream complete");
+            log.info("gRPC inbound stream complete");
 
             grpcObserver.onCompleted();
         }
@@ -229,7 +229,7 @@ public class GrpcStreams {
         @Override
         public void onError(Throwable error) {
 
-            log.error("gRPC inbound stream failed: {}", error.getMessage(), error);
+            log.error("gRPC outbound stream failed: {}", error.getMessage(), error);
 
             subscriber.onError(error);
         }
@@ -237,7 +237,7 @@ public class GrpcStreams {
         @Override
         public void onCompleted() {
 
-            log.error("gRPC inbound stream complete");
+            log.info("gRPC outbound stream complete");
 
             subscriber.onComplete();
         }
