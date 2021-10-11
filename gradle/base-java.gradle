@@ -39,7 +39,9 @@ test {
 
     useJUnitPlatform {
         excludeTags "integration"
-        excludeTags "slow"
+
+        // Run stability tests as part of the standard build (does this need a separate tag)?
+        // excludeTags "slow"
     }
 }
 
