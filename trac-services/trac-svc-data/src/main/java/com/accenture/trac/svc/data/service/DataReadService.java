@@ -55,11 +55,12 @@ public class DataReadService {
         this.metaApi = metaApi;
     }
 
-    public Flow.Publisher<ByteBuf> readFile(String tenant, TagSelector selector, IExecutionContext execCtx) {
+    public void readFile(
+            String tenant, TagSelector selector,
+            Flow.Subscriber<ByteBuf> dataStream,
+            IExecutionContext execCtx) {
 
         var allocator = ByteBufAllocator.DEFAULT;
-
-        var response = Concurrent.<ByteBuf>hub(execCtx);
         var state = new RequestState();
 
         CompletableFuture.completedFuture(null)
@@ -71,24 +72,22 @@ public class DataReadService {
                 .thenAccept(obj -> state.storage = obj.getDefinition().getStorage())
 
                 .thenApply(x -> readFile(state.file, state.storage, execCtx))
-                .thenAccept(byteStream -> byteStream.subscribe(response))
+                .thenAccept(byteStream -> byteStream.subscribe(dataStream))
 
                 .exceptionally(error -> {
 
                     log.error(error.getMessage(), error);
 
-                    response.onSubscribe(new Flow.Subscription() {
+                    dataStream.onSubscribe(new Flow.Subscription() {
                         @Override public void request(long n) {}
 
                         @Override public void cancel() {}
                     });
 
-                    response.onError(error);
+                    dataStream.onError(error);
 
                     return null;
                 });
-
-        return response;
     }
 
     private CompletionStage<Tag> readMetadata(String tenant, TagSelector selector) {

@@ -27,6 +27,7 @@ import com.accenture.trac.svc.data.service.DataWriteService;
 
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,14 +110,15 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var tenant = request.getTenant();
         var selector = request.getSelector();
 
-        var dataStream = readService.readFile(tenant, selector, execCtx);
-
+        var dataStream = Concurrent.<ByteBuf>hub(execCtx);
         var response = Concurrent.map(dataStream, chunk ->
                 FileReadResponse.newBuilder()
                 .setContent(Bytes.toProtoBytes(chunk))
                 .build());
 
         response.subscribe(GrpcStreams.relay(responseObserver));
+
+        readService.readFile(tenant, selector, dataStream, execCtx);
     }
 
     @Override
