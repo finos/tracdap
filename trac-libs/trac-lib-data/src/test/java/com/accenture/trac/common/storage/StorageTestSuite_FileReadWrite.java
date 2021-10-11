@@ -770,8 +770,8 @@ public class StorageTestSuite_FileReadWrite {
         Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
         reader.subscribe(subscriber);
 
-        verify(subscriber, never()).onSubscribe(any(Flow.Subscription.class));
         verify(subscriber, timeout(ASYNC_DELAY.toMillis())).onError(any(IllegalStateException.class));
+        verify(subscriber, never()).onSubscribe(any(Flow.Subscription.class));
     }
 
     @Test
@@ -803,8 +803,8 @@ public class StorageTestSuite_FileReadWrite {
         // Second should receive onError with an illegal state exception
         // As per: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
 
-        verify(subscriber1, times(1)).onSubscribe(any(Flow.Subscription.class));
-        verify(subscriber2, times(1)).onError(any(IllegalStateException.class));
+        verify(subscriber1, timeout(ASYNC_DELAY.toMillis())).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber2, timeout(ASYNC_DELAY.toMillis())).onError(any(IllegalStateException.class));
 
         // Subscription 1 should still work as normal when data is requested
 
