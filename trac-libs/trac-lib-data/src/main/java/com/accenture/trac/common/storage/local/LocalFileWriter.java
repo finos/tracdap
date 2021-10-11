@@ -110,28 +110,9 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
             throw new IllegalStateException(eStorage.getMessage(), eStorage);
         }
 
-        // At this point it is certain there is only one subscription
-        // The method is still running on the calling thread though
-        // That is ok so long as the publisher is well-behaved and doesn't send anything until onSubscribe() completes
+        this.subscription = subscription;
 
-        try {
-
-            this.subscription = subscription;
-
-            this.channel = AsynchronousFileChannel.open(absolutePath, Set.of(WRITE, CREATE_NEW), executor);
-            this.writeHandler = new ChunkWriteHandler();
-
-            log.info("File channel open for writing: [{}]", absolutePath);
-
-            subscription.request(1);
-        }
-        catch (Exception e) {
-
-            subscription.cancel();
-
-            var eStorage = errors.handleException(e, storagePath, WRITE_OPERATION);
-            signal.completeExceptionally(eStorage);
-        }
+        executor.submit(this::doStart);
     }
 
     @Override
@@ -268,6 +249,26 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
             else
                 // For errors after termination, put a warning in the log
                 log.warn("Write operation is terminated but further errors occurred: [{}]", absolutePath, error);
+        }
+    }
+
+    private void doStart() {
+
+        try {
+
+            this.channel = AsynchronousFileChannel.open(absolutePath, Set.of(WRITE, CREATE_NEW), executor);
+            this.writeHandler = new ChunkWriteHandler();
+
+            log.info("File channel open for writing: [{}]", absolutePath);
+
+            subscription.request(1);
+        }
+        catch (Exception e) {
+
+            subscription.cancel();
+
+            var eStorage = errors.handleException(e, storagePath, WRITE_OPERATION);
+            signal.completeExceptionally(eStorage);
         }
     }
 

@@ -94,39 +94,25 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
     @Override
     public void subscribe(Flow.Subscriber<? super ByteBuf> subscriber) {
 
-        try {
+        // Avoid concurrency issues - use atomic boolean CAS to ensure the method is only called once
+        // No other processing has started at this point
 
-            // Avoid concurrency issues - use atomic boolean CAS to ensure the method is only called once
-            // No other processing has started at this point
+        var subscribeOk = subscriberSet.compareAndSet(false, true);
 
-            var subscribeOk = subscriberSet.compareAndSet(false, true);
+        if (!subscribeOk) {
 
-            if (!subscribeOk) {
+            // According to Java API docs, errors in subscribe() should be reported as IllegalStateException
+            // https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
 
-                // According to Java API docs, errors in subscribe() should be reported as IllegalStateException
-                // https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Flow.Publisher.html#subscribe(java.util.concurrent.Flow.Subscriber)
-
-                var eStorage = errors.explicitError(DUPLICATE_SUBSCRIPTION, storagePath, READ_OPERATION);
-                var eFlowState = new IllegalStateException(eStorage.getMessage(), eStorage);
-                subscriber.onError(eFlowState);
-                return;
-            }
-
-            this.subscriber = subscriber;
-
-            this.channel = AsynchronousFileChannel.open(absolutePath, Set.of(READ), executor);
-            this.readHandler = new ChunkReadHandler();
-
-            log.info("File channel open for reading: [{}]", absolutePath);
-
-            subscriber.onSubscribe(new ReadSubscription());
-        }
-        catch (Exception e) {
-
-            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
+            var eStorage = errors.explicitError(DUPLICATE_SUBSCRIPTION, storagePath, READ_OPERATION);
             var eFlowState = new IllegalStateException(eStorage.getMessage(), eStorage);
             subscriber.onError(eFlowState);
+            return;
         }
+
+        this.subscriber = subscriber;
+
+        executor.submit(this::doStart);
     }
 
     private class ReadSubscription implements Flow.Subscription {
@@ -250,6 +236,25 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             else
                 // For errors after termination, put a warning in the log
                 log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, error);
+        }
+    }
+
+    private void doStart() {
+
+        try {
+
+            this.channel = AsynchronousFileChannel.open(absolutePath, Set.of(READ), executor);
+            this.readHandler = new ChunkReadHandler();
+
+            log.info("File channel open for reading: [{}]", absolutePath);
+
+            subscriber.onSubscribe(new ReadSubscription());
+        }
+        catch (Exception e) {
+
+            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
+            var eFlowState = new IllegalStateException(eStorage.getMessage(), eStorage);
+            subscriber.onError(eFlowState);
         }
     }
 

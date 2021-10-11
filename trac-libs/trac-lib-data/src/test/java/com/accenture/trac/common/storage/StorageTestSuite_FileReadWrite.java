@@ -29,9 +29,7 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -70,11 +68,27 @@ public class StorageTestSuite_FileReadWrite {
     public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
     public static final Duration ASYNC_DELAY = Duration.ofSeconds(1);
 
-    IFileStorage storage;
-    IExecutionContext execContext;
+    @TempDir
+    static Path staticStorageDir;
+    static IFileStorage staticStorage;
+    static IExecutionContext staticExecContext;
 
     @TempDir
     Path storageDir;
+    IFileStorage storage;
+    IExecutionContext execContext;
+
+    @BeforeAll
+    static void setupStaticStorage() {
+
+        // TODO: Abstract mechanism for obtaining storage impl using config
+
+        var storageProps = new Properties();
+        storageProps.put(LocalStoragePlugin.CONFIG_ROOT_DIR, staticStorageDir.toString());
+
+        staticStorage = new LocalFileStorage("TEST_STORAGE", storageProps);
+        staticExecContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
+    }
 
     @BeforeEach
     void setupStorage() {
@@ -149,7 +163,34 @@ public class StorageTestSuite_FileReadWrite {
         roundTripTest(storagePath, List.of(emptyBytes));
     }
 
+    @RepeatedTest(1000)
+    void rapidFireTest(RepetitionInfo repetitionInfo) throws Exception {
+
+        // copy of heterogeneous round trip test
+
+        var storagePath = String.format("test_file_%d.dat", repetitionInfo.getCurrentRepetition());
+
+        var bytes = List.of(  // Selection of different size chunks
+                new byte[3],
+                new byte[10000],
+                new byte[42],
+                new byte[4097],
+                new byte[1],
+                new byte[2000]);
+
+        var random = new Random();
+        bytes.forEach(random::nextBytes);
+
+        roundTripTest(storagePath, bytes, staticStorage, staticExecContext);
+    }
+
     private void roundTripTest(String storagePath, List<byte[]> originalBytes) throws Exception {
+        roundTripTest(storagePath, originalBytes, storage, execContext);
+    }
+
+    private void roundTripTest(
+            String storagePath, List<byte[]> originalBytes,
+            IFileStorage storage, IExecutionContext execContext) throws Exception {
 
         var originalBuffers = originalBytes.stream().map(bytes ->
                 ByteBufAllocator.DEFAULT
@@ -254,7 +295,7 @@ public class StorageTestSuite_FileReadWrite {
         Assertions.assertThrows(EStorageRequest.class, () -> {
 
             contentStream2.subscribe(writer2);
-            waitFor(TEST_TIMEOUT, writeSignal);
+            waitFor(TEST_TIMEOUT, writeSignal2);
             resultOf(writeSignal2);
         });
     }
@@ -690,8 +731,8 @@ public class StorageTestSuite_FileReadWrite {
         var reader = storage.reader(storagePath, execContext);
         reader.subscribe(subscriber);
 
-        // onSubscribe should be received right away
-        verify(subscriber, times(1)).onSubscribe(any(Flow.Subscription.class));
+        // onSubscribe should be received
+        verify(subscriber, timeout(ASYNC_DELAY.toMillis())).onSubscribe(any(Flow.Subscription.class));
 
         // The stream should be read until complete
         verify(subscriber, timeout(TEST_TIMEOUT.toMillis())).onComplete();
@@ -730,7 +771,7 @@ public class StorageTestSuite_FileReadWrite {
         reader.subscribe(subscriber);
 
         verify(subscriber, never()).onSubscribe(any(Flow.Subscription.class));
-        verify(subscriber, times(1)).onError(any(IllegalStateException.class));
+        verify(subscriber, timeout(ASYNC_DELAY.toMillis())).onError(any(IllegalStateException.class));
     }
 
     @Test
