@@ -19,9 +19,14 @@ package com.accenture.trac.svc.data.service;
 import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.metadata.StorageDefinition;
 import com.accenture.trac.metadata.TagHeader;
+import com.accenture.trac.metadata.TagUpdate;
+
+import java.util.List;
 
 
 class RequestState {
+
+    List<TagUpdate> tags;
 
     TagHeader fileId;
 

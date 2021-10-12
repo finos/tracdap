@@ -31,14 +31,22 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 public class DataWriteService {
+
+    private static final String TRAC_FILE_NAME_ATTR = "trac_file_name";
+    private static final String TRAC_FILE_EXTENSION_ATTR = "trac_file_extension";
+    private static final String TRAC_FILE_MIME_TYPE_ATTR = "trac_file_mime_type";
+    private static final String TRAC_FILE_SIZE_ATTR = "trac_file_size";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -54,13 +62,17 @@ public class DataWriteService {
     }
 
     public CompletionStage<TagHeader> createFile(
-            String tenant,
+            String tenant, List<TagUpdate> tags,
+            String name, String mimeType,
             Flow.Publisher<ByteBuf> contentStream,
             IExecutionContext execContext) {
 
         log.info("In service method...");
 
+        // TODO: Validation
+
         var defs = new RequestState();
+        defs.tags = tags;
 
         var preallocateRequest = MetadataWriteRequest.newBuilder()
             .setTenant(tenant)
@@ -75,7 +87,7 @@ public class DataWriteService {
                 .thenAccept(fileId -> defs.fileId = fileId)
 
                 // Build initial definition objects
-                .thenApply(x -> buildDefinitions(defs.fileId))
+                .thenApply(x -> buildDefinitions(defs.fileId, name, mimeType))
                 .thenAccept(defs_ -> {
                     defs.file = defs_.file;
                     defs.storage = defs_.storage; })
@@ -94,7 +106,7 @@ public class DataWriteService {
 
                 // Save storage metadata
                 .thenCompose(x -> createObject(
-                        tenant, ObjectType.STORAGE, defs.storage,
+                        tenant, tags, ObjectType.STORAGE, defs.storage,
                         ObjectDefinition.Builder::setStorage))
 
                 // Record storage ID in file definition
@@ -103,10 +115,44 @@ public class DataWriteService {
                     .setStorageId(MetadataUtil.selectorForLatest(storageHeader))
                     .build())
 
+                // Add file-specific controlled tag attrs
+                .thenAccept(x -> defs.tags = addFileAAttrs(defs.tags, defs.file))
+
                 // Save file metadata
                 .thenCompose(x -> createPreallocated(
-                        tenant, defs.fileId, defs.file,
+                        tenant, defs.tags, defs.fileId, defs.file,
                         ObjectDefinition.Builder::setFile));
+    }
+
+    private List<TagUpdate> addFileAAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
+
+        var nameAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_FILE_NAME_ATTR)
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue(fileDef.getName()))
+                .build();
+
+        var extensionAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_FILE_EXTENSION_ATTR)
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue(fileDef.getExtension()))
+                .build();
+
+        var mimeTypeAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_FILE_MIME_TYPE_ATTR)
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue(fileDef.getMimeType()))
+                .build();
+
+        var sizeAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_FILE_SIZE_ATTR)
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue(fileDef.getSize()))
+                .build();
+
+        var fileAttrs = List.of(nameAttr, extensionAttr, mimeTypeAttr, sizeAttr);
+
+        return Stream.concat(tags.stream(), fileAttrs.stream()).collect(Collectors.toList());
     }
 
     private CompletionStage<Long> writeDataItem(
@@ -131,7 +177,7 @@ public class DataWriteService {
     }
 
     private <TDef> CompletionStage<TagHeader> createObject(
-            String tenant, ObjectType objectType, TDef def,
+            String tenant, List<TagUpdate> tags, ObjectType objectType, TDef def,
             BiFunction<ObjectDefinition.Builder, TDef, ObjectDefinition.Builder> objSetter) {
 
         var objBuilder = ObjectDefinition.newBuilder().setObjectType(objectType);
@@ -141,14 +187,14 @@ public class DataWriteService {
                 .setTenant(tenant)
                 .setObjectType(objectType)
                 .setDefinition(obj)
-                // TODO: tag updates
+                .addAllTagUpdates(tags)
                 .build();
 
         return Futures.javaFuture(metaApi.createObject(request));
     }
 
     private <TDef> CompletionStage<TagHeader> createPreallocated(
-            String tenant, TagHeader objectHeader, TDef def,
+            String tenant, List<TagUpdate> tags, TagHeader objectHeader, TDef def,
             BiFunction<ObjectDefinition.Builder, TDef, ObjectDefinition.Builder> objSetter) {
 
         var objectType = objectHeader.getObjectType();
@@ -160,13 +206,13 @@ public class DataWriteService {
                 .setObjectType(objectType)
                 .setPriorVersion(MetadataUtil.selectorFor(objectHeader))
                 .setDefinition(obj)
-                // TODO: tag updates
+                .addAllTagUpdates(tags)
                 .build();
 
         return Futures.javaFuture(metaApi.createPreallocatedObject(request));
     }
 
-    private RequestState buildDefinitions(TagHeader fileHeader) {
+    private RequestState buildDefinitions(TagHeader fileHeader, String fileName, String mimeType) {
 
         var FILE_DATA_ITEM_TEMPLATE = "file/%s/version-%d";
         var FILE_STORAGE_PATH_TEMPLATE = "file/%s/version-%d/%s";
@@ -176,17 +222,15 @@ public class DataWriteService {
 
         var dataItem = String.format(FILE_DATA_ITEM_TEMPLATE, fileId, fileVersion);
 
-        var fileName = "TODO_FILE_NAME.ext";
         var extension = fileName.contains(".")
                 ? fileName.substring(fileName.lastIndexOf(".") + 1)
                 : "";
-        var fileType = "";
 
         // Size and storage ID omitted, will be set later
         var fileDef = FileDefinition.newBuilder()
                 .setName(fileName)
                 .setExtension(extension)
-                .setMimeType(fileType)
+                .setMimeType(mimeType)
                 .setDataItem(dataItem)
                 .build();
 
@@ -199,7 +243,7 @@ public class DataWriteService {
         var storageCopy = StorageCopy.newBuilder()
                 .setStorageKey(storageKey)
                 .setStoragePath(storagePath)
-                .setStorageFormat(fileType)  // TODO: Always use binary blob type for files?
+                .setStorageFormat(mimeType)  // TODO: Always use binary blob type for files?
                 .setCopyStatus(CopyStatus.COPY_AVAILABLE)
                 .setCopyTimestamp(storageTimestamp);
 

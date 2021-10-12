@@ -84,7 +84,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var byteBufContent = Concurrent.map(protoContent, Bytes::fromProtoBytes);
 
         var fileObjectHeader = firstMessage.thenCompose(msg -> writeService.createFile(
-                msg.getTenant(),
+                msg.getTenant(), msg.getTagUpdatesList(),
+                msg.getName(), msg.getMimeType(),
                 byteBufContent, execCtx));
 
         fileObjectHeader.whenComplete(GrpcStreams.resultHandler(responseObserver));
