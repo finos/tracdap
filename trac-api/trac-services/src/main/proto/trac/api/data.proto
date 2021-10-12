@@ -176,9 +176,8 @@ message FileWriteRequest {
   repeated metadata.TagUpdate tagUpdates = 3;
 
   string name = 4;
-  string extension = 5;
-  string mimeType = 6;
-  optional uint64 size = 7;
+  string mimeType = 5;
+  optional uint64 size = 6;
 
   bytes content = 1000;
 }
