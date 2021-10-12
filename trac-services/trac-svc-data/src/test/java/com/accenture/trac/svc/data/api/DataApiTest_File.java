@@ -16,9 +16,15 @@
 
 package com.accenture.trac.svc.data.api;
 
+import com.accenture.trac.api.FileReadRequest;
+import com.accenture.trac.api.FileReadResponse;
 import com.accenture.trac.api.FileWriteRequest;
+import com.accenture.trac.api.MetadataReadRequest;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
+import com.accenture.trac.common.util.Concurrent;
+import com.accenture.trac.common.util.Futures;
+import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagOperation;
 import com.accenture.trac.metadata.TagUpdate;
 import com.google.protobuf.ByteString;
@@ -38,6 +44,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class DataApiTest_File extends DataApiTest_Base {
 
+    // Functional test cases for file operations in the data API
+    // (createFile, updateFile, readFile)
+
     @Override
     protected boolean isRapidFire() {
         return false;
@@ -55,27 +64,98 @@ public class DataApiTest_File extends DataApiTest_Base {
                     .setValue(MetadataCodec.encodeValue("Describes what this template does in the app"))
                     .build());
 
+    private static final ByteString BASIC_FILE_CONTENT = ByteString
+            .copyFrom("Sample content\n", StandardCharsets.UTF_8);
+
     private static final FileWriteRequest BASIC_CREATE_FILE_REQUEST = FileWriteRequest.newBuilder()
             .setTenant(TEST_TENANT)
             .addAllTagUpdates(BASIC_TAG_UPDATES)
-            .setName("some_file.dat")
-            .setMimeType("application/octet-stream")
-            .setContent(ByteString.copyFrom("Template content", StandardCharsets.UTF_8))
+            .setName("some_file.txt")
+            .setMimeType("text/plain")
+            .setSize(BASIC_FILE_CONTENT.size())
+            .setContent(BASIC_FILE_CONTENT)
             .build();
 
     @Test
-    void testCreateFile_dataOk() {
-        Assertions.fail();
+    void testCreateFile_dataOk() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var fileId = resultOf(createFile);
+
+        // Read back content and check
+
+        var fileReadRequest = FileReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(fileId))
+                .build();
+
+        var responseStream = Helpers.serverStreaming(dataClient::readFile, fileReadRequest, execContext);
+        var byteStream = Concurrent.map(responseStream, FileReadResponse::getContent);
+        var content = Concurrent.fold(byteStream,
+                ByteString::concat,
+                ByteString.EMPTY);
+
+        waitFor(TEST_TIMEOUT, content);
+        Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(content));
     }
 
     @Test
-    void testCreateFile_metadataOk() {
-        Assertions.fail();
-    }
+    void testCreateFile_metadataOk() throws Exception {
 
-    @Test
-    void testCreateFile_sizeOptional() {
-        Assertions.fail();
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var fileId = resultOf(createFile);
+
+        var metaReadRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(fileId))
+                .build();
+
+        var metaResponse = Futures.javaFuture(metaClient.readObject(metaReadRequest));
+        waitFor(TEST_TIMEOUT, metaResponse);
+        var tag = resultOf(metaResponse);
+
+        // Explicitly set attrs
+
+        Assertions.assertTrue(tag.containsAttrs("app_template"));
+        Assertions.assertTrue(tag.containsAttrs("description"));
+        var appTemplateAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("app_template"));
+        var descriptionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("description"));
+        Assertions.assertEquals("template_1", appTemplateAttr);
+        Assertions.assertEquals("Describes what this template does in the app", descriptionAttr);
+
+        // Controlled attrs should always be set for files
+
+        Assertions.assertTrue(tag.containsAttrs("trac_file_name"));
+        Assertions.assertTrue(tag.containsAttrs("trac_file_extension"));
+        Assertions.assertTrue(tag.containsAttrs("trac_file_mime_type"));
+        Assertions.assertTrue(tag.containsAttrs("trac_file_size"));
+        var nameAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_name"));
+        var extensionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_extension"));
+        var mimeTypeAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_mime_type"));
+        var sizeAttr = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_file_size"));
+        Assertions.assertEquals("some_file.txt", nameAttr);
+        Assertions.assertEquals("txt", extensionAttr);
+        Assertions.assertEquals("text/plain", mimeTypeAttr);
+        Assertions.assertEquals(BASIC_FILE_CONTENT.size(), sizeAttr);
+
+        // Check core attributes of the file definition
+
+        var def = tag.getDefinition();
+        Assertions.assertEquals(ObjectType.FILE, def.getObjectType());
+
+        var fileDef = def.getFile();
+        Assertions.assertEquals("some_file.txt", fileDef.getName());
+        Assertions.assertEquals("txt", fileDef.getExtension());
+        Assertions.assertEquals("text/plain", fileDef.getMimeType());
+        Assertions.assertEquals(BASIC_FILE_CONTENT.size(), fileDef.getSize());
+
+        // Storage def is intended for internal use by the platform
+        // This is just a cursory check to make sure it has been set
+
+        Assertions.assertEquals(ObjectType.STORAGE, fileDef.getStorageId().getObjectType());
+        Assertions.assertFalse(fileDef.getDataItem().isBlank());
     }
 
     @Test
@@ -214,6 +294,48 @@ public class DataApiTest_File extends DataApiTest_Base {
             var badMimeTypeError = assertThrows(StatusRuntimeException.class, () -> resultOf(badMimeTypeResult));
             assertEquals(Status.Code.INVALID_ARGUMENT, badMimeTypeError.getStatus().getCode());
         }
+    }
+
+    @Test
+    void testCreateFile_sizeOptional() throws Exception {
+
+        // If size is not specified, TRAC should still accept the file and set the received size in the metadata
+        // In this case the usual verification of file size is not performed
+
+        var sizeOmitted = BASIC_CREATE_FILE_REQUEST.toBuilder().clearSize().build();
+        var createFile = Helpers.clientStreaming(dataClient::createFile, sizeOmitted);
+        waitFor(TEST_TIMEOUT, createFile);
+        var fileId = resultOf(createFile);
+
+        // Check size is set in metadata
+
+        var metaReadRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(fileId))
+                .build();
+
+        var metaResponse = Futures.javaFuture(metaClient.readObject(metaReadRequest));
+        waitFor(TEST_TIMEOUT, metaResponse);
+        var tag = resultOf(metaResponse);
+        var def = tag.getDefinition();
+        var fileDef = def.getFile();
+        Assertions.assertEquals(BASIC_FILE_CONTENT.size(), fileDef.getSize());
+
+        // Read back content and check
+
+        var fileReadRequest = FileReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(fileId))
+                .build();
+
+        var responseStream = Helpers.serverStreaming(dataClient::readFile, fileReadRequest, execContext);
+        var byteStream = Concurrent.map(responseStream, FileReadResponse::getContent);
+        var content = Concurrent.fold(byteStream,
+                ByteString::concat,
+                ByteString.EMPTY);
+
+        waitFor(TEST_TIMEOUT, content);
+        Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(content));
     }
 
     @Test
