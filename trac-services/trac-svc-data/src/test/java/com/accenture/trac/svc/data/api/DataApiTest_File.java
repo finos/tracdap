@@ -432,8 +432,66 @@ public class DataApiTest_File extends DataApiTest_Base {
     }
 
     @Test
-    void testUpdateFile_metadataOk() {
-        Assertions.fail();
+    void testUpdateFile_metadataOk() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var v1Selector = MetadataUtil.selectorFor(v1Id);
+        var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
+        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var v2Id = resultOf(updateFile);
+
+        var metaReadRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(v2Id))
+                .build();
+
+        var metaResponse = Futures.javaFuture(metaClient.readObject(metaReadRequest));
+        waitFor(TEST_TIMEOUT, metaResponse);
+        var tag = resultOf(metaResponse);
+
+        // Explicitly set attrs
+
+        Assertions.assertTrue(tag.containsAttrs("app_template"));
+        Assertions.assertTrue(tag.containsAttrs("description"));
+        var appTemplateAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("app_template"));
+        var descriptionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("description"));
+        Assertions.assertEquals("template_name", appTemplateAttr);
+        Assertions.assertEquals("Describes what is in the V2 template", descriptionAttr);
+
+        // Controlled attrs should always be set for files
+
+        Assertions.assertTrue(tag.containsAttrs("trac_file_name"));
+        Assertions.assertTrue(tag.containsAttrs("trac_file_extension"));
+        Assertions.assertTrue(tag.containsAttrs("trac_file_mime_type"));
+        Assertions.assertTrue(tag.containsAttrs("trac_file_size"));
+        var nameAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_name"));
+        var extensionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_extension"));
+        var mimeTypeAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_mime_type"));
+        var sizeAttr = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_file_size"));
+        Assertions.assertEquals("some_file_v2.txt", nameAttr);
+        Assertions.assertEquals("txt", extensionAttr);
+        Assertions.assertEquals("text/plain", mimeTypeAttr);
+        Assertions.assertEquals(BASIC_FILE_CONTENT_V2.size(), sizeAttr);
+
+        // Check core attributes of the file definition
+
+        var def = tag.getDefinition();
+        Assertions.assertEquals(ObjectType.FILE, def.getObjectType());
+
+        var fileDef = def.getFile();
+        Assertions.assertEquals("some_file_v2.txt", fileDef.getName());
+        Assertions.assertEquals("txt", fileDef.getExtension());
+        Assertions.assertEquals("text/plain", fileDef.getMimeType());
+        Assertions.assertEquals(BASIC_FILE_CONTENT_V2.size(), fileDef.getSize());
+
+        // Storage def is intended for internal use by the platform
+        // This is just a cursory check to make sure it has been set
+
+        Assertions.assertEquals(ObjectType.STORAGE, fileDef.getStorageId().getObjectType());
+        Assertions.assertFalse(fileDef.getDataItem().isBlank());
     }
 
     @Test
@@ -485,12 +543,14 @@ public class DataApiTest_File extends DataApiTest_Base {
         var v1Selector = MetadataUtil.selectorFor(v1Id);
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
         var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
         Assertions.assertDoesNotThrow(() -> resultOf(updateFile));
 
         // Attempt to create v2 again
 
         var updateRequest2 = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
         var updateFile2 = Helpers.clientStreaming(dataClient::updateFile, updateRequest2);
+        waitFor(TEST_TIMEOUT, updateFile2);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile2));
         assertEquals(Status.Code.ALREADY_EXISTS, updateError.getStatus().getCode());
     }
@@ -513,6 +573,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v2Selector).build();
         var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.ALREADY_EXISTS, updateError.getStatus().getCode());
     }
@@ -520,11 +581,11 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testUpdateFile_priorVersionNull() {
 
-        var nullPriorRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().clearPriorVersion().build();
-        var nullPrior = Helpers.clientStreaming(dataClient::updateFile, nullPriorRequest);
-        waitFor(TEST_TIMEOUT, nullPrior);
-        var nullPriorError = assertThrows(StatusRuntimeException.class, () -> resultOf(nullPrior));
-        assertEquals(Status.Code.INVALID_ARGUMENT, nullPriorError.getStatus().getCode());
+        var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().clearPriorVersion().build();
+        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
     }
 
     @Test
@@ -584,18 +645,87 @@ public class DataApiTest_File extends DataApiTest_Base {
     }
 
     @Test
-    void testUpdateFile_tagUpdateInvalid() {
-        Assertions.fail();
+    void testUpdateFile_tagUpdateInvalid() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+        var v1Selector = MetadataUtil.selectorFor(v1Id);
+
+        var invalidTagUpdate = TagUpdate.newBuilder()
+                .setAttrName("£!£$%£$%")
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue("some_value"))
+                .build();
+
+        var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder()
+                .setPriorVersion(v1Selector)
+                .addTagUpdates(invalidTagUpdate)
+                .build();
+
+        var updateFile = Helpers.clientStreaming(dataClient::createFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
     }
 
     @Test
-    void testUpdateFile_tagUpdateReserved() {
-        Assertions.fail();
+    void testUpdateFile_tagUpdateReserved() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+        var v1Selector = MetadataUtil.selectorFor(v1Id);
+
+        var reservedAttrs = List.of("trac_file_attr", "_file_attr", "__file_attr");
+
+        for (var attrName: reservedAttrs) {
+
+            var invalidTagUpdate = TagUpdate.newBuilder()
+                    .setAttrName(attrName)
+                    .setOperation(TagOperation.CREATE_ATTR)
+                    .setValue(MetadataCodec.encodeValue("some_value"))
+                    .build();
+
+            var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder()
+                    .setPriorVersion(v1Selector)
+                    .addTagUpdates(invalidTagUpdate)
+                    .build();
+
+            var updateFile = Helpers.clientStreaming(dataClient::createFile, updateRequest);
+            waitFor(TEST_TIMEOUT, updateFile);
+            var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
+            assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
+        }
     }
 
     @Test
-    void testUpdateFile_tagUpdateAttrNotPresent() {
-        Assertions.fail();
+    void testUpdateFile_tagUpdateAttrNotPresent() throws Exception {
+
+        // Attempt to replace an attr that doesn't already exist
+        // Report this as failed_precondition, rather than not_found
+        // not_found would imply the file object/version itself was missing
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+        var v1Selector = MetadataUtil.selectorFor(v1Id);
+
+        var invalidTagUpdate = TagUpdate.newBuilder()
+                .setAttrName("an_attr_that_is_not_set")
+                .setOperation(TagOperation.REPLACE_ATTR)
+                .setValue(MetadataCodec.encodeValue("some_value"))
+                .build();
+
+        var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder()
+                .setPriorVersion(v1Selector)
+                .addTagUpdates(invalidTagUpdate)
+                .build();
+
+        var updateFile = Helpers.clientStreaming(dataClient::createFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
+        assertEquals(Status.Code.FAILED_PRECONDITION, updateError.getStatus().getCode());
     }
 
     @Test
@@ -612,6 +742,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .build();
 
         var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
     }
@@ -661,6 +792,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .build();
 
         var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
         assertDoesNotThrow(() -> resultOf(updateFile));
     }
 
@@ -680,6 +812,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .build();
 
         var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.FAILED_PRECONDITION, updateError.getStatus().getCode());
     }
@@ -698,6 +831,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .build();
 
         var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
     }
@@ -747,23 +881,100 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .build();
 
         var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.FAILED_PRECONDITION, updateError.getStatus().getCode());
     }
 
     @Test
-    void testUpdateFile_sizeOptional() {
-        Assertions.fail();
+    void testUpdateFile_sizeOptional() throws Exception {
+
+        // If size is not specified, TRAC should still accept the file and set the received size in the metadata
+        // In this case the usual verification of file size is not performed
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+        var v1Selector = MetadataUtil.selectorFor(v1Id);
+
+        var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder()
+                .setPriorVersion(v1Selector)
+                .clearSize()
+                .build();
+
+        var updateFile = Helpers.clientStreaming(dataClient::createFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
+        var v2Id = resultOf(updateFile);
+
+        // Check size is set in metadata
+
+        var metaReadRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(v2Id))
+                .build();
+
+        var metaResponse = Futures.javaFuture(metaClient.readObject(metaReadRequest));
+        waitFor(TEST_TIMEOUT, metaResponse);
+        var tag = resultOf(metaResponse);
+        var def = tag.getDefinition();
+        var fileDef = def.getFile();
+        Assertions.assertEquals(BASIC_FILE_CONTENT_V2.size(), fileDef.getSize());
+
+        // Read back content and check
+
+        var fileReadRequest = FileReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(v2Id))
+                .build();
+
+        var responseStream = Helpers.serverStreaming(dataClient::readFile, fileReadRequest, execContext);
+        var byteStream = Concurrent.map(responseStream, FileReadResponse::getContent);
+        var content = Concurrent.fold(byteStream,
+                ByteString::concat,
+                ByteString.EMPTY);
+
+        waitFor(TEST_TIMEOUT, content);
+        Assertions.assertEquals(BASIC_FILE_CONTENT_V2, resultOf(content));
     }
 
     @Test
-    void testUpdateFile_sizeNegative() {
-        Assertions.fail();
+    void testUpdateFile_sizeNegative() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+        var v1Selector = MetadataUtil.selectorFor(v1Id);
+
+        var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder()
+                .setPriorVersion(v1Selector)
+                .setSize(-1)
+                .build();
+
+        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
     }
 
     @Test
-    void testUpdateFile_sizeMismatch() {
-        Assertions.fail();
+    void testUpdateFile_sizeMismatch() throws Exception {
+
+        // Size mis-match is reported as error status DATA_LOSS
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+        var v1Selector = MetadataUtil.selectorFor(v1Id);
+
+        var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder()
+                .setPriorVersion(v1Selector)
+                .setSize(1)
+                .build();
+
+        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
     }
 
 
