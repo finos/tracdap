@@ -71,6 +71,11 @@ public class DataApiTest_File extends DataApiTest_Base {
             .setContent(BASIC_FILE_CONTENT)
             .build();
 
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // CREATE FILE
+    // -----------------------------------------------------------------------------------------------------------------
+
     @Test
     void testCreateFile_dataOk() throws Exception {
 
@@ -356,7 +361,115 @@ public class DataApiTest_File extends DataApiTest_Base {
         assertEquals(Status.Code.DATA_LOSS, sizeNegativeError.getStatus().getCode());
     }
 
-    // TODO: Update tests
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // UPDATE FILE
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @Test
+    void testUpdateFile_dataOk() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_metadataOk() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_tenancy() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_priorVersionNull() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_priorVersionInvalid() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_priorVersionWrongType() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_priorVersionNotFound() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_tagUpdateInvalid() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_tagUpdateReserved() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_tagUpdateAttrNotPresent() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_nameMissing() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_nameInvalid() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_nameChange() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_nameExtensionChange() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_mimeTypeMissing() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_mimeTypeInvalid() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_mimeTypeChange() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_sizeOptional() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_sizeNegative() {
+        Assertions.fail();
+    }
+
+    @Test
+    void testUpdateFile_sizeMismatch() {
+        Assertions.fail();
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // READ FILE
+    // -----------------------------------------------------------------------------------------------------------------
 
     void testReadFile_ok() {}
 
