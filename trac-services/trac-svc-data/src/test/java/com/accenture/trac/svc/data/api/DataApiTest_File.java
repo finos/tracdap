@@ -16,7 +16,24 @@
 
 package com.accenture.trac.svc.data.api;
 
+import com.accenture.trac.api.FileWriteRequest;
+import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.MetadataUtil;
+import com.accenture.trac.metadata.TagOperation;
+import com.accenture.trac.metadata.TagUpdate;
+import com.google.protobuf.ByteString;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
+import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 
 public class DataApiTest_File extends DataApiTest_Base {
@@ -26,35 +43,201 @@ public class DataApiTest_File extends DataApiTest_Base {
         return false;
     }
 
+    private static final List<TagUpdate> BASIC_TAG_UPDATES = List.of(
+            TagUpdate.newBuilder()
+                    .setAttrName("app_template")
+                    .setOperation(TagOperation.CREATE_ATTR)
+                    .setValue(MetadataCodec.encodeValue("template_1"))
+                    .build(),
+            TagUpdate.newBuilder()
+                    .setAttrName("description")
+                    .setOperation(TagOperation.CREATE_ATTR)
+                    .setValue(MetadataCodec.encodeValue("Describes what this template does in the app"))
+                    .build());
+
+    private static final FileWriteRequest BASIC_CREATE_FILE_REQUEST = FileWriteRequest.newBuilder()
+            .setTenant(TEST_TENANT)
+            .addAllTagUpdates(BASIC_TAG_UPDATES)
+            .setName("some_file.dat")
+            .setMimeType("application/octet-stream")
+            .setContent(ByteString.copyFrom("Template content", StandardCharsets.UTF_8))
+            .build();
 
     @Test
-    void testCreateFile_dataOk() {}
+    void testCreateFile_dataOk() {
+        Assertions.fail();
+    }
 
-    void testCreateFile_metadataOk() {}
+    @Test
+    void testCreateFile_metadataOk() {
+        Assertions.fail();
+    }
 
-    void testCreateFile_sizeOptional() {}
+    @Test
+    void testCreateFile_sizeOptional() {
+        Assertions.fail();
+    }
 
-    void testCreateFile_noTenant() {}
+    @Test
+    void testCreateFile_tenancy() {
 
-    void testCreateFile_invalidTenant() {}
+        var noTenant = BASIC_CREATE_FILE_REQUEST.toBuilder().clearTenant().build();
+        var noTenantResult = Helpers.clientStreaming(dataClient::createFile, noTenant);
+        waitFor(TEST_TIMEOUT, noTenantResult);
+        var noTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(noTenantResult));
+        assertEquals(Status.Code.INVALID_ARGUMENT, noTenantError.getStatus().getCode());
 
-    void testCreateFile_unknownTenant() {}
+        var invalidTenant = BASIC_CREATE_FILE_REQUEST.toBuilder().setTenant("£$%^**!\0\n/`¬").build();
+        var invalidTenantResult = Helpers.clientStreaming(dataClient::createFile, invalidTenant);
+        waitFor(TEST_TIMEOUT, invalidTenantResult);
+        var invalidTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(invalidTenantResult));
+        assertEquals(Status.Code.INVALID_ARGUMENT, invalidTenantError.getStatus().getCode());
 
-    void testCreateFile_priorVersionNotNull() {}
+        var unknownTenant = BASIC_CREATE_FILE_REQUEST.toBuilder().setTenant("UNKNOWN").build();
+        var unknownTenantResult = Helpers.clientStreaming(dataClient::createFile, unknownTenant);
+        waitFor(TEST_TIMEOUT, unknownTenantResult);
+        var unknownTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(unknownTenantResult));
+        assertEquals(Status.Code.NOT_FOUND, unknownTenantError.getStatus().getCode());
+    }
 
-    void testCreateFile_noName() {}
+    @Test
+    void testCreateFile_priorVersionNotNull() throws Exception {
 
-    void testCreateFile_invalidName() {}
+        // Prior version should not be set when creating a new file object
 
-    void testCreateFile_noExtension() {}
+        // Create an object to use as the prior, so errors will not come because the prior does not exist
+        var priorResult = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, priorResult);
+        var priorId = resultOf(priorResult);
 
-    void testCreateFile_invalidExtension() {}
+        var priorNotNull = BASIC_CREATE_FILE_REQUEST.toBuilder()
+                .setPriorVersion(MetadataUtil.selectorFor(priorId))
+                .build();
 
-    void testCreateFile_noMimeType() {}
+        var priorNotNullResult = Helpers.clientStreaming(dataClient::createFile, priorNotNull);
+        waitFor(TEST_TIMEOUT, priorNotNullResult);
+        var priorNotNullError = assertThrows(StatusRuntimeException.class, () -> resultOf(priorNotNullResult));
+        assertEquals(Status.Code.INVALID_ARGUMENT, priorNotNullError.getStatus().getCode());
+    }
 
-    void testCreateFile_invalidMimeType() {}
+    @Test
+    void testCreateFile_tagUpdateInvalid() {
 
-    void testCreateFile_sizeMismatch() {}
+        var invalidTagUpdate = TagUpdate.newBuilder()
+                .setAttrName("£!£$%£$%")
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue("some_value"))
+                .build();
+
+        var invalidTagRequest = BASIC_CREATE_FILE_REQUEST.toBuilder().addTagUpdates(invalidTagUpdate).build();
+        var invalidTagResult = Helpers.clientStreaming(dataClient::createFile, invalidTagRequest);
+        waitFor(TEST_TIMEOUT, invalidTagResult);
+        var invalidTagError = assertThrows(StatusRuntimeException.class, () -> resultOf(invalidTagResult));
+        assertEquals(Status.Code.INVALID_ARGUMENT, invalidTagError.getStatus().getCode());
+    }
+
+    @Test
+    void testCreateFile_tagUpdateReserved() {
+
+        var reservedAttrs = List.of("trac_file_attr", "_file_attr", "__file_attr");
+
+        for (var attrName: reservedAttrs) {
+
+            var invalidTagUpdate = TagUpdate.newBuilder()
+                    .setAttrName(attrName)
+                    .setOperation(TagOperation.CREATE_ATTR)
+                    .setValue(MetadataCodec.encodeValue("some_value"))
+                    .build();
+
+            var invalidTagRequest = BASIC_CREATE_FILE_REQUEST.toBuilder().addTagUpdates(invalidTagUpdate).build();
+            var invalidTagResult = Helpers.clientStreaming(dataClient::createFile, invalidTagRequest);
+            waitFor(TEST_TIMEOUT, invalidTagResult);
+            var invalidTagError = assertThrows(StatusRuntimeException.class, () -> resultOf(invalidTagResult));
+            assertEquals(Status.Code.INVALID_ARGUMENT, invalidTagError.getStatus().getCode());
+        }
+    }
+
+    @Test
+    void testCreateFile_nameMissing() {
+
+        var noName = BASIC_CREATE_FILE_REQUEST.toBuilder().clearName().build();
+        var noNameResult = Helpers.clientStreaming(dataClient::createFile, noName);
+        waitFor(TEST_TIMEOUT, noNameResult);
+        var noNameError = assertThrows(StatusRuntimeException.class, () -> resultOf(noNameResult));
+        assertEquals(Status.Code.INVALID_ARGUMENT, noNameError.getStatus().getCode());
+    }
+
+    @Test
+    void testCreateFile_nameInvalid() {
+
+        var invalidNames = List.of(
+                ".", "/", "\\",
+                "./a", ".\\a", "a/b", "a\\b", "a/", "a\\",
+                "a\rb", "a\nb", "a\tb", "a\0b",
+                "$£\"£$%^\0<:$%^&D'¬#FSG)");
+
+        for (var name: invalidNames) {
+
+            var badName = BASIC_CREATE_FILE_REQUEST.toBuilder().setName(name).build();
+            var badNameResult = Helpers.clientStreaming(dataClient::createFile, badName);
+            waitFor(TEST_TIMEOUT, badNameResult);
+            var badNameError = assertThrows(StatusRuntimeException.class, () -> resultOf(badNameResult));
+            assertEquals(Status.Code.INVALID_ARGUMENT, badNameError.getStatus().getCode());
+        }
+    }
+
+    @Test
+    void testCreateFile_mimeTypeMissing() {
+
+        var noMimeType = BASIC_CREATE_FILE_REQUEST.toBuilder().clearMimeType().build();
+        var noMimeTypeResult = Helpers.clientStreaming(dataClient::createFile, noMimeType);
+        waitFor(TEST_TIMEOUT, noMimeTypeResult);
+        var noMimeTypeResultError = assertThrows(StatusRuntimeException.class, () -> resultOf(noMimeTypeResult));
+        assertEquals(Status.Code.INVALID_ARGUMENT, noMimeTypeResultError.getStatus().getCode());
+    }
+
+    @Test
+    void testCreateFile_mimeTypeInvalid() {
+
+        var invalidMimeTypes = List.of(
+                "test/plain/extra_part",
+                "single_part",
+                "forward\\slash",
+                ".", "/", "\\",
+                "unregistered/primary.type");
+
+        for (var mimeType: invalidMimeTypes) {
+
+            var badMimeType = BASIC_CREATE_FILE_REQUEST.toBuilder().setMimeType(mimeType).build();
+            var badMimeTypeResult = Helpers.clientStreaming(dataClient::createFile, badMimeType);
+            waitFor(TEST_TIMEOUT, badMimeTypeResult);
+            var badMimeTypeError = assertThrows(StatusRuntimeException.class, () -> resultOf(badMimeTypeResult));
+            assertEquals(Status.Code.INVALID_ARGUMENT, badMimeTypeError.getStatus().getCode());
+        }
+    }
+
+    @Test
+    void testCreateFile_sizeNegative() {
+
+        var sizeNegative = BASIC_CREATE_FILE_REQUEST.toBuilder().setSize(-1).build();
+        var sizeNegativeResult = Helpers.clientStreaming(dataClient::createFile, sizeNegative);
+        waitFor(TEST_TIMEOUT, sizeNegativeResult);
+        var sizeNegativeError = assertThrows(StatusRuntimeException.class, () -> resultOf(sizeNegativeResult));
+        assertEquals(Status.Code.INVALID_ARGUMENT, sizeNegativeError.getStatus().getCode());
+    }
+
+    @Test
+    void testCreateFile_sizeMismatch() {
+
+        // Size is specified but does not match the number of bytes received on the stream
+        // This is reported as DATA_LOSS
+
+        var sizeNegative = BASIC_CREATE_FILE_REQUEST.toBuilder().setSize(1).build();
+        var sizeNegativeResult = Helpers.clientStreaming(dataClient::createFile, sizeNegative);
+        waitFor(TEST_TIMEOUT, sizeNegativeResult);
+        var sizeNegativeError = assertThrows(StatusRuntimeException.class, () -> resultOf(sizeNegativeResult));
+        assertEquals(Status.Code.DATA_LOSS, sizeNegativeError.getStatus().getCode());
+    }
 
     // TODO: Update tests
 
