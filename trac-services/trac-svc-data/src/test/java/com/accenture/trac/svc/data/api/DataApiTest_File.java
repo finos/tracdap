@@ -173,10 +173,13 @@ public class DataApiTest_File extends DataApiTest_Base {
         Assertions.assertEquals("text/plain", fileDef.getMimeType());
         Assertions.assertEquals(BASIC_FILE_CONTENT.size(), fileDef.getSize());
 
-        // Storage def is intended for internal use by the platform
-        // This is just a cursory check to make sure it has been set
+        // Storage ID should always point to a storage object and refer to the latest object/tag version
+        // This is because storage can evolve independently of logical files/data (e.g. due to retention policy)
+        // Data item should always be set
 
         Assertions.assertEquals(ObjectType.STORAGE, fileDef.getStorageId().getObjectType());
+        Assertions.assertTrue(fileDef.getStorageId().getLatestObject());
+        Assertions.assertTrue(fileDef.getStorageId().getLatestTag());
         Assertions.assertFalse(fileDef.getDataItem().isBlank());
     }
 
@@ -495,11 +498,28 @@ public class DataApiTest_File extends DataApiTest_Base {
         Assertions.assertEquals("text/plain", fileDef.getMimeType());
         Assertions.assertEquals(BASIC_FILE_CONTENT_V2.size(), fileDef.getSize());
 
-        // Storage def is intended for internal use by the platform
-        // This is just a cursory check to make sure it has been set
+        // Storage checks
 
         Assertions.assertEquals(ObjectType.STORAGE, fileDef.getStorageId().getObjectType());
+        Assertions.assertTrue(fileDef.getStorageId().getLatestObject());
+        Assertions.assertTrue(fileDef.getStorageId().getLatestTag());
         Assertions.assertFalse(fileDef.getDataItem().isBlank());
+
+        // Make sure V2 file is referring to the same storage object
+        // Also, V1 and V2 file blobs should have different data item IDs
+
+        var metaV1Request = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(v2Id))
+                .build();
+
+        var metaV1Response = Futures.javaFuture(metaClient.readObject(metaV1Request));
+        waitFor(TEST_TIMEOUT, metaV1Response);
+        var tagV1 = resultOf(metaV1Response);
+        var fileDefV1 = tagV1.getDefinition().getFile();
+
+        Assertions.assertEquals(fileDefV1.getStorageId(), fileDef.getStorageId());
+        Assertions.assertNotEquals(fileDefV1.getDataItem(), fileDef.getDataItem());
     }
 
     @Test
