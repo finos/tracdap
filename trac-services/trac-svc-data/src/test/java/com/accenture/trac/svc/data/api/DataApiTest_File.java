@@ -47,11 +47,6 @@ public class DataApiTest_File extends DataApiTest_Base {
     // Functional test cases for file operations in the data API
     // (createFile, updateFile, readFile)
 
-    @Override
-    protected boolean isRapidFire() {
-        return false;
-    }
-
     private static final List<TagUpdate> BASIC_TAG_UPDATES = List.of(
             TagUpdate.newBuilder()
                     .setAttrName("app_template")

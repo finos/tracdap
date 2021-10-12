@@ -25,7 +25,6 @@ import com.accenture.trac.common.eventloop.ExecutionContext;
 import com.accenture.trac.common.eventloop.ExecutionRegister;
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.storage.StorageManager;
-import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.svc.data.TracDataService;
 import com.accenture.trac.svc.data.service.DataReadService;
@@ -56,8 +55,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
-
 
 abstract  class DataApiTest_Base {
 
@@ -68,10 +65,6 @@ abstract  class DataApiTest_Base {
     protected static final String STORAGE_ROOT_DIR = "unit_test_storage";
 
     protected static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
-
-
-    // Indicates that tests should not wait for the results of shutdown operations before completing
-    protected abstract boolean isRapidFire();
 
 
     @TempDir
@@ -201,27 +194,18 @@ abstract  class DataApiTest_Base {
         dataClientChannel.shutdown();
         dataService.shutdown();
         dataSvcClientChannel.shutdown();
-        var eventLoopShutdown = workerGroup.shutdownGracefully();
+        workerGroup.shutdownGracefully();
 
-        if (!isRapidFire()) {
+        // Clean shutdown of channels and event loops takes about 2 seconds
+        // This is fine for the real service, but here it is added to the time of each individual test
+        // We want to run lots of test cases!
 
-            // Do not wait for shutdown to complete when running rapid fire tests
+        // So, just fire and forget the shutdown methods
+        // A 10 ms delay helps avoid any lingering file locks (assuming most functional tests use the local file impl)
 
-            dataClientChannel.awaitTermination(TEST_TIMEOUT.getSeconds(), TimeUnit.SECONDS);
-            dataService.awaitTermination(TEST_TIMEOUT.getSeconds(), TimeUnit.SECONDS);
-            dataSvcClientChannel.awaitTermination(TEST_TIMEOUT.getSeconds(), TimeUnit.SECONDS);
-            waitFor(TEST_TIMEOUT, Futures.javaFuture(eventLoopShutdown));
-        }
-        else {
+        Thread.sleep(10);
 
-            // Waiting for clean shutdown takes too long when running 1000s of tests
-            // We still want to avoid resource locks though
-            // Allow some time for things to get released
-
-            // Perhaps a better approach would be to create
-            // a static instance for the lifetime of the test case
-
-            Thread.sleep(10);
-        }
+        // Separate test cases are needed to look at the shutdown sequence explicitly
+        // These probably belong in the top level package for the service, i.e. testing the service entry point class
     }
 }

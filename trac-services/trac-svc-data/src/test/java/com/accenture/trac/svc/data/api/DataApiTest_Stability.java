@@ -44,12 +44,6 @@ import static com.accenture.trac.test.storage.StorageTestHelpers.readFile;
 @Tag("slow")
 public class DataApiTest_Stability extends DataApiTest_Base {
 
-    // Do not wait for shutdown to complete before proceeding to the next test
-    @Override
-    protected boolean isRapidFire() {
-        return true;
-    }
-
     @Test
     void testRoundTrip_basic() throws Exception {
 
