@@ -20,6 +20,7 @@ import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.metadata.*;
@@ -71,7 +72,7 @@ public class DataWriteService {
                 // Call meta svc to preallocate file object ID
                 .thenApply(x -> metaApi.preallocateId(preallocateRequest))
                 .thenCompose(Futures::javaFuture)
-                .thenAccept(fileId -> {defs.fileId = fileId;})
+                .thenAccept(fileId -> defs.fileId = fileId)
 
                 // Build initial definition objects
                 .thenApply(x -> buildDefinitions(defs.fileId))
@@ -99,7 +100,7 @@ public class DataWriteService {
                 // Record storage ID in file definition
                 .thenAccept(storageHeader -> defs.file =
                     defs.file.toBuilder()
-                    .setStorageId(selectorForLatest(storageHeader))
+                    .setStorageId(MetadataUtil.selectorForLatest(storageHeader))
                     .build())
 
                 // Save file metadata
@@ -157,41 +158,13 @@ public class DataWriteService {
         var request = MetadataWriteRequest.newBuilder()
                 .setTenant(tenant)
                 .setObjectType(objectType)
-                .setPriorVersion(selectorFor(objectHeader))
+                .setPriorVersion(MetadataUtil.selectorFor(objectHeader))
                 .setDefinition(obj)
                 // TODO: tag updates
                 .build();
 
         return Futures.javaFuture(metaApi.createPreallocatedObject(request));
     }
-
-    private static TagSelector selectorFor(TagHeader header) {
-        return selectorFor(header, false, false);
-    }
-
-    private static TagSelector selectorForLatest(TagHeader header) {
-        return selectorFor(header, true, true);
-    }
-
-    private static TagSelector selectorFor(TagHeader header, boolean latestObject, boolean latestTag) {
-
-        var selector = TagSelector.newBuilder()
-                .setObjectType(header.getObjectType())
-                .setObjectId(header.getObjectId());
-
-        if (latestObject)
-            selector.setLatestObject(true);
-        else
-            selector.setObjectVersion(header.getObjectVersion());
-
-        if (latestTag)
-            selector.setLatestTag(true);
-        else
-            selector.setTagVersion(header.getTagVersion());
-
-        return selector.build();
-    }
-
 
     private RequestState buildDefinitions(TagHeader fileHeader) {
 
