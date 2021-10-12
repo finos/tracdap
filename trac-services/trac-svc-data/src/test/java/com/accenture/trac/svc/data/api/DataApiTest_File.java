@@ -110,11 +110,13 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setSelector(MetadataUtil.selectorFor(fileId))
                 .build();
 
-        var responseStream = Helpers.serverStreaming(dataClient::readFile, fileReadRequest, execContext);
+        var responseStream = Concurrent.<FileReadResponse>hub(execContext);
         var byteStream = Concurrent.map(responseStream, FileReadResponse::getContent);
         var content = Concurrent.fold(byteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
+
+        Helpers.serverStreaming(dataClient::readFile, fileReadRequest, responseStream);
 
         waitFor(TEST_TIMEOUT, content);
         Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(content));
@@ -348,11 +350,13 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setSelector(MetadataUtil.selectorFor(fileId))
                 .build();
 
-        var responseStream = Helpers.serverStreaming(dataClient::readFile, fileReadRequest, execContext);
+        var responseStream = Concurrent.<FileReadResponse>hub(execContext);
         var byteStream = Concurrent.map(responseStream, FileReadResponse::getContent);
         var content = Concurrent.fold(byteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
+
+        Helpers.serverStreaming(dataClient::readFile, fileReadRequest, responseStream);
 
         waitFor(TEST_TIMEOUT, content);
         Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(content));
@@ -405,11 +409,13 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setSelector(MetadataUtil.selectorFor(v2Id))
                 .build();
 
-        var v2Response = Helpers.serverStreaming(dataClient::readFile, v2ReadRequest, execContext);
+        var v2Response = Concurrent.<FileReadResponse>hub(execContext);
         var v2ByteStream = Concurrent.map(v2Response, FileReadResponse::getContent);
         var v2Content = Concurrent.fold(v2ByteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
+
+        Helpers.serverStreaming(dataClient::readFile, v2ReadRequest, v2Response);
 
         waitFor(TEST_TIMEOUT, v2Content);
         Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(v2Content));
@@ -421,11 +427,13 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setSelector(MetadataUtil.selectorFor(v1Id))
                 .build();
 
-        var v1Response = Helpers.serverStreaming(dataClient::readFile, v1ReadRequest, execContext);
+        var v1Response = Concurrent.<FileReadResponse>hub(execContext);
         var v1ByteStream = Concurrent.map(v1Response, FileReadResponse::getContent);
         var v1Content = Concurrent.fold(v1ByteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
+
+        Helpers.serverStreaming(dataClient::readFile, v1ReadRequest, v1Response);
 
         waitFor(TEST_TIMEOUT, v1Content);
         Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(v1Content));
@@ -663,7 +671,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .addTagUpdates(invalidTagUpdate)
                 .build();
 
-        var updateFile = Helpers.clientStreaming(dataClient::createFile, updateRequest);
+        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -692,7 +700,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                     .addTagUpdates(invalidTagUpdate)
                     .build();
 
-            var updateFile = Helpers.clientStreaming(dataClient::createFile, updateRequest);
+            var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
             waitFor(TEST_TIMEOUT, updateFile);
             var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
             assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -722,7 +730,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .addTagUpdates(invalidTagUpdate)
                 .build();
 
-        var updateFile = Helpers.clientStreaming(dataClient::createFile, updateRequest);
+        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.FAILED_PRECONDITION, updateError.getStatus().getCode());
@@ -768,7 +776,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                     .setName(name)
                     .build();
 
-            var updateFile = Helpers.clientStreaming(dataClient::createFile, updateRequest);
+            var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
             waitFor(TEST_TIMEOUT, updateFile);
             var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
             assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -858,7 +866,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                     .setMimeType(mimeType)
                     .build();
 
-            var updateFile = Helpers.clientStreaming(dataClient::createFile, updateRequest);
+            var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
             waitFor(TEST_TIMEOUT, updateFile);
             var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
             assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -902,7 +910,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .clearSize()
                 .build();
 
-        var updateFile = Helpers.clientStreaming(dataClient::createFile, updateRequest);
+        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var v2Id = resultOf(updateFile);
 
@@ -927,11 +935,13 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setSelector(MetadataUtil.selectorFor(v2Id))
                 .build();
 
-        var responseStream = Helpers.serverStreaming(dataClient::readFile, fileReadRequest, execContext);
+        var responseStream = Concurrent.<FileReadResponse>hub(execContext);
         var byteStream = Concurrent.map(responseStream, FileReadResponse::getContent);
         var content = Concurrent.fold(byteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
+
+        Helpers.serverStreaming(dataClient::readFile, fileReadRequest, responseStream);
 
         waitFor(TEST_TIMEOUT, content);
         Assertions.assertEquals(BASIC_FILE_CONTENT_V2, resultOf(content));
