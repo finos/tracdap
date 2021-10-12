@@ -19,23 +19,19 @@ package com.accenture.trac.svc.data.api;
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.util.Concurrent;
 import com.accenture.trac.common.util.Futures;
-import com.accenture.trac.common.util.GrpcStreams;
 import com.accenture.trac.metadata.ObjectDefinition;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagSelector;
 
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
-import io.grpc.stub.StreamObserver;
 
 import org.junit.jupiter.api.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -133,7 +129,7 @@ public class DataApiTest_Stability extends DataApiTest_Base {
         // Set up a request stream and client streaming call, wait for the call to complete
 
         var createFileRequest = fileWriteRequest(content, dataInChunkZero);
-        var createFile = clientStreaming(dataClient::createFile, createFileRequest);
+        var createFile = Helpers.clientStreaming(dataClient::createFile, createFileRequest);
 
         waitFor(TEST_TIMEOUT, createFile);
         var objHeader = resultOf(createFile);
@@ -193,7 +189,7 @@ public class DataApiTest_Stability extends DataApiTest_Base {
         var readByteStream = Concurrent.map(readResponse, FileReadResponse::getContent);
         var readBytes = Concurrent.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
 
-        serverStreaming(dataClient::readFile, readRequest, readResponse);
+        Helpers.serverStreaming(dataClient::readFile, readRequest, readResponse);
 
         waitFor(TEST_TIMEOUT, readResponse0, readBytes);
         var roundTripTag = resultOf(readResponse0).getFileTag();
@@ -214,7 +210,6 @@ public class DataApiTest_Stability extends DataApiTest_Base {
         var requestZero = FileWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setName("test_file.dat")
-                .setExtension("dat")
                 .setMimeType("application/octet-stream")
                 .setContent(chunkZeroBytes)
                 .build();
@@ -231,44 +226,6 @@ public class DataApiTest_Stability extends DataApiTest_Base {
         return Concurrent.publish(Streams.concat(
                 Stream.of(requestZero),
                 requestStream));
-    }
-
-    private <TReq, TResp>
-    Flow.Publisher<TResp> serverStreaming(
-            BiConsumer<TReq, StreamObserver<TResp>> grpcMethod,
-            TReq request) {
-
-        var response = Concurrent.<TResp>hub(execContext);
-        var responseGrpc = GrpcStreams.relay(response);
-
-        grpcMethod.accept(request, responseGrpc);
-
-        return response;
-    }
-
-    private <TReq, TResp>
-    void serverStreaming(
-            BiConsumer<TReq, StreamObserver<TResp>> grpcMethod,
-            TReq request, Flow.Subscriber<TResp> response) {
-
-        var responseGrpc = GrpcStreams.relay(response);
-        grpcMethod.accept(request, responseGrpc);
-    }
-
-    private <TReq, TResp>
-    CompletableFuture<TResp> clientStreaming(
-            Function<StreamObserver<TResp>, StreamObserver<TReq>> grpcMethod,
-            Flow.Publisher<TReq> requestPublisher) {
-
-        var response = new CompletableFuture<TResp>();
-
-        var responseGrpc = GrpcStreams.unaryResult(response);
-        var requestGrpc = grpcMethod.apply(responseGrpc);
-        var requestSubscriber = GrpcStreams.relay(requestGrpc);
-
-        requestPublisher.subscribe(requestSubscriber);
-
-        return response;
     }
 
     private <TDef>
