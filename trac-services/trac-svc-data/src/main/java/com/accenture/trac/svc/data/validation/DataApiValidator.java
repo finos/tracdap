@@ -19,8 +19,11 @@ package com.accenture.trac.svc.data.validation;
 import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
 import com.accenture.trac.api.TracDataApiGrpc;
+import com.accenture.trac.common.exception.EUnexpected;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
+
+import java.util.regex.Pattern;
 
 
 public class DataApiValidator {
@@ -83,7 +86,7 @@ public class DataApiValidator {
         var fd = msg.getDescriptorForType().findFieldByName(field);
 
         if (!msg.hasField(fd)) {
-            var err = String.format("Missing required field: [%s]", field);
+            var err = String.format("A value is required for field [%s]", field);
             return ctx.error(err);
         }
 
@@ -92,7 +95,7 @@ public class DataApiValidator {
             var value = (String) msg.getField(fd);
 
             if (value.isEmpty()) {
-                var err = String.format("Missing required field: [%s]", field);
+                var err = String.format("A value is required for field [%s]", field);
                 return ctx.error(err);
             }
         }
@@ -105,7 +108,7 @@ public class DataApiValidator {
         var fd = msg.getDescriptorForType().findFieldByName(field);
 
         if (msg.hasField(fd)) {
-            var err = String.format("Field must not be provided: [%s]", field);
+            var err = String.format("A value must not be provided for field [%s]", field);
             return ctx.error(err);
         }
 
@@ -119,8 +122,7 @@ public class DataApiValidator {
 
     private static ValidationContext validIdentifier(Message msg, String field, ValidationContext ctx) {
 
-        msg.getField(msg.getDescriptorForType().findFieldByName(field));
-        return ctx;
+        return regexMatch(msg, field, ValidationConstants.VALID_IDENTIFIER, "a valid identifier", ctx);
     }
 
     private static ValidationContext validFileName(Message msg, String field, ValidationContext ctx) {
@@ -131,7 +133,42 @@ public class DataApiValidator {
 
     private static ValidationContext validMimeType(Message msg, String field, ValidationContext ctx) {
 
-        msg.getField(msg.getDescriptorForType().findFieldByName(field));
+        // First check the value matches the mime type regex, i.e. has the right form
+        var regexCtx = regexMatch(msg, field, ValidationConstants.MIME_TYPE, "a valid mime type", ctx);
+        if (regexCtx != ctx)
+            return regexCtx;
+
+        // Second check the main part of the type is a registered media type
+        var fd = msg.getDescriptorForType().findFieldByName(field);
+        var value = (String) msg.getField(fd);
+        var mainType = value.substring(0, value.indexOf("/"));
+
+        if (!ValidationConstants.REGISTERED_MIME_TYPES.contains(mainType)) {
+            var err = String.format("Value of field [%s] must be a registered mime type: [%s]", field, value);
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext regexMatch(
+            Message msg, String field,
+            Pattern regex, String desc,
+            ValidationContext ctx) {
+
+        var fd = msg.getDescriptorForType().findFieldByName(field);
+
+        if (fd.getType() != Descriptors.FieldDescriptor.Type.STRING)
+            throw new EUnexpected();
+
+        var value = (String) msg.getField(fd);
+        var matcher = regex.matcher(value);
+
+        if (!matcher.matches()) {
+            var err = String.format("Value of field [%s] must be %s: [%s]", field, desc, value);
+            return ctx.error(err);
+        }
+
         return ctx;
     }
 

@@ -316,7 +316,12 @@ public class DataApiTest_File extends DataApiTest_Base {
             var badMimeType = BASIC_CREATE_FILE_REQUEST.toBuilder().setMimeType(mimeType).build();
             var badMimeTypeResult = Helpers.clientStreaming(dataClient::createFile, badMimeType);
             waitFor(TEST_TIMEOUT, badMimeTypeResult);
-            var badMimeTypeError = assertThrows(StatusRuntimeException.class, () -> resultOf(badMimeTypeResult));
+
+            var badMimeTypeError = assertThrows(
+                    StatusRuntimeException.class,
+                    () -> resultOf(badMimeTypeResult),
+                    "Invalid mime type did not fail: " + mimeType);
+
             assertEquals(Status.Code.INVALID_ARGUMENT, badMimeTypeError.getStatus().getCode());
         }
     }

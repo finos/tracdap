@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.data.validation;
 
+import java.util.List;
 import java.util.regex.Pattern;
 
 
@@ -27,4 +28,11 @@ public class ValidationConstants {
 
     public static final Pattern TRAC_RESERVED_IDENTIFIER = Pattern.compile(
             "\\Atrac_.*", Pattern.CASE_INSENSITIVE);
+
+    public static final Pattern MIME_TYPE = Pattern.compile("\\A\\w+/[-.\\w]+(?:\\+[-.\\w]+)?\\Z");
+
+    public static final List<String> REGISTERED_MIME_TYPES = List.of(
+            "application", "audio", "font", "example",
+            "image", "message", "model", "multipart",
+            "text", "video");
 }
