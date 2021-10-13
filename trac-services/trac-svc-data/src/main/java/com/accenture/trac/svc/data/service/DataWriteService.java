@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.data.service;
 
+import com.accenture.trac.api.MetadataReadRequest;
 import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import com.accenture.trac.common.eventloop.IExecutionContext;
@@ -124,6 +125,51 @@ public class DataWriteService {
                         ObjectDefinition.Builder::setFile));
     }
 
+    public CompletionStage<TagHeader> updateFile(
+            String tenant, List<TagUpdate> tags,
+            TagSelector priorVersion,
+            String name, String mimeType,
+            Flow.Publisher<ByteBuf> contentStream,
+            IExecutionContext execContext) {
+
+        // TODO: Validation
+
+        var defs = new RequestState();
+        defs.tags = tags;
+
+        var readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(priorVersion)
+                .build();
+
+        CompletableFuture.completedFuture(null)
+
+                .thenApply(x -> metaApi.readObject(readRequest))
+                .thenCompose(Futures::javaFuture)
+                .thenAccept(priorFile -> {
+
+                    // New ID - bump object version
+                    defs.fileId = priorFile.getHeader().toBuilder()
+                            .setObjectVersion(priorFile.getHeader().getObjectVersion() + 1)
+                            .setTagVersion(1)
+                            .build();
+
+                    defs.file = priorFile
+                            .getDefinitionOrBuilder()
+                            .getFile();
+                })
+
+                // TODO: Check compatibility
+
+                .thenApply(x -> buildDefinitions(defs.fileId, name, mimeType))
+                .thenAccept(defs_ -> {
+                    defs.file = defs_.file;
+                    defs.storage = defs_.storage; });
+
+        return null;
+
+    }
+
     private List<TagUpdate> addFileAAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
 
         var nameAttr = TagUpdate.newBuilder()
@@ -218,7 +264,7 @@ public class DataWriteService {
         var FILE_STORAGE_PATH_TEMPLATE = "file/%s/version-%d/%s";
 
         var fileId = UUID.fromString(fileHeader.getObjectId());
-        var fileVersion = 1;
+        var fileVersion = fileHeader.getObjectVersion();
 
         var dataItem = String.format(FILE_DATA_ITEM_TEMPLATE, fileId, fileVersion);
 

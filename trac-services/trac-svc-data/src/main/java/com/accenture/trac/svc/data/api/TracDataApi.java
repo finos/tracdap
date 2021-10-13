@@ -18,6 +18,8 @@ package com.accenture.trac.svc.data.api;
 
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.eventloop.ExecutionContext;
+import com.accenture.trac.common.eventloop.IExecutionContext;
+import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.util.Bytes;
 import com.accenture.trac.common.util.Concurrent;
 import com.accenture.trac.common.util.GrpcStreams;
@@ -25,12 +27,22 @@ import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
 
+import com.accenture.trac.svc.data.validation.ValidationFailure;
+import com.accenture.trac.svc.data.validation.Validator;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Message;
+import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Flow;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 
 public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
@@ -39,6 +51,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     private final DataReadService readService;
     private final DataWriteService writeService;
+
+    private final Validator validator = new Validator();
+
 
     public TracDataApi(DataReadService readService, DataWriteService writeService) {
         this.readService = readService;
@@ -73,53 +88,77 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public StreamObserver<FileWriteRequest> createFile(StreamObserver<TagHeader> responseObserver) {
 
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+        var method = TracDataApiGrpc.getCreateFileMethod();
 
-        var requestHub = Concurrent.<FileWriteRequest>hub(execCtx);
-        var firstMessage = Concurrent.first(requestHub);
+        return clientStreaming(method, responseObserver,
+                FileWriteRequest::getContent,
+                this::doCreateFile);
+    }
 
-        // TODO: Validation - firstMessage.thenApply(validationFunc);
+    private CompletionStage<TagHeader> doCreateFile(
+            FileWriteRequest request,
+            Flow.Publisher<ByteBuf> byteStream,
+            IExecutionContext execCtx) {
 
-        var protoContent = Concurrent.map(requestHub, FileWriteRequest::getContent);
-        var byteBufContent = Concurrent.map(protoContent, Bytes::fromProtoBytes);
+        var tenant = request.getTenant();
+        var tagUpdates = request.getTagUpdatesList();
+        var fileName = request.getName();
+        var mimeType = request.getMimeType();
 
-        var fileObjectHeader = firstMessage.thenCompose(msg -> writeService.createFile(
-                msg.getTenant(), msg.getTagUpdatesList(),
-                msg.getName(), msg.getMimeType(),
-                byteBufContent, execCtx));
-
-        fileObjectHeader.whenComplete(GrpcStreams.resultHandler(responseObserver));
-
-        return GrpcStreams.relay(requestHub);
+        return writeService.createFile(
+                tenant, tagUpdates,
+                fileName, mimeType,
+                byteStream, execCtx);
     }
 
     @Override
     public StreamObserver<FileWriteRequest> updateFile(StreamObserver<TagHeader> responseObserver) {
-        return super.updateFile(responseObserver);
+
+        var method = TracDataApiGrpc.getUpdateFileMethod();
+
+        return clientStreaming(method, responseObserver,
+                FileWriteRequest::getContent,
+                this::doUpdateFile);
     }
+
+    private CompletionStage<TagHeader> doUpdateFile(
+            FileWriteRequest request,
+            Flow.Publisher<ByteBuf> byteStream,
+            IExecutionContext execCtx) {
+
+        var tenant = request.getTenant();
+        var tagUpdates = request.getTagUpdatesList();
+        var priorVersion = request.getPriorVersion();
+        var fileName = request.getName();
+        var mimeType = request.getMimeType();
+
+        return writeService.updateFile(
+                tenant, tagUpdates,
+                priorVersion, fileName, mimeType,
+                byteStream, execCtx);
+    }
+
 
     @Override
     public void readFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-        log.info("Got ctx: {}", execCtx);
+        var method = TracDataApiGrpc.getReadFileMethod();
 
-        // TODO: Validation
+        serverStreaming(method, request, responseObserver,
+                FileReadResponse::newBuilder,
+                FileReadResponse.Builder::setContent,
+                this::doReadFile);
+    }
 
-        log.info("In read call");
+    private void doReadFile(
+            FileReadRequest request,
+            Flow.Subscriber<ByteBuf> byteStream,
+            IExecutionContext execCtx) {
 
         var tenant = request.getTenant();
         var selector = request.getSelector();
 
-        var dataStream = Concurrent.<ByteBuf>hub(execCtx);
-        var response = Concurrent.map(dataStream, chunk ->
-                FileReadResponse.newBuilder()
-                .setContent(Bytes.toProtoBytes(chunk))
-                .build());
-
-        response.subscribe(GrpcStreams.relay(responseObserver));
-
-        readService.readFile(tenant, selector, dataStream, execCtx);
+        readService.readFile(tenant, selector, byteStream, execCtx);
     }
 
     @Override
@@ -133,4 +172,97 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     }
 
 
+    private <TReq extends Message, TResp extends Message>
+    StreamObserver<TReq> clientStreaming(
+            MethodDescriptor<TReq, TResp> method,
+            StreamObserver<TResp> responseObserver,
+            Function<TReq, ByteString> getContent,
+            ClientStreamingMethod<TReq, TResp> serviceMethod) {
+
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+
+        var requestHub = Concurrent.<TReq>hub(execCtx);
+
+        var firstMessage = Concurrent.first(requestHub);
+        var validRequest = firstMessage.thenApply(msg -> validateRequest(method, msg));
+
+        var protoContent = Concurrent.map(requestHub, getContent);
+        var byteBufContent = Concurrent.map(protoContent, Bytes::fromProtoBytes);
+
+        var response = validRequest.thenCompose(msg -> serviceMethod.execute(msg, byteBufContent, execCtx));
+        response.whenComplete(GrpcStreams.resultHandler(responseObserver));
+
+        return GrpcStreams.relay(requestHub);
+    }
+
+    private <TReq extends Message, TResp extends Message, TBuilder extends Message.Builder>
+    void serverStreaming(
+            MethodDescriptor<TReq, TResp> method,
+            TReq request,
+            StreamObserver<TResp> responseObserver,
+            Supplier<TBuilder> responseProvider,
+            BiFunction<TBuilder, ByteString, TBuilder> putContent,
+            ServerStreamingMethod<TReq> serviceMethod) {
+
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+
+        try {
+            validateRequest(method, request);
+        }
+        catch (EInputValidation e) {
+            responseObserver.onError(e);
+            return;
+        }
+
+        var byteStream = Concurrent.<ByteBuf>hub(execCtx);
+        var protoByteStream = Concurrent.map(byteStream, Bytes::toProtoBytes);
+
+        @SuppressWarnings("unchecked")
+        var response = Concurrent.map(protoByteStream, bytes ->
+                (TResp) putContent.apply(responseProvider.get(), bytes).build());
+
+        response.subscribe(GrpcStreams.relay(responseObserver));
+
+        serviceMethod.execute(request, byteStream, execCtx);
+    }
+
+
+    private <TReq extends Message, TResp extends Message>
+    TReq validateRequest(MethodDescriptor<TReq, TResp> method, TReq msg) {
+
+        var result = validator.validateApiCall(msg, method);
+
+        if (!result.ok()) {
+
+            var message = result.failures()
+                    .stream()
+                    .map(ValidationFailure::message)
+                    .collect(Collectors.joining("\n"));
+
+            throw new EInputValidation(message);
+        }
+
+        return msg;
+    }
+
+    @FunctionalInterface
+    private interface ClientStreamingMethod<
+            TReq extends Message,
+            TResp extends Message> {
+
+        CompletionStage<TResp> execute(
+                TReq request,
+                Flow.Publisher<ByteBuf> byteStream,
+                IExecutionContext execCtx);
+    }
+
+    @FunctionalInterface
+    private interface ServerStreamingMethod<
+            TReq extends Message> {
+
+        void execute(
+                TReq request,
+                Flow.Subscriber<ByteBuf> byteStream,
+                IExecutionContext execCtx);
+    }
 }
