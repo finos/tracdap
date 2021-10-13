@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.data.validation;
 
+import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
 import com.accenture.trac.api.TracDataApiGrpc;
 import com.google.protobuf.Descriptors;
@@ -63,6 +64,16 @@ public class DataApiValidator {
 
         ctx = optional(msg, "size", ctx);
         ctx = nonNegative(msg, "size", ctx);
+
+        return ctx;
+    }
+
+    public static ValidationContext validateReadFile(FileReadRequest msg, ValidationContext ctx) {
+
+        ctx = required(msg, "tenant", ctx);
+        ctx = validIdentifier(msg, "tenant", ctx);
+
+        ctx = required(msg, "selector", ctx);
 
         return ctx;
     }

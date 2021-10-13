@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.data.validation;
 
+import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
@@ -55,6 +56,11 @@ public class Validator {
 
         if (methodName.equals("updateFile") && msg instanceof FileWriteRequest) {
             ctx = DataApiValidator.validateUpdateFile((FileWriteRequest) msg, ctx);
+            return ValidationResult.forContext(ctx);
+        }
+
+        if (methodName.equals("readFile") && msg instanceof FileReadRequest) {
+            ctx = DataApiValidator.validateReadFile((FileReadRequest) msg, ctx);
             return ValidationResult.forContext(ctx);
         }
 
