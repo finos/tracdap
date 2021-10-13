@@ -16,6 +16,7 @@
 
 package com.accenture.trac.common.util;
 
+import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
 import io.grpc.Status;
@@ -26,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -70,29 +72,34 @@ public class GrpcStreams {
         @Override
         public void accept(T result, Throwable error) {
 
-            if (error != null) {
-
-                LoggerFactory.getLogger(getClass()).error("Error escaped processing", error);
-
-                if (error instanceof StatusRuntimeException || error instanceof StatusException)
-                    grpcObserver.onError(error);
-                else {
-
-                    var statusCode = Status.Code.INTERNAL;
-
-                    var errorMessage = error.getMessage();
-
-                    var status = Status.fromCode(statusCode)
-                            .withDescription(errorMessage)
-                            .withCause(error);
-
-                    grpcObserver.onError(status.asRuntimeException());
-                }
-            }
-            else {
+            if (error == null) {
                 grpcObserver.onNext(result);
                 grpcObserver.onCompleted();
+                return;
             }
+
+            // Unwrap future errors
+            if (error instanceof CompletionException)
+                error = error.getCause();
+
+            if (error instanceof EInputValidation) {
+
+                var status = Status.fromCode(Status.Code.INVALID_ARGUMENT)
+                        .withDescription(error.getMessage())
+                        .withCause(error);
+
+                grpcObserver.onError(status.asRuntimeException());
+                return;
+            }
+
+            var status = Status.fromCode(Status.Code.INTERNAL)
+                    .withDescription(Status.INTERNAL.getDescription())
+                    .withCause(error);
+
+            grpcObserver.onError(status.asRuntimeException());
+
+            // TODO: More error types and logging
+
         }
     }
 
