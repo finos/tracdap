@@ -63,6 +63,7 @@ public class GrpcStreams {
 
     public static class GrpcResultHandler<T> implements BiConsumer<T, Throwable> {
 
+        private final Logger log = LoggerFactory.getLogger(getClass());
         private final StreamObserver<T> grpcObserver;
 
         public GrpcResultHandler(StreamObserver<T> grpcObserver) {
@@ -75,12 +76,15 @@ public class GrpcStreams {
             if (error == null) {
                 grpcObserver.onNext(result);
                 grpcObserver.onCompleted();
+                log.info("gRPC call complete");
                 return;
             }
 
             // Unwrap future errors
             if (error instanceof CompletionException)
                 error = error.getCause();
+
+            log.error("gRPC call failed: {}", error.getMessage(), error);
 
             if (error instanceof EInputValidation) {
 
