@@ -17,9 +17,11 @@
 package com.accenture.trac.svc.data.validation;
 
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.metadata.DecimalValue;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 
+import java.math.BigDecimal;
 import java.util.regex.Pattern;
 
 public class Validation {
@@ -99,7 +101,39 @@ public class Validation {
         return ctx;
     }
 
-    static ValidationContext nonNegative(Message message, ValidationContext ctx) {
+    static ValidationContext notNegative(Message msg, ValidationContext ctx) {
+
+        var value = msg.getField(ctx.field());
+        boolean negative;
+
+        switch (ctx.field().getJavaType()) {
+
+            case INT: negative = (int) value < 0; break;
+            case LONG: negative = (long) value < 0; break;
+            case FLOAT: negative = (float) value < 0; break;
+            case DOUBLE: negative = (double) value < 0; break;
+
+            case MESSAGE:
+
+                var msgType = ctx.field().getMessageType();
+
+                // Handle DecimalValue messages, otherwise drop through to the default case
+
+                if (msgType.equals(DecimalValue.getDescriptor())) {
+                    var decimalMsg = (DecimalValue) msg;
+                    var decimalValue = new BigDecimal(decimalMsg.getDecimal());
+                    negative = ! decimalValue.abs().equals(decimalValue);
+                    break;
+                }
+
+            default:
+                throw new EUnexpected();
+        }
+
+        if (negative) {
+            var err = String.format("Value of field [%s] cannot be negative: [%s]", ctx.fieldName(), value);
+            return ctx.error(err);
+        }
 
         return ctx;
     }

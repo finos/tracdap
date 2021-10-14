@@ -18,7 +18,6 @@ package com.accenture.trac.svc.data.validation;
 
 import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
-import com.google.protobuf.Message;
 
 
 public class DataApiValidator {
@@ -67,7 +66,7 @@ public class DataApiValidator {
 
         ctx = ctx.push(msg, "size")
                 .apply(Validation::optional)
-                .apply(Validation::nonNegative)
+                .apply(Validation::notNegative)
                 .pop();
 
         return ctx;
