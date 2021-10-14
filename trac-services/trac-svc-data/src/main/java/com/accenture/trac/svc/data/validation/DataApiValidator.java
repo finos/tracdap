@@ -18,161 +18,71 @@ package com.accenture.trac.svc.data.validation;
 
 import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
-import com.accenture.trac.api.TracDataApiGrpc;
-import com.accenture.trac.common.exception.EUnexpected;
-import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
-
-import java.util.regex.Pattern;
 
 
 public class DataApiValidator {
 
-    private static final String CREATE_FILE_METHOD = TracDataApiGrpc.getCreateFileMethod().getFullMethodName();
-    private static final String UPDATE_FILE_METHOD = TracDataApiGrpc.getUpdateFileMethod().getFullMethodName();
-
     public static ValidationContext validateCreateFile(FileWriteRequest msg, ValidationContext ctx) {
 
-        ctx = required(msg, "tenant", ctx);
-        ctx = validIdentifier(msg, "tenant", ctx);
+        ctx = ctx.push(msg, "tenant")
+                .apply(Validation::required)
+                .apply(Validation::identifier)
+                .pop();
 
-        ctx = omitted(msg, "priorVersion", ctx);
+        ctx = ctx.push(msg, "priorVersion")
+                .apply(Validation::omitted)
+                .pop();
 
-        ctx = createOrUpdateFile(msg, ctx);
-
-        return ctx;
+        return createOrUpdateFile(msg, ctx);
     }
 
     public static ValidationContext validateUpdateFile(FileWriteRequest msg, ValidationContext ctx) {
 
-        ctx = required(msg, "tenant", ctx);
-        ctx = validIdentifier(msg, "tenant", ctx);
+        ctx = ctx.push(msg, "tenant")
+                .apply(Validation::required)
+                .apply(Validation::identifier)
+                .pop();
 
-        ctx = required(msg, "priorVersion", ctx);
+        ctx = ctx.push(msg, "priorVersion")
+                .apply(Validation::required)
+                .pop();
 
-        ctx = createOrUpdateFile(msg, ctx);
-
-        return ctx;
+        return createOrUpdateFile(msg, ctx);
     }
 
     private static ValidationContext createOrUpdateFile(FileWriteRequest msg, ValidationContext ctx) {
 
         // Todo: tag updates
 
-        ctx = required(msg, "name", ctx);
-        ctx = validFileName(msg, "name", ctx);
+        ctx = ctx.push(msg, "name")
+                .apply(Validation::required)
+                //.apply(Validation::fileName)
+                .pop();
 
-        ctx = required(msg, "mimeType", ctx);
-        ctx = validMimeType(msg, "mimeType", ctx);
+        ctx = ctx.push(msg, "mimeType")
+                .apply(Validation::required)
+                .apply(Validation::mimeType)
+                .pop();
 
-        ctx = optional(msg, "size", ctx);
-        ctx = nonNegative(msg, "size", ctx);
+        ctx = ctx.push(msg, "size")
+                .apply(Validation::optional)
+                .apply(Validation::nonNegative)
+                .pop();
 
         return ctx;
     }
 
     public static ValidationContext validateReadFile(FileReadRequest msg, ValidationContext ctx) {
 
-        ctx = required(msg, "tenant", ctx);
-        ctx = validIdentifier(msg, "tenant", ctx);
+        ctx = ctx.push(msg, "tenant")
+                .apply(Validation::required)
+                .apply(Validation::identifier)
+                .pop();
 
-        ctx = required(msg, "selector", ctx);
-
-        return ctx;
-    }
-
-    private static ValidationContext required(Message msg, String field, ValidationContext ctx) {
-
-        var fd = msg.getDescriptorForType().findFieldByName(field);
-
-        if (!msg.hasField(fd)) {
-            var err = String.format("A value is required for field [%s]", field);
-            return ctx.error(err);
-        }
-
-        if (fd.getType() == Descriptors.FieldDescriptor.Type.STRING) {
-
-            var value = (String) msg.getField(fd);
-
-            if (value.isEmpty()) {
-                var err = String.format("A value is required for field [%s]", field);
-                return ctx.error(err);
-            }
-        }
-
-        return ctx;
-    }
-
-    private static ValidationContext omitted(Message msg, String field, ValidationContext ctx) {
-
-        var fd = msg.getDescriptorForType().findFieldByName(field);
-
-        if (msg.hasField(fd)) {
-            var err = String.format("A value must not be provided for field [%s]", field);
-            return ctx.error(err);
-        }
-
-        return ctx;
-    }
-
-    private static ValidationContext optional(Message msg, String field, ValidationContext ctx) {
-
-        return ctx;
-    }
-
-    private static ValidationContext validIdentifier(Message msg, String field, ValidationContext ctx) {
-
-        return regexMatch(msg, field, ValidationConstants.VALID_IDENTIFIER, "a valid identifier", ctx);
-    }
-
-    private static ValidationContext validFileName(Message msg, String field, ValidationContext ctx) {
-
-        msg.getField(msg.getDescriptorForType().findFieldByName(field));
-        return ctx;
-    }
-
-    private static ValidationContext validMimeType(Message msg, String field, ValidationContext ctx) {
-
-        // First check the value matches the mime type regex, i.e. has the right form
-        var regexCtx = regexMatch(msg, field, ValidationConstants.MIME_TYPE, "a valid mime type", ctx);
-        if (regexCtx != ctx)
-            return regexCtx;
-
-        // Second check the main part of the type is a registered media type
-        var fd = msg.getDescriptorForType().findFieldByName(field);
-        var value = (String) msg.getField(fd);
-        var mainType = value.substring(0, value.indexOf("/"));
-
-        if (!ValidationConstants.REGISTERED_MIME_TYPES.contains(mainType)) {
-            var err = String.format("Value of field [%s] must be a registered mime type: [%s]", field, value);
-            return ctx.error(err);
-        }
-
-        return ctx;
-    }
-
-    private static ValidationContext regexMatch(
-            Message msg, String field,
-            Pattern regex, String desc,
-            ValidationContext ctx) {
-
-        var fd = msg.getDescriptorForType().findFieldByName(field);
-
-        if (fd.getType() != Descriptors.FieldDescriptor.Type.STRING)
-            throw new EUnexpected();
-
-        var value = (String) msg.getField(fd);
-        var matcher = regex.matcher(value);
-
-        if (!matcher.matches()) {
-            var err = String.format("Value of field [%s] must be %s: [%s]", field, desc, value);
-            return ctx.error(err);
-        }
-
-        return ctx;
-    }
-
-    private static ValidationContext nonNegative(Message msg, String field, ValidationContext ctx) {
+        ctx = ctx.push(msg, "selector")
+                .apply(Validation::required)
+                .pop();
 
         return ctx;
     }

@@ -16,76 +16,117 @@
 
 package com.accenture.trac.svc.data.validation;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Vector;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Message;
+
+import java.util.*;
 
 
 public class ValidationContext {
 
-    private final List<ValidationLocation> location;
+    private final Stack<ValidationLocation> location;
     private final List<ValidationFailure> failures;
-    private final ValidationContext parent;
+    private Message msg;
 
-    public static ValidationContext newContext() {
-        return new ValidationContext();
+    private ValidationContext(ValidationLocation root) {
+
+        location = new Stack<>();
+        location.push(root);
+
+        failures = new ArrayList<>();
     }
 
-    public ValidationContext push(ValidationLocation location) {
+    public static ValidationContext forMessage(Descriptors.Descriptor message) {
 
-        var newLocation = new LinkedList<ValidationLocation>();  // location.withParent(this.location);
-        newLocation.add(location);  // TODO
+        var root = new ValidationLocation(null, null, null);
+        return new ValidationContext(root);
+    }
 
-        return new ValidationContext(
-                newLocation,
-                this.failures,
-                this);
+    public static ValidationContext forApiCall(Descriptors.MethodDescriptor method) {
+
+        var root = new ValidationLocation(null, null, null);
+        return new ValidationContext(root);
+    }
+
+    public ValidationContext push(Message msg, String field) {
+
+        var fd = msg.getDescriptorForType().findFieldByName(field);
+        var parentLoc = location.peek();
+        var loc = new ValidationLocation(parentLoc, fd, field);
+
+        if (parentLoc.skipped())
+            loc.skip();
+
+        location.push(loc);
+        this.msg = msg;
+
+        return this;
     }
 
     public ValidationContext pop() {
 
-        if (parent == null)
+        if (location.empty())
             throw new IllegalStateException();
 
-        if (parent.failures.size() == failures.size())
-            return parent;
+        location.pop();
+        this.msg = null;
 
-        return new ValidationContext(
-                parent.location,
-                this.failures,
-                parent.parent);
+        return this;
+    }
+
+    public ValidationContext apply(ValidationFunction validation) {
+
+        if (done())
+            return this;
+
+        return validation.validate(msg, this);  // todo: msg
+    }
+
+    public ValidationContext skip() {
+
+        var loc = location.peek();
+        loc.skip();
+
+        return this;
     }
 
     public ValidationContext error(String message) {
 
-        var failure = new ValidationFailure(new ValidationLocation(null), message);
-
-        var failures = new Vector<ValidationFailure>(this.failures.size() + 1);
-        failures.addAll(this.failures);
+        var failure = new ValidationFailure(null, message);  // todo: loc in error
         failures.add(failure);
 
-        return new ValidationContext(this.location, failures, this.parent);
+        var loc = location.peek();
+        loc.fail();
+
+        return this;
     }
+
+    public Descriptors.FieldDescriptor field() {
+        return location.peek().field();
+    }
+
+    public String fieldName() {
+        return location.peek().fieldName();
+    }
+
+    public boolean failed() {
+        return location.peek().failed();
+    }
+
+    public boolean skipped() {
+        return location.peek().skipped();
+    }
+
+    public boolean done() {
+        return location.peek().done();
+    }
+
+
+
 
     public List<ValidationFailure> getErrors() {
         return failures;
     }
 
-    private ValidationContext() {
-        location = new LinkedList<>();
-        failures = new ArrayList<>();
-        parent = null;
-    }
-
-    private ValidationContext(
-            List<ValidationLocation> location,
-            List<ValidationFailure> failures,
-            ValidationContext parent) {
-
-        this.location = location;
-        this.failures = failures;
-        this.parent = parent;
-    }
 
 }

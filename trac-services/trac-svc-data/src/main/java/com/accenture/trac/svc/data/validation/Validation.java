@@ -1,0 +1,125 @@
+/*
+ * Copyright 2021 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.accenture.trac.svc.data.validation;
+
+import com.accenture.trac.common.exception.EUnexpected;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Message;
+
+import java.util.regex.Pattern;
+
+public class Validation {
+
+
+    static ValidationContext required(Message msg, ValidationContext ctx) {
+
+        if (!msg.hasField(ctx.field())) {
+            var err = String.format("A value is required for field [%s]", ctx.fieldName());
+            return ctx.error(err);
+        }
+
+        if (ctx.field().getType() == Descriptors.FieldDescriptor.Type.STRING) {
+
+            var value = (String) msg.getField(ctx.field());
+
+            if (value.isEmpty()) {
+                var err = String.format("A value is required for field [%s]", ctx.fieldName());
+                return ctx.error(err);
+            }
+        }
+
+        return ctx;
+    }
+
+    static ValidationContext omitted(Message msg, ValidationContext ctx) {
+
+        if (msg.hasField(ctx.field())) {
+            var err = String.format("A value must not be provided for field [%s]", ctx.fieldName());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    static ValidationContext optional(Message msg, ValidationContext ctx) {
+
+        if (!msg.hasField(ctx.field()))
+            return ctx.skip();
+
+        return ctx;
+    }
+
+    static ValidationContext identifier(Message msg, ValidationContext ctx) {
+
+        return regexMatch(
+                ValidationConstants.VALID_IDENTIFIER,
+                "a valid identifier",
+                msg, ctx);
+    }
+
+    static ValidationContext mimeType(Message msg, ValidationContext ctx) {
+
+        // First check the value matches the mime type regex, i.e. has the right form
+        ctx = regexMatch(
+                ValidationConstants.MIME_TYPE,
+                "a valid mime type",
+                msg, ctx);
+
+        if (ctx.failed())
+            return ctx;
+
+        // Second check the main part of the type is a registered media type
+        var value = (String) msg.getField(ctx.field());
+        var mainType = value.substring(0, value.indexOf("/"));
+
+        if (!ValidationConstants.REGISTERED_MIME_TYPES.contains(mainType)) {
+            var err = String.format("Value of field [%s] must be a registered mime type: [%s]", ctx.fieldName(), value);
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    static ValidationContext fileName(Message msg, ValidationContext ctx) {
+
+        return ctx;
+    }
+
+    static ValidationContext nonNegative(Message message, ValidationContext ctx) {
+
+        return ctx;
+    }
+
+    private static ValidationContext regexMatch(
+            Pattern regex, String desc,
+            Message msg, ValidationContext ctx) {
+
+        if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
+            throw new EUnexpected();
+
+        var value = (String) msg.getField(ctx.field());
+        var matcher = regex.matcher(value);
+
+        if (!matcher.matches()) {
+            var err = String.format("Value of field [%s] must be %s: [%s]", ctx.fieldName(), desc, value);
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+}

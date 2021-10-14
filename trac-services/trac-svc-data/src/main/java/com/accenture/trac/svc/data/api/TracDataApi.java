@@ -116,6 +116,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         var method = TracDataApiGrpc.getUpdateFileMethod();
 
+
+
         return clientStreaming(method, responseObserver,
                 FileWriteRequest::getContent,
                 this::doUpdateFile);
@@ -230,7 +232,12 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     private <TReq extends Message, TResp extends Message>
     TReq validateRequest(MethodDescriptor<TReq, TResp> method, TReq msg) {
 
-        var result = validator.validateApiCall(msg, method);
+        var protoMethod = Data.getDescriptor()
+                .getFile()
+                .findServiceByName("TracDataApi")
+                .findMethodByName(method.getBareMethodName());
+
+        var result = validator.validateApiCall(msg, protoMethod);
 
         if (!result.ok()) {
 

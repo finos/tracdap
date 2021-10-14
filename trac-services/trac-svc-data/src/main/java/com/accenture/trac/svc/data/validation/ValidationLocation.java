@@ -16,16 +16,65 @@
 
 package com.accenture.trac.svc.data.validation;
 
+import com.google.protobuf.Descriptors;
+
 import java.util.List;
+import java.util.Stack;
 import java.util.Vector;
 
-public class ValidationLocation {
+class ValidationLocation {
 
     private final ValidationLocation parent;
 
-    public ValidationLocation(ValidationLocation parent) {
+    private final Descriptors.MethodDescriptor method = null;
+    private final Descriptors.FieldDescriptor field;
+    private final String fieldName;
+
+    private boolean failed;
+    private boolean skipped;
+
+    public ValidationLocation(
+            ValidationLocation parent,
+            Descriptors.FieldDescriptor field,
+            String fieldName) {
+
         this.parent = parent;
+        this.field = field;
+        this.fieldName = fieldName;
+
+        this.failed = false;
+        this.skipped = false;
     }
+
+    public void fail() {
+        failed = true;
+    }
+
+    public void skip() {
+        skipped = true;
+    }
+
+
+    public Descriptors.FieldDescriptor field() {
+        return field;
+    }
+
+    public String fieldName() {
+        return fieldName;
+    }
+
+    public boolean failed() {
+        return failed;
+    }
+
+    public boolean skipped() {
+        return skipped;
+    }
+
+    public boolean done() {
+        return failed || skipped;
+    }
+
 
     public ValidationLocation parent() {
         return parent;

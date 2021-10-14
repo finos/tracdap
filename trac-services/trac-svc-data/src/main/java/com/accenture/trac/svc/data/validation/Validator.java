@@ -20,8 +20,8 @@ import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
+import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
-import io.grpc.MethodDescriptor;
 
 
 public class Validator {
@@ -31,9 +31,9 @@ public class Validator {
         return ValidationResult.pass();
     }
 
-    public ValidationResult validateApiCall(Message msg, MethodDescriptor<?, ?> method) {
+    public ValidationResult validateApiCall(Message msg, Descriptors.MethodDescriptor method) {
 
-        var ctx = ValidationContext.newContext();
+        var ctx = ValidationContext.forApiCall(method);
         return validateApiCall(msg, method, ctx);
     }
 
@@ -42,9 +42,9 @@ public class Validator {
         return ValidationResult.pass();
     }
 
-    private ValidationResult validateApiCall(Message msg, MethodDescriptor<?, ?> method, ValidationContext ctx) {
+    private ValidationResult validateApiCall(Message msg, Descriptors.MethodDescriptor method, ValidationContext ctx) {
 
-        var methodName = method.getBareMethodName();
+        var methodName = method.getName();
 
         if (methodName == null)
             throw new EUnexpected();
