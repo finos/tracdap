@@ -26,10 +26,12 @@ import java.util.List;
 
 class RequestState {
 
-    List<TagUpdate> tags;
+    List<TagUpdate> fileTags;
+    List<TagUpdate> storageTags;
 
-    TagHeader fileId;
+    TagHeader fileId, priorFileId;
+    TagHeader storageId, priorStorageId;
 
-    FileDefinition file;
-    StorageDefinition storage;
+    FileDefinition file, priorFile;
+    StorageDefinition storage, priorStorage;
 }

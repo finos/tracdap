@@ -49,6 +49,9 @@ public class DataWriteService {
     private static final String TRAC_FILE_MIME_TYPE_ATTR = "trac_file_mime_type";
     private static final String TRAC_FILE_SIZE_ATTR = "trac_file_size";
 
+    private static final String FILE_DATA_ITEM_TEMPLATE = "file/%s/version-%d";
+    private static final String FILE_STORAGE_PATH_TEMPLATE = "file/%s/version-%d/%s";
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final IStorageManager storageManager;
@@ -68,30 +71,20 @@ public class DataWriteService {
             Flow.Publisher<ByteBuf> contentStream,
             IExecutionContext execContext) {
 
-        log.info("In service method...");
-
-        // TODO: Validation
-
         var defs = new RequestState();
-        defs.tags = tags;
-
-        var preallocateRequest = MetadataWriteRequest.newBuilder()
-            .setTenant(tenant)
-            .setObjectType(ObjectType.FILE)
-            .build();
+        defs.fileTags = tags;
 
         return CompletableFuture.completedFuture(null)
 
                 // Call meta svc to preallocate file object ID
-                .thenApply(x -> metaApi.preallocateId(preallocateRequest))
+                .thenApply(x -> preallocateForType(tenant, ObjectType.FILE))
+                .thenApply(metaApi::preallocateId)
                 .thenCompose(Futures::javaFuture)
                 .thenAccept(fileId -> defs.fileId = fileId)
 
-                // Build initial definition objects
-                .thenApply(x -> buildDefinitions(defs.fileId, name, mimeType))
-                .thenAccept(defs_ -> {
-                    defs.file = defs_.file;
-                    defs.storage = defs_.storage; })
+                // Build definition objects
+                .thenAccept(x -> defs.file = createFileDef(defs.fileId, name, mimeType))
+                .thenAccept(x -> defs.storage = createStorageDef(defs.fileId, name, mimeType))
 
                 // Write file content stream to the storage layer
                 .thenCompose(x -> writeDataItem(
@@ -105,6 +98,10 @@ public class DataWriteService {
                     .setSize(size)
                     .build())
 
+                // Add controlled tag attrs (must be done after file size is known)
+                .thenAccept(x -> defs.fileTags = createFileAttrs(defs.fileTags, defs.file))
+                .thenAccept(x -> defs.storageTags = createStorageAttrs(defs.fileTags, defs.file))
+
                 // Save storage metadata
                 .thenCompose(x -> createObject(
                         tenant, tags, ObjectType.STORAGE, defs.storage,
@@ -116,12 +113,9 @@ public class DataWriteService {
                     .setStorageId(MetadataUtil.selectorForLatest(storageHeader))
                     .build())
 
-                // Add file-specific controlled tag attrs
-                .thenAccept(x -> defs.tags = addFileAAttrs(defs.tags, defs.file))
-
                 // Save file metadata
                 .thenCompose(x -> createPreallocated(
-                        tenant, defs.tags, defs.fileId, defs.file,
+                        tenant, defs.fileTags, defs.fileId, defs.file,
                         ObjectDefinition.Builder::setFile));
     }
 
@@ -132,73 +126,63 @@ public class DataWriteService {
             Flow.Publisher<ByteBuf> contentStream,
             IExecutionContext execContext) {
 
-        // TODO: Validation
-
         var defs = new RequestState();
-        defs.tags = tags;
+        defs.fileTags = tags;
 
-        var readRequest = MetadataReadRequest.newBuilder()
-                .setTenant(tenant)
-                .setSelector(priorVersion)
-                .build();
+        return CompletableFuture.completedFuture(null)
 
-        CompletableFuture.completedFuture(null)
-
-                .thenApply(x -> metaApi.readObject(readRequest))
+                // Read prior file metadata
+                .thenApply(x -> requestForSelector(tenant, priorVersion))
+                .thenApply(metaApi::readObject)
                 .thenCompose(Futures::javaFuture)
                 .thenAccept(priorFile -> {
-
-                    // New ID - bump object version
-                    defs.fileId = priorFile.getHeader().toBuilder()
-                            .setObjectVersion(priorFile.getHeader().getObjectVersion() + 1)
-                            .setTagVersion(1)
-                            .build();
-
-                    defs.file = priorFile
-                            .getDefinitionOrBuilder()
-                            .getFile();
+                    defs.priorFileId = priorFile.getHeader();
+                    defs.priorFile = priorFile.getDefinition().getFile();
                 })
 
-                // TODO: Check compatibility
+                // Read prior storage metadata
+                .thenApply(x -> requestForSelector(tenant, defs.priorFile.getStorageId()))
+                .thenApply(metaApi::readObject)
+                .thenCompose(Futures::javaFuture)
+                .thenAccept(priorStorage -> {
+                    defs.priorStorageId = priorStorage.getHeader();
+                    defs.priorStorage = priorStorage.getDefinition().getStorage();
+                })
 
-                .thenApply(x -> buildDefinitions(defs.fileId, name, mimeType))
-                .thenAccept(defs_ -> {
-                    defs.file = defs_.file;
-                    defs.storage = defs_.storage; });
+                // Bump object versions
+                .thenAccept(x -> defs.fileId = bumpVersion(defs.priorFileId))
+                .thenAccept(x -> defs.storageId = bumpVersion(defs.priorStorageId))
 
-        return null;
+                // Build definition objects
+                .thenAccept(x -> defs.file = updateFileDef(defs.priorFile, defs.fileId, name, mimeType))
+                .thenAccept(x -> defs.storage = updateStorageDef(defs.priorStorage, defs.fileId, name, mimeType))
 
-    }
+                // Write file content stream to the storage layer
+                .thenCompose(x -> writeDataItem(
+                        defs.storage,
+                        defs.file.getDataItem(),
+                        contentStream, execContext))
 
-    private List<TagUpdate> addFileAAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
+                // Record size from storage in file definition
+                .thenAccept(size -> defs.file =
+                        defs.file.toBuilder()
+                        .setSize(size)
+                        .build())
 
-        var nameAttr = TagUpdate.newBuilder()
-                .setAttrName(TRAC_FILE_NAME_ATTR)
-                .setOperation(TagOperation.CREATE_ATTR)
-                .setValue(MetadataCodec.encodeValue(fileDef.getName()))
-                .build();
+                // Add controlled tag attrs (must be done after file size is known)
+                .thenAccept(x -> defs.fileTags = updateFileAttrs(defs.fileTags, defs.file))
+                .thenAccept(x -> defs.storageTags = updateStorageAttrs(defs.fileTags, defs.file))
 
-        var extensionAttr = TagUpdate.newBuilder()
-                .setAttrName(TRAC_FILE_EXTENSION_ATTR)
-                .setOperation(TagOperation.CREATE_ATTR)
-                .setValue(MetadataCodec.encodeValue(fileDef.getExtension()))
-                .build();
+                // Save storage metadata
+                .thenCompose(x -> updateObject(
+                        tenant, MetadataUtil.selectorFor(defs.priorStorageId),
+                        defs.storage, defs.storageTags, ObjectDefinition.Builder::setStorage))
 
-        var mimeTypeAttr = TagUpdate.newBuilder()
-                .setAttrName(TRAC_FILE_MIME_TYPE_ATTR)
-                .setOperation(TagOperation.CREATE_ATTR)
-                .setValue(MetadataCodec.encodeValue(fileDef.getMimeType()))
-                .build();
+                // Save file metadata
+                .thenCompose(x -> updateObject(
+                        tenant, MetadataUtil.selectorFor(defs.priorFileId),
+                        defs.file, defs.fileTags, ObjectDefinition.Builder::setFile));
 
-        var sizeAttr = TagUpdate.newBuilder()
-                .setAttrName(TRAC_FILE_SIZE_ATTR)
-                .setOperation(TagOperation.CREATE_ATTR)
-                .setValue(MetadataCodec.encodeValue(fileDef.getSize()))
-                .build();
-
-        var fileAttrs = List.of(nameAttr, extensionAttr, mimeTypeAttr, sizeAttr);
-
-        return Stream.concat(tags.stream(), fileAttrs.stream()).collect(Collectors.toList());
     }
 
     private CompletionStage<Long> writeDataItem(
@@ -239,6 +223,24 @@ public class DataWriteService {
         return Futures.javaFuture(metaApi.createObject(request));
     }
 
+    private <TDef> CompletionStage<TagHeader> updateObject(
+            String tenant, TagSelector priorVersion, TDef def, List<TagUpdate> tags,
+            BiFunction<ObjectDefinition.Builder, TDef, ObjectDefinition.Builder> objSetter) {
+
+        var objBuilder = ObjectDefinition.newBuilder().setObjectType(priorVersion.getObjectType());
+        var obj = objSetter.apply(objBuilder, def);
+
+        var request = MetadataWriteRequest.newBuilder()
+                .setTenant(tenant)
+                .setObjectType(priorVersion.getObjectType())
+                .setPriorVersion(priorVersion)
+                .setDefinition(obj)
+                .addAllTagUpdates(tags)
+                .build();
+
+        return Futures.javaFuture(metaApi.updateObject(request));
+    }
+
     private <TDef> CompletionStage<TagHeader> createPreallocated(
             String tenant, List<TagUpdate> tags, TagHeader objectHeader, TDef def,
             BiFunction<ObjectDefinition.Builder, TDef, ObjectDefinition.Builder> objSetter) {
@@ -258,10 +260,22 @@ public class DataWriteService {
         return Futures.javaFuture(metaApi.createPreallocatedObject(request));
     }
 
-    private RequestState buildDefinitions(TagHeader fileHeader, String fileName, String mimeType) {
+    private static FileDefinition createFileDef(
+            TagHeader fileHeader, String fileName, String mimeType) {
 
-        var FILE_DATA_ITEM_TEMPLATE = "file/%s/version-%d";
-        var FILE_STORAGE_PATH_TEMPLATE = "file/%s/version-%d/%s";
+        return buildFileDef(FileDefinition.newBuilder(), fileHeader, fileName, mimeType);
+    }
+
+    private static FileDefinition updateFileDef(
+            FileDefinition priorFile,
+            TagHeader fileHeader, String fileName, String mimeType) {
+
+        return buildFileDef(priorFile.toBuilder(), fileHeader, fileName, mimeType);
+    }
+
+    private static FileDefinition buildFileDef(
+            FileDefinition.Builder fileDef,
+            TagHeader fileHeader, String fileName, String mimeType) {
 
         var fileId = UUID.fromString(fileHeader.getObjectId());
         var fileVersion = fileHeader.getObjectVersion();
@@ -273,14 +287,37 @@ public class DataWriteService {
                 : "";
 
         // Size and storage ID omitted, will be set later
-        var fileDef = FileDefinition.newBuilder()
+        return fileDef
                 .setName(fileName)
                 .setExtension(extension)
                 .setMimeType(mimeType)
                 .setDataItem(dataItem)
                 .build();
+    }
 
+    private static StorageDefinition createStorageDef(
+            TagHeader fileHeader, String fileName, String mimeType) {
+
+        return buildStorageDef(StorageDefinition.newBuilder(), fileHeader, fileName, mimeType);
+    }
+
+    private static StorageDefinition updateStorageDef(
+            StorageDefinition priorStorage,
+            TagHeader fileHeader, String fileName, String mimeType) {
+
+        return buildStorageDef(priorStorage.toBuilder(), fileHeader, fileName, mimeType);
+    }
+
+    private static StorageDefinition buildStorageDef(
+            StorageDefinition.Builder storageDef,
+            TagHeader fileHeader, String fileName, String mimeType) {
+
+        var fileId = UUID.fromString(fileHeader.getObjectId());
+        var fileVersion = fileHeader.getObjectVersion();
+
+        var dataItem = String.format(FILE_DATA_ITEM_TEMPLATE, fileId, fileVersion);
         var storagePath = String.format(FILE_STORAGE_PATH_TEMPLATE, fileId, fileVersion, fileName);
+
         var storageKey = "UNIT_TEST_STORAGE";  // TODO: Where to store
         var storageTimestamp = MetadataCodec
                 .encodeDatetime(Instant.now()  // TODO: timestamp
@@ -303,14 +340,94 @@ public class DataWriteService {
                 .addIncarnations(storageIncarnation)
                 .build();
 
-        var storageDef = StorageDefinition.newBuilder()
-                .putDataItems(dataItem, storageItem).build();
-
-        var defSet = new RequestState();
-        defSet.file = fileDef;
-        defSet.storage = storageDef;
-
-        return defSet;
+        return storageDef
+                .putDataItems(dataItem, storageItem)
+                .build();
     }
 
+    private static List<TagUpdate> createFileAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
+
+        var nameAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_FILE_NAME_ATTR)
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue(fileDef.getName()))
+                .build();
+
+        var extensionAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_FILE_EXTENSION_ATTR)
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue(fileDef.getExtension()))
+                .build();
+
+        var mimeTypeAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_FILE_MIME_TYPE_ATTR)
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue(fileDef.getMimeType()))
+                .build();
+
+        var sizeAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_FILE_SIZE_ATTR)
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue(fileDef.getSize()))
+                .build();
+
+        var fileAttrs = List.of(nameAttr, extensionAttr, mimeTypeAttr, sizeAttr);
+
+        return Stream.concat(tags.stream(), fileAttrs.stream()).collect(Collectors.toList());
+    }
+
+    private static List<TagUpdate> updateFileAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
+
+        // Extension and mime type are not allowed to change between file versions
+
+        var nameAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_FILE_NAME_ATTR)
+                .setOperation(TagOperation.REPLACE_ATTR)
+                .setValue(MetadataCodec.encodeValue(fileDef.getName()))
+                .build();
+
+        var sizeAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_FILE_SIZE_ATTR)
+                .setOperation(TagOperation.REPLACE_ATTR)
+                .setValue(MetadataCodec.encodeValue(fileDef.getSize()))
+                .build();
+
+        var fileAttrs = List.of(nameAttr, sizeAttr);
+
+        return Stream.concat(tags.stream(), fileAttrs.stream()).collect(Collectors.toList());
+    }
+
+    private static List<TagUpdate> createStorageAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
+
+        return List.of();  // TODO: Storage attrs
+    }
+
+    private static List<TagUpdate> updateStorageAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
+
+        return List.of();  // TODO: Storage attrs
+    }
+
+    private static MetadataWriteRequest preallocateForType(String tenant, ObjectType objectType) {
+
+        return MetadataWriteRequest.newBuilder()
+                .setTenant(tenant)
+                .setObjectType(objectType)
+                .build();
+    }
+
+    private static MetadataReadRequest requestForSelector(String tenant, TagSelector selector) {
+
+        return MetadataReadRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(selector)
+                .build();
+    }
+
+    private static TagHeader bumpVersion(TagHeader priorVersion) {
+
+        return priorVersion.toBuilder()
+                .setObjectVersion(priorVersion.getObjectVersion() + 1)
+                .setTagVersion(1)
+                .build();
+    }
 }

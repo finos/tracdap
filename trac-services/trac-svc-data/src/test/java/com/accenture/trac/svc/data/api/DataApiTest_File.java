@@ -408,6 +408,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         var v1Selector = MetadataUtil.selectorFor(v1Id);
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
         var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
         var v2Id = resultOf(updateFile);
 
         // Read back updated content and check
@@ -426,7 +427,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         Helpers.serverStreaming(dataClient::readFile, v2ReadRequest, v2Response);
 
         waitFor(TEST_TIMEOUT, v2Content);
-        Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(v2Content));
+        Assertions.assertEquals(BASIC_FILE_CONTENT_V2, resultOf(v2Content));
 
         // Make sure original content is still available as v1
 
@@ -457,6 +458,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         var v1Selector = MetadataUtil.selectorFor(v1Id);
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
         var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
         var v2Id = resultOf(updateFile);
 
         var metaReadRequest = MetadataReadRequest.newBuilder()
@@ -487,7 +489,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         var extensionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_extension"));
         var mimeTypeAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_mime_type"));
         var sizeAttr = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_file_size"));
-        Assertions.assertEquals("some_file_v2.txt", nameAttr);
+        Assertions.assertEquals("some_file.txt", nameAttr);
         Assertions.assertEquals("txt", extensionAttr);
         Assertions.assertEquals("text/plain", mimeTypeAttr);
         Assertions.assertEquals(BASIC_FILE_CONTENT_V2.size(), sizeAttr);
@@ -498,7 +500,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         Assertions.assertEquals(ObjectType.FILE, def.getObjectType());
 
         var fileDef = def.getFile();
-        Assertions.assertEquals("some_file_v2.txt", fileDef.getName());
+        Assertions.assertEquals("some_file.txt", fileDef.getName());
         Assertions.assertEquals("txt", fileDef.getExtension());
         Assertions.assertEquals("text/plain", fileDef.getMimeType());
         Assertions.assertEquals(BASIC_FILE_CONTENT_V2.size(), fileDef.getSize());
@@ -515,7 +517,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         var metaV1Request = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(v2Id))
+                .setSelector(MetadataUtil.selectorFor(v1Id))
                 .build();
 
         var metaV1Response = Futures.javaFuture(metaClient.readObject(metaV1Request));
@@ -826,7 +828,42 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
-        assertDoesNotThrow(() -> resultOf(updateFile));
+        var v2Id =  resultOf(updateFile);
+
+        var metaReadRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(v2Id))
+                .build();
+
+        var metaResponse = Futures.javaFuture(metaClient.readObject(metaReadRequest));
+        waitFor(TEST_TIMEOUT, metaResponse);
+        var tag = resultOf(metaResponse);
+
+        // Check controlled tag attrs
+
+        Assertions.assertTrue(tag.containsAttrs("trac_file_name"));
+        Assertions.assertTrue(tag.containsAttrs("trac_file_extension"));
+        Assertions.assertTrue(tag.containsAttrs("trac_file_mime_type"));
+        Assertions.assertTrue(tag.containsAttrs("trac_file_size"));
+        var nameAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_name"));
+        var extensionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_extension"));
+        var mimeTypeAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_mime_type"));
+        var sizeAttr = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_file_size"));
+        Assertions.assertEquals("alternate_file_name_v2.txt", nameAttr);
+        Assertions.assertEquals("txt", extensionAttr);
+        Assertions.assertEquals("text/plain", mimeTypeAttr);
+        Assertions.assertEquals(BASIC_FILE_CONTENT_V2.size(), sizeAttr);
+
+        // Check file definition
+
+        var def = tag.getDefinition();
+        Assertions.assertEquals(ObjectType.FILE, def.getObjectType());
+
+        var fileDef = def.getFile();
+        Assertions.assertEquals("alternate_file_name_v2.txt", fileDef.getName());
+        Assertions.assertEquals("txt", fileDef.getExtension());
+        Assertions.assertEquals("text/plain", fileDef.getMimeType());
+        Assertions.assertEquals(BASIC_FILE_CONTENT_V2.size(), fileDef.getSize());
     }
 
     @Test
