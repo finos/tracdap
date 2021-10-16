@@ -16,6 +16,7 @@
 
 package com.accenture.trac.common.util;
 
+import com.accenture.trac.common.exception.EData;
 import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
@@ -89,6 +90,16 @@ public class GrpcStreams {
             if (error instanceof EInputValidation) {
 
                 var status = Status.fromCode(Status.Code.INVALID_ARGUMENT)
+                        .withDescription(error.getMessage())
+                        .withCause(error);
+
+                grpcObserver.onError(status.asRuntimeException());
+                return;
+            }
+
+            if (error instanceof EData) {
+
+                var status = Status.fromCode(Status.Code.DATA_LOSS)
                         .withDescription(error.getMessage())
                         .withCause(error);
 

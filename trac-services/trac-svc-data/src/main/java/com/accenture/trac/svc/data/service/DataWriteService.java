@@ -20,6 +20,7 @@ import com.accenture.trac.api.MetadataReadRequest;
 import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import com.accenture.trac.common.eventloop.IExecutionContext;
+import com.accenture.trac.common.exception.EDataSize;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.storage.IStorageManager;
@@ -67,7 +68,7 @@ public class DataWriteService {
 
     public CompletionStage<TagHeader> createFile(
             String tenant, List<TagUpdate> tags,
-            String name, String mimeType,
+            String name, String mimeType, Long expectedSize,
             Flow.Publisher<ByteBuf> contentStream,
             IExecutionContext execContext) {
 
@@ -88,15 +89,13 @@ public class DataWriteService {
 
                 // Write file content stream to the storage layer
                 .thenCompose(x -> writeDataItem(
-                    defs.storage,
-                    defs.file.getDataItem(),
-                    contentStream, execContext))
+                        defs.storage,
+                        defs.file.getDataItem(),
+                        contentStream, execContext))
 
-                // Record size from storage in file definition
-                .thenAccept(size -> defs.file =
-                    defs.file.toBuilder()
-                    .setSize(size)
-                    .build())
+                // Check and record size from storage in file definition
+                .thenApply(size -> checkSize(size, expectedSize))
+                .thenAccept(size -> defs.file = recordSize(size, defs.file))
 
                 // Add controlled tag attrs (must be done after file size is known)
                 .thenAccept(x -> defs.fileTags = createFileAttrs(defs.fileTags, defs.file))
@@ -108,10 +107,7 @@ public class DataWriteService {
                         ObjectDefinition.Builder::setStorage))
 
                 // Record storage ID in file definition
-                .thenAccept(storageHeader -> defs.file =
-                    defs.file.toBuilder()
-                    .setStorageId(MetadataUtil.selectorForLatest(storageHeader))
-                    .build())
+                .thenAccept(storageId -> defs.file = recordStorageId(storageId, defs.file))
 
                 // Save file metadata
                 .thenCompose(x -> createPreallocated(
@@ -122,7 +118,7 @@ public class DataWriteService {
     public CompletionStage<TagHeader> updateFile(
             String tenant, List<TagUpdate> tags,
             TagSelector priorVersion,
-            String name, String mimeType,
+            String name, String mimeType, Long expectedSize,
             Flow.Publisher<ByteBuf> contentStream,
             IExecutionContext execContext) {
 
@@ -136,8 +132,8 @@ public class DataWriteService {
                 .thenApply(metaApi::readObject)
                 .thenCompose(Futures::javaFuture)
                 .thenAccept(priorFile -> {
-                    defs.priorFileId = priorFile.getHeader();
-                    defs.priorFile = priorFile.getDefinition().getFile();
+                        defs.priorFileId = priorFile.getHeader();
+                        defs.priorFile = priorFile.getDefinition().getFile();
                 })
 
                 // Read prior storage metadata
@@ -145,8 +141,8 @@ public class DataWriteService {
                 .thenApply(metaApi::readObject)
                 .thenCompose(Futures::javaFuture)
                 .thenAccept(priorStorage -> {
-                    defs.priorStorageId = priorStorage.getHeader();
-                    defs.priorStorage = priorStorage.getDefinition().getStorage();
+                        defs.priorStorageId = priorStorage.getHeader();
+                        defs.priorStorage = priorStorage.getDefinition().getStorage();
                 })
 
                 // Bump object versions
@@ -163,11 +159,9 @@ public class DataWriteService {
                         defs.file.getDataItem(),
                         contentStream, execContext))
 
-                // Record size from storage in file definition
-                .thenAccept(size -> defs.file =
-                        defs.file.toBuilder()
-                        .setSize(size)
-                        .build())
+                // Check and record size from storage in file definition
+                .thenApply(size -> checkSize(size, expectedSize))
+                .thenAccept(size -> defs.file = recordSize(size, defs.file))
 
                 // Add controlled tag attrs (must be done after file size is known)
                 .thenAccept(x -> defs.fileTags = updateFileAttrs(defs.fileTags, defs.file))
@@ -204,6 +198,25 @@ public class DataWriteService {
             contentStream.subscribe(writer);
             return signal;
         });
+    }
+
+    private long checkSize(long actualSize, Long expectedSize) {
+
+        // Size cannot be checked if no expected size is provided
+        if (expectedSize == null)
+            return actualSize;
+
+        if (actualSize != expectedSize) {
+
+            var err = String.format(
+                    "File size received does not match the size expected: Received %d B, expected %d B",
+                    actualSize, expectedSize);
+
+            log.error(err);
+            throw new EDataSize(err);
+        }
+
+        return actualSize;
     }
 
     private <TDef> CompletionStage<TagHeader> createObject(
@@ -259,6 +272,11 @@ public class DataWriteService {
 
         return Futures.javaFuture(metaApi.createPreallocatedObject(request));
     }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // METADATA BUILDERS
+    // -----------------------------------------------------------------------------------------------------------------
 
     private static FileDefinition createFileDef(
             TagHeader fileHeader, String fileName, String mimeType) {
@@ -428,6 +446,22 @@ public class DataWriteService {
         return priorVersion.toBuilder()
                 .setObjectVersion(priorVersion.getObjectVersion() + 1)
                 .setTagVersion(1)
+                .build();
+    }
+
+    private FileDefinition recordSize(long actualSize, FileDefinition fileDef) {
+
+        return fileDef.toBuilder()
+                .setSize(actualSize)
+                .build();
+    }
+
+    private static FileDefinition recordStorageId(TagHeader storageId, FileDefinition fileDef) {
+
+        var storageSelector = MetadataUtil.selectorForLatest(storageId);
+
+        return fileDef.toBuilder()
+                .setStorageId(storageSelector)
                 .build();
     }
 }

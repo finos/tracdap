@@ -105,9 +105,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var fileName = request.getName();
         var mimeType = request.getMimeType();
 
+        var expectedSize = request.hasSize()
+                ? request.getSize()
+                : null;
+
         return writeService.createFile(
                 tenant, tagUpdates,
-                fileName, mimeType,
+                fileName, mimeType, expectedSize,
                 byteStream, execCtx);
     }
 
@@ -115,8 +119,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     public StreamObserver<FileWriteRequest> updateFile(StreamObserver<TagHeader> responseObserver) {
 
         var method = TracDataApiGrpc.getUpdateFileMethod();
-
-
 
         return clientStreaming(method, responseObserver,
                 FileWriteRequest::getContent,
@@ -134,9 +136,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var fileName = request.getName();
         var mimeType = request.getMimeType();
 
+        var expectedSize = request.hasSize()
+                ? request.getSize()
+                : null;
+
         return writeService.updateFile(
                 tenant, tagUpdates,
-                priorVersion, fileName, mimeType,
+                priorVersion, fileName, mimeType, expectedSize,
                 byteStream, execCtx);
     }
 
