@@ -16,12 +16,15 @@
 
 package com.accenture.trac.common.metadata;
 
+import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.exception.EValidationGap;
 import com.accenture.trac.metadata.*;
 
 import java.math.BigDecimal;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoField;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -365,18 +368,47 @@ public class MetadataCodec {
 
     public static OffsetDateTime decodeDatetime(DatetimeValue datetime) {
 
-        return OffsetDateTime.from(ISO_DATETIME_FORMAT.parse(datetime.getIsoDatetime()));
+        try {
+
+            var parseResult = ISO_DATETIME_INPUT_FORMAT.parseBest(
+                    datetime.getIsoDatetime(),
+                    OffsetDateTime::from,
+                    LocalDateTime::from);
+
+            if (parseResult instanceof OffsetDateTime)
+                return (OffsetDateTime) parseResult;
+
+            if (parseResult instanceof LocalDateTime)
+                return ((LocalDateTime) parseResult).atOffset(ZoneOffset.UTC);
+
+            throw new EUnexpected();
+        }
+        catch (DateTimeParseException e) {
+            throw new EValidationGap(e.getMessage(), e);
+        }
     }
 
-    private static final DateTimeFormatter ISO_DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
+    public static final DateTimeFormatter ISO_DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
 
     // Using DateTimeFormatter.ISO_OFFSET_DATE_TIME results in > 6 decimal points.
     // TRAC metadata tags are stored with timestamps at precision 6
     // To avoid discrepancies, define a formatter that always uses 6 d.p.
 
-    private static final DateTimeFormatter ISO_DATETIME_FORMAT = new DateTimeFormatterBuilder()
+    public static final DateTimeFormatter ISO_DATETIME_FORMAT = new DateTimeFormatterBuilder()
             .appendPattern("uuuu-MM-dd'T'kk:mm:ss")
             .appendFraction(ChronoField.MICRO_OF_SECOND, 6, 6, true)
+            .appendOffsetId()
+            .toFormatter();
+
+    // For parsing inputs, allow flexibility on case and the precision of fractional seconds
+    // Do require the offset to be specified -
+    // this prevents lazy clients from sending in local time values, which would get misinterpreted as UTC
+
+    public static final DateTimeFormatter ISO_DATETIME_INPUT_FORMAT = new DateTimeFormatterBuilder()
+            .parseCaseInsensitive()
+            .parseLenient()
+            .appendPattern("uuuu-MM-dd'T'kk:mm:ss")
+            .appendFraction(ChronoField.MICRO_OF_SECOND, 0, 9, true)
             .appendOffsetId()
             .toFormatter();
 
