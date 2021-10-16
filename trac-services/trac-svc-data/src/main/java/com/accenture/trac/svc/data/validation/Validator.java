@@ -33,7 +33,7 @@ public class Validator {
 
     public ValidationResult validateApiCall(Message msg, Descriptors.MethodDescriptor method) {
 
-        var ctx = ValidationContext.forApiCall(method);
+        var ctx = ValidationContext.forApiCall(method, msg);
         return validateApiCall(msg, method, ctx);
     }
 

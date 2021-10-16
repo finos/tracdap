@@ -16,7 +16,9 @@
 
 package com.accenture.trac.svc.data.validation;
 
+import com.accenture.trac.common.exception.EUnexpected;
 import com.google.protobuf.Descriptors;
+import com.google.protobuf.Message;
 
 import java.util.List;
 import java.util.Stack;
@@ -30,17 +32,22 @@ class ValidationLocation {
     private final Descriptors.FieldDescriptor field;
     private final String fieldName;
 
+    private final Object msg;
+
     private boolean failed;
     private boolean skipped;
 
     public ValidationLocation(
             ValidationLocation parent,
             Descriptors.FieldDescriptor field,
-            String fieldName) {
+            String fieldName,
+            Object msg) {
 
         this.parent = parent;
         this.field = field;
         this.fieldName = fieldName;
+
+        this.msg = msg;
 
         this.failed = false;
         this.skipped = false;
@@ -61,6 +68,18 @@ class ValidationLocation {
 
     public String fieldName() {
         return fieldName;
+    }
+
+    public Object obj() {
+        return msg;
+    }
+
+    public Message msg() {
+
+        if (!(msg instanceof Message))
+            throw new EUnexpected();
+
+        return (Message) msg;
     }
 
     public boolean failed() {

@@ -24,7 +24,7 @@ public interface ValidationFunction {
     @FunctionalInterface
     interface Basic {
 
-        ValidationContext validate(Message msg, ValidationContext ctx);
+        ValidationContext validate(Object value, ValidationContext ctx);
     }
 
     @FunctionalInterface

@@ -27,7 +27,6 @@ public class ValidationContext {
 
     private final Stack<ValidationLocation> location;
     private final List<ValidationFailure> failures;
-    private Message msg;
 
     private ValidationContext(ValidationLocation root) {
 
@@ -37,31 +36,57 @@ public class ValidationContext {
         failures = new ArrayList<>();
     }
 
-    public static ValidationContext forMessage(Descriptors.Descriptor message) {
+    public static ValidationContext forMessage(Descriptors.Descriptor message, Message msg) {
 
-        var root = new ValidationLocation(null, null, null);
+        var root = new ValidationLocation(null, null, null, msg);
         return new ValidationContext(root);
     }
 
-    public static ValidationContext forApiCall(Descriptors.MethodDescriptor method) {
+    public static ValidationContext forApiCall(Descriptors.MethodDescriptor method, Message msg) {
 
-        var root = new ValidationLocation(null, null, null);
+        var root = new ValidationLocation(null, null, null, msg);
         return new ValidationContext(root);
     }
 
-    public ValidationContext push(Message msg, String field) {
+    public ValidationContext push(String field) {
 
-        var fd = msg.getDescriptorForType().findFieldByName(field);
         var parentLoc = location.peek();
-        var loc = new ValidationLocation(parentLoc, fd, field);
+        var parentMsg = parentLoc.msg();
+
+        var fd = parentMsg.getDescriptorForType().findFieldByName(field);
+        var obj = parentMsg.getField(fd);
+
+        var loc = new ValidationLocation(parentLoc, fd, field, obj);
 
         if (parentLoc.skipped())
             loc.skip();
 
         location.push(loc);
-        this.msg = msg;
 
         return this;
+    }
+
+    private ValidationContext pushList(Integer index) {
+
+        var parentLoc = location.peek();
+
+        if (!parentLoc.field().isRepeated() || parentLoc.field().isMapField())
+            throw new EUnexpected();
+
+        var list = (List<?>) parentLoc.obj();
+        var obj = list.get(index);
+        var fieldName = String.format("[%d]", index);
+
+        var loc = new ValidationLocation(parentLoc, parentLoc.field(), fieldName, obj);
+
+        if (parentLoc.skipped())
+            loc.skip();
+
+        location.push(loc);
+
+        return this;
+
+
     }
 
     public ValidationContext pop() {
@@ -70,7 +95,6 @@ public class ValidationContext {
             throw new IllegalStateException();
 
         location.pop();
-        this.msg = null;
 
         return this;
     }
@@ -80,11 +104,15 @@ public class ValidationContext {
         if (done())
             return this;
 
-        return validation.validate(msg, this);  // todo: msg
+        var obj = location.peek().obj();
+
+        return validation.validate(obj, this);  // todo: msg
     }
 
     <TMsg extends Message>
     ValidationContext applyTyped(ValidationFunction.Typed<TMsg> validation, Class<TMsg> msgClass) {
+
+        var msg = location.peek().msg();
 
         if (!msgClass.isInstance(msg))
             throw new EUnexpected();
@@ -109,8 +137,7 @@ public class ValidationContext {
         if (!loc.field().isRepeated() || loc.field().isMapField())
             throw new EUnexpected();
 
-        @SuppressWarnings("unchecked")
-        var list = (List<TMsg>) msg.getField(loc.field());
+        var list = (List<?>) loc.obj();
 
         if (list == null)
             throw new EUnexpected();
@@ -119,10 +146,8 @@ public class ValidationContext {
 
         for (var i = 0; i < list.size(); i++) {
 
-            var listMsg = list.get(i);
-
             resultCtx = resultCtx
-                    .push(listMsg, Integer.toString(i))
+                    .pushList(i)
                     .applyTyped(validation, msgClass)
                     .pop();
         }
@@ -147,6 +172,10 @@ public class ValidationContext {
         loc.fail();
 
         return this;
+    }
+
+    public Message parentMsg() {
+        return location.peek().parent().msg();
     }
 
     public Descriptors.FieldDescriptor field() {

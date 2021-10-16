@@ -20,29 +20,50 @@ import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.metadata.TagUpdate;
 import com.google.protobuf.ProtocolMessageEnum;
 
+import java.util.UUID;
+
 
 public class MetadataValidator {
 
+    // Rough implementation that provides only a few validation points
+    // Full implementation will be comprehensive across the metadata model
+    // Requires generic handling of all message, enum and primitive types, as well as the TRAC type system
+
+
     public static ValidationContext validateTagUpdate(TagUpdate msg, ValidationContext ctx) {
 
-        ctx = ctx.push(msg, "attrName")
+        ctx = ctx.push("attrName")
                 .apply(Validation::identifier)
                 .apply(Validation::notTracReserved)
                 .pop();
 
-        ctx = ctx.push(msg, "operation")
-                //.apply(this::validateEnum)
-                .pop();
+        // TODO: Enum validation
+        // Requires constructing generic enum from enum value descriptor
+//        ctx = ctx.push(msg, "operation")
+//                .apply(this::validateEnum, TagUpdate.class)
+//                .pop();
 
         // TODO: Validation for values and the TRAC type system
 
         return ctx;
     }
 
+    public static ValidationContext validateTagSelector(TagSelector msg, ValidationContext ctx) {
 
-    public void validateTagSelector(TagSelector msg, ValidationContext ctx) {
+        // TODO: Validate object type enum
 
-        // if (msg.has)
+        try {
+            @SuppressWarnings("unused")
+            var uuid = UUID.fromString(msg.getObjectId());
+        }
+        catch (IllegalArgumentException e) {
+            var err = String.format("Object ID for [%s] is not a valid object ID", ctx.fieldName());
+            return ctx.error(err);
+        }
+
+        // TODO: Validate versions
+
+        return ctx;
     }
 
     public ValidationContext validateEnum(

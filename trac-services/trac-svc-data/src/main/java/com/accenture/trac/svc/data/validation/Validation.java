@@ -27,18 +27,20 @@ import java.util.regex.Pattern;
 public class Validation {
 
 
-    static ValidationContext required(Message msg, ValidationContext ctx) {
+    static ValidationContext required(Object value, ValidationContext ctx) {
 
-        if (!msg.hasField(ctx.field())) {
+        var parentMsg = ctx.parentMsg();
+
+        if (!parentMsg.hasField(ctx.field())) {
             var err = String.format("A value is required for field [%s]", ctx.fieldName());
             return ctx.error(err);
         }
 
         if (ctx.field().getType() == Descriptors.FieldDescriptor.Type.STRING) {
 
-            var value = (String) msg.getField(ctx.field());
+            var str = (String) value;
 
-            if (value.isEmpty()) {
+            if (str.isEmpty()) {
                 var err = String.format("A value is required for field [%s]", ctx.fieldName());
                 return ctx.error(err);
             }
@@ -47,9 +49,11 @@ public class Validation {
         return ctx;
     }
 
-    static ValidationContext omitted(Message msg, ValidationContext ctx) {
+    static ValidationContext omitted(Object value, ValidationContext ctx) {
 
-        if (msg.hasField(ctx.field())) {
+        var parentMsg = ctx.parentMsg();
+
+        if (parentMsg.hasField(ctx.field())) {
             var err = String.format("A value must not be provided for field [%s]", ctx.fieldName());
             return ctx.error(err);
         }
@@ -57,41 +61,43 @@ public class Validation {
         return ctx;
     }
 
-    static ValidationContext optional(Message msg, ValidationContext ctx) {
+    static ValidationContext optional(Object value, ValidationContext ctx) {
 
-        if (!msg.hasField(ctx.field()))
+        var parentMsg = ctx.parentMsg();
+
+        if (!parentMsg.hasField(ctx.field()))
             return ctx.skip();
 
         return ctx;
     }
 
-    static ValidationContext identifier(Message msg, ValidationContext ctx) {
+    static ValidationContext identifier(Object value, ValidationContext ctx) {
 
         return regexMatch(
                 ValidationConstants.VALID_IDENTIFIER, true,
-                "is not a valid identifier", msg, ctx);
+                "is not a valid identifier", value, ctx);
     }
 
-    static ValidationContext notTracReserved(Message msg, ValidationContext ctx) {
+    static ValidationContext notTracReserved(Object value, ValidationContext ctx) {
 
         return regexMatch(
                 ValidationConstants.TRAC_RESERVED_IDENTIFIER, false,
-                "is a TRAC reserved identifier", msg, ctx);
+                "is a TRAC reserved identifier", value, ctx);
     }
 
-    static ValidationContext mimeType(Message msg, ValidationContext ctx) {
+    static ValidationContext mimeType(Object value, ValidationContext ctx) {
 
         // First check the value matches the mime type regex, i.e. has the right form
         ctx = regexMatch(
                 ValidationConstants.MIME_TYPE, true,
-                "is not a valid mime type", msg, ctx);
+                "is not a valid mime type", value, ctx);
 
         if (ctx.failed())
             return ctx;
 
         // Second check the main part of the type is a registered media type
-        var value = (String) msg.getField(ctx.field());
-        var mainType = value.substring(0, value.indexOf("/"));
+        var str = (String) value;
+        var mainType = str.substring(0, str.indexOf("/"));
 
         if (!ValidationConstants.REGISTERED_MIME_TYPES.contains(mainType)) {
             var err = String.format("Value of field [%s] is not a registered mime type: [%s]", ctx.fieldName(), value);
@@ -101,35 +107,34 @@ public class Validation {
         return ctx;
     }
 
-    static ValidationContext fileName(Message msg, ValidationContext ctx) {
+    static ValidationContext fileName(Object value, ValidationContext ctx) {
 
         ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_CHARS, false,
-                "contains illegal characters", msg, ctx);
+                "contains illegal characters", value, ctx);
 
         ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_WHITESPACE, false,
-                "contains non-standard whitespace (tab, return, form-feed etc.)", msg, ctx);
+                "contains non-standard whitespace (tab, return, form-feed etc.)", value, ctx);
 
         ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_CTRL, false,
-                "contains ASCII control characters", msg, ctx);
+                "contains ASCII control characters", value, ctx);
 
         ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_START, false,
-                "starts with a space character", msg, ctx);
+                "starts with a space character", value, ctx);
 
         ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_ENDING, false,
-                "ends with a space or period character", msg, ctx);
+                "ends with a space or period character", value, ctx);
 
         ctx = regexMatch(ValidationConstants.FILENAME_RESERVED, false,
-                "is a reserved filename", msg, ctx);
+                "is a reserved filename", value, ctx);
 
         ctx = regexMatch(ValidationConstants.TRAC_RESERVED_IDENTIFIER, false,
-                "is a TRAC reserved identifier", msg, ctx);
+                "is a TRAC reserved identifier", value, ctx);
 
         return ctx;
     }
 
-    static ValidationContext notNegative(Message msg, ValidationContext ctx) {
+    static ValidationContext notNegative(Object value, ValidationContext ctx) {
 
-        var value = msg.getField(ctx.field());
         boolean negative;
 
         switch (ctx.field().getJavaType()) {
@@ -146,7 +151,7 @@ public class Validation {
                 // Handle DecimalValue messages, otherwise drop through to the default case
 
                 if (msgType.equals(DecimalValue.getDescriptor())) {
-                    var decimalMsg = (DecimalValue) msg;
+                    var decimalMsg = (DecimalValue) value;
                     var decimalValue = new BigDecimal(decimalMsg.getDecimal());
                     negative = ! decimalValue.abs().equals(decimalValue);
                     break;
@@ -166,13 +171,12 @@ public class Validation {
 
     private static ValidationContext regexMatch(
             Pattern regex, boolean invertMatch, String desc,
-            Message msg, ValidationContext ctx) {
+            Object value, ValidationContext ctx) {
 
         if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
             throw new EUnexpected();
 
-        var value = (String) msg.getField(ctx.field());
-        var matcher = regex.matcher(value);
+        var matcher = regex.matcher((String) value);
 
         if (matcher.matches() ^ invertMatch) {
             var err = String.format("Value of field [%s] %s: [%s]", ctx.fieldName(), desc, value);

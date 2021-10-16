@@ -18,6 +18,8 @@ package com.accenture.trac.svc.data.validation;
 
 import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
+import com.accenture.trac.metadata.ObjectType;
+import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.metadata.TagUpdate;
 
 
@@ -25,12 +27,12 @@ public class DataApiValidator {
 
     public static ValidationContext validateCreateFile(FileWriteRequest msg, ValidationContext ctx) {
 
-        ctx = ctx.push(msg, "tenant")
+        ctx = ctx.push("tenant")
                 .apply(Validation::required)
                 .apply(Validation::identifier)
                 .pop();
 
-        ctx = ctx.push(msg, "priorVersion")
+        ctx = ctx.push("priorVersion")
                 .apply(Validation::omitted)
                 .pop();
 
@@ -39,13 +41,15 @@ public class DataApiValidator {
 
     public static ValidationContext validateUpdateFile(FileWriteRequest msg, ValidationContext ctx) {
 
-        ctx = ctx.push(msg, "tenant")
+        ctx = ctx.push("tenant")
                 .apply(Validation::required)
                 .apply(Validation::identifier)
                 .pop();
 
-        ctx = ctx.push(msg, "priorVersion")
+        ctx = ctx.push("priorVersion")
                 .apply(Validation::required)
+                .applyTyped(MetadataValidator::validateTagSelector, TagSelector.class)
+                .applyTyped(DataApiValidator::priorVersionIsFile, TagSelector.class)
                 .pop();
 
         return createOrUpdateFile(msg, ctx);
@@ -53,21 +57,21 @@ public class DataApiValidator {
 
     private static ValidationContext createOrUpdateFile(FileWriteRequest msg, ValidationContext ctx) {
 
-        ctx = ctx.push(msg, "tagUpdates")
+        ctx = ctx.push("tagUpdates")
                 .applyTypedList(MetadataValidator::validateTagUpdate, TagUpdate.class)
                 .pop();
 
-        ctx = ctx.push(msg, "name")
+        ctx = ctx.push("name")
                 .apply(Validation::required)
                 .apply(Validation::fileName)
                 .pop();
 
-        ctx = ctx.push(msg, "mimeType")
+        ctx = ctx.push("mimeType")
                 .apply(Validation::required)
                 .apply(Validation::mimeType)
                 .pop();
 
-        ctx = ctx.push(msg, "size")
+        ctx = ctx.push("size")
                 .apply(Validation::optional)
                 .apply(Validation::notNegative)
                 .pop();
@@ -77,14 +81,27 @@ public class DataApiValidator {
 
     public static ValidationContext validateReadFile(FileReadRequest msg, ValidationContext ctx) {
 
-        ctx = ctx.push(msg, "tenant")
+        ctx = ctx.push("tenant")
                 .apply(Validation::required)
                 .apply(Validation::identifier)
                 .pop();
 
-        ctx = ctx.push(msg, "selector")
+        ctx = ctx.push("selector")
                 .apply(Validation::required)
                 .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext priorVersionIsFile(TagSelector priorVersion, ValidationContext ctx) {
+
+        if (priorVersion.getObjectType() != ObjectType.FILE) {
+
+            var err = String.format("Wrong object type for [%s]: expected [%s], got [%s]",
+                    ctx.fieldName(), ObjectType.FILE, priorVersion.getObjectType());
+
+            return ctx.error(err);
+        }
 
         return ctx;
     }
