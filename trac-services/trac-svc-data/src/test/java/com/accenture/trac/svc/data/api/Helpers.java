@@ -40,7 +40,7 @@ class Helpers {
             BiConsumer<TReq, StreamObserver<TResp>> grpcMethod,
             TReq request, Flow.Subscriber<TResp> response) {
 
-        var responseGrpc = GrpcStreams.relay(response);
+        var responseGrpc = GrpcStreams.clientResponseStream(response);
         grpcMethod.accept(request, responseGrpc);
     }
 
@@ -55,7 +55,7 @@ class Helpers {
         var msgStream = Concurrent.<TResp>hub(execCtx);
         var discard = Concurrent.fold(msgStream, (acc, msg) -> acc, (Void) null);
 
-        var grpcStream = GrpcStreams.relay(msgStream);
+        var grpcStream = GrpcStreams.clientResponseStream(msgStream);
         grpcMethod.accept(request, grpcStream);
 
         return discard;
@@ -68,9 +68,9 @@ class Helpers {
 
         var response = new CompletableFuture<TResp>();
 
-        var responseGrpc = GrpcStreams.unaryResult(response);
+        var responseGrpc = GrpcStreams.clientResponseHandler(response);
         var requestGrpc = grpcMethod.apply(responseGrpc);
-        var requestSubscriber = GrpcStreams.relay(requestGrpc);
+        var requestSubscriber = GrpcStreams.clientRequestStream(requestGrpc);
 
         requestPublisher.subscribe(requestSubscriber);
 

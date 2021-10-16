@@ -198,9 +198,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var byteBufContent = Concurrent.map(protoContent, Bytes::fromProtoBytes);
 
         var response = validRequest.thenCompose(msg -> serviceMethod.execute(msg, byteBufContent, execCtx));
-        response.whenComplete(GrpcStreams.resultHandler(responseObserver));
+        response.whenComplete(GrpcStreams.serverResponseHandler(method, responseObserver));
 
-        return GrpcStreams.relay(requestHub);
+        return GrpcStreams.serverRequestStream(requestHub);
     }
 
     private <TReq extends Message, TResp extends Message, TBuilder extends Message.Builder>
@@ -208,35 +208,39 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             MethodDescriptor<TReq, TResp> method,
             TReq request,
             StreamObserver<TResp> responseObserver,
-            Supplier<TBuilder> responseProvider,
+            Supplier<TBuilder> responseSupplier,
             BiFunction<TBuilder, ByteString, TBuilder> putContent,
             ServerStreamingMethod<TReq> serviceMethod) {
 
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-
-        try {
-            validateRequest(method, request);
-        }
-        catch (EInputValidation e) {
-            responseObserver.onError(e);
-            return;
-        }
 
         var byteStream = Concurrent.<ByteBuf>hub(execCtx);
         var protoByteStream = Concurrent.map(byteStream, Bytes::toProtoBytes);
 
         @SuppressWarnings("unchecked")
         var response = Concurrent.map(protoByteStream, bytes ->
-                (TResp) putContent.apply(responseProvider.get(), bytes).build());
+                (TResp) putContent
+                .apply(responseSupplier.get(), bytes)
+                .build());
 
-        response.subscribe(GrpcStreams.relay(responseObserver));
+        response.subscribe(GrpcStreams.serverResponseStream(method, responseObserver));
 
-        serviceMethod.execute(request, byteStream, execCtx);
+        // Handle synchronous exceptions during validation
+
+        try {
+            validateRequest(method, request);
+            serviceMethod.execute(request, byteStream, execCtx);
+        }
+        catch (Exception e) {
+            byteStream.onError(e);
+        }
     }
 
 
     private <TReq extends Message, TResp extends Message>
     TReq validateRequest(MethodDescriptor<TReq, TResp> method, TReq msg) {
+
+        log.info("VALIDATE CALL: [{}]", method.getBareMethodName());
 
         var protoMethod = Data.getDescriptor()
                 .getFile()

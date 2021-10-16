@@ -20,9 +20,8 @@ import com.accenture.trac.common.exception.EData;
 import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
+import io.grpc.MethodDescriptor;
 import io.grpc.Status;
-import io.grpc.StatusException;
-import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,36 +37,51 @@ import java.util.function.BiConsumer;
 public class GrpcStreams {
 
     public static <T>
-    BiConsumer<T, Throwable> resultHandler(StreamObserver<T> grpcObserver) {
+    BiConsumer<T, Throwable> serverResponseHandler(MethodDescriptor<?, T> method, StreamObserver<T> observer) {
 
-        return new GrpcResultHandler<>(grpcObserver);
+        return new ServerResponseHandler<>(method, observer);
     }
 
     public static <T>
-    StreamObserver<T> unaryResult(CompletableFuture<T> result) {
+    Flow.Subscriber<T> serverResponseStream(MethodDescriptor<?, T> method, StreamObserver<T> observer) {
 
-        return new UnaryResultObserver<>(result);
+        return new ServerResponseStream<>(method, observer);
     }
 
     public static <T>
-    Flow.Subscriber<T> relay(StreamObserver<T> observer) {
+    StreamObserver<T> serverRequestStream(Flow.Subscriber<T> subscriber) {
 
-        return new GrpcStreamSubscriber<>(observer);
+        return new ServerRequestStream<>(subscriber);
     }
 
     public static <T>
-    StreamObserver<T> relay(Flow.Subscriber<T> subscriber) {
+    StreamObserver<T> clientResponseHandler(CompletableFuture<T> result) {
 
-        return new GrpcStreamPublisher<>(subscriber);
+        return new ClientResultHandler<>(result);
+    }
+
+    public static <T>
+    StreamObserver<T> clientResponseStream(Flow.Subscriber<T> subscriber) {
+
+        return new ClientResponseStream<>(subscriber);
+    }
+
+    public static <T>
+    Flow.Subscriber<T> clientRequestStream(StreamObserver<T> observer) {
+
+        return new ClientRequestStream<>(observer);
     }
 
 
-    public static class GrpcResultHandler<T> implements BiConsumer<T, Throwable> {
+    public static class ServerResponseHandler<T> implements BiConsumer<T, Throwable> {
 
         private final Logger log = LoggerFactory.getLogger(getClass());
+
+        private final MethodDescriptor<?, T> method;
         private final StreamObserver<T> grpcObserver;
 
-        public GrpcResultHandler(StreamObserver<T> grpcObserver) {
+        public ServerResponseHandler(MethodDescriptor<?, T> method, StreamObserver<T> grpcObserver) {
+            this.method = method;
             this.grpcObserver = grpcObserver;
         }
 
@@ -75,55 +89,128 @@ public class GrpcStreams {
         public void accept(T result, Throwable error) {
 
             if (error == null) {
+
+                log.info("CLIENT STREAMING CALL SUCCEEDED: [{}]", method);
+
                 grpcObserver.onNext(result);
                 grpcObserver.onCompleted();
-                log.info("gRPC call complete");
-                return;
             }
+            else {
 
-            // Unwrap future errors
-            if (error instanceof CompletionException)
-                error = error.getCause();
+                var status = translateErrorStatus(error);
+                var statusError = status.asRuntimeException();
 
-            log.error("gRPC call failed: {}", error.getMessage(), error);
+                log.error("CLIENT STREAMING CALL FAILED: [{}] {}", method, statusError.getMessage(), statusError);
 
-            if (error instanceof EInputValidation) {
-
-                var status = Status.fromCode(Status.Code.INVALID_ARGUMENT)
-                        .withDescription(error.getMessage())
-                        .withCause(error);
-
-                grpcObserver.onError(status.asRuntimeException());
-                return;
+                grpcObserver.onError(statusError);
             }
-
-            if (error instanceof EData) {
-
-                var status = Status.fromCode(Status.Code.DATA_LOSS)
-                        .withDescription(error.getMessage())
-                        .withCause(error);
-
-                grpcObserver.onError(status.asRuntimeException());
-                return;
-            }
-
-            var status = Status.fromCode(Status.Code.INTERNAL)
-                    .withDescription(Status.INTERNAL.getDescription())
-                    .withCause(error);
-
-            grpcObserver.onError(status.asRuntimeException());
-
-            // TODO: More error types and logging
-
         }
     }
 
-    public static class UnaryResultObserver<T> implements StreamObserver<T> {
+    public static class ServerResponseStream<T> implements Flow.Subscriber<T> {
+
+        private final Logger log = LoggerFactory.getLogger(getClass());
+
+        private final MethodDescriptor<?, T> method;
+        private final StreamObserver<T> grpcObserver;
+
+        private final AtomicBoolean subscribed = new AtomicBoolean(false);
+        private Flow.Subscription subscription;
+
+        public ServerResponseStream(
+                MethodDescriptor<?, T> method,
+                StreamObserver<T> grpcObserver) {
+
+            this.method = method;
+            this.grpcObserver = grpcObserver;
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+
+            var subscribedOk = this.subscribed.compareAndSet(false, true);
+
+            if (!subscribedOk)
+                throw new ETracInternal("Multiple subscriptions on gRPC observer wrapper");
+
+            this.subscription = subscription;
+            subscription.request(1);
+        }
+
+        @Override
+        public void onNext(T item) {
+            grpcObserver.onNext(item);
+            subscription.request(1);
+        }
+
+        @Override
+        public void onError(Throwable error) {
+
+            var status = translateErrorStatus(error);
+            var statusError = status.asRuntimeException();
+
+            log.error("SERVER STREAMING CALL FAILED: [{}] {}", method, statusError.getMessage(), statusError);
+
+            grpcObserver.onError(statusError);
+            subscription.cancel();
+        }
+
+        @Override
+        public void onComplete() {
+
+            log.info("SERVER STREAMING CALL SUCCEEDED: [{}]", method);
+
+            grpcObserver.onCompleted();
+        }
+    }
+
+    public static class ServerRequestStream<T> implements StreamObserver<T> {
+
+        private final Logger log = LoggerFactory.getLogger(getClass());
+
+        private final Flow.Subscriber<T> subscriber;
+
+        public static class Subscription implements Flow.Subscription {
+            @Override public void request(long n) {}
+            @Override public void cancel() {}
+        }
+
+        public ServerRequestStream(Flow.Subscriber<T> subscriber) {
+
+            this.subscriber = subscriber;
+
+            var subscription = new Subscription();
+            subscriber.onSubscribe(subscription);
+        }
+
+        @Override
+        public void onNext(T value) {
+            subscriber.onNext(value);
+        }
+
+        @Override
+        public void onError(Throwable error) {
+
+            log.error("Inbound server stream failed: {}", error.getMessage(), error);
+
+            subscriber.onError(error);
+        }
+
+        @Override
+        public void onCompleted() {
+
+            log.info("Inbound server stream complete");
+
+            subscriber.onComplete();
+        }
+    }
+
+    public static class ClientResultHandler<T> implements StreamObserver<T> {
 
         private final CompletableFuture<T> resultFuture;
         private final AtomicReference<T> resultBuffer;
 
-        public UnaryResultObserver(CompletableFuture<T> result) {
+        public ClientResultHandler(CompletableFuture<T> result) {
 
             // Raise an error on the processing thread if the result is already set
 
@@ -175,7 +262,48 @@ public class GrpcStreams {
         }
     }
 
-    public static class GrpcStreamSubscriber<T> implements Flow.Subscriber<T> {
+    public static class ClientResponseStream<T> implements StreamObserver<T> {
+
+        private final Logger log = LoggerFactory.getLogger(getClass());
+
+        private final Flow.Subscriber<T> subscriber;
+
+        public static class Subscription implements Flow.Subscription {
+            @Override public void request(long n) {}
+            @Override public void cancel() {}
+        }
+
+        public ClientResponseStream(Flow.Subscriber<T> subscriber) {
+
+            this.subscriber = subscriber;
+
+            var subscription = new Subscription();
+            subscriber.onSubscribe(subscription);
+        }
+
+        @Override
+        public void onNext(T value) {
+            subscriber.onNext(value);
+        }
+
+        @Override
+        public void onError(Throwable error) {
+
+            log.error("Server streaming failed in client: {}", error.getMessage(), error);
+
+            subscriber.onError(error);
+        }
+
+        @Override
+        public void onCompleted() {
+
+            log.info("Server streaming succeeded in client");
+
+            subscriber.onComplete();
+        }
+    }
+
+    public static class ClientRequestStream<T> implements Flow.Subscriber<T> {
 
         private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -184,7 +312,7 @@ public class GrpcStreams {
         private final AtomicBoolean subscribed = new AtomicBoolean(false);
         private Flow.Subscription subscription;
 
-        public GrpcStreamSubscriber(StreamObserver<T> grpcObserver) {
+        public ClientRequestStream(StreamObserver<T> grpcObserver) {
             this.grpcObserver = grpcObserver;
         }
 
@@ -209,59 +337,48 @@ public class GrpcStreams {
         @Override
         public void onError(Throwable error) {
 
-            log.error("gRPC inbound stream failed: {}", error.getMessage(), error);
+            var status = translateErrorStatus(error);
+            var statusError = status.asRuntimeException();
 
+            log.error("Client streaming failed in client: {}", statusError.getMessage(), statusError);
+
+            grpcObserver.onError(statusError);
             subscription.cancel();
-            grpcObserver.onError(error);
         }
 
         @Override
         public void onComplete() {
 
-            log.info("gRPC inbound stream complete");
+            log.info("Client streaming succeeded in client");
 
             grpcObserver.onCompleted();
         }
     }
 
-    public static class GrpcStreamPublisher<T> implements StreamObserver<T> {
+    private static Status translateErrorStatus(Throwable error) {
 
-        private final Logger log = LoggerFactory.getLogger(getClass());
+        // Unwrap future errors
+        if (error instanceof CompletionException)
+            error = error.getCause();
 
-        private final Flow.Subscriber<T> subscriber;
+        if (error instanceof EInputValidation) {
 
-        public static class Subscription implements Flow.Subscription {
-            @Override public void request(long n) {}
-            @Override public void cancel() {}
+            return Status.fromCode(Status.Code.INVALID_ARGUMENT)
+                    .withDescription(error.getMessage())
+                    .withCause(error);
         }
 
-        public GrpcStreamPublisher(Flow.Subscriber<T> subscriber) {
+        if (error instanceof EData) {
 
-            this.subscriber = subscriber;
-
-            var subscription = new Subscription();
-            subscriber.onSubscribe(subscription);
+            return Status.fromCode(Status.Code.DATA_LOSS)
+                    .withDescription(error.getMessage())
+                    .withCause(error);
         }
 
-        @Override
-        public void onNext(T value) {
-            subscriber.onNext(value);
-        }
+        // For anything unrecognized, fall back to an internal error
 
-        @Override
-        public void onError(Throwable error) {
-
-            log.error("gRPC outbound stream failed: {}", error.getMessage(), error);
-
-            subscriber.onError(error);
-        }
-
-        @Override
-        public void onCompleted() {
-
-            log.info("gRPC outbound stream complete");
-
-            subscriber.onComplete();
-        }
+        return Status.fromCode(Status.Code.INTERNAL)
+                .withDescription(Status.INTERNAL.getDescription())
+                .withCause(error);
     }
 }
