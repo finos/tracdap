@@ -1066,22 +1066,157 @@ public class DataApiTest_File extends DataApiTest_Base {
     }
 
     @Test
-    void testReadFile_objectVersionLatest() {
-        Assertions.fail();
+    void testReadFile_objectVersionLatest() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicReq = readRequest(v1Id);
+
+        // Request last file read, should return V1
+
+        var latestReq = basicReq.toBuilder()
+                .setSelector(basicReq.getSelector().toBuilder()
+                .setLatestObject(true))
+                .build();
+
+        var v2ResponseStream = Concurrent.<FileReadResponse>hub(execContext);
+        var v2ByteStream = Concurrent.map(v2ResponseStream, FileReadResponse::getContent);
+        var v2Content = Concurrent.fold(v2ByteStream,
+                ByteString::concat,
+                ByteString.EMPTY);
+
+        Helpers.serverStreaming(dataClient::readFile, latestReq, v2ResponseStream);
+
+        waitFor(TEST_TIMEOUT, v2Content);
+        Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(v2Content));
+
+        // Update file with V2
+
+        var v1Selector = MetadataUtil.selectorFor(v1Id);
+        var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
+        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
+
+        // Use the same requesat for latest file read again, should return V2
+
+        var v1ResponseStream = Concurrent.<FileReadResponse>hub(execContext);
+        var v1ByteStream = Concurrent.map(v1ResponseStream, FileReadResponse::getContent);
+        var v1Content = Concurrent.fold(v1ByteStream,
+                ByteString::concat,
+                ByteString.EMPTY);
+
+        Helpers.serverStreaming(dataClient::readFile, latestReq, v1ResponseStream);
+
+        waitFor(TEST_TIMEOUT, v1Content);
+        Assertions.assertEquals(BASIC_FILE_CONTENT_V2, resultOf(v1Content));
     }
 
     @Test
-    void testReadFile_objectVersionExplicit() {
-        Assertions.fail();
+    void testReadFile_objectVersionExplicit() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var v1Selector = MetadataUtil.selectorFor(v1Id);
+        var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
+        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
+        var v2Id = resultOf(updateFile);
+
+        // Explicit data read for V2
+
+        var v2Request = readRequest(v2Id);
+        var v2ResponseStream = Concurrent.<FileReadResponse>hub(execContext);
+        var v2ByteStream = Concurrent.map(v2ResponseStream, FileReadResponse::getContent);
+        var v2Content = Concurrent.fold(v2ByteStream,
+                ByteString::concat,
+                ByteString.EMPTY);
+
+        Helpers.serverStreaming(dataClient::readFile, v2Request, v2ResponseStream);
+
+        waitFor(TEST_TIMEOUT, v2Content);
+        Assertions.assertEquals(BASIC_FILE_CONTENT_V2, resultOf(v2Content));
+
+        // Explicit data read for V1
+
+        var v1Request = readRequest(v1Id);
+        var v1ResponseStream = Concurrent.<FileReadResponse>hub(execContext);
+        var v1ByteStream = Concurrent.map(v1ResponseStream, FileReadResponse::getContent);
+        var v1Content = Concurrent.fold(v1ByteStream,
+                ByteString::concat,
+                ByteString.EMPTY);
+
+        Helpers.serverStreaming(dataClient::readFile, v1Request, v1ResponseStream);
+
+        waitFor(TEST_TIMEOUT, v1Content);
+        Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(v1Content));
     }
 
     @Test
-    void testReadFile_objectVersionAsOf() {
-        Assertions.fail();
+    void testReadFile_objectVersionAsOf() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        Thread.sleep(10);
+        var v1Timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+        Thread.sleep(10);
+
+        var v1Selector = MetadataUtil.selectorFor(v1Id);
+        var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
+        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        waitFor(TEST_TIMEOUT, updateFile);
+        var v2Id = resultOf(updateFile);
+
+        Thread.sleep(10);
+        var v2Timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+        Thread.sleep(10);
+
+        // Explicit data read, as-of the V2 timestamp
+
+        var basicReq = readRequest(v2Id);
+
+        var v2Request = basicReq.toBuilder()
+                .setSelector(basicReq.getSelector().toBuilder()
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v2Timestamp)))
+                .build();
+
+        var v2ResponseStream = Concurrent.<FileReadResponse>hub(execContext);
+        var v2ByteStream = Concurrent.map(v2ResponseStream, FileReadResponse::getContent);
+        var v2Content = Concurrent.fold(v2ByteStream,
+                ByteString::concat,
+                ByteString.EMPTY);
+
+        Helpers.serverStreaming(dataClient::readFile, v2Request, v2ResponseStream);
+
+        waitFor(TEST_TIMEOUT, v2Content);
+        Assertions.assertEquals(BASIC_FILE_CONTENT_V2, resultOf(v2Content));
+
+        // Explicit data read, as-of the V1 timestamp
+
+        var v1Request = basicReq.toBuilder()
+                .setSelector(basicReq.getSelector().toBuilder()
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v1Timestamp)))
+                .build();
+
+        var v1ResponseStream = Concurrent.<FileReadResponse>hub(execContext);
+        var v1ByteStream = Concurrent.map(v1ResponseStream, FileReadResponse::getContent);
+        var v1Content = Concurrent.fold(v1ByteStream,
+                ByteString::concat,
+                ByteString.EMPTY);
+
+        Helpers.serverStreaming(dataClient::readFile, v1Request, v1ResponseStream);
+
+        waitFor(TEST_TIMEOUT, v1Content);
+        Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(v1Content));
     }
 
     @Test
-    void testReadFile_tagVersionLatest() {
+    void testReadFile_tagVersionLatest() throws Exception {
         Assertions.fail();
     }
 
@@ -1288,7 +1423,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testReadFile_objectVersionNotFoundAsOf() throws Exception {
 
-        var timeBeforeTest = Instant.now();
+        var timeBeforeTest = Instant.now().atOffset(ZoneOffset.UTC);
         Thread.sleep(10);
 
         var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
@@ -1393,7 +1528,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testReadFile_tagVersionNotFoundAsOf() throws Exception {
 
-        var timeBeforeTest = Instant.now();
+        var timeBeforeTest = Instant.now().atOffset(ZoneOffset.UTC);
         Thread.sleep(10);
 
         var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
