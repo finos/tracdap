@@ -32,6 +32,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -1203,13 +1205,61 @@ public class DataApiTest_File extends DataApiTest_Base {
     }
 
     @Test
-    void testReadFile_objectVersionMissing() {
-        Assertions.fail();
+    void testReadFile_objectVersionMissing() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .clearObjectVersionCriteria())
+                .build();
+
+        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
     }
 
     @Test
-    void testReadFile_objectVersionInvalid() {
-        Assertions.fail();
+    void testReadFile_objectVersionInvalid() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicRequest = readRequest(v1Id);
+
+        // Try to read obj version 0 - versions should start at 1
+
+        var readRequest1 = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setObjectVersion(0))
+                .build();
+
+        var readFile1 = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest1, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile1);
+        var updateError1 = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile1));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError1.getStatus().getCode());
+
+        // Try to read as-of an invalid datetime
+
+        var readRequest2 = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setObjectAsOf(DatetimeValue.newBuilder()
+                .setIsoDatetime("invalid_iso_datetime")))
+                .build();
+
+        var readFile2 = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest2, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile2);
+        var updateError2 = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile1));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError2.getStatus().getCode());
     }
 
     @Test
@@ -1236,18 +1286,85 @@ public class DataApiTest_File extends DataApiTest_Base {
     }
 
     @Test
-    void testReadFile_objectVersionNotFoundAsOf() {
-        Assertions.fail();
+    void testReadFile_objectVersionNotFoundAsOf() throws Exception {
+
+        var timeBeforeTest = Instant.now();
+        Thread.sleep(10);
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setObjectAsOf(MetadataCodec.encodeDatetime(timeBeforeTest)))
+                .build();
+
+        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
+        assertEquals(Status.Code.NOT_FOUND, updateError.getStatus().getCode());
     }
 
     @Test
-    void testReadFile_tagVersionMissing() {
-        Assertions.fail();
+    void testReadFile_tagVersionMissing() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .clearTagVersionCriteria())
+                .build();
+
+        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
     }
 
     @Test
-    void testReadFile_tagVersionInvalid() {
-        Assertions.fail();
+    void testReadFile_tagVersionInvalid() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicRequest = readRequest(v1Id);
+
+        // Try to read tag version 0 - versions should start at 1
+
+        var readRequest1 = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setTagVersion(0))
+                .build();
+
+        var readFile1 = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest1, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile1);
+        var updateError1 = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile1));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError1.getStatus().getCode());
+
+        // Try to read as-of an invalid datetime
+
+        var readRequest2 = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setTagAsOf(DatetimeValue.newBuilder()
+                .setIsoDatetime("invalid_iso_datetime")))
+                .build();
+
+        var readFile2 = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest2, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile2);
+        var updateError2 = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile1));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError2.getStatus().getCode());
     }
 
     @Test
@@ -1274,7 +1391,26 @@ public class DataApiTest_File extends DataApiTest_Base {
     }
 
     @Test
-    void testReadFile_tagVersionNotFoundAsOf() {
-        Assertions.fail();
+    void testReadFile_tagVersionNotFoundAsOf() throws Exception {
+
+        var timeBeforeTest = Instant.now();
+        Thread.sleep(10);
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setTagAsOf(MetadataCodec.encodeDatetime(timeBeforeTest)))
+                .build();
+
+        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
+        assertEquals(Status.Code.NOT_FOUND, updateError.getStatus().getCode());
     }
 }

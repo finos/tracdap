@@ -226,6 +226,15 @@ public class MetadataCodec {
                 .build();
     }
 
+    public static DatetimeValue encodeDatetime(Instant datetime) {
+
+        var isoDatetime = ISO_DATETIME_FORMAT.format(datetime);
+
+        return DatetimeValue.newBuilder()
+                .setIsoDatetime(isoDatetime)
+                .build();
+    }
+
     public static <T> Value encodeArrayValue(List<T> arrayValue, TypeDescriptor arrayType) {
 
         var encodedArray = ArrayValue.newBuilder()
