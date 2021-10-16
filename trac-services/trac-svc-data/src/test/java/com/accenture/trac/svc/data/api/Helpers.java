@@ -16,31 +16,24 @@
 
 package com.accenture.trac.svc.data.api;
 
+import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.common.eventloop.IExecutionContext;
+import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.util.Concurrent;
 import com.accenture.trac.common.util.GrpcStreams;
+import com.accenture.trac.metadata.TagHeader;
 import io.grpc.stub.StreamObserver;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import static com.accenture.trac.svc.data.api.DataApiTest_Base.TEST_TENANT;
+
 class Helpers {
-
-    static <TReq, TResp>
-    Flow.Publisher<TResp> serverStreaming(
-            BiConsumer<TReq, StreamObserver<TResp>> grpcMethod,
-            TReq request, IExecutionContext execContext) {
-
-        var response = Concurrent.<TResp>hub(execContext);
-        var responseGrpc = GrpcStreams.relay(response);
-
-        grpcMethod.accept(request, responseGrpc);
-
-        return response;
-    }
 
     static <TReq, TResp>
     void serverStreaming(
@@ -49,6 +42,23 @@ class Helpers {
 
         var responseGrpc = GrpcStreams.relay(response);
         grpcMethod.accept(request, responseGrpc);
+    }
+
+    static <TReq, TResp>
+    CompletionStage<Void> serverStreamingDiscard(
+            BiConsumer<TReq, StreamObserver<TResp>> grpcMethod,
+            TReq request, IExecutionContext execCtx) {
+
+        // Server streaming response uses ByteString for binary data
+        // ByteString does not need an explicit release
+
+        var msgStream = Concurrent.<TResp>hub(execCtx);
+        var discard = Concurrent.fold(msgStream, (acc, msg) -> acc, (Void) null);
+
+        var grpcStream = GrpcStreams.relay(msgStream);
+        grpcMethod.accept(request, grpcStream);
+
+        return discard;
     }
 
     static <TReq, TResp>
@@ -73,5 +83,15 @@ class Helpers {
             TReq request) {
 
         return clientStreaming(grpcMethod, Concurrent.publish(Stream.of(request)));
+    }
+
+    static FileReadRequest readRequest(TagHeader fileId) {
+
+        var fileSelector = MetadataUtil.selectorFor(fileId);
+
+        return FileReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(fileSelector)
+                .build();
     }
 }

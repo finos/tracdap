@@ -24,10 +24,7 @@ import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.util.Concurrent;
 import com.accenture.trac.common.util.Futures;
-import com.accenture.trac.metadata.ObjectType;
-import com.accenture.trac.metadata.TagOperation;
-import com.accenture.trac.metadata.TagSelector;
-import com.accenture.trac.metadata.TagUpdate;
+import com.accenture.trac.metadata.*;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -48,7 +45,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     // Functional test cases for file operations in the data API
     // (createFile, updateFile, readFile)
 
-    private static final List<TagUpdate> BASIC_TAG_UPDATES = List.of(
+    static final List<TagUpdate> BASIC_TAG_UPDATES = List.of(
             TagUpdate.newBuilder()
                     .setAttrName("app_template")
                     .setOperation(TagOperation.CREATE_ATTR)
@@ -60,10 +57,10 @@ public class DataApiTest_File extends DataApiTest_Base {
                     .setValue(MetadataCodec.encodeValue("Describes what this template does in the app"))
                     .build());
 
-    private static final ByteString BASIC_FILE_CONTENT = ByteString
+    static final ByteString BASIC_FILE_CONTENT = ByteString
             .copyFrom("Sample content\n", StandardCharsets.UTF_8);
 
-    private static final FileWriteRequest BASIC_CREATE_FILE_REQUEST = FileWriteRequest.newBuilder()
+    static final FileWriteRequest BASIC_CREATE_FILE_REQUEST = FileWriteRequest.newBuilder()
             .setTenant(TEST_TENANT)
             .addAllTagUpdates(BASIC_TAG_UPDATES)
             .setName("some_file.txt")
@@ -72,17 +69,17 @@ public class DataApiTest_File extends DataApiTest_Base {
             .setContent(BASIC_FILE_CONTENT)
             .build();
 
-    private static final List<TagUpdate> BASIC_TAG_UPDATES_V2 = List.of(
+    static final List<TagUpdate> BASIC_TAG_UPDATES_V2 = List.of(
             TagUpdate.newBuilder()
                     .setAttrName("description")
                     .setOperation(TagOperation.REPLACE_ATTR)
                     .setValue(MetadataCodec.encodeValue("Describes what is in the V2 template"))
                     .build());
 
-    private static final ByteString BASIC_FILE_CONTENT_V2 = ByteString
+    static final ByteString BASIC_FILE_CONTENT_V2 = ByteString
             .copyFrom("Sample content v2\nSome new updated content\n", StandardCharsets.UTF_8);
 
-    private static final FileWriteRequest BASIC_UPDATE_FILE_REQUEST = FileWriteRequest.newBuilder()
+    static final FileWriteRequest BASIC_UPDATE_FILE_REQUEST = FileWriteRequest.newBuilder()
             .setTenant(TEST_TENANT)
             .addAllTagUpdates(BASIC_TAG_UPDATES_V2)
             .setName("some_file.txt")
@@ -181,28 +178,6 @@ public class DataApiTest_File extends DataApiTest_Base {
         Assertions.assertTrue(fileDef.getStorageId().getLatestObject());
         Assertions.assertTrue(fileDef.getStorageId().getLatestTag());
         Assertions.assertFalse(fileDef.getDataItem().isBlank());
-    }
-
-    @Test
-    void testCreateFile_tenancy() {
-
-        var noTenant = BASIC_CREATE_FILE_REQUEST.toBuilder().clearTenant().build();
-        var noTenantResult = Helpers.clientStreaming(dataClient::createFile, noTenant);
-        waitFor(TEST_TIMEOUT, noTenantResult);
-        var noTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(noTenantResult));
-        assertEquals(Status.Code.INVALID_ARGUMENT, noTenantError.getStatus().getCode());
-
-        var invalidTenant = BASIC_CREATE_FILE_REQUEST.toBuilder().setTenant("£$%^**!\0\n/`¬").build();
-        var invalidTenantResult = Helpers.clientStreaming(dataClient::createFile, invalidTenant);
-        waitFor(TEST_TIMEOUT, invalidTenantResult);
-        var invalidTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(invalidTenantResult));
-        assertEquals(Status.Code.INVALID_ARGUMENT, invalidTenantError.getStatus().getCode());
-
-        var unknownTenant = BASIC_CREATE_FILE_REQUEST.toBuilder().setTenant("UNKNOWN").build();
-        var unknownTenantResult = Helpers.clientStreaming(dataClient::createFile, unknownTenant);
-        waitFor(TEST_TIMEOUT, unknownTenantResult);
-        var unknownTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(unknownTenantResult));
-        assertEquals(Status.Code.NOT_FOUND, unknownTenantError.getStatus().getCode());
     }
 
     @Test
@@ -557,41 +532,6 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         Assertions.assertEquals(fileDefV1.getStorageId(), fileDef.getStorageId());
         Assertions.assertNotEquals(fileDefV1.getDataItem(), fileDef.getDataItem());
-    }
-
-    @Test
-    void testUpdateFile_tenancy() throws Exception {
-
-        // Create a valid v1
-
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
-        waitFor(TEST_TIMEOUT, createFile);
-        var v1Id = resultOf(createFile);
-
-        // Set up an update request using the valid v1 prior version
-
-        var v1Selector = MetadataUtil.selectorFor(v1Id);
-        var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
-
-        // No do the tenancy checks on updateFile
-
-        var noTenant = updateRequest.toBuilder().clearTenant().build();
-        var noTenantResult = Helpers.clientStreaming(dataClient::updateFile, noTenant);
-        waitFor(TEST_TIMEOUT, noTenantResult);
-        var noTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(noTenantResult));
-        assertEquals(Status.Code.INVALID_ARGUMENT, noTenantError.getStatus().getCode());
-
-        var invalidTenant = updateRequest.toBuilder().setTenant("£$%^**!\0\n/`¬").build();
-        var invalidTenantResult = Helpers.clientStreaming(dataClient::updateFile, invalidTenant);
-        waitFor(TEST_TIMEOUT, invalidTenantResult);
-        var invalidTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(invalidTenantResult));
-        assertEquals(Status.Code.INVALID_ARGUMENT, invalidTenantError.getStatus().getCode());
-
-        var unknownTenant = updateRequest.toBuilder().setTenant("UNKNOWN").build();
-        var unknownTenantResult = Helpers.clientStreaming(dataClient::updateFile, unknownTenant);
-        waitFor(TEST_TIMEOUT, unknownTenantResult);
-        var unknownTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(unknownTenantResult));
-        assertEquals(Status.Code.NOT_FOUND, unknownTenantError.getStatus().getCode());
     }
 
     @Test
@@ -1117,49 +1057,103 @@ public class DataApiTest_File extends DataApiTest_Base {
     // READ FILE
     // -----------------------------------------------------------------------------------------------------------------
 
-    void testReadFile_ok() {}
+    @Test
+    void testReadFile_ok() {
+        Assertions.fail();
+    }
 
-    void testReadFile_objectVersionLatest() {}
+    @Test
+    void testReadFile_objectVersionLatest() {
+        Assertions.fail();
+    }
 
-    void testReadFile_objectVersionExplicit() {}
+    @Test
+    void testReadFile_objectVersionExplicit() {
+        Assertions.fail();
+    }
 
-    void testReadFile_objectVersionAsOf() {}
+    @Test
+    void testReadFile_objectVersionAsOf() {
+        Assertions.fail();
+    }
 
-    void testReadFile_tagVersionLatest() {}
+    @Test
+    void testReadFile_tagVersionLatest() {
+        Assertions.fail();
+    }
 
-    void testReadFile_tagVersionExplicit() {}
+    @Test
+    void testReadFile_tagVersionExplicit() {
+        Assertions.fail();
+    }
 
-    void testReadFile_tagVersionAsOf() {}
+    @Test
+    void testReadFile_tagVersionAsOf() {
+        Assertions.fail();
+    }
 
-    void testReadFile_tenantOmitted() {}
+    @Test
+    void testReadFile_selectorTypeOmitted() {
+        Assertions.fail();
+    }
 
-    void testReadFile_tenantInvalid() {}
+    @Test
+    void testReadFile_selectorTypeNotFile() {
+        Assertions.fail();
+    }
 
-    void testReadFile_tenantNotFound() {}
+    @Test
+    void testReadFile_selectorIdOmitted() {
+        Assertions.fail();
+    }
 
-    void testReadFile_selectorTypeOmitted() {}
+    @Test
+    void testReadFile_selectorIdInvalid() {
+        Assertions.fail();
+    }
 
-    void testReadFile_selectorTypeNotFile() {}
+    @Test
+    void testReadFile_selectorIdNotFound() {
+        Assertions.fail();
+    }
 
-    void testReadFile_selectorIdOmitted() {}
+    @Test
+    void testReadFile_objectVersionMissing() {
+        Assertions.fail();
+    }
 
-    void testReadFile_selectorIdInvalid() {}
+    @Test
+    void testReadFile_objectVersionInvalid() {
+        Assertions.fail();
+    }
 
-    void testReadFile_selectorIdNotFound() {}
+    @Test
+    void testReadFile_objectVersionNotFound() {
+        Assertions.fail();
+    }
 
-    void testReadFile_objectVersionMissing() {}
+    @Test
+    void testReadFile_objectVersionNotFoundAsOf() {
+        Assertions.fail();
+    }
 
-    void testReadFile_objectVersionInvalid() {}
+    @Test
+    void testReadFile_tagVersionMissing() {
+        Assertions.fail();
+    }
 
-    void testReadFile_objectVersionNotFound() {}
+    @Test
+    void testReadFile_tagVersionInvalid() {
+        Assertions.fail();
+    }
 
-    void testReadFile_objectVersionNotFoundAsOf() {}
+    @Test
+    void testReadFile_tagVersionNotFound() {
+        Assertions.fail();
+    }
 
-    void testReadFile_tagVersionMissing() {}
-
-    void testReadFile_tagVersionInvalid() {}
-
-    void testReadFile_tagVersionNotFound() {}
-
-    void testReadFile_tagVersionNotFoundAsOf() {}
+    @Test
+    void testReadFile_tagVersionNotFoundAsOf() {
+        Assertions.fail();
+    }
 }
