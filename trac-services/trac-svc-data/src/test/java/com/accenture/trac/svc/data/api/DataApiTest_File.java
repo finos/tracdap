@@ -35,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
+import static com.accenture.trac.svc.data.api.Helpers.readRequest;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.junit.jupiter.api.Assertions.*;
@@ -1093,28 +1094,112 @@ public class DataApiTest_File extends DataApiTest_Base {
     }
 
     @Test
-    void testReadFile_selectorTypeOmitted() {
-        Assertions.fail();
+    void testReadFile_selectorTypeOmitted() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .clearObjectType())
+                .build();
+
+        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
     }
 
     @Test
-    void testReadFile_selectorTypeNotFile() {
-        Assertions.fail();
+    void testReadFile_selectorTypeNotFile() throws Exception {
+
+        // Selector object type must be ObjectType.FILE for file read requests
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setObjectType(ObjectType.DATA))
+                .build();
+
+        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
     }
 
     @Test
-    void testReadFile_selectorIdOmitted() {
-        Assertions.fail();
+    void testReadFile_selectorIdOmitted() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .clearObjectId())
+                .build();
+
+        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
     }
 
     @Test
-    void testReadFile_selectorIdInvalid() {
-        Assertions.fail();
+    void testReadFile_selectorIdInvalid() throws Exception {
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setObjectId("not_a_valid_id"))
+                .build();
+
+        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
+        assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
     }
 
     @Test
-    void testReadFile_selectorIdNotFound() {
-        Assertions.fail();
+    void testReadFile_selectorIdNotFound() throws Exception {
+
+        var objId = UUID.randomUUID().toString();  // non-existent object ID to look for
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setObjectId(objId))
+                .build();
+
+        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
+        assertEquals(Status.Code.NOT_FOUND, updateError.getStatus().getCode());
     }
 
     @Test
@@ -1128,8 +1213,26 @@ public class DataApiTest_File extends DataApiTest_Base {
     }
 
     @Test
-    void testReadFile_objectVersionNotFound() {
-        Assertions.fail();
+    void testReadFile_objectVersionNotFound() throws Exception {
+
+        var objVer = 2;  // non-existent object version to look for
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setObjectVersion(objVer))
+                .build();
+
+        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
+        assertEquals(Status.Code.NOT_FOUND, updateError.getStatus().getCode());
     }
 
     @Test
@@ -1148,8 +1251,26 @@ public class DataApiTest_File extends DataApiTest_Base {
     }
 
     @Test
-    void testReadFile_tagVersionNotFound() {
-        Assertions.fail();
+    void testReadFile_tagVersionNotFound() throws Exception {
+
+        var tagVer = 2;  // non-existent object version to look for
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setTagVersion(tagVer))
+                .build();
+
+        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readFile);
+        var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
+        assertEquals(Status.Code.NOT_FOUND, updateError.getStatus().getCode());
     }
 
     @Test
