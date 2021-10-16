@@ -18,6 +18,7 @@ package com.accenture.trac.svc.data.validation;
 
 import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
+import com.accenture.trac.metadata.TagUpdate;
 
 
 public class DataApiValidator {
@@ -52,7 +53,9 @@ public class DataApiValidator {
 
     private static ValidationContext createOrUpdateFile(FileWriteRequest msg, ValidationContext ctx) {
 
-        // Todo: tag updates
+        ctx = ctx.push(msg, "tagUpdates")
+                .applyTypedList(MetadataValidator::validateTagUpdate, TagUpdate.class)
+                .pop();
 
         ctx = ctx.push(msg, "name")
                 .apply(Validation::required)

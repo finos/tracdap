@@ -19,8 +19,17 @@ package com.accenture.trac.svc.data.validation;
 import com.google.protobuf.Message;
 
 
-@FunctionalInterface
 public interface ValidationFunction {
 
-    ValidationContext validate(Message msg, ValidationContext ctx);
+    @FunctionalInterface
+    interface Basic {
+
+        ValidationContext validate(Message msg, ValidationContext ctx);
+    }
+
+    @FunctionalInterface
+    interface Typed<TMsg extends Message> {
+
+        ValidationContext validate(TMsg msg, ValidationContext ctx);
+    }
 }

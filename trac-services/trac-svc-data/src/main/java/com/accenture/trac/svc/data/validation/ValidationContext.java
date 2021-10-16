@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.data.validation;
 
+import com.accenture.trac.common.exception.EUnexpected;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 
@@ -74,12 +75,59 @@ public class ValidationContext {
         return this;
     }
 
-    public ValidationContext apply(ValidationFunction validation) {
+    public ValidationContext apply(ValidationFunction.Basic validation) {
 
         if (done())
             return this;
 
         return validation.validate(msg, this);  // todo: msg
+    }
+
+    <TMsg extends Message>
+    ValidationContext applyTyped(ValidationFunction.Typed<TMsg> validation, Class<TMsg> msgClass) {
+
+        if (!msgClass.isInstance(msg))
+            throw new EUnexpected();
+
+        if (done())
+            return this;
+
+        @SuppressWarnings("unchecked")
+        var typedMsg = (TMsg) msg;
+
+        return validation.validate(typedMsg, this);  // todo: msg
+    }
+
+    <TMsg extends Message>
+    ValidationContext applyTypedList(ValidationFunction.Typed<TMsg> validation, Class<TMsg> msgClass) {
+
+        if (done())
+            return this;
+
+        var loc = location.peek();
+
+        if (!loc.field().isRepeated() || loc.field().isMapField())
+            throw new EUnexpected();
+
+        @SuppressWarnings("unchecked")
+        var list = (List<TMsg>) msg.getField(loc.field());
+
+        if (list == null)
+            throw new EUnexpected();
+
+        var resultCtx = this;
+
+        for (var i = 0; i < list.size(); i++) {
+
+            var listMsg = list.get(i);
+
+            resultCtx = resultCtx
+                    .push(listMsg, Integer.toString(i))
+                    .applyTyped(validation, msgClass)
+                    .pop();
+        }
+
+        return resultCtx;
     }
 
     public ValidationContext skip() {

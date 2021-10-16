@@ -72,6 +72,13 @@ public class Validation {
                 "is not a valid identifier", msg, ctx);
     }
 
+    static ValidationContext notTracReserved(Message msg, ValidationContext ctx) {
+
+        return regexMatch(
+                ValidationConstants.TRAC_RESERVED_IDENTIFIER, false,
+                "is a TRAC reserved identifier", msg, ctx);
+    }
+
     static ValidationContext mimeType(Message msg, ValidationContext ctx) {
 
         // First check the value matches the mime type regex, i.e. has the right form

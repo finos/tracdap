@@ -16,15 +16,29 @@
 
 package com.accenture.trac.svc.data.validation;
 
-import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagSelector;
-import com.google.protobuf.Descriptors;
+import com.accenture.trac.metadata.TagUpdate;
 import com.google.protobuf.ProtocolMessageEnum;
 
-import java.util.List;
 
+public class MetadataValidator {
 
-public class ObjectIdValidator {
+    public static ValidationContext validateTagUpdate(TagUpdate msg, ValidationContext ctx) {
+
+        ctx = ctx.push(msg, "attrName")
+                .apply(Validation::identifier)
+                .apply(Validation::notTracReserved)
+                .pop();
+
+        ctx = ctx.push(msg, "operation")
+                //.apply(this::validateEnum)
+                .pop();
+
+        // TODO: Validation for values and the TRAC type system
+
+        return ctx;
+    }
+
 
     public void validateTagSelector(TagSelector msg, ValidationContext ctx) {
 
