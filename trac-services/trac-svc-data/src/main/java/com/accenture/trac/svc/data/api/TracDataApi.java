@@ -19,7 +19,6 @@ package com.accenture.trac.svc.data.api;
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.eventloop.ExecutionContext;
 import com.accenture.trac.common.eventloop.IExecutionContext;
-import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.util.Bytes;
 import com.accenture.trac.common.util.Concurrent;
 import com.accenture.trac.common.util.GrpcStreams;
@@ -27,7 +26,6 @@ import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
 
-import com.accenture.trac.svc.data.validation.ValidationFailure;
 import com.accenture.trac.svc.data.validation.Validator;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
@@ -42,7 +40,6 @@ import java.util.concurrent.Flow;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 
 public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
@@ -240,24 +237,12 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     private <TReq extends Message, TResp extends Message>
     TReq validateRequest(MethodDescriptor<TReq, TResp> method, TReq msg) {
 
-        log.info("VALIDATE CALL: [{}]", method.getBareMethodName());
-
         var protoMethod = Data.getDescriptor()
                 .getFile()
                 .findServiceByName("TracDataApi")
                 .findMethodByName(method.getBareMethodName());
 
-        var result = validator.validateApiCall(msg, protoMethod);
-
-        if (!result.ok()) {
-
-            var message = result.failures()
-                    .stream()
-                    .map(ValidationFailure::message)
-                    .collect(Collectors.joining("\n"));
-
-            throw new EInputValidation(message);
-        }
+        validator.validateApiCall(msg, protoMethod);
 
         return msg;
     }

@@ -18,6 +18,7 @@ package com.accenture.trac.svc.data.validation.core;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 public class ValidationResult {
@@ -43,5 +44,12 @@ public class ValidationResult {
 
     public List<ValidationFailure> failures() {
         return failures;
+    }
+
+    public String failureMessage() {
+
+        return failures().stream()
+                .map(ValidationFailure::message)
+                .collect(Collectors.joining("\n"));
     }
 }

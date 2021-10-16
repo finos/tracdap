@@ -90,7 +90,7 @@ public class GrpcStreams {
 
             if (error == null) {
 
-                log.info("CLIENT STREAMING CALL SUCCEEDED: [{}]", method);
+                log.info("CLIENT STREAMING CALL SUCCEEDED: [{}]", method.getBareMethodName());
 
                 grpcObserver.onNext(result);
                 grpcObserver.onCompleted();
@@ -100,7 +100,10 @@ public class GrpcStreams {
                 var status = translateErrorStatus(error);
                 var statusError = status.asRuntimeException();
 
-                log.error("CLIENT STREAMING CALL FAILED: [{}] {}", method, statusError.getMessage(), statusError);
+                log.error("CLIENT STREAMING CALL FAILED: [{}] {}",
+                        method.getBareMethodName(),
+                        statusError.getMessage(),
+                        statusError);
 
                 grpcObserver.onError(statusError);
             }
@@ -149,7 +152,10 @@ public class GrpcStreams {
             var status = translateErrorStatus(error);
             var statusError = status.asRuntimeException();
 
-            log.error("SERVER STREAMING CALL FAILED: [{}] {}", method, statusError.getMessage(), statusError);
+            log.error("SERVER STREAMING CALL FAILED: [{}] {}",
+                    method.getBareMethodName(),
+                    statusError.getMessage(),
+                    statusError);
 
             grpcObserver.onError(statusError);
             subscription.cancel();
@@ -158,7 +164,7 @@ public class GrpcStreams {
         @Override
         public void onComplete() {
 
-            log.info("SERVER STREAMING CALL SUCCEEDED: [{}]", method);
+            log.info("SERVER STREAMING CALL SUCCEEDED: [{}]", method.getBareMethodName());
 
             grpcObserver.onCompleted();
         }

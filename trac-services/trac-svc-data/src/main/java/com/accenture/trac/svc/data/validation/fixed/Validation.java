@@ -186,8 +186,16 @@ public class Validation {
         ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_WHITESPACE, false,
                 "contains non-standard whitespace (tab, return, form-feed etc.)", value, ctx);
 
-        ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_CTRL, false,
-                "contains ASCII control characters", value, ctx);
+        // Only check for ctrl characters if illegal whitespace is not present
+        // This is because non-standard whitespace is included in the ctrl chars
+
+        // There is a possibility ctrl chars are present as well and will not be reported
+        // In that case the error for ctrl chars will become visible when non-standard whitespace is removed
+
+        if (! ValidationConstants.FILENAME_ILLEGAL_WHITESPACE.matcher(value.toString()).matches())
+
+            ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_CTRL, false,
+                    "contains ASCII control characters", value, ctx);
 
         ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_START, false,
                 "starts with a space character", value, ctx);

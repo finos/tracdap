@@ -18,6 +18,7 @@ package com.accenture.trac.svc.data.validation;
 
 import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
+import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.svc.data.validation.core.ValidationContext;
@@ -25,49 +26,64 @@ import com.accenture.trac.svc.data.validation.core.ValidationResult;
 import com.accenture.trac.svc.data.validation.fixed.DataApiValidator;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class Validator {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     public ValidationResult validateObject(Message msg) {
 
         return ValidationResult.pass();
     }
 
-    public ValidationResult validateApiCall(Message msg, Descriptors.MethodDescriptor method) {
+    public void validateApiCall(Message msg, Descriptors.MethodDescriptor method) {
 
         var ctx = ValidationContext.forApiCall(method, msg);
-        return validateApiCall(msg, method, ctx);
+        validateApiCall(msg, method, ctx);
     }
 
-    public ValidationResult validateVersion(Message msg, Message original) {
+    public void validateVersion(Message msg, Message original) {
 
-        return ValidationResult.pass();
+        ValidationResult.pass();
     }
 
-    private ValidationResult validateApiCall(Message msg, Descriptors.MethodDescriptor method, ValidationContext ctx) {
+    private void validateApiCall(Message msg, Descriptors.MethodDescriptor method, ValidationContext ctx) {
 
         var methodName = method.getName();
 
         if (methodName == null)
             throw new EUnexpected();
 
-        if (methodName.equals("createFile") && msg instanceof FileWriteRequest) {
+        log.info("VALIDATION START: [{}]", methodName);
+
+        if (methodName.equals("createFile") && msg instanceof FileWriteRequest)
             ctx = DataApiValidator.validateCreateFile((FileWriteRequest) msg, ctx);
-            return ValidationResult.forContext(ctx);
-        }
 
-        if (methodName.equals("updateFile") && msg instanceof FileWriteRequest) {
+        else if (methodName.equals("updateFile") && msg instanceof FileWriteRequest)
             ctx = DataApiValidator.validateUpdateFile((FileWriteRequest) msg, ctx);
-            return ValidationResult.forContext(ctx);
-        }
 
-        if (methodName.equals("readFile") && msg instanceof FileReadRequest) {
+        else if (methodName.equals("readFile") && msg instanceof FileReadRequest)
             ctx = DataApiValidator.validateReadFile((FileReadRequest) msg, ctx);
-            return ValidationResult.forContext(ctx);
+
+        else
+            throw new ETracInternal("Missing required validators");
+
+        var result = ValidationResult.forContext(ctx);
+
+        if (!result.ok()) {
+
+            log.error("VALIDATION FAILED: [{}]", methodName);
+
+            for (var failure: result.failures())
+                log.error(failure.message());
+
+            throw new EInputValidation(result.failureMessage());
         }
 
-        throw new ETracInternal("Missing required validators");
+        log.info("VALIDATION SUCCEEDED: [{}]", methodName);
     }
 
 }
