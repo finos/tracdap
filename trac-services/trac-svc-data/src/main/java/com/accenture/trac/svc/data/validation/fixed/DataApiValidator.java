@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.validation;
+package com.accenture.trac.svc.data.validation.fixed;
 
 import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.metadata.TagUpdate;
+import com.accenture.trac.svc.data.validation.core.ValidationContext;
 
 
 public class DataApiValidator {

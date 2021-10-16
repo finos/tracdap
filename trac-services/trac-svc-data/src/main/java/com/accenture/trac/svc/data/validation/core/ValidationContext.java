@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.validation;
+package com.accenture.trac.svc.data.validation.core;
 
 import com.accenture.trac.common.exception.EUnexpected;
 import com.google.protobuf.Descriptors;
@@ -143,7 +143,7 @@ public class ValidationContext {
         return validation.validate(obj, this);
     }
 
-    <TMsg extends Message>
+    public <TMsg extends Message>
     ValidationContext apply(ValidationFunction.Typed<TMsg> validation, Class<TMsg> msgClass) {
 
         if (done())
@@ -170,7 +170,7 @@ public class ValidationContext {
         return validation.validate(obj, this);
     }
 
-    <TMsg extends Message>
+    public <TMsg extends Message>
     ValidationContext applyIf(ValidationFunction.Typed<TMsg> validation, Class<TMsg> msgClass, boolean condition) {
 
         if (done() || !condition)
@@ -187,7 +187,7 @@ public class ValidationContext {
         return validation.validate(typedMsg, this);
     }
 
-    <TMsg extends Message>
+    public <TMsg extends Message>
     ValidationContext applyTypedList(ValidationFunction.Typed<TMsg> validation, Class<TMsg> msgClass) {
 
         if (done())

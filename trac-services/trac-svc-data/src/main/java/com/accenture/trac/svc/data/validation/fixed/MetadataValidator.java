@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.validation;
+package com.accenture.trac.svc.data.validation.fixed;
 
 import com.accenture.trac.metadata.DatetimeValue;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.metadata.TagUpdate;
+import com.accenture.trac.svc.data.validation.core.ValidationContext;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.ProtocolMessageEnum;
 

@@ -20,6 +20,9 @@ import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.svc.data.validation.core.ValidationContext;
+import com.accenture.trac.svc.data.validation.core.ValidationResult;
+import com.accenture.trac.svc.data.validation.fixed.DataApiValidator;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 

@@ -14,19 +14,22 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.validation;
+package com.accenture.trac.svc.data.validation.core;
 
-public class ValidationFailure {
+import com.google.protobuf.Message;
 
-    private final ValidationLocation location;
-    private final String message;
 
-    public ValidationFailure(ValidationLocation location, String message ) {
-        this.location = location;
-        this.message = message;
+public interface ValidationFunction {
+
+    @FunctionalInterface
+    interface Basic {
+
+        ValidationContext validate(Object value, ValidationContext ctx);
     }
 
-    public String message() {
-        return message;
+    @FunctionalInterface
+    interface Typed<TMsg extends Message> {
+
+        ValidationContext validate(TMsg msg, ValidationContext ctx);
     }
 }
