@@ -27,11 +27,6 @@ public class DataApiValidator {
 
     public static ValidationContext validateCreateFile(FileWriteRequest msg, ValidationContext ctx) {
 
-        ctx = ctx.push("tenant")
-                .apply(Validation::required)
-                .apply(Validation::identifier)
-                .pop();
-
         ctx = ctx.push("priorVersion")
                 .apply(Validation::omitted)
                 .pop();
@@ -41,21 +36,25 @@ public class DataApiValidator {
 
     public static ValidationContext validateUpdateFile(FileWriteRequest msg, ValidationContext ctx) {
 
-        ctx = ctx.push("tenant")
-                .apply(Validation::required)
-                .apply(Validation::identifier)
-                .pop();
-
         ctx = ctx.push("priorVersion")
                 .apply(Validation::required)
-                .applyTyped(MetadataValidator::validateTagSelector, TagSelector.class)
-                .applyTyped(DataApiValidator::priorVersionIsFile, TagSelector.class)
+                .apply(MetadataValidator::validateTagSelector, TagSelector.class)
+                .apply(Validation.selectorType(ObjectType.FILE), TagSelector.class)
                 .pop();
 
         return createOrUpdateFile(msg, ctx);
     }
 
     private static ValidationContext createOrUpdateFile(FileWriteRequest msg, ValidationContext ctx) {
+
+        // Restricting tenant keys to be valid identifiers is a very strong restriction!
+        // This could be loosened a bit, perhaps natural language and UTF is ok?
+        // Easier to loosen later hence leaving the strict restriction for now
+
+        ctx = ctx.push("tenant")
+                .apply(Validation::required)
+                .apply(Validation::identifier)
+                .pop();
 
         ctx = ctx.push("tagUpdates")
                 .applyTypedList(MetadataValidator::validateTagUpdate, TagUpdate.class)
@@ -88,21 +87,9 @@ public class DataApiValidator {
 
         ctx = ctx.push("selector")
                 .apply(Validation::required)
-                .applyTyped(MetadataValidator::validateTagSelector, TagSelector.class)
+                .apply(MetadataValidator::validateTagSelector, TagSelector.class)
+                .apply(Validation.selectorType(ObjectType.FILE), TagSelector.class)
                 .pop();
-
-        return ctx;
-    }
-
-    private static ValidationContext priorVersionIsFile(TagSelector priorVersion, ValidationContext ctx) {
-
-        if (priorVersion.getObjectType() != ObjectType.FILE) {
-
-            var err = String.format("Wrong object type for [%s]: expected [%s], got [%s]",
-                    ctx.fieldName(), ObjectType.FILE, priorVersion.getObjectType());
-
-            return ctx.error(err);
-        }
 
         return ctx;
     }

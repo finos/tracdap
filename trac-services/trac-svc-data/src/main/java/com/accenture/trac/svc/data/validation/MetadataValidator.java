@@ -16,11 +16,11 @@
 
 package com.accenture.trac.svc.data.validation;
 
+import com.accenture.trac.metadata.DatetimeValue;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.metadata.TagUpdate;
+import com.google.protobuf.Descriptors;
 import com.google.protobuf.ProtocolMessageEnum;
-
-import java.util.UUID;
 
 
 public class MetadataValidator {
@@ -29,41 +29,71 @@ public class MetadataValidator {
     // Full implementation will be comprehensive across the metadata model
     // Requires generic handling of all message, enum and primitive types, as well as the TRAC type system
 
+    private static final Descriptors.FieldDescriptor TAG_SELECTOR_OBJECT_VERSION_FIELD =
+            TagSelector.getDescriptor()
+            .findFieldByNumber(TagSelector.OBJECTVERSION_FIELD_NUMBER);
+
+    private static final Descriptors.FieldDescriptor TAG_SELECTOR_OBJECT_ASOF_FIELD =
+            TagSelector.getDescriptor()
+            .findFieldByNumber(TagSelector.OBJECTASOF_FIELD_NUMBER);
+
+    private static final Descriptors.FieldDescriptor TAG_SELECTOR_TAG_VERSION_FIELD =
+            TagSelector.getDescriptor()
+            .findFieldByNumber(TagSelector.TAGVERSION_FIELD_NUMBER);
+
+    private static final Descriptors.FieldDescriptor TAG_SELECTOR_TAG_ASOF_FIELD =
+            TagSelector.getDescriptor()
+            .findFieldByNumber(TagSelector.TAGASOF_FIELD_NUMBER);
+
 
     public static ValidationContext validateTagUpdate(TagUpdate msg, ValidationContext ctx) {
 
+        // TODO: Incomplete validation for TagUpdate
+        // Requires enum validation for TagOperation
+        // Also requires full recursive validation of TRAC Values and TypeDescriptors
+
         ctx = ctx.push("attrName")
+                .apply(Validation::required)
                 .apply(Validation::identifier)
                 .apply(Validation::notTracReserved)
                 .pop();
-
-        // TODO: Enum validation
-        // Requires constructing generic enum from enum value descriptor
-//        ctx = ctx.push(msg, "operation")
-//                .apply(this::validateEnum, TagUpdate.class)
-//                .pop();
-
-        // TODO: Validation for values and the TRAC type system
 
         return ctx;
     }
 
     public static ValidationContext validateTagSelector(TagSelector msg, ValidationContext ctx) {
 
-        // TODO: Validate object type enum
+        // TODO: Incomplete validation for TagSelector
+        // Requires enum validation for ObjectType
+        // There is an issue where protobuf returns EnumValueDescriptor for the field value
+        // A generic way is needed to convert these into the actual enum type
 
-        try {
-            @SuppressWarnings("unused")
-            var uuid = UUID.fromString(msg.getObjectId());
-        }
-        catch (IllegalArgumentException e) {
-            var err = String.format("Object ID for [%s] is not a valid object ID", ctx.fieldName());
-            return ctx.error(err);
-        }
+        ctx = ctx.push("objectId")
+                .apply(Validation::required)
+                .apply(Validation::uuid)
+                .pop();
 
-        // TODO: Validate versions
+        ctx = ctx.pushOneOf("objectVersionCriteria")
+                .apply(Validation::required)
+                .applyIf(Validation::positive, msg.hasField(TAG_SELECTOR_OBJECT_VERSION_FIELD))
+                .applyIf(MetadataValidator::datetimeValue, DatetimeValue.class, msg.hasField(TAG_SELECTOR_OBJECT_ASOF_FIELD))
+                .pop();
+
+        ctx = ctx.pushOneOf("tagVersionCriteria")
+                .apply(Validation::required)
+                .applyIf(Validation::positive, msg.hasField(TAG_SELECTOR_TAG_VERSION_FIELD))
+                .applyIf(MetadataValidator::datetimeValue, DatetimeValue.class, msg.hasField(TAG_SELECTOR_TAG_ASOF_FIELD))
+                .pop();
 
         return ctx;
+    }
+
+    public static ValidationContext datetimeValue(DatetimeValue msg, ValidationContext ctx) {
+
+        return ctx.push("isoDatetime")
+                .apply(Validation::required)
+                .apply(Validation::isoDatetime)
+                .pop();
     }
 
     public ValidationContext validateEnum(

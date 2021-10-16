@@ -66,6 +66,40 @@ public class ValidationContext {
         return this;
     }
 
+    public ValidationContext pushOneOf(String field) {
+
+        var parentLoc = location.peek();
+        var parentMsg = parentLoc.msg();
+
+        var oneOfs = parentMsg.getDescriptorForType().getOneofs();
+        var oneOfMaybe = oneOfs.stream().filter(oneOf -> oneOf.getName().equals(field)).findFirst();
+
+        if (oneOfMaybe.isEmpty())
+            throw new EUnexpected();
+
+        var oneOf = oneOfMaybe.get();
+
+        // If the oneOf field has been set, look up the fd, field name and value for the field in use
+        // In this case the location ctx be reported as that field in any error messages
+
+        // If the oneOf is not set, fd and value cannot be set, the name is left as the oneOf name
+        // Error messages for required() will refer to the oneOf name
+        // Other checks must be guarded with optional(), omitted() or applyIf()
+
+        var fd = parentMsg.hasOneof(oneOf) ? parentMsg.getOneofFieldDescriptor(oneOf) : null;
+        var name = fd != null ? fd.getName() : field;
+        var obj = fd != null ? parentMsg.getField(fd) : null;
+
+        var loc = new ValidationLocation(parentLoc, oneOf, fd, name, obj);
+
+        if (parentLoc.skipped())
+            loc.skip();
+
+        location.push(loc);
+
+        return this;
+    }
+
     private ValidationContext pushList(Integer index) {
 
         var parentLoc = location.peek();
@@ -106,24 +140,51 @@ public class ValidationContext {
 
         var obj = location.peek().obj();
 
-        return validation.validate(obj, this);  // todo: msg
+        return validation.validate(obj, this);
     }
 
     <TMsg extends Message>
-    ValidationContext applyTyped(ValidationFunction.Typed<TMsg> validation, Class<TMsg> msgClass) {
+    ValidationContext apply(ValidationFunction.Typed<TMsg> validation, Class<TMsg> msgClass) {
+
+        if (done())
+            return this;
 
         var msg = location.peek().msg();
 
         if (!msgClass.isInstance(msg))
             throw new EUnexpected();
 
-        if (done())
+        @SuppressWarnings("unchecked")
+        var typedMsg = (TMsg) msg;
+
+        return validation.validate(typedMsg, this);
+    }
+
+    public ValidationContext applyIf(ValidationFunction.Basic validation, boolean condition) {
+
+        if (done() || !condition)
             return this;
+
+        var obj = location.peek().obj();
+
+        return validation.validate(obj, this);
+    }
+
+    <TMsg extends Message>
+    ValidationContext applyIf(ValidationFunction.Typed<TMsg> validation, Class<TMsg> msgClass, boolean condition) {
+
+        if (done() || !condition)
+            return this;
+
+        var msg = location.peek().msg();
+
+        if (!msgClass.isInstance(msg))
+            throw new EUnexpected();
 
         @SuppressWarnings("unchecked")
         var typedMsg = (TMsg) msg;
 
-        return validation.validate(typedMsg, this);  // todo: msg
+        return validation.validate(typedMsg, this);
     }
 
     <TMsg extends Message>
@@ -148,7 +209,7 @@ public class ValidationContext {
 
             resultCtx = resultCtx
                     .pushList(i)
-                    .applyTyped(validation, msgClass)
+                    .apply(validation, msgClass)
                     .pop();
         }
 
@@ -165,7 +226,7 @@ public class ValidationContext {
 
     public ValidationContext error(String message) {
 
-        var failure = new ValidationFailure(null, message);  // todo: loc in error
+        var failure = new ValidationFailure(location.peek(), message);
         failures.add(failure);
 
         var loc = location.peek();
@@ -176,6 +237,14 @@ public class ValidationContext {
 
     public Message parentMsg() {
         return location.peek().parent().msg();
+    }
+
+    public boolean isOneOf() {
+        return location.peek().isOneOf();
+    }
+
+    public Descriptors.OneofDescriptor oneOf() {
+        return location.peek().oneOf();
     }
 
     public Descriptors.FieldDescriptor field() {

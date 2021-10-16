@@ -17,11 +17,17 @@
 package com.accenture.trac.svc.data.validation;
 
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.metadata.DecimalValue;
+import com.accenture.trac.metadata.ObjectType;
+import com.accenture.trac.metadata.TagSelector;
 import com.google.protobuf.Descriptors;
-import com.google.protobuf.Message;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 public class Validation {
@@ -30,6 +36,11 @@ public class Validation {
     static ValidationContext required(Object value, ValidationContext ctx) {
 
         var parentMsg = ctx.parentMsg();
+
+        if (ctx.isOneOf() && !parentMsg.hasOneof(ctx.oneOf())) {
+            var err = String.format("A value is required for field [%s]", ctx.fieldName());
+            return ctx.error(err);
+        }
 
         if (!parentMsg.hasField(ctx.field())) {
             var err = String.format("A value is required for field [%s]", ctx.fieldName());
@@ -53,9 +64,19 @@ public class Validation {
 
         var parentMsg = ctx.parentMsg();
 
-        if (parentMsg.hasField(ctx.field())) {
-            var err = String.format("A value must not be provided for field [%s]", ctx.fieldName());
-            return ctx.error(err);
+        if (ctx.isOneOf()) {
+
+            if (parentMsg.hasOneof(ctx.oneOf())) {
+                var err = String.format("A value must not be provided for field [%s]", ctx.fieldName());
+                return ctx.error(err);
+            }
+        }
+        else {
+
+            if (parentMsg.hasField(ctx.field())) {
+                var err = String.format("A value must not be provided for field [%s]", ctx.fieldName());
+                return ctx.error(err);
+            }
         }
 
         return ctx;
@@ -65,10 +86,58 @@ public class Validation {
 
         var parentMsg = ctx.parentMsg();
 
-        if (!parentMsg.hasField(ctx.field()))
-            return ctx.skip();
+        if (ctx.isOneOf()) {
+
+            if (!parentMsg.hasOneof(ctx.oneOf()))
+                return ctx.skip();
+        }
+        else {
+
+            if (!parentMsg.hasField(ctx.field()))
+                return ctx.skip();
+        }
 
         return ctx;
+    }
+
+    static ValidationContext uuid(Object value, ValidationContext ctx) {
+
+        try {
+            @SuppressWarnings("unused")
+            var uuid = UUID.fromString(value.toString());
+        }
+        catch (IllegalArgumentException e) {
+            var err = String.format("Value of field [%s] is not a valid object ID: [%s]", ctx.fieldName(), value);
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    static ValidationContext isoDatetime(Object value, ValidationContext ctx) {
+
+        if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
+            throw new EUnexpected();
+
+        var str = (String) value;
+
+        try {
+
+            // Allow for parsing with or without zone offsets
+
+            MetadataCodec.ISO_DATETIME_INPUT_FORMAT.parseBest(str,
+                    OffsetDateTime::from,
+                    LocalDateTime::from);
+
+            return ctx;
+        }
+        catch (DateTimeParseException e) {
+
+            var err = String.format("Value of field [%s] is not a valid datetime: [%s] %s",
+                    ctx.fieldName(), value, e.getMessage());
+
+            return ctx.error(err);
+        }
     }
 
     static ValidationContext identifier(Object value, ValidationContext ctx) {
@@ -133,6 +202,25 @@ public class Validation {
         return ctx;
     }
 
+
+
+    private static ValidationContext regexMatch(
+            Pattern regex, boolean invertMatch, String desc,
+            Object value, ValidationContext ctx) {
+
+        if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
+            throw new EUnexpected();
+
+        var matcher = regex.matcher((String) value);
+
+        if (matcher.matches() ^ invertMatch) {
+            var err = String.format("Value of field [%s] %s: [%s]", ctx.fieldName(), desc, value);
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
     static ValidationContext notNegative(Object value, ValidationContext ctx) {
 
         boolean negative;
@@ -169,17 +257,52 @@ public class Validation {
         return ctx;
     }
 
-    private static ValidationContext regexMatch(
-            Pattern regex, boolean invertMatch, String desc,
-            Object value, ValidationContext ctx) {
+    static ValidationContext positive(Object value, ValidationContext ctx) {
 
-        if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
-            throw new EUnexpected();
+        boolean positive;
 
-        var matcher = regex.matcher((String) value);
+        switch (ctx.field().getJavaType()) {
 
-        if (matcher.matches() ^ invertMatch) {
-            var err = String.format("Value of field [%s] %s: [%s]", ctx.fieldName(), desc, value);
+            case INT: positive = (int) value > 0; break;
+            case LONG: positive = (long) value > 0; break;
+            case FLOAT: positive = (float) value > 0; break;
+            case DOUBLE: positive = (double) value > 0; break;
+
+            case MESSAGE:
+
+                var msgType = ctx.field().getMessageType();
+
+                // Handle DecimalValue messages, otherwise drop through to the default case
+
+                if (msgType.equals(DecimalValue.getDescriptor())) {
+                    var decimalMsg = (DecimalValue) value;
+                    var decimalValue = new BigDecimal(decimalMsg.getDecimal());
+                    positive = decimalValue.abs().equals(decimalValue) && !decimalValue.equals(BigDecimal.ZERO);
+                    break;
+                }
+
+            default:
+                throw new EUnexpected();
+        }
+
+        if (!positive) {
+            var err = String.format("Value of field [%s] must be positive: [%s]", ctx.fieldName(), value);
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationFunction.Typed<TagSelector> selectorType(ObjectType requiredType) {
+
+        return (selector, ctx) -> selectorType(requiredType, selector, ctx);
+    }
+
+    public static ValidationContext selectorType(ObjectType requiredType, TagSelector selector, ValidationContext ctx) {
+
+        if (!selector.getObjectType().equals(requiredType)) {
+            var err = String.format("Wrong object type for [%s]: expected [%s], got [%s]",
+                    ctx.fieldName(), requiredType, selector.getObjectType());
             return ctx.error(err);
         }
 

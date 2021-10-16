@@ -20,15 +20,15 @@ import com.accenture.trac.common.exception.EUnexpected;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Stack;
-import java.util.Vector;
 
 class ValidationLocation {
 
     private final ValidationLocation parent;
 
     private final Descriptors.MethodDescriptor method = null;
+    private final Descriptors.OneofDescriptor oneOf;
     private final Descriptors.FieldDescriptor field;
     private final String fieldName;
 
@@ -39,11 +39,13 @@ class ValidationLocation {
 
     public ValidationLocation(
             ValidationLocation parent,
+            Descriptors.OneofDescriptor oneOf,
             Descriptors.FieldDescriptor field,
             String fieldName,
             Object msg) {
 
         this.parent = parent;
+        this.oneOf = oneOf;
         this.field = field;
         this.fieldName = fieldName;
 
@@ -51,6 +53,15 @@ class ValidationLocation {
 
         this.failed = false;
         this.skipped = false;
+    }
+
+    public ValidationLocation(
+            ValidationLocation parent,
+            Descriptors.FieldDescriptor field,
+            String fieldName,
+            Object msg) {
+
+        this(parent, null, field, fieldName, msg);
     }
 
     public void fail() {
@@ -61,6 +72,13 @@ class ValidationLocation {
         skipped = true;
     }
 
+    public boolean isOneOf() {
+        return oneOf != null;
+    }
+
+    public Descriptors.OneofDescriptor oneOf() {
+        return oneOf;
+    }
 
     public Descriptors.FieldDescriptor field() {
         return field;
@@ -103,10 +121,10 @@ class ValidationLocation {
         return stack(0);
     }
 
-    private Vector<ValidationLocation> stack(int depth) {
+    private List<ValidationLocation> stack(int depth) {
 
         var stack = (parent == null)
-                ? new Vector<ValidationLocation>(depth + 1)
+                ? new ArrayList<ValidationLocation>(depth + 1)
                 : parent.stack(depth + 1);
 
         stack.set(depth, this);

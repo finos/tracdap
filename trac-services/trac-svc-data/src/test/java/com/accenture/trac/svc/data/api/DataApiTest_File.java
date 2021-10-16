@@ -1205,7 +1205,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     }
 
     @Test
-    void testReadFile_objectVersionMissing() throws Exception {
+    void testReadFile_objectVersionOmitted() throws Exception {
 
         var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
@@ -1252,7 +1252,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         var readRequest2 = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
                 .setObjectAsOf(DatetimeValue.newBuilder()
-                .setIsoDatetime("invalid_iso_datetime")))
+                .setIsoDatetime("2021-10-03T12:34:56+01:00+invalid/part")))
                 .build();
 
         var readFile2 = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest2, execContext);
@@ -1310,7 +1310,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     }
 
     @Test
-    void testReadFile_tagVersionMissing() throws Exception {
+    void testReadFile_tagVersionOmitted() throws Exception {
 
         var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
