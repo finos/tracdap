@@ -68,18 +68,16 @@ public class Validation {
     static ValidationContext identifier(Message msg, ValidationContext ctx) {
 
         return regexMatch(
-                ValidationConstants.VALID_IDENTIFIER,
-                "a valid identifier",
-                msg, ctx);
+                ValidationConstants.VALID_IDENTIFIER, true,
+                "is not a valid identifier", msg, ctx);
     }
 
     static ValidationContext mimeType(Message msg, ValidationContext ctx) {
 
         // First check the value matches the mime type regex, i.e. has the right form
         ctx = regexMatch(
-                ValidationConstants.MIME_TYPE,
-                "a valid mime type",
-                msg, ctx);
+                ValidationConstants.MIME_TYPE, true,
+                "is not a valid mime type", msg, ctx);
 
         if (ctx.failed())
             return ctx;
@@ -89,7 +87,7 @@ public class Validation {
         var mainType = value.substring(0, value.indexOf("/"));
 
         if (!ValidationConstants.REGISTERED_MIME_TYPES.contains(mainType)) {
-            var err = String.format("Value of field [%s] must be a registered mime type: [%s]", ctx.fieldName(), value);
+            var err = String.format("Value of field [%s] is not a registered mime type: [%s]", ctx.fieldName(), value);
             return ctx.error(err);
         }
 
@@ -97,6 +95,27 @@ public class Validation {
     }
 
     static ValidationContext fileName(Message msg, ValidationContext ctx) {
+
+        ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_CHARS, false,
+                "contains illegal characters", msg, ctx);
+
+        ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_WHITESPACE, false,
+                "contains non-standard whitespace (tab, return, form-feed etc.)", msg, ctx);
+
+        ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_CTRL, false,
+                "contains ASCII control characters", msg, ctx);
+
+        ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_START, false,
+                "starts with a space character", msg, ctx);
+
+        ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_ENDING, false,
+                "ends with a space or period character", msg, ctx);
+
+        ctx = regexMatch(ValidationConstants.FILENAME_RESERVED, false,
+                "is a reserved filename", msg, ctx);
+
+        ctx = regexMatch(ValidationConstants.TRAC_RESERVED_IDENTIFIER, false,
+                "is a TRAC reserved identifier", msg, ctx);
 
         return ctx;
     }
@@ -139,7 +158,7 @@ public class Validation {
     }
 
     private static ValidationContext regexMatch(
-            Pattern regex, String desc,
+            Pattern regex, boolean invertMatch, String desc,
             Message msg, ValidationContext ctx) {
 
         if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
@@ -148,8 +167,8 @@ public class Validation {
         var value = (String) msg.getField(ctx.field());
         var matcher = regex.matcher(value);
 
-        if (!matcher.matches()) {
-            var err = String.format("Value of field [%s] must be %s: [%s]", ctx.fieldName(), desc, value);
+        if (matcher.matches() ^ invertMatch) {
+            var err = String.format("Value of field [%s] %s: [%s]", ctx.fieldName(), desc, value);
             return ctx.error(err);
         }
 

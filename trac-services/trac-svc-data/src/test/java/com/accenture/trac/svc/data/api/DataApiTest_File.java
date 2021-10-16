@@ -279,15 +279,45 @@ public class DataApiTest_File extends DataApiTest_Base {
                 ".", "/", "\\",
                 "./a", ".\\a", "a/b", "a\\b", "a/", "a\\",
                 "a\rb", "a\nb", "a\tb", "a\0b",
-                "$£\"£$%^\0<:$%^&D'¬#FSG)");
+                "$£\"£$%^\0<:$%^&D'¬#FSG)",
+                "asci\u0003_ctrl.dat", "nul\0char.dat", "form\ffeed.txt",
+                " leading_space.txt", "trailing_space.txt ", "trailing_dot.",
+                "COM1", "lpt2.txt", "trac_file.dat", "_special.txt");
 
         for (var name: invalidNames) {
 
             var badName = BASIC_CREATE_FILE_REQUEST.toBuilder().setName(name).build();
             var badNameResult = Helpers.clientStreaming(dataClient::createFile, badName);
             waitFor(TEST_TIMEOUT, badNameResult);
-            var badNameError = assertThrows(StatusRuntimeException.class, () -> resultOf(badNameResult));
+
+            var badNameError = assertThrows(
+                    StatusRuntimeException.class,
+                    () -> resultOf(badNameResult),
+                    "Invalid file name did not fail: " + name);
+
             assertEquals(Status.Code.INVALID_ARGUMENT, badNameError.getStatus().getCode());
+        }
+    }
+
+    @Test
+    void testCreateFile_nameValid() {
+
+        // Make sure file name validation is not rejecting valid punctuation, unicode etc.
+
+        var validNames = List.of(
+                "A name with spaces.doc",
+                "Some punctuation - this is allowed (for non reserved chars).pptx",
+                "Unicode - 你好.txt");
+
+        for (var name: validNames) {
+
+            var badName = BASIC_CREATE_FILE_REQUEST.toBuilder().setName(name).build();
+            var badNameResult = Helpers.clientStreaming(dataClient::createFile, badName);
+            waitFor(TEST_TIMEOUT, badNameResult);
+
+            assertDoesNotThrow(
+                    () -> resultOf(badNameResult),
+                    "Valid file name rejected: " + name);
         }
     }
 
@@ -807,6 +837,39 @@ public class DataApiTest_File extends DataApiTest_Base {
             waitFor(TEST_TIMEOUT, updateFile);
             var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
             assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
+        }
+    }
+
+    @Test
+    void testUpdateFile_nameValid() throws Exception {
+
+        // Make sure file name validation is not rejecting valid punctuation, unicode etc.
+
+        var validNames = List.of(
+                "A name with spaces.txt",
+                "Some punctuation - this is allowed (for non reserved chars).txt",
+                "Unicode - 你好.txt");
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+        var latestSelector = MetadataUtil.selectorFor(v1Id);
+
+        for (var name: validNames) {
+
+            var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder()
+                    .setPriorVersion(latestSelector)
+                    .setName(name)
+                    .build();
+
+            var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+            waitFor(TEST_TIMEOUT, updateFile);
+
+            var latestId = assertDoesNotThrow(
+                    () -> resultOf(updateFile),
+                    "Valid file name rejected: " + name);
+
+            latestSelector = MetadataUtil.selectorFor(latestId);
         }
     }
 

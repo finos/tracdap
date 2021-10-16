@@ -56,7 +56,7 @@ public class DataApiValidator {
 
         ctx = ctx.push(msg, "name")
                 .apply(Validation::required)
-                //.apply(Validation::fileName)
+                .apply(Validation::fileName)
                 .pop();
 
         ctx = ctx.push(msg, "mimeType")

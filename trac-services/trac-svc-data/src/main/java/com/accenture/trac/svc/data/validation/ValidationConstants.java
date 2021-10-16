@@ -27,7 +27,7 @@ public class ValidationConstants {
     // Identifiers starting trac_ are reserved for use by the TRAC platform
 
     public static final Pattern TRAC_RESERVED_IDENTIFIER = Pattern.compile(
-            "\\Atrac_.*", Pattern.CASE_INSENSITIVE);
+            "\\A(trac_|_).*", Pattern.CASE_INSENSITIVE);
 
     public static final Pattern MIME_TYPE = Pattern.compile("\\A\\w+/[-.\\w]+(?:\\+[-.\\w]+)?\\Z");
 
@@ -35,4 +35,14 @@ public class ValidationConstants {
             "application", "audio", "font", "example",
             "image", "message", "model", "multipart",
             "text", "video");
+
+    public static final Pattern FILENAME_ILLEGAL_CHARS = Pattern.compile(".*[<>:\"/\\\\|?*].*");
+    public static final Pattern FILENAME_ILLEGAL_WHITESPACE = Pattern.compile(".*[\\s\\vR&&[^ ]].*");
+    public static final Pattern FILENAME_ILLEGAL_CTRL = Pattern.compile(".*\\p{Cntrl}.*");
+    public static final Pattern FILENAME_ILLEGAL_START = Pattern.compile("\\A[ ].*");
+    public static final Pattern FILENAME_ILLEGAL_ENDING = Pattern.compile(".*[. ]\\Z");
+    public static final Pattern FILENAME_RESERVED = Pattern.compile(
+            "\\A(COM\\d*|LPT\\d*|PRN|AUX|NUL)(\\..*)?\\Z", Pattern.CASE_INSENSITIVE);
+
+
 }
