@@ -88,6 +88,7 @@ public class DataApiValidator {
 
         ctx = ctx.push("selector")
                 .apply(Validation::required)
+                .applyTyped(MetadataValidator::validateTagSelector, TagSelector.class)
                 .pop();
 
         return ctx;
