@@ -130,8 +130,8 @@ public class DataApiTest_Stability extends DataApiTest_Base {
 
         // Fetch metadata for the file and storage objects that should be created
 
-        var fileDef = fetchDefinition(TEST_TENANT, selectorFor(objHeader), ObjectDefinition::getFile);
-        var storageDef = fetchDefinition(TEST_TENANT, fileDef.getStorageId(), ObjectDefinition::getStorage);
+        var fileDef = fetchDefinition(selectorFor(objHeader), ObjectDefinition::getFile);
+        var storageDef = fetchDefinition(fileDef.getStorageId(), ObjectDefinition::getStorage);
 
         var dataItem = fileDef.getDataItem();
         var storageItem = storageDef.getDataItemsOrThrow(dataItem);
@@ -142,7 +142,10 @@ public class DataApiTest_Stability extends DataApiTest_Base {
         Assertions.assertEquals(1, objHeader.getObjectVersion());
         Assertions.assertEquals(1, objHeader.getTagVersion());
 
-        // TODO: More assert checks on stored metadata
+        Assertions.assertEquals("test_file.dat", fileDef.getName());
+        Assertions.assertEquals("dat", fileDef.getExtension());
+        Assertions.assertEquals("application/octet-stream", fileDef.getMimeType());
+        Assertions.assertEquals(content.size(), fileDef.getSize());
 
         // Use storage impl directly to check file has arrived in the storage back end
 
@@ -186,10 +189,13 @@ public class DataApiTest_Stability extends DataApiTest_Base {
         Helpers.serverStreaming(dataClient::readFile, readRequest, readResponse);
 
         waitFor(TEST_TIMEOUT, readResponse0, readBytes);
-        var roundTripTag = resultOf(readResponse0).getFileTag();
+        var roundTripDef = resultOf(readResponse0).getFileDefinition();
         var roundTripBytes = resultOf(readBytes);
 
-        // TODO: Compare tag / definition
+        Assertions.assertEquals("test_file.dat", roundTripDef.getName());
+        Assertions.assertEquals("dat", roundTripDef.getExtension());
+        Assertions.assertEquals("application/octet-stream", roundTripDef.getMimeType());
+        Assertions.assertEquals(content.size(), roundTripDef.getSize());
 
         Assertions.assertEquals(originalBytes, roundTripBytes);
     }
@@ -224,12 +230,12 @@ public class DataApiTest_Stability extends DataApiTest_Base {
 
     private <TDef>
     TDef fetchDefinition(
-            String tenant, TagSelector selector,
+            TagSelector selector,
             Function<ObjectDefinition, TDef> defTypeFunc)
             throws Exception {
 
         var tagGrpc = metaClient.readObject(MetadataReadRequest.newBuilder()
-                .setTenant(tenant)
+                .setTenant(TEST_TENANT)
                 .setSelector(selector)
                 .build());
 

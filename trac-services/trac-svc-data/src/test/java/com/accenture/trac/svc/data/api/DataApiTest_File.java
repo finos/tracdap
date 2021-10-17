@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -1061,8 +1062,84 @@ public class DataApiTest_File extends DataApiTest_Base {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Test
-    void testReadFile_ok() {
-        Assertions.fail();
+    void testReadFile_dataOk() throws Exception {
+
+        // First response message in the stream should be an empty buffer
+        // Content follows in subsequent messages
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var responseStream = Concurrent.<FileReadResponse>hub(execContext);
+
+        // Collect response messages into a list for direct inspection
+        var collectList = Concurrent.fold(responseStream,
+                (bs, b) -> {bs.add(b); return bs;},
+                new ArrayList<FileReadResponse>());
+
+        var readReq = readRequest(v1Id);
+        Helpers.serverStreaming(dataClient::readFile, readReq, responseStream);
+
+        waitFor(TEST_TIMEOUT, collectList);
+        var responseList = resultOf(collectList);
+
+        // First response message should contain metadata only, with an empty buffer
+        var response0 = responseList.get(0);
+        Assertions.assertEquals(ByteString.EMPTY, response0.getContent());
+
+        // The remainder of the list should contain the file content
+
+        var content = responseList.stream()
+                .skip(1)
+                .map(FileReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
+
+        Assertions.assertEquals(BASIC_FILE_CONTENT, content);
+    }
+
+    @Test
+    void testReadFile_metadataOk() throws Exception {
+
+        // First response message in the stream should contain metadata
+        // Subsequent messages should not have any metadata fields set
+
+        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        waitFor(TEST_TIMEOUT, createFile);
+        var v1Id = resultOf(createFile);
+
+        var responseStream = Concurrent.<FileReadResponse>hub(execContext);
+
+        // Collect response messages into a list for direct inspection
+        var collectList = Concurrent.fold(responseStream,
+                (bs, b) -> {bs.add(b); return bs;},
+                new ArrayList<FileReadResponse>());
+
+        var readReq = readRequest(v1Id);
+        Helpers.serverStreaming(dataClient::readFile, readReq, responseStream);
+
+        waitFor(TEST_TIMEOUT, collectList);
+        var responseList = resultOf(collectList);
+
+        // Get the field def for file definition field
+        var fileDefField = FileReadResponse
+                .getDescriptor()
+                .findFieldByNumber(FileReadResponse.FILEDEFINITION_FIELD_NUMBER);
+
+        // First response message should contain file def metadata
+        var response0 = responseList.get(0);
+        Assertions.assertTrue(response0.hasField(fileDefField));
+
+        var fileDef = response0.getFileDefinition();
+        Assertions.assertEquals("some_file.txt", fileDef.getName());
+        Assertions.assertEquals("txt", fileDef.getExtension());
+        Assertions.assertEquals("text/plain", fileDef.getMimeType());
+        Assertions.assertEquals(BASIC_FILE_CONTENT.size(), fileDef.getSize());
+
+        // All subsequent response messages should not have any metadata set, they only contain content
+
+        for (var i = 1; i < responseList.size(); i++)
+            Assertions.assertFalse(responseList.get(i).hasField(fileDefField));
     }
 
     @Test
@@ -1099,7 +1176,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
 
-        // Use the same requesat for latest file read again, should return V2
+        // Use the same request for latest file read again, should return V2
 
         var v1ResponseStream = Concurrent.<FileReadResponse>hub(execContext);
         var v1ByteStream = Concurrent.map(v1ResponseStream, FileReadResponse::getContent);
@@ -1213,21 +1290,6 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         waitFor(TEST_TIMEOUT, v1Content);
         Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(v1Content));
-    }
-
-    @Test
-    void testReadFile_tagVersionLatest() throws Exception {
-        Assertions.fail();
-    }
-
-    @Test
-    void testReadFile_tagVersionExplicit() {
-        Assertions.fail();
-    }
-
-    @Test
-    void testReadFile_tagVersionAsOf() {
-        Assertions.fail();
     }
 
     @Test
