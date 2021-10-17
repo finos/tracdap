@@ -583,7 +583,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
-        assertEquals(Status.Code.ALREADY_EXISTS, updateError.getStatus().getCode());
+        assertEquals(Status.Code.NOT_FOUND, updateError.getStatus().getCode());
     }
 
     @Test
