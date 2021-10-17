@@ -19,6 +19,7 @@ package com.accenture.trac.common.util;
 import com.accenture.trac.common.exception.*;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -360,9 +361,20 @@ public class GrpcStreams {
 
     private static Status translateErrorStatus(Throwable error) {
 
-        // Unwrap future errors
+        // Unwrap future/streaming completion errors
         if (error instanceof CompletionException)
             error = error.getCause();
+
+        // Status runtime exception is a gRPC exception that is already propagated in the event stream
+        // This is most likely the result of an error when calling into another TRAC service
+        // For now, pass these errors on directly
+        // At some point there may (or may not) be benefit in wrapping/transforming upstream errors
+        // E.g. to handle particular types of expected exception
+        // However a lot of error response translate directly
+        // E.g. for metadata not found or permission denied lower down the stack - there is little benefit to wrapping
+
+        if (error instanceof StatusRuntimeException)
+            return ((StatusRuntimeException) error).getStatus();
 
         if (error instanceof EInputValidation) {
 
