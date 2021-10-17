@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Accenture Global Solutions Limited
+ * Copyright 2021 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +16,20 @@
 
 package com.accenture.trac.common.exception;
 
-/**
- * A validation gap is a type of internal error, it indicates a condition inside
- * TRAC that should have been caught higher up the stack in a validation layer.
- *
- * A validation gap is not a validation error!
- */
-public class EValidationGap extends ETracInternal {
 
-    public EValidationGap(String message, Throwable cause) {
+/**
+ * A validation failure for version compatibility
+ *
+ * Version validation checks consecutive object versions for backwards compatibility.
+ * A failure during this validation stage results in a version validation error.
+ */
+public class EVersionValidation extends EValidation {
+
+    public EVersionValidation(String message, Throwable cause) {
         super(message, cause);
     }
 
-    public EValidationGap(String message) {
+    public EVersionValidation(String message) {
         super(message);
     }
 }

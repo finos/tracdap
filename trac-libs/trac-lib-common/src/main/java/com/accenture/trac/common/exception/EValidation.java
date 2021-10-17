@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Accenture Global Solutions Limited
+ * Copyright 2021 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +16,23 @@
 
 package com.accenture.trac.common.exception;
 
-/**
- * A validation gap is a type of internal error, it indicates a condition inside
- * TRAC that should have been caught higher up the stack in a validation layer.
- *
- * A validation gap is not a validation error!
- */
-public class EValidationGap extends ETracInternal {
 
-    public EValidationGap(String message, Throwable cause) {
+/**
+ * Represents a validation error
+ *
+ * Child error types are available to represent the particular type of validation error
+ * as they have different response codes. E.g. input validation is an ILLEGAL_ARGUMENT
+ * response, where versioned and referential validation are FAILED_PRECONDITION.
+ *
+ * Validation errors are public errors that should be reported back to the client.
+ */
+public abstract class EValidation extends ETracPublic {
+
+    public EValidation(String message, Throwable cause) {
         super(message, cause);
     }
 
-    public EValidationGap(String message) {
+    public EValidation(String message) {
         super(message);
     }
 }
