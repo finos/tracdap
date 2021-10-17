@@ -322,7 +322,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
-                names = {"DATA", "SCHEMA", "CUSTOM"})
+                names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
     void updateObject_trustedTypesOk(ObjectType objectType) {
 
         updateObject_ok(objectType, request -> trustedApi.updateObject(request));
@@ -360,7 +360,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "DATA", "SCHEMA", "CUSTOM"})
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
     void updateObject_versionsNotSupported(ObjectType objectType) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
