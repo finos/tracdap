@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -52,13 +53,15 @@ public class DataWriteService {
     private static final String TRAC_FILE_SIZE_ATTR = "trac_file_size";
 
     private static final String FILE_DATA_ITEM_TEMPLATE = "file/%s/version-%d";
-    private static final String FILE_STORAGE_PATH_TEMPLATE = "file/%s/version-%d/%s";
+    private static final String FILE_STORAGE_PATH_TEMPLATE = "file/%s/version-%d%s/%s";
+    private static final String FILE_STORAGE_PATH_SUFFIX_TEMPLATE = "-x%06x";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final IStorageManager storageManager;
     private final TrustedMetadataApiFutureStub metaApi;
     private final Validator validator = new Validator();
+    private final Random random = new Random();
 
     public DataWriteService(
             IStorageManager storageManager,
@@ -83,11 +86,14 @@ public class DataWriteService {
                 .thenApply(x -> preallocateForType(tenant, ObjectType.FILE))
                 .thenApply(metaApi::preallocateId)
                 .thenCompose(Futures::javaFuture)
-                .thenAccept(fileId -> defs.fileId = fileId)
+                .thenAccept(fileId -> defs.priorFileId = fileId)
+
+                // Preallocate ID comes back with version 0, bump to get ID for first real version
+                .thenAccept(x -> defs.fileId = bumpVersion(defs.priorFileId))
 
                 // Build definition objects
                 .thenAccept(x -> defs.file = createFileDef(defs.fileId, name, mimeType))
-                .thenAccept(x -> defs.storage = createStorageDef(defs.fileId, name, mimeType))
+                .thenAccept(x -> defs.storage = createStorageDef(defs.fileId, name, mimeType, random))
 
                 // Write file content stream to the storage layer
                 .thenCompose(x -> writeDataItem(
@@ -153,7 +159,7 @@ public class DataWriteService {
 
                 // Build definition objects
                 .thenAccept(x -> defs.file = updateFileDef(defs.priorFile, defs.fileId, name, mimeType))
-                .thenAccept(x -> defs.storage = updateStorageDef(defs.priorStorage, defs.fileId, name, mimeType))
+                .thenAccept(x -> defs.storage = updateStorageDef(defs.priorStorage, defs.fileId, name, mimeType, random))
 
                 .thenAccept(x -> validator.validateVersion(defs.file, defs.priorFile))
 
@@ -259,6 +265,7 @@ public class DataWriteService {
     }
 
     private <TDef> CompletionStage<TagHeader> createPreallocated(
+
             String tenant, List<TagUpdate> tags, TagHeader objectHeader, TDef def,
             BiFunction<ObjectDefinition.Builder, TDef, ObjectDefinition.Builder> objSetter) {
 
@@ -318,37 +325,64 @@ public class DataWriteService {
     }
 
     private static StorageDefinition createStorageDef(
-            TagHeader fileHeader, String fileName, String mimeType) {
+            TagHeader fileHeader, String fileName, String mimeType, Random random) {
 
-        return buildStorageDef(StorageDefinition.newBuilder(), fileHeader, fileName, mimeType);
+        return buildStorageDef(StorageDefinition.newBuilder(), fileHeader, fileName, mimeType, random);
     }
 
     private static StorageDefinition updateStorageDef(
             StorageDefinition priorStorage,
-            TagHeader fileHeader, String fileName, String mimeType) {
+            TagHeader fileHeader, String fileName, String mimeType, Random random) {
 
-        return buildStorageDef(priorStorage.toBuilder(), fileHeader, fileName, mimeType);
+        return buildStorageDef(priorStorage.toBuilder(), fileHeader, fileName, mimeType, random);
     }
 
     private static StorageDefinition buildStorageDef(
             StorageDefinition.Builder storageDef,
-            TagHeader fileHeader, String fileName, String mimeType) {
+            TagHeader fileHeader, String fileName, String mimeType, Random random) {
 
         var fileId = UUID.fromString(fileHeader.getObjectId());
         var fileVersion = fileHeader.getObjectVersion();
 
         var dataItem = String.format(FILE_DATA_ITEM_TEMPLATE, fileId, fileVersion);
-        var storagePath = String.format(FILE_STORAGE_PATH_TEMPLATE, fileId, fileVersion, fileName);
 
-        var storageKey = "UNIT_TEST_STORAGE";  // TODO: Where to store
-        var storageTimestamp = MetadataCodec
-                .encodeDatetime(Instant.now()  // TODO: timestamp
-                .atOffset(ZoneOffset.UTC));
+        // It is possible to call updateFile twice on the same prior version at the same time
+        // In this case both calls will try to create the same file at the same time
+        // It is also possible that a failed call leaves behind a file without creating a valid metadata record
+        // In this case, it would not be possible for an update to succeed one the orphans file is there
+        // Best efforts checks can be made but will never cover all possible concurrent code paths
+
+        // To get around this problem, we add some random hex digits into the storage path
+        // Update collisions are still resolved when the metadata record is created
+        // In this case, the request error handler *should* clean up the file
+        // For orphaned files, there is still a chance the random bytes collide
+        // But this can be resolved by retrying
+
+        var storageSuffixBytes = random.nextInt(1 << 24);
+        var storageSuffix = String.format(FILE_STORAGE_PATH_SUFFIX_TEMPLATE, storageSuffixBytes);
+
+        var storagePath = String.format(FILE_STORAGE_PATH_TEMPLATE, fileId, fileVersion, storageSuffix, fileName);
+
+        // TODO: Storage timestamp
+        // This should ideally line up with the object timestamp recorded in the metadata service
+        // Can we allow timestamps to be pre-set in the trusted API?
+        // Also, once this solution is in place, use storage timestamp as the path suffix
+
+        var storageTimestamp = MetadataCodec.encodeDatetime(
+                Instant.now().atOffset(ZoneOffset.UTC));
+
+        // TODO: Storage key
+        // Use service configuration to choose for new items
+        // For existing items, try to put new parts into the same storage
+
+        var storageKey = "UNIT_TEST_STORAGE";
+
+        // For FILE objects, storage format is taken as the supplied mime type of the file
 
         var storageCopy = StorageCopy.newBuilder()
                 .setStorageKey(storageKey)
                 .setStoragePath(storagePath)
-                .setStorageFormat(mimeType)  // TODO: Always use binary blob type for files?
+                .setStorageFormat(mimeType)
                 .setCopyStatus(CopyStatus.COPY_AVAILABLE)
                 .setCopyTimestamp(storageTimestamp);
 
