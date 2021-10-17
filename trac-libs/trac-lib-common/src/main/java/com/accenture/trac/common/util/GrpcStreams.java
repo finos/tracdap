@@ -16,10 +16,7 @@
 
 package com.accenture.trac.common.util;
 
-import com.accenture.trac.common.exception.EData;
-import com.accenture.trac.common.exception.EInputValidation;
-import com.accenture.trac.common.exception.ETracInternal;
-import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.exception.*;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -370,6 +367,13 @@ public class GrpcStreams {
         if (error instanceof EInputValidation) {
 
             return Status.fromCode(Status.Code.INVALID_ARGUMENT)
+                    .withDescription(error.getMessage())
+                    .withCause(error);
+        }
+
+        if (error instanceof EVersionValidation) {
+
+            return Status.fromCode(Status.Code.FAILED_PRECONDITION)
                     .withDescription(error.getMessage())
                     .withCause(error);
         }

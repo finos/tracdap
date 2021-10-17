@@ -28,7 +28,7 @@ public class ValidationKey implements Comparable<ValidationKey> {
     private static final String OPAQUE_KEY_TEMPLATE = "%s:%s:%s";
     private final String opaqueKey;
 
-    private static final String DISPLAY_NAME_TEMPLATE = "%s %s %s";
+    private static final String DISPLAY_NAME_TEMPLATE = "%s %s%s";
     private final String displayName;
 
     public static ValidationKey fixed(
@@ -36,6 +36,11 @@ public class ValidationKey implements Comparable<ValidationKey> {
             Descriptors.MethodDescriptor method) {
 
         return new ValidationKey(ValidationType.FIXED, messageType, method);
+    }
+
+    public static ValidationKey version(Descriptors.Descriptor messageType) {
+
+        return new ValidationKey(ValidationType.VERSION, messageType, null);
     }
 
     public ValidationKey(
@@ -92,6 +97,10 @@ public class ValidationKey implements Comparable<ValidationKey> {
     @Override
     public int hashCode() {
         return opaqueKey.hashCode();
+    }
+
+    public ValidationType validationType() {
+        return validationType;
     }
 
     public String displayName() {

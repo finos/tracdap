@@ -18,6 +18,7 @@ package com.accenture.trac.svc.data.validation;
 
 import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.exception.EVersionValidation;
 import com.accenture.trac.metadata.ObjectDefinition;
 import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.svc.data.validation.core.*;
@@ -55,8 +56,8 @@ public class Validator {
     public <TMsg extends Message>
     void validateVersion(TMsg current, TMsg prior) {
 
-        var ctx = ValidationContext.forVersion(current, prior, prior.getDescriptorForType());
-        topLevelValidation(current, ctx);  // TODO: prior
+        var ctx = ValidationContext.forVersion(current, prior);
+        topLevelValidation(current, ctx);
     }
 
     public <TMsg extends Message>
@@ -71,7 +72,7 @@ public class Validator {
 
         log.info("VALIDATION START: [{}]", key.displayName());
 
-        var resultCtx = registeredValidation(msg, ctx).pop();
+        var resultCtx = registeredValidation(msg, ctx);
         var result = ValidationResult.forContext(resultCtx);
 
         if (!result.ok()) {
@@ -81,7 +82,16 @@ public class Validator {
             for (var failure: result.failures())
                 log.error(failure.message());
 
-            throw new EInputValidation(result.failureMessage());
+            switch (ctx.validationType()) {
+
+                case FIXED: throw new EInputValidation(result.failureMessage());
+                case VERSION: throw new EVersionValidation(result.failureMessage());
+
+                default:
+                    throw new EUnexpected();
+            }
+
+
         }
 
         log.info("VALIDATION SUCCEEDED: [{}]", key.displayName());
@@ -94,20 +104,31 @@ public class Validator {
         var validator = validators.get(key);
 
         if (validator == null) {
-            log.error("No validator is registered for validation [{}]", key);
+            log.error("Required validator is not registered: [{}]", key.displayName());
             throw new EUnexpected();
         }
 
         if (validator.isBasic())
             return ctx.apply(validator.basic());
 
-        if (validator.isTyped()) {
+        if (!validator.targetClass().isInstance(msg))
+            throw new EUnexpected();
 
-            if (!validator.targetClass().isInstance(msg))
-                throw new EUnexpected();
+        if (validator.isTyped()) {
 
             @SuppressWarnings("unchecked")
             var typedValidator = (ValidationFunction.Typed<TMsg>) validator.typed();
+
+            @SuppressWarnings("unchecked")
+            var typedTarget = (Class<TMsg>) msg.getClass();
+
+            return ctx.apply(typedValidator, typedTarget);
+        }
+
+        if (validator.isVersion()) {
+
+            @SuppressWarnings("unchecked")
+            var typedValidator = (ValidationFunction.Version<TMsg>) validator.version();
 
             @SuppressWarnings("unchecked")
             var typedTarget = (Class<TMsg>) msg.getClass();

@@ -28,6 +28,7 @@ class ValidationLocation {
     private final ValidationLocation parent;
     private final ValidationKey key;
     private final Object target;
+    private final Object prior;
 
     private final Descriptors.MethodDescriptor method = null;
     private final Descriptors.OneofDescriptor oneOf;
@@ -42,6 +43,7 @@ class ValidationLocation {
             ValidationLocation parent,
             ValidationKey key,
             Object target,
+            Object prior,
 
             Descriptors.OneofDescriptor oneOf,
             Descriptors.FieldDescriptor field,
@@ -50,6 +52,7 @@ class ValidationLocation {
         this.parent = parent;
         this.key = key;
         this.target = target;
+        this.prior = prior;
 
         this.oneOf = oneOf;
         this.field = field;
@@ -63,10 +66,22 @@ class ValidationLocation {
             ValidationLocation parent,
             ValidationKey key,
             Object target,
+
+            Descriptors.OneofDescriptor oneOf,
             Descriptors.FieldDescriptor field,
             String fieldName) {
 
-        this(parent, key, target, null, field, fieldName);
+        this(parent, key, target, null, oneOf, field, fieldName);
+    }
+
+    public ValidationLocation(
+            ValidationLocation parent,
+            ValidationKey key,
+            Object target,
+            Descriptors.FieldDescriptor field,
+            String fieldName) {
+
+        this(parent, key, target, null, null, field, fieldName);
     }
 
     public ValidationLocation parent() {
@@ -81,8 +96,12 @@ class ValidationLocation {
         return fieldName;
     }
 
-    public Object obj() {
+    public Object target() {
         return target;
+    }
+
+    public Object prior() {
+        return prior;
     }
 
     public boolean isOneOf() {
@@ -123,6 +142,17 @@ class ValidationLocation {
             throw new EUnexpected();
 
         return (Message) target;
+    }
+
+    Message priorMsg() {
+
+        if (prior == null)
+            return null;
+
+        if (!(prior instanceof Message))
+            throw new EUnexpected();
+
+        return (Message) prior;
     }
 
 

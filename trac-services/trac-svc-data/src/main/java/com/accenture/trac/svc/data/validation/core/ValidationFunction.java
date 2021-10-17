@@ -22,29 +22,39 @@ import com.google.protobuf.Message;
 public class ValidationFunction<T> {
 
     @FunctionalInterface
-    public interface Basic { ValidationContext validate(ValidationContext ctx); }
+    public interface Basic { ValidationContext apply(ValidationContext ctx); }
 
     @FunctionalInterface
-    public interface Typed<T> { ValidationContext validate(T value, ValidationContext ctx); }
+    public interface Typed<T> { ValidationContext apply(T value, ValidationContext ctx); }
 
     @FunctionalInterface
-    public interface Version<T> { ValidationContext validate(T current, T prior, ValidationContext ctx); }
+    public interface Version<T> { ValidationContext apply(T current, T prior, ValidationContext ctx); }
 
 
     private final Class<T> targetClass;
     private final ValidationFunction.Basic basic;
     private final ValidationFunction.Typed<T> typed;
+    private final ValidationFunction.Version<T> version;
 
     public ValidationFunction(ValidationFunction.Basic validator, Class<T> targetClass) {
         this.targetClass = targetClass;
         this.basic = validator;
         this.typed = null;
+        this.version = null;
     }
 
     public ValidationFunction(ValidationFunction.Typed<T> validator, Class<T> targetClass) {
         this.targetClass = targetClass;
         this.basic = null;
         this.typed = validator;
+        this.version = null;
+    }
+
+    public ValidationFunction(ValidationFunction.Version<T> validator, Class<T> targetClass) {
+        this.targetClass = targetClass;
+        this.basic = null;
+        this.typed = null;
+        this.version = validator;
     }
 
     public Class<T> targetClass() {
@@ -65,5 +75,13 @@ public class ValidationFunction<T> {
 
     public ValidationFunction.Typed<T> typed() {
         return typed;
+    }
+
+    public boolean isVersion() {
+        return version != null;
+    }
+
+    public ValidationFunction.Version<T> version() {
+        return version;
     }
 }

@@ -42,7 +42,7 @@ public class FileVersionValidator {
     public static ValidationContext fileVersion(FileDefinition current, FileDefinition prior, ValidationContext ctx) {
 
         ctx = ctx.push(FILE_NAME)
-                .apply(FileVersionValidator::sameExtension)
+                .apply(FileVersionValidator::sameExtension, String.class)
                 .pop();
 
         ctx = ctx.push(FILE_EXTENSION)

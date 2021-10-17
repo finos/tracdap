@@ -27,6 +27,7 @@ import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.metadata.*;
 
+import com.accenture.trac.svc.data.validation.Validator;
 import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +58,7 @@ public class DataWriteService {
 
     private final IStorageManager storageManager;
     private final TrustedMetadataApiFutureStub metaApi;
+    private final Validator validator = new Validator();
 
     public DataWriteService(
             IStorageManager storageManager,
@@ -152,6 +154,8 @@ public class DataWriteService {
                 // Build definition objects
                 .thenAccept(x -> defs.file = updateFileDef(defs.priorFile, defs.fileId, name, mimeType))
                 .thenAccept(x -> defs.storage = updateStorageDef(defs.priorStorage, defs.fileId, name, mimeType))
+
+                .thenAccept(x -> validator.validateVersion(defs.file, defs.priorFile))
 
                 // Write file content stream to the storage layer
                 .thenCompose(x -> writeDataItem(

@@ -19,9 +19,11 @@ package com.accenture.trac.svc.data.validation;
 import com.accenture.trac.api.Data;
 import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
+import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.svc.data.validation.core.ValidationFunction;
 import com.accenture.trac.svc.data.validation.core.ValidationKey;
 import com.accenture.trac.svc.data.validation.fixed.DataApiValidator;
+import com.accenture.trac.svc.data.validation.version.FileVersionValidator;
 import com.google.protobuf.Descriptors;
 
 import java.util.HashMap;
@@ -48,6 +50,9 @@ public class ValidatorBuilder {
         addValidator(validatorMap, FileReadRequest.class, DataApiValidator::validateReadFile,
                 dataProto, "TracDataApi", "readFile");
 
+        addVersionValidator(validatorMap, FileDefinition.class, FileVersionValidator::fileVersion,
+                FileDefinition.getDescriptor());
+
         return validatorMap;
     }
 
@@ -63,6 +68,18 @@ public class ValidatorBuilder {
         var func = new ValidationFunction<T>(validator, targetClass);
 
         validatorMap.put(key, func);
+    }
+
+    private static <T> void addVersionValidator(
+            Map<ValidationKey, ValidationFunction<?>> validatorMap,
+            Class<T> targetClass, ValidationFunction.Version<T> validator,
+            Descriptors.Descriptor messageType) {
+
+        var key = ValidationKey.version(messageType);
+        var func = new ValidationFunction<T>(validator, targetClass);
+
+        validatorMap.put(key, func);
+
     }
 
 }
