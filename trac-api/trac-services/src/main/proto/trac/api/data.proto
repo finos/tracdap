@@ -296,9 +296,7 @@ message FileReadRequest {
 
 message FileReadResponse {
 
-  optional metadata.Tag fileTag = 1;
-  optional metadata.FileDefinition fileDefinition = 2;
-
+  optional metadata.FileDefinition fileDefinition = 1;
   bytes content = 1000;
 }
 
