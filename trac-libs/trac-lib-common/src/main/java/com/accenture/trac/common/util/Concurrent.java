@@ -42,6 +42,12 @@ public class Concurrent {
         return new SourcePublisher<>(source);
     }
 
+    public static <T>
+    Flow.Publisher<T> publish(CompletionStage<T> source) {
+
+        return new FuturePublisher<>(source);
+    }
+
     public static <T, U>
     Flow.Publisher<U> map(Flow.Publisher<T> source, Function<T, U> mapping) {
 
@@ -89,6 +95,13 @@ public class Concurrent {
     }
 
     public static <T>
+    Flow.Publisher<T> concat(CompletionStage<T> head, Flow.Publisher<T> tail) {
+
+        var headStream = publish(head);
+        return new ConcatProcessor<>(headStream, tail);
+    }
+
+    public static <T>
     CompletionStage<List<T>> toList(Flow.Publisher<T> source) {
 
         return fold(source, (xs, x) -> {xs.add(x); return xs;}, new ArrayList<>());
@@ -123,44 +136,87 @@ public class Concurrent {
         @Override
         public void subscribe(Flow.Subscriber<? super T> subscriber) {
 
-            var subscription = new Flow.Subscription() {
+            var subscription = new Subscription(subscriber);
+            subscriber.onSubscribe(subscription);
+        }
 
-                @Override
-                public void request(long n) {
+        private class Subscription implements Flow.Subscription {
 
-                    try {
+            Flow.Subscriber<? super T> subscriber;
 
-                        for (int i = 0; i < n && source.hasNext(); i++)
-                            subscriber.onNext(source.next());
+            public Subscription(Flow.Subscriber<? super T> subscriber) {
+                this.subscriber = subscriber;
+            }
 
-                        if (!source.hasNext() && !done) {
-                            subscriber.onComplete();
-                            done = true;
-                        }
-                    }
-                    catch (Exception e) {
-                        subscriber.onError(e);
+            @Override
+            public void request(long n) {
+
+                try {
+
+                    for (int i = 0; i < n && source.hasNext(); i++)
+                        subscriber.onNext(source.next());
+
+                    if (!source.hasNext() && !done) {
+                        subscriber.onComplete();
                         done = true;
                     }
                 }
-
-                @Override
-                public void cancel() {
-
-                    if (closeable != null) try {
-                        closeable.close();
-                    }
-                    catch (Exception e) {
-                        throw new ETracInternal(e.getMessage(), e);
-                    }
+                catch (Exception e) {
+                    subscriber.onError(e);
+                    done = true;
                 }
-            };
+            }
 
-            subscriber.onSubscribe(subscription);
+            @Override
+            public void cancel() {
+
+                if (closeable != null) try {
+                    closeable.close();
+                }
+                catch (Exception e) {
+                    throw new ETracInternal(e.getMessage(), e);
+                }
+            }
         }
     }
 
+    public static class FuturePublisher<T> implements Flow.Publisher<T> {
 
+        private final CompletionStage<T> source;
+
+        FuturePublisher(CompletionStage<T> source) {
+            this.source = source;
+        }
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super T> subscriber) {
+
+            var subscription = new Subscription(subscriber);
+            subscriber.onSubscribe(subscription);
+        }
+
+        private class Subscription implements Flow.Subscription {
+
+            Flow.Subscriber<? super T> subscriber;
+
+            public Subscription(Flow.Subscriber<? super T> subscriber) {
+                this.subscriber = subscriber;
+            }
+
+            @Override
+            public void request(long n) {
+
+                // TODO
+                throw new RuntimeException();
+            }
+
+            @Override
+            public void cancel() {
+
+                // TODO
+            }
+        }
+    }
 
     public static class MapProcessor<T, U> implements Flow.Processor<T, U> {
 
@@ -552,6 +608,46 @@ public class Concurrent {
             int requestIndex;
             int receiveIndex;
             boolean completeFlag;
+        }
+    }
+
+    private static class ConcatProcessor<T> implements Flow.Processor<T, T> {
+
+        private final Vector<Flow.Publisher<T>> publishers;
+
+        public ConcatProcessor(Flow.Publisher<T> first, Flow.Publisher<T> second) {
+            this.publishers = new Vector<>(2);
+            this.publishers.add(first);
+            this.publishers.add(second);
+        }
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super T> subscriber) {
+
+            // TODO
+            throw new RuntimeException();
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+
+            // TODO
+            throw new RuntimeException();
+        }
+
+        @Override
+        public void onNext(T item) {
+
+        }
+
+        @Override
+        public void onError(Throwable throwable) {
+
+        }
+
+        @Override
+        public void onComplete() {
+
         }
     }
 

@@ -20,7 +20,6 @@ import com.accenture.trac.api.MetadataReadRequest;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.storage.StorageManager;
-import com.accenture.trac.common.util.Concurrent;
 import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.metadata.StorageDefinition;
@@ -28,16 +27,12 @@ import com.accenture.trac.metadata.Tag;
 import com.accenture.trac.metadata.TagSelector;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.CharBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
-import java.util.stream.Stream;
 
 
 public class DataReadService {
@@ -57,7 +52,8 @@ public class DataReadService {
 
     public void readFile(
             String tenant, TagSelector selector,
-            Flow.Subscriber<ByteBuf> dataStream,
+            CompletableFuture<FileDefinition> definition,
+            Flow.Subscriber<ByteBuf> content,
             IExecutionContext execCtx) {
 
         var allocator = ByteBufAllocator.DEFAULT;
@@ -71,20 +67,27 @@ public class DataReadService {
                 .thenCompose(x -> readMetadata(tenant, state.file.getStorageId()))
                 .thenAccept(obj -> state.storage = obj.getDefinition().getStorage())
 
+                .thenAccept(x -> definition.complete(state.file))
+
                 .thenApply(x -> readFile(state.file, state.storage, execCtx))
-                .thenAccept(byteStream -> byteStream.subscribe(dataStream))
+                .thenAccept(byteStream -> byteStream.subscribe(content))
 
                 .exceptionally(error -> {
 
                     log.error(error.getMessage(), error);
 
-                    dataStream.onSubscribe(new Flow.Subscription() {
-                        @Override public void request(long n) {}
+                    if (!definition.isDone())
+                        definition.completeExceptionally(error);
 
-                        @Override public void cancel() {}
-                    });
+                    else {
 
-                    dataStream.onError(error);
+                        content.onSubscribe(new Flow.Subscription() {
+                            @Override public void request(long n) {}
+                            @Override public void cancel() {}
+                        });
+
+                        content.onError(error);
+                    }
 
                     return null;
                 });

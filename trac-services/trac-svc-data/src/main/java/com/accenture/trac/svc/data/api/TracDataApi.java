@@ -22,6 +22,7 @@ import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.util.Bytes;
 import com.accenture.trac.common.util.Concurrent;
 import com.accenture.trac.common.util.GrpcStreams;
+import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
@@ -35,6 +36,7 @@ import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.function.BiFunction;
@@ -151,19 +153,21 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         serverStreaming(method, request, responseObserver,
                 FileReadResponse::newBuilder,
+                FileReadResponse.Builder::setFileDefinition,
                 FileReadResponse.Builder::setContent,
                 this::doReadFile);
     }
 
     private void doReadFile(
             FileReadRequest request,
+            CompletableFuture<FileDefinition> fileDef,
             Flow.Subscriber<ByteBuf> byteStream,
             IExecutionContext execCtx) {
 
         var tenant = request.getTenant();
         var selector = request.getSelector();
 
-        readService.readFile(tenant, selector, byteStream, execCtx);
+        readService.readFile(tenant, selector, fileDef, byteStream, execCtx);
     }
 
     @Override
@@ -200,36 +204,43 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         return GrpcStreams.serverRequestStream(requestHub);
     }
 
-    private <TReq extends Message, TResp extends Message, TBuilder extends Message.Builder>
+    private <TReq extends Message, TResp extends Message, TDef extends Message, TBuilder extends Message.Builder>
     void serverStreaming(
-            MethodDescriptor<TReq, TResp> method,
-            TReq request,
+            MethodDescriptor<TReq, TResp> method, TReq request,
             StreamObserver<TResp> responseObserver,
             Supplier<TBuilder> responseSupplier,
+            BiFunction<TBuilder, TDef, TBuilder> putDefinition,
             BiFunction<TBuilder, ByteString, TBuilder> putContent,
-            ServerStreamingMethod<TReq> serviceMethod) {
+            ServerStreamingMethod<TReq, TDef> serviceMethod) {
 
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
 
+        var definition = new CompletableFuture<TDef>();
         var byteStream = Concurrent.<ByteBuf>hub(execCtx);
         var protoByteStream = Concurrent.map(byteStream, Bytes::toProtoBytes);
 
         @SuppressWarnings("unchecked")
-        var response = Concurrent.map(protoByteStream, bytes ->
+        var message0 = definition.thenApply(def_ ->
+                (TResp) putDefinition
+                .apply(responseSupplier.get(), def_));
+
+        @SuppressWarnings("unchecked")
+        var content = Concurrent.map(protoByteStream, bytes ->
                 (TResp) putContent
                 .apply(responseSupplier.get(), bytes)
                 .build());
 
+        var response = Concurrent.concat(message0, content);
         response.subscribe(GrpcStreams.serverResponseStream(method, responseObserver));
 
         // Handle synchronous exceptions during validation
 
         try {
             validateRequest(method, request);
-            serviceMethod.execute(request, byteStream, execCtx);
+            serviceMethod.execute(request, definition, byteStream, execCtx);
         }
         catch (Exception e) {
-            byteStream.onError(e);
+            definition.completeExceptionally(e);
         }
     }
 
@@ -260,10 +271,11 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     @FunctionalInterface
     private interface ServerStreamingMethod<
-            TReq extends Message> {
+            TReq extends Message, TDef extends Message> {
 
         void execute(
                 TReq request,
+                CompletableFuture<TDef> def,
                 Flow.Subscriber<ByteBuf> byteStream,
                 IExecutionContext execCtx);
     }
