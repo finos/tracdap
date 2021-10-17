@@ -17,7 +17,16 @@
 package com.accenture.trac.common.exception;
 
 
-public class EInputValidation extends ETracPublic {
+/**
+ * A validation error during initial validation of request inputs
+ *
+ * Input validation errors refer to the first phase of validation, which is
+ * validation of fixed inputs. This validation refers to inputs in isolation,
+ * i.e. as a static object tree with no references to other versions or referenced
+ * objects. As such, input validations are always a result of invalid requests and
+ * are reported as ILLEGAL_ARGUMENT errors.
+ */
+public class EInputValidation extends EValidation {
 
     public EInputValidation(String message, Throwable cause) {
         super(message, cause);
