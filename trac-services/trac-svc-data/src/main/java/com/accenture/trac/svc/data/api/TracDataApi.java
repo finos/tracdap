@@ -242,7 +242,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 .findServiceByName("TracDataApi")
                 .findMethodByName(method.getBareMethodName());
 
-        validator.validateApiCall(msg, protoMethod);
+        validator.validateFixedMethod(msg, protoMethod);
 
         return msg;
     }

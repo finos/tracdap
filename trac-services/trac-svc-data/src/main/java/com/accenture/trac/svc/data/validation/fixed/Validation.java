@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 
 public class Validation {
 
-    static ValidationContext required(Object value, ValidationContext ctx) {
+    static ValidationContext required(ValidationContext ctx) {
 
         var parentMsg = ctx.parentMsg();
 
@@ -51,7 +51,7 @@ public class Validation {
 
         if (ctx.field().getType() == Descriptors.FieldDescriptor.Type.STRING) {
 
-            var str = (String) value;
+            var str = (String) ctx.target();
 
             if (str.isEmpty()) {
                 var err = String.format("A value is required for field [%s]", ctx.fieldName());
@@ -62,7 +62,7 @@ public class Validation {
         return ctx;
     }
 
-    static ValidationContext omitted(Object value, ValidationContext ctx) {
+    static ValidationContext omitted(ValidationContext ctx) {
 
         var parentMsg = ctx.parentMsg();
 
@@ -84,7 +84,7 @@ public class Validation {
         return ctx;
     }
 
-    static ValidationContext optional(Object value, ValidationContext ctx) {
+    static ValidationContext optional(ValidationContext ctx) {
 
         var parentMsg = ctx.parentMsg();
 
@@ -102,11 +102,11 @@ public class Validation {
         return ctx;
     }
 
-    static ValidationContext uuid(Object value, ValidationContext ctx) {
+    static ValidationContext uuid(String value, ValidationContext ctx) {
 
         try {
             @SuppressWarnings("unused")
-            var uuid = UUID.fromString(value.toString());
+            var uuid = UUID.fromString(value);
         }
         catch (IllegalArgumentException e) {
             var err = String.format("Value of field [%s] is not a valid object ID: [%s]", ctx.fieldName(), value);
@@ -116,18 +116,16 @@ public class Validation {
         return ctx;
     }
 
-    static ValidationContext isoDatetime(Object value, ValidationContext ctx) {
+    static ValidationContext isoDatetime(String value, ValidationContext ctx) {
 
         if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
             throw new EUnexpected();
-
-        var str = (String) value;
 
         try {
 
             // Allow for parsing with or without zone offsets
 
-            MetadataCodec.ISO_DATETIME_INPUT_FORMAT.parseBest(str,
+            MetadataCodec.ISO_DATETIME_INPUT_FORMAT.parseBest(value,
                     OffsetDateTime::from,
                     LocalDateTime::from);
 
@@ -142,21 +140,21 @@ public class Validation {
         }
     }
 
-    static ValidationContext identifier(Object value, ValidationContext ctx) {
+    static ValidationContext identifier(String value, ValidationContext ctx) {
 
         return regexMatch(
                 ValidationConstants.VALID_IDENTIFIER, true,
                 "is not a valid identifier", value, ctx);
     }
 
-    static ValidationContext notTracReserved(Object value, ValidationContext ctx) {
+    static ValidationContext notTracReserved(String value, ValidationContext ctx) {
 
         return regexMatch(
                 ValidationConstants.TRAC_RESERVED_IDENTIFIER, false,
                 "is a TRAC reserved identifier", value, ctx);
     }
 
-    static ValidationContext mimeType(Object value, ValidationContext ctx) {
+    static ValidationContext mimeType(String value, ValidationContext ctx) {
 
         // First check the value matches the mime type regex, i.e. has the right form
         ctx = regexMatch(
@@ -167,8 +165,7 @@ public class Validation {
             return ctx;
 
         // Second check the main part of the type is a registered media type
-        var str = (String) value;
-        var mainType = str.substring(0, str.indexOf("/"));
+        var mainType = value.substring(0, value.indexOf("/"));
 
         if (!ValidationConstants.REGISTERED_MIME_TYPES.contains(mainType)) {
             var err = String.format("Value of field [%s] is not a registered mime type: [%s]", ctx.fieldName(), value);
@@ -178,7 +175,7 @@ public class Validation {
         return ctx;
     }
 
-    static ValidationContext fileName(Object value, ValidationContext ctx) {
+    static ValidationContext fileName(String value, ValidationContext ctx) {
 
         ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_CHARS, false,
                 "contains illegal characters", value, ctx);
@@ -192,7 +189,7 @@ public class Validation {
         // There is a possibility ctrl chars are present as well and will not be reported
         // In that case the error for ctrl chars will become visible when non-standard whitespace is removed
 
-        if (! ValidationConstants.FILENAME_ILLEGAL_WHITESPACE.matcher(value.toString()).matches())
+        if (! ValidationConstants.FILENAME_ILLEGAL_WHITESPACE.matcher(value).matches())
 
             ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_CTRL, false,
                     "contains ASCII control characters", value, ctx);
@@ -216,12 +213,12 @@ public class Validation {
 
     private static ValidationContext regexMatch(
             Pattern regex, boolean invertMatch, String desc,
-            Object value, ValidationContext ctx) {
+            String value, ValidationContext ctx) {
 
         if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
             throw new EUnexpected();
 
-        var matcher = regex.matcher((String) value);
+        var matcher = regex.matcher(value);
 
         if (matcher.matches() ^ invertMatch) {
             var err = String.format("Value of field [%s] %s: [%s]", ctx.fieldName(), desc, value);

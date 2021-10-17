@@ -26,30 +26,34 @@ import java.util.List;
 class ValidationLocation {
 
     private final ValidationLocation parent;
+    private final ValidationKey key;
+    private final Object target;
 
     private final Descriptors.MethodDescriptor method = null;
     private final Descriptors.OneofDescriptor oneOf;
     private final Descriptors.FieldDescriptor field;
     private final String fieldName;
 
-    private final Object msg;
 
     private boolean failed;
     private boolean skipped;
 
     public ValidationLocation(
             ValidationLocation parent,
+            ValidationKey key,
+            Object target,
+
             Descriptors.OneofDescriptor oneOf,
             Descriptors.FieldDescriptor field,
-            String fieldName,
-            Object msg) {
+            String fieldName) {
 
         this.parent = parent;
+        this.key = key;
+        this.target = target;
+
         this.oneOf = oneOf;
         this.field = field;
         this.fieldName = fieldName;
-
-        this.msg = msg;
 
         this.failed = false;
         this.skipped = false;
@@ -57,19 +61,28 @@ class ValidationLocation {
 
     public ValidationLocation(
             ValidationLocation parent,
+            ValidationKey key,
+            Object target,
             Descriptors.FieldDescriptor field,
-            String fieldName,
-            Object msg) {
+            String fieldName) {
 
-        this(parent, null, field, fieldName, msg);
+        this(parent, key, target, null, field, fieldName);
     }
 
-    public void fail() {
-        failed = true;
+    public ValidationLocation parent() {
+        return parent;
     }
 
-    public void skip() {
-        skipped = true;
+    public ValidationKey key() {
+        return key;
+    }
+
+    public String fieldName() {
+        return fieldName;
+    }
+
+    public Object obj() {
+        return target;
     }
 
     public boolean isOneOf() {
@@ -84,22 +97,6 @@ class ValidationLocation {
         return field;
     }
 
-    public String fieldName() {
-        return fieldName;
-    }
-
-    public Object obj() {
-        return msg;
-    }
-
-    public Message msg() {
-
-        if (!(msg instanceof Message))
-            throw new EUnexpected();
-
-        return (Message) msg;
-    }
-
     public boolean failed() {
         return failed;
     }
@@ -112,10 +109,22 @@ class ValidationLocation {
         return failed || skipped;
     }
 
-
-    public ValidationLocation parent() {
-        return parent;
+    void fail() {
+        failed = true;
     }
+
+    void skip() {
+        skipped = true;
+    }
+
+    Message msg() {
+
+        if (!(target instanceof Message))
+            throw new EUnexpected();
+
+        return (Message) target;
+    }
+
 
     public List<ValidationLocation> stack() {
         return stack(0);

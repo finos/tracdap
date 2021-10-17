@@ -22,13 +22,44 @@ import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.metadata.TagUpdate;
 import com.accenture.trac.svc.data.validation.core.ValidationContext;
+import com.google.protobuf.Descriptors;
 
 
 public class DataApiValidator {
 
+    private static final Descriptors.Descriptor FILE_WRITE_REQUEST;
+    private static final Descriptors.FieldDescriptor FWR_TENANT;
+    private static final Descriptors.FieldDescriptor FWR_TAG_UPDATES;
+    private static final Descriptors.FieldDescriptor FWR_PRIOR_VERSION;
+    private static final Descriptors.FieldDescriptor FWR_NAME;
+    private static final Descriptors.FieldDescriptor FWR_MIME_TYPE;
+    private static final Descriptors.FieldDescriptor FWR_SIZE;
+
+    private static final Descriptors.Descriptor FILE_READ_REQUEST;
+    private static final Descriptors.FieldDescriptor FRR_TENANT;
+    private static final Descriptors.FieldDescriptor FRR_SELECTOR;
+
+    static {
+        FILE_WRITE_REQUEST = FileWriteRequest.getDescriptor();
+        FWR_TENANT = field(FILE_WRITE_REQUEST, FileWriteRequest.TENANT_FIELD_NUMBER);
+        FWR_TAG_UPDATES = field(FILE_WRITE_REQUEST, FileWriteRequest.TAGUPDATES_FIELD_NUMBER);
+        FWR_PRIOR_VERSION = field(FILE_WRITE_REQUEST, FileWriteRequest.PRIORVERSION_FIELD_NUMBER);
+        FWR_NAME = field(FILE_WRITE_REQUEST, FileWriteRequest.NAME_FIELD_NUMBER);
+        FWR_MIME_TYPE = field(FILE_WRITE_REQUEST, FileWriteRequest.MIMETYPE_FIELD_NUMBER);
+        FWR_SIZE = field(FILE_WRITE_REQUEST, FileWriteRequest.SIZE_FIELD_NUMBER);
+
+        FILE_READ_REQUEST = FileReadRequest.getDescriptor();
+        FRR_TENANT = field(FILE_READ_REQUEST, FileReadRequest.TENANT_FIELD_NUMBER);
+        FRR_SELECTOR = field(FILE_READ_REQUEST, FileReadRequest.SELECTOR_FIELD_NUMBER);
+    }
+
+    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
+        return msg.findFieldByNumber(fieldNo);
+    }
+
     public static ValidationContext validateCreateFile(FileWriteRequest msg, ValidationContext ctx) {
 
-        ctx = ctx.push("priorVersion")
+        ctx = ctx.push(FWR_PRIOR_VERSION)
                 .apply(Validation::omitted)
                 .pop();
 
@@ -37,7 +68,7 @@ public class DataApiValidator {
 
     public static ValidationContext validateUpdateFile(FileWriteRequest msg, ValidationContext ctx) {
 
-        ctx = ctx.push("priorVersion")
+        ctx = ctx.push(FWR_PRIOR_VERSION)
                 .apply(Validation::required)
                 .apply(MetadataValidator::validateTagSelector, TagSelector.class)
                 .apply(Validation.selectorType(ObjectType.FILE), TagSelector.class)
@@ -52,28 +83,28 @@ public class DataApiValidator {
         // This could be loosened a bit, perhaps natural language and UTF is ok?
         // Easier to loosen later hence leaving the strict restriction for now
 
-        ctx = ctx.push("tenant")
+        ctx = ctx.push(FWR_TENANT)
                 .apply(Validation::required)
                 .apply(Validation::identifier)
                 .pop();
 
-        ctx = ctx.push("tagUpdates")
+        ctx = ctx.push(FWR_TAG_UPDATES)
                 .applyTypedList(MetadataValidator::validateTagUpdate, TagUpdate.class)
                 .pop();
 
-        ctx = ctx.push("name")
+        ctx = ctx.push(FWR_NAME)
                 .apply(Validation::required)
                 .apply(Validation::fileName)
                 .pop();
 
-        ctx = ctx.push("mimeType")
+        ctx = ctx.push(FWR_MIME_TYPE)
                 .apply(Validation::required)
                 .apply(Validation::mimeType)
                 .pop();
 
-        ctx = ctx.push("size")
+        ctx = ctx.push(FWR_SIZE)
                 .apply(Validation::optional)
-                .apply(Validation::notNegative)
+                .apply(Validation::notNegative, Long.class)
                 .pop();
 
         return ctx;
@@ -81,12 +112,12 @@ public class DataApiValidator {
 
     public static ValidationContext validateReadFile(FileReadRequest msg, ValidationContext ctx) {
 
-        ctx = ctx.push("tenant")
+        ctx = ctx.push(FRR_TENANT)
                 .apply(Validation::required)
                 .apply(Validation::identifier)
                 .pop();
 
-        ctx = ctx.push("selector")
+        ctx = ctx.push(FRR_SELECTOR)
                 .apply(Validation::required)
                 .apply(MetadataValidator::validateTagSelector, TagSelector.class)
                 .apply(Validation.selectorType(ObjectType.FILE), TagSelector.class)

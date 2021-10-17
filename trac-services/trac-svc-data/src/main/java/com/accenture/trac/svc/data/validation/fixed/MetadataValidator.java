@@ -30,21 +30,42 @@ public class MetadataValidator {
     // Full implementation will be comprehensive across the metadata model
     // Requires generic handling of all message, enum and primitive types, as well as the TRAC type system
 
-    private static final Descriptors.FieldDescriptor TAG_SELECTOR_OBJECT_VERSION_FIELD =
-            TagSelector.getDescriptor()
-            .findFieldByNumber(TagSelector.OBJECTVERSION_FIELD_NUMBER);
+    private static final Descriptors.Descriptor TAG_UPDATE;
+    private static final Descriptors.FieldDescriptor TU_ATTR_NAME;
 
-    private static final Descriptors.FieldDescriptor TAG_SELECTOR_OBJECT_ASOF_FIELD =
-            TagSelector.getDescriptor()
-            .findFieldByNumber(TagSelector.OBJECTASOF_FIELD_NUMBER);
+    private static final Descriptors.Descriptor TAG_SELECTOR;
+    private static final Descriptors.FieldDescriptor TS_OBJECT_ID;
+    private static final Descriptors.FieldDescriptor TS_OBJECT_VERSION;
+    private static final Descriptors.FieldDescriptor TS_OBJECT_ASOF;
+    private static final Descriptors.FieldDescriptor TS_TAG_VERSION;
+    private static final Descriptors.FieldDescriptor TS_TAG_ASOF;
+    private static final Descriptors.OneofDescriptor TS_OBJECT_CRITERIA;
+    private static final Descriptors.OneofDescriptor TS_TAG_CRITERIA;
 
-    private static final Descriptors.FieldDescriptor TAG_SELECTOR_TAG_VERSION_FIELD =
-            TagSelector.getDescriptor()
-            .findFieldByNumber(TagSelector.TAGVERSION_FIELD_NUMBER);
+    private static final Descriptors.Descriptor DATETIME_VALUE;
+    private static final Descriptors.FieldDescriptor DTV_ISO_DATETIME;
 
-    private static final Descriptors.FieldDescriptor TAG_SELECTOR_TAG_ASOF_FIELD =
-            TagSelector.getDescriptor()
-            .findFieldByNumber(TagSelector.TAGASOF_FIELD_NUMBER);
+    static {
+
+        TAG_UPDATE = TagUpdate.getDescriptor();
+        TU_ATTR_NAME = field(TAG_UPDATE, TagUpdate.ATTRNAME_FIELD_NUMBER);
+
+        TAG_SELECTOR = TagSelector.getDescriptor();
+        TS_OBJECT_ID = field(TAG_SELECTOR, TagSelector.OBJECTID_FIELD_NUMBER);
+        TS_OBJECT_VERSION = field(TAG_SELECTOR, TagSelector.OBJECTVERSION_FIELD_NUMBER);
+        TS_OBJECT_ASOF =field(TAG_SELECTOR, TagSelector.OBJECTASOF_FIELD_NUMBER);
+        TS_TAG_VERSION = field(TAG_SELECTOR, TagSelector.TAGVERSION_FIELD_NUMBER);
+        TS_TAG_ASOF = field(TAG_SELECTOR, TagSelector.TAGASOF_FIELD_NUMBER);
+        TS_OBJECT_CRITERIA = TS_OBJECT_VERSION.getContainingOneof();
+        TS_TAG_CRITERIA = TS_TAG_VERSION.getContainingOneof();
+
+        DATETIME_VALUE = DatetimeValue.getDescriptor();
+        DTV_ISO_DATETIME = field(DATETIME_VALUE, DatetimeValue.ISODATETIME_FIELD_NUMBER);
+    }
+
+    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
+        return msg.findFieldByNumber(fieldNo);
+    }
 
 
     public static ValidationContext validateTagUpdate(TagUpdate msg, ValidationContext ctx) {
@@ -53,7 +74,7 @@ public class MetadataValidator {
         // Requires enum validation for TagOperation
         // Also requires full recursive validation of TRAC Values and TypeDescriptors
 
-        ctx = ctx.push("attrName")
+        ctx = ctx.push(TU_ATTR_NAME)
                 .apply(Validation::required)
                 .apply(Validation::identifier)
                 .apply(Validation::notTracReserved)
@@ -69,21 +90,21 @@ public class MetadataValidator {
         // There is an issue where protobuf returns EnumValueDescriptor for the field value
         // A generic way is needed to convert these into the actual enum type
 
-        ctx = ctx.push("objectId")
+        ctx = ctx.push(TS_OBJECT_ID)
                 .apply(Validation::required)
                 .apply(Validation::uuid)
                 .pop();
 
-        ctx = ctx.pushOneOf("objectVersionCriteria")
+        ctx = ctx.pushOneOf(TS_OBJECT_CRITERIA)
                 .apply(Validation::required)
-                .applyIf(Validation::positive, msg.hasField(TAG_SELECTOR_OBJECT_VERSION_FIELD))
-                .applyIf(MetadataValidator::datetimeValue, DatetimeValue.class, msg.hasField(TAG_SELECTOR_OBJECT_ASOF_FIELD))
+                .applyIf(Validation::positive, Integer.class, msg.hasField(TS_OBJECT_VERSION))
+                .applyIf(MetadataValidator::datetimeValue, DatetimeValue.class, msg.hasField(TS_OBJECT_ASOF))
                 .pop();
 
-        ctx = ctx.pushOneOf("tagVersionCriteria")
+        ctx = ctx.pushOneOf(TS_TAG_CRITERIA)
                 .apply(Validation::required)
-                .applyIf(Validation::positive, msg.hasField(TAG_SELECTOR_TAG_VERSION_FIELD))
-                .applyIf(MetadataValidator::datetimeValue, DatetimeValue.class, msg.hasField(TAG_SELECTOR_TAG_ASOF_FIELD))
+                .applyIf(Validation::positive, Integer.class, msg.hasField(TS_TAG_VERSION))
+                .applyIf(MetadataValidator::datetimeValue, DatetimeValue.class, msg.hasField(TS_TAG_ASOF))
                 .pop();
 
         return ctx;
@@ -91,7 +112,7 @@ public class MetadataValidator {
 
     public static ValidationContext datetimeValue(DatetimeValue msg, ValidationContext ctx) {
 
-        return ctx.push("isoDatetime")
+        return ctx.push(DTV_ISO_DATETIME)
                 .apply(Validation::required)
                 .apply(Validation::isoDatetime)
                 .pop();

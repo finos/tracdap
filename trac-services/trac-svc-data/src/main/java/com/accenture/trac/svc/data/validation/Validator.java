@@ -16,66 +16,67 @@
 
 package com.accenture.trac.svc.data.validation;
 
-import com.accenture.trac.api.FileReadRequest;
-import com.accenture.trac.api.FileWriteRequest;
 import com.accenture.trac.common.exception.EInputValidation;
-import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.svc.data.validation.core.ValidationContext;
-import com.accenture.trac.svc.data.validation.core.ValidationResult;
-import com.accenture.trac.svc.data.validation.fixed.DataApiValidator;
+import com.accenture.trac.metadata.ObjectDefinition;
+import com.accenture.trac.metadata.TagHeader;
+import com.accenture.trac.svc.data.validation.core.*;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
+
 
 public class Validator {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
+    private final Map<ValidationKey, ValidationFunction<?>> validators;
 
-    public ValidationResult validateObject(Message msg) {
-
-        return ValidationResult.pass();
+    public Validator() {
+        this.validators = ValidatorBuilder.buildValidatorMap();
     }
 
-    public void validateApiCall(Message msg, Descriptors.MethodDescriptor method) {
+    public <TMsg extends Message>
+    void validateFixedMethod(TMsg message, Descriptors.MethodDescriptor method) {
 
-        var ctx = ValidationContext.forApiCall(method, msg);
-        validateApiCall(msg, method, ctx);
+        var ctx = ValidationContext.forMethod(message, method);
+        topLevelValidation(message, ctx);
     }
 
-    public void validateVersion(Message msg, Message original) {
+    public <TMsg extends Message>
+    void validateFixedObject(TMsg message) {
 
-        ValidationResult.pass();
+        var ctx = ValidationContext.forMessage(message);
+        topLevelValidation(message, ctx);
     }
 
-    private void validateApiCall(Message msg, Descriptors.MethodDescriptor method, ValidationContext ctx) {
+    public <TMsg extends Message>
+    void validateVersion(TMsg current, TMsg prior) {
 
-        var methodName = method.getName();
+        var ctx = ValidationContext.forVersion(current, prior, prior.getDescriptorForType());
+        topLevelValidation(current, ctx);  // TODO: prior
+    }
 
-        if (methodName == null)
-            throw new EUnexpected();
+    public <TMsg extends Message>
+    void validateReferential(TMsg message, Map<TagHeader, ObjectDefinition> references) {
 
-        log.info("VALIDATION START: [{}]", methodName);
+    }
 
-        if (methodName.equals("createFile") && msg instanceof FileWriteRequest)
-            ctx = DataApiValidator.validateCreateFile((FileWriteRequest) msg, ctx);
+    private <TMsg extends Message>
+    void topLevelValidation(TMsg msg, ValidationContext ctx) {
 
-        else if (methodName.equals("updateFile") && msg instanceof FileWriteRequest)
-            ctx = DataApiValidator.validateUpdateFile((FileWriteRequest) msg, ctx);
+        var key = ctx.key();
 
-        else if (methodName.equals("readFile") && msg instanceof FileReadRequest)
-            ctx = DataApiValidator.validateReadFile((FileReadRequest) msg, ctx);
+        log.info("VALIDATION START: [{}]", key.displayName());
 
-        else
-            throw new ETracInternal("Missing required validators");
-
-        var result = ValidationResult.forContext(ctx);
+        var resultCtx = registeredValidation(msg, ctx).pop();
+        var result = ValidationResult.forContext(resultCtx);
 
         if (!result.ok()) {
 
-            log.error("VALIDATION FAILED: [{}]", methodName);
+            log.error("VALIDATION FAILED: [{}]", key.displayName());
 
             for (var failure: result.failures())
                 log.error(failure.message());
@@ -83,7 +84,37 @@ public class Validator {
             throw new EInputValidation(result.failureMessage());
         }
 
-        log.info("VALIDATION SUCCEEDED: [{}]", methodName);
+        log.info("VALIDATION SUCCEEDED: [{}]", key.displayName());
     }
 
+    private <TMsg extends Message>
+    ValidationContext registeredValidation(TMsg msg, ValidationContext ctx) {
+
+        var key = ctx.key();
+        var validator = validators.get(key);
+
+        if (validator == null) {
+            log.error("No validator is registered for validation [{}]", key);
+            throw new EUnexpected();
+        }
+
+        if (validator.isBasic())
+            return ctx.apply(validator.basic());
+
+        if (validator.isTyped()) {
+
+            if (!validator.targetClass().isInstance(msg))
+                throw new EUnexpected();
+
+            @SuppressWarnings("unchecked")
+            var typedValidator = (ValidationFunction.Typed<TMsg>) validator.typed();
+
+            @SuppressWarnings("unchecked")
+            var typedTarget = (Class<TMsg>) msg.getClass();
+
+            return ctx.apply(typedValidator, typedTarget);
+        }
+
+        throw new EUnexpected();
+    }
 }

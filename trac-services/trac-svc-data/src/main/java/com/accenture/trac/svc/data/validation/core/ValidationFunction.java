@@ -19,17 +19,51 @@ package com.accenture.trac.svc.data.validation.core;
 import com.google.protobuf.Message;
 
 
-public interface ValidationFunction {
+public class ValidationFunction<T> {
 
     @FunctionalInterface
-    interface Basic {
+    public interface Basic { ValidationContext validate(ValidationContext ctx); }
 
-        ValidationContext validate(Object value, ValidationContext ctx);
+    @FunctionalInterface
+    public interface Typed<T> { ValidationContext validate(T value, ValidationContext ctx); }
+
+    @FunctionalInterface
+    public interface Version<T> { ValidationContext validate(T current, T prior, ValidationContext ctx); }
+
+
+    private final Class<T> targetClass;
+    private final ValidationFunction.Basic basic;
+    private final ValidationFunction.Typed<T> typed;
+
+    public ValidationFunction(ValidationFunction.Basic validator, Class<T> targetClass) {
+        this.targetClass = targetClass;
+        this.basic = validator;
+        this.typed = null;
     }
 
-    @FunctionalInterface
-    interface Typed<TMsg extends Message> {
+    public ValidationFunction(ValidationFunction.Typed<T> validator, Class<T> targetClass) {
+        this.targetClass = targetClass;
+        this.basic = null;
+        this.typed = validator;
+    }
 
-        ValidationContext validate(TMsg msg, ValidationContext ctx);
+    public Class<T> targetClass() {
+        return targetClass;
+    }
+
+    public boolean isBasic() {
+        return basic != null;
+    }
+
+    public ValidationFunction.Basic basic() {
+        return basic;
+    }
+
+    public boolean isTyped() {
+        return typed != null;
+    }
+
+    public ValidationFunction.Typed<T> typed() {
+        return typed;
     }
 }

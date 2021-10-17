@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.data.validation.core;
 
+import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
@@ -36,27 +37,40 @@ public class ValidationContext {
         failures = new ArrayList<>();
     }
 
-    public static ValidationContext forMessage(Descriptors.Descriptor message, Message msg) {
+    public static ValidationContext forMethod(Message msg, Descriptors.MethodDescriptor descriptor) {
 
-        var root = new ValidationLocation(null, null, null, msg);
+        var key = ValidationKey.fixed(msg.getDescriptorForType(), descriptor);
+
+        var root = new ValidationLocation(null, key, msg, null, null);
         return new ValidationContext(root);
     }
 
-    public static ValidationContext forApiCall(Descriptors.MethodDescriptor method, Message msg) {
+    public static ValidationContext forMessage(Message msg) {
 
-        var root = new ValidationLocation(null, null, null, msg);
+        var key = ValidationKey.fixed(msg.getDescriptorForType(), null);
+
+        var root = new ValidationLocation(null, key, msg, null, null);
         return new ValidationContext(root);
     }
 
-    public ValidationContext push(String field) {
+    public static ValidationContext forVersion(Message current, Message prior, Descriptors.Descriptor descriptor) {
+
+        var key = ValidationKey.fixed(prior.getDescriptorForType(), null);  // todo: key for version val
+
+        var root = new ValidationLocation(null, key, current, null, null);
+        return new ValidationContext(root);
+    }
+
+    public ValidationContext push(Descriptors.FieldDescriptor fd) {
 
         var parentLoc = location.peek();
+        var parentKey = parentLoc.key();
         var parentMsg = parentLoc.msg();
 
-        var fd = parentMsg.getDescriptorForType().findFieldByName(field);
+        var field = fd.getName();
         var obj = parentMsg.getField(fd);
 
-        var loc = new ValidationLocation(parentLoc, fd, field, obj);
+        var loc = new ValidationLocation(parentLoc, null, obj, fd, field);
 
         if (parentLoc.skipped())
             loc.skip();
@@ -66,18 +80,10 @@ public class ValidationContext {
         return this;
     }
 
-    public ValidationContext pushOneOf(String field) {
+    public ValidationContext pushOneOf(Descriptors.OneofDescriptor oneOf) {
 
         var parentLoc = location.peek();
         var parentMsg = parentLoc.msg();
-
-        var oneOfs = parentMsg.getDescriptorForType().getOneofs();
-        var oneOfMaybe = oneOfs.stream().filter(oneOf -> oneOf.getName().equals(field)).findFirst();
-
-        if (oneOfMaybe.isEmpty())
-            throw new EUnexpected();
-
-        var oneOf = oneOfMaybe.get();
 
         // If the oneOf field has been set, look up the fd, field name and value for the field in use
         // In this case the location ctx be reported as that field in any error messages
@@ -87,10 +93,10 @@ public class ValidationContext {
         // Other checks must be guarded with optional(), omitted() or applyIf()
 
         var fd = parentMsg.hasOneof(oneOf) ? parentMsg.getOneofFieldDescriptor(oneOf) : null;
-        var name = fd != null ? fd.getName() : field;
+        var name = fd != null ? fd.getName() : oneOf.getName();
         var obj = fd != null ? parentMsg.getField(fd) : null;
 
-        var loc = new ValidationLocation(parentLoc, oneOf, fd, name, obj);
+        var loc = new ValidationLocation(parentLoc, null, obj, oneOf, fd, name);
 
         if (parentLoc.skipped())
             loc.skip();
@@ -111,7 +117,7 @@ public class ValidationContext {
         var obj = list.get(index);
         var fieldName = String.format("[%d]", index);
 
-        var loc = new ValidationLocation(parentLoc, parentLoc.field(), fieldName, obj);
+        var loc = new ValidationLocation(parentLoc, null, obj, parentLoc.field(), fieldName);
 
         if (parentLoc.skipped())
             loc.skip();
@@ -138,53 +144,57 @@ public class ValidationContext {
         if (done())
             return this;
 
-        var obj = location.peek().obj();
-
-        return validation.validate(obj, this);
+        return validation.validate(this);
     }
 
-    public <TMsg extends Message>
-    ValidationContext apply(ValidationFunction.Typed<TMsg> validation, Class<TMsg> msgClass) {
+    public ValidationContext apply(ValidationFunction.Typed<String> validation) {
+        return apply(validation, String.class);
+    }
+
+    public <T>
+    ValidationContext apply(ValidationFunction.Typed<T> validation, Class<T> targetClass) {
 
         if (done())
             return this;
 
-        var msg = location.peek().msg();
+        var obj = location.peek().obj();
 
-        if (!msgClass.isInstance(msg))
-            throw new EUnexpected();
+        if (!targetClass.isInstance(obj)) {
+            var err = String.format("Validator type error (expected %s, got %s)", targetClass, obj.getClass());
+            throw new ETracInternal(err);
+        }
 
         @SuppressWarnings("unchecked")
-        var typedMsg = (TMsg) msg;
+        var target = (T) obj;
 
-        return validation.validate(typedMsg, this);
+        return validation.validate(target, this);
+    }
+
+    public <T> ValidationContext apply(ValidationFunction.Version<T> validation) {
+
+        if (done())
+            return this;
+
+        var obj = (T) location.peek().obj();  // todo
+
+        return validation.validate(obj, null, this);
     }
 
     public ValidationContext applyIf(ValidationFunction.Basic validation, boolean condition) {
 
-        if (done() || !condition)
+        if (!condition)
             return this;
 
-        var obj = location.peek().obj();
-
-        return validation.validate(obj, this);
+        return apply(validation);
     }
 
-    public <TMsg extends Message>
-    ValidationContext applyIf(ValidationFunction.Typed<TMsg> validation, Class<TMsg> msgClass, boolean condition) {
+    public <T>
+    ValidationContext applyIf(ValidationFunction.Typed<T> validation, Class<T> targetClass, boolean condition) {
 
-        if (done() || !condition)
+        if (!condition)
             return this;
 
-        var msg = location.peek().msg();
-
-        if (!msgClass.isInstance(msg))
-            throw new EUnexpected();
-
-        @SuppressWarnings("unchecked")
-        var typedMsg = (TMsg) msg;
-
-        return validation.validate(typedMsg, this);
+        return apply(validation, targetClass);
     }
 
     public <TMsg extends Message>
@@ -235,6 +245,14 @@ public class ValidationContext {
         return this;
     }
 
+    public ValidationKey key() {
+        return location.peek().key();
+    }
+
+    public Object target() {
+        return location.peek().obj();
+    }
+
     public Message parentMsg() {
         return location.peek().parent().msg();
     }
@@ -267,12 +285,7 @@ public class ValidationContext {
         return location.peek().done();
     }
 
-
-
-
     public List<ValidationFailure> getErrors() {
         return failures;
     }
-
-
 }
