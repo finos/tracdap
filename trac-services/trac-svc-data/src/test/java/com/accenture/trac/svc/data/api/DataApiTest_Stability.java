@@ -154,8 +154,8 @@ public class DataApiTest_Stability extends DataApiTest_Base {
         // Use storage impl directly to check file has arrived in the storage back end
 
         var storageImpl = storage.getFileStorage(copy.getStorageKey());
-        var exists = storageImpl.exists(copy.getStoragePath());
-        var size = storageImpl.size(copy.getStoragePath());
+        var exists = storageImpl.exists(copy.getStoragePath(), execContext);
+        var size = storageImpl.size(copy.getStoragePath(), execContext);
         var storedContent = readFile(copy.getStoragePath(), storageImpl, execContext);
 
         waitFor(TEST_TIMEOUT, exists, size, storedContent);

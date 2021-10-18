@@ -26,17 +26,17 @@ import java.util.concurrent.Flow;
 
 public interface IFileStorage {
 
-    CompletionStage<Boolean> exists(String storagePath);
+    CompletionStage<Boolean> exists(String storagePath, IExecutionContext execContext);
 
-    CompletionStage<Long> size(String storagePath);
+    CompletionStage<Long> size(String storagePath, IExecutionContext execContext);
 
-    CompletionStage<FileStat> stat(String storagePath);
+    CompletionStage<FileStat> stat(String storagePath, IExecutionContext execContext);
 
-    CompletionStage<DirStat> ls(String storagePath);
+    CompletionStage<DirStat> ls(String storagePath, IExecutionContext execContext);
 
-    CompletionStage<Void> mkdir(String storagePath, boolean recursive);
+    CompletionStage<Void> mkdir(String storagePath, boolean recursive, IExecutionContext execContext);
 
-    CompletionStage<Void> rm(String storagePath, boolean recursive);
+    CompletionStage<Void> rm(String storagePath, boolean recursive, IExecutionContext execContext);
 
     Flow.Publisher<ByteBuf> reader(
             String storagePath,

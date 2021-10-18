@@ -201,7 +201,7 @@ public class DataWriteService {
         var storagePath = copy.getStoragePath();
         var storageDir = storagePath.substring(0, storagePath.lastIndexOf("/"));  // TODO: Can this be cleaner?
 
-        return storage.mkdir(storageDir, true).thenCompose(x -> {
+        return storage.mkdir(storageDir, true, execContext).thenCompose(x -> {
 
             var signal = new CompletableFuture<Long>();
             var writer = storage.writer(storagePath, signal, execContext);

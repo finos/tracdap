@@ -127,7 +127,7 @@ public class LocalFileStorage implements IFileStorage {
     }
 
     @Override
-    public CompletionStage<Boolean> exists(String storagePath) {
+    public CompletionStage<Boolean> exists(String storagePath, IExecutionContext execContext) {
 
         try {
             log.info("STORAGE OPERATION: {} {} [{}]", storageKey, EXISTS_OPERATION, storagePath);
@@ -146,7 +146,7 @@ public class LocalFileStorage implements IFileStorage {
     }
 
     @Override
-    public CompletableFuture<Long> size(String storagePath) {
+    public CompletableFuture<Long> size(String storagePath, IExecutionContext execContext) {
 
         try {
             log.info("STORAGE OPERATION: {} {} [{}]", storageKey, SIZE_OPERATION, storagePath);
@@ -170,7 +170,7 @@ public class LocalFileStorage implements IFileStorage {
     }
 
     @Override
-    public CompletionStage<FileStat> stat(String storagePath) {
+    public CompletionStage<FileStat> stat(String storagePath, IExecutionContext execContext) {
 
         try {
             log.info("STORAGE OPERATION: {} {} [{}]", storageKey, STAT_OPERATION, storagePath);
@@ -188,7 +188,7 @@ public class LocalFileStorage implements IFileStorage {
     }
 
     @Override
-    public CompletionStage<DirStat> ls(String storagePath) {
+    public CompletionStage<DirStat> ls(String storagePath, IExecutionContext execContext) {
 
         try {
             log.info("STORAGE OPERATION: {} {} [{}]", storageKey, LS_OPERATION, storagePath);
@@ -273,7 +273,7 @@ public class LocalFileStorage implements IFileStorage {
     }
 
     @Override
-    public CompletionStage<Void> mkdir(String storagePath, boolean recursive) {
+    public CompletionStage<Void> mkdir(String storagePath, boolean recursive, IExecutionContext execContext) {
 
         try {
             log.info("STORAGE OPERATION: {} {} [{}]", storageKey, MKDIR_OPERATION, storagePath);
@@ -295,7 +295,7 @@ public class LocalFileStorage implements IFileStorage {
     }
 
     @Override
-    public CompletionStage<Void> rm(String storagePath, boolean recursive) {
+    public CompletionStage<Void> rm(String storagePath, boolean recursive, IExecutionContext execContext) {
 
         try {
             log.info("STORAGE OPERATION: {} {} [{}]", storageKey, RM_OPERATION, storagePath);

@@ -45,6 +45,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Properties;
 import java.util.concurrent.*;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 
@@ -88,11 +89,11 @@ public class StorageTestSuite_FileOperations {
     @Test
     void testExists_dir() throws Exception {
 
-        var prepare = storage.mkdir("test_dir", false);
+        var prepare = storage.mkdir("test_dir", false, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var dirPresent = storage.exists("test_dir");
-        var dirNotPresent = storage.exists("other_dir");
+        var dirPresent = storage.exists("test_dir", execContext);
+        var dirNotPresent = storage.exists("other_dir", execContext);
 
         waitFor(TEST_TIMEOUT, dirPresent, dirNotPresent);
 
@@ -106,8 +107,8 @@ public class StorageTestSuite_FileOperations {
         var prepare = makeSmallFile("test_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var filePresent = storage.exists("test_file.txt");
-        var fileNotPresent = storage.exists("other_file.txt");
+        var filePresent = storage.exists("test_file.txt", execContext);
+        var fileNotPresent = storage.exists("other_file.txt", execContext);
 
         waitFor(TEST_TIMEOUT, filePresent, fileNotPresent);
 
@@ -121,7 +122,7 @@ public class StorageTestSuite_FileOperations {
         var prepare = makeFile("test_file.txt", Unpooled.EMPTY_BUFFER, storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var emptyFileExist = storage.exists("test_file.txt");
+        var emptyFileExist = storage.exists("test_file.txt", execContext);
 
         waitFor(TEST_TIMEOUT, emptyFileExist);
 
@@ -133,7 +134,7 @@ public class StorageTestSuite_FileOperations {
 
         // Storage root should always exist
 
-        var exists = storage.exists(".");
+        var exists = storage.exists(".", execContext);
 
         waitFor(TEST_TIMEOUT, exists);
 
@@ -163,7 +164,7 @@ public class StorageTestSuite_FileOperations {
         var prepare = makeFile("test_file.txt", content, storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var size = storage.size("test_file.txt");
+        var size = storage.size("test_file.txt", execContext);
 
         waitFor(TEST_TIMEOUT, size);
 
@@ -176,7 +177,7 @@ public class StorageTestSuite_FileOperations {
         var prepare = makeFile("test_file.txt", Unpooled.EMPTY_BUFFER, storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var size =  storage.size("test_file.txt");
+        var size =  storage.size("test_file.txt", execContext);
 
         waitFor(TEST_TIMEOUT, size);
 
@@ -186,10 +187,10 @@ public class StorageTestSuite_FileOperations {
     @Test
     void testSize_dir() {
 
-        var prepare = storage.mkdir("test_dir", false);
+        var prepare = storage.mkdir("test_dir", false, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var size = storage.size("test_dir");
+        var size = storage.size("test_dir", execContext);
 
         waitFor(TEST_TIMEOUT, size);
 
@@ -199,7 +200,7 @@ public class StorageTestSuite_FileOperations {
     @Test
     void testSize_missing() {
 
-        var size = storage.size("missing_file.txt");
+        var size = storage.size("missing_file.txt", execContext);
 
         waitFor(TEST_TIMEOUT, size);
 
@@ -211,7 +212,7 @@ public class StorageTestSuite_FileOperations {
 
         // Storage root is a directory, size operation should fail with EStorageRequest
 
-        var size = storage.size(".");
+        var size = storage.size(".", execContext);
 
         waitFor(TEST_TIMEOUT, size);
 
@@ -241,12 +242,12 @@ public class StorageTestSuite_FileOperations {
 
         var expectedSize = content.readableBytes();
         var prepare = storage
-                .mkdir("some_dir", false)
+                .mkdir("some_dir", false, execContext)
                 .thenCompose(x -> makeFile("some_dir/test_file.txt", content, storage, execContext));
 
         waitFor(TEST_TIMEOUT, prepare);
 
-        var stat = storage.stat("some_dir/test_file.txt");
+        var stat = storage.stat("some_dir/test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
         var statResult = resultOf(stat);
@@ -274,7 +275,7 @@ public class StorageTestSuite_FileOperations {
         var prepare = makeSmallFile("test_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var stat = storage.stat("test_file.txt");
+        var stat = storage.stat("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(100);  // Let time elapse before/after the test calls
@@ -296,7 +297,7 @@ public class StorageTestSuite_FileOperations {
         var prepare = makeSmallFile("test_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var stat = storage.stat("test_file.txt");
+        var stat = storage.stat("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(100);  // Let time elapse before/after the test calls
@@ -339,7 +340,7 @@ public class StorageTestSuite_FileOperations {
         waitFor(TEST_TIMEOUT, collect);
         collect.toCompletableFuture().get().release();
 
-        var stat = storage.stat("test_file.txt");
+        var stat = storage.stat("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(100);  // Let time elapse before/after the test calls
@@ -354,10 +355,10 @@ public class StorageTestSuite_FileOperations {
     @Test
     void testStat_dirOk() throws Exception {
 
-        var prepare = storage.mkdir("some_dir/test_dir", true);
+        var prepare = storage.mkdir("some_dir/test_dir", true, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var stat = storage.stat("some_dir/test_dir");
+        var stat = storage.stat("some_dir/test_dir", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
         var statResult = resultOf(stat);
@@ -379,10 +380,10 @@ public class StorageTestSuite_FileOperations {
         var testStart = Instant.now();
         Thread.sleep(100);  // Let time elapse before/after the test calls
 
-        var prepare = storage.mkdir("some_dir/test_dir", true);
+        var prepare = storage.mkdir("some_dir/test_dir", true, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var stat = storage.stat("some_dir/test_dir");
+        var stat = storage.stat("some_dir/test_dir", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(100);  // Let time elapse before/after the test calls
@@ -399,7 +400,7 @@ public class StorageTestSuite_FileOperations {
         // ctime, mtime and atime for dirs is unlikely to be supported in cloud storage buckets
         // So, all of these fields are optional in stat responses for directories
 
-        var prepare1 = storage.mkdir("some_dir/test_dir", true);
+        var prepare1 = storage.mkdir("some_dir/test_dir", true, execContext);
         waitFor(TEST_TIMEOUT, prepare1);
 
         // "Modify" the directory by adding a file to it
@@ -410,7 +411,7 @@ public class StorageTestSuite_FileOperations {
         var prepare2 = makeSmallFile("some_dir/test_dir/a_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare2);
 
-        var stat = storage.stat("some_dir/test_dir");
+        var stat = storage.stat("some_dir/test_dir", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(100);  // Let time elapse before/after the test calls
@@ -428,7 +429,7 @@ public class StorageTestSuite_FileOperations {
         // So, all of these fields are optional in stat responses for directories
 
         var prepare1 = storage
-                .mkdir("some_dir/test_dir", true)
+                .mkdir("some_dir/test_dir", true, execContext)
                 .thenCompose(x -> makeSmallFile("some_dir/test_dir/a_file.txt", storage, execContext));
         waitFor(TEST_TIMEOUT, prepare1);
 
@@ -437,10 +438,10 @@ public class StorageTestSuite_FileOperations {
         var testStart = Instant.now();
         Thread.sleep(100);  // Let time elapse before/after the test calls
 
-        var prepare2 = storage.ls("some_dir/test_dir");
+        var prepare2 = storage.ls("some_dir/test_dir", execContext);
         waitFor(TEST_TIMEOUT, prepare2);
 
-        var stat = storage.stat("some_dir/test_dir");
+        var stat = storage.stat("some_dir/test_dir", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
         Thread.sleep(100);  // Let time elapse before/after the test calls
@@ -454,7 +455,7 @@ public class StorageTestSuite_FileOperations {
     @Test
     void testStat_storageRoot() throws Exception {
 
-        var rootStat = storage.stat(".");
+        var rootStat = storage.stat(".", execContext);
 
         waitFor(TEST_TIMEOUT, rootStat);
 
@@ -471,7 +472,7 @@ public class StorageTestSuite_FileOperations {
     @Test
     void testStat_missing() {
 
-        var stat = storage.stat("does_not_exist.dat");
+        var stat = storage.stat("does_not_exist.dat", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
         Assertions.assertThrows(EStorageRequest.class, () -> resultOf(stat));
@@ -493,12 +494,12 @@ public class StorageTestSuite_FileOperations {
 
         // Simple listing, dir containing one file and one sub dir
 
-        var prepare = storage.mkdir("test_dir", false)
-                .thenCompose(x -> storage.mkdir("test_dir/child_1", false))
+        var prepare = storage.mkdir("test_dir", false, execContext)
+                .thenCompose(x -> storage.mkdir("test_dir/child_1", false, execContext))
                 .thenCompose(x -> makeSmallFile("test_dir/child_2.txt", storage, execContext));
         waitFor(TEST_TIMEOUT, prepare);
 
-        var ls = storage.ls("test_dir");
+        var ls = storage.ls("test_dir", execContext);
         waitFor(TEST_TIMEOUT, ls);
 
         var dirStat = resultOf(ls);
@@ -523,12 +524,12 @@ public class StorageTestSuite_FileOperations {
         // Corner case - dir with an extension, file without extension
 
 
-        var prepare = storage.mkdir("test_dir", false)
-                .thenCompose(x -> storage.mkdir("test_dir/child_1.dat", false))
+        var prepare = storage.mkdir("test_dir", false, execContext)
+                .thenCompose(x -> storage.mkdir("test_dir/child_1.dat", false, execContext))
                 .thenCompose(x -> makeSmallFile("test_dir/child_2_file", storage, execContext));
         waitFor(TEST_TIMEOUT, prepare);
 
-        var ls = storage.ls("test_dir");
+        var ls = storage.ls("test_dir", execContext);
         waitFor(TEST_TIMEOUT, ls);
 
         var dirStat = resultOf(ls);
@@ -552,12 +553,12 @@ public class StorageTestSuite_FileOperations {
 
         // Storage path should be accepted with or without trailing slash
 
-        var prepare = storage.mkdir("test_dir", false)
+        var prepare = storage.mkdir("test_dir", false, execContext)
                 .thenCompose(x -> makeSmallFile("test_dir/some_file.txt", storage, execContext));
         waitFor(TEST_TIMEOUT, prepare);
 
-        var ls1 = storage.ls("test_dir");
-        var ls2 = storage.ls("test_dir/");
+        var ls1 = storage.ls("test_dir", execContext);
+        var ls2 = storage.ls("test_dir/", execContext);
         waitFor(TEST_TIMEOUT, ls1, ls2);
 
         var dirStat1 = resultOf(ls1);
@@ -572,11 +573,11 @@ public class StorageTestSuite_FileOperations {
 
         // Ls is one operation that is allowed on the storage root!
 
-        var prepare = storage.mkdir("test_dir", false)
+        var prepare = storage.mkdir("test_dir", false, execContext)
                 .thenCompose(x -> makeSmallFile("test_file.txt", storage, execContext));
         waitFor(TEST_TIMEOUT, prepare);
 
-        var ls = storage.ls(".");
+        var ls = storage.ls(".", execContext);
         waitFor(TEST_TIMEOUT, ls);
 
         var dirStat = resultOf(ls);
@@ -603,7 +604,7 @@ public class StorageTestSuite_FileOperations {
         var prepare = makeSmallFile("test_file", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var ls = storage.ls("test_file");
+        var ls = storage.ls("test_file", execContext);
         waitFor(TEST_TIMEOUT, ls);
 
         Assertions.assertThrows(EStorageRequest.class, () -> resultOf(ls));
@@ -614,7 +615,7 @@ public class StorageTestSuite_FileOperations {
 
         // Ls on a missing path is an error condition
 
-        var ls = storage.ls("dir_does_not_exist/");
+        var ls = storage.ls("dir_does_not_exist/", execContext);
         waitFor(TEST_TIMEOUT, ls);
 
         Assertions.assertThrows(EStorageRequest.class, () -> resultOf(ls));
@@ -636,20 +637,20 @@ public class StorageTestSuite_FileOperations {
 
         // Simplest case - create a single directory
 
-        var mkdir = storage.mkdir("test_dir", false);
+        var mkdir = storage.mkdir("test_dir", false, execContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
         Assertions.assertDoesNotThrow(() -> resultOf(mkdir));
 
         // Creating a single child dir when the parent already exists
 
-        var childDir = storage.mkdir("test_dir/child", false);
+        var childDir = storage.mkdir("test_dir/child", false, execContext);
         waitFor(TEST_TIMEOUT, childDir);
 
         Assertions.assertDoesNotThrow(() -> resultOf(childDir));
 
-        var dirExists = storage.exists("test_dir");
-        var childExists = storage.exists("test_dir/child");
+        var dirExists = storage.exists("test_dir", execContext);
+        var childExists = storage.exists("test_dir/child", execContext);
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
         Assertions.assertTrue(resultOf(dirExists));
@@ -661,10 +662,10 @@ public class StorageTestSuite_FileOperations {
 
         // mkdir with recursive = false should throw EStorageRequest if dir already exists
 
-        var prepare = storage.mkdir("test_dir", false);
+        var prepare = storage.mkdir("test_dir", false, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var mkdir = storage.mkdir("test_dir", false);
+        var mkdir = storage.mkdir("test_dir", false, execContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
         Assertions.assertThrows(EStorageRequest.class, () -> resultOf(mkdir));
@@ -678,7 +679,7 @@ public class StorageTestSuite_FileOperations {
         var prepare = makeSmallFile("test_dir", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var mkdir = storage.mkdir("test_dir", false);
+        var mkdir = storage.mkdir("test_dir", false, execContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
         Assertions.assertThrows(EStorageRequest.class, () -> resultOf(mkdir));
@@ -690,13 +691,13 @@ public class StorageTestSuite_FileOperations {
         // With recursive = false, mkdir with a missing parent should fail
         // Neither parent nor child dir should be created
 
-        var childDir = storage.mkdir("test_dir/child", false);
+        var childDir = storage.mkdir("test_dir/child", false, execContext);
         waitFor(TEST_TIMEOUT, childDir);
 
         Assertions.assertThrows(EStorageRequest.class, () -> resultOf(childDir));
 
-        var dirExists = storage.exists("test_dir");
-        var childExists = storage.exists("test_dir/child");
+        var dirExists = storage.exists("test_dir", execContext);
+        var childExists = storage.exists("test_dir/child", execContext);
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
         Assertions.assertFalse(resultOf(dirExists));
@@ -708,13 +709,13 @@ public class StorageTestSuite_FileOperations {
 
         // mkdir, recursive = true, create parent and child dir in a single call
 
-        var mkdir = storage.mkdir("test_dir/child", true);
+        var mkdir = storage.mkdir("test_dir/child", true, execContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
         Assertions.assertDoesNotThrow(() -> resultOf(mkdir));
 
-        var dirExists = storage.exists("test_dir");
-        var childExists = storage.exists("test_dir/child");
+        var dirExists = storage.exists("test_dir", execContext);
+        var childExists = storage.exists("test_dir/child", execContext);
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
         Assertions.assertTrue(resultOf(dirExists));
@@ -726,16 +727,16 @@ public class StorageTestSuite_FileOperations {
 
         // mkdir, when recursive = true it is not an error if the target dir already exists
 
-        var prepare = storage.mkdir("test_dir/child", true);
+        var prepare = storage.mkdir("test_dir/child", true, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var mkdir = storage.mkdir("test_dir/child", true);
+        var mkdir = storage.mkdir("test_dir/child", true, execContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
         Assertions.assertDoesNotThrow(() -> resultOf(mkdir));
 
-        var dirExists = storage.exists("test_dir");
-        var childExists = storage.exists("test_dir/child");
+        var dirExists = storage.exists("test_dir", execContext);
+        var childExists = storage.exists("test_dir/child", execContext);
         waitFor(TEST_TIMEOUT, dirExists, childExists);
 
         Assertions.assertTrue(resultOf(dirExists));
@@ -748,12 +749,12 @@ public class StorageTestSuite_FileOperations {
         // mkdir should always fail if requested dir already exists and is a file
 
         var prepare = storage
-                .mkdir("test_dir", false)
+                .mkdir("test_dir", false, execContext)
                 .thenCompose(x -> makeSmallFile("test_dir/child", storage, execContext));
 
         waitFor(TEST_TIMEOUT, prepare);
 
-        var mkdir = storage.mkdir("test_dir/child", false);
+        var mkdir = storage.mkdir("test_dir/child", false, execContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
         Assertions.assertThrows(EStorageRequest.class, () -> resultOf(mkdir));
@@ -762,15 +763,15 @@ public class StorageTestSuite_FileOperations {
     @Test
     void testMkdir_badPaths() {
 
-        testBadPaths(storagePath -> storage.mkdir(storagePath, false));
-        testBadPaths(storagePath -> storage.mkdir(storagePath, true));
+        testBadPaths((storagePath, execCtx)  -> storage.mkdir(storagePath, false, execCtx));
+        testBadPaths((storagePath, execCtx)  -> storage.mkdir(storagePath, true, execCtx));
     }
 
     @Test
     void testMkdir_storageRoot() {
 
-        failForStorageRoot(storagePath -> storage.mkdir(storagePath, false));
-        failForStorageRoot(storagePath -> storage.mkdir(storagePath, true));
+        failForStorageRoot((storagePath, execCtx) -> storage.mkdir(storagePath, false, execCtx));
+        failForStorageRoot((storagePath, execCtx)  -> storage.mkdir(storagePath, true, execCtx));
     }
 
 
@@ -786,14 +787,14 @@ public class StorageTestSuite_FileOperations {
         var prepare = makeSmallFile("test_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var rm = storage.rm("test_file.txt", false);
+        var rm = storage.rm("test_file.txt", false, execContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertDoesNotThrow(() -> resultOf(rm));
 
         // File should be gone
 
-        var exists = storage.exists("test_file.txt");
+        var exists = storage.exists("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, exists);
         Assertions.assertFalse(resultOf(exists));
     }
@@ -803,17 +804,17 @@ public class StorageTestSuite_FileOperations {
 
         // Calling rm on a directory with recursive = false is a bad request, even if the dir is empty
 
-        var prepare = storage.mkdir("test_dir", false);
+        var prepare = storage.mkdir("test_dir", false, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var rm = storage.rm("test_dir", false);
+        var rm = storage.rm("test_dir", false, execContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertThrows(EStorageRequest.class, () -> resultOf(rm));
 
         // Dir should still exist because rm has failed
 
-        var exists = storage.exists("test_dir");
+        var exists = storage.exists("test_dir", execContext);
         waitFor(TEST_TIMEOUT, exists);
         Assertions.assertTrue(resultOf(exists));
     }
@@ -823,7 +824,7 @@ public class StorageTestSuite_FileOperations {
 
         // Try to delete a path that does not exist
 
-        var rm = storage.rm("missing_path", false);
+        var rm = storage.rm("missing_path", false, execContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertThrows(EStorageRequest.class, () -> resultOf(rm));
@@ -836,22 +837,22 @@ public class StorageTestSuite_FileOperations {
         // Sibling dir tree should be unaffected
 
         var prepare = storage
-                .mkdir("test_dir/child_1", true)
+                .mkdir("test_dir/child_1", true, execContext)
                 .thenCompose(x -> makeSmallFile("test_dir/child_1/file_a.txt", storage, execContext))
                 .thenCompose(x -> makeSmallFile("test_dir/child_1/file_b.txt", storage, execContext))
-                .thenCompose(x -> storage.mkdir("test_dir/child_2", true))
+                .thenCompose(x -> storage.mkdir("test_dir/child_2", true, execContext))
                 .thenCompose(x -> makeSmallFile("test_dir/child_2/file_a.txt", storage, execContext));
 
         waitFor(TEST_TIMEOUT.multipliedBy(2), prepare);  // Allow extra time for multiple operations
 
-        var rm = storage.rm("test_dir/child_1", true);
+        var rm = storage.rm("test_dir/child_1", true, execContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertDoesNotThrow(() -> resultOf(rm));
 
-        var exists1 = storage.exists("test_dir/child_1");
-        var exists2 = storage.exists("test_dir/child_2");
-        var size2a = storage.size("test_dir/child_2/file_a.txt");
+        var exists1 = storage.exists("test_dir/child_1", execContext);
+        var exists2 = storage.exists("test_dir/child_2", execContext);
+        var size2a = storage.size("test_dir/child_2/file_a.txt", execContext);
         waitFor(TEST_TIMEOUT, exists1, exists2, size2a);
 
         Assertions.assertFalse(resultOf(exists1));
@@ -866,19 +867,19 @@ public class StorageTestSuite_FileOperations {
         // The recursive delete should just remove that individual file
 
         var prepare = storage
-                .mkdir("test_dir", false)
+                .mkdir("test_dir", false, execContext)
                 .thenCompose(x -> makeSmallFile("test_dir/file_a.txt", storage, execContext))
                 .thenCompose(x -> makeSmallFile("test_dir/file_b.txt", storage, execContext));
 
         waitFor(TEST_TIMEOUT, prepare);
 
-        var rm = storage.rm("test_dir/file_a.txt", true);
+        var rm = storage.rm("test_dir/file_a.txt", true, execContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertDoesNotThrow(() -> resultOf(rm));
 
-        var existsA = storage.exists("test_dir/file_a.txt");
-        var existsB = storage.exists("test_dir/file_b.txt");
+        var existsA = storage.exists("test_dir/file_a.txt", execContext);
+        var existsB = storage.exists("test_dir/file_b.txt", execContext);
         waitFor(TEST_TIMEOUT, existsA, existsB);
 
         Assertions.assertFalse(resultOf(existsA));
@@ -890,10 +891,10 @@ public class StorageTestSuite_FileOperations {
 
         // Try to delete a path that does not exist, should fail regardless of recursive = true
 
-        var prepare = storage.mkdir("test_dir", false);
+        var prepare = storage.mkdir("test_dir", false, execContext);
         waitFor(TEST_TIMEOUT, prepare);
 
-        var rm = storage.rm("test_dir/child", true);
+        var rm = storage.rm("test_dir/child", true, execContext);
         waitFor(TEST_TIMEOUT, rm);
 
         Assertions.assertThrows(EStorageRequest.class, () -> resultOf(rm));
@@ -902,15 +903,15 @@ public class StorageTestSuite_FileOperations {
     @Test
     void testRm_badPaths() {
 
-        testBadPaths(storagePath -> storage.rm(storagePath, false));
-        testBadPaths(storagePath -> storage.rm(storagePath, true));
+        testBadPaths((storagePath, execCtx) -> storage.rm(storagePath, false, execCtx));
+        testBadPaths((storagePath, execCtx) -> storage.rm(storagePath, true, execCtx));
     }
 
     @Test
     void testRm_storageRoot() {
 
-        failForStorageRoot(storagePath -> storage.rm(storagePath, false));
-        failForStorageRoot(storagePath -> storage.rm(storagePath, true));
+        failForStorageRoot((storagePath, execCtx) -> storage.rm(storagePath, false, execCtx));
+        failForStorageRoot((storagePath, execCtx) -> storage.rm(storagePath, true, execCtx));
     }
 
 
@@ -919,9 +920,9 @@ public class StorageTestSuite_FileOperations {
     // -----------------------------------------------------------------------------------------------------------------
 
 
-    <T> void failForStorageRoot(Function<String, CompletionStage<T>> testMethod) {
+    <T> void failForStorageRoot(BiFunction<String, IExecutionContext, CompletionStage<T>> testMethod) {
 
-        var storageRootResult = testMethod.apply(".");
+        var storageRootResult = testMethod.apply(".", execContext);
 
         waitFor(TEST_TIMEOUT, storageRootResult);
 
@@ -929,21 +930,21 @@ public class StorageTestSuite_FileOperations {
         Assertions.assertThrows(ETracInternal.class, () -> resultOf(storageRootResult));
     }
 
-    <T> void testBadPaths(Function<String, CompletionStage<T>> testMethod) {
+    <T> void testBadPaths(BiFunction<String, IExecutionContext, CompletionStage<T>> testMethod) {
 
-        var escapingPathResult = testMethod.apply("../");
+        var escapingPathResult = testMethod.apply("../", execContext);
 
         var absolutePathResult = OS.WINDOWS.isCurrentOs()
-                ? testMethod.apply("C:\\Windows")
-                : testMethod.apply("/bin");
+                ? testMethod.apply("C:\\Windows", execContext)
+                : testMethod.apply("/bin", execContext);
 
         // \0 and / are the two characters that are always illegal in posix filenames
         // But / will be interpreted as a separator
         // There are several illegal characters for filenames on Windows!
 
         var invalidPathResult = OS.WINDOWS.isCurrentOs()
-                ? testMethod.apply("£$ N'`¬$£>.)_£\"+\n%")
-                : testMethod.apply("nul\0char");
+                ? testMethod.apply("£$ N'`¬$£>.)_£\"+\n%", execContext)
+                : testMethod.apply("nul\0char", execContext);
 
         waitFor(TEST_TIMEOUT,
             escapingPathResult,

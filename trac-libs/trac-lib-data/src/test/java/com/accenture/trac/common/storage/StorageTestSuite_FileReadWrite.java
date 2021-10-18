@@ -283,7 +283,7 @@ public class StorageTestSuite_FileReadWrite {
 
         waitFor(TEST_TIMEOUT, writeSignal);
 
-        var exists = storage.exists(storagePath);
+        var exists = storage.exists(storagePath, execContext);
         waitFor(TEST_TIMEOUT, exists);
 
         Assertions.assertTrue(resultOf(exists));
@@ -470,10 +470,10 @@ public class StorageTestSuite_FileReadWrite {
 
         // Set up a dir in storage
 
-        var mkdir = storage.mkdir("some_dir", false);
+        var mkdir = storage.mkdir("some_dir", false, execContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
-        var dirExists = storage.exists("some_dir");
+        var dirExists = storage.exists("some_dir", execContext);
         waitFor(TEST_TIMEOUT, dirExists);
         Assertions.assertTrue(resultOf(dirExists));
 
@@ -487,7 +487,7 @@ public class StorageTestSuite_FileReadWrite {
         Thread.sleep(ASYNC_DELAY.toMillis());
 
         // File should not have been created as onSubscribe has not been called
-        var fileExists = storage.exists(storagePath);
+        var fileExists = storage.exists(storagePath, execContext);
         waitFor(TEST_TIMEOUT, fileExists);
         Assertions.assertFalse(resultOf(fileExists));
     }
@@ -523,7 +523,7 @@ public class StorageTestSuite_FileReadWrite {
         Assertions.assertDoesNotThrow(() -> resultOf(writerSignal));
 
         // File should now be visible in storage
-        var size = storage.size(storagePath);
+        var size = storage.size(storagePath, execContext);
         waitFor(TEST_TIMEOUT, size);
         Assertions.assertEquals(bytes.length, resultOf(size));
     }
@@ -568,7 +568,7 @@ public class StorageTestSuite_FileReadWrite {
         // If there is a partially written file,
         // the writer should remove it as part of the error cleanup
 
-        var exists = storage.exists(storagePath);
+        var exists = storage.exists(storagePath, execContext);
         waitFor(TEST_TIMEOUT, exists);
 
         Assertions.assertFalse(resultOf(exists));
@@ -623,7 +623,7 @@ public class StorageTestSuite_FileReadWrite {
         // If there is a partially written file,
         // the writer should remove it as part of the error cleanup
 
-        var exists = storage.exists(storagePath);
+        var exists = storage.exists(storagePath, execContext);
         waitFor(TEST_TIMEOUT, exists);
 
         Assertions.assertFalse(resultOf(exists));
@@ -657,7 +657,7 @@ public class StorageTestSuite_FileReadWrite {
         Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal1));
 
         // File should not exist in storage after an aborted write
-        var exists1 = storage.exists(storagePath);
+        var exists1 = storage.exists(storagePath, execContext);
         waitFor(TEST_TIMEOUT, exists1);
         Assertions.assertFalse(resultOf(exists1));
 
@@ -678,7 +678,7 @@ public class StorageTestSuite_FileReadWrite {
         Assertions.assertDoesNotThrow(() -> resultOf(writerSignal2));
 
         // File should now be visible in storage
-        var size2 = storage.size(storagePath);
+        var size2 = storage.size(storagePath, execContext);
         waitFor(TEST_TIMEOUT, size2);
         Assertions.assertEquals(dataSize, resultOf(size2));
     }
@@ -763,7 +763,7 @@ public class StorageTestSuite_FileReadWrite {
         resultOf(content).release();
 
         // Delete the file
-        var rm = storage.rm(storagePath, false);
+        var rm = storage.rm(storagePath, false, execContext);
         waitFor(TEST_TIMEOUT, rm);
 
         // Now try subscribing to the reader - should result in an illegal state exception
@@ -979,11 +979,11 @@ public class StorageTestSuite_FileReadWrite {
 
         // Now delete the file
 
-        var rm = storage.rm(storagePath, false);
+        var rm = storage.rm(storagePath, false, execContext);
 
         waitFor(TEST_TIMEOUT, rm);
 
-        var exists = storage.exists(storagePath);
+        var exists = storage.exists(storagePath, execContext);
 
         waitFor(TEST_TIMEOUT, exists);
         Assertions.assertFalse(resultOf(exists));
