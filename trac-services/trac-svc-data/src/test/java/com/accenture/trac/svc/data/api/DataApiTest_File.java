@@ -29,6 +29,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -708,7 +709,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         }
     }
 
-    @Test
+    @Test @Disabled("Required error handling not implemented yet in metadata service")
     void testUpdateFile_tagUpdateAttrNotPresent() throws Exception {
 
         // Attempt to replace an attr that doesn't already exist
