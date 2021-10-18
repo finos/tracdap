@@ -138,6 +138,10 @@ public class DataApiTest_Stability extends DataApiTest_Base {
         var incarnation = storageItem.getIncarnations(0);
         var copy = incarnation.getCopies(0);
 
+        var expectedSize = content.stream()
+                .mapToLong(bs -> bs.length)
+                .sum();
+
         Assertions.assertEquals(ObjectType.FILE, objHeader.getObjectType());
         Assertions.assertEquals(1, objHeader.getObjectVersion());
         Assertions.assertEquals(1, objHeader.getTagVersion());
@@ -145,7 +149,7 @@ public class DataApiTest_Stability extends DataApiTest_Base {
         Assertions.assertEquals("test_file.dat", fileDef.getName());
         Assertions.assertEquals("dat", fileDef.getExtension());
         Assertions.assertEquals("application/octet-stream", fileDef.getMimeType());
-        Assertions.assertEquals(content.size(), fileDef.getSize());
+        Assertions.assertEquals(expectedSize, fileDef.getSize());
 
         // Use storage impl directly to check file has arrived in the storage back end
 
@@ -195,7 +199,7 @@ public class DataApiTest_Stability extends DataApiTest_Base {
         Assertions.assertEquals("test_file.dat", roundTripDef.getName());
         Assertions.assertEquals("dat", roundTripDef.getExtension());
         Assertions.assertEquals("application/octet-stream", roundTripDef.getMimeType());
-        Assertions.assertEquals(content.size(), roundTripDef.getSize());
+        Assertions.assertEquals(expectedSize, roundTripDef.getSize());
 
         Assertions.assertEquals(originalBytes, roundTripBytes);
     }
