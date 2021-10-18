@@ -18,10 +18,14 @@ package com.accenture.trac.common.util;
 
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.exception.ETracInternal;
+import com.accenture.trac.common.exception.EUnexpected;
 import io.netty.util.concurrent.OrderedEventExecutor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -98,7 +102,11 @@ public class Concurrent {
     Flow.Publisher<T> concat(CompletionStage<T> head, Flow.Publisher<T> tail) {
 
         var headStream = publish(head);
-        return new ConcatProcessor<>(headStream, tail);
+
+        var concat = new ConcatProcessor<>(headStream, tail);
+        headStream.subscribe(concat);
+
+        return concat;
     }
 
     public static <T>
@@ -182,38 +190,97 @@ public class Concurrent {
 
     public static class FuturePublisher<T> implements Flow.Publisher<T> {
 
-        private final CompletionStage<T> source;
+        private final AtomicReference<ResultState> state;
+        private Flow.Subscriber<? super T> subscriber;
 
         FuturePublisher(CompletionStage<T> source) {
-            this.source = source;
+
+            this.state = new AtomicReference<>(new ResultState());
+            source.whenComplete(this::acceptResult);
         }
 
         @Override
         public void subscribe(Flow.Subscriber<? super T> subscriber) {
 
-            var subscription = new Subscription(subscriber);
+            this.subscriber = subscriber;
+
+            var subscription = new Subscription();
             subscriber.onSubscribe(subscription);
         }
 
         private class Subscription implements Flow.Subscription {
 
-            Flow.Subscriber<? super T> subscriber;
-
-            public Subscription(Flow.Subscriber<? super T> subscriber) {
-                this.subscriber = subscriber;
-            }
-
             @Override
             public void request(long n) {
 
-                // TODO
-                throw new RuntimeException();
+                var priorState = state.getAndUpdate(s1 -> {
+                    var s2 = s1.clone();
+                    s2.requested = true;
+                    return s2;
+                });
+
+                if (!priorState.requested && !priorState.cancelled) {
+
+                    if (priorState.result != null) {
+                        subscriber.onNext(priorState.result);
+                        subscriber.onComplete();
+                    }
+
+                    if (priorState.error != null) {
+                        subscriber.onError(priorState.error);
+                    }
+                }
             }
 
             @Override
             public void cancel() {
 
-                // TODO
+                state.getAndUpdate(s1 -> {
+                    var s2 = s1.clone();
+                    s2.cancelled = true;
+                    return s2;
+                });
+            }
+        }
+
+        private void acceptResult(T result, Throwable error) {
+
+            var prior = this.state.getAndUpdate(s1 -> {
+                var s2 =s1.clone();
+                s2.result = result;
+                s2.error = error;
+                return s2;
+            });
+
+            if (prior.requested && !prior.cancelled) {
+
+                if (error == null) {
+                    this.subscriber.onNext(result);
+                    this.subscriber.onComplete();
+                }
+                else
+                    this.subscriber.onError(error);
+            }
+        }
+
+        private class ResultState implements Cloneable {
+
+            boolean requested;
+            boolean cancelled;
+
+            T result;
+            Throwable error;
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public ResultState clone() {
+
+                try {
+                    return (ResultState) super.clone();
+                }
+                catch (CloneNotSupportedException ex) {
+                    throw new EUnexpected();
+                }
             }
         }
     }
@@ -613,7 +680,14 @@ public class Concurrent {
 
     private static class ConcatProcessor<T> implements Flow.Processor<T, T> {
 
+        private final Logger log = LoggerFactory.getLogger(getClass());
+
         private final Vector<Flow.Publisher<T>> publishers;
+        private Flow.Subscriber<? super T> subscriber;
+
+        private Flow.Subscription sourceSubscription;
+        private int sourceIndex;
+        private int nPending;
 
         public ConcatProcessor(Flow.Publisher<T> first, Flow.Publisher<T> second) {
             this.publishers = new Vector<>(2);
@@ -624,30 +698,84 @@ public class Concurrent {
         @Override
         public void subscribe(Flow.Subscriber<? super T> subscriber) {
 
-            // TODO
-            throw new RuntimeException();
+            log.info("concat subscribe");
+
+            this.subscriber = subscriber;
+
+            var targetSubscription = new Subscription();
+            subscriber.onSubscribe(targetSubscription);
         }
 
         @Override
         public void onSubscribe(Flow.Subscription subscription) {
 
-            // TODO
-            throw new RuntimeException();
+            log.info("concat onSubscribe");
+
+            this.sourceSubscription = subscription;
+
+            if (nPending > 0)
+                sourceSubscription.request(nPending);
         }
 
         @Override
         public void onNext(T item) {
 
+            log.info("concat onNext");
+
+            nPending -= 1;
+
+            subscriber.onNext(item);
         }
 
         @Override
-        public void onError(Throwable throwable) {
+        public void onError(Throwable error) {
 
+            log.info("concat onError");
+
+            this.sourceSubscription = null;
+
+            subscriber.onError(error);
         }
 
         @Override
         public void onComplete() {
 
+            log.info("concat.onComplete");
+
+            this.sourceSubscription = null;
+            this.sourceIndex += 1;
+
+            if (this.sourceIndex < publishers.size())
+                publishers.get(sourceIndex).subscribe(this);
+
+            else
+                subscriber.onComplete();
+
+        }
+
+        private class Subscription implements Flow.Subscription {
+
+            @Override
+            public void request(long n) {
+
+                log.info("concat request");
+
+                nPending += n;
+
+                if (sourceSubscription != null)
+                    sourceSubscription.request(nPending);
+            }
+
+            @Override
+            public void cancel() {
+
+                log.info("concat cancel");
+
+                if (sourceSubscription != null) {
+                    sourceSubscription.cancel();
+                    sourceSubscription = null;
+                }
+            }
         }
     }
 

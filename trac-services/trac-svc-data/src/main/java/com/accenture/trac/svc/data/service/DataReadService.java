@@ -72,25 +72,7 @@ public class DataReadService {
                 .thenApply(x -> readFile(state.file, state.storage, execCtx))
                 .thenAccept(byteStream -> byteStream.subscribe(content))
 
-                .exceptionally(error -> {
-
-                    log.error(error.getMessage(), error);
-
-                    if (!definition.isDone())
-                        definition.completeExceptionally(error);
-
-                    else {
-
-                        content.onSubscribe(new Flow.Subscription() {
-                            @Override public void request(long n) {}
-                            @Override public void cancel() {}
-                        });
-
-                        content.onError(error);
-                    }
-
-                    return null;
-                });
+                .exceptionally(error -> reportError(error, definition, content));
     }
 
     private CompletionStage<Tag> readMetadata(String tenant, TagSelector selector) {
@@ -118,6 +100,27 @@ public class DataReadService {
 
         var storage = storageManager.getFileStorage(storageKey);
         return storage.reader(storagePath, execCtx);
+    }
+
+    private Void reportError(
+            Throwable error,
+            CompletableFuture<?> definition,
+            Flow.Subscriber<?> content) {
+
+        if (!definition.isDone())
+            definition.completeExceptionally(error);
+
+        else {
+
+            content.onSubscribe(new Flow.Subscription() {
+                @Override public void request(long n) {}
+                @Override public void cancel() {}
+            });
+
+            content.onError(error);
+        }
+
+        return null;
     }
 
 }

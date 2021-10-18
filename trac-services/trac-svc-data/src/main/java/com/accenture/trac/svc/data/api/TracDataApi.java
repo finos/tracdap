@@ -222,7 +222,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         @SuppressWarnings("unchecked")
         var message0 = definition.thenApply(def_ ->
                 (TResp) putDefinition
-                .apply(responseSupplier.get(), def_));
+                .apply(responseSupplier.get(), def_)
+                .build());
 
         @SuppressWarnings("unchecked")
         var content = Concurrent.map(protoByteStream, bytes ->
