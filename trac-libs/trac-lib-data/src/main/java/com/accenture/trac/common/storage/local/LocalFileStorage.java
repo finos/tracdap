@@ -64,7 +64,9 @@ public class LocalFileStorage implements IFileStorage {
 
         this.errors = new LocalFileErrors(log, storageKey);
 
-        var rootDirProp = config.getProperty(CONFIG_ROOT_DIR);  // TODO: Config helpers
+        // TODO: Robust config handling
+
+        var rootDirProp = config.getProperty(CONFIG_ROOT_DIR);
 
         this.storageKey = storageKey;
         this.rootPath = Paths.get(rootDirProp)
