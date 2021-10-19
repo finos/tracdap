@@ -82,51 +82,98 @@ service TracDataApi {
 
 
   /**
-   * Create a new FILE object and store the content into TRAC
+   * Upload a new file into TRAC
    *
-   * This is a client streaming request. Clients must set all the request fields
-   * in the first message of the stream and should not set any fields except the
-   * file content from the second message onward (such fields will be ignored).
-   *
-   * Semantics for creating tag attributes are the same as for the createObject()
+   * Calling this method will create a new FILE object in the metadata store.
+   * Tag updates can be supplied when creating a FILE, they will be passed on to the
+   * metadata service. The semantics for tag updates are identical to the createObject()
    * method in TracMetadataApi.
    *
-   * File content may be included as part of the first message. Alternatively the
-   * first message can contain an empty content buffer, with content starting in
-   * the second message. Either pattern will work.
+   * This is a client streaming method. The first message in the request stream
+   * must contain all the request fields and required metadata. The second and subsequent
+   * messages should contain the content of the file as a series of chunks (byte buffers).
+   * (other fields that are set after the first message will be ignored).
+   * Empty chunks can be included at any point in the stream and will be ignored.
+   * Clients may choose to include the first chunk in the first message along with the
+   * request metadata, or to put an empty chunk in the first message and start streaming
+   * content in the second message. For very small files, it is possible to put the entire
+   * content in one chunk in the first message, so there is only a single message in the stream.
+   * All of these approaches are supported.
    *
-   * The call returns the header of the newly created FILE object. Error conditions
-   * include: Invalid request, unknown tenant, validation failure and data loss (if
-   * the number of bytes stored does not match the number specified in the request).
+   * Clients may specify the size of the file being created. When a size is supplied, TRAC
+   * will check the size against the number of bytes stored. If the stored file size does not
+   * match the supplied value, the error will be reported with an error status of DATA_LOSS.
+   * When no size is supplied the check cannot be performed.
+   *
+   * The method returns the header of the newly created FILE object. Error conditions
+   * include: Invalid request, unknown tenant and validation failure and data loss
+   * (if the number of bytes stored does not match the number specified in the request).
+   * Storage errors may also be reported if there is a problem communicating with the
+   * underlying storage technology. In the event of an error, TRAC will do its best to
+   * clean up any partially-written data in the storage layer.
    */
   rpc createFile (stream FileWriteRequest) returns (metadata.TagHeader);
 
   /**
-   * Update an existing FILE object and store the new content into TRAC
+   * Upload a new version of an existing file into TRAC
    *
-   * This is a client streaming request. Clients must set all the request fields
-   * in the first message of the stream and should not set any fields except the
-   * file content from the second message onward (such fields will be ignored).
-   *
-   * To update a file, the latest version must be supplied in the priorVersion field
+   * Calling this method will update the relevant FILE object in the metadata store.
+   * The latest version of the FILE must be supplied in the priorVersion field
    * of the request. For example if the latest version of a FILE object is version 2,
    * the priorVersion field should refer to version 2 and TRAC will create version 3
-   * as a result of the update call. File extension and mime type must stay the same
-   * between versions. Semantics for updating tag attributes are the same as for the
-   * updateObject() method in TracMetadataApi.
+   * as a result of the update call. The metadata and content of prior versions
+   * remain unaltered. The file name may be changed between versions, but the extension
+   * and mime type must stay the same. Tag updates can be supplied when updating a FILE,
+   * they will be passed on to the metadata service> The semantics for tag updates are
+   * identical to the updateObject() method in TracMetadataApi.
    *
-   * File content may be included as part of the first message. Alternatively the
-   * first message can contain an empty content buffer, with content starting in
-   * the second message. Either pattern will work.
+   * This is a client streaming method. The first message in the request stream
+   * must contain all the request fields and required metadata. The second and subsequent
+   * messages should contain the content of the file as a series of byte buffers.
+   * (other fields that are set after the first message will be ignored).
+   * Empty chunks can be included at any point in the stream and will be ignored.
+   * Clients may choose to include the first chunk in the first message along with the
+   * request metadata, or to put an empty chunk in the first message and start streaming
+   * content in the second message. For very small files, it is possible to put the entire
+   * content in one chunk in the first message, so there is only a single message in the stream.
+   * All of these approaches are supported.
+   *
+   * Clients may specify the size of the file being updated. When a size is supplied, TRAC
+   * will check the size against the number of bytes stored. If the stored file size does not
+   * match the supplied value, the error will be reported with an error status of DATA_LOSS.
+   * When no size is supplied the check cannot be performed.
    *
    * The call returns the header for the new version of the FILE object. Error conditions
    * include: Invalid request, unknown tenant, validation failure, failed preconditions
-   * (for extension and mime type changes) and data loss (if the number of bytes stored
-   * does not match the number specified in the request).
+   * (e.g. extension and mime type changes) and data loss (if the number of bytes stored
+   * does not match the number specified in the request). Storage errors may also be reported
+   * if there is a problem communicating with the underlying storage technology. In the event
+   * of an error, TRAC will do its best to clean up any partially-written data in the storage layer.
    */
   rpc updateFile (stream FileWriteRequest) returns (metadata.TagHeader);
 
-  /// Download a file that has been stored in TRAC
+  /**
+   * Download a file that has been stored in TRAC
+   *
+   * The request uses a regular TagSelector to indicate which file to read. The
+   * semantics of the request are identical to the readObject() method in
+   * TracMetadataApi.
+   *
+   * This is a server streaming method. The first message in the response stream will
+   * contain the response metadata (i.e. the file definition). The second
+   * and subsequent messages will deliver the content of the file as a stream of chunks
+   * (byte buffers). Empty chunks may be included at any point in the stream and
+   * should be ignored. In particular, TRAC guarantees that the chunk in the first
+   * message will always be an empty chunk. Clients are free to ignore this chunk,
+   * for example if they have a separate function for processing the first message in
+   * the response stream. Alternatively clients may process the empty chunk in the firs
+   * message in the same way as any other chunk. Both approaches are supported.
+   *
+   * Error conditions include: Invalid request, unknown tenant, unknown object ID,
+   * object type does not match ID, unknown object version, unknown tag version.
+   * Storage errors may also be reported if there is a problem communicating with the
+   * underlying storage technology.
+   */
   rpc readFile (FileReadRequest) returns (stream FileReadResponse);
 
 
@@ -208,26 +255,27 @@ message DataReadResponse {
 
 
 /**
- * Request to create or update a FILE object and store content to the platform.
+ * Request to create or update a FILE and store content to the platform
  *
- * @see TracDataApi
+ * @see TracDataApi.createFile()
+ * @see TracDataApi.updateFile()
  */
 message FileWriteRequest {
 
   /**
-   * Tenant code for the requested operation, always required.
+   * Tenant code for the requested operation, always required
    */
   string tenant = 1;
 
   /**
-   * Prior object/tag version to use for update operations.
+   * Prior object/tag version to use for update operations
    *
    * This field should be omitted when creating a new file.
    */
   optional metadata.TagSelector priorVersion = 2;
 
   /**
-   * Tag update operations to be applied.
+   * Tag update operations to be applied
    *
    * Tag updates are applied in exactly the same way as for metadata write requests.
    *
@@ -237,7 +285,7 @@ message FileWriteRequest {
   repeated metadata.TagUpdate tagUpdates = 3;
 
   /**
-   * File name of the file being saved, always required.
+   * File name of the file being saved, always required
    *
    * Must be a valid file name with no path component (i.e. the name may not contain slashes).
    *
@@ -249,24 +297,24 @@ message FileWriteRequest {
    * name as "my_file_v1.doc" would not be allowed. Attempting to change the extension in an
    * update will result in an error status of FAILED_PRECONDITION.
    *
-   * Fle name and extension are stored in the created file definition, and in the trac_file_name
+   * Fle name and extension are stored in the file definition, and in the trac_file_name
    * and trac_file_extension attributes.
    */
   string name = 4;
 
   /**
-   * Mime type of the file being saved, always required.
+   * Mime type of the file being saved, always required
    *
    * Must be a valid mime type. For update requests, the mime type must match exactly
    * with the mime type supplied when the file was originally created. Attempting to change
    * the mime type in an update will result in an error status of FAILED_PRECONDITION.
    *
-   * Mime type is stored in the created file definition and in the trac_file_mime_type attribute.
+   * Mime type is stored in the file definition and in the trac_file_mime_type attribute.
    */
   string mimeType = 5;
 
   /**
-   * Size of the file being saved, if known in advance.
+   * Size of the file being saved, if known in advance
    *
    * When a size is supplied, TRAC will check the size against the number of bytes stored.
    * If the stored file size does not match the supplied value, the error will be reported
@@ -277,26 +325,53 @@ message FileWriteRequest {
   optional uint64 size = 6;
 
   /**
-   * Content of the file to be stored.
+   * A chunk of the file content
    *
-   * Client implementations are free to include empty buffers in the message stream.
-   * In particular, the content buffer may be left empty in the first message, so clients
-   * can send one message with the request parameters followed by a stream of messages with
-   * content. This behavior is not required, clients are also free to include content in
-   * the first message, or to include empty buffers at any point in the stream.
+   * The file content should be sent as a stream of chunks (byte buffers), with one chunk in each message.
+   * Empty chunks can be included at any point in the request stream and will be ignored.
    */
   bytes content = 1000;
 }
 
+
+/**
+ * Request to read a FILE, i.e. retrieve its content from the platform
+ *
+ * @see TracDataApi
+ */
 message FileReadRequest {
 
+  /**
+   * Tenant code for the requested operation, always required
+   */
   string tenant = 1;
+
+  /**
+   * Selector for the FILE being read
+   */
   metadata.TagSelector selector = 2;
 }
 
+
+/**
+ * Response to a request to read a FILE, i.e. retrieve its content from the platform
+ *
+ * @see TracDataApi.readFile()
+ */
 message FileReadResponse {
 
+  /**
+   * Definition of the FILE being read
+   */
   optional metadata.FileDefinition fileDefinition = 1;
+
+  /**
+   * A chunk of the file content
+   *
+   * The file content will be sent as a stream of chunks (byte buffers), with one chunk in each message.
+   * Empty chunks may be included at any point in the response stream and should be ignored.
+   * In particular, TRAC guarantees that the chunk in the first message will always be an empty chunk.
+   */
   bytes content = 1000;
 }
 
