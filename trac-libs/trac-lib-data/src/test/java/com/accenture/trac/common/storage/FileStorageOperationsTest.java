@@ -20,6 +20,7 @@ import com.accenture.trac.common.eventloop.ExecutionContext;
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.exception.EStorageRequest;
 import com.accenture.trac.common.exception.ETracInternal;
+import com.accenture.trac.common.exception.EValidationGap;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
 import com.accenture.trac.common.storage.local.LocalStoragePlugin;
 import com.accenture.trac.common.util.Concurrent;
@@ -46,16 +47,17 @@ import java.time.Instant;
 import java.util.Properties;
 import java.util.concurrent.*;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
 
-public class StorageTestSuite_FileOperations {
+public class FileStorageOperationsTest {
 
-    /* >>> Generic tests for IFileStorage - file system operations
+    /* >>> Test suite for IFileStorage - file system operations, functional tests
 
-    These tests are implemented purely in terms of the IFileStorage interface. E.g. to test the "exists" method,
-    a directory is created using IFileStorage.exists(). This test suite can be run for any storage implementation.
-    Valid storage implementations must pass this test suite.
+    These tests are implemented purely in terms of the IFileStorage interface. The test suite can be run for
+    any storage implementation and a valid storage implementations must pass this test suite.
+
+    NOTE: To test a new storage implementation, setupStorage() must be replaced
+    with a method to provide a storage implementation based on a supplied test config.
 
     Storage implementations may also wish to supply their own tests that use native APIs to set up and control
     tests. This can allow for finer grained control, particularly when testing corner cases and error conditions.
@@ -71,8 +73,6 @@ public class StorageTestSuite_FileOperations {
 
     @BeforeEach
     void setupStorage() {
-
-        // TODO: Abstract mechanism for obtaining storage impl using config
 
         var storageProps = new Properties();
         storageProps.put(LocalStoragePlugin.CONFIG_ROOT_DIR, storageDir.toString());
@@ -922,12 +922,14 @@ public class StorageTestSuite_FileOperations {
 
     <T> void failForStorageRoot(BiFunction<String, IExecutionContext, CompletionStage<T>> testMethod) {
 
+        // TRAC should not allow write-operations with path "." to reach the storage layer
+        // Storage implementations should report this as a validation gap
+
         var storageRootResult = testMethod.apply(".", execContext);
 
         waitFor(TEST_TIMEOUT, storageRootResult);
 
-        // TODO: Should this be EStorageRequest?
-        Assertions.assertThrows(ETracInternal.class, () -> resultOf(storageRootResult));
+        Assertions.assertThrows(EValidationGap.class, () -> resultOf(storageRootResult));
     }
 
     <T> void testBadPaths(BiFunction<String, IExecutionContext, CompletionStage<T>> testMethod) {
