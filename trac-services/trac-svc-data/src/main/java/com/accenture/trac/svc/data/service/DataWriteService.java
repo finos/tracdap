@@ -23,6 +23,7 @@ import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.exception.EDataSize;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
+import com.accenture.trac.common.storage.IFileStorage;
 import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.metadata.*;
@@ -55,6 +56,8 @@ public class DataWriteService {
     private static final String FILE_DATA_ITEM_TEMPLATE = "file/%s/version-%d";
     private static final String FILE_STORAGE_PATH_TEMPLATE = "file/%s/version-%d%s/%s";
     private static final String FILE_STORAGE_PATH_SUFFIX_TEMPLATE = "-x%06x";
+
+    private static final String BACKSLASH = "/";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -194,20 +197,45 @@ public class DataWriteService {
             Flow.Publisher<ByteBuf> contentStream, IExecutionContext execContext) {
 
         var storageItem = storageDef.getDataItemsOrThrow(dataItem);
-        var incarnation = storageItem.getIncarnations(storageItem.getIncarnationsCount() - 1);  // TODO: Right one
-        var copy = incarnation.getCopies(incarnation.getCopiesCount() - 1);  // TODO: Right one
+
+        // Select the incarnation to write data for
+        // Currently there is only one incarnation being created per storage item
+
+        var incarnationIndex = 0;
+        var incarnation = storageItem.getIncarnations(incarnationIndex);
+
+        // Select the copy to write data for
+        // Currently there is only one copy being created per incarnation
+
+        var copyIndex = 0;
+        var copy = incarnation.getCopies(copyIndex);
+
+        // Get the storage implementation for the storage key where this copy is being saved
 
         var storage = storageManager.getFileStorage(copy.getStorageKey());
+
+        // Create the parent directory where the item will be stored
+
         var storagePath = copy.getStoragePath();
-        var storageDir = storagePath.substring(0, storagePath.lastIndexOf("/"));  // TODO: Can this be cleaner?
+        var storageDir = storagePath.substring(0, storagePath.lastIndexOf(BACKSLASH));
 
-        return storage.mkdir(storageDir, true, execContext).thenCompose(x -> {
+        var mkdir = storage.mkdir(storageDir, true, execContext);
 
-            var signal = new CompletableFuture<Long>();
-            var writer = storage.writer(storagePath, signal, execContext);
-            contentStream.subscribe(writer);
-            return signal;
-        });
+        // Finally, kick off the file write operation
+
+        return mkdir.thenComposeAsync(x ->
+                doWriteDataItem(storage, storagePath, contentStream, execContext),
+                execContext.eventLoopExecutor());
+    }
+
+    private CompletionStage<Long> doWriteDataItem(
+            IFileStorage storage, String storagePath,
+            Flow.Publisher<ByteBuf> contentStream, IExecutionContext execContext) {
+
+        var signal = new CompletableFuture<Long>();
+        var writer = storage.writer(storagePath, signal, execContext);
+        contentStream.subscribe(writer);
+        return signal;
     }
 
     private long checkSize(long actualSize, Long expectedSize) {
