@@ -267,10 +267,12 @@ public class FileStorageOperationsTest {
 
         var testStart = Instant.now();
 
-        // For local storage, the test calls may complete faster than the resolution of the clock!
-        // So, sleep for 1 ms to let some time elapse
+        // On macOS (APFS), the stat ctime is rounded down to 1 second resolution,
+        // even though the filesystem supports nanosecond precision (which is used for mtime and atime)
+        // I am not sure if this is a bug in the JDK or a limitation in the underlying system calls
+        // Either way, allowing a whole second of sleep should always mean the ctime is after testStart
 
-        Thread.sleep(100);  // Let time elapse before/after the test calls
+        Thread.sleep(1000);  // Let time elapse before/after the test calls
 
         var prepare = makeSmallFile("test_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
@@ -278,7 +280,7 @@ public class FileStorageOperationsTest {
         var stat = storage.stat("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
-        Thread.sleep(100);  // Let time elapse before/after the test calls
+        Thread.sleep(1);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
         var statResult = resultOf(stat);
@@ -292,7 +294,7 @@ public class FileStorageOperationsTest {
         // All storage implementations must implement mtime for files
 
         var testStart = Instant.now();
-        Thread.sleep(100);  // Let time elapse before/after the test calls
+        Thread.sleep(1);  // Let time elapse before/after the test calls
 
         var prepare = makeSmallFile("test_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
@@ -300,7 +302,7 @@ public class FileStorageOperationsTest {
         var stat = storage.stat("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
-        Thread.sleep(100);  // Let time elapse before/after the test calls
+        Thread.sleep(1);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
         var statResult = resultOf(stat);
@@ -330,7 +332,7 @@ public class FileStorageOperationsTest {
         waitFor(TEST_TIMEOUT, prepare);
 
         var testStart = Instant.now();
-        Thread.sleep(100);  // Let time elapse before/after the test calls
+        Thread.sleep(1);  // Let time elapse before/after the test calls
 
         var reader = storage.reader("test_file.txt", execContext);
         var collect = Concurrent.fold(
@@ -343,7 +345,7 @@ public class FileStorageOperationsTest {
         var stat = storage.stat("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
-        Thread.sleep(100);  // Let time elapse before/after the test calls
+        Thread.sleep(1);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
         var statResult = resultOf(stat);
@@ -378,7 +380,13 @@ public class FileStorageOperationsTest {
         // So, all of these fields are optional in stat responses for directories
 
         var testStart = Instant.now();
-        Thread.sleep(100);  // Let time elapse before/after the test calls
+
+        // On macOS (APFS), the stat ctime is rounded down to 1 second resolution,
+        // even though the filesystem supports nanosecond precision (which is used for mtime and atime)
+        // I am not sure if this is a bug in the JDK or a limitation in the underlying system calls
+        // Either way, allowing a whole second of sleep should always mean the ctime is after testStart
+
+        Thread.sleep(1000);  // Let time elapse before/after the test calls
 
         var prepare = storage.mkdir("some_dir/test_dir", true, execContext);
         waitFor(TEST_TIMEOUT, prepare);
@@ -386,7 +394,7 @@ public class FileStorageOperationsTest {
         var stat = storage.stat("some_dir/test_dir", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
-        Thread.sleep(100);  // Let time elapse before/after the test calls
+        Thread.sleep(1);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
         var statResult = resultOf(stat);
@@ -406,7 +414,7 @@ public class FileStorageOperationsTest {
         // "Modify" the directory by adding a file to it
 
         var testStart = Instant.now();
-        Thread.sleep(100);  // Let time elapse before/after the test calls
+        Thread.sleep(1);  // Let time elapse before/after the test calls
 
         var prepare2 = makeSmallFile("some_dir/test_dir/a_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare2);
@@ -414,7 +422,7 @@ public class FileStorageOperationsTest {
         var stat = storage.stat("some_dir/test_dir", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
-        Thread.sleep(100);  // Let time elapse before/after the test calls
+        Thread.sleep(1);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
         var statResult = resultOf(stat);
@@ -436,7 +444,7 @@ public class FileStorageOperationsTest {
         // Access the directory by running "ls" on it
 
         var testStart = Instant.now();
-        Thread.sleep(100);  // Let time elapse before/after the test calls
+        Thread.sleep(1);  // Let time elapse before/after the test calls
 
         var prepare2 = storage.ls("some_dir/test_dir", execContext);
         waitFor(TEST_TIMEOUT, prepare2);
@@ -444,7 +452,7 @@ public class FileStorageOperationsTest {
         var stat = storage.stat("some_dir/test_dir", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
-        Thread.sleep(100);  // Let time elapse before/after the test calls
+        Thread.sleep(1);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
         var statResult = resultOf(stat);
