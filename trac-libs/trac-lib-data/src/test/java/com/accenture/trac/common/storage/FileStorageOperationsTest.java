@@ -280,7 +280,7 @@ public class FileStorageOperationsTest {
         var stat = storage.stat("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
-        Thread.sleep(1);  // Let time elapse before/after the test calls
+        Thread.sleep(10);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
         var statResult = resultOf(stat);
@@ -294,7 +294,7 @@ public class FileStorageOperationsTest {
         // All storage implementations must implement mtime for files
 
         var testStart = Instant.now();
-        Thread.sleep(1);  // Let time elapse before/after the test calls
+        Thread.sleep(10);  // Let time elapse before/after the test calls
 
         var prepare = makeSmallFile("test_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare);
@@ -302,7 +302,7 @@ public class FileStorageOperationsTest {
         var stat = storage.stat("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
-        Thread.sleep(1);  // Let time elapse before/after the test calls
+        Thread.sleep(10);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
         var statResult = resultOf(stat);
@@ -332,7 +332,7 @@ public class FileStorageOperationsTest {
         waitFor(TEST_TIMEOUT, prepare);
 
         var testStart = Instant.now();
-        Thread.sleep(1);  // Let time elapse before/after the test calls
+        Thread.sleep(10);  // Let time elapse before/after the test calls
 
         var reader = storage.reader("test_file.txt", execContext);
         var collect = Concurrent.fold(
@@ -345,7 +345,7 @@ public class FileStorageOperationsTest {
         var stat = storage.stat("test_file.txt", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
-        Thread.sleep(1);  // Let time elapse before/after the test calls
+        Thread.sleep(10);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
         var statResult = resultOf(stat);
@@ -394,7 +394,7 @@ public class FileStorageOperationsTest {
         var stat = storage.stat("some_dir/test_dir", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
-        Thread.sleep(1);  // Let time elapse before/after the test calls
+        Thread.sleep(10);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
         var statResult = resultOf(stat);
@@ -414,7 +414,7 @@ public class FileStorageOperationsTest {
         // "Modify" the directory by adding a file to it
 
         var testStart = Instant.now();
-        Thread.sleep(1);  // Let time elapse before/after the test calls
+        Thread.sleep(10);  // Let time elapse before/after the test calls
 
         var prepare2 = makeSmallFile("some_dir/test_dir/a_file.txt", storage, execContext);
         waitFor(TEST_TIMEOUT, prepare2);
@@ -422,7 +422,7 @@ public class FileStorageOperationsTest {
         var stat = storage.stat("some_dir/test_dir", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
-        Thread.sleep(1);  // Let time elapse before/after the test calls
+        Thread.sleep(10);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
         var statResult = resultOf(stat);
@@ -444,7 +444,7 @@ public class FileStorageOperationsTest {
         // Access the directory by running "ls" on it
 
         var testStart = Instant.now();
-        Thread.sleep(1);  // Let time elapse before/after the test calls
+        Thread.sleep(10);  // Let time elapse before/after the test calls
 
         var prepare2 = storage.ls("some_dir/test_dir", execContext);
         waitFor(TEST_TIMEOUT, prepare2);
@@ -452,7 +452,7 @@ public class FileStorageOperationsTest {
         var stat = storage.stat("some_dir/test_dir", execContext);
         waitFor(TEST_TIMEOUT, stat);
 
-        Thread.sleep(1);  // Let time elapse before/after the test calls
+        Thread.sleep(10);  // Let time elapse before/after the test calls
         var testFinish = Instant.now();
 
         var statResult = resultOf(stat);
