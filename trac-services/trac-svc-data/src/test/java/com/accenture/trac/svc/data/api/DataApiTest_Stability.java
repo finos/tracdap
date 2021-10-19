@@ -112,7 +112,7 @@ public class DataApiTest_Stability extends DataApiTest_Base {
         roundTripTest(content, false);
     }
 
-    @RepeatedTest(1000)
+    @RepeatedTest(100) @Tag("slow")
     void rapidFireTest() throws Exception {
 
         testRoundTrip_heterogeneousChunks();
