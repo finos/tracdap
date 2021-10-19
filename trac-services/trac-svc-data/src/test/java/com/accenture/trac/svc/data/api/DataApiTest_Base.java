@@ -60,9 +60,11 @@ abstract  class DataApiTest_Base {
 
     protected static final String TRAC_UNIT_CONFIG = "config/trac-unit.properties";
     protected static final String TRAC_UNIT_CONFIG_YAML = "config/trac-unit.yaml";
-    protected static final String TEST_TENANT = "ACME_CORP";
     protected static final short METADATA_SVC_PORT = 8081;
     protected static final String STORAGE_ROOT_DIR = "unit_test_storage";
+
+    protected static final String TEST_TENANT = "ACME_CORP";
+    protected static final String TEST_TENANT_2 = "SOME_OTHER_CORP";
 
     protected static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
 
@@ -91,8 +93,9 @@ abstract  class DataApiTest_Base {
 
         var deploy_schema_task = StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK_NAME, "", "");
         var add_tenant_task = StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, TEST_TENANT, "");
+        var add_tenant_2_task = StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, TEST_TENANT_2, "");
         var deployDb = new DeployMetaDB(testConfig);
-        deployDb.runDeployment(List.of(deploy_schema_task, add_tenant_task));
+        deployDb.runDeployment(List.of(deploy_schema_task, add_tenant_task, add_tenant_2_task));
 
         metaSvc = new TracMetadataService(testConfig);
         metaSvc.start();
