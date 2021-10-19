@@ -172,7 +172,7 @@ abstract  class DataApiTest_Base {
         var metaApi = TrustedMetadataApiGrpc.newFutureStub(dataSvcClientChannel);
 
         var readService = new DataReadService(storage, metaApi);
-        var writeService = new DataWriteService(storage, metaApi);
+        var writeService = new DataWriteService(dataSvcConfig, storage, metaApi);
         var publicApiImpl =  new TracDataApi(readService, writeService);
 
         dataService = InProcessServerBuilder.forName(dataSvcName)

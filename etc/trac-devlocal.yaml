@@ -38,6 +38,7 @@ trac:
 
     data:
       port: 8082
+      defaultStorage: STORAGE1
 
       storage:
 

@@ -19,6 +19,7 @@ package com.accenture.trac.svc.data.service;
 import com.accenture.trac.api.MetadataReadRequest;
 import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
+import com.accenture.trac.api.config.DataServiceConfig;
 import com.accenture.trac.common.eventloop.IExecutionContext;
 import com.accenture.trac.common.exception.EDataSize;
 import com.accenture.trac.common.metadata.MetadataCodec;
@@ -34,7 +35,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -61,15 +61,18 @@ public class DataWriteService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final DataServiceConfig config;
     private final IStorageManager storageManager;
     private final TrustedMetadataApiFutureStub metaApi;
     private final Validator validator = new Validator();
     private final Random random = new Random();
 
     public DataWriteService(
+            DataServiceConfig config,
             IStorageManager storageManager,
             TrustedMetadataApiFutureStub metaApi) {
 
+        this.config = config;
         this.storageManager = storageManager;
         this.metaApi = metaApi;
     }
@@ -82,6 +85,20 @@ public class DataWriteService {
 
         var defs = new RequestState();
         defs.fileTags = tags;
+
+        // This timestamp is set in the storage definition to timestamp storage incarnations/copies
+        // It is also used in the physical storage path
+
+        // TODO: Single object timestamp
+
+        // It would be nice to have a single timestamp for each object version,
+        // which is used in the object header, inside the definitions where needed and for any physical attributes
+        // Currently the metadata service generates its own timestamps, which will always be different
+        // One possible solution would be a change in the trusted metadata API,
+        // letting other TRAC services specify the object timestamp
+        // To avoid polluting the public API, this could go into the gRPC call metadata
+
+        defs.objectTimestamp = Instant.now();
 
         return CompletableFuture.completedFuture(null)
 
@@ -96,7 +113,9 @@ public class DataWriteService {
 
                 // Build definition objects
                 .thenAccept(x -> defs.file = createFileDef(defs.fileId, name, mimeType))
-                .thenAccept(x -> defs.storage = createStorageDef(defs.fileId, name, mimeType, random))
+                .thenAccept(x -> defs.storage = createStorageDef(
+                        config.getDefaultStorage(),  defs.objectTimestamp,
+                        defs.fileId, name, mimeType, random))
 
                 // Write file content stream to the storage layer
                 .thenCompose(x -> writeDataItem(
@@ -135,6 +154,7 @@ public class DataWriteService {
 
         var defs = new RequestState();
         defs.fileTags = tags;
+        defs.objectTimestamp = Instant.now();
 
         return CompletableFuture.completedFuture(null)
 
@@ -162,7 +182,9 @@ public class DataWriteService {
 
                 // Build definition objects
                 .thenAccept(x -> defs.file = updateFileDef(defs.priorFile, defs.fileId, name, mimeType))
-                .thenAccept(x -> defs.storage = updateStorageDef(defs.priorStorage, defs.fileId, name, mimeType, random))
+                .thenAccept(x -> defs.storage = updateStorageDef(
+                        defs.priorStorage, config.getDefaultStorage(), defs.objectTimestamp,
+                        defs.fileId, name, mimeType, random))
 
                 .thenAccept(x -> validator.validateVersion(defs.file, defs.priorFile))
 
@@ -353,20 +375,25 @@ public class DataWriteService {
     }
 
     private static StorageDefinition createStorageDef(
+            String storageKey, Instant storageTimestamp,
             TagHeader fileHeader, String fileName, String mimeType, Random random) {
 
-        return buildStorageDef(StorageDefinition.newBuilder(), fileHeader, fileName, mimeType, random);
+        return buildStorageDef(
+                StorageDefinition.newBuilder(), storageKey, storageTimestamp,
+                fileHeader, fileName, mimeType, random);
     }
 
     private static StorageDefinition updateStorageDef(
-            StorageDefinition priorStorage,
+            StorageDefinition priorStorage, String storageKey, Instant storageTimestamp,
             TagHeader fileHeader, String fileName, String mimeType, Random random) {
 
-        return buildStorageDef(priorStorage.toBuilder(), fileHeader, fileName, mimeType, random);
+        return buildStorageDef(
+                priorStorage.toBuilder(), storageKey, storageTimestamp,
+                fileHeader, fileName, mimeType, random);
     }
 
     private static StorageDefinition buildStorageDef(
-            StorageDefinition.Builder storageDef,
+            StorageDefinition.Builder storageDef, String storageKey, Instant storageTimestamp,
             TagHeader fileHeader, String fileName, String mimeType, Random random) {
 
         var fileId = UUID.fromString(fileHeader.getObjectId());
@@ -391,19 +418,7 @@ public class DataWriteService {
 
         var storagePath = String.format(FILE_STORAGE_PATH_TEMPLATE, fileId, fileVersion, storageSuffix, fileName);
 
-        // TODO: Storage timestamp
-        // This should ideally line up with the object timestamp recorded in the metadata service
-        // Can we allow timestamps to be pre-set in the trusted API?
-        // Also, once this solution is in place, use storage timestamp as the path suffix
-
-        var storageTimestamp = MetadataCodec.encodeDatetime(
-                Instant.now().atOffset(ZoneOffset.UTC));
-
-        // TODO: Storage key
-        // Use service configuration to choose for new items
-        // For existing items, try to put new parts into the same storage
-
-        var storageKey = "UNIT_TEST_STORAGE";
+        var storageEncodedTimestamp = MetadataCodec.encodeDatetime(storageTimestamp);
 
         // For FILE objects, storage format is taken as the supplied mime type of the file
 
@@ -412,12 +427,12 @@ public class DataWriteService {
                 .setStoragePath(storagePath)
                 .setStorageFormat(mimeType)
                 .setCopyStatus(CopyStatus.COPY_AVAILABLE)
-                .setCopyTimestamp(storageTimestamp);
+                .setCopyTimestamp(storageEncodedTimestamp);
 
         var storageIncarnation = StorageIncarnation.newBuilder()
                 .addCopies(storageCopy)
                 .setIncarnationIndex(0)
-                .setIncarnationTimestamp(storageTimestamp)
+                .setIncarnationTimestamp(storageEncodedTimestamp)
                 .setIncarnationStatus(IncarnationStatus.INCARNATION_AVAILABLE);
 
         var storageItem = StorageItem.newBuilder()

@@ -231,7 +231,7 @@ public class MetadataCodec {
 
     public static DatetimeValue encodeDatetime(Instant datetime) {
 
-        var isoDatetime = ISO_DATETIME_FORMAT.format(datetime);
+        var isoDatetime = ISO_DATETIME_FORMAT.format(datetime.atOffset(ZoneOffset.UTC));
 
         return DatetimeValue.newBuilder()
                 .setIsoDatetime(isoDatetime)

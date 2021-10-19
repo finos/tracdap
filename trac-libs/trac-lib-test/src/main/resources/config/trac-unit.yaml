@@ -38,6 +38,7 @@ trac:
 
     data:
       port: 8082
+      defaultStorage: UNIT_TEST_STORAGE
 
       storage:
 

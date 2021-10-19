@@ -134,7 +134,7 @@ public class TracDataService extends CommonServiceBase {
             var metaApi = TrustedMetadataApiGrpc.newFutureStub(clientChannel);
 
             var dataReadSvc = new DataReadService(storage, metaApi);
-            var dataWriteSvc = new DataWriteService(storage, metaApi);
+            var dataWriteSvc = new DataWriteService(dataSvcConfig, storage, metaApi);
 
             var publicApi = new TracDataApi(dataReadSvc, dataWriteSvc);
 

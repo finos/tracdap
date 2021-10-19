@@ -21,10 +21,13 @@ import com.accenture.trac.metadata.StorageDefinition;
 import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.metadata.TagUpdate;
 
+import java.time.Instant;
 import java.util.List;
 
 
 class RequestState {
+
+    Instant objectTimestamp;
 
     List<TagUpdate> fileTags;
     List<TagUpdate> storageTags;
