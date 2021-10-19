@@ -81,6 +81,8 @@ public class TracDataService extends CommonServiceBase {
 
         try {
 
+            // TODO: Channel type
+
             var channelType = NioServerSocketChannel.class;
             var clientChannelType = NioSocketChannel.class;
             var bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
@@ -91,13 +93,18 @@ public class TracDataService extends CommonServiceBase {
             storage.initStoragePlugins();
             storage.initStorage(dataSvcConfig.getStorage());
 
-            var clientChannelBuilder = NettyChannelBuilder.forAddress("localhost", 1234)  // TODO: Meta svc config
+            // TODO: Meta svc config
+
+            var clientChannelBuilder = NettyChannelBuilder.forAddress("localhost", 1234)
                     .channelType(clientChannelType)
                     .eventLoopGroup(workerGroup)
                     .directExecutor()
                     .usePlaintext();
 
             var baseChannel = clientChannelBuilder.build();
+
+            // TODO: Make event loop client channel interceptor a reusable class
+            // Spin up channels on startup, and shut them all down on close
 
             var clientChannel = ClientInterceptors.intercept(baseChannel, new ClientInterceptor() {
 
@@ -112,7 +119,7 @@ public class TracDataService extends CommonServiceBase {
 
                     if (eventLoop == null) {
 
-                        // TODO: Warnings
+                        // TODO: Log warnings
                         return baseChannel.newCall(method, callOptions);
                     }
 
@@ -161,6 +168,8 @@ public class TracDataService extends CommonServiceBase {
 
         server.shutdown();
         server.awaitTermination(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
+
+        // TODO: Shut down event loops and client channels
 
         if (server.isTerminated())
             return 0;
