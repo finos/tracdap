@@ -153,7 +153,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
     private void doStart() {
 
         // When doStart is called, subscription is already active
-        // So, it is fine to report errors without using IllegalStateException (which is for errors before onSubscribe)
+        // So, it is fine to report errors normally if they occur
 
         try {
 
@@ -164,6 +164,9 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         }
         catch (Exception e) {
 
+            log.error("File channel could not be opened: {} [{}]", e.getMessage(), absolutePath, e);
+
+            gotError = true;
             var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
             subscriber.onError(eStorage);
         }
@@ -185,6 +188,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
             log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
 
+            gotError = true;
             var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
             subscriber.onError(eStorage);
         }
@@ -204,14 +208,12 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
     private void doCancel() {
 
+        // Do not process cancellation if the read operation has finished for any reason
+        if (gotComplete || gotError || gotCancel)
+            return;
+
         try {
-
-            var alreadyCancelled = gotCancel;
             gotCancel = true;
-
-            // Do not run onCancel twice, or if the read operation has already finished for any reason
-            if ((gotComplete || gotError || alreadyCancelled))
-                return;
 
             log.info("Read operation cancelled: [{}]",  absolutePath);
 
@@ -225,10 +227,9 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
             log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
 
-            // If the cancel results in an error closing the file, do send the onError message
+            gotError = true;
 
-            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
-            subscriber.onError(eStorage);
+            // If the cancel results in an error closing the file, do send the onError message
         }
     }
 
@@ -236,9 +237,8 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
         try {
 
-            // If readChunk is called when chunkInProgress is true, that is a race condition
-            // Being conservative, let's blow up the read operation if that happens
-            // This will be reported to the user as "Unexpected internal error (this is a bug)"
+            // This should never happen - chunkInProgress is always checked or set before calling readChunk()
+            // If this condition check ever fails, a race condition has occurred and the reader is in unknown state
 
             if (chunkInProgress)
                 throw new EUnexpected();
@@ -256,16 +256,8 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         }
         catch (Exception e) {
 
-            var alreadyGotError = gotError;
             gotError = true;
-
-            // Only report errors to the subscriber if there is no previous termination signal
-            if (!(gotComplete || gotCancel || alreadyGotError))
-                handleError(e);
-
-            else
-                // For errors after termination, put a warning in the log
-                log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, e);
+            handleError(e);
         }
     }
 
@@ -320,22 +312,22 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
         // Async close exception is sent for operations that were in progress when the channel was closed
         // If the close happened because of a complete or cancel event,
-        // then it is safe to ignore these errors
+        // then it is safe to ignore the error
 
         if (gotCancel && error instanceof AsynchronousCloseException)
             return;
 
-        // Make sure not to send multiple onError signals
+        // If a chunk read fails after the operation has completed for any other reason, just log a warning
+        // It won't be possible to signal the subscriber, because a final status is already sent
 
-        var alreadyFailed = gotError;
-        gotError = true;
+        if (gotComplete || gotCancel || gotError) {
 
-        if (!(gotComplete || gotCancel || alreadyFailed))
-            handleError(error);
-
-        else
-            // For errors after termination, put a warning in the log
             log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, error);
+            return;
+        }
+
+        gotError = true;
+        handleError(error);
     }
 
     private void gotChunk(ByteBuf chunk, int nBytes) {
@@ -368,16 +360,8 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
             releaseBuffer(chunk);
 
-            var alreadyGotError = gotError;
             gotError = true;
-
-            // Only report errors to the subscriber if there is no previous termination signal
-            if (!(gotComplete || gotCancel || alreadyGotError))
-                handleError(e);
-
-            else
-                // For errors after termination, put a warning in the log
-                log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, e);
+            handleError(e);
         }
     }
 
