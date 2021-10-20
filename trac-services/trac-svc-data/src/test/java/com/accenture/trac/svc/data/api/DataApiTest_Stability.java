@@ -18,7 +18,7 @@ package com.accenture.trac.svc.data.api;
 
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.concurrent.Flows;
-import com.accenture.trac.common.util.Futures;
+import com.accenture.trac.common.concurrent.Futures;
 import com.accenture.trac.metadata.ObjectDefinition;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagSelector;

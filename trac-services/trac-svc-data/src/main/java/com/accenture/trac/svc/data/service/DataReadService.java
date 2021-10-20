@@ -20,7 +20,7 @@ import com.accenture.trac.api.MetadataReadRequest;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.storage.StorageManager;
-import com.accenture.trac.common.util.Futures;
+import com.accenture.trac.common.concurrent.Futures;
 import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.metadata.StorageDefinition;
 import com.accenture.trac.metadata.Tag;

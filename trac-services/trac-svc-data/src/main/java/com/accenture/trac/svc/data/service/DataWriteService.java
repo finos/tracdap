@@ -26,7 +26,7 @@ import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.storage.IFileStorage;
 import com.accenture.trac.common.storage.IStorageManager;
-import com.accenture.trac.common.util.Futures;
+import com.accenture.trac.common.concurrent.Futures;
 import com.accenture.trac.metadata.*;
 
 import com.accenture.trac.svc.data.validation.Validator;

@@ -23,7 +23,7 @@ import com.accenture.trac.api.MetadataReadRequest;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.concurrent.Flows;
-import com.accenture.trac.common.util.Futures;
+import com.accenture.trac.common.concurrent.Futures;
 import com.accenture.trac.metadata.*;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;

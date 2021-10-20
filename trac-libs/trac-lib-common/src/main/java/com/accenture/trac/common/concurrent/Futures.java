@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.util;
+package com.accenture.trac.common.concurrent;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.MoreExecutors;
