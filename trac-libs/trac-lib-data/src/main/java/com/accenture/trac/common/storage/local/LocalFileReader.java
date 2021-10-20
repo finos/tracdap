@@ -57,6 +57,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
     private int chunksPending;
     private long bytesRead;
+    private boolean chunkInProgress;
     private boolean gotComplete;
     private boolean gotCancel;
     private boolean gotError;
@@ -191,15 +192,14 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
     private void doRequest(long n) {
 
-        var alreadyReading = (chunksPending > 0);
+        // Do not accept the request if the read operation has finished for any reason
+        if (gotComplete || gotError || gotCancel)
+            return;
+
         chunksPending += n;
 
-        // Do not trigger a read if the read operation has finished for any reason
-        // Also do not trigger if there are chunks already being read
-
-        if (!(gotComplete || gotError || gotCancel))
-            if (!alreadyReading)
-                readChunk();
+        if (!chunkInProgress)
+            readChunk();
     }
 
     private void doCancel() {
@@ -236,6 +236,13 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
         try {
 
+            // If readChunk is called when chunkInProgress is true, that is a race condition
+            // Being conservative, let's blow up the read operation if that happens
+            // This will be reported to the user as "Unexpected internal error (this is a bug)"
+
+            if (chunkInProgress)
+                throw new EUnexpected();
+
             var chunk = allocator.ioBuffer(DEFAULT_CHUNK_SIZE);
 
             if (chunk.nioBufferCount() != 1)
@@ -244,6 +251,8 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             var nioChunk = chunk.nioBuffer(0, DEFAULT_CHUNK_SIZE);
 
             channel.read(nioChunk, bytesRead, chunk, readHandler);
+
+            chunkInProgress = true;
         }
         catch (Exception e) {
 
@@ -264,10 +273,11 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
         // Update counts
 
-        chunksPending -= 1;
-
         if (nBytes > 0)
             bytesRead += nBytes;
+
+        chunksPending -= 1;
+        chunkInProgress = false;
 
         // Check if the read is already failed or cancelled
         // If so, release the buffer and do not send any further signals
@@ -303,6 +313,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
     private void readChunkFailed(Throwable error, ByteBuf chunk) {
 
         chunksPending -= 1;
+        chunkInProgress = false;
 
         // Buffer contains no data so can be released immediately
         releaseBuffer(chunk);
@@ -311,16 +322,15 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         // If the close happened because of a complete or cancel event,
         // then it is safe to ignore these errors
 
-        if (error instanceof AsynchronousCloseException)
-            if (gotComplete || gotCancel)
-                return;
+        if (gotCancel && error instanceof AsynchronousCloseException)
+            return;
 
         // Make sure not to send multiple onError signals
 
         var alreadyFailed = gotError;
         gotError = true;
 
-        if (!gotComplete || gotCancel || alreadyFailed)
+        if (!(gotComplete || gotCancel || alreadyFailed))
             handleError(error);
 
         else
