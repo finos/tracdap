@@ -743,7 +743,8 @@ public class FileStorageReadWriteTest {
     void testRead_subscribeTwice() throws Exception {
 
         var storagePath = "some_file.txt";
-        makeSmallFile(storagePath, storage, execContext);
+        var writeSignal = makeSmallFile(storagePath, storage, execContext);
+        waitFor(TEST_TIMEOUT, writeSignal);
 
         // Two subscribers that just record their subscriptions
 
@@ -790,7 +791,8 @@ public class FileStorageReadWriteTest {
     void testRead_cancelImmediately() throws Exception {
 
         var storagePath = "some_file.txt";
-        makeSmallFile(storagePath, storage, execContext);
+        var writeSignal = makeSmallFile(storagePath, storage, execContext);
+        waitFor(TEST_TIMEOUT, writeSignal);
 
         // A subscriber that cancels as soon as it receives onSubscribe
 
@@ -836,7 +838,8 @@ public class FileStorageReadWriteTest {
         random.nextBytes(originalBytes);
         originalContent.writeBytes(originalBytes);
 
-        makeFile(storagePath, originalContent, storage, execContext);
+        var writeSignal = makeFile(storagePath, originalContent, storage, execContext);
+        waitFor(TEST_TIMEOUT, writeSignal);
 
         // A subscriber that will read one chunk and then cancel the subscription
 
@@ -903,7 +906,8 @@ public class FileStorageReadWriteTest {
         random.nextBytes(originalBytes);
         originalContent.writeBytes(originalBytes);
 
-        makeFile(storagePath, originalContent, storage, execContext);
+        var writeSignal = makeFile(storagePath, originalContent, storage, execContext);
+        waitFor(TEST_TIMEOUT, writeSignal);
 
         // A subscriber that will read one chunk and then cancel the subscription
 
