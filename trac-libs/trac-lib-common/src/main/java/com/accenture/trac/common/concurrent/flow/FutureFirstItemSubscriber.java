@@ -19,6 +19,7 @@ package com.accenture.trac.common.concurrent.flow;
 import com.accenture.trac.common.exception.ETracInternal;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Flow;
 
 public class FutureFirstItemSubscriber<T> implements Flow.Subscriber<T> {
@@ -44,13 +45,20 @@ public class FutureFirstItemSubscriber<T> implements Flow.Subscriber<T> {
 
     @Override
     public void onError(Throwable error) {
-        if (!firstFuture.isDone())
-            firstFuture.completeExceptionally(error);  // TODO: Error
+
+        if (!firstFuture.isDone()) {
+
+            var completionError = (error instanceof CompletionException)
+                    ? error : new CompletionException(error.getMessage(), error);
+
+            firstFuture.completeExceptionally(completionError);
+        }
     }
 
     @Override
     public void onComplete() {
+
         if (!firstFuture.isDone())
-            firstFuture.completeExceptionally(new ETracInternal("No data on stream"));  // TODO: Error
+            firstFuture.completeExceptionally(new IllegalStateException());
     }
 }
