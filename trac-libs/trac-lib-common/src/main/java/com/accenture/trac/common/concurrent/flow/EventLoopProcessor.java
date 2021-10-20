@@ -18,6 +18,7 @@ package com.accenture.trac.common.concurrent.flow;
 
 import io.netty.util.concurrent.OrderedEventExecutor;
 
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Flow;
 
 public class EventLoopProcessor<T> implements Flow.Processor<T, T> {
@@ -52,7 +53,11 @@ public class EventLoopProcessor<T> implements Flow.Processor<T, T> {
 
     @Override
     public void onError(Throwable error) {
-        executor.execute(() -> target.onError(error));
+
+        var completionError = (error instanceof CompletionException)
+                ? error : new CompletionException(error.getMessage(), error);
+
+        executor.execute(() -> target.onError(completionError));
     }
 
     @Override
