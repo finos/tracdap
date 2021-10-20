@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.channels.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,6 +36,9 @@ import static java.nio.file.StandardOpenOption.*;
 
 
 public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
+
+    private static final int CHUNK_BUFFER_CAPACITY = 32;
+    private static final int CHUNK_BUFFER_MIN_REQUESTS = 8;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
     private final LocalFileErrors errors;
@@ -49,7 +53,9 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     private AsynchronousFileChannel channel;
     private ChunkWriteHandler writeHandler;
 
-    private int chunksPending;
+    private final Queue<ByteBuf> chunkBuffer;
+    private int chunksRequested;
+    private boolean chunkInProgress;
     private long bytesReceived;
     private long bytesWritten;
     private boolean gotComplete;
@@ -70,7 +76,7 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
         this.subscriptionSet = new AtomicBoolean(false);
         this.subscription = null;
 
-        chunksPending = 0;
+        this.chunkBuffer = new ArrayBlockingQueue<>(CHUNK_BUFFER_CAPACITY);
         bytesReceived = 0;
         bytesWritten = 0;
         gotComplete = false;
@@ -119,53 +125,21 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     public void onNext(ByteBuf chunk) {
 
         // Avoid concurrency issues - ensure all calls are processed in the ordered event loop
-
-        if (!executor.inEventLoop()) {
-            executor.submit(() -> this.onNext(chunk));
-            return;
-        }
-
-        chunksPending += 1;
-
-        if (!(gotComplete || gotError || gotCancel))
-            writeChunk(chunk);
-
-        else
-            releaseBuffer(chunk);
+        executor.submit(() -> this.doNext(chunk));
     }
 
     @Override
     public void onComplete() {
 
         // Avoid concurrency issues - ensure all calls are processed in the ordered event loop
-
-        if (!executor.inEventLoop()) {
-            executor.submit(this::onComplete);
-            return;
-        }
-
-        var alreadyComplete = gotComplete;
-        gotComplete = true;
-
-        if (chunksPending == 0 && !(gotError || alreadyComplete))
-            doComplete();
+        executor.submit(this::doComplete);
     }
 
     @Override
     public void onError(Throwable error) {
 
         // Avoid concurrency issues - ensure all calls are processed in the ordered event loop
-
-        if (!executor.inEventLoop()) {
-            executor.submit(() -> this.onError(error));
-            return;
-        }
-
-        var alreadyFailed = gotError;
-        gotError = true;
-
-        if (!(gotComplete || gotCancel || alreadyFailed))
-            handleError(error, false);
+        executor.submit(() -> this.doError(error));
     }
 
 
@@ -174,83 +148,6 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
     // -----------------------------------------------------------------------------------------------------------------
 
     // These methods are only ever called on the ordered event executor
-
-
-    private class ChunkWriteHandler implements CompletionHandler<Integer, ByteBuf> {
-
-        @Override
-        public void completed(Integer nBytes, ByteBuf chunk) {
-
-            // Update counts
-            chunksPending -= 1;
-            bytesWritten += nBytes;
-
-            // The number of bytes in the buffer is the expected number of bytes written
-            var bytesExpected = chunk.readableBytes();
-
-            // Chunk can be released whether the operation succeeds or fails - it is no longer needed
-            releaseBuffer(chunk);
-
-            // Check if the write operation is already failed or cancelled
-            // If so, do not send any further signals
-            if (gotError || gotCancel) {
-
-                if (log.isDebugEnabled())
-                    log.debug("Ignoring chunks, write operation is failed or terminated: [{}]", absolutePath);
-            }
-
-            // If the full content of the buffer was not written, this is an error
-            else if (nBytes != bytesExpected) {
-
-                gotError = true;
-
-                var error = errors.chunkNotFullyWritten(bytesExpected, nBytes);
-                handleError(error, true);
-            }
-
-            // If onComplete has been sent and there are no chunks pending, then the operation is complete
-            else if (gotComplete && chunksPending == 0) {
-
-                doComplete();
-            }
-
-            // Otherwise, this is a normal write
-            else {
-
-                nextChunk();
-            }
-        }
-
-        @Override
-        public void failed(Throwable error, ByteBuf chunk) {
-
-            // Update counts
-            chunksPending -= 1;
-
-            // Chunk can be released whether the operation succeeds or fails - it is no longer needed
-            releaseBuffer(chunk);
-
-            // Async close exception is sent for operations that were in progress when the channel was closed
-            // If the close happened because of a complete or cancel event,
-            // then it is safe to ignore these errors
-
-            if (error instanceof AsynchronousCloseException)
-                if (gotComplete || gotCancel)
-                    return;
-
-            // Make sure not to send multiple onError signals
-
-            var alreadyFailed = gotError;
-            gotError = true;
-
-            if (!gotComplete || gotCancel || alreadyFailed)
-                handleError(error, true);
-
-            else
-                // For errors after termination, put a warning in the log
-                log.warn("Write operation is terminated but further errors occurred: [{}]", absolutePath, error);
-        }
-    }
 
     private void doStart() {
 
@@ -261,7 +158,11 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
             log.info("File channel open for writing: [{}]", absolutePath);
 
-            subscription.request(1);
+            // We want to keep at least MIN_REQUESTS chunks in the buffer, so start with double that
+            var initialRequest = CHUNK_BUFFER_MIN_REQUESTS * 2;
+
+            subscription.request(initialRequest);
+            chunksRequested += initialRequest;
         }
         catch (Exception e) {
 
@@ -272,9 +173,81 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
         }
     }
 
-    private void writeChunk(ByteBuf chunk) {
+    private void doRequestMore() {
+
+        // Do not request more if the operation is already finished for any reason
+        if (gotComplete || gotError || gotCancel)
+            return;
 
         try {
+            if (chunksRequested < CHUNK_BUFFER_MIN_REQUESTS)
+                subscription.request(CHUNK_BUFFER_MIN_REQUESTS);
+        }
+        catch (Exception e) {
+
+            gotError = true;
+            handleError(e, true);
+        }
+    }
+
+    private void doNext(ByteBuf chunk) {
+
+        // Do not accept the onNext message if the operation is already finished for any reason
+
+        if (gotComplete || gotError || gotCancel) {
+            releaseBuffer(chunk);
+            return;
+        }
+
+        var bufferedOk = chunkBuffer.offer(chunk);
+
+        // Buffer overflow will only happen if more chunks are sent than have been requested
+        if (!bufferedOk)
+            throw new EUnexpected();
+
+        if (!chunkInProgress)
+            writeNextChunk();
+    }
+
+    private void doComplete() {
+
+        // Do not accept the onComplete message if the operation is already finished for any reason
+
+        if (gotComplete || gotError || gotCancel)
+            return;
+
+        gotComplete = true;
+
+        if (chunkBuffer.isEmpty() && !chunkInProgress)
+            handleComplete();
+    }
+
+    private void doError(Throwable error) {
+
+        // Do not accept the onError message if the operation is already finished for any reason
+
+        if (gotComplete || gotError || gotCancel)
+            return;
+
+        gotError = true;
+        handleError(error, false);
+    }
+
+    private void writeNextChunk() {
+
+        ByteBuf chunk = null;
+
+        try {
+
+            // This should never happen - chunkInProgress is always checked or set before calling writeChunk()
+            // If this condition check ever fails, a race condition has occurred and the writer is in unknown state
+
+            if (chunkInProgress || chunkBuffer.isEmpty())
+                throw new EUnexpected();
+
+            chunkInProgress = true;
+            chunksRequested -= 1;
+            chunk = chunkBuffer.remove();
 
             var offset = bytesReceived;
             bytesReceived += chunk.readableBytes();
@@ -288,43 +261,90 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
         }
         catch (Exception e) {
 
-            releaseBuffer(chunk);
+            if (chunk != null)
+                releaseBuffer(chunk);
 
-            var alreadyGotError = gotError;
             gotError = true;
-
-            // Only report errors to the subscriber if there is no previous termination signal
-            if (!(gotComplete || gotCancel || alreadyGotError))
-                handleError(e, true);
-
-            else
-                // For errors after termination, put a warning in the log
-                log.warn("Write operation is terminated but further errors occurred: [{}]", absolutePath, e);
+            handleError(e, true);
         }
     }
 
-    private void nextChunk() {
+    public void writeChunkComplete(Integer nBytes, ByteBuf chunk) {
 
-        try {
+        // Update counts
+        bytesWritten += nBytes;
+        chunkInProgress = false;
 
-            subscription.request(1);
+        // The number of bytes in the buffer is the expected number of bytes written
+        var bytesExpected = chunk.readableBytes();
+
+        // Chunk can be released whether the operation succeeds or fails - it is no longer needed
+        releaseBuffer(chunk);
+
+        // Check if the write operation is already failed or cancelled
+
+        if (gotError || gotCancel) {
+
+            if (log.isDebugEnabled())
+                log.debug("Ignoring chunks, write operation is failed or terminated: [{}]", absolutePath);
+
+            return;
         }
-        catch (Exception e) {
 
-            var alreadyGotError = gotError;
+        // If the full content of the buffer was not written, this is an error
+        if (nBytes != bytesExpected) {
+
             gotError = true;
 
-            // Only report errors to the subscriber if there is no previous termination signal
-            if (!(gotComplete || gotCancel || alreadyGotError))
-                handleError(e, true);
+            var error = errors.chunkNotFullyWritten(bytesExpected, nBytes);
+            handleError(error, true);
+        }
 
-            else
-                // For errors after termination, put a warning in the log
-                log.warn("Write operation is terminated but further errors occurred: [{}]", absolutePath, e);
+        // If onComplete has been sent and there are no chunks pending, then the operation is complete
+        else if (gotComplete && chunkBuffer.isEmpty()) {
+
+            handleComplete();
+        }
+
+        // Otherwise, this is a normal write
+        else {
+
+            if (!chunkBuffer.isEmpty())
+                writeNextChunk();
+
+            doRequestMore();
         }
     }
 
-    private void doComplete() {
+    public void writeChunkFailed(Throwable error, ByteBuf chunk) {
+
+        // Update counts
+        chunkInProgress = false;
+
+        // Chunk can be released whether the operation succeeds or fails - it is no longer needed
+        releaseBuffer(chunk);
+
+        // Async close exception is sent for operations that were in progress when the channel was closed
+        // If the close happened because of a complete or cancel event,
+        // then it is safe to ignore the error
+
+        if (error instanceof AsynchronousCloseException)
+            return;
+
+        // If a chunk write fails after the operation has finished for any other reason, just log a warning
+        // It won't be possible to send the signal, because a signal is already sent
+
+        if (gotComplete || gotError || gotCancel) {
+
+            log.warn("Write operation is terminated but further errors occurred: [{}]", absolutePath, error);
+            return;
+        }
+
+        gotError = true;
+        handleError(error, true);
+    }
+
+    private void handleComplete() {
 
         try {
 
@@ -360,6 +380,11 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
             else
                 log.error("Write operation stopped due to an error: {} [{}]", error.getMessage(), absolutePath, eWrapped);
 
+            while (!chunkBuffer.isEmpty()) {
+                var chunk = chunkBuffer.remove();
+                releaseBuffer(chunk);
+            }
+
             channel.close();
 
             // Try to remove the partially written file
@@ -393,5 +418,20 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
         if (!releaseOk && buffer.capacity() > 0)
             log.warn("Chunk buffer was not released (this could indicate a memory leak)");
+    }
+
+    private class ChunkWriteHandler implements CompletionHandler<Integer, ByteBuf> {
+
+        @Override
+        public void completed(Integer nBytes, ByteBuf chunk) {
+
+            writeChunkComplete(nBytes, chunk);
+        }
+
+        @Override
+        public void failed(Throwable error, ByteBuf chunk) {
+
+            writeChunkFailed(error, chunk);
+        }
     }
 }

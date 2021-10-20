@@ -317,7 +317,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         if (gotCancel && error instanceof AsynchronousCloseException)
             return;
 
-        // If a chunk read fails after the operation has completed for any other reason, just log a warning
+        // If a chunk read fails after the operation has finished for any other reason, just log a warning
         // It won't be possible to signal the subscriber, because a final status is already sent
 
         if (gotComplete || gotCancel || gotError) {

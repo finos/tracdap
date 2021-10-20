@@ -165,7 +165,7 @@ public class FileStorageReadWriteTest {
         var writer = storage.writer(storagePath, writeSignal, execContext);
         Flows.publish(originalBuffers).subscribe(writer);
 
-        waitFor(TEST_TIMEOUT, writeSignal);
+        waitFor(Duration.ofHours(1), writeSignal);
 
         // Make sure the write operation did not report an error before trying to read
         Assertions.assertDoesNotThrow(() -> resultOf(writeSignal));
@@ -713,7 +713,8 @@ public class FileStorageReadWriteTest {
     void testRead_subscribeLate() throws Exception {
 
         var storagePath = "some_file.txt";
-        makeSmallFile(storagePath, storage, execContext);
+        var writeSignal = makeSmallFile(storagePath, storage, execContext);
+        waitFor(TEST_TIMEOUT, writeSignal);
 
         // Create a reader but do not subscribe to it
         // Reader should not try to access the file
