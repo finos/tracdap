@@ -16,8 +16,8 @@
 
 package com.accenture.trac.common.storage;
 
-import com.accenture.trac.common.eventloop.ExecutionContext;
-import com.accenture.trac.common.eventloop.IExecutionContext;
+import com.accenture.trac.common.concurrent.ExecutionContext;
+import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
 import com.accenture.trac.common.storage.local.LocalStoragePlugin;
 import io.netty.util.concurrent.DefaultEventExecutor;

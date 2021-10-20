@@ -16,7 +16,7 @@
 
 package com.accenture.trac.common.util;
 
-import com.accenture.trac.common.eventloop.IExecutionContext;
+import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
 import io.netty.util.concurrent.OrderedEventExecutor;

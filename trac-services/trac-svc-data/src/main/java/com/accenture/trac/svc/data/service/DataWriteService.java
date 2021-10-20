@@ -20,7 +20,7 @@ import com.accenture.trac.api.MetadataReadRequest;
 import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import com.accenture.trac.api.config.DataServiceConfig;
-import com.accenture.trac.common.eventloop.IExecutionContext;
+import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.exception.EDataSize;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;

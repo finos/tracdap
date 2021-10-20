@@ -16,7 +16,7 @@
 
 package com.accenture.trac.common.storage;
 
-import com.accenture.trac.common.eventloop.IExecutionContext;
+import com.accenture.trac.common.concurrent.IExecutionContext;
 import io.netty.buffer.ByteBuf;
 
 import java.util.concurrent.CompletableFuture;

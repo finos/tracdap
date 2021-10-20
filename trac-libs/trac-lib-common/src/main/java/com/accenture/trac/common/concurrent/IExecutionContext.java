@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.eventloop;
+package com.accenture.trac.common.concurrent;
 
 import io.netty.util.concurrent.OrderedEventExecutor;
 

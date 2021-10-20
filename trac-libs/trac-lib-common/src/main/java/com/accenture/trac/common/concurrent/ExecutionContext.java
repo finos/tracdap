@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.eventloop;
+package com.accenture.trac.common.concurrent;
 
 import io.grpc.*;
-import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.OrderedEventExecutor;
 
 import javax.annotation.Nullable;

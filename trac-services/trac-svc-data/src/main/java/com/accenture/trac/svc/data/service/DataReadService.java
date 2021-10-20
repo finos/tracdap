@@ -18,7 +18,7 @@ package com.accenture.trac.svc.data.service;
 
 import com.accenture.trac.api.MetadataReadRequest;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
-import com.accenture.trac.common.eventloop.IExecutionContext;
+import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.metadata.FileDefinition;
