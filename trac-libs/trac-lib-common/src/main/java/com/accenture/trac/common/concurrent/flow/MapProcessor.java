@@ -16,15 +16,25 @@
 
 package com.accenture.trac.common.concurrent.flow;
 
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Flow;
 import java.util.function.Function;
 
 public class MapProcessor<T, U> implements Flow.Processor<T, U> {
 
+    // Map processor is NOT thread safe
+    // The map operation happens on the stack, so it relies on the thread safety of source and/or target
+
+    // Map processor does not insist on the order in which source/target are connected
+    // If the target connects first, subscription requests are buffered
+
     private final Function<T, U> mapping;
 
     private Flow.Subscriber<? super U> subscriber = null;
     private Flow.Subscription sourceSubscription = null;
+
+    private int bufferRequest;
+    private boolean bufferCancel;
 
     public MapProcessor(Function<T, U> mapping) {
         this.mapping = mapping;
@@ -33,26 +43,26 @@ public class MapProcessor<T, U> implements Flow.Processor<T, U> {
     @Override
     public void subscribe(Flow.Subscriber<? super U> subscriber) {
 
-        var targetSubscription = new Flow.Subscription() {
-
-            @Override
-            public void request(long n) {
-                sourceSubscription.request(n);
-            }
-
-            @Override
-            public void cancel() {
-                sourceSubscription.cancel();
-            }
-        };
-
         this.subscriber = subscriber;
+
+        var targetSubscription = new MapSubscription();
         subscriber.onSubscribe(targetSubscription);
     }
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
+
         this.sourceSubscription = subscription;
+
+        if (bufferCancel) {
+            subscription.cancel();
+            bufferCancel = false;
+        }
+
+        else if (bufferRequest > 0) {
+            subscription.request(bufferRequest);
+            bufferRequest = 0;
+        }
     }
 
     @Override
@@ -68,14 +78,37 @@ public class MapProcessor<T, U> implements Flow.Processor<T, U> {
     }
 
     @Override
-    public void onError(Throwable throwable) {
+    public void onError(Throwable error) {
 
-        sourceSubscription.cancel();
-        subscriber.onError(throwable);
+        var completionError = error instanceof CompletionException
+                ? error : new CompletionException(error.getMessage(), error);
+
+        subscriber.onError(completionError);
     }
 
     @Override
     public void onComplete() {
         subscriber.onComplete();
+    }
+
+    private class MapSubscription implements Flow.Subscription {
+
+        @Override
+        public void request(long n) {
+
+            if (sourceSubscription != null)
+                sourceSubscription.request(n);
+            else
+                bufferRequest += n;
+        }
+
+        @Override
+        public void cancel() {
+
+            if (sourceSubscription != null)
+                sourceSubscription.cancel();
+            else
+                bufferCancel = true;
+        }
     }
 }

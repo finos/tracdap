@@ -19,17 +19,34 @@ package com.accenture.trac.common.concurrent.flow;
 import com.accenture.trac.common.exception.ETracInternal;
 import io.netty.util.concurrent.OrderedEventExecutor;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 
 public class HubProcessor<T> implements Flow.Processor<T, T> {
 
+    // Hub processor is a thread-safe processor
+    // This is achieved by deferring all operations to happen on the event loop
+
+    // Subscribe and onSubscribe implement guard checks, which happen synchronously
+    // Otherwise there is nowhere to report errors in onSubscribe
+    // Once the checks are passed, these actions are also deferred to the event loop
+
+    // Hub processor insists that at least one target is subscribed before connecting the source
+    // Otherwise source messages would be discarded (including error/complete messages)
+
     private Flow.Subscription sourceSubscription;
     private final Map<Flow.Subscriber<? super T>, HubTargetState> targets;
+
+    private final AtomicBoolean sourceGuard;
+    private final ConcurrentMap<Flow.Subscriber<?>, Object> targetGuard;
 
     private final LinkedList<T> messageBuffer;
     private final Consumer<T> releaseFunc;
@@ -42,7 +59,10 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
 
     public HubProcessor(OrderedEventExecutor eventLoop, Consumer<T> releaseFunc) {
 
-        this.targets = new ConcurrentHashMap<>();
+        this.targets = new HashMap<>();
+
+        this.sourceGuard = new AtomicBoolean(false);
+        this.targetGuard = new ConcurrentHashMap<>();
 
         this.messageBuffer = new LinkedList<>();
         this.releaseFunc = releaseFunc;
@@ -60,20 +80,26 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
     @Override
     public void subscribe(Flow.Subscriber<? super T> subscriber) {
 
+        var priorTarget = targetGuard.putIfAbsent(subscriber, new Object());
+
+        if (priorTarget != null) {
+
+            var err = new IllegalStateException("Duplicate subscription in hub processor (this is a bug)");
+            eventLoop.execute(() -> subscriber.onError(err));
+
+            return;
+        }
+
+        eventLoop.execute(() -> doNewSubscription(subscriber));
+    }
+
+    private void doNewSubscription(Flow.Subscriber<? super T> subscriber) {
+
         var subscription = new HubSubscription(subscriber);
         var state = new HubTargetState();
         state.subscription = subscription;
 
-        // Concurrent check - ensure each subscriber is only subscribed once
-        // Targets is a concurrent map
-
-        var priorState = targets.putIfAbsent(subscriber, state);
-
-        if (priorState != null) {
-            var err = new IllegalStateException("Duplicate subscription in hub processor (this is a bug)");
-            subscriber.onError(err);
-            return;
-        }
+        targets.put(subscriber, state);
 
         subscriber.onSubscribe(subscription);
     }
@@ -81,15 +107,29 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
 
-        // todo: guard
+        var priorSourceOk = sourceGuard.compareAndSet(false, true);
 
-        if (sourceSubscription != null)
+        if (!priorSourceOk)
             throw new ETracInternal("Hub processor subscribed to multiple upstream sources");
 
-        if (targets.isEmpty())
+        if (targetGuard.isEmpty())
             throw new ETracInternal("Hub processor connected to source before any targets");
 
+        eventLoop.execute(() -> doSubscribe(subscription));
+    }
+
+    private void doSubscribe(Flow.Subscription subscription) {
+
         sourceSubscription = subscription;
+
+        // Targets have definitely been registered because this is guarded in onSubscribe
+        // There is a possibility all target subscriptions already got cancelled
+        // In this case, cancel the source subscription as well
+
+        if (targets.isEmpty()) {
+            sourceSubscription.cancel();
+            return;
+        }
 
         var maxRequest = targets.values().stream()
                 .map(state -> state.requestIndex)
@@ -104,37 +144,44 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
     @Override
     public void onNext(T message) {
 
-        eventLoop.submit(() -> {
+        eventLoop.submit(() -> doNext(message));
+    }
 
-            messageBuffer.add(message);
-            messageBufferEnd++;
+    private void doNext(T message) {
 
-            dispatchMessages();
-        });
+        messageBuffer.add(message);
+        messageBufferEnd++;
+
+        dispatchMessages();
     }
 
     @Override
     public void onError(Throwable error) {
 
-        eventLoop.submit(() -> {
+        eventLoop.submit(() -> doError(error));
+    }
 
-            clearBuffer();
+    private void doError(Throwable error) {
 
-            // todo: wrap completion error
+        clearBuffer();
 
-            for (var subscriber: targets.keySet())
-                subscriber.onError(error);
-        });
+        var completionError = error instanceof CompletionException
+                ? error : new CompletionException(error.getMessage(), error);
+
+        for (var subscriber: targets.keySet())
+            subscriber.onError(completionError);
     }
 
     @Override
     public void onComplete() {
 
-        eventLoop.submit(() -> {
+        eventLoop.submit(this::doComplete);
+    }
 
-            completeFlag = true;
-            dispatchMessages();
-        });
+    private void doComplete() {
+
+        completeFlag = true;
+        dispatchMessages();
     }
 
     private void dispatchMessages() {
@@ -215,8 +262,11 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
         targets.remove(target);
 
         if (targets.isEmpty()) {
+
             clearBuffer();
-            sourceSubscription.cancel();
+
+            if (sourceSubscription != null)
+                sourceSubscription.cancel();
         }
     }
 
