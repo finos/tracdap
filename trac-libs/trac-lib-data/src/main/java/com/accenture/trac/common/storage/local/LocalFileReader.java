@@ -110,9 +110,18 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             return;
         }
 
-        this.subscriber = subscriber;
+        // Make sure the doStart action goes into the event loop before calling subscriber.onSubscribe()
+        // This makes sure that doStart is called before any requests from the subscription get processed
 
         executor.submit(this::doStart);
+
+        // Now activate the subscription, before doStart gets invoked
+        // This approach allows errors to be reported normally during onStart (e.g. file not found)
+        // Otherwise, if the subscription is not yet active, errors should be reported with IllegalStateException
+        // File not found is an expected error, reporting it with EStorage makes for cleaner error handling
+
+        this.subscriber = subscriber;
+        subscriber.onSubscribe(new ReadSubscription());
     }
 
     private class ReadSubscription implements Flow.Subscription {
@@ -241,20 +250,20 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
     private void doStart() {
 
+        // When doStart is called, subscription is already active
+        // So, it is fine to report errors without using IllegalStateException (which is for errors before onSubscribe)
+
         try {
 
             this.channel = AsynchronousFileChannel.open(absolutePath, Set.of(READ), executor);
             this.readHandler = new ChunkReadHandler();
 
             log.info("File channel open for reading: [{}]", absolutePath);
-
-            subscriber.onSubscribe(new ReadSubscription());
         }
         catch (Exception e) {
 
             var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
-            var eFlowState = new IllegalStateException(eStorage.getMessage(), eStorage);
-            subscriber.onError(eFlowState);
+            subscriber.onError(eStorage);
         }
     }
 

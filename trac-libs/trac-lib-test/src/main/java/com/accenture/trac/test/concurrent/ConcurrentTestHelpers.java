@@ -47,7 +47,7 @@ public class ConcurrentTestHelpers {
         }
     }
 
-    public static <T> T resultOf(CompletionStage<T> task) throws Exception {
+    public static <T> T resultOf(CompletionStage<T> task, boolean unwrap) throws Exception {
 
         var taskFuture = task.toCompletableFuture();
 
@@ -56,31 +56,23 @@ public class ConcurrentTestHelpers {
 
         // Calling join() will always wrap errors with CompletionError
         // We want to get the exception that was originally used to complete the task
-
-        // The original error can be checked using whenComplete()
-        // If the original error was in fact a CompletionError, then throw that
-        // If join() is wrapping another error, unwrap it and throw the original cause
-
-        var isAlreadyWrapped = new CompletableFuture<Boolean>();
-
-        taskFuture.whenComplete((result, error) -> {
-
-            if (error instanceof CompletionException)
-                isAlreadyWrapped.complete(true);
-            else
-                isAlreadyWrapped.complete(false);
-        });
+        // A few test cases check for the completion explicitly, they can set unwrap = false
 
         try {
             return task.toCompletableFuture().join();
         }
         catch (CompletionException e) {
 
-            if (isAlreadyWrapped.get())
+            if (!unwrap)
                 throw e;
 
             var cause = e.getCause();
             throw (cause instanceof Exception) ? (Exception) cause : e;
         }
+    }
+
+    public static <T> T resultOf(CompletionStage<T> task) throws Exception {
+
+        return resultOf(task, true);
     }
 }

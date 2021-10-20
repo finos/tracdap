@@ -519,11 +519,11 @@ public class FileStorageReadWriteTest {
 
         // For errors received externally via onError(),
         // The writer should wrap the error with a completion error and use the wrapped error as the result signal
-        Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal));
+        Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal, false));
 
         // The wrapped exception should be what was received in onError
         try {
-            resultOf(writerSignal);
+            resultOf(writerSignal, false);
         }
         catch (CompletionException e) {
             Assertions.assertTrue(e.getCause() instanceof TestException);
@@ -574,11 +574,11 @@ public class FileStorageReadWriteTest {
 
         // For errors received externally via onError(),
         // The writer should wrap the error with a completion error and use the wrapped error as the result signal
-        Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal));
+        Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal, false));
 
         // The wrapped exception should be what was received in onError
         try {
-            resultOf(writerSignal);
+            resultOf(writerSignal, false);
         }
         catch (CompletionException e) {
             Assertions.assertTrue(e.getCause() instanceof TestException);
@@ -618,7 +618,7 @@ public class FileStorageReadWriteTest {
         // Send the onError() message and make sure the writer signal reports the failure
         writer1.onError(new TestException());
         waitFor(TEST_TIMEOUT, writerSignal1);
-        Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal1));
+        Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal1, false));
 
         // File should not exist in storage after an aborted write
         var exists1 = storage.exists(storagePath, execContext);
@@ -730,12 +730,12 @@ public class FileStorageReadWriteTest {
         var rm = storage.rm(storagePath, false, execContext);
         waitFor(TEST_TIMEOUT, rm);
 
-        // Now try subscribing to the reader - should result in an illegal state exception
+        // Now try subscribing to the reader - should result in a storage request error
         Flow.Subscriber<ByteBuf> subscriber = unchecked(mock(Flow.Subscriber.class));
         reader.subscribe(subscriber);
 
-        verify(subscriber, timeout(ASYNC_DELAY.toMillis())).onError(any(IllegalStateException.class));
-        verify(subscriber, never()).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, timeout(ASYNC_DELAY.toMillis())).onSubscribe(any(Flow.Subscription.class));
+        verify(subscriber, timeout(ASYNC_DELAY.toMillis())).onError(any(EStorageRequest.class));
     }
 
     @Test

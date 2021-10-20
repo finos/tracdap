@@ -79,36 +79,14 @@ public class ReduceProcessor<T, U> implements Flow.Subscriber<T> {
     @Override
     public void onError(Throwable error) {
 
-        var unwrapped = unwrapConcurrentError(error);
-        result.completeExceptionally(unwrapped);
+        var completionError = (error instanceof CompletionException)
+                ? error : new CompletionException(error.getMessage(), error);
+
+        result.completeExceptionally(completionError);
     }
 
     @Override
     public void onComplete() {
         result.complete(acc);
     }
-
-
-    // TODO: This is not right!
-    // Errors should be wrapped in CompletionException when passing to the next stage
-
-    // Exceptions that are wrappers for errors that occurred during stream processing
-    // These exceptions are unwrapped when a stream is resolved, i.e. their semantic value is discarded
-    // Wrapper exceptions where the semantic value should be retained are not in this list
-    // E.g. cancellation may be caused by an error, but the semantic value of cancellation is retained
-
-    private static Throwable unwrapConcurrentError(Throwable error) {
-
-        if (error.getCause() != null)
-            for (var wrapping : WRAPPED_CONCURRENT_EXCEPTIONS)
-                if (wrapping.isInstance(error))
-                    return error.getCause();
-
-        return error;
-    }
-
-    private static final List<Class<? extends Exception>> WRAPPED_CONCURRENT_EXCEPTIONS = List.of(
-            ExecutionException.class,
-            CompletionException.class,
-            IllegalStateException.class);
 }
