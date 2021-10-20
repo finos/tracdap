@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.util;
+package com.accenture.trac.common.concurrent;
 
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.exception.ETracInternal;
@@ -32,7 +32,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 
-public class Concurrent {
+public class Flows {
 
     public static <T>
     Flow.Publisher<T> publish(List<T> source) {

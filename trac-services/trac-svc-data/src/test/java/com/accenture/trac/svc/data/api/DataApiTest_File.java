@@ -22,7 +22,7 @@ import com.accenture.trac.api.FileWriteRequest;
 import com.accenture.trac.api.MetadataReadRequest;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
-import com.accenture.trac.common.util.Concurrent;
+import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.metadata.*;
 import com.google.protobuf.ByteString;
@@ -112,9 +112,9 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setSelector(MetadataUtil.selectorFor(fileId))
                 .build();
 
-        var responseStream = Concurrent.<FileReadResponse>hub(execContext);
-        var byteStream = Concurrent.map(responseStream, FileReadResponse::getContent);
-        var content = Concurrent.fold(byteStream,
+        var responseStream = Flows.<FileReadResponse>hub(execContext);
+        var byteStream = Flows.map(responseStream, FileReadResponse::getContent);
+        var content = Flows.fold(byteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
 
@@ -368,9 +368,9 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setSelector(MetadataUtil.selectorFor(fileId))
                 .build();
 
-        var responseStream = Concurrent.<FileReadResponse>hub(execContext);
-        var byteStream = Concurrent.map(responseStream, FileReadResponse::getContent);
-        var content = Concurrent.fold(byteStream,
+        var responseStream = Flows.<FileReadResponse>hub(execContext);
+        var byteStream = Flows.map(responseStream, FileReadResponse::getContent);
+        var content = Flows.fold(byteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
 
@@ -428,9 +428,9 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setSelector(MetadataUtil.selectorFor(v2Id))
                 .build();
 
-        var v2Response = Concurrent.<FileReadResponse>hub(execContext);
-        var v2ByteStream = Concurrent.map(v2Response, FileReadResponse::getContent);
-        var v2Content = Concurrent.fold(v2ByteStream,
+        var v2Response = Flows.<FileReadResponse>hub(execContext);
+        var v2ByteStream = Flows.map(v2Response, FileReadResponse::getContent);
+        var v2Content = Flows.fold(v2ByteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
 
@@ -446,9 +446,9 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setSelector(MetadataUtil.selectorFor(v1Id))
                 .build();
 
-        var v1Response = Concurrent.<FileReadResponse>hub(execContext);
-        var v1ByteStream = Concurrent.map(v1Response, FileReadResponse::getContent);
-        var v1Content = Concurrent.fold(v1ByteStream,
+        var v1Response = Flows.<FileReadResponse>hub(execContext);
+        var v1ByteStream = Flows.map(v1Response, FileReadResponse::getContent);
+        var v1Content = Flows.fold(v1ByteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
 
@@ -1005,9 +1005,9 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setSelector(MetadataUtil.selectorFor(v2Id))
                 .build();
 
-        var responseStream = Concurrent.<FileReadResponse>hub(execContext);
-        var byteStream = Concurrent.map(responseStream, FileReadResponse::getContent);
-        var content = Concurrent.fold(byteStream,
+        var responseStream = Flows.<FileReadResponse>hub(execContext);
+        var byteStream = Flows.map(responseStream, FileReadResponse::getContent);
+        var content = Flows.fold(byteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
 
@@ -1072,10 +1072,10 @@ public class DataApiTest_File extends DataApiTest_Base {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var responseStream = Concurrent.<FileReadResponse>hub(execContext);
+        var responseStream = Flows.<FileReadResponse>hub(execContext);
 
         // Collect response messages into a list for direct inspection
-        var collectList = Concurrent.fold(responseStream,
+        var collectList = Flows.fold(responseStream,
                 (bs, b) -> {bs.add(b); return bs;},
                 new ArrayList<FileReadResponse>());
 
@@ -1109,10 +1109,10 @@ public class DataApiTest_File extends DataApiTest_Base {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var responseStream = Concurrent.<FileReadResponse>hub(execContext);
+        var responseStream = Flows.<FileReadResponse>hub(execContext);
 
         // Collect response messages into a list for direct inspection
-        var collectList = Concurrent.fold(responseStream,
+        var collectList = Flows.fold(responseStream,
                 (bs, b) -> {bs.add(b); return bs;},
                 new ArrayList<FileReadResponse>());
 
@@ -1159,9 +1159,9 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setLatestObject(true))
                 .build();
 
-        var v2ResponseStream = Concurrent.<FileReadResponse>hub(execContext);
-        var v2ByteStream = Concurrent.map(v2ResponseStream, FileReadResponse::getContent);
-        var v2Content = Concurrent.fold(v2ByteStream,
+        var v2ResponseStream = Flows.<FileReadResponse>hub(execContext);
+        var v2ByteStream = Flows.map(v2ResponseStream, FileReadResponse::getContent);
+        var v2Content = Flows.fold(v2ByteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
 
@@ -1179,9 +1179,9 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         // Use the same request for latest file read again, should return V2
 
-        var v1ResponseStream = Concurrent.<FileReadResponse>hub(execContext);
-        var v1ByteStream = Concurrent.map(v1ResponseStream, FileReadResponse::getContent);
-        var v1Content = Concurrent.fold(v1ByteStream,
+        var v1ResponseStream = Flows.<FileReadResponse>hub(execContext);
+        var v1ByteStream = Flows.map(v1ResponseStream, FileReadResponse::getContent);
+        var v1Content = Flows.fold(v1ByteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
 
@@ -1207,9 +1207,9 @@ public class DataApiTest_File extends DataApiTest_Base {
         // Explicit data read for V2
 
         var v2Request = readRequest(v2Id);
-        var v2ResponseStream = Concurrent.<FileReadResponse>hub(execContext);
-        var v2ByteStream = Concurrent.map(v2ResponseStream, FileReadResponse::getContent);
-        var v2Content = Concurrent.fold(v2ByteStream,
+        var v2ResponseStream = Flows.<FileReadResponse>hub(execContext);
+        var v2ByteStream = Flows.map(v2ResponseStream, FileReadResponse::getContent);
+        var v2Content = Flows.fold(v2ByteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
 
@@ -1221,9 +1221,9 @@ public class DataApiTest_File extends DataApiTest_Base {
         // Explicit data read for V1
 
         var v1Request = readRequest(v1Id);
-        var v1ResponseStream = Concurrent.<FileReadResponse>hub(execContext);
-        var v1ByteStream = Concurrent.map(v1ResponseStream, FileReadResponse::getContent);
-        var v1Content = Concurrent.fold(v1ByteStream,
+        var v1ResponseStream = Flows.<FileReadResponse>hub(execContext);
+        var v1ByteStream = Flows.map(v1ResponseStream, FileReadResponse::getContent);
+        var v1Content = Flows.fold(v1ByteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
 
@@ -1263,9 +1263,9 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setObjectAsOf(MetadataCodec.encodeDatetime(v2Timestamp)))
                 .build();
 
-        var v2ResponseStream = Concurrent.<FileReadResponse>hub(execContext);
-        var v2ByteStream = Concurrent.map(v2ResponseStream, FileReadResponse::getContent);
-        var v2Content = Concurrent.fold(v2ByteStream,
+        var v2ResponseStream = Flows.<FileReadResponse>hub(execContext);
+        var v2ByteStream = Flows.map(v2ResponseStream, FileReadResponse::getContent);
+        var v2Content = Flows.fold(v2ByteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
 
@@ -1281,9 +1281,9 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setObjectAsOf(MetadataCodec.encodeDatetime(v1Timestamp)))
                 .build();
 
-        var v1ResponseStream = Concurrent.<FileReadResponse>hub(execContext);
-        var v1ByteStream = Concurrent.map(v1ResponseStream, FileReadResponse::getContent);
-        var v1Content = Concurrent.fold(v1ByteStream,
+        var v1ResponseStream = Flows.<FileReadResponse>hub(execContext);
+        var v1ByteStream = Flows.map(v1ResponseStream, FileReadResponse::getContent);
+        var v1Content = Flows.fold(v1ByteStream,
                 ByteString::concat,
                 ByteString.EMPTY);
 

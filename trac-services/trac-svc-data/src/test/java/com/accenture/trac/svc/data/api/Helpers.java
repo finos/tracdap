@@ -19,7 +19,7 @@ package com.accenture.trac.svc.data.api;
 import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.metadata.MetadataUtil;
-import com.accenture.trac.common.util.Concurrent;
+import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.util.GrpcStreams;
 import com.accenture.trac.metadata.TagHeader;
 import io.grpc.stub.StreamObserver;
@@ -52,8 +52,8 @@ class Helpers {
         // Server streaming response uses ByteString for binary data
         // ByteString does not need an explicit release
 
-        var msgStream = Concurrent.<TResp>hub(execCtx);
-        var discard = Concurrent.fold(msgStream, (acc, msg) -> acc, (Void) null);
+        var msgStream = Flows.<TResp>hub(execCtx);
+        var discard = Flows.fold(msgStream, (acc, msg) -> acc, (Void) null);
 
         var grpcStream = GrpcStreams.clientResponseStream(msgStream);
         grpcMethod.accept(request, grpcStream);
@@ -82,7 +82,7 @@ class Helpers {
             Function<StreamObserver<TResp>, StreamObserver<TReq>> grpcMethod,
             TReq request) {
 
-        return clientStreaming(grpcMethod, Concurrent.publish(Stream.of(request)));
+        return clientStreaming(grpcMethod, Flows.publish(Stream.of(request)));
     }
 
     static FileReadRequest readRequest(TagHeader fileId) {

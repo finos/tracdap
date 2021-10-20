@@ -20,7 +20,7 @@ import com.accenture.trac.api.*;
 import com.accenture.trac.common.concurrent.ExecutionContext;
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.util.Bytes;
-import com.accenture.trac.common.util.Concurrent;
+import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.util.GrpcStreams;
 import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.metadata.TagHeader;
@@ -190,13 +190,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
 
-        var requestHub = Concurrent.<TReq>hub(execCtx);
+        var requestHub = Flows.<TReq>hub(execCtx);
 
-        var firstMessage = Concurrent.first(requestHub);
+        var firstMessage = Flows.first(requestHub);
         var validRequest = firstMessage.thenApply(msg -> validateRequest(method, msg));
 
-        var protoContent = Concurrent.map(requestHub, getContent);
-        var byteBufContent = Concurrent.map(protoContent, Bytes::fromProtoBytes);
+        var protoContent = Flows.map(requestHub, getContent);
+        var byteBufContent = Flows.map(protoContent, Bytes::fromProtoBytes);
 
         var response = validRequest.thenCompose(msg -> serviceMethod.execute(msg, byteBufContent, execCtx));
         response.whenComplete(GrpcStreams.serverResponseHandler(method, responseObserver));
@@ -216,8 +216,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
 
         var definition = new CompletableFuture<TDef>();
-        var byteStream = Concurrent.<ByteBuf>hub(execCtx);
-        var protoByteStream = Concurrent.map(byteStream, Bytes::toProtoBytes);
+        var byteStream = Flows.<ByteBuf>hub(execCtx);
+        var protoByteStream = Flows.map(byteStream, Bytes::toProtoBytes);
 
         @SuppressWarnings("unchecked")
         var message0 = definition.thenApply(def_ ->
@@ -226,12 +226,12 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 .build());
 
         @SuppressWarnings("unchecked")
-        var content = Concurrent.map(protoByteStream, bytes ->
+        var content = Flows.map(protoByteStream, bytes ->
                 (TResp) putContent
                 .apply(responseSupplier.get(), bytes)
                 .build());
 
-        var response = Concurrent.concat(message0, content);
+        var response = Flows.concat(message0, content);
         response.subscribe(GrpcStreams.serverResponseStream(method, responseObserver));
 
         // Handle synchronous exceptions during validation

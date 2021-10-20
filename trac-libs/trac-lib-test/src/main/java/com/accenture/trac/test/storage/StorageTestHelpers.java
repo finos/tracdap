@@ -18,7 +18,7 @@ package com.accenture.trac.test.storage;
 
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.storage.IFileStorage;
-import com.accenture.trac.common.util.Concurrent;
+import com.accenture.trac.common.concurrent.Flows;
 
 import io.netty.buffer.*;
 
@@ -37,7 +37,7 @@ public class StorageTestHelpers {
         var signal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, signal, execContext);
 
-        Concurrent.publish(Stream.of(content)).subscribe(writer);
+        Flows.publish(Stream.of(content)).subscribe(writer);
 
         return signal;
     }
@@ -62,7 +62,7 @@ public class StorageTestHelpers {
 
         var reader = storage.reader(storagePath, execContext);
 
-        return Concurrent.fold(
+        return Flows.fold(
                 reader, (composite, buf) -> ((CompositeByteBuf) composite).addComponent(true, buf),
                 ByteBufAllocator.DEFAULT.compositeBuffer());
     }

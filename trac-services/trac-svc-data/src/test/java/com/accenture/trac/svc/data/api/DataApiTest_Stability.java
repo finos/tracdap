@@ -17,7 +17,7 @@
 package com.accenture.trac.svc.data.api;
 
 import com.accenture.trac.api.*;
-import com.accenture.trac.common.util.Concurrent;
+import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.util.Futures;
 import com.accenture.trac.metadata.ObjectDefinition;
 import com.accenture.trac.metadata.ObjectType;
@@ -185,10 +185,10 @@ public class DataApiTest_Stability extends DataApiTest_Base {
                 .setSelector(selectorFor(objHeader))
                 .build();
 
-        var readResponse = Concurrent.<FileReadResponse>hub(execContext);
-        var readResponse0 = Concurrent.first(readResponse);
-        var readByteStream = Concurrent.map(readResponse, FileReadResponse::getContent);
-        var readBytes = Concurrent.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
+        var readResponse = Flows.<FileReadResponse>hub(execContext);
+        var readResponse0 = Flows.first(readResponse);
+        var readByteStream = Flows.map(readResponse, FileReadResponse::getContent);
+        var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
 
         Helpers.serverStreaming(dataClient::readFile, readRequest, readResponse);
 
@@ -227,7 +227,7 @@ public class DataApiTest_Stability extends DataApiTest_Base {
                 .setContent(ByteString.copyFrom(bytes))
                 .build());
 
-        return Concurrent.publish(Streams.concat(
+        return Flows.publish(Streams.concat(
                 Stream.of(requestZero),
                 requestStream));
     }

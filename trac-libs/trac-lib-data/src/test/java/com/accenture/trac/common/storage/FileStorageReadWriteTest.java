@@ -22,7 +22,7 @@ import com.accenture.trac.common.exception.EStorageRequest;
 import com.accenture.trac.common.exception.EValidationGap;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
 import com.accenture.trac.common.storage.local.LocalStoragePlugin;
-import com.accenture.trac.common.util.Concurrent;
+import com.accenture.trac.common.concurrent.Flows;
 
 import io.netty.buffer.*;
 import io.netty.util.ReferenceCountUtil;
@@ -163,7 +163,7 @@ public class FileStorageReadWriteTest {
 
         var writeSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writeSignal, execContext);
-        Concurrent.publish(originalBuffers).subscribe(writer);
+        Flows.publish(originalBuffers).subscribe(writer);
 
         waitFor(TEST_TIMEOUT, writeSignal);
 
@@ -171,7 +171,7 @@ public class FileStorageReadWriteTest {
         Assertions.assertDoesNotThrow(() -> resultOf(writeSignal));
 
         var reader = storage.reader(storagePath, execContext);
-        var readResult = Concurrent.fold(
+        var readResult = Flows.fold(
                 reader, (composite, buf) -> composite.addComponent(true, buf),
                 ByteBufAllocator.DEFAULT.compositeBuffer());
 
@@ -218,7 +218,7 @@ public class FileStorageReadWriteTest {
                 CharBuffer.wrap("Some content"),
                 StandardCharsets.UTF_8);
 
-        var contentStream = Concurrent.publish(Stream.of(content));
+        var contentStream = Flows.publish(Stream.of(content));
 
         var writeSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writeSignal, execContext);
@@ -240,7 +240,7 @@ public class FileStorageReadWriteTest {
                 CharBuffer.wrap("Some content"),
                 StandardCharsets.UTF_8);
 
-        var contentStream = Concurrent.publish(Stream.of(content));
+        var contentStream = Flows.publish(Stream.of(content));
         var writeSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writeSignal, execContext);
         contentStream.subscribe(writer);
@@ -252,7 +252,7 @@ public class FileStorageReadWriteTest {
 
         Assertions.assertTrue(resultOf(exists));
 
-        var contentStream2 = Concurrent.publish(Stream.of(content));
+        var contentStream2 = Flows.publish(Stream.of(content));
         var writeSignal2 = new CompletableFuture<Long>();
         var writer2 = storage.writer(storagePath, writeSignal2, execContext);
 
@@ -319,7 +319,7 @@ public class FileStorageReadWriteTest {
 
         Assertions.assertThrows(EStorageRequest.class, () -> {
 
-            var readResult = Concurrent.fold(
+            var readResult = Flows.fold(
                     reader, (composite, buf) -> composite.addComponent(true, buf),
                     ByteBufAllocator.DEFAULT.compositeBuffer());
 
@@ -419,7 +419,7 @@ public class FileStorageReadWriteTest {
 
         var writeSignal = new CompletableFuture<Long>();
         var writer = storage.writer(storagePath, writeSignal, execContext);
-        Concurrent.publish(chunks).subscribe(writer);
+        Flows.publish(chunks).subscribe(writer);
 
         waitFor(TEST_TIMEOUT, writeSignal);
 

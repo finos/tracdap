@@ -23,7 +23,7 @@ import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EValidationGap;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
 import com.accenture.trac.common.storage.local.LocalStoragePlugin;
-import com.accenture.trac.common.util.Concurrent;
+import com.accenture.trac.common.concurrent.Flows;
 
 import io.netty.buffer.*;
 import io.netty.util.concurrent.DefaultEventExecutor;
@@ -335,7 +335,7 @@ public class FileStorageOperationsTest {
         Thread.sleep(10);  // Let time elapse before/after the test calls
 
         var reader = storage.reader("test_file.txt", execContext);
-        var collect = Concurrent.fold(
+        var collect = Flows.fold(
                 reader, (composite, buf) -> composite.addComponent(true, buf),
                 ByteBufAllocator.DEFAULT.compositeBuffer());
 
