@@ -46,6 +46,10 @@ import java.util.function.Supplier;
 
 public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
+    private static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_FILE_METHOD = TracDataApiGrpc.getCreateFileMethod();
+    private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_FILE_METHOD = TracDataApiGrpc.getUpdateFileMethod();
+    private static final MethodDescriptor<FileReadRequest, FileReadResponse> FILE_READ_METHOD = TracDataApiGrpc.getReadFileMethod();
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final DataReadService readService;
@@ -87,9 +91,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public StreamObserver<FileWriteRequest> createFile(StreamObserver<TagHeader> responseObserver) {
 
-        var method = TracDataApiGrpc.getCreateFileMethod();
-
-        return clientStreaming(method, responseObserver,
+        return clientStreaming(CREATE_FILE_METHOD, responseObserver,
                 FileWriteRequest::getContent,
                 this::doCreateFile);
     }
@@ -98,6 +100,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             FileWriteRequest request,
             Flow.Publisher<ByteBuf> byteStream,
             IExecutionContext execCtx) {
+
+        validateRequest(CREATE_FILE_METHOD, request);
 
         var tenant = request.getTenant();
         var tagUpdates = request.getTagUpdatesList();
@@ -117,9 +121,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public StreamObserver<FileWriteRequest> updateFile(StreamObserver<TagHeader> responseObserver) {
 
-        var method = TracDataApiGrpc.getUpdateFileMethod();
-
-        return clientStreaming(method, responseObserver,
+        return clientStreaming(UPDATE_FILE_METHOD, responseObserver,
                 FileWriteRequest::getContent,
                 this::doUpdateFile);
     }
@@ -128,6 +130,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             FileWriteRequest request,
             Flow.Publisher<ByteBuf> byteStream,
             IExecutionContext execCtx) {
+
+        validateRequest(UPDATE_FILE_METHOD, request);
 
         var tenant = request.getTenant();
         var tagUpdates = request.getTagUpdatesList();
@@ -149,9 +153,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void readFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
-        var method = TracDataApiGrpc.getReadFileMethod();
-
-        serverStreaming(method, request, responseObserver,
+        serverStreaming(FILE_READ_METHOD, request, responseObserver,
                 FileReadResponse::newBuilder,
                 FileReadResponse.Builder::setFileDefinition,
                 FileReadResponse.Builder::setContent,
@@ -163,6 +165,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             CompletableFuture<FileDefinition> fileDef,
             Flow.Subscriber<ByteBuf> byteStream,
             IExecutionContext execCtx) {
+
+        validateRequest(FILE_READ_METHOD, request);
 
         var tenant = request.getTenant();
         var selector = request.getSelector();
@@ -186,68 +190,71 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             MethodDescriptor<TReq, TResp> method,
             StreamObserver<TResp> responseObserver,
             Function<TReq, ByteString> getContent,
-            ClientStreamingMethod<TReq, TResp> serviceMethod) {
+            ClientStreamingMethod<TReq, TResp> apiMethod) {
 
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
 
         var requestHub = Flows.<TReq>hub(execCtx);
-
-        var firstMessage = Flows.first(requestHub);
-        var validRequest = firstMessage.thenApply(msg -> validateRequest(method, msg));
-
+        var message0 = Flows.first(requestHub);
         var protoContent = Flows.map(requestHub, getContent);
-        var byteBufContent = Flows.map(protoContent, Bytes::fromProtoBytes);
+        var content = Flows.map(protoContent, Bytes::fromProtoBytes);
 
-        var response = validRequest.thenCompose(msg -> serviceMethod.execute(msg, byteBufContent, execCtx));
+        var response = message0.thenCompose(msg0 ->
+                apiMethod.execute(msg0, content, execCtx));
+
         response.whenComplete(GrpcStreams.serverResponseHandler(method, responseObserver));
 
         return GrpcStreams.serverRequestStream(requestHub);
     }
 
-    private <TReq extends Message, TResp extends Message, TDef extends Message, TBuilder extends Message.Builder>
+    @SuppressWarnings("unchecked")
+    private <
+            TReq extends Message, TResp extends Message,
+            TDef extends Message, TBuilder extends Message.Builder>
     void serverStreaming(
             MethodDescriptor<TReq, TResp> method, TReq request,
             StreamObserver<TResp> responseObserver,
             Supplier<TBuilder> responseSupplier,
             BiFunction<TBuilder, TDef, TBuilder> putDefinition,
             BiFunction<TBuilder, ByteString, TBuilder> putContent,
-            ServerStreamingMethod<TReq, TDef> serviceMethod) {
+            ServerStreamingMethod<TReq, TDef> apiMethod) {
 
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
 
         var definition = new CompletableFuture<TDef>();
-        var byteStream = Flows.<ByteBuf>hub(execCtx);
-        var protoByteStream = Flows.map(byteStream, Bytes::toProtoBytes);
-
-        @SuppressWarnings("unchecked")
         var message0 = definition.thenApply(def_ ->
                 (TResp) putDefinition
                 .apply(responseSupplier.get(), def_)
                 .build());
 
-        @SuppressWarnings("unchecked")
+        var byteStream = Flows.<ByteBuf>hub(execCtx);
+        var protoByteStream = Flows.map(byteStream, Bytes::toProtoBytes);
         var content = Flows.map(protoByteStream, bytes ->
                 (TResp) putContent
                 .apply(responseSupplier.get(), bytes)
                 .build());
 
         var response = Flows.concat(message0, content);
+
         response.subscribe(GrpcStreams.serverResponseStream(method, responseObserver));
 
-        // Handle synchronous exceptions during validation
-
         try {
-            validateRequest(method, request);
-            serviceMethod.execute(request, definition, byteStream, execCtx);
+            apiMethod.execute(request, definition, byteStream, execCtx);
         }
         catch (Exception e) {
-            definition.completeExceptionally(e);
+
+            // Handle synchronous exceptions during validation
+
+            if (!definition.isDone())
+                definition.completeExceptionally(e);
+            else
+                byteStream.onError(e);
         }
     }
 
 
     private <TReq extends Message, TResp extends Message>
-    TReq validateRequest(MethodDescriptor<TReq, TResp> method, TReq msg) {
+    void validateRequest(MethodDescriptor<TReq, TResp> method, TReq msg) {
 
         var protoMethod = Data.getDescriptor()
                 .getFile()
@@ -255,8 +262,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 .findMethodByName(method.getBareMethodName());
 
         validator.validateFixedMethod(msg, protoMethod);
-
-        return msg;
     }
 
     @FunctionalInterface
