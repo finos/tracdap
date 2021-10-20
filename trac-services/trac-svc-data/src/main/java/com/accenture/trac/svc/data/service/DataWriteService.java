@@ -53,6 +53,8 @@ public class DataWriteService {
     private static final String TRAC_FILE_MIME_TYPE_ATTR = "trac_file_mime_type";
     private static final String TRAC_FILE_SIZE_ATTR = "trac_file_size";
 
+    private static final String TRAC_STORAGE_OBJECT_ATTR = "trac_storage_object";
+
     private static final String FILE_DATA_ITEM_TEMPLATE = "file/%s/version-%d";
     private static final String FILE_STORAGE_PATH_TEMPLATE = "file/%s/version-%d%s/%s";
     private static final String FILE_STORAGE_PATH_SUFFIX_TEMPLATE = "-x%06x";
@@ -83,8 +85,9 @@ public class DataWriteService {
             Flow.Publisher<ByteBuf> contentStream,
             IExecutionContext execContext) {
 
-        var defs = new RequestState();
-        defs.fileTags = tags;
+        var req = new RequestState();
+        req.fileTags = tags;           // File tags requested by the client
+        req.storageTags = List.of();   // Storage tags is empty to start with
 
         // This timestamp is set in the storage definition to timestamp storage incarnations/copies
         // It is also used in the physical storage path
@@ -98,7 +101,7 @@ public class DataWriteService {
         // letting other TRAC services specify the object timestamp
         // To avoid polluting the public API, this could go into the gRPC call metadata
 
-        defs.objectTimestamp = Instant.now();
+        req.objectTimestamp = Instant.now();
 
         return CompletableFuture.completedFuture(null)
 
@@ -106,42 +109,42 @@ public class DataWriteService {
                 .thenApply(x -> preallocateForType(tenant, ObjectType.FILE))
                 .thenApply(metaApi::preallocateId)
                 .thenCompose(Futures::javaFuture)
-                .thenAccept(fileId -> defs.priorFileId = fileId)
+                .thenAccept(fileId -> req.priorFileId = fileId)
 
                 // Preallocate ID comes back with version 0, bump to get ID for first real version
-                .thenAccept(x -> defs.fileId = bumpVersion(defs.priorFileId))
+                .thenAccept(x -> req.fileId = bumpVersion(req.priorFileId))
 
                 // Build definition objects
-                .thenAccept(x -> defs.file = createFileDef(defs.fileId, name, mimeType))
-                .thenAccept(x -> defs.storage = createStorageDef(
-                        config.getDefaultStorage(),  defs.objectTimestamp,
-                        defs.fileId, name, mimeType, random))
+                .thenAccept(x -> req.file = createFileDef(req.fileId, name, mimeType))
+                .thenAccept(x -> req.storage = createStorageDef(
+                        config.getDefaultStorage(),  req.objectTimestamp,
+                        req.fileId, name, mimeType, random))
 
                 // Write file content stream to the storage layer
                 .thenCompose(x -> writeDataItem(
-                        defs.storage,
-                        defs.file.getDataItem(),
+                        req.storage,
+                        req.file.getDataItem(),
                         contentStream, execContext))
 
                 // Check and record size from storage in file definition
                 .thenApply(size -> checkSize(size, expectedSize))
-                .thenAccept(size -> defs.file = recordSize(size, defs.file))
+                .thenAccept(size -> req.file = recordSize(size, req.file))
 
                 // Add controlled tag attrs (must be done after file size is known)
-                .thenAccept(x -> defs.fileTags = createFileAttrs(defs.fileTags, defs.file))
-                .thenAccept(x -> defs.storageTags = createStorageAttrs(defs.fileTags, defs.file))
+                .thenAccept(x -> req.fileTags = createFileAttrs(req.fileTags, req.file))
+                .thenAccept(x -> req.storageTags = createStorageAttrs(req.storageTags, req.fileId))
 
                 // Save storage metadata
                 .thenCompose(x -> createObject(
-                        tenant, tags, ObjectType.STORAGE, defs.storage,
+                        tenant, tags, ObjectType.STORAGE, req.storage,
                         ObjectDefinition.Builder::setStorage))
 
                 // Record storage ID in file definition
-                .thenAccept(storageId -> defs.file = recordStorageId(storageId, defs.file))
+                .thenAccept(storageId -> req.file = recordStorageId(storageId, req.file))
 
                 // Save file metadata
                 .thenCompose(x -> createPreallocated(
-                        tenant, defs.fileTags, defs.fileId, defs.file,
+                        tenant, req.fileTags, req.fileId, req.file,
                         ObjectDefinition.Builder::setFile));
     }
 
@@ -152,9 +155,10 @@ public class DataWriteService {
             Flow.Publisher<ByteBuf> contentStream,
             IExecutionContext execContext) {
 
-        var defs = new RequestState();
-        defs.fileTags = tags;
-        defs.objectTimestamp = Instant.now();
+        var req = new RequestState();
+        req.fileTags = tags;           // File tags requested by the client
+        req.storageTags = List.of();   // Storage tags is empty to start with
+        req.objectTimestamp = Instant.now();
 
         return CompletableFuture.completedFuture(null)
 
@@ -163,54 +167,55 @@ public class DataWriteService {
                 .thenApply(metaApi::readObject)
                 .thenCompose(Futures::javaFuture)
                 .thenAccept(priorFile -> {
-                        defs.priorFileId = priorFile.getHeader();
-                        defs.priorFile = priorFile.getDefinition().getFile();
+                        req.priorFileId = priorFile.getHeader();
+                        req.priorFile = priorFile.getDefinition().getFile();
                 })
 
                 // Read prior storage metadata
-                .thenApply(x -> requestForSelector(tenant, defs.priorFile.getStorageId()))
+                .thenApply(x -> requestForSelector(tenant, req.priorFile.getStorageId()))
                 .thenApply(metaApi::readObject)
                 .thenCompose(Futures::javaFuture)
                 .thenAccept(priorStorage -> {
-                        defs.priorStorageId = priorStorage.getHeader();
-                        defs.priorStorage = priorStorage.getDefinition().getStorage();
+                        req.priorStorageId = priorStorage.getHeader();
+                        req.priorStorage = priorStorage.getDefinition().getStorage();
                 })
 
                 // Bump object versions
-                .thenAccept(x -> defs.fileId = bumpVersion(defs.priorFileId))
-                .thenAccept(x -> defs.storageId = bumpVersion(defs.priorStorageId))
+                .thenAccept(x -> req.fileId = bumpVersion(req.priorFileId))
+                .thenAccept(x -> req.storageId = bumpVersion(req.priorStorageId))
 
                 // Build definition objects
-                .thenAccept(x -> defs.file = updateFileDef(defs.priorFile, defs.fileId, name, mimeType))
-                .thenAccept(x -> defs.storage = updateStorageDef(
-                        defs.priorStorage, config.getDefaultStorage(), defs.objectTimestamp,
-                        defs.fileId, name, mimeType, random))
+                .thenAccept(x -> req.file = updateFileDef(req.priorFile, req.fileId, name, mimeType))
+                .thenAccept(x -> req.storage = updateStorageDef(
+                        req.priorStorage, config.getDefaultStorage(), req.objectTimestamp,
+                        req.fileId, name, mimeType, random))
 
-                .thenAccept(x -> validator.validateVersion(defs.file, defs.priorFile))
+                .thenAccept(x -> validator.validateVersion(req.file, req.priorFile))
 
                 // Write file content stream to the storage layer
                 .thenCompose(x -> writeDataItem(
-                        defs.storage,
-                        defs.file.getDataItem(),
+                        req.storage,
+                        req.file.getDataItem(),
                         contentStream, execContext))
 
                 // Check and record size from storage in file definition
                 .thenApply(size -> checkSize(size, expectedSize))
-                .thenAccept(size -> defs.file = recordSize(size, defs.file))
+                .thenAccept(size -> req.file = recordSize(size, req.file))
 
                 // Add controlled tag attrs (must be done after file size is known)
-                .thenAccept(x -> defs.fileTags = updateFileAttrs(defs.fileTags, defs.file))
-                .thenAccept(x -> defs.storageTags = updateStorageAttrs(defs.fileTags, defs.file))
+                .thenAccept(x -> req.fileTags = updateFileAttrs(req.fileTags, req.file))
+
+                // Storage attrs do not require an explicit update
 
                 // Save storage metadata
                 .thenCompose(x -> updateObject(
-                        tenant, MetadataUtil.selectorFor(defs.priorStorageId),
-                        defs.storage, defs.storageTags, ObjectDefinition.Builder::setStorage))
+                        tenant, MetadataUtil.selectorFor(req.priorStorageId),
+                        req.storage, req.storageTags, ObjectDefinition.Builder::setStorage))
 
                 // Save file metadata
                 .thenCompose(x -> updateObject(
-                        tenant, MetadataUtil.selectorFor(defs.priorFileId),
-                        defs.file, defs.fileTags, ObjectDefinition.Builder::setFile));
+                        tenant, MetadataUtil.selectorFor(req.priorFileId),
+                        req.file, req.fileTags, ObjectDefinition.Builder::setFile));
 
     }
 
@@ -496,14 +501,21 @@ public class DataWriteService {
         return Stream.concat(tags.stream(), fileAttrs.stream()).collect(Collectors.toList());
     }
 
-    private static List<TagUpdate> createStorageAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
+    private static List<TagUpdate> createStorageAttrs(List<TagUpdate> tags, TagHeader objectId) {
 
-        return List.of();  // TODO: Storage attrs
-    }
+        // TODO: Special metadata Value type for handling tag selectors
+        var selector = MetadataUtil.selectorForLatest(objectId);
+        var storageObjectAttr = String.format("%s:%s", selector.getObjectType(), selector.getObjectId());
 
-    private static List<TagUpdate> updateStorageAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
+        var storageForAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_STORAGE_OBJECT_ATTR)
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue(storageObjectAttr))
+                .build();
 
-        return List.of();  // TODO: Storage attrs
+        var storageAttrs= List.of(storageForAttr);
+
+        return Stream.concat(tags.stream(), storageAttrs.stream()).collect(Collectors.toList());
     }
 
     private static MetadataWriteRequest preallocateForType(String tenant, ObjectType objectType) {
