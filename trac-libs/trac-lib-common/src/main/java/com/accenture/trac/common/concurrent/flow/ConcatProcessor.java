@@ -16,17 +16,15 @@
 
 package com.accenture.trac.common.concurrent.flow;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Vector;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Flow;
+
 
 public class ConcatProcessor<T> implements Flow.Processor<T, T> {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
-
-    private final Vector<Flow.Publisher<T>> publishers;
+    private final List<Flow.Publisher<T>> publishers;
     private Flow.Subscriber<? super T> subscriber;
 
     private Flow.Subscription sourceSubscription;
@@ -34,15 +32,13 @@ public class ConcatProcessor<T> implements Flow.Processor<T, T> {
     private int nPending;
 
     public ConcatProcessor(Flow.Publisher<T> first, Flow.Publisher<T> second) {
-        this.publishers = new Vector<>(2);
+        this.publishers = new ArrayList<>(2);
         this.publishers.add(first);
         this.publishers.add(second);
     }
 
     @Override
     public void subscribe(Flow.Subscriber<? super T> subscriber) {
-
-        log.info("concat subscribe");
 
         this.subscriber = subscriber;
 
@@ -53,8 +49,6 @@ public class ConcatProcessor<T> implements Flow.Processor<T, T> {
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
 
-        log.info("concat onSubscribe");
-
         this.sourceSubscription = subscription;
 
         if (nPending > 0)
@@ -64,27 +58,23 @@ public class ConcatProcessor<T> implements Flow.Processor<T, T> {
     @Override
     public void onNext(T item) {
 
-        log.info("concat onNext");
-
         nPending -= 1;
-
         subscriber.onNext(item);
     }
 
     @Override
     public void onError(Throwable error) {
 
-        log.info("concat onError");
-
         this.sourceSubscription = null;
 
-        subscriber.onError(error);
+        var completionError = (error instanceof CompletionException)
+                ? error : new CompletionException(error.getMessage(), error);
+
+        subscriber.onError(completionError);
     }
 
     @Override
     public void onComplete() {
-
-        log.info("concat.onComplete");
 
         this.sourceSubscription = null;
         this.sourceIndex += 1;
@@ -102,8 +92,6 @@ public class ConcatProcessor<T> implements Flow.Processor<T, T> {
         @Override
         public void request(long n) {
 
-            log.info("concat request");
-
             nPending += n;
 
             if (sourceSubscription != null)
@@ -112,8 +100,6 @@ public class ConcatProcessor<T> implements Flow.Processor<T, T> {
 
         @Override
         public void cancel() {
-
-            log.info("concat cancel");
 
             if (sourceSubscription != null) {
                 sourceSubscription.cancel();

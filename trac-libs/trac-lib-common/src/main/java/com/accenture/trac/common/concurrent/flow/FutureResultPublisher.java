@@ -18,6 +18,7 @@ package com.accenture.trac.common.concurrent.flow;
 
 import com.accenture.trac.common.exception.EUnexpected;
 
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicReference;
@@ -92,8 +93,13 @@ public class FutureResultPublisher<T> implements Flow.Publisher<T> {
                 this.subscriber.onNext(result);
                 this.subscriber.onComplete();
             }
-            else
-                this.subscriber.onError(error);
+            else {
+
+                var completionError = (error instanceof CompletionException)
+                        ? error : new CompletionException(error.getMessage(), error);
+
+                this.subscriber.onError(completionError);
+            }
         }
     }
 
