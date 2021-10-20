@@ -843,9 +843,9 @@ public class FileStorageReadWriteTest {
         CompletableFuture<Flow.Subscription> subscription = new CompletableFuture<>();
         doAnswer(invocation -> {
 
-            // Request 2 chunks, but we'll cancel when we get the first one
+            // Request 4 chunks, but we'll cancel when we get the first one
             subscription.complete(invocation.getArgument(0));
-            subscription.get().request(2);
+            subscription.get().request(4);
             return null;
 
         }).when(subscriber).onSubscribe(any(Flow.Subscription.class));
@@ -864,13 +864,13 @@ public class FileStorageReadWriteTest {
 
         // Expected sequence of calls into the subscriber
         //  - One call into onSubscribe, we request 2 chunks
-        //  - One call into onNext, then we cancel the subscription
-        //  - No further calls to onNext, no calls to onComplete or onError
+        //  - Allow the reader to send at most one chunk after cancelling (in fact, Java Publisher spec allows more)
+        //  - No calls to onComplete or onError
 
         Thread.sleep(ASYNC_DELAY.toMillis());
 
         verify(subscriber, times(1)).onSubscribe(any(Flow.Subscription.class));
-        verify(subscriber, times(1)).onNext(any());
+        verify(subscriber, atMost(2)).onNext(any());
         verify(subscriber, never()).onComplete();
         verify(subscriber, never()).onError(any());
 
@@ -910,9 +910,9 @@ public class FileStorageReadWriteTest {
         CompletableFuture<Flow.Subscription> subscription = new CompletableFuture<>();
         doAnswer(invocation -> {
 
-            // Request 2 chunks, but we'll cancel when we get the first one
+            // Request 4 chunks, but we'll cancel when we get the first one
             subscription.complete(invocation.getArgument(0));
-            subscription.get().request(2);
+            subscription.get().request(4);
             return null;
 
         }).when(subscriber).onSubscribe(any(Flow.Subscription.class));
@@ -932,12 +932,13 @@ public class FileStorageReadWriteTest {
         // Expected sequence of calls into the subscriber
         //  - One call into onSubscribe, we request 2 chunks
         //  - One call into onNext, then we cancel the subscription
-        //  - No further calls to onNext, no calls to onComplete or onError
+        //  - Allow the reader to send at most one chunk after cancelling (in fact, Java Publisher spec allows more)
+        //  - No calls to onComplete or onError
 
         Thread.sleep(ASYNC_DELAY.toMillis());
 
         verify(subscriber, times(1)).onSubscribe(any(Flow.Subscription.class));
-        verify(subscriber, times(1)).onNext(any());
+        verify(subscriber, atMost(2)).onNext(any());
         verify(subscriber, never()).onComplete();
         verify(subscriber, never()).onError(any());
 

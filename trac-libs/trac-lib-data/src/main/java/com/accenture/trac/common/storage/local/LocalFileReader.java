@@ -110,17 +110,18 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             return;
         }
 
+        this.subscriber = subscriber;
+
         // Make sure the doStart action goes into the event loop before calling subscriber.onSubscribe()
         // This makes sure that doStart is called before any requests from the subscription get processed
 
         executor.submit(this::doStart);
 
-        // Now activate the subscription, before doStart gets invoked
+        // Now activate the subscription, before doStart gets executed
         // This approach allows errors to be reported normally during onStart (e.g. file not found)
         // Otherwise, if the subscription is not yet active, errors should be reported with IllegalStateException
         // File not found is an expected error, reporting it with EStorage makes for cleaner error handling
 
-        this.subscriber = subscriber;
         subscriber.onSubscribe(new ReadSubscription());
     }
 
@@ -130,40 +131,14 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
         public void request(long n) {
 
             // Avoid concurrency issues - ensure all calls are processed in the ordered event loop
-
-            if (!executor.inEventLoop()) {
-                executor.submit(() -> request(n));
-                return;
-            }
-
-            var alreadyReading = (chunksPending > 0);
-            chunksPending += n;
-
-            // Do not trigger a read if the read operation has finished for any reason
-            // Also do not trigger if there are chunks already being read
-
-            if (!(gotComplete || gotError || gotCancel))
-                if (!alreadyReading)
-                    readChunk();
+            executor.submit(() -> doRequest(n));
         }
 
         @Override
         public void cancel() {
 
             // Avoid concurrency issues - ensure all calls are processed in the ordered event loop
-
-            if (!executor.inEventLoop()) {
-                executor.submit(this::cancel);
-                return;
-            }
-
-            // Do not run onCancel twice, or if the read operation has already finished for any reason
-
-            var alreadyCancelled = gotCancel;
-            gotCancel = true;
-
-            if (!(gotComplete || gotError || alreadyCancelled))
-                doCancel();
+            executor.submit(LocalFileReader.this::doCancel);
         }
     }
 
@@ -173,80 +148,6 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
     // -----------------------------------------------------------------------------------------------------------------
 
     // These methods are only ever called on the ordered event executor
-
-
-    private class ChunkReadHandler implements CompletionHandler<Integer, ByteBuf> {
-
-        @Override
-        public void completed(Integer nBytes, ByteBuf chunk) {
-
-            // Update counts
-
-            chunksPending -= 1;
-
-            if (nBytes > 0)
-                bytesRead += nBytes;
-
-            // Check if the read is already failed or cancelled
-            // If so, release the buffer and do not send any further signals
-            if (gotError || gotCancel) {
-
-                releaseBuffer(chunk);
-            }
-
-            // nBytes read < 0 indicates the read is complete
-            else if (nBytes < 0) {
-
-                // Buffer contains no data so can be released immediately
-                releaseBuffer(chunk);
-
-                // Make sure not to send multiple onComplete signals
-                // E.g. if multiple chunks have been requested past the end of the file
-
-                var alreadyComplete = gotComplete;
-                gotComplete = true;
-
-                if (!(gotError || gotCancel || alreadyComplete))
-                    doComplete();
-            }
-
-            // Otherwise, this is a normal read
-            // Count the bytes and send them on their journey!
-            else {
-
-                gotChunk(chunk, nBytes);
-            }
-        }
-
-        @Override
-        public void failed(Throwable error, ByteBuf chunk) {
-
-            chunksPending -= 1;
-
-            // Buffer contains no data so can be released immediately
-            releaseBuffer(chunk);
-
-            // Async close exception is sent for operations that were in progress when the channel was closed
-            // If the close happened because of a complete or cancel event,
-            // then it is safe to ignore these errors
-
-            if (error instanceof AsynchronousCloseException)
-                if (gotComplete || gotCancel)
-                    return;
-
-            // Make sure not to send multiple onError signals
-
-            var alreadyFailed = gotError;
-            gotError = true;
-
-            if (!gotComplete || gotCancel || alreadyFailed)
-                handleError(error);
-
-            else
-                // For errors after termination, put a warning in the log
-                log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, error);
-        }
-    }
 
     private void doStart() {
 
@@ -261,6 +162,70 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             log.info("File channel open for reading: [{}]", absolutePath);
         }
         catch (Exception e) {
+
+            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
+            subscriber.onError(eStorage);
+        }
+    }
+
+    private void doComplete() {
+
+        try {
+
+            log.info("Read operation complete: {} bytes read [{}]", bytesRead, absolutePath);
+
+            channel.close();
+
+            log.info("File channel closed: [{}]", absolutePath);
+
+            subscriber.onComplete();
+        }
+        catch (Exception e) {
+
+            log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
+
+            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
+            subscriber.onError(eStorage);
+        }
+    }
+
+    private void doRequest(long n) {
+
+        var alreadyReading = (chunksPending > 0);
+        chunksPending += n;
+
+        // Do not trigger a read if the read operation has finished for any reason
+        // Also do not trigger if there are chunks already being read
+
+        if (!(gotComplete || gotError || gotCancel))
+            if (!alreadyReading)
+                readChunk();
+    }
+
+    private void doCancel() {
+
+        try {
+
+            var alreadyCancelled = gotCancel;
+            gotCancel = true;
+
+            // Do not run onCancel twice, or if the read operation has already finished for any reason
+            if ((gotComplete || gotError || alreadyCancelled))
+                return;
+
+            log.info("Read operation cancelled: [{}]",  absolutePath);
+
+            channel.close();
+
+            log.info("File channel closed: [{}]", absolutePath);
+
+            // Do not send any signal to the subscriber for a clean cancel
+        }
+        catch (Exception e) {
+
+            log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
+
+            // If the cancel results in an error closing the file, do send the onError message
 
             var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
             subscriber.onError(eStorage);
@@ -293,12 +258,86 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
                 // For errors after termination, put a warning in the log
                 log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, e);
         }
+    }
 
+    private void readChunkComplete(Integer nBytes, ByteBuf chunk) {
+
+        // Update counts
+
+        chunksPending -= 1;
+
+        if (nBytes > 0)
+            bytesRead += nBytes;
+
+        // Check if the read is already failed or cancelled
+        // If so, release the buffer and do not send any further signals
+        if (gotError || gotCancel) {
+
+            releaseBuffer(chunk);
+        }
+
+        // nBytes read < 0 indicates the read is complete
+        else if (nBytes < 0) {
+
+            // Buffer contains no data so can be released immediately
+            releaseBuffer(chunk);
+
+            // Make sure not to send multiple onComplete signals
+            // E.g. if multiple chunks have been requested past the end of the file
+
+            var alreadyComplete = gotComplete;
+            gotComplete = true;
+
+            if (!(gotError || gotCancel || alreadyComplete))
+                doComplete();
+        }
+
+        // Otherwise, this is a normal read
+        // Count the bytes and send them on their journey!
+        else {
+
+            gotChunk(chunk, nBytes);
+        }
+    }
+
+    private void readChunkFailed(Throwable error, ByteBuf chunk) {
+
+        chunksPending -= 1;
+
+        // Buffer contains no data so can be released immediately
+        releaseBuffer(chunk);
+
+        // Async close exception is sent for operations that were in progress when the channel was closed
+        // If the close happened because of a complete or cancel event,
+        // then it is safe to ignore these errors
+
+        if (error instanceof AsynchronousCloseException)
+            if (gotComplete || gotCancel)
+                return;
+
+        // Make sure not to send multiple onError signals
+
+        var alreadyFailed = gotError;
+        gotError = true;
+
+        if (!gotComplete || gotCancel || alreadyFailed)
+            handleError(error);
+
+        else
+            // For errors after termination, put a warning in the log
+            log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, error);
     }
 
     private void gotChunk(ByteBuf chunk, int nBytes) {
 
         try {
+
+            // If the operation is already failed / cancelled, don't pass this chunk on
+
+            if (gotCancel || gotError) {
+                releaseBuffer(chunk);
+                return;
+            }
 
             // Trigger the next read operation immediately
             // Possibly the subscriber is going to do processing in onNext
@@ -329,50 +368,6 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             else
                 // For errors after termination, put a warning in the log
                 log.warn("Read operation is terminated but further errors occurred: [{}]", absolutePath, e);
-        }
-    }
-
-    private void doComplete() {
-
-        try {
-
-            log.info("Read operation complete: {} bytes read [{}]", bytesRead, absolutePath);
-
-            channel.close();
-
-            log.info("File channel closed: [{}]", absolutePath);
-
-            subscriber.onComplete();
-        }
-        catch (Exception e) {
-
-            log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
-
-            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
-            subscriber.onError(eStorage);
-        }
-    }
-
-    private void doCancel() {
-
-        try {
-
-            log.info("Read operation cancelled: [{}]",  absolutePath);
-
-            channel.close();
-
-            log.info("File channel closed: [{}]", absolutePath);
-
-            // Do not send any signal to the subscriber for a clean cancel
-        }
-        catch (Exception e) {
-
-            log.error("File channel was not closed cleanly: {} [{}]", e.getMessage(), absolutePath, e);
-
-            // If the cancel results in an error closing the file, do send the onError message
-
-            var eStorage = errors.handleException(e, storagePath, READ_OPERATION);
-            subscriber.onError(eStorage);
         }
     }
 
@@ -412,4 +407,18 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             log.warn("Chunk buffer was not released (this could indicate a memory leak)");
     }
 
+    private class ChunkReadHandler implements CompletionHandler<Integer, ByteBuf> {
+
+        @Override
+        public void completed(Integer nBytes, ByteBuf chunk) {
+
+            readChunkComplete(nBytes, chunk);
+        }
+
+        @Override
+        public void failed(Throwable error, ByteBuf chunk) {
+
+            readChunkFailed(error, chunk);
+        }
+    }
 }
