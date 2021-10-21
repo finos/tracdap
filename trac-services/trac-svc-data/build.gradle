@@ -35,6 +35,7 @@ dependencies {
     implementation project(':trac-api-metadata')
     implementation project(':trac-api-services')
     implementation project(':trac-lib-common')
+    implementation project(':trac-lib-validation')
     implementation project(':trac-lib-data')
 
     // Core framework - gRPC on Netty
