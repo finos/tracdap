@@ -32,6 +32,8 @@ public class MetadataValidator {
     private static final Set<ObjectType> VERSIONED_OBJECT_TYPES = Set.of(
             ObjectType.DATA,
             ObjectType.SCHEMA,
+            ObjectType.FILE,
+            ObjectType.STORAGE,
             ObjectType.CUSTOM);
 
     private static final Map<ObjectDefinition.DefinitionCase, ObjectType> DEFINITION_TYPE_MAPPING = Map.of(

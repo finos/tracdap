@@ -29,36 +29,35 @@ enum CopyStatus {
   COPY_EXPUNGED = 2;
 }
 
-message StorageCopy {
-
-  string storageKey = 1;
-  string storagePath = 2;
-  string storageFormat = 3;
-  CopyStatus copyStatus = 4;
-}
-
-
 enum IncarnationStatus {
   INCARNATION_STATUS_NOT_SET = 0;
   INCARNATION_AVAILABLE = 1;
   INCARNATION_EXPUNGED = 2;
 }
 
-message StorageIncarnation {
+message StorageCopy {
 
-  int32 incarnationIndex = 1;
-  DatetimeValue incarnationTimestamp = 2;
-  IncarnationStatus incarnationStatus = 3;
+  string storageKey = 1;
+  string storagePath = 2;
+  string storageFormat = 3;
 
-  repeated StorageCopy copies = 4;
+  CopyStatus copyStatus = 4;
+  DatetimeValue copyTimestamp = 5;
 }
 
+message StorageIncarnation {
+
+  repeated StorageCopy copies = 1;
+
+  int32 incarnationIndex = 2;
+  DatetimeValue incarnationTimestamp = 3;
+  IncarnationStatus incarnationStatus = 4;
+}
 
 message StorageItem {
 
   repeated StorageIncarnation incarnations = 1;
 }
-
 
 message StorageDefinition {
 

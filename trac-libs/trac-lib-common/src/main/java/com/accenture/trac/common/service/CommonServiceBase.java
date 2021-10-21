@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -122,6 +123,45 @@ public abstract class CommonServiceBase {
      */
     protected void setShutdownTimeout(Duration shutdownTimeout) {
         this.shutdownTimeout = shutdownTimeout;
+    }
+
+    /**
+     * Helper function for shutting down resources with a shutdown deadline
+     *
+     * @param resourceName Name of the resource being shut down (will appear in the logs)
+     * @param deadline Shutdown deadline
+     * @param action An action to shut down the resource, returns a boolean value indicating success/failure
+     * @return The success value returned by the shutdown action
+     */
+    protected boolean shutdownResource(String resourceName, Instant deadline, ShutdownAction action) {
+
+        var remaining = Duration.between(Instant.now(), deadline);
+        var safeRemaining = remaining.isNegative() ? Duration.ZERO : remaining;
+
+        boolean ok;
+
+        try {
+            ok = action.apply(safeRemaining);
+        }
+        catch (InterruptedException e) {
+            ok = false;
+            Thread.currentThread().interrupt();
+        }
+
+        if (ok) {
+            log.info("{} has gone down", resourceName);
+        }
+        else {
+            log.error("{} did not go down cleanly", resourceName);
+        }
+
+        return ok;
+    }
+
+    @FunctionalInterface
+    protected interface ShutdownAction {
+
+        boolean apply(Duration remainingTime) throws InterruptedException;
     }
 
 

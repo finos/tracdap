@@ -34,10 +34,14 @@ project(":trac-api-services").projectDir = file("trac-api/trac-services")
 
 include 'trac-lib-common'
 include 'trac-lib-db'
+include 'trac-lib-data'
+include 'trac-lib-test'
 include 'sql-drivers'
 
 project(":trac-lib-common").projectDir = file("trac-libs/trac-lib-common")
 project(":trac-lib-db").projectDir = file("trac-libs/trac-lib-db")
+project(":trac-lib-data").projectDir = file("trac-libs/trac-lib-data")
+project(":trac-lib-test").projectDir = file("trac-libs/trac-lib-test")
 project(":sql-drivers").projectDir = file("trac-libs/sql-drivers")
 
 

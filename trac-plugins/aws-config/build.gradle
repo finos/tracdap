@@ -31,12 +31,6 @@ dependencies {
 
     implementation group: 'com.amazonaws', name: 'aws-java-sdk', version: "$aws_sdk_version"
 
-    // Logging
-    implementation group: 'org.slf4j', name: 'slf4j-api', version: "$slf4j_version"
-    implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: "$log4j_version"
-    implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: "$log4j_version"
-    implementation group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: "$log4j_version"
-
     testImplementation group: 'jakarta.xml.bind',  name: 'jakarta.xml.bind-api', version: '2.3.2'
     testImplementation group: 'org.glassfish.jaxb',  name: 'jaxb-runtime', version: '2.3.2'
 }

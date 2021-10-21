@@ -19,6 +19,8 @@ package com.accenture.trac.common.exception;
 /**
  * A validation gap is a type of internal error, it indicates a condition inside
  * TRAC that should have been caught higher up the stack in a validation layer.
+ *
+ * A validation gap is not a validation error!
  */
 public class EValidationGap extends ETracInternal {
 

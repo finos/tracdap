@@ -24,7 +24,7 @@ import com.accenture.trac.svc.meta.services.MetadataReadService;
 import com.accenture.trac.svc.meta.services.MetadataSearchService;
 import com.accenture.trac.svc.meta.services.MetadataWriteService;
 
-import com.accenture.trac.svc.meta.test.JdbcIntegration;
+import com.accenture.trac.test.meta.JdbcIntegration;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
@@ -34,9 +34,9 @@ import io.grpc.testing.GrpcCleanupRule;
 import java.util.UUID;
 import java.util.function.Function;
 
-import com.accenture.trac.svc.meta.test.IDalTestable;
-import com.accenture.trac.svc.meta.test.JdbcUnit;
-import com.accenture.trac.svc.meta.test.TestData;
+import com.accenture.trac.test.meta.IDalTestable;
+import com.accenture.trac.test.meta.JdbcUnit;
+import com.accenture.trac.test.meta.TestData;
 
 import org.junit.Rule;
 import org.junit.jupiter.api.Disabled;
@@ -46,7 +46,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
-import static com.accenture.trac.svc.meta.test.TestData.*;
+import static com.accenture.trac.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -322,7 +322,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
-                names = {"DATA", "SCHEMA", "CUSTOM"})
+                names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
     void updateObject_trustedTypesOk(ObjectType objectType) {
 
         updateObject_ok(objectType, request -> trustedApi.updateObject(request));
@@ -360,7 +360,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "DATA", "SCHEMA", "CUSTOM"})
+                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
     void updateObject_versionsNotSupported(ObjectType objectType) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);

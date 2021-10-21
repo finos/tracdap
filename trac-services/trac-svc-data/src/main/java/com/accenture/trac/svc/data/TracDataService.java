@@ -16,34 +16,45 @@
 
 package com.accenture.trac.svc.data;
 
+import com.accenture.trac.api.TrustedMetadataApiGrpc;
+import com.accenture.trac.api.config.DataServiceConfig;
+import com.accenture.trac.api.config.RootConfig;
+import com.accenture.trac.api.config.TracConfig;
 import com.accenture.trac.common.config.ConfigManager;
+import com.accenture.trac.common.concurrent.ExecutionRegister;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.service.CommonServiceBase;
+import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.svc.data.api.TracDataApi;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.grpc.Server;
-import io.grpc.ServerBuilder;
+import com.accenture.trac.svc.data.service.DataReadService;
+import com.accenture.trac.svc.data.service.DataWriteService;
+
+import io.grpc.*;
+import io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.NettyServerBuilder;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
 
 public class TracDataService extends CommonServiceBase {
 
-    private static final short DATA_SERVICE_PORT = 8082;
-
-    private static final int WORKER_POOL_SIZE = 6;
-    private static final int OVERFLOW_SIZE = 10;
-
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final ConfigManager configManager;
+
+    private EventLoopGroup bossGroup;
+    private EventLoopGroup workerGroup;
+    private ManagedChannel clientChannel;
     private Server server;
 
     public TracDataService(ConfigManager config) {
@@ -53,22 +64,65 @@ public class TracDataService extends CommonServiceBase {
     @Override
     protected void doStartup(Duration startupTimeout) {
 
+        RootConfig rootConfig;
+        DataServiceConfig dataSvcConfig;
+
+        try {
+            log.info("Loading TRAC platform config...");
+
+            rootConfig = configManager.loadRootConfig(RootConfig.class);
+            dataSvcConfig = rootConfig.getTrac().getServices().getData();
+
+            // TODO: Config validation
+
+            log.info("Config looks ok");
+        }
+        catch (Exception e) {
+
+            var errorMessage = "There was an error loading the platform config: " + e.getMessage();
+            log.error(errorMessage, e);
+            throw new EStartup(errorMessage, e);
+        }
+
         try {
 
-            var publicApi = new TracDataApi();
+            var channelType = NioServerSocketChannel.class;
+            var clientChannelType = NioSocketChannel.class;
+
+            var workerThreads = Runtime.getRuntime().availableProcessors() * 2;
+            workerGroup = new NioEventLoopGroup(workerThreads, new DefaultThreadFactory("data-svc"));
+            bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("data-boss"));
+
+            var execRegister = new ExecutionRegister(workerGroup);
+
+            var storage = new StorageManager();
+            storage.initStoragePlugins();
+            storage.initStorage(dataSvcConfig.getStorage());
+
+            var metaClient = prepareMetadataClient(rootConfig.getTrac(), clientChannelType);
+
+            var dataReadSvc = new DataReadService(storage, metaClient);
+            var dataWriteSvc = new DataWriteService(dataSvcConfig, storage, metaClient);
+            var publicApi = new TracDataApi(dataReadSvc, dataWriteSvc);
 
             // Create the main server
 
-            var executor = createPrimaryExecutor();
-
-            this.server = ServerBuilder
-                    .forPort(DATA_SERVICE_PORT)
+            this.server = NettyServerBuilder
+                    .forPort(dataSvcConfig.getPort())
                     .addService(publicApi)
-                    .executor(executor)
+
+                    .channelType(channelType)
+                    .bossEventLoopGroup(bossGroup)
+                    .workerEventLoopGroup(workerGroup)
+                    .directExecutor()
+                    .intercept(execRegister.registerExecContext())
+
                     .build();
 
             // Good to go, let's start!
             server.start();
+
+            log.info("Data service is listening on port {}", server.getPort());
         }
         catch (IOException e) {
 
@@ -76,43 +130,76 @@ public class TracDataService extends CommonServiceBase {
         }
     }
 
-    @Override
-    protected int doShutdown(Duration shutdownTimeout) throws InterruptedException {
+    private TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub
+    prepareMetadataClient(
+            TracConfig tracConfig,
+            Class<? extends io.netty.channel.Channel> channelType) {
 
-        server.shutdown();
-        server.awaitTermination(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
+        var metaInstances = tracConfig.getInstances().getMeta();
 
-        if (server.isTerminated())
-            return 0;
+        if (metaInstances.isEmpty()) {
 
-        server.shutdownNow();
-        return -1;
+            var err = "Configuration contains no instances of the metadata service";
+            log.error(err);
+            throw new EStartup(err);
+        }
+
+        var metaInstance = metaInstances.get(0);  // Just use the first instance for now
+
+        log.info("Using metadata service instance at [{}:{}]",
+                metaInstance.getHost(), metaInstance.getPort());
+
+        var clientChannelBuilder = NettyChannelBuilder
+                .forAddress(metaInstance.getHost(), metaInstance.getPort())
+                .channelType(channelType)
+                .eventLoopGroup(workerGroup)
+                .directExecutor()
+                .usePlaintext();
+
+        clientChannel = EventLoopChannel.wrapChannel(clientChannelBuilder, workerGroup);
+
+        return TrustedMetadataApiGrpc.newFutureStub(clientChannel);
     }
 
-    private ExecutorService createPrimaryExecutor() {
+    @Override
+    protected int doShutdown(Duration shutdownTimeout) {
 
-        // TODO: Review executor settings
+        var deadline = Instant.now().plus(shutdownTimeout);
 
-        var HEADROOM_THREADS = 1;
-        var HEADROOM_THREADS_TIMEOUT = 60;
-        var HEADROOM_THREADS_TIMEOUT_UNIT = TimeUnit.SECONDS;
+        var serverDown = shutdownResource("Data service server", deadline, remaining -> {
 
-        var threadFactory = new ThreadFactoryBuilder()
-                .setNameFormat("worker-%d")
-                .setPriority(Thread.NORM_PRIORITY)
-                .build();
+            server.shutdown();
+            return server.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
 
-        var overflowQueue = new ArrayBlockingQueue<Runnable>(OVERFLOW_SIZE);
+        var clientDown = shutdownResource("Metadata service client", deadline, remaining -> {
 
-        var executor = new ThreadPoolExecutor(
-                WORKER_POOL_SIZE, WORKER_POOL_SIZE + HEADROOM_THREADS,
-                HEADROOM_THREADS_TIMEOUT, HEADROOM_THREADS_TIMEOUT_UNIT,
-                overflowQueue, threadFactory);
+            clientChannel.shutdown();
+            return clientChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
 
-        executor.prestartAllCoreThreads();
-        executor.allowCoreThreadTimeOut(false);
+        var workersDown = shutdownResource("Worker thread pool", deadline, remaining -> {
 
-        return executor;
+            workerGroup.shutdownGracefully(0, remaining.toMillis(), TimeUnit.MILLISECONDS);
+            return workerGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        var bossDown = shutdownResource("Boss thread pool", deadline, remaining -> {
+
+            bossGroup.shutdownGracefully(0, remaining.toMillis(), TimeUnit.MILLISECONDS);
+            return bossGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        if (serverDown && clientDown && workersDown && bossDown)
+            return 0;
+
+        if (!serverDown)
+            server.shutdownNow();
+
+        if (!clientDown)
+            clientChannel.shutdownNow();
+
+        return -1;
     }
 
     public static void main(String[] args) {

@@ -31,8 +31,17 @@ jobs:
     - name: Build
       run: ./gradlew build -x test
 
-    - name: Unit Tests
+    - name: Unit tests
       run: ./gradlew test
+
+    # If the tests fail, make the output available for download
+    - name: Store failed test results
+      uses: actions/upload-artifact@v2
+      if: failure()
+      with:
+        name: junit-test-results
+        path: build/modules/*/reports/**
+        retention-days: 7
 
 
   python_runtime:

@@ -18,18 +18,19 @@ package com.accenture.trac.plugins.config.gcp;
 
 import com.accenture.trac.common.config.IConfigLoader;
 import com.accenture.trac.common.exception.EStartup;
+
 import com.google.cloud.ReadChannel;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
-import org.apache.logging.log4j.core.util.IOUtils;
 
 import java.io.BufferedReader;
-import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 /**
@@ -69,9 +70,9 @@ public class GcpConfigLoader implements IConfigLoader {
 
         String output;
         try {
-            output = IOUtils.toString(br);
+            output = br.lines().collect(Collectors.joining());
             return output;
-        } catch (IllegalArgumentException | IOException e) {
+        } catch (IllegalArgumentException | UncheckedIOException e) {
 
             var message = String.format(ERROR_MSG_TEMPLATE, path, e.getMessage());
             throw new EStartup(message, e);

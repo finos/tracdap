@@ -26,18 +26,37 @@ dependencies {
 
     api project(':trac-api-metadata')
 
-    // gRPC
+    // Google Guava - common lib includes helpers to translate to/from equivalent JDK types
+    api group: 'com.google.guava', name: 'guava', version: "$guava_version"
+
+    // gRPC - common lib includes standard wrappers for gRPC stubs and calls
+    api group: 'io.grpc', name: 'grpc-api', version: "$grpc_version"
     api group: 'io.grpc', name: 'grpc-stub', version: "$grpc_version"
 
-    // Apache Commons Components
+    // Netty - common lib includes helpers to translate to/from equivalent JDK types
+    api group: 'io.netty', name: 'netty-common', version: "$netty_version"
+    api group: 'io.netty', name: 'netty-buffer', version: "$netty_version"
+
+    // CLI is implemented with Apache Commons CLI
     implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"
 
-    // Config reading
+    // Config parser uses SnakeYAML
     implementation group: 'org.yaml', name: 'snakeyaml', version: "$snakeyaml_version"
 
-    // Logging
-    implementation group: 'org.slf4j', name: 'slf4j-api', version: "$slf4j_version"
+    // Logging facade is an API dependency
+    api group: 'org.slf4j', name: 'slf4j-api', version: "$slf4j_version"
+
+    // Logging implementation is manipulated in lib-common but not exposed to client code
     implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: "$log4j_version"
     implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: "$log4j_version"
     implementation group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: "$log4j_version"
+
+    testImplementation project(':trac-lib-test')
 }
+
+
+// Compiling dependent targets does not require processResources to be executed by default
+// E.g. running tests from the IDE will not trigger processResources - this can cause confusion!
+// This dependency ensures resources are always processed, even for partial builds
+
+compileJava.dependsOn(processResources)

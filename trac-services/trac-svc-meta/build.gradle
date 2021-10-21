@@ -58,14 +58,7 @@ dependencies {
     implementation group: 'io.netty', name: 'netty-handler-proxy', version: "$netty_version"
     implementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
 
-    // CLI library for processing startup args (part of the .config package)
-    implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"
-
-    // Logging
-    implementation group: 'org.slf4j', name: 'slf4j-api', version: "$slf4j_version"
-    implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: "$log4j_version"
-    implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: "$log4j_version"
-    implementation group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: "$log4j_version"
+    testImplementation project(':trac-lib-test')
 
     // Migration support for JUnit 4 Rules, provided by gRPC for managing test service instances
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-migrationsupport', version: "$junit_version"

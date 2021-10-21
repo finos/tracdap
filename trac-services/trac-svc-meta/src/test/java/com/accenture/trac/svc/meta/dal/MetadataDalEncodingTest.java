@@ -19,16 +19,16 @@ package com.accenture.trac.svc.meta.dal;
 import com.accenture.trac.metadata.BasicType;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.common.metadata.MetadataCodec;
-import static com.accenture.trac.svc.meta.test.TestData.*;
+import static com.accenture.trac.test.meta.TestData.*;
 
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.UUID;
 
-import com.accenture.trac.svc.meta.test.IDalTestable;
-import com.accenture.trac.svc.meta.test.JdbcUnit;
-import com.accenture.trac.svc.meta.test.JdbcIntegration;
+import com.accenture.trac.test.meta.IDalTestable;
+import com.accenture.trac.test.meta.JdbcUnit;
+import com.accenture.trac.test.meta.JdbcIntegration;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
