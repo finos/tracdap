@@ -26,6 +26,7 @@ import com.accenture.trac.common.concurrent.ExecutionRegister;
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.deploy.metadb.DeployMetaDB;
+import com.accenture.trac.svc.data.EventLoopChannel;
 import com.accenture.trac.svc.data.TracDataService;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
@@ -39,6 +40,7 @@ import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.netty.NettyChannelBuilder;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
@@ -164,10 +166,13 @@ abstract  class DataApiTest_Base {
         workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("data-svc"));
         var execRegister = new ExecutionRegister(workerGroup);
 
-        dataSvcClientChannel = NettyChannelBuilder.forAddress("localhost", METADATA_SVC_PORT)
+        var dataSvcClientChannelBuilder = NettyChannelBuilder.forAddress("localhost", METADATA_SVC_PORT)
+                .channelType(NioSocketChannel.class)
+                .eventLoopGroup(workerGroup)
                 .directExecutor()
-                .usePlaintext()
-                .build();
+                .usePlaintext();
+
+        dataSvcClientChannel = EventLoopChannel.wrapChannel(dataSvcClientChannelBuilder, workerGroup);
 
         var metaApi = TrustedMetadataApiGrpc.newFutureStub(dataSvcClientChannel);
 
@@ -195,6 +200,7 @@ abstract  class DataApiTest_Base {
     void teardown() throws Exception {
 
         dataClientChannel.shutdown();
+
         dataService.shutdown();
         dataSvcClientChannel.shutdown();
         workerGroup.shutdownGracefully();

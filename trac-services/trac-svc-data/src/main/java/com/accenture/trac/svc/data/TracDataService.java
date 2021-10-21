@@ -20,7 +20,6 @@ import com.accenture.trac.api.TrustedMetadataApiGrpc;
 import com.accenture.trac.api.config.DataServiceConfig;
 import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.config.ConfigManager;
-import com.accenture.trac.common.concurrent.ExecutionContext;
 import com.accenture.trac.common.concurrent.ExecutionRegister;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.service.CommonServiceBase;
@@ -32,7 +31,7 @@ import com.accenture.trac.svc.data.service.DataWriteService;
 import io.grpc.*;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.NettyServerBuilder;
-import io.netty.channel.EventLoop;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -42,6 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
 
@@ -50,6 +50,10 @@ public class TracDataService extends CommonServiceBase {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final ConfigManager configManager;
+
+    private EventLoopGroup bossGroup;
+    private EventLoopGroup workerGroup;
+    private ManagedChannel clientChannel;
     private Server server;
 
     public TracDataService(ConfigManager config) {
@@ -81,12 +85,13 @@ public class TracDataService extends CommonServiceBase {
 
         try {
 
-            // TODO: Channel type
-
             var channelType = NioServerSocketChannel.class;
             var clientChannelType = NioSocketChannel.class;
-            var bossGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("boss"));
-            var workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("worker"));
+
+            var workerThreads = Runtime.getRuntime().availableProcessors() * 2;
+            workerGroup = new NioEventLoopGroup(workerThreads, new DefaultThreadFactory("data-svc"));
+            bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("data-boss"));
+
             var execRegister = new ExecutionRegister(workerGroup);
 
             var storage = new StorageManager();
@@ -101,41 +106,12 @@ public class TracDataService extends CommonServiceBase {
                     .directExecutor()
                     .usePlaintext();
 
-            var baseChannel = clientChannelBuilder.build();
-
-            // TODO: Make event loop client channel interceptor a reusable class
-            // Spin up channels on startup, and shut them all down on close
-
-            var clientChannel = ClientInterceptors.intercept(baseChannel, new ClientInterceptor() {
-
-                @Override public <ReqT, RespT>
-                ClientCall<ReqT, RespT> interceptCall(
-                        MethodDescriptor<ReqT, RespT> method,
-                        CallOptions callOptions,
-                        Channel baseChannel) {
-
-                    var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-                    var eventLoop = (EventLoop) execCtx.eventLoopExecutor();
-
-                    if (eventLoop == null) {
-
-                        // TODO: Log warnings
-                        return baseChannel.newCall(method, callOptions);
-                    }
-
-                    var channel = clientChannelBuilder
-                            .eventLoopGroup(eventLoop)
-                            .build();
-
-                    return channel.newCall(method, callOptions);
-                }
-            });
+            clientChannel = EventLoopChannel.wrapChannel(clientChannelBuilder, workerGroup);
 
             var metaApi = TrustedMetadataApiGrpc.newFutureStub(clientChannel);
 
             var dataReadSvc = new DataReadService(storage, metaApi);
             var dataWriteSvc = new DataWriteService(dataSvcConfig, storage, metaApi);
-
             var publicApi = new TracDataApi(dataReadSvc, dataWriteSvc);
 
             // Create the main server
@@ -155,7 +131,7 @@ public class TracDataService extends CommonServiceBase {
             // Good to go, let's start!
             server.start();
 
-            server.getPort();
+            log.info("Data service is using port {}", server.getPort());
         }
         catch (IOException e) {
 
@@ -166,12 +142,29 @@ public class TracDataService extends CommonServiceBase {
     @Override
     protected int doShutdown(Duration shutdownTimeout) throws InterruptedException {
 
+        var shutdownStart = Instant.now();
+        var shutdownDeadline = shutdownStart.plus(shutdownTimeout);
+
+        var timeRemaining = Duration.between(Instant.now(), shutdownDeadline);
+        var millisRemaining = timeRemaining.isNegative() ? 0 : timeRemaining.toMillis();
+
         server.shutdown();
-        server.awaitTermination(shutdownTimeout.getSeconds(), TimeUnit.SECONDS);
+        server.awaitTermination(millisRemaining, TimeUnit.MILLISECONDS);
 
-        // TODO: Shut down event loops and client channels
+        timeRemaining = Duration.between(Instant.now(), shutdownDeadline);
+        millisRemaining = timeRemaining.isNegative() ? 0 : timeRemaining.toMillis();
 
-        if (server.isTerminated())
+        clientChannel.shutdown();
+        clientChannel.awaitTermination(millisRemaining, TimeUnit.MILLISECONDS);
+
+        workerGroup.shutdownGracefully(0, millisRemaining, TimeUnit.MILLISECONDS);
+
+        timeRemaining = Duration.between(Instant.now(), shutdownDeadline);
+        millisRemaining = timeRemaining.isNegative() ? 0 : timeRemaining.toMillis();
+
+        bossGroup.shutdownGracefully(0, millisRemaining, TimeUnit.MILLISECONDS);
+
+        if (server.isTerminated() && workerGroup.isTerminated() && bossGroup.isTerminated())
             return 0;
 
         server.shutdownNow();
