@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Accenture Global Solutions Limited
+ * Copyright 2020 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.validation.core;
+plugins {
+    id "java-library"
+    id "idea"
+}
 
-public class ValidationFailure {
+apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
-    private final ValidationLocation location;
-    private final String message;
 
-    public ValidationFailure(ValidationLocation location, String message ) {
-        this.location = location;
-        this.message = message;
-    }
+dependencies {
 
-    public String message() {
-        return message;
-    }
+    api project(':trac-api-metadata')
+    api project(':trac-api-services')
+    api project(':trac-lib-common')
+
+    testImplementation project(':trac-lib-test')
 }

@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.validation.core;
-
-import com.google.protobuf.Message;
+package com.accenture.trac.common.validation.core;
 
 
 public class ValidationFunction<T> {

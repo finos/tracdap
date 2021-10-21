@@ -22,12 +22,12 @@ import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.util.Bytes;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.util.GrpcStreams;
+import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.DataWriteService;
 
-import com.accenture.trac.svc.data.validation.Validator;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
 import io.grpc.MethodDescriptor;

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.validation;
+package com.accenture.trac.common.validation;
 
 import java.util.List;
 import java.util.regex.Pattern;

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.validation.core;
+package com.accenture.trac.common.validation.core;
 
 import java.util.Collections;
 import java.util.List;

@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.validation.fixed;
+package com.accenture.trac.common.validation.fixed;
 
 import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.metadata.TagUpdate;
-import com.accenture.trac.svc.data.validation.core.ValidationContext;
+import com.accenture.trac.common.validation.core.ValidationContext;
 import com.google.protobuf.Descriptors;
 
 

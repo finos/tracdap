@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.validation;
+package com.accenture.trac.common.validation;
 
 import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.exception.EVersionValidation;
 import com.accenture.trac.metadata.ObjectDefinition;
 import com.accenture.trac.metadata.TagHeader;
-import com.accenture.trac.svc.data.validation.core.*;
+import com.accenture.trac.common.validation.core.*;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import org.slf4j.Logger;
