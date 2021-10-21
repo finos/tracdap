@@ -21,6 +21,19 @@ config:
 
 
 trac:
+
+  instances:
+
+    meta:
+      - scheme: http
+        host: localhost
+        port: 8081
+
+    data:
+      - scheme: http
+        host: localhost
+        port: 8082
+
   services:
 
 #    meta:

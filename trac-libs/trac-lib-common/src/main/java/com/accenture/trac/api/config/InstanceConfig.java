@@ -16,25 +16,33 @@
 
 package com.accenture.trac.api.config;
 
-public class TracConfig {
+public class InstanceConfig {
 
-    private InstancesConfig instances;
+    private String scheme;
+    private String host;
+    private short port;
 
-    private ServicesConfig services;
-
-    public InstancesConfig getInstances() {
-        return instances;
+    public String getScheme() {
+        return scheme;
     }
 
-    public void setInstances(InstancesConfig instances) {
-        this.instances = instances;
+    public void setScheme(String scheme) {
+        this.scheme = scheme;
     }
 
-    public ServicesConfig getServices() {
-        return services;
+    public String getHost() {
+        return host;
     }
 
-    public void setServices(ServicesConfig services) {
-        this.services = services;
+    public void setHost(String host) {
+        this.host = host;
+    }
+
+    public short getPort() {
+        return port;
+    }
+
+    public void setPort(short port) {
+        this.port = port;
     }
 }

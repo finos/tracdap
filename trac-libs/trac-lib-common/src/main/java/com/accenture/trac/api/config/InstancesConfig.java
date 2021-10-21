@@ -16,25 +16,26 @@
 
 package com.accenture.trac.api.config;
 
-public class TracConfig {
+import java.util.List;
 
-    private InstancesConfig instances;
+public class InstancesConfig {
 
-    private ServicesConfig services;
+    private List<InstanceConfig> meta = List.of();
+    private List<InstanceConfig> data = List.of();
 
-    public InstancesConfig getInstances() {
-        return instances;
+    public List<InstanceConfig> getMeta() {
+        return meta;
     }
 
-    public void setInstances(InstancesConfig instances) {
-        this.instances = instances;
+    public void setMeta(List<InstanceConfig> meta) {
+        this.meta = meta;
     }
 
-    public ServicesConfig getServices() {
-        return services;
+    public List<InstanceConfig> getData() {
+        return data;
     }
 
-    public void setServices(ServicesConfig services) {
-        this.services = services;
+    public void setData(List<InstanceConfig> data) {
+        this.data = data;
     }
 }
