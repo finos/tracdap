@@ -148,23 +148,23 @@ public class EventLoopChannel extends ManagedChannel {
     @Override
     public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
 
-        var timeoutStart = Instant.now();
-        boolean ok = true;
+        var deadline = Instant.now().plus(Duration.of(timeout, unit.toChronoUnit()));
+        var ok = true;
 
         for (var ch : eventLoopChannels.values()) {
 
-            var elapsed = Duration.between(timeoutStart, Instant.now());
-            var remaining = elapsed.get(unit.toChronoUnit());
+            var remaining = Duration.between(Instant.now(), deadline);
+            var safeRemaining = remaining.isNegative() ? Duration.ZERO : remaining;
 
-            var result = ch.awaitTermination(remaining, unit);
+            var result = ch.awaitTermination(safeRemaining.toMillis(), TimeUnit.MILLISECONDS);
 
             ok = ok & result;
         }
 
-        var elapsed = Duration.between(timeoutStart, Instant.now());
-        var remaining = elapsed.get(unit.toChronoUnit());
+        var remaining = Duration.between(Instant.now(), deadline);
+        var safeRemaining = remaining.isNegative() ? Duration.ZERO : remaining;
 
-        var result = baseChannel.awaitTermination(remaining, unit);
+        var result = baseChannel.awaitTermination(safeRemaining.toMillis(), TimeUnit.MILLISECONDS);
 
         return ok & result;
     }

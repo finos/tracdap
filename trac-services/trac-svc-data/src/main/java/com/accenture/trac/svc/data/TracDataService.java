@@ -19,6 +19,7 @@ package com.accenture.trac.svc.data;
 import com.accenture.trac.api.TrustedMetadataApiGrpc;
 import com.accenture.trac.api.config.DataServiceConfig;
 import com.accenture.trac.api.config.RootConfig;
+import com.accenture.trac.api.config.TracConfig;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.concurrent.ExecutionRegister;
 import com.accenture.trac.common.exception.EStartup;
@@ -98,20 +99,10 @@ public class TracDataService extends CommonServiceBase {
             storage.initStoragePlugins();
             storage.initStorage(dataSvcConfig.getStorage());
 
-            // TODO: Meta svc config
+            var metaClient = prepareMetadataClient(rootConfig.getTrac(), clientChannelType);
 
-            var clientChannelBuilder = NettyChannelBuilder.forAddress("localhost", 1234)
-                    .channelType(clientChannelType)
-                    .eventLoopGroup(workerGroup)
-                    .directExecutor()
-                    .usePlaintext();
-
-            clientChannel = EventLoopChannel.wrapChannel(clientChannelBuilder, workerGroup);
-
-            var metaApi = TrustedMetadataApiGrpc.newFutureStub(clientChannel);
-
-            var dataReadSvc = new DataReadService(storage, metaApi);
-            var dataWriteSvc = new DataWriteService(dataSvcConfig, storage, metaApi);
+            var dataReadSvc = new DataReadService(storage, metaClient);
+            var dataWriteSvc = new DataWriteService(dataSvcConfig, storage, metaClient);
             var publicApi = new TracDataApi(dataReadSvc, dataWriteSvc);
 
             // Create the main server
@@ -131,7 +122,7 @@ public class TracDataService extends CommonServiceBase {
             // Good to go, let's start!
             server.start();
 
-            log.info("Data service is using port {}", server.getPort());
+            log.info("Data service is listening on port {}", server.getPort());
         }
         catch (IOException e) {
 
@@ -139,39 +130,77 @@ public class TracDataService extends CommonServiceBase {
         }
     }
 
-    @Override
-    protected int doShutdown(Duration shutdownTimeout) throws InterruptedException {
+    private TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub
+    prepareMetadataClient(
+            TracConfig tracConfig,
+            Class<? extends io.netty.channel.Channel> channelType) {
 
-        var shutdownStart = Instant.now();
-        var shutdownDeadline = shutdownStart.plus(shutdownTimeout);
+        var metaInstances = tracConfig.getInstances().getMeta();
 
-        var timeRemaining = Duration.between(Instant.now(), shutdownDeadline);
-        var millisRemaining = timeRemaining.isNegative() ? 0 : timeRemaining.toMillis();
+        if (metaInstances.isEmpty()) {
 
-        server.shutdown();
-        server.awaitTermination(millisRemaining, TimeUnit.MILLISECONDS);
+            var err = "Configuration contains no instances of the metadata service";
+            log.error(err);
+            throw new EStartup(err);
+        }
 
-        timeRemaining = Duration.between(Instant.now(), shutdownDeadline);
-        millisRemaining = timeRemaining.isNegative() ? 0 : timeRemaining.toMillis();
+        var metaInstance = metaInstances.get(0);  // Just use the first instance for now
 
-        clientChannel.shutdown();
-        clientChannel.awaitTermination(millisRemaining, TimeUnit.MILLISECONDS);
+        log.info("Using metadata service instance at [{}:{}]",
+                metaInstance.getHost(), metaInstance.getPort());
 
-        workerGroup.shutdownGracefully(0, millisRemaining, TimeUnit.MILLISECONDS);
+        var clientChannelBuilder = NettyChannelBuilder
+                .forAddress(metaInstance.getHost(), metaInstance.getPort())
+                .channelType(channelType)
+                .eventLoopGroup(workerGroup)
+                .directExecutor()
+                .usePlaintext();
 
-        timeRemaining = Duration.between(Instant.now(), shutdownDeadline);
-        millisRemaining = timeRemaining.isNegative() ? 0 : timeRemaining.toMillis();
+        clientChannel = EventLoopChannel.wrapChannel(clientChannelBuilder, workerGroup);
 
-        bossGroup.shutdownGracefully(0, millisRemaining, TimeUnit.MILLISECONDS);
-
-        if (server.isTerminated() && workerGroup.isTerminated() && bossGroup.isTerminated())
-            return 0;
-
-        server.shutdownNow();
-        return -1;
+        return TrustedMetadataApiGrpc.newFutureStub(clientChannel);
     }
 
+    @Override
+    protected int doShutdown(Duration shutdownTimeout) {
 
+        var deadline = Instant.now().plus(shutdownTimeout);
+
+        var serverDown = shutdownResource("Data service server", deadline, remaining -> {
+
+            server.shutdown();
+            return server.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        var clientDown = shutdownResource("Metadata service client", deadline, remaining -> {
+
+            clientChannel.shutdown();
+            return clientChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        var workersDown = shutdownResource("Worker thread pool", deadline, remaining -> {
+
+            workerGroup.shutdownGracefully(0, remaining.toMillis(), TimeUnit.MILLISECONDS);
+            return workerGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        var bossDown = shutdownResource("Boss thread pool", deadline, remaining -> {
+
+            bossGroup.shutdownGracefully(0, remaining.toMillis(), TimeUnit.MILLISECONDS);
+            return bossGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        if (serverDown && clientDown && workersDown && bossDown)
+            return 0;
+
+        if (!serverDown)
+            server.shutdownNow();
+
+        if (!clientDown)
+            clientChannel.shutdownNow();
+
+        return -1;
+    }
 
     public static void main(String[] args) {
 
