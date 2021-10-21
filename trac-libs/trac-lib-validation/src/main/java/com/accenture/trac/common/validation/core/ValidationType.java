@@ -14,19 +14,10 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.validation.core;
+package com.accenture.trac.common.validation.core;
 
-public class ValidationFailure {
-
-    private final ValidationLocation location;
-    private final String message;
-
-    public ValidationFailure(ValidationLocation location, String message ) {
-        this.location = location;
-        this.message = message;
-    }
-
-    public String message() {
-        return message;
-    }
+public enum ValidationType {
+    FIXED,
+    VERSION,
+    REFERENTIAL
 }

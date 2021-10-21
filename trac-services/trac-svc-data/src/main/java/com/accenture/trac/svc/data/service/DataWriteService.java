@@ -27,9 +27,9 @@ import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.storage.IFileStorage;
 import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.common.concurrent.Futures;
+import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.*;
 
-import com.accenture.trac.svc.data.validation.Validator;
 import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

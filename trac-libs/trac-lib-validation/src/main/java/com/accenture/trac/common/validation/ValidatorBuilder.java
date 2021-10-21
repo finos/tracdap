@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.validation;
+package com.accenture.trac.common.validation;
 
 import com.accenture.trac.api.Data;
 import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
 import com.accenture.trac.metadata.FileDefinition;
-import com.accenture.trac.svc.data.validation.core.ValidationFunction;
-import com.accenture.trac.svc.data.validation.core.ValidationKey;
-import com.accenture.trac.svc.data.validation.fixed.DataApiValidator;
-import com.accenture.trac.svc.data.validation.version.FileVersionValidator;
+import com.accenture.trac.common.validation.core.ValidationFunction;
+import com.accenture.trac.common.validation.core.ValidationKey;
+import com.accenture.trac.common.validation.fixed.DataApiValidator;
+import com.accenture.trac.common.validation.version.FileVersionValidator;
 import com.google.protobuf.Descriptors;
 
 import java.util.HashMap;

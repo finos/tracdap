@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.validation.version;
+package com.accenture.trac.common.validation.version;
 
 import com.accenture.trac.metadata.FileDefinition;
-import com.accenture.trac.svc.data.validation.core.ValidationContext;
+import com.accenture.trac.common.validation.core.ValidationContext;
 import com.google.protobuf.*;
 
 import java.util.Objects;
