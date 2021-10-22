@@ -44,6 +44,8 @@ dependencyCheck {
         directory = rootProject.buildDir.path + '/nvd/'
     }
 
+    suppressionFiles = ["$projectDir/dev/vulnerabilities/false-positives.xml"]
+
     // CVSS score < 4 is "low severity" according to NIST
     // https://nvd.nist.gov/vuln-metrics/cvss
 
