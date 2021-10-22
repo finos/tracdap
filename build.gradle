@@ -39,9 +39,15 @@ subprojects {
 }
 
 dependencyCheck {
+
     data {
         directory = rootProject.buildDir.path + '/nvd/'
     }
+
+    // CVSS score < 4 is "low severity" according to NIST
+    // https://nvd.nist.gov/vuln-metrics/cvss
+
+    failBuildOnCVSS = 4
 }
 
 licenseReport {
