@@ -20,6 +20,8 @@ plugins {
     id 'idea'
 }
 
+import com.github.jk1.license.filter.*
+
 apply from: 'gradle/config.gradle'
 apply from: 'gradle/functions.gradle'
 
@@ -40,4 +42,13 @@ dependencyCheck {
     data {
         directory = rootProject.buildDir.path + '/nvd/'
     }
+}
+
+licenseReport {
+
+    allowedLicensesFile = new File("$projectDir/dev/licenses/permitted-licenses.json")
+
+    filters = [
+            new LicenseBundleNormalizer(createDefaultTransformationRules: true),
+            new LicenseBundleNormalizer(bundlePath: "$projectDir/dev/licenses/license-normalization.json")]
 }
