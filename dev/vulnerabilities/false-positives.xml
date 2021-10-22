@@ -31,4 +31,12 @@
         <cpe>cpe:/a:www-sql_project:www-sql</cpe>
     </suppress>
 
+    <suppress>
+        <notes><![CDATA[
+   file name: sql-drivers.jar (project :sql-drivers)
+   ]]></notes>
+        <sha1>6f86de9eb5cbfe63852a67fb4312df1d13d5bcff</sha1>
+        <cpe>cpe:/a:www-sql_project:www-sql</cpe>
+    </suppress>
+
 </suppressions>
