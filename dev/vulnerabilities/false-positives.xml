@@ -24,18 +24,7 @@
 
     <!-- The sql-drivers module is falsely matched as another project -->
     <suppress>
-        <notes><![CDATA[
-   file name: sql-drivers.jar (project :sql-drivers)
-   ]]></notes>
-        <sha1>4eb102690537fabf37736bba806d7a94d8e6f10c</sha1>
-        <cpe>cpe:/a:www-sql_project:www-sql</cpe>
-    </suppress>
-
-    <suppress>
-        <notes><![CDATA[
-   file name: sql-drivers.jar (project :sql-drivers)
-   ]]></notes>
-        <sha1>6f86de9eb5cbfe63852a67fb4312df1d13d5bcff</sha1>
+        <packageUrl regex="true">^pkg:maven/com\.accenture\.trac/sql\-drivers@.*$</packageUrl>
         <cpe>cpe:/a:www-sql_project:www-sql</cpe>
     </suppress>
 
