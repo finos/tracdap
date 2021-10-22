@@ -26,7 +26,7 @@ ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Data Service")
 
 
 application {
-    mainClassName = 'com.accenture.trac.svc.data.TracDataService'
+    mainClass.set("com.accenture.trac.svc.data.TracDataService")
     tasks.run.workingDir = rootProject.projectDir
 }
 

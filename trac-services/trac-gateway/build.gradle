@@ -27,7 +27,7 @@ ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Platform Gateway")
 
 
 application {
-    mainClassName = 'com.accenture.trac.gateway.TracPlatformGateway'
+    mainClass.set("com.accenture.trac.gateway.TracPlatformGateway")
     tasks.run.workingDir = rootProject.projectDir
 }
 
