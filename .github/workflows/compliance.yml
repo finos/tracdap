@@ -1,0 +1,44 @@
+name: Compliance
+
+# Run compliance on all builds for now
+# Once it is working reliably, switch to just PR, merge and tag
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+
+
+jobs:
+
+  java_compliance:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+
+      - name: Set up Java
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11.0.x
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Dependency vulnerability scan
+        run: ./gradlew dependencyCheckAggregate
+
+      - name: Dependency license scan
+        run: ./gradlew checkLicense
+
+      # Always save the reports - they are especially needed when the checks have failed!
+      - name: Store compliance reports
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: compliance-reports
+          path: build/reports/**
