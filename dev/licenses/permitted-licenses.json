@@ -11,6 +11,23 @@
     },
     {
       "moduleLicense": "BSD Zero Clause License"
+    },
+
+    {
+      "moduleName": "org.junit.jupiter:.*",
+      "moduleLicense": "Eclipse Public License - v 2.0"
+    },
+    {
+      "moduleName": "org.junit.platform:.*",
+      "moduleLicense": "Eclipse Public License - v 2.0"
+    },
+    {
+      "moduleName": "org.junit:junit-bom",
+      "moduleLicense": null
+    },
+    {
+      "moduleName": "com.fasterxml.jackson:jackson-bom",
+      "moduleLicense": null
     }
   ]
 }
