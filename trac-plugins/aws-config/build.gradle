@@ -26,11 +26,7 @@ dependencies {
 
     api project(':trac-lib-common')
 
-    // Apache Commons Components
-    implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"
-
-    implementation group: 'com.amazonaws', name: 'aws-java-sdk', version: "$aws_sdk_version"
-
-    testImplementation group: 'jakarta.xml.bind',  name: 'jakarta.xml.bind-api', version: '2.3.2'
-    testImplementation group: 'org.glassfish.jaxb',  name: 'jaxb-runtime', version: '2.3.2'
+    implementation group: 'com.amazonaws', name: 'aws-java-sdk-s3', version: "$aws_sdk_version"
+    implementation group: 'com.amazonaws', name: 'aws-java-sdk-kms', version: "$aws_sdk_version"
+    implementation group: 'com.amazonaws', name: 'aws-java-sdk-core', version: "$aws_sdk_version"
 }
