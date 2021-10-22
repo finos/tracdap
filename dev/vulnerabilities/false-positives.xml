@@ -22,9 +22,8 @@
         <cpe>cpe:/a:trac:trac</cpe>
     </suppress>
 
-    <!-- The sql-drivers module is falsely matched as another project -->
+    <!-- The sql-drivers module is falsely recognized as www-sql -->
     <suppress>
-        <packageUrl regex="true">^pkg:maven/com\.accenture\.trac/sql\-drivers@.*$</packageUrl>
         <cpe>cpe:/a:www-sql_project:www-sql</cpe>
     </suppress>
 
