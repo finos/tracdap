@@ -29,5 +29,5 @@ dependencies {
     // Apache Commons Components
     implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"
 
-    compile group: 'com.google.cloud', name: 'google-cloud-storage', version: "$gcp_sdk_version"
+    implementation group: 'com.google.cloud', name: 'google-cloud-storage', version: "$gcp_sdk_version"
 }
