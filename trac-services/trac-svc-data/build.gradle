@@ -59,3 +59,6 @@ dependencies {
         exclude group: 'junit', module: 'junit'
     }
 }
+
+ext.pluginDependency("AWS_CONFIG", project(":aws-config"))
+ext.pluginDependency("GCP_CONFIG", project(":gcp-config"))
