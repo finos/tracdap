@@ -24,18 +24,18 @@ jobs:
 
     steps:
 
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
       - name: Set up Java
         uses: actions/setup-java@v2
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
-
-      # fetch-depth = 0 is needed to get tags for version info
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
 
       - name: Dependency vulnerability scan
         run: ./gradlew dependencyCheckAggregate
