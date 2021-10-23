@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Accenture Global Solutions Limited
+ * Copyright 2021 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,23 +16,6 @@
 
 plugins {
     id "java-library"
-    id "idea"
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
-
-
-dependencies {
-
-    api project(':trac-lib-common')
-
-    // Google cloud libs use the @Generated annotation, which introduces the CDDL license dependency
-    // To work around this limitation, TRAC provides a version of just this one annotation class
-    implementation project(':trac-lib-javax')
-
-    implementation (group: 'com.google.cloud', name: 'google-cloud-storage', version: "$gcp_sdk_version") {
-
-        // Do not pull in the JavaX annotation JAR, which is licensed under CDDL
-        exclude group: 'javax.annotation', module: 'javax.annotation-api'
-    }
-}

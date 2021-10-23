@@ -19,7 +19,6 @@ package com.accenture.trac.common.concurrent;
 import io.grpc.*;
 import io.netty.util.concurrent.OrderedEventExecutor;
 
-import javax.annotation.Nullable;
 import java.util.concurrent.Executor;
 
 public class ExecutionContext implements IExecutionContext {
@@ -41,7 +40,7 @@ public class ExecutionContext implements IExecutionContext {
 
         return new ServerCallExecutorSupplier() {
 
-            @Override @Nullable
+            @Override
             public <ReqT, RespT>
             Executor getExecutor(ServerCall<ReqT, RespT> call, Metadata metadata) {
 
