@@ -22,7 +22,7 @@ plugins {
 
 import com.github.jk1.license.filter.*
 
-apply from: 'gradle/config.gradle'
+apply from: 'gradle/versions.gradle'
 apply from: 'gradle/functions.gradle'
 
 def versionNumber = ext.getVersionFromGit()
