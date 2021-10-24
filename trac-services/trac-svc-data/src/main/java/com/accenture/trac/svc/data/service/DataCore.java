@@ -92,37 +92,6 @@ public class DataCore {
         }
     }
 
-    // JSON impl? : https://github.com/ngs-doo/dsl-json
-
-
-    class CsvEncoder implements Flow.Processor<VectorSchemaRoot, ByteBuf> {
-
-        @Override
-        public void subscribe(Flow.Subscriber<? super ByteBuf> subscriber) {
-
-        }
-
-        @Override
-        public void onSubscribe(Flow.Subscription subscription) {
-
-        }
-
-        @Override
-        public void onNext(VectorSchemaRoot item) {
-
-        }
-
-        @Override
-        public void onError(Throwable throwable) {
-
-        }
-
-        @Override
-        public void onComplete() {
-
-        }
-    }
-
     static class FlatDataStorage implements IDataStorage {
 
         private final IFileStorage fileStorage;
