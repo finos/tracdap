@@ -16,6 +16,8 @@
 
 package com.accenture.trac.svc.data.service;
 
+import com.accenture.trac.common.concurrent.IExecutionContext;
+import com.accenture.trac.common.storage.IFileStorage;
 import io.netty.buffer.ByteBuf;
 import org.apache.arrow.vector.VectorSchemaRoot;
 
@@ -27,7 +29,7 @@ import java.util.function.Supplier;
 
 public class DataCore {
 
-    CompletableFuture<Boolean> writeData(Flow.Publisher<ByteBuf> byteStream) {
+    CompletableFuture<Boolean> writeData(Flow.Publisher<ByteBuf> byteStream, IExecutionContext execCtx) {
 
         var signal = new CompletableFuture<Boolean>();
 
@@ -35,7 +37,7 @@ public class DataCore {
         var decoder = codec.decoder(null);
 
         var storage = (IDataStorage) null;
-        var writer = storage.writeDelta(null, signal);
+        var writer = storage.writeDelta(null, signal, execCtx);
 
         byteStream.subscribe(decoder);
         decoder.subscribe(writer);
@@ -43,13 +45,13 @@ public class DataCore {
         return signal;
     }
 
-    Flow.Publisher<ByteBuf> readDelta() {
+    Flow.Publisher<ByteBuf> readDelta(IExecutionContext execCtx) {
 
         var codec = (IDataCodec) null;
         var encoder = codec.encoder(null);
 
         var storage = (IDataStorage) null;
-        var reader = storage.readDelta(null);
+        var reader = storage.readDelta(null, execCtx);
 
         reader.subscribe(encoder);
 
@@ -59,11 +61,13 @@ public class DataCore {
     interface IDataStorage {
 
         Flow.Publisher<VectorSchemaRoot> readDelta(
-                Supplier<VectorSchemaRoot> recycler);
+                Supplier<VectorSchemaRoot> recycler,
+                IExecutionContext execCtx);
 
         Flow.Subscriber<VectorSchemaRoot> writeDelta(
                 Consumer<VectorSchemaRoot> recycler,
-                CompletableFuture<Boolean> signal);
+                CompletableFuture<Boolean> signal,
+                IExecutionContext execCtx);
     }
 
     interface IDataCodec {
@@ -87,6 +91,9 @@ public class DataCore {
             return null;
         }
     }
+
+    // JSON impl? : https://github.com/ngs-doo/dsl-json
+
 
     class CsvEncoder implements Flow.Processor<VectorSchemaRoot, ByteBuf> {
 
@@ -113,6 +120,56 @@ public class DataCore {
         @Override
         public void onComplete() {
 
+        }
+    }
+
+    static class FlatDataStorage implements IDataStorage {
+
+        private final IFileStorage fileStorage;
+
+        public FlatDataStorage(IFileStorage fileStorage) {
+            this.fileStorage = fileStorage;
+        }
+
+        @Override
+        public Flow.Publisher<VectorSchemaRoot> readDelta(
+                Supplier<VectorSchemaRoot> recycler,
+                IExecutionContext execCtx) {
+
+            var storagePath = (String) null;
+            var codec = (IDataCodec) null;
+
+            var byteStream = fileStorage.reader(storagePath, execCtx);
+            var decoder = codec.decoder(recycler);
+            byteStream.subscribe(decoder);
+
+            return decoder;
+        }
+
+        @Override
+        public Flow.Subscriber<VectorSchemaRoot> writeDelta(
+                Consumer<VectorSchemaRoot> recycler,
+                CompletableFuture<Boolean> signal,
+                IExecutionContext execCtx) {
+
+            var storagePath = (String) null;
+            var codec = (IDataCodec) null;
+
+            var fileSignal = new CompletableFuture<Long>();
+
+            fileSignal.whenComplete((result, error) -> {
+
+                if (error != null)
+                    signal.completeExceptionally(error);
+                else
+                    signal.complete(true);
+            });
+
+            var fileWriter = fileStorage.writer(storagePath, fileSignal, execCtx);
+            var encoder = codec.encoder(recycler);
+            encoder.subscribe(fileWriter);
+
+            return encoder;
         }
     }
 }
