@@ -16,19 +16,33 @@
 
 package com.accenture.trac.common.codec.csv;
 
+import com.accenture.trac.metadata.TableSchema;
 import com.fasterxml.jackson.dataformat.csv.CsvGenerator;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import io.netty.buffer.ByteBuf;
+import io.netty.util.ConstantPool;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.BitVector;
+import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.types.pojo.Field;
 
 import java.io.DataOutput;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Flow;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 
 public class CsvEncoder implements Flow.Processor<VectorSchemaRoot, ByteBuf> {
+
+    //private final TableSchema tableSchema;
 
     private final Consumer<VectorSchemaRoot> recycler;
     private final CsvMapper mapper = null;
@@ -110,7 +124,7 @@ public class CsvEncoder implements Flow.Processor<VectorSchemaRoot, ByteBuf> {
         }
     }
 
-    private class PartialOutputStream extends OutputStream {
+    private static class PartialOutputStream extends OutputStream {
 
         @Override
         public void write(byte[] b, int off, int len) throws IOException {

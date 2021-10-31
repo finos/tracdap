@@ -16,46 +16,123 @@
 
 package com.accenture.trac.svc.data.service;
 
+import com.accenture.trac.api.MetadataReadRequest;
+import com.accenture.trac.common.concurrent.Flows;
+import com.accenture.trac.common.concurrent.Futures;
 import com.accenture.trac.common.concurrent.IExecutionContext;
+import com.accenture.trac.common.data.BatchRecycler;
 import com.accenture.trac.common.storage.IFileStorage;
+import com.accenture.trac.metadata.DataDefinition;
+import com.accenture.trac.metadata.StorageDefinition;
+import com.accenture.trac.metadata.Tag;
+import com.accenture.trac.metadata.TagSelector;
 import io.netty.buffer.ByteBuf;
+import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.types.pojo.Field;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 
 public class DataCore {
 
-    CompletableFuture<Boolean> writeData(Flow.Publisher<ByteBuf> byteStream, IExecutionContext execCtx) {
+    CompletableFuture<Boolean> writeDelta(
+            Flow.Publisher<ByteBuf> byteStream,
+            IExecutionContext execCtx) {
 
         var signal = new CompletableFuture<Boolean>();
 
+        var fields = List.<Field>of();
+        var batchSize = 1024;
+        var allocator = new RootAllocator();
+
+        var recycler = new BatchRecycler(fields, batchSize, allocator);
+
         var codec = (IDataCodec) null;
-        var decoder = codec.decoder(null);
+        var decoder = codec.decoder(recycler.supplier());
 
         var storage = (IDataStorage) null;
-        var writer = storage.writeDelta(null, signal, execCtx);
+        var writer = storage.writeDelta(recycler.consumer(), signal, execCtx);
 
         byteStream.subscribe(decoder);
         decoder.subscribe(writer);
 
-        return signal;
+        return signal.whenComplete((result, err) -> recycler.clear());
     }
 
-    Flow.Publisher<ByteBuf> readDelta(IExecutionContext execCtx) {
+    void readPart(String tenant, TagSelector selector) {
+
+        var state = new RequestState();
+
+        CompletableFuture.completedFuture(null)
+
+                .thenCompose(x -> readMetadata(tenant, selector))
+                .thenAccept(obj -> state.file = obj.getDefinition().getFile())
+
+                .thenCompose(x -> readMetadata(tenant, state.file.getStorageId()))
+                .thenAccept(obj -> state.storage = obj.getDefinition().getStorage())
+    }
+
+    private Flow.Publisher<ByteBuf> readPart(
+            DataDefinition data,
+            StorageDefinition storage,
+            IExecutionContext execCtx) {
+
+        var part = data.getPartsOrDefault(null, null);
+        var snap = part.getSnap();
+
+        return readSnap(snap, storage, execCtx);
+    }
+
+    private Flow.Publisher<ByteBuf> readSnap(
+            DataDefinition.Snap snap,
+            StorageDefinition storage,
+            IExecutionContext execCtx) {
+
+        var deltas = snap.getDeltasList()
+                .stream()
+                .map(d -> readDelta(d, storage, execCtx))
+                .collect(Collectors.toList());
+
+        return Flows.concat(deltas);
+    }
+
+    Flow.Publisher<ByteBuf> readDelta(
+            DataDefinition.Delta delta,
+            StorageDefinition storage,
+            IExecutionContext execCtx) {
+
+        var fields = List.<Field>of();
+        var batchSize = 1024;
+        var allocator = new RootAllocator();
+
+        var recycler = new BatchRecycler(fields, batchSize, allocator);
 
         var codec = (IDataCodec) null;
-        var encoder = codec.encoder(null);
+        var encoder = codec.encoder(recycler.consumer());
 
         var storage = (IDataStorage) null;
-        var reader = storage.readDelta(null, execCtx);
+        var reader = storage.readDelta(recycler.supplier(), execCtx);
 
         reader.subscribe(encoder);
 
-        return encoder;
+        return encoder;  // TODO: Concurrent.whenComplete(encoder, (result, err) -> recycler.clear());
+    }
+
+    private CompletionStage<Tag> readMetadata(String tenant, TagSelector selector) {
+
+        var metaRequest = MetadataReadRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(selector)
+                .build();
+
+        return Futures.javaFuture(metaApi.readObject(metaRequest));
     }
 
     interface IDataStorage {

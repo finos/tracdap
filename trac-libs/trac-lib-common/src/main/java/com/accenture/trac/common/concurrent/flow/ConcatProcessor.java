@@ -31,10 +31,8 @@ public class ConcatProcessor<T> implements Flow.Processor<T, T> {
     private int sourceIndex;
     private int nPending;
 
-    public ConcatProcessor(Flow.Publisher<T> first, Flow.Publisher<T> second) {
-        this.publishers = new ArrayList<>(2);
-        this.publishers.add(first);
-        this.publishers.add(second);
+    public ConcatProcessor(List<Flow.Publisher<T>> publishers) {
+        this.publishers = publishers;
     }
 
     @Override

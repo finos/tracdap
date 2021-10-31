@@ -17,6 +17,7 @@
 package com.accenture.trac.common.concurrent;
 
 import com.accenture.trac.common.concurrent.flow.*;
+import com.accenture.trac.common.exception.EUnexpected;
 import io.netty.util.concurrent.OrderedEventExecutor;
 
 import java.util.*;
@@ -93,11 +94,28 @@ public class Flows {
     }
 
     public static <T>
+    Flow.Publisher<T> concat(List<Flow.Publisher<T>> publishers) {
+
+        if (publishers.isEmpty())
+            throw new EUnexpected();
+
+        var concat = new ConcatProcessor<>(publishers);
+
+        publishers.get(0).subscribe(concat);
+
+        return concat;
+    }
+
+    public static <T>
     Flow.Publisher<T> concat(CompletionStage<T> head, Flow.Publisher<T> tail) {
 
         var headStream = publish(head);
 
-        var concat = new ConcatProcessor<>(headStream, tail);
+        var publishers = new ArrayList<Flow.Publisher<T>>(2);
+        publishers.add(headStream);
+        publishers.add(tail);
+
+        var concat = new ConcatProcessor<>(publishers);
         headStream.subscribe(concat);
 
         return concat;

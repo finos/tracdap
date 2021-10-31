@@ -16,6 +16,7 @@
 
 package com.accenture.trac.common.codec.csv;
 
+import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import io.netty.buffer.ByteBuf;
 import org.apache.arrow.vector.VectorSchemaRoot;
 
@@ -23,6 +24,12 @@ import java.util.concurrent.Flow;
 
 
 public class CsvDecoder implements Flow.Processor<ByteBuf, VectorSchemaRoot> {
+
+    private final CsvMapper mapper;
+
+    public CsvDecoder() {
+        mapper = new CsvMapper();
+    }
 
     @Override
     public void subscribe(Flow.Subscriber<? super VectorSchemaRoot> subscriber) {
@@ -47,5 +54,18 @@ public class CsvDecoder implements Flow.Processor<ByteBuf, VectorSchemaRoot> {
     @Override
     public void onComplete() {
 
+    }
+
+    private class Subscription implements Flow.Subscription {
+
+        @Override
+        public void request(long n) {
+
+        }
+
+        @Override
+        public void cancel() {
+
+        }
     }
 }
