@@ -16,56 +16,64 @@
 
 package com.accenture.trac.common.codec.csv;
 
+import com.accenture.trac.common.concurrent.flow.CommonBaseProcessor;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.CompositeByteBuf;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.Flow;
 
+public class CsvDecoder extends CommonBaseProcessor<ByteBuf, VectorSchemaRoot> {
 
-public class CsvDecoder implements Flow.Processor<ByteBuf, VectorSchemaRoot> {
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final CompositeByteBuf buffer;
     private final CsvMapper mapper;
 
     public CsvDecoder() {
+        buffer = ByteBufAllocator.DEFAULT.compositeBuffer();
         mapper = new CsvMapper();
     }
 
     @Override
-    public void subscribe(Flow.Subscriber<? super VectorSchemaRoot> subscriber) {
+    protected void handleTargetRequest() {
 
+        if (nTargetRequested() > 0 && nSourceRequested() <= nSourceDelivered())
+            doSourceRequest(1);
     }
 
     @Override
-    public void onSubscribe(Flow.Subscription subscription) {
+    protected void handleTargetCancel() {
 
+        releaseBuffer();
     }
 
     @Override
-    public void onNext(ByteBuf item) {
+    protected void handleSourceNext(ByteBuf chunk) {
 
+        buffer.addComponent(chunk);
     }
 
     @Override
-    public void onError(Throwable throwable) {
+    protected void handleSourceError(Throwable error) {
 
+        releaseBuffer();
     }
 
     @Override
-    public void onComplete() {
+    protected void handleSourceComplete() {
 
+        releaseBuffer();
     }
 
-    private class Subscription implements Flow.Subscription {
+    private void releaseBuffer() {
 
-        @Override
-        public void request(long n) {
+        var releaseOk = buffer.release();
 
-        }
-
-        @Override
-        public void cancel() {
-
-        }
+        if (!releaseOk && buffer.capacity() > 0)
+            log.warn("CSV decode buffer was not released (this could indicate a memory leak)");
     }
 }

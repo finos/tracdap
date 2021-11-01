@@ -16,60 +16,39 @@
 
 package com.accenture.trac.common.codec.csv;
 
-import com.accenture.trac.metadata.TableSchema;
+import com.accenture.trac.common.concurrent.flow.CommonBaseProcessor;
 import com.fasterxml.jackson.dataformat.csv.CsvGenerator;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import io.netty.buffer.ByteBuf;
-import io.netty.util.ConstantPool;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.BitVector;
-import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.types.pojo.Field;
 
-import java.io.DataOutput;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Flow;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 
-public class CsvEncoder implements Flow.Processor<VectorSchemaRoot, ByteBuf> {
-
-    //private final TableSchema tableSchema;
+public class CsvEncoder extends CommonBaseProcessor<VectorSchemaRoot, ByteBuf> {
 
     private final Consumer<VectorSchemaRoot> recycler;
     private final CsvMapper mapper = null;
     private CsvGenerator generator;
-    private final PartialOutputStream output = null;
-
-    private Flow.Subscription sourceSubscription;
+    //private final ByteBufOutputStream ostream;
 
     public CsvEncoder(Consumer<VectorSchemaRoot> recycler) {
         this.recycler = recycler;
+        //ostream = new ByteBufOutputStream()
     }
 
     @Override
-    public void subscribe(Flow.Subscriber<? super ByteBuf> subscriber) {
+    protected void handleTargetRequest() {
 
-        var targetSubscription = new CsvEncoderSubscription();
-        subscriber.onSubscribe(targetSubscription);
     }
 
     @Override
-    public void onSubscribe(Flow.Subscription subscription) {
-
-        sourceSubscription = subscription;
+    protected void handleSourceNext(VectorSchemaRoot item) {
+        encodeBatch(item);
     }
 
-    @Override
-    public void onNext(VectorSchemaRoot batch) {
+    private void encodeBatch(VectorSchemaRoot batch) {
 
         try {
 
@@ -98,43 +77,6 @@ public class CsvEncoder implements Flow.Processor<VectorSchemaRoot, ByteBuf> {
         finally {
 
             recycler.accept(batch);
-        }
-    }
-
-    @Override
-    public void onError(Throwable throwable) {
-
-    }
-
-    @Override
-    public void onComplete() {
-
-    }
-
-    private class CsvEncoderSubscription implements Flow.Subscription {
-
-        @Override
-        public void request(long n) {
-
-        }
-
-        @Override
-        public void cancel() {
-
-        }
-    }
-
-    private static class PartialOutputStream extends OutputStream {
-
-        @Override
-        public void write(byte[] b, int off, int len) throws IOException {
-            super.write(b, off, len);
-        }
-
-        @Override
-        public void write(int b) throws IOException {
-
-            this.write(new byte[0]);
         }
     }
 }
