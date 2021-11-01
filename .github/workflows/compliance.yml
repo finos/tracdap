@@ -1,12 +1,23 @@
 name: Compliance
 
-# Run compliance on all builds for now
-# Once it is working reliably, switch to just PR, merge and tag
 on:
+
+  # Run compliance jobs for pull requests, to make sure there are no issues before merging
+  pull_request:
+
+  # Re-run compliance jobs in main, to make sure there are no issues from the merge
   push:
     branches:
-      - '**'
-  pull_request:
+      - main
+
+  # Use the release:publish event to generate compliance reports for releases
+  # This lines up with the packaging workflow, so reports will be published when packages are published
+  release:
+    types:
+      - published
+
+  # Allow manual triggering of the compliance jobs
+  workflow_dispatch:
 
 
 # Use baseline language versions for compliance builds
