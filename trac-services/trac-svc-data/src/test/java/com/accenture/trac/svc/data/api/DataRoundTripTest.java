@@ -1,0 +1,328 @@
+/*
+ * Copyright 2021 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.accenture.trac.svc.data.api;
+
+import com.accenture.trac.api.*;
+import com.accenture.trac.common.concurrent.Flows;
+import com.accenture.trac.common.concurrent.Futures;
+import com.accenture.trac.metadata.BasicType;
+import com.accenture.trac.metadata.DataDefinition;
+import com.accenture.trac.metadata.ObjectDefinition;
+import com.accenture.trac.metadata.TagSelector;
+import com.google.common.collect.Streams;
+import com.google.protobuf.ByteString;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.VarCharVector;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.apache.arrow.vector.ipc.ArrowStreamWriter;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+import java.io.ByteArrayInputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.WritableByteChannel;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Vector;
+import java.util.concurrent.Flow;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
+import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
+import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
+
+
+class DataRoundTripTest extends DataApiTestBase {
+
+    private static final String BASIC_CSV_DATA = "/basic_csv_data.csv";
+    private static final String BASIC_JSON_DATA = "/basic_json_data.json";
+
+    private static class TestDataContainer {
+
+        List<String> fieldNames;
+        List<BasicType> fieldTypes;
+        List<Vector<Object>> values;
+    }
+
+    private static final TestDataContainer BASIC_TEST_DATA;
+
+    static {
+
+        BASIC_TEST_DATA = new TestDataContainer();
+        BASIC_TEST_DATA.fieldNames = List.of("string_field", "int_field");
+        BASIC_TEST_DATA.fieldTypes = List.of(BasicType.STRING, BasicType.INTEGER);
+        BASIC_TEST_DATA.values = List.of(new Vector<>(), new Vector<>());
+
+        for (int i = 0; i < 10; i++) {
+            BASIC_TEST_DATA.values.get(0).add("string_" + i);
+            BASIC_TEST_DATA.values.get(1).add((long) i);
+        }
+    }
+
+    private static class ChunkChannel implements WritableByteChannel {
+
+        private final List<ByteString> chunks = new ArrayList<>();
+        private boolean isOpen = true;
+
+        public List<ByteString> getChunks() {
+            return chunks;
+        }
+
+        @Override
+        public int write(ByteBuffer chunk) {
+
+            var copied = ByteString.copyFrom(chunk);
+            chunks.add(copied);
+            return copied.size();
+        }
+
+        @Override public boolean isOpen() { return isOpen; }
+        @Override public void close() { isOpen = false; }
+    }
+
+    @Test
+    void roundTrip_arrowBasic() throws Exception {
+
+        // Create a single batch of Arrow data
+
+        var allocator = new RootAllocator();
+        var varcharVector = new VarCharVector("string_field", allocator);
+        var intVector = new IntVector("int_field", allocator);
+
+        var nRows = 10;
+
+        var originalVarchar = new String[nRows];
+        var originalInt = new int[nRows];
+
+        varcharVector.allocateNew(nRows);
+        intVector.allocateNew(nRows);
+
+        for (int i = 0; i < nRows; i++) {
+
+            originalVarchar[i] = String.format("string_%d", i);
+            originalInt[i] = i;
+
+            varcharVector.set(i, originalVarchar[i].getBytes(StandardCharsets.UTF_8));
+            intVector.set(i, originalInt[i]);
+        }
+
+        varcharVector.setValueCount(nRows);
+        intVector.setValueCount(nRows);
+
+        var fields = List.of(varcharVector.getField(), intVector.getField());
+        var vectors = List.<FieldVector>of(varcharVector, intVector);
+        var batch = new VectorSchemaRoot(fields, vectors);
+
+        // Use a writer to encode the batch as a stream of chunks (arrow record batches, including the schema)
+
+        var writeChannel = new ChunkChannel();
+
+        try (var writer = new ArrowStreamWriter(batch, null, writeChannel)) {
+
+            writer.start();
+            writer.writeBatch();
+            writer.end();
+        }
+
+        roundTripTest(writeChannel.getChunks(), "ARROW", "ARROW", this::decodeArrow, BASIC_TEST_DATA, true);
+        roundTripTest(writeChannel.getChunks(), "ARROW", "ARROW", this::decodeArrow, BASIC_TEST_DATA, false);
+    }
+
+    @Test
+    void roundTrip_csv() throws Exception {
+
+        var testDataStream = getClass().getResourceAsStream(BASIC_CSV_DATA);
+
+        if (testDataStream == null)
+            throw new RuntimeException("Test data not found");
+
+        var testDataBytes = testDataStream.readAllBytes();
+        var testData = List.of(ByteString.copyFrom(testDataBytes));
+
+        roundTripTest(testData, "CSV", "CSV", this::decodeCsv, BASIC_TEST_DATA, true);
+        roundTripTest(testData, "CSV", "CSV", this::decodeCsv, BASIC_TEST_DATA, false);
+    }
+
+    @Test
+    void roundTrip_json() throws Exception {
+
+        var testDataStream = getClass().getResourceAsStream(BASIC_JSON_DATA);
+
+        if (testDataStream == null)
+            throw new RuntimeException("Test data not found");
+
+        var testDataBytes = testDataStream.readAllBytes();
+        var testData = List.of(ByteString.copyFrom(testDataBytes));
+
+        roundTripTest(testData, "JSON", "JSON", this::decodeJson, BASIC_TEST_DATA, true);
+        roundTripTest(testData, "JSON", "JSON", this::decodeJson, BASIC_TEST_DATA, false);
+    }
+
+    private void roundTripTest(
+            List<ByteString> content, String writeFormat, String readFormat,
+            BiFunction<DataDefinition, List<ByteString>, TestDataContainer> decodeFunc,
+            TestDataContainer expectedResult, boolean dataInChunkZero) throws Exception {
+
+        var requestParams = DataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setFormat(writeFormat)
+                .build();
+
+        var createDataRequest = dataWriteRequest(requestParams, content, dataInChunkZero);
+        var createData = DataApiTestHelpers.clientStreaming(dataClient::createData, createDataRequest);
+
+        waitFor(TEST_TIMEOUT, createData);
+        var objHeader = resultOf(createData);
+
+        // Fetch metadata for the data and storage objects that should be created
+
+        var dataDef = fetchDefinition(selectorFor(objHeader), ObjectDefinition::getData);
+        var storageDef = fetchDefinition(dataDef.getStorageId(), ObjectDefinition::getStorage);
+
+        // TODO: Check definitions
+
+        var dataRequest = DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(selectorFor(objHeader))
+                .setFormat(readFormat)
+                .build();
+
+        var readResponse = Flows.<DataReadResponse>hub(execContext);
+        var readResponse0 = Flows.first(readResponse);
+        var readByteStream = Flows.map(readResponse, DataReadResponse::getContent);
+        var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
+
+        DataApiTestHelpers.serverStreaming(dataClient::readData, dataRequest, readResponse);
+
+        waitFor(TEST_TIMEOUT, readResponse0, readBytes);
+        // var roundTripDef = resultOf(readResponse0);     // TODO: compare data def and schema
+
+        var roundTripBytes = resultOf(readBytes);
+        var roundTripData = decodeFunc.apply(dataDef, List.of(roundTripBytes));
+
+        Assertions.assertEquals(expectedResult, roundTripData);
+    }
+
+    private Flow.Publisher<DataWriteRequest> dataWriteRequest(
+            DataWriteRequest requestParams,
+            List<ByteString> content,
+            boolean dataInChunkZero) {
+
+        var chunkZeroBytes = dataInChunkZero
+                ? content.get(0)
+                : ByteString.EMPTY;
+
+        var requestZero = requestParams.toBuilder()
+                .setContent(chunkZeroBytes)
+                .build();
+
+        var remainingContent = dataInChunkZero
+                ? content.subList(1, content.size())
+                : content;
+
+        var requestStream = remainingContent.stream().map(bytes ->
+                DataWriteRequest.newBuilder()
+                .setContent(bytes)
+                .build());
+
+        return Flows.publish(Streams.concat(
+                Stream.of(requestZero),
+                requestStream));
+    }
+
+    private <TDef>
+    TDef fetchDefinition(
+            TagSelector selector,
+            Function<ObjectDefinition, TDef> defTypeFunc)
+            throws Exception {
+
+        var tagGrpc = metaClient.readObject(MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(selector)
+                .build());
+
+        var tag = Futures.javaFuture(tagGrpc);
+
+        waitFor(TEST_TIMEOUT, tag);
+
+        var objDef = resultOf(tag).getDefinition();
+
+        return defTypeFunc.apply(objDef);
+    }
+
+
+
+    private TestDataContainer decodeCsv(DataDefinition dataDef, List<ByteString> data) {
+        return null;
+    }
+
+    private TestDataContainer decodeJson(DataDefinition dataDef, List<ByteString> data) {
+        return null;
+    }
+
+    private TestDataContainer decodeArrow(DataDefinition dataDef, List<ByteString> data) {
+
+        var allocator = new RootAllocator();  // TODO: Pass in an allocator
+
+        var allData = data.stream().reduce(ByteString.EMPTY, ByteString::concat);
+
+        try (var stream = new ByteArrayInputStream(allData.toByteArray());
+             var reader = new ArrowStreamReader(stream, allocator)) {
+
+            var rtBatch = reader.getVectorSchemaRoot();
+            var rtSchema = rtBatch.getSchema();
+            var nCols = rtSchema.getFields().size();
+
+            var result = new TestDataContainer();
+            result.fieldNames = rtSchema.getFields().stream().map(Field::getName).collect(Collectors.toList());
+            result.fieldTypes = null;  // new BasicType[rtSchema.getFields().size()];
+            result.values = new ArrayList<>(nCols);
+
+            for(var j = 0; j < nCols; j++)
+                result.values.set(j, new Vector<>());
+
+            while (reader.loadNextBatch()) {
+
+                for (int j = 0; j < nCols; j++) {
+
+                    var resultCol = result.values.get(j);
+                    var arrowCol = rtBatch.getVector(j);
+
+                    for (int i = 0; i < rtBatch.getRowCount(); i++)
+                        resultCol.add(arrowCol.getObject(i));
+                }
+            }
+
+            return result;
+        }
+        catch (Exception e) {
+
+            if (e instanceof RuntimeException)
+                throw (RuntimeException) e;
+            else
+                throw new RuntimeException(e);
+        }
+    }
+}
