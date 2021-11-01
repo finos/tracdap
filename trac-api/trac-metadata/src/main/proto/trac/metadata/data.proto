@@ -112,7 +112,7 @@ message DataDefinition {
     message Delta {
 
         uint32 deltaIndex = 1;
-        string dataItemId = 2;
+        string dataItem = 2;
     }
 
     message Snap {
@@ -129,5 +129,5 @@ message DataDefinition {
 
     map<string, Part> parts = 3;
 
-    string storageId = 4;
+    TagSelector storageId = 4;
 }
