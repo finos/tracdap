@@ -44,26 +44,26 @@ service TracDataApi {
    * Requires client-streaming, not yet available in gRPC-Web.
    * First message includes all metadata, subsequent are data stream only.
    */
-  rpc createData (stream DataWriteRequest) returns (DataWriteResponse);
+  rpc createData (stream DataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * To support web clients where client-streaming is not available.
    * The same as createData(), but the data stream is sent as a single blob.
    */
-  rpc createDataUnary (DataWriteRequest) returns (DataWriteResponse);
+  rpc createDataUnary (DataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Update a dataset by supplying a data update (and optional schema update)
    *
    * Mirrors MetadataWriteRequest for specifying prior version and updating tags
    */
-  rpc updateData (stream DataWriteRequest) returns (DataWriteResponse);
+  rpc updateData (stream DataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * To support web clients where client-streaming is not available.
    * The same as updateData(), but the data stream is sent as a single blob.
    */
-  rpc updateDataUnary (DataWriteRequest) returns (DataWriteResponse);
+  rpc updateDataUnary (DataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Read the contents of a dataset (in whole or in part)
