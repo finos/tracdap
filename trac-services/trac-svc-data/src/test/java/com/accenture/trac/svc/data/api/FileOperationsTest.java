@@ -39,13 +39,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static com.accenture.trac.svc.data.api.Helpers.readRequest;
+import static com.accenture.trac.svc.data.api.DataApiTestHelpers.readRequest;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.junit.jupiter.api.Assertions.*;
 
 
-public class DataApiTest_File extends DataApiTest_Base {
+public class FileOperationsTest extends DataApiTestBase {
 
     // Functional test cases for file operations in the data API
     // (createFile, updateFile, readFile)
@@ -101,7 +101,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testCreateFile_dataOk() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var fileId = resultOf(createFile);
 
@@ -118,7 +118,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 ByteString::concat,
                 ByteString.EMPTY);
 
-        Helpers.serverStreaming(dataClient::readFile, fileReadRequest, responseStream);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, fileReadRequest, responseStream);
 
         waitFor(TEST_TIMEOUT, content);
         Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(content));
@@ -127,7 +127,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testCreateFile_metadataOk() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var fileId = resultOf(createFile);
 
@@ -191,7 +191,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         // Prior version should not be set when creating a new file object
 
         // Create an object to use as the prior, so errors will not come because the prior does not exist
-        var priorResult = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var priorResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, priorResult);
         var priorId = resultOf(priorResult);
 
@@ -199,7 +199,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setPriorVersion(MetadataUtil.selectorFor(priorId))
                 .build();
 
-        var priorNotNullResult = Helpers.clientStreaming(dataClient::createFile, priorNotNull);
+        var priorNotNullResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, priorNotNull);
         waitFor(TEST_TIMEOUT, priorNotNullResult);
         var priorNotNullError = assertThrows(StatusRuntimeException.class, () -> resultOf(priorNotNullResult));
         assertEquals(Status.Code.INVALID_ARGUMENT, priorNotNullError.getStatus().getCode());
@@ -215,7 +215,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .build();
 
         var invalidTagRequest = BASIC_CREATE_FILE_REQUEST.toBuilder().addTagUpdates(invalidTagUpdate).build();
-        var invalidTagResult = Helpers.clientStreaming(dataClient::createFile, invalidTagRequest);
+        var invalidTagResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, invalidTagRequest);
         waitFor(TEST_TIMEOUT, invalidTagResult);
         var invalidTagError = assertThrows(StatusRuntimeException.class, () -> resultOf(invalidTagResult));
         assertEquals(Status.Code.INVALID_ARGUMENT, invalidTagError.getStatus().getCode());
@@ -235,7 +235,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                     .build();
 
             var invalidTagRequest = BASIC_CREATE_FILE_REQUEST.toBuilder().addTagUpdates(invalidTagUpdate).build();
-            var invalidTagResult = Helpers.clientStreaming(dataClient::createFile, invalidTagRequest);
+            var invalidTagResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, invalidTagRequest);
             waitFor(TEST_TIMEOUT, invalidTagResult);
             var invalidTagError = assertThrows(StatusRuntimeException.class, () -> resultOf(invalidTagResult));
             assertEquals(Status.Code.INVALID_ARGUMENT, invalidTagError.getStatus().getCode());
@@ -246,7 +246,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     void testCreateFile_nameMissing() {
 
         var noName = BASIC_CREATE_FILE_REQUEST.toBuilder().clearName().build();
-        var noNameResult = Helpers.clientStreaming(dataClient::createFile, noName);
+        var noNameResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, noName);
         waitFor(TEST_TIMEOUT, noNameResult);
         var noNameError = assertThrows(StatusRuntimeException.class, () -> resultOf(noNameResult));
         assertEquals(Status.Code.INVALID_ARGUMENT, noNameError.getStatus().getCode());
@@ -267,7 +267,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         for (var name: invalidNames) {
 
             var badName = BASIC_CREATE_FILE_REQUEST.toBuilder().setName(name).build();
-            var badNameResult = Helpers.clientStreaming(dataClient::createFile, badName);
+            var badNameResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, badName);
             waitFor(TEST_TIMEOUT, badNameResult);
 
             var badNameError = assertThrows(
@@ -292,7 +292,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         for (var name: validNames) {
 
             var badName = BASIC_CREATE_FILE_REQUEST.toBuilder().setName(name).build();
-            var badNameResult = Helpers.clientStreaming(dataClient::createFile, badName);
+            var badNameResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, badName);
             waitFor(TEST_TIMEOUT, badNameResult);
 
             assertDoesNotThrow(
@@ -305,7 +305,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     void testCreateFile_mimeTypeMissing() {
 
         var noMimeType = BASIC_CREATE_FILE_REQUEST.toBuilder().clearMimeType().build();
-        var noMimeTypeResult = Helpers.clientStreaming(dataClient::createFile, noMimeType);
+        var noMimeTypeResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, noMimeType);
         waitFor(TEST_TIMEOUT, noMimeTypeResult);
         var noMimeTypeResultError = assertThrows(StatusRuntimeException.class, () -> resultOf(noMimeTypeResult));
         assertEquals(Status.Code.INVALID_ARGUMENT, noMimeTypeResultError.getStatus().getCode());
@@ -324,7 +324,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         for (var mimeType: invalidMimeTypes) {
 
             var badMimeType = BASIC_CREATE_FILE_REQUEST.toBuilder().setMimeType(mimeType).build();
-            var badMimeTypeResult = Helpers.clientStreaming(dataClient::createFile, badMimeType);
+            var badMimeTypeResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, badMimeType);
             waitFor(TEST_TIMEOUT, badMimeTypeResult);
 
             var badMimeTypeError = assertThrows(
@@ -343,7 +343,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         // In this case the usual verification of file size is not performed
 
         var sizeOmitted = BASIC_CREATE_FILE_REQUEST.toBuilder().clearSize().build();
-        var createFile = Helpers.clientStreaming(dataClient::createFile, sizeOmitted);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, sizeOmitted);
         waitFor(TEST_TIMEOUT, createFile);
         var fileId = resultOf(createFile);
 
@@ -374,7 +374,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 ByteString::concat,
                 ByteString.EMPTY);
 
-        Helpers.serverStreaming(dataClient::readFile, fileReadRequest, responseStream);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, fileReadRequest, responseStream);
 
         waitFor(TEST_TIMEOUT, content);
         Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(content));
@@ -384,7 +384,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     void testCreateFile_sizeNegative() {
 
         var sizeNegative = BASIC_CREATE_FILE_REQUEST.toBuilder().setSize(-1).build();
-        var sizeNegativeResult = Helpers.clientStreaming(dataClient::createFile, sizeNegative);
+        var sizeNegativeResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, sizeNegative);
         waitFor(TEST_TIMEOUT, sizeNegativeResult);
         var sizeNegativeError = assertThrows(StatusRuntimeException.class, () -> resultOf(sizeNegativeResult));
         assertEquals(Status.Code.INVALID_ARGUMENT, sizeNegativeError.getStatus().getCode());
@@ -397,7 +397,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         // This is reported as DATA_LOSS
 
         var sizeNegative = BASIC_CREATE_FILE_REQUEST.toBuilder().setSize(1).build();
-        var sizeNegativeResult = Helpers.clientStreaming(dataClient::createFile, sizeNegative);
+        var sizeNegativeResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, sizeNegative);
         waitFor(TEST_TIMEOUT, sizeNegativeResult);
         var sizeNegativeError = assertThrows(StatusRuntimeException.class, () -> resultOf(sizeNegativeResult));
         assertEquals(Status.Code.DATA_LOSS, sizeNegativeError.getStatus().getCode());
@@ -411,13 +411,13 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testUpdateFile_dataOk() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
         var v1Selector = MetadataUtil.selectorFor(v1Id);
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var v2Id = resultOf(updateFile);
 
@@ -434,7 +434,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 ByteString::concat,
                 ByteString.EMPTY);
 
-        Helpers.serverStreaming(dataClient::readFile, v2ReadRequest, v2Response);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, v2ReadRequest, v2Response);
 
         waitFor(TEST_TIMEOUT, v2Content);
         Assertions.assertEquals(BASIC_FILE_CONTENT_V2, resultOf(v2Content));
@@ -452,7 +452,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 ByteString::concat,
                 ByteString.EMPTY);
 
-        Helpers.serverStreaming(dataClient::readFile, v1ReadRequest, v1Response);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, v1ReadRequest, v1Response);
 
         waitFor(TEST_TIMEOUT, v1Content);
         Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(v1Content));
@@ -461,13 +461,13 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testUpdateFile_metadataOk() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
         var v1Selector = MetadataUtil.selectorFor(v1Id);
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var v2Id = resultOf(updateFile);
 
@@ -544,7 +544,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         // Create valid v1
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -552,14 +552,14 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         var v1Selector = MetadataUtil.selectorFor(v1Id);
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         Assertions.assertDoesNotThrow(() -> resultOf(updateFile));
 
         // Attempt to create v2 again
 
         var updateRequest2 = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
-        var updateFile2 = Helpers.clientStreaming(dataClient::updateFile, updateRequest2);
+        var updateFile2 = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest2);
         waitFor(TEST_TIMEOUT, updateFile2);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile2));
         assertEquals(Status.Code.ALREADY_EXISTS, updateError.getStatus().getCode());
@@ -570,7 +570,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         // Create valid v1
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -582,7 +582,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .build();
 
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v2Selector).build();
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.NOT_FOUND, updateError.getStatus().getCode());
@@ -592,7 +592,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     void testUpdateFile_priorVersionNull() {
 
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().clearPriorVersion().build();
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -609,7 +609,7 @@ public class DataApiTest_File extends DataApiTest_Base {
             .build();
 
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(priorSelector).build();
-        var update = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var update = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, update);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(update));
         assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -620,7 +620,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         // Create a valid v1
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -631,7 +631,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .build();
 
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
-        var update = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var update = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, update);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(update));
         assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -648,7 +648,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .build();
 
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(priorSelector).build();
-        var update = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var update = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, update);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(update));
         assertEquals(Status.Code.NOT_FOUND, updateError.getStatus().getCode());
@@ -657,7 +657,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testUpdateFile_tagUpdateInvalid() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
@@ -673,7 +673,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .addTagUpdates(invalidTagUpdate)
                 .build();
 
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -682,7 +682,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testUpdateFile_tagUpdateReserved() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
@@ -702,7 +702,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                     .addTagUpdates(invalidTagUpdate)
                     .build();
 
-            var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+            var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
             waitFor(TEST_TIMEOUT, updateFile);
             var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
             assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -716,7 +716,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         // Report this as failed_precondition, rather than not_found
         // not_found would imply the file object/version itself was missing
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
@@ -732,7 +732,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .addTagUpdates(invalidTagUpdate)
                 .build();
 
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.FAILED_PRECONDITION, updateError.getStatus().getCode());
@@ -741,7 +741,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testUpdateFile_nameOmitted() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
@@ -751,7 +751,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .clearName()
                 .build();
 
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -766,7 +766,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 "a\rb", "a\nb", "a\tb", "a\0b",
                 "$£\"£$%^\0<:$%^&D'¬#FSG)");
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
@@ -778,7 +778,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                     .setName(name)
                     .build();
 
-            var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+            var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
             waitFor(TEST_TIMEOUT, updateFile);
             var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
             assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -795,7 +795,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 "Some punctuation - this is allowed (for non reserved chars).txt",
                 "Unicode - 你好.txt");
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var latestSelector = MetadataUtil.selectorFor(v1Id);
@@ -807,7 +807,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                     .setName(name)
                     .build();
 
-            var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+            var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
             waitFor(TEST_TIMEOUT, updateFile);
 
             var latestId = assertDoesNotThrow(
@@ -824,7 +824,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         // Name change is allowed so long as extension remains the same
         // metadataOk test also checks new file name is set
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
@@ -834,7 +834,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setName("alternate_file_name_v2.txt")
                 .build();
 
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var v2Id =  resultOf(updateFile);
 
@@ -879,7 +879,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         // Differing extension is a failed pre-condition
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
@@ -889,7 +889,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setName("some_file.docx")
                 .build();
 
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.FAILED_PRECONDITION, updateError.getStatus().getCode());
@@ -898,7 +898,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testUpdateFile_mimeTypeOmitted() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
@@ -908,7 +908,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .clearMimeType()
                 .build();
 
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -924,7 +924,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 ".", "/", "\\",
                 "unregistered/primary.type");
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
@@ -936,7 +936,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                     .setMimeType(mimeType)
                     .build();
 
-            var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+            var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
             waitFor(TEST_TIMEOUT, updateFile);
             var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
             assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -948,7 +948,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         // Changing mime type is a failed pre-condition
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
@@ -958,7 +958,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setMimeType("text/html")
                 .build();
 
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.FAILED_PRECONDITION, updateError.getStatus().getCode());
@@ -970,7 +970,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         // If size is not specified, TRAC should still accept the file and set the received size in the metadata
         // In this case the usual verification of file size is not performed
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
@@ -980,7 +980,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .clearSize()
                 .build();
 
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var v2Id = resultOf(updateFile);
 
@@ -1011,7 +1011,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 ByteString::concat,
                 ByteString.EMPTY);
 
-        Helpers.serverStreaming(dataClient::readFile, fileReadRequest, responseStream);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, fileReadRequest, responseStream);
 
         waitFor(TEST_TIMEOUT, content);
         Assertions.assertEquals(BASIC_FILE_CONTENT_V2, resultOf(content));
@@ -1020,7 +1020,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testUpdateFile_sizeNegative() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
@@ -1030,7 +1030,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setSize(-1)
                 .build();
 
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.INVALID_ARGUMENT, updateError.getStatus().getCode());
@@ -1041,7 +1041,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         // Size mis-match is reported as error status DATA_LOSS
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
@@ -1051,7 +1051,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setSize(1)
                 .build();
 
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(updateFile));
         assertEquals(Status.Code.DATA_LOSS, updateError.getStatus().getCode());
@@ -1068,7 +1068,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         // First response message in the stream should be an empty buffer
         // Content follows in subsequent messages
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1080,7 +1080,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 new ArrayList<FileReadResponse>());
 
         var readReq = readRequest(v1Id);
-        Helpers.serverStreaming(dataClient::readFile, readReq, responseStream);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, readReq, responseStream);
 
         waitFor(TEST_TIMEOUT, collectList);
         var responseList = resultOf(collectList);
@@ -1105,7 +1105,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         // First response message in the stream should contain metadata
         // Subsequent messages should not have any metadata fields set
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1117,7 +1117,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 new ArrayList<FileReadResponse>());
 
         var readReq = readRequest(v1Id);
-        Helpers.serverStreaming(dataClient::readFile, readReq, responseStream);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, readReq, responseStream);
 
         waitFor(TEST_TIMEOUT, collectList);
         var responseList = resultOf(collectList);
@@ -1146,7 +1146,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testReadFile_objectVersionLatest() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1165,7 +1165,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 ByteString::concat,
                 ByteString.EMPTY);
 
-        Helpers.serverStreaming(dataClient::readFile, latestReq, v2ResponseStream);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, latestReq, v2ResponseStream);
 
         waitFor(TEST_TIMEOUT, v2Content);
         Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(v2Content));
@@ -1174,7 +1174,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         var v1Selector = MetadataUtil.selectorFor(v1Id);
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
 
         // Use the same request for latest file read again, should return V2
@@ -1185,7 +1185,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 ByteString::concat,
                 ByteString.EMPTY);
 
-        Helpers.serverStreaming(dataClient::readFile, latestReq, v1ResponseStream);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, latestReq, v1ResponseStream);
 
         waitFor(TEST_TIMEOUT, v1Content);
         Assertions.assertEquals(BASIC_FILE_CONTENT_V2, resultOf(v1Content));
@@ -1194,13 +1194,13 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testReadFile_objectVersionExplicit() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
         var v1Selector = MetadataUtil.selectorFor(v1Id);
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var v2Id = resultOf(updateFile);
 
@@ -1213,7 +1213,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 ByteString::concat,
                 ByteString.EMPTY);
 
-        Helpers.serverStreaming(dataClient::readFile, v2Request, v2ResponseStream);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, v2Request, v2ResponseStream);
 
         waitFor(TEST_TIMEOUT, v2Content);
         Assertions.assertEquals(BASIC_FILE_CONTENT_V2, resultOf(v2Content));
@@ -1227,7 +1227,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 ByteString::concat,
                 ByteString.EMPTY);
 
-        Helpers.serverStreaming(dataClient::readFile, v1Request, v1ResponseStream);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, v1Request, v1ResponseStream);
 
         waitFor(TEST_TIMEOUT, v1Content);
         Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(v1Content));
@@ -1236,7 +1236,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testReadFile_objectVersionAsOf() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1246,7 +1246,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         var v1Selector = MetadataUtil.selectorFor(v1Id);
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
-        var updateFile = Helpers.clientStreaming(dataClient::updateFile, updateRequest);
+        var updateFile = DataApiTestHelpers.clientStreaming(dataClient::updateFile, updateRequest);
         waitFor(TEST_TIMEOUT, updateFile);
         var v2Id = resultOf(updateFile);
 
@@ -1269,7 +1269,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 ByteString::concat,
                 ByteString.EMPTY);
 
-        Helpers.serverStreaming(dataClient::readFile, v2Request, v2ResponseStream);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, v2Request, v2ResponseStream);
 
         waitFor(TEST_TIMEOUT, v2Content);
         Assertions.assertEquals(BASIC_FILE_CONTENT_V2, resultOf(v2Content));
@@ -1287,7 +1287,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 ByteString::concat,
                 ByteString.EMPTY);
 
-        Helpers.serverStreaming(dataClient::readFile, v1Request, v1ResponseStream);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, v1Request, v1ResponseStream);
 
         waitFor(TEST_TIMEOUT, v1Content);
         Assertions.assertEquals(BASIC_FILE_CONTENT, resultOf(v1Content));
@@ -1296,7 +1296,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testReadFile_selectorTypeOmitted() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1307,7 +1307,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .clearObjectType())
                 .build();
 
-        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+        var readFile = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
 
         waitFor(TEST_TIMEOUT, readFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
@@ -1319,7 +1319,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         // Selector object type must be ObjectType.FILE for file read requests
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1330,7 +1330,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setObjectType(ObjectType.DATA))
                 .build();
 
-        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+        var readFile = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
 
         waitFor(TEST_TIMEOUT, readFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
@@ -1340,7 +1340,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testReadFile_selectorIdOmitted() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1351,7 +1351,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .clearObjectId())
                 .build();
 
-        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+        var readFile = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
 
         waitFor(TEST_TIMEOUT, readFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
@@ -1361,7 +1361,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testReadFile_selectorIdInvalid() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1372,7 +1372,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setObjectId("not_a_valid_id"))
                 .build();
 
-        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+        var readFile = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
 
         waitFor(TEST_TIMEOUT, readFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
@@ -1384,7 +1384,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         var objId = UUID.randomUUID().toString();  // non-existent object ID to look for
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1395,7 +1395,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setObjectId(objId))
                 .build();
 
-        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+        var readFile = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
 
         waitFor(TEST_TIMEOUT, readFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
@@ -1405,7 +1405,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testReadFile_objectVersionOmitted() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1416,7 +1416,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .clearObjectVersionCriteria())
                 .build();
 
-        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+        var readFile = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
 
         waitFor(TEST_TIMEOUT, readFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
@@ -1426,7 +1426,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testReadFile_objectVersionInvalid() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1439,7 +1439,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setObjectVersion(0))
                 .build();
 
-        var readFile1 = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest1, execContext);
+        var readFile1 = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest1, execContext);
 
         waitFor(TEST_TIMEOUT, readFile1);
         var updateError1 = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile1));
@@ -1453,7 +1453,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setIsoDatetime("2021-10-03T12:34:56+01:00+invalid/part")))
                 .build();
 
-        var readFile2 = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest2, execContext);
+        var readFile2 = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest2, execContext);
 
         waitFor(TEST_TIMEOUT, readFile2);
         var updateError2 = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile1));
@@ -1465,7 +1465,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         var objVer = 2;  // non-existent object version to look for
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1476,7 +1476,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setObjectVersion(objVer))
                 .build();
 
-        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+        var readFile = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
 
         waitFor(TEST_TIMEOUT, readFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
@@ -1489,7 +1489,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         var timeBeforeTest = Instant.now().atOffset(ZoneOffset.UTC);
         Thread.sleep(10);
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1500,7 +1500,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setObjectAsOf(MetadataCodec.encodeDatetime(timeBeforeTest)))
                 .build();
 
-        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+        var readFile = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
 
         waitFor(TEST_TIMEOUT, readFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
@@ -1510,7 +1510,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testReadFile_tagVersionOmitted() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1521,7 +1521,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .clearTagVersionCriteria())
                 .build();
 
-        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+        var readFile = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
 
         waitFor(TEST_TIMEOUT, readFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
@@ -1531,7 +1531,7 @@ public class DataApiTest_File extends DataApiTest_Base {
     @Test
     void testReadFile_tagVersionInvalid() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1544,7 +1544,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setTagVersion(0))
                 .build();
 
-        var readFile1 = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest1, execContext);
+        var readFile1 = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest1, execContext);
 
         waitFor(TEST_TIMEOUT, readFile1);
         var updateError1 = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile1));
@@ -1558,7 +1558,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setIsoDatetime("invalid_iso_datetime")))
                 .build();
 
-        var readFile2 = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest2, execContext);
+        var readFile2 = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest2, execContext);
 
         waitFor(TEST_TIMEOUT, readFile2);
         var updateError2 = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile1));
@@ -1570,7 +1570,7 @@ public class DataApiTest_File extends DataApiTest_Base {
 
         var tagVer = 2;  // non-existent object version to look for
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1581,7 +1581,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setTagVersion(tagVer))
                 .build();
 
-        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+        var readFile = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
 
         waitFor(TEST_TIMEOUT, readFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));
@@ -1594,7 +1594,7 @@ public class DataApiTest_File extends DataApiTest_Base {
         var timeBeforeTest = Instant.now().atOffset(ZoneOffset.UTC);
         Thread.sleep(10);
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -1605,7 +1605,7 @@ public class DataApiTest_File extends DataApiTest_Base {
                 .setTagAsOf(MetadataCodec.encodeDatetime(timeBeforeTest)))
                 .build();
 
-        var readFile = Helpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
+        var readFile = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
 
         waitFor(TEST_TIMEOUT, readFile);
         var updateError = assertThrows(StatusRuntimeException.class, () -> resultOf(readFile));

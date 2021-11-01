@@ -58,7 +58,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 
-abstract  class DataApiTest_Base {
+abstract  class DataApiTestBase {
 
     protected static final String TRAC_UNIT_CONFIG = "config/trac-unit.properties";
     protected static final String TRAC_UNIT_CONFIG_YAML = "config/trac-unit.yaml";

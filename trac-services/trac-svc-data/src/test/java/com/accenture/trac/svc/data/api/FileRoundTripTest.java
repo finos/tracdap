@@ -41,8 +41,7 @@ import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.*;
 import static com.accenture.trac.test.storage.StorageTestHelpers.readFile;
 
 
-@Tag("slow")
-public class DataApiTest_Stability extends DataApiTest_Base {
+public class FileRoundTripTest extends DataApiTestBase {
 
     @Test
     void testRoundTrip_basic() throws Exception {
@@ -123,7 +122,7 @@ public class DataApiTest_Stability extends DataApiTest_Base {
         // Set up a request stream and client streaming call, wait for the call to complete
 
         var createFileRequest = fileWriteRequest(content, dataInChunkZero);
-        var createFile = Helpers.clientStreaming(dataClient::createFile, createFileRequest);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, createFileRequest);
 
         waitFor(TEST_TIMEOUT, createFile);
         var objHeader = resultOf(createFile);
@@ -190,7 +189,7 @@ public class DataApiTest_Stability extends DataApiTest_Base {
         var readByteStream = Flows.map(readResponse, FileReadResponse::getContent);
         var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
 
-        Helpers.serverStreaming(dataClient::readFile, readRequest, readResponse);
+        DataApiTestHelpers.serverStreaming(dataClient::readFile, readRequest, readResponse);
 
         waitFor(TEST_TIMEOUT, readResponse0, readBytes);
         var roundTripDef = resultOf(readResponse0).getFileDefinition();

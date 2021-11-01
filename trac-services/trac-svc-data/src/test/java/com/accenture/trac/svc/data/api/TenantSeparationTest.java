@@ -21,21 +21,21 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.junit.jupiter.api.Test;
 
-import static com.accenture.trac.svc.data.api.DataApiTest_File.BASIC_CREATE_FILE_REQUEST;
-import static com.accenture.trac.svc.data.api.DataApiTest_File.BASIC_UPDATE_FILE_REQUEST;
-import static com.accenture.trac.svc.data.api.Helpers.readRequest;
+import static com.accenture.trac.svc.data.api.FileOperationsTest.BASIC_CREATE_FILE_REQUEST;
+import static com.accenture.trac.svc.data.api.FileOperationsTest.BASIC_UPDATE_FILE_REQUEST;
+import static com.accenture.trac.svc.data.api.DataApiTestHelpers.readRequest;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-public class DataApiTest_Tenancy extends DataApiTest_Base {
+public class TenantSeparationTest extends DataApiTestBase {
 
     @Test
     void testCreateFile_tenantOmitted() {
 
         var noTenant = BASIC_CREATE_FILE_REQUEST.toBuilder().clearTenant().build();
-        var noTenantResult = Helpers.clientStreaming(dataClient::createFile, noTenant);
+        var noTenantResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, noTenant);
         waitFor(TEST_TIMEOUT, noTenantResult);
         var noTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(noTenantResult));
         assertEquals(Status.Code.INVALID_ARGUMENT, noTenantError.getStatus().getCode());
@@ -45,7 +45,7 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
     void testCreateFile_tenantInvalid() {
 
         var invalidTenant = BASIC_CREATE_FILE_REQUEST.toBuilder().setTenant("£$%^**!\0\n/`¬").build();
-        var invalidTenantResult = Helpers.clientStreaming(dataClient::createFile, invalidTenant);
+        var invalidTenantResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, invalidTenant);
         waitFor(TEST_TIMEOUT, invalidTenantResult);
         var invalidTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(invalidTenantResult));
         assertEquals(Status.Code.INVALID_ARGUMENT, invalidTenantError.getStatus().getCode());
@@ -55,7 +55,7 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
     void testCreateFile_tenantNotFound() {
 
         var unknownTenant = BASIC_CREATE_FILE_REQUEST.toBuilder().setTenant("UNKNOWN").build();
-        var unknownTenantResult = Helpers.clientStreaming(dataClient::createFile, unknownTenant);
+        var unknownTenantResult = DataApiTestHelpers.clientStreaming(dataClient::createFile, unknownTenant);
         waitFor(TEST_TIMEOUT, unknownTenantResult);
         var unknownTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(unknownTenantResult));
         assertEquals(Status.Code.NOT_FOUND, unknownTenantError.getStatus().getCode());
@@ -64,7 +64,7 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
     @Test
     void testUpdateFile_tenantOmitted() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -72,7 +72,7 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
 
         var noTenant = updateRequest.toBuilder().clearTenant().build();
-        var noTenantResult = Helpers.clientStreaming(dataClient::updateFile, noTenant);
+        var noTenantResult = DataApiTestHelpers.clientStreaming(dataClient::updateFile, noTenant);
         waitFor(TEST_TIMEOUT, noTenantResult);
         var noTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(noTenantResult));
         assertEquals(Status.Code.INVALID_ARGUMENT, noTenantError.getStatus().getCode());
@@ -81,7 +81,7 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
     @Test
     void testUpdateFile_tenantInvalid() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -89,7 +89,7 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
 
         var invalidTenant = updateRequest.toBuilder().setTenant("£$%^**!\0\n/`¬").build();
-        var invalidTenantResult = Helpers.clientStreaming(dataClient::updateFile, invalidTenant);
+        var invalidTenantResult = DataApiTestHelpers.clientStreaming(dataClient::updateFile, invalidTenant);
         waitFor(TEST_TIMEOUT, invalidTenantResult);
         var invalidTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(invalidTenantResult));
         assertEquals(Status.Code.INVALID_ARGUMENT, invalidTenantError.getStatus().getCode());
@@ -99,7 +99,7 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
     @Test
     void testUpdateFile_tenantNotFound() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -107,7 +107,7 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
 
         var unknownTenant = updateRequest.toBuilder().setTenant("UNKNOWN").build();
-        var unknownTenantResult = Helpers.clientStreaming(dataClient::updateFile, unknownTenant);
+        var unknownTenantResult = DataApiTestHelpers.clientStreaming(dataClient::updateFile, unknownTenant);
         waitFor(TEST_TIMEOUT, unknownTenantResult);
         var unknownTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(unknownTenantResult));
         assertEquals(Status.Code.NOT_FOUND, unknownTenantError.getStatus().getCode());
@@ -119,7 +119,7 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
         // Try to update a file created in a different tenant
         // Should fail with object not found, because original object does not exist in the tenant
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
@@ -127,7 +127,7 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
         var updateRequest = BASIC_UPDATE_FILE_REQUEST.toBuilder().setPriorVersion(v1Selector).build();
 
         var crossTenant = updateRequest.toBuilder().setTenant(TEST_TENANT_2).build();
-        var crossTenantResult = Helpers.clientStreaming(dataClient::updateFile, crossTenant);
+        var crossTenantResult = DataApiTestHelpers.clientStreaming(dataClient::updateFile, crossTenant);
         waitFor(TEST_TIMEOUT, crossTenantResult);
         var crossTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(crossTenantResult));
         assertEquals(Status.Code.NOT_FOUND, crossTenantError.getStatus().getCode());
@@ -136,13 +136,13 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
     @Test
     void testReadFile_tenantOmitted() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var readRequest = readRequest(v1Id);
 
         var noTenant = readRequest.toBuilder().clearTenant().build();
-        var noTenantResult = Helpers.serverStreamingDiscard(dataClient::readFile, noTenant, execContext);
+        var noTenantResult = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, noTenant, execContext);
         waitFor(TEST_TIMEOUT, noTenantResult);
         var noTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(noTenantResult));
         assertEquals(Status.Code.INVALID_ARGUMENT, noTenantError.getStatus().getCode());
@@ -151,13 +151,13 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
     @Test
     void testReadFile_tenantInvalid() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var readRequest = readRequest(v1Id);
 
         var invalidTenant = readRequest.toBuilder().setTenant("£$%^**!\0\n/`¬").build();
-        var invalidTenantResult = Helpers.serverStreamingDiscard(dataClient::readFile, invalidTenant, execContext);
+        var invalidTenantResult = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, invalidTenant, execContext);
         waitFor(TEST_TIMEOUT, invalidTenantResult);
         var invalidTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(invalidTenantResult));
         assertEquals(Status.Code.INVALID_ARGUMENT, invalidTenantError.getStatus().getCode());
@@ -166,13 +166,13 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
     @Test
     void testReadFile_tenantNotFound() throws Exception {
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var readRequest = readRequest(v1Id);
 
         var unknownTenant = readRequest.toBuilder().setTenant("UNKNOWN").build();
-        var unknownTenantResult = Helpers.serverStreamingDiscard(dataClient::readFile, unknownTenant, execContext);
+        var unknownTenantResult = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, unknownTenant, execContext);
         waitFor(TEST_TIMEOUT, unknownTenantResult);
         var unknownTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(unknownTenantResult));
         assertEquals(Status.Code.NOT_FOUND, unknownTenantError.getStatus().getCode());
@@ -184,13 +184,13 @@ public class DataApiTest_Tenancy extends DataApiTest_Base {
         // Try to read a file created in a different tenant
         // Should fail with object not found, because original object does not exist in the tenant
 
-        var createFile = Helpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
+        var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
         var readRequest = readRequest(v1Id);
 
         var crossTenant = readRequest.toBuilder().setTenant(TEST_TENANT_2).build();
-        var crossTenantResult = Helpers.serverStreamingDiscard(dataClient::readFile, crossTenant, execContext);
+        var crossTenantResult = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, crossTenant, execContext);
         waitFor(TEST_TIMEOUT, crossTenantResult);
         var crossTenantError = assertThrows(StatusRuntimeException.class, () -> resultOf(crossTenantResult));
         assertEquals(Status.Code.NOT_FOUND, crossTenantError.getStatus().getCode());

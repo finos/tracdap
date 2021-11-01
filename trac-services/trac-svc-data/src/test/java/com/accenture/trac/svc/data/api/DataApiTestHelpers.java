@@ -31,9 +31,9 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-import static com.accenture.trac.svc.data.api.DataApiTest_Base.TEST_TENANT;
+import static com.accenture.trac.svc.data.api.DataApiTestBase.TEST_TENANT;
 
-class Helpers {
+class DataApiTestHelpers {
 
     static <TReq, TResp>
     void serverStreaming(
