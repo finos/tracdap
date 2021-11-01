@@ -101,11 +101,13 @@ class GraphBuilder:
         for input_name, data_id in job_config.inputs.items():
 
             data_def = job_config.objects[data_id].data
-            storage_def = job_config.objects[data_def.storageId].storage
+
+            # TODO: Real lookup for selectors
+            storage_def = job_config.objects[data_def.storageId.objectId].storage
 
             # TODO: Get this from somewhere
             root_part_opaque_key = 'part-root'
-            data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItemId
+            data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
 
             # Physical load of data items from disk
             # Currently one item per input, since inputs are single part/delta
@@ -136,11 +138,13 @@ class GraphBuilder:
         for output_name, data_id in job_config.outputs.items():
 
             data_def = job_config.objects[data_id].data
-            storage_def = job_config.objects[data_def.storageId].storage
+
+            # TODO: Real lookup for selectors
+            storage_def = job_config.objects[data_def.storageId.objectId].storage
 
             # TODO: Get this from somewhere
             root_part_opaque_key = 'part-root'
-            data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItemId
+            data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
 
             # Output data view must already exist in the namespace
             data_view_id = NodeId(output_name, namespace)
