@@ -76,7 +76,7 @@ public class DataCore {
                 .thenAccept(obj -> state.file = obj.getDefinition().getFile())
 
                 .thenCompose(x -> readMetadata(tenant, state.file.getStorageId()))
-                .thenAccept(obj -> state.storage = obj.getDefinition().getStorage())
+                .thenAccept(obj -> state.storage = obj.getDefinition().getStorage());
     }
 
     private Flow.Publisher<ByteBuf> readPart(
@@ -104,8 +104,8 @@ public class DataCore {
     }
 
     Flow.Publisher<ByteBuf> readDelta(
-            DataDefinition.Delta delta,
-            StorageDefinition storage,
+            DataDefinition.Delta deltaDef,
+            StorageDefinition storageDef,
             IExecutionContext execCtx) {
 
         var fields = List.<Field>of();
@@ -132,7 +132,7 @@ public class DataCore {
                 .setSelector(selector)
                 .build();
 
-        return Futures.javaFuture(metaApi.readObject(metaRequest));
+        return null;  // return Futures.javaFuture(metaApi.readObject(metaRequest));
     }
 
     interface IDataStorage {
