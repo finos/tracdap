@@ -128,7 +128,11 @@ public class TestData {
 
             // There is no attempt here to link this to a storage definition
             // Not needed yet to test metadata semantics in isolation
-            .setStorageId("dummy_storage")
+            .setStorageId(TagSelector.newBuilder()
+                    .setObjectType(ObjectType.STORAGE)
+                    .setObjectId(UUID.randomUUID().toString())
+                    .setLatestObject(true)
+                    .setLatestTag(true))
 
             .setSchema(SchemaDefinition.newBuilder()
                 .setSchemaType(SchemaType.TABLE)

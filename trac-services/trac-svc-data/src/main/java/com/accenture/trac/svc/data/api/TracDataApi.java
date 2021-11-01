@@ -64,22 +64,22 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     }
 
     @Override
-    public StreamObserver<DataWriteRequest> createData(StreamObserver<DataWriteResponse> responseObserver) {
+    public StreamObserver<DataWriteRequest> createData(StreamObserver<TagHeader> responseObserver) {
         return super.createData(responseObserver);
     }
 
     @Override
-    public void createDataUnary(DataWriteRequest request, StreamObserver<DataWriteResponse> responseObserver) {
+    public void createDataUnary(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
         super.createDataUnary(request, responseObserver);
     }
 
     @Override
-    public StreamObserver<DataWriteRequest> updateData(StreamObserver<DataWriteResponse> responseObserver) {
+    public StreamObserver<DataWriteRequest> updateData(StreamObserver<TagHeader> responseObserver) {
         return super.updateData(responseObserver);
     }
 
     @Override
-    public void updateDataUnary(DataWriteRequest request, StreamObserver<DataWriteResponse> responseObserver) {
+    public void updateDataUnary(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
         super.updateDataUnary(request, responseObserver);
     }
 
