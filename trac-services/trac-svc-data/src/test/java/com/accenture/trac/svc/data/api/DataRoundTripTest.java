@@ -190,11 +190,11 @@ class DataRoundTripTest extends DataApiTestBase {
                 .setFormat(writeFormat)
                 .build();
 
-        var createDataRequest = dataWriteRequest(requestParams, content, dataInChunkZero);
-        var createData = DataApiTestHelpers.clientStreaming(dataClient::createData, createDataRequest);
+        var createDatasetRequest = dataWriteRequest(requestParams, content, dataInChunkZero);
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, createDatasetRequest);
 
-        waitFor(TEST_TIMEOUT, createData);
-        var objHeader = resultOf(createData);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var objHeader = resultOf(createDataset);
 
         // Fetch metadata for the data and storage objects that should be created
 
@@ -214,7 +214,7 @@ class DataRoundTripTest extends DataApiTestBase {
         var readByteStream = Flows.map(readResponse, DataReadResponse::getContent);
         var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
 
-        DataApiTestHelpers.serverStreaming(dataClient::readData, dataRequest, readResponse);
+        DataApiTestHelpers.serverStreaming(dataClient::readDataset, dataRequest, readResponse);
 
         waitFor(TEST_TIMEOUT, readResponse0, readBytes);
         // var roundTripDef = resultOf(readResponse0);     // TODO: compare data def and schema
