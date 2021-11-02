@@ -247,8 +247,7 @@ message DataReadRequest {
 
 message DataReadResponse {
 
-  uint32 size = 1;
-  bool finished = 2;
+  optional metadata.SchemaDefinition schema = 1;
 
   bytes content = 1000;
 }
