@@ -171,7 +171,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             Flow.Publisher<ByteBuf> byteStream,
             IExecutionContext execCtx) {
 
-        validateRequest(methodName, request);
+        // validateRequest(methodName, request);
 
         var tenant = request.getTenant();
         var tagUpdates = request.getTagUpdatesList();
@@ -187,7 +187,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             Flow.Publisher<ByteBuf> byteStream,
             IExecutionContext execCtx) {
 
-        validateRequest(methodName, request);
+        // validateRequest(methodName, request);
 
         var tenant = request.getTenant();
         var tagUpdates = request.getTagUpdatesList();
@@ -206,7 +206,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             Flow.Subscriber<ByteBuf> byteStream,
             IExecutionContext execCtx) {
 
-        validateRequest(methodName, request);
+        // validateRequest(methodName, request);
 
         var tenant = request.getTenant();
         var selector = request.getSelector();

@@ -14,11 +14,17 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.storage;
+package com.accenture.trac.common.codec;
 
-public interface IStorageManager {
+import io.netty.buffer.ByteBuf;
+import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 
-    IDataStorage getDataStorage(String storageKey);
+import java.util.concurrent.Flow;
 
-    IFileStorage getFileStorage(String storageKey);
+
+public interface ICodecManager {
+
+    Flow.Processor<ArrowRecordBatch, ByteBuf> getEncoder(String format);
+
+    Flow.Processor<ByteBuf, ArrowRecordBatch> getDecoder(String format);
 }

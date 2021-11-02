@@ -20,6 +20,7 @@ import com.accenture.trac.api.TrustedMetadataApiGrpc;
 import com.accenture.trac.api.config.DataServiceConfig;
 import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.api.config.TracConfig;
+import com.accenture.trac.common.codec.CodecManager;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.concurrent.ExecutionRegister;
 import com.accenture.trac.common.exception.EStartup;
@@ -99,9 +100,12 @@ public class TracDataService extends CommonServiceBase {
             storage.initStoragePlugins();
             storage.initStorage(dataSvcConfig.getStorage());
 
+            var formats = new CodecManager();
+            // formats.initFormatPlugins();
+
             var metaClient = prepareMetadataClient(rootConfig.getTrac(), clientChannelType);
 
-            var dataSvc = new DataRWService(dataSvcConfig, storage, metaClient);
+            var dataSvc = new DataRWService(dataSvcConfig, storage, formats, metaClient);
             var fileSvc = new FileReadWriteService(dataSvcConfig, storage, metaClient);
             var publicApi = new TracDataApi(dataSvc, fileSvc);
 

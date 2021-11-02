@@ -16,24 +16,30 @@
 
 package com.accenture.trac.svc.data.service;
 
-import com.accenture.trac.metadata.*;
-
-import java.time.Instant;
-import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Flow;
 
 
-class RequestState {
+class Helpers {
 
-    Instant objectTimestamp;
+    static Void reportError(
+            Throwable error,
+            CompletableFuture<?> definition,
+            Flow.Subscriber<?> content) {
 
-    List<TagUpdate> fileTags;
-    List<TagUpdate> storageTags;
+        if (!definition.isDone())
+            definition.completeExceptionally(error);
 
-    TagHeader fileId, priorFileId;
-    TagHeader storageId, priorStorageId;
+        else {
 
-    DataDefinition data, priorData;
-    SchemaDefinition schema, priorSchema;
-    FileDefinition file, priorFile;
-    StorageDefinition storage, priorStorage;
+            content.onSubscribe(new Flow.Subscription() {
+                @Override public void request(long n) {}
+                @Override public void cancel() {}
+            });
+
+            content.onError(error);
+        }
+
+        return null;
+    }
 }

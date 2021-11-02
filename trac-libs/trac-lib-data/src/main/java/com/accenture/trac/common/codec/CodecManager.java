@@ -16,5 +16,56 @@
 
 package com.accenture.trac.common.codec;
 
-public class CodecManager {
+import com.accenture.trac.common.storage.IStoragePlugin;
+import com.accenture.trac.common.storage.StorageManager;
+import io.netty.buffer.ByteBuf;
+import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
+import java.util.ServiceLoader;
+import java.util.concurrent.Flow;
+
+
+public class CodecManager implements ICodecManager {
+
+//    private final Logger log = LoggerFactory.getLogger(getClass());
+//
+//    private final Map<String, IFormatPlugin> plugins;
+//    private final Map<String, StorageManager.StorageBackend> storage;
+//
+//    public CodecManager() {
+//        this.plugins = new HashMap<>();
+//        this.storage = new HashMap<>();
+//    }
+//
+//    public void initFormatPlugins() {
+//
+//        log.info("Looking for format plugins...");
+//
+//        var availablePlugins = ServiceLoader.load(IFormatPlugin.class);
+//
+//        for (var plugin: availablePlugins) {
+//
+//            var discoveryMsg = String.format("Storage plugin: [%s] (protocols: %s)",
+//                    plugin.name(),
+//                    String.join(", ", plugin.protocols()));
+//
+//            log.info(discoveryMsg);
+//
+//            for (var protocol : plugin.protocols())
+//                plugins.put(protocol, plugin);
+//        }
+//    }
+
+    @Override
+    public Flow.Processor<ArrowRecordBatch, ByteBuf> getEncoder(String format) {
+        return null;
+    }
+
+    @Override
+    public Flow.Processor<ByteBuf, ArrowRecordBatch> getDecoder(String format) {
+        return null;
+    }
 }

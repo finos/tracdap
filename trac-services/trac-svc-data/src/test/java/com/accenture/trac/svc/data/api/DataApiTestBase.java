@@ -19,6 +19,7 @@ package com.accenture.trac.svc.data.api;
 import com.accenture.trac.api.TracDataApiGrpc;
 import com.accenture.trac.api.TrustedMetadataApiGrpc;
 import com.accenture.trac.api.config.RootConfig;
+import com.accenture.trac.common.codec.CodecManager;
 import com.accenture.trac.common.config.ConfigBootstrap;
 import com.accenture.trac.common.config.StandardArgs;
 import com.accenture.trac.common.concurrent.ExecutionContext;
@@ -124,6 +125,7 @@ abstract  class DataApiTestBase {
     Path tempDir;
 
     protected StorageManager storage;
+    protected CodecManager formats;
 
     private EventLoopGroup workerGroup;
     protected IExecutionContext execContext;
@@ -159,6 +161,9 @@ abstract  class DataApiTestBase {
         storage.initStoragePlugins();
         storage.initStorage(dataSvcConfig.getStorage());
 
+        formats = new CodecManager();
+        // formats.initFormatPlugins();
+
         execContext = new ExecutionContext(new DefaultEventExecutor());
 
         var dataSvcName = InProcessServerBuilder.generateName();
@@ -176,7 +181,7 @@ abstract  class DataApiTestBase {
 
         var metaApi = TrustedMetadataApiGrpc.newFutureStub(dataSvcClientChannel);
 
-        var dataRwSvc = new DataRWService(dataSvcConfig, storage, metaApi);
+        var dataRwSvc = new DataRWService(dataSvcConfig, storage, formats, metaApi);
         var fileRwSvc = new FileReadWriteService(dataSvcConfig, storage, metaApi);
         var publicApiImpl =  new TracDataApi(dataRwSvc, fileRwSvc);
 

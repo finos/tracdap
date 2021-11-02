@@ -96,6 +96,12 @@ public class StorageManager implements IStorageManager {
     }
 
     @Override
+    public IDataStorage getDataStorage(String storageKey) {
+
+        throw new RuntimeException("Not implemented yet");
+    }
+
+    @Override
     public IFileStorage getFileStorage(String storageKey) {
 
         // TODO: Full implementation for selecting the storage backend

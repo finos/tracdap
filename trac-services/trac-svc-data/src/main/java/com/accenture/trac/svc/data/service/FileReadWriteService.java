@@ -42,7 +42,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
-import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -137,7 +136,7 @@ public class FileReadWriteService {
                 .thenAccept(x -> req.storageTags = createStorageAttrs(req.storageTags, req.fileId))
 
                 // Save storage metadata
-                .thenCompose(x -> createObject(
+                .thenCompose(x -> MetadataHelpers.createObject(metaApi,
                         tenant, tags, ObjectType.STORAGE, req.storage,
                         ObjectDefinition.Builder::setStorage))
 
@@ -145,7 +144,7 @@ public class FileReadWriteService {
                 .thenAccept(storageId -> req.file = recordStorageId(storageId, req.file))
 
                 // Save file metadata
-                .thenCompose(x -> createPreallocated(
+                .thenCompose(x -> MetadataHelpers.createPreallocated(metaApi,
                         tenant, req.fileTags, req.fileId, req.file,
                         ObjectDefinition.Builder::setFile));
     }
@@ -210,12 +209,12 @@ public class FileReadWriteService {
                 // Storage attrs do not require an explicit update
 
                 // Save storage metadata
-                .thenCompose(x -> updateObject(
+                .thenCompose(x -> MetadataHelpers.updateObject(metaApi,
                         tenant, MetadataUtil.selectorFor(req.priorStorageId),
                         req.storage, req.storageTags, ObjectDefinition.Builder::setStorage))
 
                 // Save file metadata
-                .thenCompose(x -> updateObject(
+                .thenCompose(x -> MetadataHelpers.updateObject(metaApi,
                         tenant, MetadataUtil.selectorFor(req.priorFileId),
                         req.file, req.fileTags, ObjectDefinition.Builder::setFile));
 
@@ -232,10 +231,10 @@ public class FileReadWriteService {
 
         CompletableFuture.completedFuture(null)
 
-                .thenCompose(x -> readMetadata(tenant, selector))
+                .thenCompose(x -> MetadataHelpers.readObject(metaApi, tenant, selector))
                 .thenAccept(obj -> state.file = obj.getDefinition().getFile())
 
-                .thenCompose(x -> readMetadata(tenant, state.file.getStorageId()))
+                .thenCompose(x -> MetadataHelpers.readObject(metaApi, tenant, state.file.getStorageId()))
                 .thenAccept(obj -> state.storage = obj.getDefinition().getStorage())
 
                 .thenAccept(x -> definition.complete(state.file))
@@ -243,29 +242,10 @@ public class FileReadWriteService {
                 .thenApply(x -> readFile(state.file, state.storage, execCtx))
                 .thenAccept(byteStream -> byteStream.subscribe(content))
 
-                .exceptionally(error -> reportError(error, definition, content));
+                .exceptionally(error -> Helpers.reportError(error, definition, content));
     }
 
-    private Void reportError(
-            Throwable error,
-            CompletableFuture<?> definition,
-            Flow.Subscriber<?> content) {
 
-        if (!definition.isDone())
-            definition.completeExceptionally(error);
-
-        else {
-
-            content.onSubscribe(new Flow.Subscription() {
-                @Override public void request(long n) {}
-                @Override public void cancel() {}
-            });
-
-            content.onError(error);
-        }
-
-        return null;
-    }
 
     private CompletionStage<Long> writeDataItem(
             StorageDefinitionOrBuilder storageDef, String dataItem,
@@ -347,71 +327,6 @@ public class FileReadWriteService {
         }
 
         return actualSize;
-    }
-
-    private <TDef> CompletionStage<TagHeader> createObject(
-            String tenant, List<TagUpdate> tags, ObjectType objectType, TDef def,
-            BiFunction<ObjectDefinition.Builder, TDef, ObjectDefinition.Builder> objSetter) {
-
-        var objBuilder = ObjectDefinition.newBuilder().setObjectType(objectType);
-        var obj = objSetter.apply(objBuilder, def);
-
-        var request = MetadataWriteRequest.newBuilder()
-                .setTenant(tenant)
-                .setObjectType(objectType)
-                .setDefinition(obj)
-                .addAllTagUpdates(tags)
-                .build();
-
-        return Futures.javaFuture(metaApi.createObject(request));
-    }
-
-    private <TDef> CompletionStage<TagHeader> createPreallocated(
-
-            String tenant, List<TagUpdate> tags, TagHeader objectHeader, TDef def,
-            BiFunction<ObjectDefinition.Builder, TDef, ObjectDefinition.Builder> objSetter) {
-
-        var objectType = objectHeader.getObjectType();
-        var objBuilder = ObjectDefinition.newBuilder().setObjectType(objectType);
-        var obj = objSetter.apply(objBuilder, def);
-
-        var request = MetadataWriteRequest.newBuilder()
-                .setTenant(tenant)
-                .setObjectType(objectType)
-                .setPriorVersion(MetadataUtil.selectorFor(objectHeader))
-                .setDefinition(obj)
-                .addAllTagUpdates(tags)
-                .build();
-
-        return Futures.javaFuture(metaApi.createPreallocatedObject(request));
-    }
-
-    private <TDef> CompletionStage<TagHeader> updateObject(
-            String tenant, TagSelector priorVersion, TDef def, List<TagUpdate> tags,
-            BiFunction<ObjectDefinition.Builder, TDef, ObjectDefinition.Builder> objSetter) {
-
-        var objBuilder = ObjectDefinition.newBuilder().setObjectType(priorVersion.getObjectType());
-        var obj = objSetter.apply(objBuilder, def);
-
-        var request = MetadataWriteRequest.newBuilder()
-                .setTenant(tenant)
-                .setObjectType(priorVersion.getObjectType())
-                .setPriorVersion(priorVersion)
-                .setDefinition(obj)
-                .addAllTagUpdates(tags)
-                .build();
-
-        return Futures.javaFuture(metaApi.updateObject(request));
-    }
-
-    private CompletionStage<Tag> readMetadata(String tenant, TagSelector selector) {
-
-        var metaRequest = MetadataReadRequest.newBuilder()
-                .setTenant(tenant)
-                .setSelector(selector)
-                .build();
-
-        return Futures.javaFuture(metaApi.readObject(metaRequest));
     }
 
 
