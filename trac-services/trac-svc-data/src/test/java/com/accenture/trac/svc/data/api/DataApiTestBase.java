@@ -28,7 +28,6 @@ import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.svc.data.EventLoopChannel;
 import com.accenture.trac.svc.data.TracDataService;
-import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.FileReadWriteService;
 import com.accenture.trac.svc.meta.TracMetadataService;
 import com.accenture.trac.test.config.ConfigHelpers;

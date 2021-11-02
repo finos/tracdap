@@ -26,7 +26,6 @@ import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.service.CommonServiceBase;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.svc.data.api.TracDataApi;
-import com.accenture.trac.svc.data.service.DataReadService;
 import com.accenture.trac.svc.data.service.FileReadWriteService;
 
 import io.grpc.*;
