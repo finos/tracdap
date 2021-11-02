@@ -36,9 +36,8 @@ public interface IDataStorage {
             IExecutionContext execContext);
 
     Flow.Subscriber<ArrowRecordBatch> writer(
-            DataDefinition dataDef,
             SchemaDefinition schemaDef,
-            StorageDefinition storageDef,
+            StorageCopy storageCopy,
             CompletableFuture<Long> signal,
             IExecutionContext execContext);
 }
