@@ -28,7 +28,7 @@ dependencies {
 
     // Google cloud libs use the @Generated annotation, which introduces the CDDL license dependency
     // To work around this limitation, TRAC provides a version of just this one annotation class
-    implementation project(':trac-lib-javax')
+    implementation project(':trac-lib-annotations')
 
     implementation (group: 'com.google.cloud', name: 'google-cloud-storage', version: "$gcp_sdk_version") {
 
