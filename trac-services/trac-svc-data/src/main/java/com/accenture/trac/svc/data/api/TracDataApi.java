@@ -19,7 +19,6 @@ package com.accenture.trac.svc.data.api;
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.concurrent.ExecutionContext;
 import com.accenture.trac.common.concurrent.IExecutionContext;
-import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.util.Bytes;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.util.GrpcStreams;
@@ -27,6 +26,7 @@ import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.metadata.SchemaDefinition;
 import com.accenture.trac.metadata.TagHeader;
+import com.accenture.trac.svc.data.service.DataRWService;
 import com.accenture.trac.svc.data.service.FileReadWriteService;
 
 import com.google.protobuf.ByteString;
@@ -60,12 +60,14 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final DataRWService dataRwService;
     private final FileReadWriteService fileService;
 
     private final Validator validator = new Validator();
 
 
-    public TracDataApi(FileReadWriteService fileService) {
+    public TracDataApi(DataRWService dataRwService, FileReadWriteService fileService) {
+        this.dataRwService = dataRwService;
         this.fileService = fileService;
     }
 
@@ -169,7 +171,14 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             Flow.Publisher<ByteBuf> byteStream,
             IExecutionContext execCtx) {
 
-        return CompletableFuture.failedFuture(new ETracInternal("Not implemented yet"));
+        validateRequest(methodName, request);
+
+        var tenant = request.getTenant();
+        var tagUpdates = request.getTagUpdatesList();
+
+        return dataRwService.createDataset(
+                tenant, tagUpdates,
+                byteStream, execCtx);
     }
 
     private CompletionStage<TagHeader> doUpdateDataset(
@@ -178,7 +187,16 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             Flow.Publisher<ByteBuf> byteStream,
             IExecutionContext execCtx) {
 
-        return CompletableFuture.failedFuture(new ETracInternal("Not implemented yet"));
+        validateRequest(methodName, request);
+
+        var tenant = request.getTenant();
+        var tagUpdates = request.getTagUpdatesList();
+        var priorVersion = request.getPriorVersion();
+
+        return dataRwService.updateDataset(
+                tenant, tagUpdates,
+                priorVersion,
+                byteStream, execCtx);
     }
 
     private void doReadDataset(
@@ -192,9 +210,11 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         var tenant = request.getTenant();
         var selector = request.getSelector();
+        var format = request.getFormat();
 
-
-        // readService.readFile(tenant, selector, dataDef, byteStream, execCtx);
+        dataRwService.readDataset(
+                tenant, selector, format,
+                schema, byteStream, execCtx);
     }
 
     private CompletionStage<TagHeader> doCreateFile(
