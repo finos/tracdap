@@ -27,7 +27,7 @@ import com.accenture.trac.common.service.CommonServiceBase;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.svc.data.api.TracDataApi;
 import com.accenture.trac.svc.data.service.DataReadService;
-import com.accenture.trac.svc.data.service.DataWriteService;
+import com.accenture.trac.svc.data.service.FileReadWriteService;
 
 import io.grpc.*;
 import io.grpc.netty.NettyChannelBuilder;
@@ -101,9 +101,8 @@ public class TracDataService extends CommonServiceBase {
 
             var metaClient = prepareMetadataClient(rootConfig.getTrac(), clientChannelType);
 
-            var dataReadSvc = new DataReadService(storage, metaClient);
-            var dataWriteSvc = new DataWriteService(dataSvcConfig, storage, metaClient);
-            var publicApi = new TracDataApi(dataReadSvc, dataWriteSvc);
+            var fileSvc = new FileReadWriteService(dataSvcConfig, storage, metaClient);
+            var publicApi = new TracDataApi(fileSvc);
 
             // Create the main server
 

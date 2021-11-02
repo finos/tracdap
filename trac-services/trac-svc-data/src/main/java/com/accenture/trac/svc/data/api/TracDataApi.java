@@ -27,8 +27,7 @@ import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.metadata.SchemaDefinition;
 import com.accenture.trac.metadata.TagHeader;
-import com.accenture.trac.svc.data.service.DataReadService;
-import com.accenture.trac.svc.data.service.DataWriteService;
+import com.accenture.trac.svc.data.service.FileReadWriteService;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
@@ -61,15 +60,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final DataReadService readService;
-    private final DataWriteService writeService;
+    private final FileReadWriteService fileService;
 
     private final Validator validator = new Validator();
 
 
-    public TracDataApi(DataReadService readService, DataWriteService writeService) {
-        this.readService = readService;
-        this.writeService = writeService;
+    public TracDataApi(FileReadWriteService fileService) {
+        this.fileService = fileService;
     }
 
 
@@ -217,7 +214,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 ? request.getSize()
                 : null;
 
-        return writeService.createFile(
+        return fileService.createFile(
                 tenant, tagUpdates,
                 fileName, mimeType, expectedSize,
                 byteStream, execCtx);
@@ -241,7 +238,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 ? request.getSize()
                 : null;
 
-        return writeService.updateFile(
+        return fileService.updateFile(
                 tenant, tagUpdates,
                 priorVersion, fileName, mimeType, expectedSize,
                 byteStream, execCtx);
@@ -259,7 +256,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var tenant = request.getTenant();
         var selector = request.getSelector();
 
-        readService.readFile(tenant, selector, fileDef, byteStream, execCtx);
+        fileService.readFile(tenant, selector, fileDef, byteStream, execCtx);
     }
 
 

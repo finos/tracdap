@@ -31,6 +31,7 @@ import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.*;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +47,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
-public class DataWriteService {
+public class FileReadWriteService {
 
     private static final String TRAC_FILE_NAME_ATTR = "trac_file_name";
     private static final String TRAC_FILE_EXTENSION_ATTR = "trac_file_extension";
@@ -69,7 +70,7 @@ public class DataWriteService {
     private final Validator validator = new Validator();
     private final Random random = new Random();
 
-    public DataWriteService(
+    public FileReadWriteService(
             DataServiceConfig config,
             IStorageManager storageManager,
             TrustedMetadataApiFutureStub metaApi) {
@@ -219,6 +220,52 @@ public class DataWriteService {
 
     }
 
+    public void readFile(
+            String tenant, TagSelector selector,
+            CompletableFuture<FileDefinition> definition,
+            Flow.Subscriber<ByteBuf> content,
+            IExecutionContext execCtx) {
+
+        var allocator = ByteBufAllocator.DEFAULT;
+        var state = new RequestState();
+
+        CompletableFuture.completedFuture(null)
+
+                .thenCompose(x -> readMetadata(tenant, selector))
+                .thenAccept(obj -> state.file = obj.getDefinition().getFile())
+
+                .thenCompose(x -> readMetadata(tenant, state.file.getStorageId()))
+                .thenAccept(obj -> state.storage = obj.getDefinition().getStorage())
+
+                .thenAccept(x -> definition.complete(state.file))
+
+                .thenApply(x -> readFile(state.file, state.storage, execCtx))
+                .thenAccept(byteStream -> byteStream.subscribe(content))
+
+                .exceptionally(error -> reportError(error, definition, content));
+    }
+
+    private Void reportError(
+            Throwable error,
+            CompletableFuture<?> definition,
+            Flow.Subscriber<?> content) {
+
+        if (!definition.isDone())
+            definition.completeExceptionally(error);
+
+        else {
+
+            content.onSubscribe(new Flow.Subscription() {
+                @Override public void request(long n) {}
+                @Override public void cancel() {}
+            });
+
+            content.onError(error);
+        }
+
+        return null;
+    }
+
     private CompletionStage<Long> writeDataItem(
             StorageDefinitionOrBuilder storageDef, String dataItem,
             Flow.Publisher<ByteBuf> contentStream, IExecutionContext execContext) {
@@ -265,6 +312,23 @@ public class DataWriteService {
         return signal;
     }
 
+    private Flow.Publisher<ByteBuf> readFile(
+            FileDefinition fileDef, StorageDefinition storageDef,
+            IExecutionContext execCtx) {
+
+        var dataItem = fileDef.getDataItem();
+        var storageItem = storageDef.getDataItemsOrThrow(dataItem);
+
+        var incarnation = storageItem.getIncarnations(0);
+        var copy = incarnation.getCopies(0);
+
+        var storageKey = copy.getStorageKey();
+        var storagePath = copy.getStoragePath();
+
+        var storage = storageManager.getFileStorage(storageKey);
+        return storage.reader(storagePath, execCtx);
+    }
+
     private long checkSize(long actualSize, Long expectedSize) {
 
         // Size cannot be checked if no expected size is provided
@@ -301,24 +365,6 @@ public class DataWriteService {
         return Futures.javaFuture(metaApi.createObject(request));
     }
 
-    private <TDef> CompletionStage<TagHeader> updateObject(
-            String tenant, TagSelector priorVersion, TDef def, List<TagUpdate> tags,
-            BiFunction<ObjectDefinition.Builder, TDef, ObjectDefinition.Builder> objSetter) {
-
-        var objBuilder = ObjectDefinition.newBuilder().setObjectType(priorVersion.getObjectType());
-        var obj = objSetter.apply(objBuilder, def);
-
-        var request = MetadataWriteRequest.newBuilder()
-                .setTenant(tenant)
-                .setObjectType(priorVersion.getObjectType())
-                .setPriorVersion(priorVersion)
-                .setDefinition(obj)
-                .addAllTagUpdates(tags)
-                .build();
-
-        return Futures.javaFuture(metaApi.updateObject(request));
-    }
-
     private <TDef> CompletionStage<TagHeader> createPreallocated(
 
             String tenant, List<TagUpdate> tags, TagHeader objectHeader, TDef def,
@@ -337,6 +383,34 @@ public class DataWriteService {
                 .build();
 
         return Futures.javaFuture(metaApi.createPreallocatedObject(request));
+    }
+
+    private <TDef> CompletionStage<TagHeader> updateObject(
+            String tenant, TagSelector priorVersion, TDef def, List<TagUpdate> tags,
+            BiFunction<ObjectDefinition.Builder, TDef, ObjectDefinition.Builder> objSetter) {
+
+        var objBuilder = ObjectDefinition.newBuilder().setObjectType(priorVersion.getObjectType());
+        var obj = objSetter.apply(objBuilder, def);
+
+        var request = MetadataWriteRequest.newBuilder()
+                .setTenant(tenant)
+                .setObjectType(priorVersion.getObjectType())
+                .setPriorVersion(priorVersion)
+                .setDefinition(obj)
+                .addAllTagUpdates(tags)
+                .build();
+
+        return Futures.javaFuture(metaApi.updateObject(request));
+    }
+
+    private CompletionStage<Tag> readMetadata(String tenant, TagSelector selector) {
+
+        var metaRequest = MetadataReadRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(selector)
+                .build();
+
+        return Futures.javaFuture(metaApi.readObject(metaRequest));
     }
 
 

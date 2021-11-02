@@ -29,7 +29,7 @@ import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.svc.data.EventLoopChannel;
 import com.accenture.trac.svc.data.TracDataService;
 import com.accenture.trac.svc.data.service.DataReadService;
-import com.accenture.trac.svc.data.service.DataWriteService;
+import com.accenture.trac.svc.data.service.FileReadWriteService;
 import com.accenture.trac.svc.meta.TracMetadataService;
 import com.accenture.trac.test.config.ConfigHelpers;
 
@@ -176,9 +176,8 @@ abstract  class DataApiTestBase {
 
         var metaApi = TrustedMetadataApiGrpc.newFutureStub(dataSvcClientChannel);
 
-        var readService = new DataReadService(storage, metaApi);
-        var writeService = new DataWriteService(dataSvcConfig, storage, metaApi);
-        var publicApiImpl =  new TracDataApi(readService, writeService);
+        var fileSvc = new FileReadWriteService(dataSvcConfig, storage, metaApi);
+        var publicApiImpl =  new TracDataApi(fileSvc);
 
         dataService = InProcessServerBuilder.forName(dataSvcName)
                 .addService(publicApiImpl)
