@@ -275,6 +275,14 @@ public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Pro
         targetSubscriber.onNext(item);
     }
 
+    protected final void doTargetOnComplete() {
+
+        // TODO: State
+
+        targetSubscriber.onComplete();
+    }
+
+
     protected final long nTargetRequested() { return nTargetRequested; }
     protected final long nTargetDelivered() { return nTargetRequested; }
     protected final long nSourceRequested() { return nSourceRequested; }
