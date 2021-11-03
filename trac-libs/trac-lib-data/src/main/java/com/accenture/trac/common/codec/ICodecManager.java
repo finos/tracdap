@@ -16,15 +16,22 @@
 
 package com.accenture.trac.common.codec;
 
+import com.accenture.trac.common.data.DataBlock;
+import com.accenture.trac.metadata.SchemaDefinition;
 import io.netty.buffer.ByteBuf;
-import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 
+
+import java.util.Map;
 import java.util.concurrent.Flow;
 
 
 public interface ICodecManager {
 
-    Flow.Processor<ArrowRecordBatch, ByteBuf> getEncoder(String format);
+    Flow.Processor<DataBlock, ByteBuf> getEncoder(
+            String format, SchemaDefinition schema,
+            Map<String, String> options);
 
-    Flow.Processor<ByteBuf, ArrowRecordBatch> getDecoder(String format);
+    Flow.Processor<ByteBuf, DataBlock> getDecoder(
+            String format, SchemaDefinition schema,
+            Map<String, String> options);
 }

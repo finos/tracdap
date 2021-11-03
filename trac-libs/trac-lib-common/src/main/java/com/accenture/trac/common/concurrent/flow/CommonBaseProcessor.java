@@ -269,17 +269,27 @@ public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Pro
         sourceSubscription.request(n);
     }
 
-    protected final void doTargetOnNext(TTarget item) {
+    protected final void doSourceCancel() {
+
+        sourceSubscription.cancel();
+    }
+
+    protected final void doTargetNext(TTarget item) {
 
         nTargetDelivered += 1;
         targetSubscriber.onNext(item);
     }
 
-    protected final void doTargetOnComplete() {
+    protected final void doTargetComplete() {
 
         // TODO: State
 
         targetSubscriber.onComplete();
+    }
+
+    protected final void doTargetError(Throwable error) {
+
+        targetSubscriber.onError(error);
     }
 
 

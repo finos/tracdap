@@ -17,6 +17,7 @@
 package com.accenture.trac.common.codec.arrow;
 
 import com.accenture.trac.common.concurrent.flow.CommonBaseProcessor;
+import com.accenture.trac.common.data.DataBlock;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import org.apache.arrow.vector.VectorLoader;
@@ -35,7 +36,7 @@ import java.util.List;
 import java.util.Queue;
 
 
-public class ArrowFileEncoder extends CommonBaseProcessor<ArrowRecordBatch, ByteBuf> {
+public class ArrowFileEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> {
 
     private final Queue<ByteBuf> outQueue;
     private final WritableByteChannel outChannel;
@@ -60,7 +61,7 @@ public class ArrowFileEncoder extends CommonBaseProcessor<ArrowRecordBatch, Byte
 
         while (nTargetDelivered() < nTargetRequested() && !outQueue.isEmpty()) {
             var chunk = outQueue.remove();
-            doTargetOnNext(chunk);
+            doTargetNext(chunk);
         }
 
         if (nTargetDelivered() < nTargetRequested()) {
@@ -69,12 +70,12 @@ public class ArrowFileEncoder extends CommonBaseProcessor<ArrowRecordBatch, Byte
                 doSourceRequest(1);  // TODO: How many batches?
 
             else
-                doTargetOnComplete();
+                doTargetComplete();
         }
     }
 
     @Override
-    protected void handleSourceNext(ArrowRecordBatch batch) {
+    protected void handleSourceNext(DataBlock block) {
 
         try {
 
@@ -86,7 +87,7 @@ public class ArrowFileEncoder extends CommonBaseProcessor<ArrowRecordBatch, Byte
 
             while (nTargetDelivered() < nTargetRequested() && !outQueue.isEmpty()) {
                 var chunk = outQueue.remove();
-                doTargetOnNext(chunk);
+                doTargetNext(chunk);
             }
 
             // if (nTargetDelivered() < nTargetRequested())
@@ -105,11 +106,11 @@ public class ArrowFileEncoder extends CommonBaseProcessor<ArrowRecordBatch, Byte
 
             while (nTargetDelivered() < nTargetRequested() && !outQueue.isEmpty()) {
                 var chunk = outQueue.remove();
-                doTargetOnNext(chunk);
+                doTargetNext(chunk);
             }
 
             if (outQueue.isEmpty())
-                doTargetOnComplete();
+                doTargetComplete();
         }
         catch (IOException e) {
 

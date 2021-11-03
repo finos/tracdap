@@ -16,14 +16,17 @@
 
 package com.accenture.trac.common.codec;
 
+import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.storage.IStoragePlugin;
 import com.accenture.trac.common.storage.StorageManager;
+import com.accenture.trac.metadata.SchemaDefinition;
 import io.netty.buffer.ByteBuf;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.concurrent.Flow;
 
@@ -59,13 +62,20 @@ public class CodecManager implements ICodecManager {
 //        }
 //    }
 
+
     @Override
-    public Flow.Processor<ArrowRecordBatch, ByteBuf> getEncoder(String format) {
+    public Flow.Processor<DataBlock, ByteBuf> getEncoder(
+            String format, SchemaDefinition schema,
+            Map<String, String> options) {
+
         return null;
     }
 
     @Override
-    public Flow.Processor<ByteBuf, ArrowRecordBatch> getDecoder(String format) {
+    public Flow.Processor<ByteBuf, DataBlock> getDecoder(
+            String format, SchemaDefinition schema,
+            Map<String, String> options) {
+
         return null;
     }
 }

@@ -17,25 +17,48 @@
 package com.accenture.trac.common.codec.csv;
 
 import com.accenture.trac.common.concurrent.flow.CommonBaseProcessor;
+import com.accenture.trac.common.data.DataBlock;
+import com.accenture.trac.metadata.SchemaDefinition;
 import com.fasterxml.jackson.dataformat.csv.CsvGenerator;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import io.netty.buffer.ByteBuf;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.VectorLoader;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
+import org.apache.arrow.vector.types.pojo.Schema;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.function.Consumer;
 
 
-public class CsvEncoder extends CommonBaseProcessor<VectorSchemaRoot, ByteBuf> {
+public class CsvEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> {
 
-    private final Consumer<VectorSchemaRoot> recycler;
+    private final SchemaDefinition schema;
+    private VectorSchemaRoot root;
+    private VectorLoader loader;
+
     private final CsvMapper mapper = null;
     private CsvGenerator generator;
     //private final ByteBufOutputStream ostream;
 
-    public CsvEncoder(Consumer<VectorSchemaRoot> recycler) {
-        this.recycler = recycler;
-        //ostream = new ByteBufOutputStream()
+    public CsvEncoder(SchemaDefinition schema) {
+
+        var allocator = new RootAllocator();
+
+        this.schema = schema;
+
+        var arrowSchema = (Schema) null;
+        var fields = arrowSchema.getFields();
+        var vectors = new ArrayList<FieldVector>(fields.size());
+
+        for (var field : fields)
+            vectors.add(field.createVector(allocator));
+
+        this.root = new VectorSchemaRoot(fields, vectors);
+        this.loader = new VectorLoader(root);  // TODO: No compression support atm
     }
 
     @Override
@@ -44,13 +67,21 @@ public class CsvEncoder extends CommonBaseProcessor<VectorSchemaRoot, ByteBuf> {
     }
 
     @Override
-    protected void handleSourceNext(VectorSchemaRoot item) {
-        encodeBatch(item);
+    protected void handleSourceNext(DataBlock block) {
+
+        if (block.arrowRecords != null)
+            encodeBatch(block.arrowRecords);
     }
 
-    private void encodeBatch(VectorSchemaRoot batch) {
+    private void encodeHeader() {
+
+    }
+
+    private void encodeBatch(ArrowRecordBatch batch) {
 
         try {
+
+            loader.load(batch);
 
             var nRows = batch.getRowCount();
             var nCols = batch.getFieldVectors().size();
