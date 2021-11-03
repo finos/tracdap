@@ -16,10 +16,11 @@
 
 package com.accenture.trac.common.codec.csv;
 
+import com.accenture.trac.common.codec.ICodec;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
+import com.accenture.trac.common.codec.arrow.ArrowValues;
 import com.accenture.trac.common.concurrent.flow.CommonBaseProcessor;
 import com.accenture.trac.common.data.DataBlock;
-import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.SchemaDefinition;
 
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
@@ -35,14 +36,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Queue;
 
 
-public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> {
+public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implements ICodec.Decoder {
 
     private static final int BATCH_SIZE = 1024;
     private static final DataBlock END_OF_STREAM = DataBlock.empty();
@@ -150,19 +149,19 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> {
 
     private void decodeInput() {
 
-        outQueue.add(DataBlock.forSchema(this.tracSchema, this.arrowSchema));
+        outQueue.add(DataBlock.forSchema(this.arrowSchema));
 
         var csvSchema =  CsvSchemaMapping
                 .arrowToCsv(this.arrowSchema)
                 .setUseHeader(headerFlag)
                 .build();
 
-        var csvMapper = CsvMapper.builder().build()
+        var csvReader = CsvMapper.builder().build()
                 .readerForArrayOf(Object.class)
                 .with(csvSchema);
 
         try (var stream = new ByteBufInputStream(buffer);
-             var itr = csvMapper.readValues((InputStream) stream)) {
+             var itr = csvReader.readValues((InputStream) stream)) {
 
             var nRowsTotal = 0;
             var nRowsBatch = 0;
@@ -185,8 +184,10 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> {
                 var row = nRowsBatch;
                 var csvValues = (Object[]) itr.nextValue();
 
-                for (int col = 0; col < nCols; col++)
-                    setValue(row, col, csvValues[col], root);
+                for (int col = 0; col < nCols; col++) {
+                    var csvValue = csvValues[col];
+                    ArrowValues.setValue(root, row, col, csvValue);
+                }
 
                 nRowsTotal++;
                 nRowsBatch++;
@@ -209,6 +210,8 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> {
                 nBatches++;
             }
 
+            outQueue.add(END_OF_STREAM);
+
             log.info("CSV Codec: Decoded {} rows in {} batches", nRowsTotal, nBatches);
         }
         catch (IOException e) {
@@ -218,97 +221,6 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> {
             // TODO: Error
         }
 
-    }
-
-    private void setValue(int row, int col, Object obj, VectorSchemaRoot root) {
-
-        var vector = root.getVector(col);
-        var arrowTypeId = vector.getField().getType().getTypeID();
-
-        var isSet = (obj != null) ? 1 : 0;
-
-        switch (arrowTypeId) {
-
-            case Bool:
-
-                var boolVec = (BitVector) vector;
-                var boolVal = (isSet != 0 && (Boolean) obj) ? 1 : 0;
-
-                boolVec.set(row, isSet, boolVal);
-
-                break;
-
-            case Int:
-
-                var intVec = (BigIntVector) vector;
-                var intVal = isSet != 0 ? (Long) obj : 0;
-
-                intVec.set(row, isSet, intVal);
-
-                break;
-
-            case FloatingPoint:
-
-                var floatVec = (Float8Vector) vector;
-                var floatVal = isSet != 0 ? (Double) obj : 0;
-
-                floatVec.set(row, isSet, floatVal);
-
-                break;
-
-            case Decimal:
-
-                var decimalVec = (Decimal256Vector) vector;
-                var decimalVal = (BigDecimal) obj;
-
-                if (isSet == 0)
-                    decimalVec.setNull(row);
-                else
-                    decimalVec.set(row, decimalVal);
-
-                break;
-
-            case Utf8:
-
-                var varcharVec = (VarCharVector) vector;
-                var varcharVal = (String) obj;
-
-                if (isSet == 0)
-                    varcharVec.setNull(row);
-                else
-                    varcharVec.set(row, varcharVal.getBytes(StandardCharsets.UTF_8));
-
-                break;
-
-            case Date:
-
-                var dateVec = (DateDayVector) vector;
-                var dateVal = (java.time.LocalDate) obj;
-                var unixEpochDay = (int) dateVal.toEpochDay();
-
-                dateVec.set(row, isSet, unixEpochDay);
-
-                break;
-
-            case Timestamp:
-
-                var timestampVec = (TimeStampMilliVector) vector;
-                var timestampVal = (java.time.OffsetDateTime) obj;
-
-                var epochSecond = timestampVal.toEpochSecond();
-                var nanos = timestampVal.getNano();
-                var millis = nanos / 1000;
-                var epochMillis = (epochSecond * 1000 * 1000) + millis;
-
-                timestampVec.set(row, isSet, epochMillis);
-
-                break;
-
-            default:
-
-                throw new EUnexpected();  // TODO: Error
-
-        }
     }
 
     private void dispatchBatch(VectorSchemaRoot root) {

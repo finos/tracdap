@@ -18,8 +18,10 @@ package com.accenture.trac.svc.data.service;
 
 import com.accenture.trac.api.TrustedMetadataApiGrpc;
 import com.accenture.trac.api.config.DataServiceConfig;
+import com.accenture.trac.common.codec.ICodec;
 import com.accenture.trac.common.codec.ICodecManager;
 import com.accenture.trac.common.concurrent.IExecutionContext;
+import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.storage.IStorageManager;
@@ -27,7 +29,9 @@ import com.accenture.trac.metadata.*;
 import io.netty.buffer.ByteBuf;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 
+import java.lang.ref.Reference;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
@@ -76,8 +80,8 @@ public class DataRWService {
 
         var state = new RequestState();
 
-        var codec = codecManager.getEncoder(format);
-        codec.subscribe(content);
+        var codec = codecManager.getCodec(format);
+        var codecOptions = Map.<String, String>of();
 
         CompletableFuture.completedFuture(null)
 
@@ -92,8 +96,14 @@ public class DataRWService {
 
                 .thenAccept(x -> schema.complete(state.schema))
 
-                .thenApply(x -> readDataset(state.data, state.schema, state.storage, execCtx))
-                .thenAccept(batches -> batches.subscribe(codec))
+                .thenAccept(x -> {
+
+                    var blockStream = readDataset(state.data, state.schema, state.storage, execCtx);
+                    var encoder = codec.getEncoder(state.schema, codecOptions);
+
+                    encoder.subscribe(content);
+                    blockStream.subscribe(encoder);
+                })
 
                 .exceptionally(error -> Helpers.reportError(error, schema, content));
 
@@ -116,7 +126,7 @@ public class DataRWService {
         throw new EUnexpected();
     }
 
-    private Flow.Publisher<ArrowRecordBatch> readDataset(
+    private Flow.Publisher<DataBlock> readDataset(
             DataDefinition dataDef,
             SchemaDefinition schemaDef,
             StorageDefinition storageDef,

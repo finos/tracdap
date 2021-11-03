@@ -16,6 +16,7 @@
 
 package com.accenture.trac.common.codec;
 
+import com.accenture.trac.common.codec.csv.CsvCodec;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.storage.IStoragePlugin;
 import com.accenture.trac.common.storage.StorageManager;
@@ -62,20 +63,8 @@ public class CodecManager implements ICodecManager {
 //        }
 //    }
 
-
     @Override
-    public Flow.Processor<DataBlock, ByteBuf> getEncoder(
-            String format, SchemaDefinition schema,
-            Map<String, String> options) {
-
-        return null;
-    }
-
-    @Override
-    public Flow.Processor<ByteBuf, DataBlock> getDecoder(
-            String format, SchemaDefinition schema,
-            Map<String, String> options) {
-
-        return null;
+    public ICodec getCodec(String format) {
+        return new CsvCodec();
     }
 }

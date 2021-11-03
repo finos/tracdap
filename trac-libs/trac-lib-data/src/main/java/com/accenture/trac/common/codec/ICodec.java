@@ -20,12 +20,18 @@ import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.metadata.SchemaDefinition;
 import io.netty.buffer.ByteBuf;
 
-
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Flow;
 
+public interface ICodec {
 
-public interface ICodecManager {
+    interface Encoder extends Flow.Processor<DataBlock, ByteBuf> {}
+    interface Decoder extends Flow.Processor<ByteBuf, DataBlock> {}
 
-    ICodec getCodec(String format);
+    List<String> options();
+
+    Encoder getEncoder(SchemaDefinition schema, Map<String, String> options);
+
+    Decoder getDecoder(SchemaDefinition schema, Map<String, String> options);
 }

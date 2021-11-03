@@ -79,6 +79,8 @@ public class ArrowFileEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> {
 
         try {
 
+            var batch = block.arrowRecords;
+
             loader.load(batch);
             arrowWriter.writeBatch();
 

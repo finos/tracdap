@@ -14,18 +14,31 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.codec;
+package com.accenture.trac.common.codec.csv;
 
-import com.accenture.trac.common.data.DataBlock;
+import com.accenture.trac.common.codec.ICodec;
 import com.accenture.trac.metadata.SchemaDefinition;
-import io.netty.buffer.ByteBuf;
 
-
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Flow;
 
 
-public interface ICodecManager {
+public class CsvCodec implements ICodec {
 
-    ICodec getCodec(String format);
+    @Override
+    public List<String> options() {
+        return List.of();
+    }
+
+    @Override
+    public Encoder getEncoder(SchemaDefinition schema, Map<String, String> options) {
+
+        return new CsvEncoder(schema);
+    }
+
+    @Override
+    public Decoder getDecoder(SchemaDefinition schema, Map<String, String> options) {
+
+        return new CsvDecoder(schema);
+    }
 }

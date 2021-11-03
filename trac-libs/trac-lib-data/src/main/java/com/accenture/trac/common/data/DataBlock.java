@@ -23,20 +23,17 @@ import org.apache.arrow.vector.types.pojo.Schema;
 
 public class DataBlock {
 
-    public final SchemaDefinition tracSchema;
     public final Schema arrowSchema;
     public final ArrowRecordBatch arrowRecords;
     public final ArrowDictionaryBatch arrowDictionary;
 
-    private static final DataBlock EMPTY = new DataBlock(null, null, null, null);
+    private static final DataBlock EMPTY = new DataBlock(null, null, null);
 
     public DataBlock(
-            SchemaDefinition tracSchema,
             Schema arrowSchema,
             ArrowRecordBatch arrowRecords,
             ArrowDictionaryBatch arrowDictionary) {
 
-        this.tracSchema = tracSchema;
         this.arrowSchema = arrowSchema;
         this.arrowRecords = arrowRecords;
         this.arrowDictionary = arrowDictionary;
@@ -46,23 +43,16 @@ public class DataBlock {
         return EMPTY;
     }
 
-    public static DataBlock forSchema(SchemaDefinition tracSchema) {
-        return new DataBlock(tracSchema, null, null, null);
-    }
 
     public static DataBlock forSchema(Schema arrowSchema) {
-        return new DataBlock(null, arrowSchema, null, null);
-    }
-
-    public static DataBlock forSchema(SchemaDefinition tracSchema, Schema arrowSchema) {
-        return new DataBlock(tracSchema, arrowSchema, null, null);
+        return new DataBlock(arrowSchema, null, null);
     }
 
     public static DataBlock forRecords(ArrowRecordBatch arrowRecords) {
-        return new DataBlock(null, null, arrowRecords, null);
+        return new DataBlock(null, arrowRecords, null);
     }
 
     public static DataBlock forDictionary(ArrowDictionaryBatch arrowDictionary) {
-        return new DataBlock(null, null, null, arrowDictionary);
+        return new DataBlock(null, null, arrowDictionary);
     }
 }

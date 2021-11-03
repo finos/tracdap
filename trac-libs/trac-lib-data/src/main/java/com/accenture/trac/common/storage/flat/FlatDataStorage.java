@@ -18,6 +18,7 @@ package com.accenture.trac.common.storage.flat;
 
 import com.accenture.trac.common.codec.ICodecManager;
 import com.accenture.trac.common.concurrent.IExecutionContext;
+import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.storage.IDataStorage;
 import com.accenture.trac.common.storage.IFileStorage;
 import com.accenture.trac.metadata.SchemaDefinition;
@@ -25,6 +26,7 @@ import com.accenture.trac.metadata.StorageCopy;
 
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 
@@ -40,7 +42,7 @@ public class FlatDataStorage implements IDataStorage {
     }
 
     @Override
-    public Flow.Publisher<ArrowRecordBatch> reader(
+    public Flow.Publisher<DataBlock> reader(
             SchemaDefinition schemaDef,
             StorageCopy storageCopy,
             IExecutionContext execContext) {
@@ -48,15 +50,18 @@ public class FlatDataStorage implements IDataStorage {
         var storagePath = storageCopy.getStoragePath();
         var storageFormat = storageCopy.getStorageFormat();
 
+        var codec = formats.getCodec(storageFormat);
+        var codecOptions = Map.<String, String>of();
+        var decoder = codec.getDecoder(schemaDef, codecOptions);
+
         var fileReader = fileStorage.reader(storagePath, execContext);
-        var decoder = formats.getDecoder(storageFormat);
         fileReader.subscribe(decoder);
 
         return decoder;
     }
 
     @Override
-    public Flow.Subscriber<ArrowRecordBatch> writer(
+    public Flow.Subscriber<DataBlock> writer(
             SchemaDefinition schemaDef,
             StorageCopy storageCopy,
             CompletableFuture<Long> signal,
@@ -65,8 +70,11 @@ public class FlatDataStorage implements IDataStorage {
         var storagePath = storageCopy.getStoragePath();
         var storageFormat = storageCopy.getStorageFormat();
 
+        var codec = formats.getCodec(storageFormat);
+        var codecOptions = Map.<String, String>of();
+        var encoder = codec.getEncoder(schemaDef, codecOptions);
+
         var fileWriter = fileStorage.writer(storagePath, signal, execContext);
-        var encoder = formats.getEncoder(storageFormat);
         encoder.subscribe(fileWriter);
 
         return encoder;

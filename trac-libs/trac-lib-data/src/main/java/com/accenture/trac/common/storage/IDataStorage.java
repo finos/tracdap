@@ -18,6 +18,7 @@ package com.accenture.trac.common.storage;
 
 
 import com.accenture.trac.common.concurrent.IExecutionContext;
+import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.metadata.DataDefinition;
 import com.accenture.trac.metadata.SchemaDefinition;
 import com.accenture.trac.metadata.StorageCopy;
@@ -30,12 +31,12 @@ import java.util.concurrent.Flow;
 
 public interface IDataStorage {
 
-    Flow.Publisher<ArrowRecordBatch> reader(
+    Flow.Publisher<DataBlock> reader(
             SchemaDefinition schemaDef,
             StorageCopy storageCopy,
             IExecutionContext execContext);
 
-    Flow.Subscriber<ArrowRecordBatch> writer(
+    Flow.Subscriber<DataBlock> writer(
             SchemaDefinition schemaDef,
             StorageCopy storageCopy,
             CompletableFuture<Long> signal,
