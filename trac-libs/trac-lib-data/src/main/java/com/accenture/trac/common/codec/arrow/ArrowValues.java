@@ -122,9 +122,9 @@ public class ArrowValues {
         var vector = root.getVector(col);
         var arrowTypeId = vector.getField().getType().getTypeID();
 
-        var isSet = vector.isNull(row);
+        var isNull = vector.isNull(row);
 
-        if (!isSet)
+        if (isNull)
             return null;
 
         switch (arrowTypeId) {

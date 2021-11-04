@@ -23,7 +23,10 @@ import com.accenture.trac.common.concurrent.flow.CommonBaseProcessor;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.metadata.SchemaDefinition;
 
+import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
+import com.fasterxml.jackson.dataformat.csv.CsvParser;
+import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufInputStream;
@@ -36,9 +39,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Queue;
+import java.text.NumberFormat;
+import java.text.ParseException;
+import java.util.*;
 
 
 public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implements ICodec.Decoder {
@@ -101,7 +104,7 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
     @Override
     protected void handleSourceNext(ByteBuf chunk) {
 
-        buffer.addComponent(chunk);
+        buffer.addComponent(true, chunk);
         doSourceRequest(1);
     }
 
@@ -150,17 +153,21 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
 
         outQueue.add(DataBlock.forSchema(this.arrowSchema));
 
+        // TODO: Parser to String[] instead of Map
+        // Map is created for every row, and updated / referenced for every field
+
         var csvSchema =  CsvSchemaMapping
                 .arrowToCsv(this.arrowSchema)
-                .setUseHeader(headerFlag)
-                .build();
+                .build()
+                .withHeader();
 
         var csvReader = CsvMapper.builder().build()
-                .readerForArrayOf(Object.class)
-                .with(csvSchema);
+                .readerForMapOf(String.class)
+                .with(csvSchema)
+                .with(CsvParser.Feature.WRAP_AS_ARRAY);
 
         try (var stream = new ByteBufInputStream(buffer);
-             var itr = csvReader.readValues((InputStream) stream)) {
+             MappingIterator<Map<String, String>> itr = csvReader.readValues((InputStream) stream)) {
 
             var nRowsTotal = 0;
             var nRowsBatch = 0;
@@ -181,11 +188,19 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
                 // Write the next row of values into the arrow root container
 
                 var row = nRowsBatch;
-                var csvValues = (Object[]) itr.nextValue();
+                var csvValues = (Map<String, String>) itr.nextValue();
 
                 for (int col = 0; col < nCols; col++) {
-                    var csvValue = csvValues[col];
-                    ArrowValues.setValue(root, row, col, csvValue);
+
+                    var csvCol = csvSchema.column(col);
+                    var csvValue = csvValues.get(csvCol.getName());
+
+                    if (csvCol.getType() == CsvSchema.ColumnType.NUMBER) {
+                        var numericValue = NumberFormat.getInstance().parse(csvValue);
+                        ArrowValues.setValue(root, row, col, numericValue);
+                    }
+                    else
+                        ArrowValues.setValue(root, row, col, csvValue);
                 }
 
                 nRowsTotal++;
@@ -195,7 +210,9 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
 
                 if (nRowsBatch == BATCH_SIZE) {
 
+                    root.setRowCount(nRowsBatch);
                     dispatchBatch(root);
+
                     nRowsBatch = 0;
                     nBatches++;
                 }
@@ -205,7 +222,9 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
 
             if (nRowsBatch > 0) {
 
+                root.setRowCount(nRowsBatch);
                 dispatchBatch(root);
+
                 nBatches++;
             }
 
@@ -213,9 +232,11 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
 
             log.info("CSV Codec: Decoded {} rows in {} batches", nRowsTotal, nBatches);
         }
-        catch (IOException e) {
+        catch (IOException | ParseException e) {
 
             root.clear();
+
+            doTargetError(e);
 
             // TODO: Error
         }

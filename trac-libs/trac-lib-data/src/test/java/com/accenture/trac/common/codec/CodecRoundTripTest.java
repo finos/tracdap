@@ -114,15 +114,12 @@ public abstract class CodecRoundTripTest {
         waitFor(TEST_TIMEOUT, roundTrip);
         var rtBlocks = resultOf(roundTrip);
 
-//        Assertions.assertEquals(2, rtBlocks.size());
-//        Assertions.assertNotNull(rtBlocks.get(0).arrowSchema);
-//        Assertions.assertNotNull(rtBlocks.get(1).arrowRecords);
+        Assertions.assertEquals(2, rtBlocks.size());
+        Assertions.assertNotNull(rtBlocks.get(0).arrowSchema);
+        Assertions.assertNotNull(rtBlocks.get(1).arrowRecords);
 
-        Assertions.assertEquals(1, rtBlocks.size());
-        Assertions.assertNotNull(rtBlocks.get(0).arrowRecords);
-
-        var rtSchema = arrowSchema;  // rtBlocks.get(9).arrowSchema;
-        var rtBatch = rtBlocks.get(0).arrowRecords;
+        var rtSchema = rtBlocks.get(0).arrowSchema;
+        var rtBatch = rtBlocks.get(1).arrowRecords;
 
         Assertions.assertEquals(arrowSchema, rtSchema);
 

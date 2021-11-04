@@ -40,7 +40,7 @@ public class ArrowSchema {
 
     private static final Map<BasicType, ArrowType> TRAC_ARROW_TYPE_MAPPING = Map.ofEntries(
             Map.entry(BasicType.BOOLEAN, ArrowType.Bool.INSTANCE),
-            Map.entry(BasicType.INTEGER, new ArrowType.Int(8, true)),
+            Map.entry(BasicType.INTEGER, new ArrowType.Int(64, true)),
             Map.entry(BasicType.FLOAT, new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)),
             Map.entry(BasicType.DECIMAL, new ArrowType.Decimal(DECIMAL_PRECISION, DECIMAL_SCALE, DECIMAL_BIT_WIDTH)),
             Map.entry(BasicType.STRING, ArrowType.Utf8.INSTANCE),

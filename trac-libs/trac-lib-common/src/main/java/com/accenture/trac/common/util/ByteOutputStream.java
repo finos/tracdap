@@ -85,7 +85,7 @@ public class ByteOutputStream extends OutputStream {
     @Override
     public void flush() {
 
-        if (buffer.readableBytes() > 0) {
+        if (buffer != null && buffer.readableBytes() > 0) {
             sink.accept(buffer);
             buffer = null;
         }

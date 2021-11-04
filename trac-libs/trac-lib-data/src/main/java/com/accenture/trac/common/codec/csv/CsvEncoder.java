@@ -182,7 +182,7 @@ public class CsvEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> implemen
                     csvValues[col] = csvValue;
                 }
 
-                outWriter.writeAll(csvValues);
+                outWriter.write(csvValues);
             }
 
             outWriter.flush();
