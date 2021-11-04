@@ -26,9 +26,11 @@ class RequestState {
 
     Instant objectTimestamp;
 
+    List<TagUpdate> dataTags;
     List<TagUpdate> fileTags;
     List<TagUpdate> storageTags;
 
+    TagHeader dataId, priorDataId;
     TagHeader fileId, priorFileId;
     TagHeader storageId, priorStorageId;
 
@@ -36,4 +38,5 @@ class RequestState {
     SchemaDefinition schema, priorSchema;
     FileDefinition file, priorFile;
     StorageDefinition storage, priorStorage;
+    StorageCopy copy;
 }

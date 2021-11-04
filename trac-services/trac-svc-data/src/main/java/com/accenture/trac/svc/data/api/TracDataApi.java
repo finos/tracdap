@@ -38,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.function.BiFunction;
@@ -173,12 +174,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         // validateRequest(methodName, request);
 
-        var tenant = request.getTenant();
-        var tagUpdates = request.getTagUpdatesList();
-
-        return dataRwService.createDataset(
-                tenant, tagUpdates,
-                byteStream, execCtx);
+        return dataRwService.createDataset(request, byteStream, execCtx);
     }
 
     private CompletionStage<TagHeader> doUpdateDataset(
@@ -189,14 +185,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         // validateRequest(methodName, request);
 
-        var tenant = request.getTenant();
-        var tagUpdates = request.getTagUpdatesList();
-        var priorVersion = request.getPriorVersion();
-
-        return dataRwService.updateDataset(
-                tenant, tagUpdates,
-                priorVersion,
-                byteStream, execCtx);
+        return dataRwService.updateDataset(request, byteStream, execCtx);
     }
 
     private void doReadDataset(
@@ -208,13 +197,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
         // validateRequest(methodName, request);
 
-        var tenant = request.getTenant();
-        var selector = request.getSelector();
-        var format = request.getFormat();
-
-        dataRwService.readDataset(
-                tenant, selector, format,
-                schema, byteStream, execCtx);
+        dataRwService.readDataset(request, schema, byteStream, execCtx);
     }
 
     private CompletionStage<TagHeader> doCreateFile(
@@ -291,6 +274,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             Function<TReq, ByteString> getContent,
             ClientStreamingMethod<TReq, TResp> apiMethod) {
 
+        log_start(method);
+
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
 
         var requestHub = Flows.<TReq>hub(execCtx);
@@ -298,11 +283,11 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var protoContent = Flows.map(requestHub, getContent);
         var content = Flows.map(protoContent, Bytes::fromProtoBytes);
 
-        var response = message0.thenCompose(msg0 -> apiMethod.execute(
-                method.getBareMethodName(),
-                msg0, content, execCtx));
+        message0.thenCompose(msg0 -> apiMethod.execute(
+                    method.getBareMethodName(), msg0, content, execCtx))
 
-        response.whenComplete(GrpcStreams.serverResponseHandler(method, responseObserver));
+                .whenComplete(GrpcStreams.serverResponseHandler(method, responseObserver))
+                .whenComplete((result, error) -> log_finish(method, error));
 
         return GrpcStreams.serverRequestStream(requestHub);
     }
@@ -318,6 +303,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             BiFunction<TBuilder, TDef, TBuilder> putDefinition,
             BiFunction<TBuilder, ByteString, TBuilder> putContent,
             ServerStreamingMethod<TReq, TDef> apiMethod) {
+
+        log_start(method);
 
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
 
@@ -385,5 +372,29 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 CompletableFuture<TDef> def,
                 Flow.Subscriber<ByteBuf> byteStream,
                 IExecutionContext execCtx);
+    }
+
+    private void log_start(MethodDescriptor<?, ?> method) {
+
+        log.info("API CALL START [{}] ({})", method.getBareMethodName(), prettyMethodType(method.getType()));
+    }
+
+    private void log_finish(MethodDescriptor<?, ?> method, Throwable error) {
+
+        if (error == null)
+            log.info("API CALL SUCCEEDED [{}]", method.getBareMethodName());
+
+        else if (error instanceof CompletionException) {
+            var innerError = error.getCause();
+            log.error("API CALL FAILED [{}]: {}", method.getBareMethodName(), innerError.getMessage(), innerError);
+        }
+
+        else
+            log.error("API CALL FAILED [{}]: {}", method.getBareMethodName(), error.getMessage(), error);
+    }
+
+    private String prettyMethodType(MethodDescriptor.MethodType methodType) {
+
+        return methodType.name().toLowerCase().replace("_", " ");
     }
 }

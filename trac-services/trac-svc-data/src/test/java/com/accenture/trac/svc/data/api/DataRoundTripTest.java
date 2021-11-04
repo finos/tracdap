@@ -19,10 +19,7 @@ package com.accenture.trac.svc.data.api;
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.concurrent.Futures;
-import com.accenture.trac.metadata.BasicType;
-import com.accenture.trac.metadata.DataDefinition;
-import com.accenture.trac.metadata.ObjectDefinition;
-import com.accenture.trac.metadata.TagSelector;
+import com.accenture.trac.metadata.*;
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import org.apache.arrow.memory.RootAllocator;
@@ -66,9 +63,23 @@ class DataRoundTripTest extends DataApiTestBase {
         List<Vector<Object>> values;
     }
 
+    private static final SchemaDefinition BASIC_TEST_SCHEMA;
     private static final TestDataContainer BASIC_TEST_DATA;
 
     static {
+
+        BASIC_TEST_SCHEMA = SchemaDefinition.newBuilder()
+                .setSchemaType(SchemaType.TABLE)
+                .setTable(TableSchema.newBuilder()
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("string_field")
+                        .setFieldOrder(0)
+                        .setFieldType(BasicType.STRING))
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("int_field")
+                        .setFieldOrder(1)
+                        .setFieldType(BasicType.INTEGER)))
+                .build();
 
         BASIC_TEST_DATA = new TestDataContainer();
         BASIC_TEST_DATA.fieldNames = List.of("string_field", "int_field");
@@ -187,6 +198,7 @@ class DataRoundTripTest extends DataApiTestBase {
 
         var requestParams = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
+                .setSchema(BASIC_TEST_SCHEMA)
                 .setFormat(writeFormat)
                 .build();
 

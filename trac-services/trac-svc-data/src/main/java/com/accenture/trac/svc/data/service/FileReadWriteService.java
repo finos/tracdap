@@ -45,6 +45,8 @@ import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
+
 
 public class FileReadWriteService {
 
@@ -107,7 +109,7 @@ public class FileReadWriteService {
         return CompletableFuture.completedFuture(null)
 
                 // Call meta svc to preallocate file object ID
-                .thenApply(x -> preallocateForType(tenant, ObjectType.FILE))
+                .thenApply(x -> preallocateRequest(tenant, ObjectType.FILE))
                 .thenApply(metaApi::preallocateId)
                 .thenCompose(Futures::javaFuture)
                 .thenAccept(fileId -> req.priorFileId = fileId)
@@ -506,30 +508,6 @@ public class FileReadWriteService {
         var storageAttrs= List.of(storageForAttr);
 
         return Stream.concat(tags.stream(), storageAttrs.stream()).collect(Collectors.toList());
-    }
-
-    private static MetadataWriteRequest preallocateForType(String tenant, ObjectType objectType) {
-
-        return MetadataWriteRequest.newBuilder()
-                .setTenant(tenant)
-                .setObjectType(objectType)
-                .build();
-    }
-
-    private static MetadataReadRequest requestForSelector(String tenant, TagSelector selector) {
-
-        return MetadataReadRequest.newBuilder()
-                .setTenant(tenant)
-                .setSelector(selector)
-                .build();
-    }
-
-    private static TagHeader bumpVersion(TagHeader priorVersion) {
-
-        return priorVersion.toBuilder()
-                .setObjectVersion(priorVersion.getObjectVersion() + 1)
-                .setTagVersion(1)
-                .build();
     }
 
     private FileDefinition recordSize(long actualSize, FileDefinition fileDef) {
