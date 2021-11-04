@@ -152,7 +152,7 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
         messageBuffer.add(message);
         messageBufferEnd++;
 
-        dispatchMessages();
+        eventLoop.submit(this::dispatchMessages);
     }
 
     @Override
@@ -181,7 +181,7 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
     private void doComplete() {
 
         completeFlag = true;
-        dispatchMessages();
+        eventLoop.submit(this::dispatchMessages);
     }
 
     private void dispatchMessages() {
@@ -254,7 +254,7 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
             sourceRequestIndex = state.requestIndex;
         }
 
-        dispatchMessages();
+        eventLoop.submit(this::dispatchMessages);
     }
 
     private void cancelTargetSubscription(Flow.Subscriber<? super T> target) {
