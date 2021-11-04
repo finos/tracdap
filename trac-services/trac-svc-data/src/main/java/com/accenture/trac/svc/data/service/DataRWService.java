@@ -232,7 +232,95 @@ public class DataRWService {
         state.dataTags = request.getTagUpdatesList();  // File tags requested by the client
         state.storageTags = List.of();                 // Storage tags is empty to start with
 
+        var dataItem = buildDataItem(request, state);
+        var dataDef = buildDataDef(request, dataItem);
+        var storageDef = buildStorageDef(request, dataItem);
+
+        state.data = dataDef;
+        state.storage = storageDef;
+
+        state.copy = storageDef
+                .getDataItemsOrThrow(dataItem)
+                .getIncarnations(0)
+                .getCopies(0);
+
         return state;
+    }
+
+    private String buildDataItem(DataWriteRequest request, RequestState state) {
+
+        var snapIndex = 0;
+        var deltaIndex = 0;
+
+        var dataItemTemplate = "data/table/%s/part-%s/snap-%d/delta-%d";
+
+        return String.format(dataItemTemplate,
+                state.dataId, PartType.PART_ROOT,  // TODO
+                snapIndex, deltaIndex);
+    }
+
+    private DataDefinition buildDataDef(DataWriteRequest request, String dataItem) {
+
+        var partKey = PartKey.newBuilder()
+                .setPartType(PartType.PART_ROOT)
+                .setOpaqueKey(PartType.PART_ROOT.name());  // TODO: opaque key
+
+        var snapIndex = 0;
+        var deltaIndex = 0;
+
+        var delta = DataDefinition.Delta.newBuilder()
+                .setDeltaIndex(deltaIndex)
+                .setDataItem(dataItem);
+
+        var snap = DataDefinition.Snap.newBuilder()
+                .setSnapIndex(snapIndex)
+                .addDeltas(deltaIndex, delta);
+
+        var part = DataDefinition.Part.newBuilder()
+                .setPartKey(partKey)
+                .setSnap(snap)
+                .build();
+
+        var dataDef = DataDefinition.newBuilder();
+
+        if (request.hasSchema())
+            dataDef.setSchema(request.getSchema());
+        else if (request.hasSchemaId())
+            dataDef.setSchemaId(request.getSchemaId());
+        else
+            throw new EUnexpected();  // TODO
+
+        return dataDef
+                .putParts(partKey.getOpaqueKey(), part)
+                .build();
+    }
+
+    private StorageDefinition buildStorageDef(DataWriteRequest request, String dataItem) {
+
+        var storageKey = config.getDefaultStorage();
+        var storageFormat = "text/csv";  // TODO  application/vnd.apache.arrow.file
+        var incarnationIndex = 0;
+
+        var copy = StorageCopy.newBuilder()
+                .setCopyStatus(CopyStatus.COPY_AVAILABLE)
+                //.setCopyTimestamp(null)  // TODO
+                .setStorageKey(storageKey)
+                .setStoragePath(dataItem)
+                .setStorageFormat(storageFormat);
+
+        var incarnation = StorageIncarnation.newBuilder()
+                .setIncarnationStatus(IncarnationStatus.INCARNATION_AVAILABLE)
+                .setIncarnationIndex(incarnationIndex)
+                //.setIncarnationTimestamp(null)  // todo
+                .addCopies(copy);
+
+        var storageItem = StorageItem.newBuilder()
+                .addIncarnations(incarnationIndex, incarnation)
+                .build();
+
+        return StorageDefinition.newBuilder()
+                .putDataItems(dataItem, storageItem)
+                .build();
     }
 
     private void finalizeMetadata(RequestState state, long rowsSaved) {
