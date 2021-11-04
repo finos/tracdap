@@ -19,6 +19,7 @@ package com.accenture.trac.common.codec;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.metadata.SchemaDefinition;
 import io.netty.buffer.ByteBuf;
+import org.apache.arrow.memory.BufferAllocator;
 
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,13 @@ public interface ICodec {
 
     List<String> options();
 
-    Encoder getEncoder(SchemaDefinition schema, Map<String, String> options);
+    Encoder getEncoder(
+            BufferAllocator arrowAllocator,
+            SchemaDefinition schema,
+            Map<String, String> options);
 
-    Decoder getDecoder(SchemaDefinition schema, Map<String, String> options);
+    Decoder getDecoder(
+            BufferAllocator arrowAllocator,
+            SchemaDefinition schema,
+            Map<String, String> options);
 }

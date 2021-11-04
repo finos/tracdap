@@ -22,11 +22,16 @@ import com.accenture.trac.common.codec.ICodec;
 import com.accenture.trac.common.codec.ICodecManager;
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.data.DataBlock;
+import com.accenture.trac.common.data.DataContext;
+import com.accenture.trac.common.data.IDataContext;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.metadata.*;
 import io.netty.buffer.ByteBuf;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.NettyAllocationManager;
+import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 
 import java.lang.ref.Reference;
@@ -43,6 +48,8 @@ public class DataRWService {
     private final ICodecManager codecManager;
     private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaApi;
 
+    private final BufferAllocator arrowAllocator;
+
     public DataRWService(
             DataServiceConfig config,
             IStorageManager storageManager,
@@ -53,6 +60,15 @@ public class DataRWService {
         this.storageManager = storageManager;
         this.codecManager = codecManager;
         this.metaApi = metaApi;
+
+        // TODO: Arrow allocator should probably be owned by the main service class and passed in
+
+        var arrowAllocatorConfig = RootAllocator
+                .configBuilder()
+                .allocationManagerFactory(NettyAllocationManager.FACTORY)
+                .build();
+
+        this.arrowAllocator = new RootAllocator(arrowAllocatorConfig);
     }
 
     public CompletionStage<TagHeader> createDataset(
@@ -78,6 +94,8 @@ public class DataRWService {
             Flow.Subscriber<ByteBuf> content,
             IExecutionContext execCtx) {
 
+        var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
+
         var state = new RequestState();
 
         var codec = codecManager.getCodec(format);
@@ -98,8 +116,8 @@ public class DataRWService {
 
                 .thenAccept(x -> {
 
-                    var blockStream = readDataset(state.data, state.schema, state.storage, execCtx);
-                    var encoder = codec.getEncoder(state.schema, codecOptions);
+                    var blockStream = readDataset(state.data, state.schema, state.storage, dataCtx);
+                    var encoder = codec.getEncoder(arrowAllocator, state.schema, codecOptions);
 
                     encoder.subscribe(content);
                     blockStream.subscribe(encoder);
@@ -130,7 +148,7 @@ public class DataRWService {
             DataDefinition dataDef,
             SchemaDefinition schemaDef,
             StorageDefinition storageDef,
-            IExecutionContext execCtx) {
+            IDataContext execCtx) {
 
         var partKey = dataDef.getPartsMap().keySet().stream().findFirst().get();  // TODO: Root part
         var part = dataDef.getPartsOrThrow(partKey);

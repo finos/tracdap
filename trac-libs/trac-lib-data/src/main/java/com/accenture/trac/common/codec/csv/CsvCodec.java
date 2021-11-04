@@ -18,6 +18,7 @@ package com.accenture.trac.common.codec.csv;
 
 import com.accenture.trac.common.codec.ICodec;
 import com.accenture.trac.metadata.SchemaDefinition;
+import org.apache.arrow.memory.BufferAllocator;
 
 import java.util.List;
 import java.util.Map;
@@ -31,14 +32,20 @@ public class CsvCodec implements ICodec {
     }
 
     @Override
-    public Encoder getEncoder(SchemaDefinition schema, Map<String, String> options) {
+    public Encoder getEncoder(
+            BufferAllocator arrowAllocator,
+            SchemaDefinition schema,
+            Map<String, String> options) {
 
-        return new CsvEncoder(schema);
+        return new CsvEncoder(arrowAllocator, schema);
     }
 
     @Override
-    public Decoder getDecoder(SchemaDefinition schema, Map<String, String> options) {
+    public Decoder getDecoder(
+            BufferAllocator arrowAllocator,
+            SchemaDefinition schema,
+            Map<String, String> options) {
 
-        return new CsvDecoder(schema);
+        return new CsvDecoder(arrowAllocator, schema);
     }
 }

@@ -28,7 +28,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.CompositeByteBuf;
-import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.*;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.slf4j.Logger;
@@ -60,9 +60,7 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
 
     private final boolean headerFlag = DEFAULT_HEADER_FLAG;
 
-    public CsvDecoder(SchemaDefinition schema) {
-
-        var allocator = new RootAllocator();
+    public CsvDecoder(BufferAllocator arrowAllocator, SchemaDefinition schema) {
 
         this.tracSchema = schema;
         this.arrowSchema = ArrowSchema.tracToArrow(this.tracSchema);
@@ -72,7 +70,7 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
 
         for (var field : fields) {
 
-            var vector = field.createVector(allocator);
+            var vector = field.createVector(arrowAllocator);
             vector.setInitialCapacity(BATCH_SIZE);
 
             vectors.add(vector);
@@ -111,6 +109,7 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
     protected void handleSourceError(Throwable error) {
 
         releaseBuffer();
+        doTargetError(error);  // todo
     }
 
     @Override

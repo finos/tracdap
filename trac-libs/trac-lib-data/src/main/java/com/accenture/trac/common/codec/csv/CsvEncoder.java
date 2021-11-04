@@ -31,7 +31,7 @@ import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.EmptyByteBuf;
-import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorLoader;
 import org.apache.arrow.vector.VectorSchemaRoot;
@@ -59,9 +59,7 @@ public class CsvEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> implemen
     private SequenceWriter outWriter;
     private final Queue<ByteBuf> outQueue;
 
-    public CsvEncoder(SchemaDefinition tracSchema) {
-
-        var allocator = new RootAllocator();
+    public CsvEncoder(BufferAllocator arrowAllocator, SchemaDefinition tracSchema) {
 
         this.tracSchema = tracSchema;
         this.arrowSchema = ArrowSchema.tracToArrow(this.tracSchema);
@@ -70,7 +68,7 @@ public class CsvEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> implemen
         var vectors = new ArrayList<FieldVector>(fields.size());
 
         for (var field : fields)
-            vectors.add(field.createVector(allocator));
+            vectors.add(field.createVector(arrowAllocator));
 
         this.root = new VectorSchemaRoot(fields, vectors);
         this.loader = new VectorLoader(root);  // TODO: No compression support atm
@@ -165,6 +163,10 @@ public class CsvEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> implemen
     private void encodeBatch(ArrowRecordBatch batch) {
 
         try (batch) {
+
+            // Todo: when to call this
+            if (outWriter == null)
+                encodeSchema(this.arrowSchema);
 
             loader.load(batch);
 

@@ -17,6 +17,7 @@
 package com.accenture.trac.common.concurrent.flow;
 
 import javax.annotation.Nonnull;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Flow;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -203,16 +204,19 @@ public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Pro
 
         nSourceDelivered += 1;
 
+        handleSourceNext(item);
     }
 
     @Override
-    public final void onError(Throwable throwable) {
+    public final void onError(Throwable error) {
 
+        handleSourceError(error);
     }
 
     @Override
     public final void onComplete() {
 
+        handleSourceComplete();
     }
 
     private class Subscription implements Flow.Subscription {
@@ -243,9 +247,8 @@ public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Pro
 
     protected void handleTargetCancel() {
 
+        doSourceCancel();
     }
-
-
 
     protected void handleSourceSubscribe() {
 
@@ -253,15 +256,16 @@ public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Pro
 
     protected abstract void handleSourceNext(TSource item);
 
+    protected abstract void handleSourceComplete();
+
     protected void handleSourceError(Throwable error) {
 
+        var completionError = error instanceof CompletionException
+                ? error
+                : new CompletionException(error.getMessage(), error);
+
+        doTargetError(completionError);
     }
-
-    protected void handleSourceComplete() {
-
-    }
-
-
 
     protected final void doSourceRequest(long n) {
 
@@ -294,7 +298,7 @@ public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Pro
 
 
     protected final long nTargetRequested() { return nTargetRequested; }
-    protected final long nTargetDelivered() { return nTargetRequested; }
+    protected final long nTargetDelivered() { return nTargetDelivered; }
     protected final long nSourceRequested() { return nSourceRequested; }
     protected final long nSourceDelivered() { return nSourceDelivered; }
 

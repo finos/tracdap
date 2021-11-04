@@ -19,6 +19,7 @@ package com.accenture.trac.common.storage.flat;
 import com.accenture.trac.common.codec.ICodecManager;
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.data.DataBlock;
+import com.accenture.trac.common.data.IDataContext;
 import com.accenture.trac.common.storage.IDataStorage;
 import com.accenture.trac.common.storage.IFileStorage;
 import com.accenture.trac.metadata.SchemaDefinition;
@@ -45,16 +46,16 @@ public class FlatDataStorage implements IDataStorage {
     public Flow.Publisher<DataBlock> reader(
             SchemaDefinition schemaDef,
             StorageCopy storageCopy,
-            IExecutionContext execContext) {
+            IDataContext dataContext) {
 
         var storagePath = storageCopy.getStoragePath();
         var storageFormat = storageCopy.getStorageFormat();
 
         var codec = formats.getCodec(storageFormat);
         var codecOptions = Map.<String, String>of();
-        var decoder = codec.getDecoder(schemaDef, codecOptions);
+        var decoder = codec.getDecoder(dataContext.arrowAllocator(), schemaDef, codecOptions);
 
-        var fileReader = fileStorage.reader(storagePath, execContext);
+        var fileReader = fileStorage.reader(storagePath, dataContext);
         fileReader.subscribe(decoder);
 
         return decoder;
@@ -65,16 +66,16 @@ public class FlatDataStorage implements IDataStorage {
             SchemaDefinition schemaDef,
             StorageCopy storageCopy,
             CompletableFuture<Long> signal,
-            IExecutionContext execContext) {
+            IDataContext dataContext) {
 
         var storagePath = storageCopy.getStoragePath();
         var storageFormat = storageCopy.getStorageFormat();
 
         var codec = formats.getCodec(storageFormat);
         var codecOptions = Map.<String, String>of();
-        var encoder = codec.getEncoder(schemaDef, codecOptions);
+        var encoder = codec.getEncoder(dataContext.arrowAllocator(), schemaDef, codecOptions);
 
-        var fileWriter = fileStorage.writer(storagePath, signal, execContext);
+        var fileWriter = fileStorage.writer(storagePath, signal, dataContext);
         encoder.subscribe(fileWriter);
 
         return encoder;
