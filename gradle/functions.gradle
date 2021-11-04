@@ -86,9 +86,22 @@ def isFeatureEnabled(String key) {
     return buildFeature
 }
 
+def pluginDependency(String pluginName, Project pluginProject) {
+
+    if (isFeatureEnabled(pluginName)) {
+
+        println("Enabling plugin: ${pluginName}")
+
+        dependencies {
+            runtimeOnly pluginProject
+        }
+    }
+}
+
 
 ext {
     addVersionInfo = { SourceSet sourceSet, String name -> this.addVersionInfo(sourceSet, name) }
     getVersionFromGit = { -> getVersionFromGit() }
     isFeatureEnabled = { String key -> this.isFeatureEnabled(key) }
+    pluginDependency = { String name, Project project -> pluginDependency(name, project) }
 }

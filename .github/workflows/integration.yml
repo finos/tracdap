@@ -14,6 +14,12 @@ on:
   workflow_dispatch:
 
 
+# Use baseline language versions for integration builds
+env:
+  JAVA_VERSION: 11
+  JAVA_DISTRIBUTION: zulu
+
+
 jobs:
 
   slow-tests:
@@ -23,16 +29,18 @@ jobs:
 
     steps:
 
-      - name: Set up Java
-        uses: actions/setup-java@v1
-        with:
-          java-version: 11.0.x
-
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v2
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
 
       - name: Build
         run: ./gradlew build -x test
@@ -112,16 +120,18 @@ jobs:
 
     steps:
 
-      - name: Set up Java
-        uses: actions/setup-java@v1
-        with:
-          java-version: 11.0.x
-
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v2
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
 
       - name: Build
         run: ./gradlew trac-svc-meta:build trac-svc-meta:testClasses deploy-metadb:build -x test

@@ -27,7 +27,7 @@ ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Platform Gateway")
 
 
 application {
-    mainClassName = 'com.accenture.trac.gateway.TracPlatformGateway'
+    mainClass.set("com.accenture.trac.gateway.TracPlatformGateway")
     tasks.run.workingDir = rootProject.projectDir
 }
 
@@ -67,22 +67,5 @@ dependencies {
     }
 }
 
-sourceSets.each { cloudProvider ->
-
-    if (cloudProvider.name != "main" && cloudProvider.name != "test") {
-
-        // Only build drivers that are enabled in gradle/plugins.gradle or using the matching env variable
-
-        def key = (String) "${cloudProvider.name}_config"
-        def buildDriver = isFeatureEnabled(key)
-
-        if (buildDriver) {
-
-            println("Enabling cloud plugin: ${cloudProvider.name}")
-
-            dependencies {
-                implementation cloudProvider.runtimeClasspath
-            }
-        }
-    }
-}
+ext.pluginDependency("AWS_CONFIG", project(":aws-config"))
+ext.pluginDependency("GCP_CONFIG", project(":gcp-config"))

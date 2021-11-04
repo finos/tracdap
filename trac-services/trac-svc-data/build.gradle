@@ -26,7 +26,7 @@ ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Data Service")
 
 
 application {
-    mainClassName = 'com.accenture.trac.svc.data.TracDataService'
+    mainClass.set("com.accenture.trac.svc.data.TracDataService")
     tasks.run.workingDir = rootProject.projectDir
 }
 
@@ -59,3 +59,6 @@ dependencies {
         exclude group: 'junit', module: 'junit'
     }
 }
+
+ext.pluginDependency("AWS_CONFIG", project(":aws-config"))
+ext.pluginDependency("GCP_CONFIG", project(":gcp-config"))

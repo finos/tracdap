@@ -26,13 +26,8 @@ ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Metadata Service")
 
 
 application {
-    mainClassName = 'com.accenture.trac.svc.meta.TracMetadataService'
+    mainClass.set("com.accenture.trac.svc.meta.TracMetadataService")
     tasks.run.workingDir = rootProject.projectDir
-}
-
-sourceSets {
-    aws {}
-    gcp {}
 }
 
 dependencies {
@@ -47,9 +42,6 @@ dependencies {
     // There may be licensing implications to enabling certain JDBC drivers
     // See the NOTICE file for more information on licensing restrictions
     runtimeOnly project(':sql-drivers')
-
-    awsRuntimeOnly project(':aws-config')
-    gcpRuntimeOnly project(':gcp-config')
 
     // Core framework - gRPC on Netty
     implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
@@ -72,28 +64,12 @@ dependencies {
     testImplementation group: 'com.h2database', name: 'h2', version: "$h2_version"
 }
 
+ext.pluginDependency("AWS_CONFIG", project(":aws-config"))
+ext.pluginDependency("GCP_CONFIG", project(":gcp-config"))
+
+
 // Bring DDL files into test JAR as resources
 processTestResources {
 
     from "${project(':trac-svc-meta').projectDir.path}/src/schema"
-}
-
-sourceSets.each { cloudProvider ->
-
-    if (cloudProvider.name != "main" && cloudProvider.name != "test") {
-
-        // Only build drivers that are enabled in gradle/plugins.gradle or using the matching env variable
-
-        def key = (String) "${cloudProvider.name}_config"
-        def buildDriver = isFeatureEnabled(key)
-
-        if (buildDriver) {
-
-            println("Enabling cloud plugin: ${cloudProvider.name}")
-
-            dependencies {
-                implementation cloudProvider.runtimeClasspath
-            }
-        }
-    }
 }

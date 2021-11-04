@@ -8,6 +8,13 @@ on:
   pull_request:
 
 
+# Use Java 11 for the baseline build, to avoid dependence on post-11 features
+# It may also be useful to add a set of cross-platform builds, targeting different platforms and Java versions
+env:
+  JAVA_VERSION: 11
+  JAVA_DISTRIBUTION: zulu
+
+
 jobs:
 
   platform_build:
@@ -17,16 +24,20 @@ jobs:
 
     steps:
 
-    - name: Set up Java
-      uses: actions/setup-java@v1
-      with:
-        java-version: 11.0.x
-
     # fetch-depth = 0 is needed to get tags for version info
     - name: Checkout
       uses: actions/checkout@v2
       with:
         fetch-depth: 0
+
+    - name: Set up Java
+      uses: actions/setup-java@v2
+      with:
+        distribution: ${{ env.JAVA_DISTRIBUTION }}
+        java-version: ${{ env.JAVA_VERSION }}
+
+        # Turn on Gradle dependency caching
+        cache: gradle
 
     - name: Build
       run: ./gradlew build -x test
