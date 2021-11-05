@@ -110,8 +110,9 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
         var priorSourceOk = sourceGuard.compareAndSet(false, true);
 
         if (!priorSourceOk)
-            throw new ETracInternal("Hub processor subscribed to multiple upstream sources");
+            throw new IllegalStateException("Hub processor subscribed to multiple upstream sources");
 
+        // TODO
         if (targetGuard.isEmpty())
             throw new ETracInternal("Hub processor connected to source before any targets");
 

@@ -32,10 +32,16 @@ class Helpers {
 
         else {
 
-            content.onSubscribe(new Flow.Subscription() {
-                @Override public void request(long n) {}
-                @Override public void cancel() {}
-            });
+            try {
+                content.onSubscribe(new Flow.Subscription() {
+                    @Override public void request(long n) {}
+                    @Override public void cancel() {}
+                });
+            }
+            catch (IllegalStateException e) {
+
+                // Already subscribed
+            }
 
             content.onError(error);
         }

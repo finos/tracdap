@@ -148,12 +148,16 @@ public class DataRWService {
 
         CompletableFuture.completedFuture(null)
 
+                // Load metadata for the dataset (DATA, STORAGE)
                 .thenCompose(x -> loadMetadata(request, state))
 
                 // Resolve a concrete schema to use for this load operation
                 // This should succeed so long as the metadata service is up,
                 // because the schema metadata was validated when the dataset was saved
                 .thenCompose(x -> resolveSchema(request, state))
+
+                // Select which copy of the data will be read
+                .thenAccept(x -> selectCopy(state))
 
                 // Report the resolved schema back to the caller
                 // This will be used to construct the first message in the response stream
@@ -172,21 +176,48 @@ public class DataRWService {
 
     private CompletionStage<Void> loadMetadata(DataReadRequest request, RequestState state) {
 
-        var dataReq = MetadataBuilders.requestForSelector(request.getTenant(), request.getSelector());
+        return CompletableFuture.completedFuture(0)
 
-        return Futures
-
-                .javaFuture(metaApi.readObject(dataReq))
+                .thenApply(x -> requestForSelector(request.getTenant(), request.getSelector()))
+                .thenCompose(req -> Futures.javaFuture(metaApi.readObject(req)))
                 .thenAccept(tag -> {
                     state.dataId = tag.getHeader();
                     state.data = tag.getDefinition().getData();
                 })
 
-                .thenCompose(x -> MetadataHelpers.readObject(metaApi, request.getTenant(), state.data.getStorageId()))
+                .thenApply(x -> requestForSelector(request.getTenant(), state.data.getStorageId()))
+                .thenCompose(req -> Futures.javaFuture(metaApi.readObject(req)))
                 .thenAccept(tag -> {
                     state.storageId = tag.getHeader();
                     state.storage = tag.getDefinition().getStorage();
                 });
+    }
+
+    private void selectCopy(RequestState state) {
+
+        // TODO
+
+        var partKey = PartKey.newBuilder()
+                .setPartType(PartType.PART_ROOT)
+                .setOpaqueKey(PartType.PART_ROOT.name());  // TODO: opaque key
+
+        var snapIndex = 0;
+        var deltaIndex = 0;
+
+        var incarnationIndex = 0;
+        var copyIndex = 0;
+
+        var delta = state.data
+                .getPartsOrThrow(partKey.getOpaqueKey())
+                .getSnap()
+                .getDeltas(deltaIndex);
+
+        var dataItem = delta.getDataItem();
+
+        state.copy = state.storage
+                .getDataItemsOrThrow(dataItem)
+                .getIncarnations(incarnationIndex)
+                .getCopies(copyIndex);
     }
 
     private CompletionStage<SchemaDefinition> resolveSchema(DataReadRequest request, RequestState state) {

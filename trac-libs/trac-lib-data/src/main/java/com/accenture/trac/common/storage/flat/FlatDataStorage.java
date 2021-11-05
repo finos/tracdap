@@ -51,11 +51,13 @@ public class FlatDataStorage implements IDataStorage {
         var storagePath = storageCopy.getStoragePath();
         var storageFormat = storageCopy.getStorageFormat();
 
+        var chunkPath = storagePath + "/chunk-1.csv";  // TODO
+
         var codec = formats.getCodec(storageFormat);
         var codecOptions = Map.<String, String>of();
         var decoder = codec.getDecoder(dataContext.arrowAllocator(), schemaDef, codecOptions);
 
-        var fileReader = fileStorage.reader(storagePath, dataContext);
+        var fileReader = fileStorage.reader(chunkPath, dataContext);
         fileReader.subscribe(decoder);
 
         return decoder;

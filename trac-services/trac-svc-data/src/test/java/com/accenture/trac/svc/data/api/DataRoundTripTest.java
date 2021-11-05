@@ -19,7 +19,10 @@ package com.accenture.trac.svc.data.api;
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.concurrent.Futures;
+import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.*;
+import com.fasterxml.jackson.dataformat.csv.CsvMapper;
+import com.fasterxml.jackson.dataformat.csv.CsvParser;
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import org.apache.arrow.memory.RootAllocator;
@@ -33,10 +36,11 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayInputStream;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
@@ -44,6 +48,7 @@ import java.util.concurrent.Flow;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
@@ -193,7 +198,7 @@ class DataRoundTripTest extends DataApiTestBase {
 
     private void roundTripTest(
             List<ByteString> content, String writeFormat, String readFormat,
-            BiFunction<DataDefinition, List<ByteString>, TestDataContainer> decodeFunc,
+            BiFunction<SchemaDefinition, List<ByteString>, TestDataContainer> decodeFunc,
             TestDataContainer expectedResult, boolean dataInChunkZero) throws Exception {
 
         var requestParams = DataWriteRequest.newBuilder()
@@ -228,13 +233,15 @@ class DataRoundTripTest extends DataApiTestBase {
 
         DataApiTestHelpers.serverStreaming(dataClient::readDataset, dataRequest, readResponse);
 
-        waitFor(TEST_TIMEOUT, readResponse0, readBytes);
-        // var roundTripDef = resultOf(readResponse0);     // TODO: compare data def and schema
-
+        waitFor(Duration.ofMinutes(20), readResponse0, readBytes);
+        var roundTripResponse = resultOf(readResponse0);
+        var roundTripSchema = roundTripResponse.getSchema();
         var roundTripBytes = resultOf(readBytes);
-        var roundTripData = decodeFunc.apply(dataDef, List.of(roundTripBytes));
 
-        Assertions.assertEquals(expectedResult, roundTripData);
+        var roundTripData = decodeFunc.apply(roundTripSchema, List.of(roundTripBytes));
+
+        Assertions.assertEquals(BASIC_TEST_SCHEMA, roundTripSchema);
+        Assertions.assertEquals(expectedResult.values, roundTripData.values);
     }
 
     private Flow.Publisher<DataWriteRequest> dataWriteRequest(
@@ -286,15 +293,72 @@ class DataRoundTripTest extends DataApiTestBase {
 
 
 
-    private TestDataContainer decodeCsv(DataDefinition dataDef, List<ByteString> data) {
+    private TestDataContainer decodeCsv(SchemaDefinition schema, List<ByteString> data) {
+
+        var result = new TestDataContainer();
+
+        result.fieldNames = schema.getTable()
+                .getFieldsList().stream()
+                .map(FieldSchema::getFieldName)
+                .collect(Collectors.toList());
+
+        result.fieldTypes = schema.getTable()
+                .getFieldsList().stream()
+                .map(FieldSchema::getFieldType)
+                .collect(Collectors.toList());
+
+        result.values = IntStream
+                .range(0, result.fieldNames.size())
+                .mapToObj(x -> new Vector<>())
+                .collect(Collectors.toList());
+
+        var allData = data.stream().reduce(ByteString.EMPTY, ByteString::concat).toString(StandardCharsets.UTF_8);
+
+        try (var reader = new BufferedReader(new StringReader(allData))) {
+
+            reader.readLine();  // skip header
+
+            var csvReader = CsvMapper.builder().build()
+                    .readerForArrayOf(String.class)
+                    .with(CsvParser.Feature.WRAP_AS_ARRAY);
+
+            try (var itr = csvReader.readValues(reader)) {
+
+                int nCols = result.fieldNames.size();
+                int row = 0;
+
+                while (itr.hasNextValue()) {
+
+                    var csvValues = (Object[]) itr.nextValue();
+
+                    for (int col = 0; col < nCols; col++) {
+
+                        var fieldType = result.fieldTypes.get(col);
+                        var csvValue = csvValues[col];
+                        var vector = result.values.get(col);
+
+                        var objValue = decodeJavaObject(fieldType, csvValue);
+
+                        vector.add(row, objValue);
+                    }
+
+                    row++;
+                }
+            }
+
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        return result;
+    }
+
+    private TestDataContainer decodeJson(SchemaDefinition schema, List<ByteString> data) {
         return null;
     }
 
-    private TestDataContainer decodeJson(DataDefinition dataDef, List<ByteString> data) {
-        return null;
-    }
-
-    private TestDataContainer decodeArrow(DataDefinition dataDef, List<ByteString> data) {
+    private TestDataContainer decodeArrow(SchemaDefinition schema, List<ByteString> data) {
 
         var allocator = new RootAllocator();  // TODO: Pass in an allocator
 
@@ -336,5 +400,49 @@ class DataRoundTripTest extends DataApiTestBase {
             else
                 throw new RuntimeException(e);
         }
+    }
+
+    private Object decodeJavaObject(BasicType fieldType, Object rawObject) {
+
+        switch (fieldType) {
+
+            case BOOLEAN:
+
+                if (rawObject instanceof Boolean)
+                    return rawObject;
+
+                throw new EUnexpected();
+
+            case INTEGER:
+
+                if (rawObject instanceof Long) return rawObject;
+                if (rawObject instanceof Integer) return (long) (int) rawObject;
+                if (rawObject instanceof Short) return (long) (short) rawObject;
+                if (rawObject instanceof Byte) return (long) (byte) rawObject;
+
+                if (rawObject instanceof String)
+                    return Long.parseLong(rawObject.toString());
+
+                throw new EUnexpected();
+
+            case FLOAT:
+
+                if (rawObject instanceof Double) return rawObject;
+                if (rawObject instanceof Float) return rawObject;
+
+                if (rawObject instanceof String)
+                    return Double.parseDouble(rawObject.toString());
+
+                throw new EUnexpected();
+
+            case STRING:
+
+                return rawObject.toString();
+
+            default:
+
+                throw new EUnexpected();
+        }
+
     }
 }
