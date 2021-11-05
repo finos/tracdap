@@ -18,10 +18,7 @@ package com.accenture.trac.common.storage.local;
 
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.exception.*;
-import com.accenture.trac.common.storage.DirStat;
-import com.accenture.trac.common.storage.FileStat;
-import com.accenture.trac.common.storage.FileType;
-import com.accenture.trac.common.storage.IFileStorage;
+import com.accenture.trac.common.storage.*;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -38,10 +35,11 @@ import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 
 import static com.accenture.trac.common.storage.local.LocalFileErrors.ExplicitError.*;
-import static com.accenture.trac.common.storage.local.LocalStoragePlugin.CONFIG_ROOT_DIR;
 
 
 public class LocalFileStorage implements IFileStorage {
+
+    public static final String CONFIG_ROOT_DIR = "rootDir";
 
     private static final String BACKSLASH = "/";
 
@@ -60,15 +58,15 @@ public class LocalFileStorage implements IFileStorage {
     private final String storageKey;
     private final Path rootPath;
 
-    public LocalFileStorage(String storageKey, Properties config) {
+    public LocalFileStorage(Properties config) {
+
+        this.storageKey = config.getProperty(IStorageManager.PROP_STORAGE_KEY);
 
         this.errors = new LocalFileErrors(log, storageKey);
 
         // TODO: Robust config handling
 
         var rootDirProp = config.getProperty(CONFIG_ROOT_DIR);
-
-        this.storageKey = storageKey;
         this.rootPath = Paths.get(rootDirProp)
                 .toAbsolutePath()
                 .normalize();

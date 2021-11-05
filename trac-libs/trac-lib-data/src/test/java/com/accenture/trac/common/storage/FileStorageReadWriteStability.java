@@ -19,7 +19,6 @@ package com.accenture.trac.common.storage;
 import com.accenture.trac.common.concurrent.ExecutionContext;
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
-import com.accenture.trac.common.storage.local.LocalStoragePlugin;
 import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import org.junit.jupiter.api.*;
@@ -54,9 +53,10 @@ public class FileStorageReadWriteStability {
     static void setupStorage() {
 
         var storageProps = new Properties();
-        storageProps.put(LocalStoragePlugin.CONFIG_ROOT_DIR, storageDir.toString());
+        storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
+        storageProps.put(LocalFileStorage.CONFIG_ROOT_DIR, storageDir.toString());
+        storage = new LocalFileStorage(storageProps);
 
-        storage = new LocalFileStorage("TEST_STORAGE", storageProps);
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
     }
 

@@ -16,55 +16,29 @@
 
 package com.accenture.trac.common.codec;
 
-import com.accenture.trac.common.codec.csv.CsvCodec;
-import com.accenture.trac.common.data.DataBlock;
-import com.accenture.trac.common.storage.IStoragePlugin;
-import com.accenture.trac.common.storage.StorageManager;
-import com.accenture.trac.metadata.SchemaDefinition;
-import io.netty.buffer.ByteBuf;
-import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.ServiceLoader;
-import java.util.concurrent.Flow;
+import com.accenture.trac.common.exception.EDataFormatNotSupported;
+import com.accenture.trac.common.exception.EPluginNotAvailable;
+import com.accenture.trac.common.plugin.IPluginManager;
 
 
 public class CodecManager implements ICodecManager {
 
-//    private final Logger log = LoggerFactory.getLogger(getClass());
-//
-//    private final Map<String, IFormatPlugin> plugins;
-//    private final Map<String, StorageManager.StorageBackend> storage;
-//
-//    public CodecManager() {
-//        this.plugins = new HashMap<>();
-//        this.storage = new HashMap<>();
-//    }
-//
-//    public void initFormatPlugins() {
-//
-//        log.info("Looking for format plugins...");
-//
-//        var availablePlugins = ServiceLoader.load(IFormatPlugin.class);
-//
-//        for (var plugin: availablePlugins) {
-//
-//            var discoveryMsg = String.format("Storage plugin: [%s] (protocols: %s)",
-//                    plugin.name(),
-//                    String.join(", ", plugin.protocols()));
-//
-//            log.info(discoveryMsg);
-//
-//            for (var protocol : plugin.protocols())
-//                plugins.put(protocol, plugin);
-//        }
-//    }
+    private final IPluginManager plugins;
+
+    public CodecManager(IPluginManager plugins) {
+        this.plugins = plugins;
+    }
 
     @Override
     public ICodec getCodec(String format) {
-        return new CsvCodec();
+
+        try {
+
+            return plugins.createService(ICodec.class, format);
+        }
+        catch (EPluginNotAvailable e) {
+
+            throw new EDataFormatNotSupported(e.getMessage(), e);
+        }
     }
 }

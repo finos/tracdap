@@ -12,5 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Local file storage is available as part of the core implementation
-com.accenture.trac.common.storage.local.LocalStoragePlugin
+# Core data plugin supplies core formats and local file storage
+com.accenture.trac.common.data.CoreDataPlugin

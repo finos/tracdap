@@ -24,6 +24,7 @@ import com.accenture.trac.common.codec.CodecManager;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.concurrent.ExecutionRegister;
 import com.accenture.trac.common.exception.EStartup;
+import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.svc.data.api.TracDataApi;
@@ -87,6 +88,9 @@ public class TracDataService extends CommonServiceBase {
 
         try {
 
+            var plugins = new PluginManager();
+            plugins.initPlugins();
+
             var channelType = NioServerSocketChannel.class;
             var clientChannelType = NioSocketChannel.class;
 
@@ -96,11 +100,8 @@ public class TracDataService extends CommonServiceBase {
 
             var execRegister = new ExecutionRegister(workerGroup);
 
-            var formats = new CodecManager();
-            // formats.initFormatPlugins();
-
-            var storage = new StorageManager();
-            storage.initStoragePlugins();
+            var formats = new CodecManager(plugins);
+            var storage = new StorageManager(plugins);
             storage.initStorage(dataSvcConfig.getStorage(), formats);
 
             var metaClient = prepareMetadataClient(rootConfig.getTrac(), clientChannelType);

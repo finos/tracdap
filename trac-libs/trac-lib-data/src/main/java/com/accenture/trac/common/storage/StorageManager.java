@@ -20,6 +20,7 @@ import com.accenture.trac.api.config.StorageConfig;
 import com.accenture.trac.common.codec.ICodecManager;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EStorageConfig;
+import com.accenture.trac.common.plugin.IPluginManager;
 import com.accenture.trac.common.storage.flat.FlatDataStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,31 +32,12 @@ public class StorageManager implements IStorageManager {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final Map<String, IStoragePlugin> plugins;
+    private final IPluginManager plugins;
     private final Map<String, StorageBackend> storage;
 
-    public StorageManager() {
-        this.plugins = new HashMap<>();
+    public StorageManager(IPluginManager plugins) {
+        this.plugins = plugins;
         this.storage = new HashMap<>();
-    }
-
-    public void initStoragePlugins() {
-
-        log.info("Looking for storage plugins...");
-
-        var availablePlugins = ServiceLoader.load(IStoragePlugin.class);
-
-        for (var plugin: availablePlugins) {
-
-            var discoveryMsg = String.format("Storage plugin: [%s] (protocols: %s)",
-                    plugin.name(),
-                    String.join(", ", plugin.protocols()));
-
-            log.info(discoveryMsg);
-
-            for (var protocol : plugin.protocols())
-                plugins.put(protocol, plugin);
-        }
     }
 
     public void initStorage(Map<String, StorageConfig> storageConfigMap, ICodecManager formats) {
@@ -73,13 +55,33 @@ public class StorageManager implements IStorageManager {
                 var protocol = instanceConfig.getStorageType();
                 var rawProps = instanceConfig.getStorageProps();
                 var props = new Properties();
+                props.put(PROP_STORAGE_KEY, storageKey);
                 props.putAll(rawProps);
 
                 log.info("Attach storage: [{}] (protocol: {})", storageKey, protocol);
 
-                var plugin = plugins.get(protocol);
+                if (plugins.isServiceAvailable(IFileStorage.class, protocol)) {
 
-                if (plugin == null) {
+                    var fileInstance = plugins.createService(IFileStorage.class, protocol, props);
+                    backend.fileInstances.add(fileInstance);
+                }
+
+                if (plugins.isServiceAvailable(IDataStorage.class, protocol)) {
+
+                    var dataInstance = plugins.createService(IDataStorage.class, protocol, props);
+                    backend.dataInstances.add(dataInstance);
+                }
+                else if (!backend.fileInstances.isEmpty()) {
+
+                    log.info("Using flat data storage (datasets will be saved as files)");
+
+                    for (var fileInstance : backend.fileInstances) {
+                        var dataInstance = new FlatDataStorage(fileInstance, formats);
+                        backend.dataInstances.add(dataInstance);
+                    }
+                }
+
+                if (backend.fileInstances.isEmpty() && backend.dataInstances.isEmpty()) {
 
                     var message = String.format("No plugin found to support storage protocol [%s]", protocol);
                     var error = new EStartup(message);
@@ -87,12 +89,6 @@ public class StorageManager implements IStorageManager {
                     log.error(message, error);
                     throw error;
                 }
-
-                var fileInstance = plugin.createFileStorage(storageKey, protocol, props);
-                var dataInstance = new FlatDataStorage(fileInstance, formats);
-
-                backend.fileInstances.add(fileInstance);
-                backend.dataInstances.add(dataInstance);
             }
 
             storage.put(storageKey, backend);

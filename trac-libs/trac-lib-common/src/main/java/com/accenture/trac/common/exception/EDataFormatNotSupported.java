@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.storage;
+package com.accenture.trac.common.exception;
 
-public interface IStorageManager {
+public class EDataFormatNotSupported extends EData {
 
-    String PROP_STORAGE_KEY = "TRAC_STORAGE_KEY";
+    public EDataFormatNotSupported(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-    IDataStorage getDataStorage(String storageKey);
-
-    IFileStorage getFileStorage(String storageKey);
+    public EDataFormatNotSupported(String message) {
+        super(message);
+    }
 }

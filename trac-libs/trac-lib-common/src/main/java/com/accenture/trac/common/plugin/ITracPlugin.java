@@ -14,13 +14,18 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.storage;
+package com.accenture.trac.common.plugin;
 
-public interface IStorageManager {
+import java.util.List;
+import java.util.Properties;
 
-    String PROP_STORAGE_KEY = "TRAC_STORAGE_KEY";
+public interface ITracPlugin {
 
-    IDataStorage getDataStorage(String storageKey);
+    String pluginName();
 
-    IFileStorage getFileStorage(String storageKey);
+    List<PluginServiceInfo> serviceInfo();
+
+    List<String> protocols(Class<?> service);
+
+    <T> T createService(Class<T> serviceClass, String protocol, Properties properties);
 }

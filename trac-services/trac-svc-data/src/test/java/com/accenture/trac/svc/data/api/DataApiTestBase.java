@@ -25,6 +25,7 @@ import com.accenture.trac.common.config.StandardArgs;
 import com.accenture.trac.common.concurrent.ExecutionContext;
 import com.accenture.trac.common.concurrent.ExecutionRegister;
 import com.accenture.trac.common.concurrent.IExecutionContext;
+import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.svc.data.EventLoopChannel;
@@ -157,11 +158,11 @@ abstract  class DataApiTestBase {
         var rootConfig = configManager.loadRootConfig(RootConfig.class);
         var dataSvcConfig = rootConfig.getTrac().getServices().getData();
 
-        formats = new CodecManager();
-        // formats.initFormatPlugins();
+        var plugins = new PluginManager();
+        plugins.initPlugins();
 
-        storage = new StorageManager();
-        storage.initStoragePlugins();
+        formats = new CodecManager(plugins);
+        storage = new StorageManager(plugins);
         storage.initStorage(dataSvcConfig.getStorage(), formats);
 
         execContext = new ExecutionContext(new DefaultEventExecutor());
