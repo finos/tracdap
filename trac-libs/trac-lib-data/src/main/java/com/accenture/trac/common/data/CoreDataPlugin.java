@@ -20,18 +20,16 @@ import com.accenture.trac.common.codec.ICodec;
 import com.accenture.trac.common.codec.csv.CsvCodec;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.common.plugin.ITracPlugin;
 import com.accenture.trac.common.plugin.PluginServiceInfo;
+import com.accenture.trac.common.plugin.TracPlugin;
 import com.accenture.trac.common.storage.IFileStorage;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.stream.Collectors;
 
 
-public class CoreDataPlugin implements ITracPlugin {
+public class CoreDataPlugin extends TracPlugin {
 
     private static final String PLUGIN_NAME = "CORE_DATA";
 
@@ -59,32 +57,10 @@ public class CoreDataPlugin implements ITracPlugin {
         return psi;
     }
 
-    @Override
-    public List<String> protocols(Class<?> service) {
-
-        var matchingPsi = psi.stream()
-                .filter(si -> si.serviceClass() == service)
-                .collect(Collectors.toList());
-
-        if (matchingPsi.isEmpty())
-            throw new IllegalArgumentException();
-
-        return matchingPsi.stream()
-                .map(PluginServiceInfo::protocols)
-                .reduce(new ArrayList<>(), (ps, p) -> {ps.addAll(p); return ps;});
-    }
-
     @Override @SuppressWarnings("unchecked")
-    public <T> T createService(Class<T> serviceClass, String protocol, Properties properties) {
+    public <T> T createService(String serviceName, Properties properties) {
 
-        var matchingPsi = psi.stream()
-                .filter(psi_ -> psiMatch(psi_, serviceClass, protocol))
-                .findFirst();
-
-        if (matchingPsi.isEmpty())
-            throw new IllegalArgumentException();
-
-        switch (matchingPsi.get().serviceName()) {
+        switch (serviceName) {
 
             case CSV_CODEC_NAME: return (T) new CsvCodec();
 
@@ -98,19 +74,5 @@ public class CoreDataPlugin implements ITracPlugin {
             default:
                 throw new EUnexpected();
         }
-    }
-
-    private static boolean psiMatch(PluginServiceInfo psi, Class<?> service, String protocol) {
-
-        if (psi.serviceClass() != service)
-            return false;
-
-        for (var psiProtocol : psi.protocols()) {
-
-            if (psiProtocol.equalsIgnoreCase(protocol))
-                return true;
-        }
-
-        return false;
     }
 }

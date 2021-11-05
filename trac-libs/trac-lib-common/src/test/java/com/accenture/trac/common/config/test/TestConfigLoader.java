@@ -17,7 +17,6 @@
 package com.accenture.trac.common.config.test;
 
 import com.accenture.trac.common.config.IConfigLoader;
-import com.accenture.trac.common.config.StandardArgs;
 import com.accenture.trac.common.exception.EStartup;
 
 import java.io.IOException;

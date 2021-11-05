@@ -20,10 +20,7 @@ import com.accenture.trac.common.exception.EPluginNotAvailable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
-import java.util.ServiceLoader;
+import java.util.*;
 
 
 public class PluginManager implements IPluginManager {
@@ -63,6 +60,19 @@ public class PluginManager implements IPluginManager {
                 }
             }
         }
+    }
+
+    @Override
+    public List<String> availableProtocols(Class<?> serviceClass) {
+
+        var protocols = new HashSet<String>();
+
+        for (var pluginKey : plugins.keySet()) {
+            if (pluginKey.serviceClass() == serviceClass)
+                protocols.add(pluginKey.protocol());
+        }
+
+        return new ArrayList<>(protocols);
     }
 
     @Override

@@ -18,6 +18,7 @@ package com.accenture.trac.common.config;
 
 import com.accenture.trac.common.exception.*;
 
+import com.accenture.trac.common.plugin.IPluginManager;
 import org.apache.logging.log4j.core.config.ConfigurationSource;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.slf4j.Logger;
@@ -65,11 +66,10 @@ public class ConfigManager {
     private static final String LOGGING_CONFIG_URL = "config.logging.url";
 
     private final StandardArgs args;
+    private final IPluginManager plugins;
 
     private final URI configRootFile;
     private final URI configRootDir;
-
-    private final Map<String, IConfigLoader> configLoaders;
 
     private Logger log;
 
@@ -79,9 +79,10 @@ public class ConfigManager {
      * @param args Standard command line args, as produced by StandardArgsProcessor
      * @throws EStartup The supplied args are not valid
      */
-    public ConfigManager(StandardArgs args) {
+    public ConfigManager(StandardArgs args, IPluginManager plugins) {
 
         this.args = args;
+        this.plugins = plugins;
 
         configRootFile = resolveConfigRootFile();
         configRootDir = configRootFile.resolve(".").normalize();
@@ -90,8 +91,6 @@ public class ConfigManager {
             logInfo("Using config root: " + Paths.get(configRootDir));
         else
             logInfo("Using config root: " + configRootDir);
-
-        this.configLoaders = new HashMap<>();
     }
 
     /**
@@ -111,37 +110,8 @@ public class ConfigManager {
      * @return List of supported URL protocols for config loading
      */
     public List<String> protocols() {
-        return List.copyOf(configLoaders.keySet());
-    }
 
-    /**
-     * Initialize the available set of config loading plugins.
-     *
-     * <p>This method must be called before any config can be loaded. It will find and load
-     * all the available config loading plugins on the current classpath, including the
-     * built in loader for loading from the filesystem.</p>
-     *
-     * @throws EStartup There was an error initializing one of the plugins
-     */
-    public void initConfigPlugins() {
-
-        logInfo("Looking for config plugins...");
-
-        var availablePlugins = ServiceLoader.load(IConfigPlugin.class);
-
-        for (var plugin: availablePlugins) {
-
-            var loader = plugin.createConfigLoader(args);
-
-            var discoveryMsg = String.format("Config plugin: %s (protocols: %s)",
-                    loader.loaderName(),
-                    String.join(", ", loader.protocols()));
-
-            logInfo(discoveryMsg);
-
-            for (var protocol : loader.protocols())
-                configLoaders.put(protocol, loader);
-        }
+        return plugins.availableProtocols(IConfigLoader.class);
     }
 
     /**
@@ -392,9 +362,7 @@ public class ConfigManager {
         if (protocol == null || protocol.isBlank())
             protocol = "file";
 
-        var loader = configLoaders.get(protocol);
-
-        if (loader == null) {
+        if (!plugins.isServiceAvailable(IConfigLoader.class, protocol)) {
 
             var message = String.format("No config loader available for protocol [%s]", protocol);
 
@@ -404,7 +372,7 @@ public class ConfigManager {
             throw new EStartup(message);
         }
 
-        return loader;
+        return plugins.createService(IConfigLoader.class, protocol);
     }
 
     private void logInfo(String message) {

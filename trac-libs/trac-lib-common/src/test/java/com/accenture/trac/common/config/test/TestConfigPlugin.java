@@ -17,28 +17,50 @@
 package com.accenture.trac.common.config.test;
 
 import com.accenture.trac.common.config.IConfigLoader;
-import com.accenture.trac.common.config.IConfigPlugin;
-import com.accenture.trac.common.config.StandardArgs;
+import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.plugin.PluginServiceInfo;
+import com.accenture.trac.common.plugin.TracPlugin;
 
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Properties;
 
 
-public class TestConfigPlugin implements IConfigPlugin {
+public class TestConfigPlugin extends TracPlugin {
 
-    private static Path tempDir;
+    private static final String PLUGIN_NAME = "TEST_CONFIG";
+    private static final String SERVICE_NAME = "TEST_CONFIG";
+
+    private static final PluginServiceInfo serviceInfo = new PluginServiceInfo(
+            PLUGIN_NAME, IConfigLoader.class,
+            SERVICE_NAME, List.of("test"));
+
+    @Override
+    public String pluginName() {
+        return PLUGIN_NAME;
+    }
+
+    @Override
+    public List<PluginServiceInfo> serviceInfo() {
+        return List.of(serviceInfo);
+    }
+
+    @Override @SuppressWarnings("unchecked")
+    protected <T> T createService(String serviceName, Properties properties) {
+
+        if (tempDir == null || !Files.exists(tempDir))
+            throw new RuntimeException("Temp dir must be set for TestConfigPlugin");
+
+        if (serviceName.equals(SERVICE_NAME))
+            return (T) new TestConfigLoader(tempDir);
+
+        throw new EUnexpected();
+    }
 
     public static void setCurrentTempDir(Path tempDir) {
         TestConfigPlugin.tempDir = tempDir;
     }
 
-    @Override
-    public IConfigLoader createConfigLoader(StandardArgs args) {
-
-        if (tempDir == null || !Files.exists(tempDir))
-            throw new RuntimeException("Temp dir must be set for TestConfigPlugin");
-
-        return new TestConfigLoader(tempDir);
-    }
+    private static Path tempDir;
 }

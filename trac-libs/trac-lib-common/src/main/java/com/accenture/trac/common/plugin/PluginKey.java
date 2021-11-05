@@ -30,6 +30,14 @@ class PluginKey {
         this.protocol = protocol.toLowerCase();
     }
 
+    public Class<?> serviceClass() {
+        return service;
+    }
+
+    public String protocol() {
+        return protocol;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

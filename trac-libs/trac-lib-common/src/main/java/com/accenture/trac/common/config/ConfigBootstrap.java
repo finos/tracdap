@@ -16,13 +16,40 @@
 
 package com.accenture.trac.common.config;
 
+import com.accenture.trac.common.exception.EStartup;
+import com.accenture.trac.common.plugin.IPluginManager;
 import com.accenture.trac.common.util.VersionInfo;
+import org.apache.logging.log4j.core.config.ConfigurationSource;
+import org.apache.logging.log4j.core.config.Configurator;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 
 public class ConfigBootstrap {
+
+    private static final String BOOTSTRAP_LOG_CONFIG = "log4j2_bootstrap.xml";
+
+    public static void bootstrapInit() {
+
+        try (var logConfig = ConfigBootstrap.class.getResourceAsStream(BOOTSTRAP_LOG_CONFIG)) {
+
+            if (logConfig == null)
+                throw new EStartup("Failed to load logging config for bootstrap");
+
+            var configSource = new ConfigurationSource(logConfig);
+            Configurator.initialize(ConfigBootstrap.class.getClassLoader(), configSource);
+        }
+        catch (IOException e) {
+            throw new EStartup("Failed to load logging config for bootstrap");
+        }
+
+        var log = LoggerFactory.getLogger(ConfigBootstrap.class);
+        log.info("Begin bootstrap sequence...");
+    }
 
     public static ConfigManager useCommandLine(Class<?> serviceClass, String[] args) {
 
@@ -74,13 +101,13 @@ public class ConfigBootstrap {
         System.out.println(startupBanner);
     }
 
-    private static ConfigManager loadConfig(StandardArgs standardArgs) {
+    private static ConfigManager loadConfig(StandardArgs standardArgs, IPluginManager plugins) {
 
         System.out.println(">>> Working directory: " + standardArgs.getWorkingDir());
         System.out.println(">>> Config file: " + standardArgs.getConfigFile());
         System.out.println();
 
-        var configManager = new ConfigManager(standardArgs);
+        var configManager = new ConfigManager(standardArgs, plugins);
         configManager.initConfigPlugins();
         configManager.initLogging();
 

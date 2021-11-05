@@ -16,9 +16,12 @@
 
 package com.accenture.trac.common.plugin;
 
+import java.util.List;
 import java.util.Properties;
 
 public interface IPluginManager {
+
+    List<String> availableProtocols(Class<?> serviceClass);
 
     boolean isServiceAvailable(Class<?> serviceClass, String protocol);
 
