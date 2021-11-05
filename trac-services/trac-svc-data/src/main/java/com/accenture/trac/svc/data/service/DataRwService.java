@@ -49,7 +49,7 @@ import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
 import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
-public class DataRWService {
+public class DataRwService {
 
     private final DataServiceConfig config;
     private final IStorageManager storageManager;
@@ -58,7 +58,7 @@ public class DataRWService {
 
     private final BufferAllocator arrowAllocator;
 
-    public DataRWService(
+    public DataRwService(
             DataServiceConfig config,
             IStorageManager storageManager,
             ICodecManager codecManager,

@@ -26,8 +26,8 @@ import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.metadata.SchemaDefinition;
 import com.accenture.trac.metadata.TagHeader;
-import com.accenture.trac.svc.data.service.DataRWService;
-import com.accenture.trac.svc.data.service.FileReadWriteService;
+import com.accenture.trac.svc.data.service.DataRwService;
+import com.accenture.trac.svc.data.service.FileRwService;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
@@ -61,13 +61,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final DataRWService dataRwService;
-    private final FileReadWriteService fileService;
+    private final DataRwService dataRwService;
+    private final FileRwService fileService;
 
     private final Validator validator = new Validator();
 
 
-    public TracDataApi(DataRWService dataRwService, FileReadWriteService fileService) {
+    public TracDataApi(DataRwService dataRwService, FileRwService fileService) {
         this.dataRwService = dataRwService;
         this.fileService = fileService;
     }
