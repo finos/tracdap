@@ -49,6 +49,10 @@ dependencies {
     implementation group: 'org.apache.arrow', name: 'arrow-vector', version: "$arrow_version"
     implementation group: 'org.apache.arrow', name: 'arrow-memory-netty', version: "$arrow_version"
 
+    // Make sure to use the correct version of Jackson
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
+    implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-csv', version: "$jackson_version"
+
     testImplementation project(':trac-lib-test')
 
     // Migration support for JUnit 4 Rules, provided by gRPC for managing test service instances
