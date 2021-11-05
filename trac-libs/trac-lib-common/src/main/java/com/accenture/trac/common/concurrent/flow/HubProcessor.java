@@ -205,8 +205,8 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
                 var target = subscriberState.getValue();
 
                 if (messageIndex == target.receiveIndex && messageIndex < target.requestIndex) {
-                    targetSubscriber.onNext(message);
                     target.receiveIndex++;
+                    targetSubscriber.onNext(message);
                 }
             }
         }
@@ -219,8 +219,8 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
                 var target = subscriberState.getValue();
 
                 if (target.receiveIndex == messageBufferEnd && !target.completeFlag) {
-                    targetSubscriber.onComplete();
                     target.completeFlag = true;
+                    targetSubscriber.onComplete();
                 }
             }
         }

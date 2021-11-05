@@ -17,8 +17,10 @@
 package com.accenture.trac.common.storage;
 
 import com.accenture.trac.api.config.StorageConfig;
+import com.accenture.trac.common.codec.ICodecManager;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EStorageConfig;
+import com.accenture.trac.common.storage.flat.FlatDataStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +58,7 @@ public class StorageManager implements IStorageManager {
         }
     }
 
-    public void initStorage(Map<String, StorageConfig> storageConfigMap) {
+    public void initStorage(Map<String, StorageConfig> storageConfigMap, ICodecManager formats) {
 
         log.info("Configuring storage...");
 
@@ -86,9 +88,11 @@ public class StorageManager implements IStorageManager {
                     throw error;
                 }
 
-                var instance = plugin.createFileStorage(storageKey, protocol, props);
+                var fileInstance = plugin.createFileStorage(storageKey, protocol, props);
+                var dataInstance = new FlatDataStorage(fileInstance, formats);
 
-                backend.fileInstances.add(instance);
+                backend.fileInstances.add(fileInstance);
+                backend.dataInstances.add(dataInstance);
             }
 
             storage.put(storageKey, backend);
@@ -98,7 +102,24 @@ public class StorageManager implements IStorageManager {
     @Override
     public IDataStorage getDataStorage(String storageKey) {
 
-        throw new RuntimeException("Not implemented yet");
+        // TODO: Full implementation for selecting the storage backend
+
+        // Full implementation should consider multiple instances, locations etc.
+        // Also handle selection between data and file storage
+
+        var store = this.storage.get(storageKey);
+
+        if (store == null) {
+            throw new EStorageConfig("Storage not configured for storage key: " + storageKey);
+        }
+
+        var instance = store.dataInstances.get(0);
+
+        if (instance == null) {
+            throw new EStorageConfig("Storage not configured for storage key: " + storageKey);
+        }
+
+        return instance;
     }
 
     @Override
@@ -127,5 +148,7 @@ public class StorageManager implements IStorageManager {
     private static class StorageBackend {
 
         List<IFileStorage> fileInstances = new ArrayList<>();
+
+        List<IDataStorage> dataInstances = new ArrayList<>();
     }
 }

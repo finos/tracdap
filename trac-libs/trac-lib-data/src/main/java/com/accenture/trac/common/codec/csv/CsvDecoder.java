@@ -196,7 +196,7 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
                     var csvValue = csvValues.get(csvCol.getName());
 
                     if (csvCol.getType() == CsvSchema.ColumnType.NUMBER) {
-                        var numericValue = NumberFormat.getInstance().parse(csvValue);
+                        var numericValue = NumberFormat.getInstance().parse(csvValue.trim());
                         ArrowValues.setValue(root, row, col, numericValue);
                     }
                     else
@@ -234,11 +234,21 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
         }
         catch (IOException | ParseException e) {
 
+            log.error("CSV Decode error", e);
+
             root.clear();
 
             doTargetError(e);
 
             // TODO: Error
+        }
+        catch (Throwable e)  {
+
+            log.error("CSV Decode error", e);
+
+            int x = 0;
+
+            doTargetError(e);
         }
 
     }

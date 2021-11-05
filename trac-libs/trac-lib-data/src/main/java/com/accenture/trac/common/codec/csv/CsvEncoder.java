@@ -108,6 +108,7 @@ public class CsvEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> implemen
         else
             throw new EUnexpected();  // TODO: Error
 
+        doSourceRequest(1);
         deliverPendingChunks();
     }
 

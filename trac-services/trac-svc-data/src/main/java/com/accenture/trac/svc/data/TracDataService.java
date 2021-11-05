@@ -96,12 +96,12 @@ public class TracDataService extends CommonServiceBase {
 
             var execRegister = new ExecutionRegister(workerGroup);
 
-            var storage = new StorageManager();
-            storage.initStoragePlugins();
-            storage.initStorage(dataSvcConfig.getStorage());
-
             var formats = new CodecManager();
             // formats.initFormatPlugins();
+
+            var storage = new StorageManager();
+            storage.initStoragePlugins();
+            storage.initStorage(dataSvcConfig.getStorage(), formats);
 
             var metaClient = prepareMetadataClient(rootConfig.getTrac(), clientChannelType);
 

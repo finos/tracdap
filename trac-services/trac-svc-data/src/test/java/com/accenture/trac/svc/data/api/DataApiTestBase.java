@@ -157,12 +157,12 @@ abstract  class DataApiTestBase {
         var rootConfig = configManager.loadRootConfig(RootConfig.class);
         var dataSvcConfig = rootConfig.getTrac().getServices().getData();
 
-        storage = new StorageManager();
-        storage.initStoragePlugins();
-        storage.initStorage(dataSvcConfig.getStorage());
-
         formats = new CodecManager();
         // formats.initFormatPlugins();
+
+        storage = new StorageManager();
+        storage.initStoragePlugins();
+        storage.initStorage(dataSvcConfig.getStorage(), formats);
 
         execContext = new ExecutionContext(new DefaultEventExecutor());
 

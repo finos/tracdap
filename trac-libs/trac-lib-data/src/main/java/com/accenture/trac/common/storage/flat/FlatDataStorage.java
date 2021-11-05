@@ -71,12 +71,25 @@ public class FlatDataStorage implements IDataStorage {
         var storagePath = storageCopy.getStoragePath();
         var storageFormat = storageCopy.getStorageFormat();
 
+        var chunkPath = storagePath + "/chunk-1.csv";  // TODO
+
         var codec = formats.getCodec(storageFormat);
         var codecOptions = Map.<String, String>of();
         var encoder = codec.getEncoder(dataContext.arrowAllocator(), schemaDef, codecOptions);
 
-        var fileWriter = fileStorage.writer(storagePath, signal, dataContext);
-        encoder.subscribe(fileWriter);
+        var mkdir = fileStorage.mkdir(storagePath, /* recursive = */ true, dataContext);
+
+        mkdir.whenComplete((result, error) -> {
+
+            if (error != null)
+                signal.completeExceptionally(error);
+
+            else {
+
+                var fileWriter = fileStorage.writer(chunkPath, signal, dataContext);
+                encoder.subscribe(fileWriter);
+            }
+        });
 
         return encoder;
     }

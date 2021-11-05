@@ -18,6 +18,7 @@ package com.accenture.trac.svc.data.service;
 
 import com.accenture.trac.api.DataReadRequest;
 import com.accenture.trac.api.DataWriteRequest;
+import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.api.TrustedMetadataApiGrpc;
 import com.accenture.trac.api.config.DataServiceConfig;
 import com.accenture.trac.common.codec.ICodec;
@@ -32,6 +33,7 @@ import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.metadata.*;
 
+import com.google.protobuf.Message;
 import io.netty.buffer.ByteBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.NettyAllocationManager;
@@ -43,6 +45,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
+import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
+import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
 import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
 public class DataRWService {
@@ -119,7 +123,7 @@ public class DataRWService {
 
                 // Save metadata to the metadata store
                 // This effectively "commits" the dataset by making it visible
-                .thenCompose(x -> saveMetadata(state));
+                .thenCompose(x -> saveMetadata(request, state));
     }
 
     public CompletionStage<TagHeader> updateDataset(
@@ -164,8 +168,6 @@ public class DataRWService {
                         state.copy, dataCtx))
 
                 .exceptionally(error -> Helpers.reportError(error, schema, contentStream));
-
-        schema.completeExceptionally(new ETracInternal("Not implemented yet"));
     }
 
     private CompletionStage<Void> loadMetadata(DataReadRequest request, RequestState state) {
@@ -173,11 +175,18 @@ public class DataRWService {
         var dataReq = MetadataBuilders.requestForSelector(request.getTenant(), request.getSelector());
 
         return Futures
-                .javaFuture(metaApi.readObject(dataReq))
-                .thenAccept(obj -> state.data = obj.getDefinition().getData())
 
-                .thenCompose(x -> MetadataHelpers.readObject(metaApi, request.getTenant(), state.file.getStorageId()))
-                .thenAccept(obj -> state.storage = obj.getDefinition().getStorage());
+                .javaFuture(metaApi.readObject(dataReq))
+                .thenAccept(tag -> {
+                    state.dataId = tag.getHeader();
+                    state.data = tag.getDefinition().getData();
+                })
+
+                .thenCompose(x -> MetadataHelpers.readObject(metaApi, request.getTenant(), state.data.getStorageId()))
+                .thenAccept(tag -> {
+                    state.storageId = tag.getHeader();
+                    state.storage = tag.getDefinition().getStorage();
+                });
     }
 
     private CompletionStage<SchemaDefinition> resolveSchema(DataReadRequest request, RequestState state) {
@@ -220,11 +229,16 @@ public class DataRWService {
 
     private CompletionStage<Void> preallocateIds(DataWriteRequest request, RequestState state) {
 
-        var preAllocRequest = preallocateRequest(request.getTenant(), ObjectType.DATA);
+        var preAllocDataReq = preallocateRequest(request.getTenant(), ObjectType.DATA);
+        var preAllocStorageReq = preallocateRequest(request.getTenant(), ObjectType.STORAGE);
 
-        return Futures
-                .javaFuture(metaApi.preallocateId(preAllocRequest))
-                .thenAccept(dataId -> state.priorDataId = dataId);
+        return CompletableFuture.completedFuture(0)
+
+                .thenCompose(x -> Futures.javaFuture(metaApi.preallocateId(preAllocDataReq)))
+                .thenAccept(dataId -> state.priorDataId = dataId)
+
+                .thenCompose(x -> Futures.javaFuture(metaApi.preallocateId(preAllocStorageReq)))
+                .thenAccept(storageId -> state.priorStorageId = storageId);
     }
 
     private RequestState buildMetadata(DataWriteRequest request, RequestState state) {
@@ -232,8 +246,11 @@ public class DataRWService {
         state.dataTags = request.getTagUpdatesList();  // File tags requested by the client
         state.storageTags = List.of();                 // Storage tags is empty to start with
 
+        state.dataId = bumpVersion(state.priorDataId);
+        state.storageId = bumpVersion(state.priorStorageId);
+
         var dataItem = buildDataItem(request, state);
-        var dataDef = buildDataDef(request, dataItem);
+        var dataDef = buildDataDef(request, state, dataItem);
         var storageDef = buildStorageDef(request, dataItem);
 
         state.data = dataDef;
@@ -255,11 +272,11 @@ public class DataRWService {
         var dataItemTemplate = "data/table/%s/part-%s/snap-%d/delta-%d";
 
         return String.format(dataItemTemplate,
-                state.dataId, PartType.PART_ROOT,  // TODO
+                state.dataId.getObjectId(), PartType.PART_ROOT,  // TODO
                 snapIndex, deltaIndex);
     }
 
-    private DataDefinition buildDataDef(DataWriteRequest request, String dataItem) {
+    private DataDefinition buildDataDef(DataWriteRequest request, RequestState state, String dataItem) {
 
         var partKey = PartKey.newBuilder()
                 .setPartType(PartType.PART_ROOT)
@@ -267,6 +284,8 @@ public class DataRWService {
 
         var snapIndex = 0;
         var deltaIndex = 0;
+
+        var storageId = selectorForLatest(state.storageId);
 
         var delta = DataDefinition.Delta.newBuilder()
                 .setDeltaIndex(deltaIndex)
@@ -281,7 +300,8 @@ public class DataRWService {
                 .setSnap(snap)
                 .build();
 
-        var dataDef = DataDefinition.newBuilder();
+        var dataDef = DataDefinition.newBuilder()
+                .setStorageId(storageId);
 
         if (request.hasSchema())
             dataDef.setSchema(request.getSchema());
@@ -327,9 +347,93 @@ public class DataRWService {
 
     }
 
-    private CompletionStage<TagHeader> saveMetadata(RequestState state) {
+    private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state) {
 
-        return CompletableFuture.failedFuture(new RuntimeException());  // TODO
+       //CompletionStage<TagHeader> saveSchema;
+        CompletionStage<TagHeader> saveStorage;
+        CompletionStage<TagHeader> saveData;
+
+        //saveSchema = CompletableFuture.completedFuture(null);
+
+        var priorStorageId = selectorFor(state.priorStorageId);
+        var storageReq = buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
+
+        var priorDataId = selectorFor(state.priorDataId);
+        var dataReq = buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
+
+        return CompletableFuture.completedFuture(0)
+
+                .thenApply(x -> storageReq)
+                .thenApply(state.priorStorage == null ? metaApi::createPreallocatedObject : metaApi::updateObject)
+                .thenCompose(Futures::javaFuture)
+
+                .thenApply(x -> dataReq)
+                .thenApply(state.priorData == null ? metaApi::createPreallocatedObject : metaApi::updateObject)
+                .thenCompose(Futures::javaFuture);
+    }
+
+    private <TDef extends Message> MetadataWriteRequest buildCreateObjectReq(
+            String tenant, TagSelector priorVersion,
+            TDef definition, List<TagUpdate> tagUpdates) {
+
+        var objectDef = objectOf(definition);
+
+        return MetadataWriteRequest.newBuilder()
+                .setTenant(tenant)
+                .setObjectType(objectDef.getObjectType())
+                .setPriorVersion(priorVersion)
+                .setDefinition(objectDef)
+                .addAllTagUpdates(tagUpdates)
+                .build();
+    }
+
+    private ObjectDefinition objectOf(Message def) {
+
+        if (def instanceof DataDefinition)
+            return objectOf((DataDefinition) def);
+
+        if (def instanceof FileDefinition)
+            return objectOf((FileDefinition) def);
+
+        if (def instanceof SchemaDefinition)
+            return objectOf((SchemaDefinition) def);
+
+        if (def instanceof StorageDefinition)
+            return objectOf((StorageDefinition) def);
+
+        throw new EUnexpected();
+    }
+
+    private ObjectDefinition objectOf(DataDefinition def) {
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setData(def)
+                .build();
+    }
+
+    private ObjectDefinition objectOf(FileDefinition def) {
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.FILE)
+                .setFile(def)
+                .build();
+    }
+
+    private ObjectDefinition objectOf(SchemaDefinition def) {
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(def)
+                .build();
+    }
+
+    private ObjectDefinition objectOf(StorageDefinition def) {
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.STORAGE)
+                .setStorage(def)
+                .build();
     }
 
     private void loadAndEncode(
