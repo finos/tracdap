@@ -48,7 +48,7 @@ import java.util.stream.Stream;
 import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
 
-public class FileReadWriteService {
+public class FileRwService {
 
     private static final String TRAC_FILE_NAME_ATTR = "trac_file_name";
     private static final String TRAC_FILE_EXTENSION_ATTR = "trac_file_extension";
@@ -72,7 +72,7 @@ public class FileReadWriteService {
     private final Validator validator = new Validator();
     private final Random random = new Random();
 
-    public FileReadWriteService(
+    public FileRwService(
             DataServiceConfig config,
             IStorageManager storageManager,
             TrustedMetadataApiFutureStub metaApi) {
