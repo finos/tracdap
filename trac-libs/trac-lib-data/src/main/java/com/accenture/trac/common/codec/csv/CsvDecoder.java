@@ -16,10 +16,9 @@
 
 package com.accenture.trac.common.codec.csv;
 
-import com.accenture.trac.common.codec.ICodec;
+import com.accenture.trac.common.codec.BaseDecoder;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
 import com.accenture.trac.common.codec.arrow.ArrowValues;
-import com.accenture.trac.common.concurrent.flow.CommonBaseProcessor;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.metadata.SchemaDefinition;
 
@@ -27,10 +26,7 @@ import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvParser;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufInputStream;
-import io.netty.buffer.CompositeByteBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.*;
 import org.apache.arrow.vector.types.pojo.Schema;
@@ -44,10 +40,10 @@ import java.text.ParseException;
 import java.util.*;
 
 
-public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implements ICodec.Decoder {
+public class CsvDecoder extends BaseDecoder {
 
     private static final int BATCH_SIZE = 1024;
-    private static final DataBlock END_OF_STREAM = DataBlock.empty();
+    private static final DataBlock END_OF_STREAM = DataBlock.eos();
 
     private static final boolean DEFAULT_HEADER_FLAG = true;
 
@@ -58,8 +54,6 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
 
     private final VectorSchemaRoot root;
     private final VectorUnloader unloader;
-    private final CompositeByteBuf buffer;
-    private final Queue<DataBlock> outQueue;
 
     private final boolean headerFlag = DEFAULT_HEADER_FLAG;
 
@@ -81,75 +75,16 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
 
         this.root = new VectorSchemaRoot(fields, vectors);
         this.unloader = new VectorUnloader(root);  // TODO: No compression support atm
-
-        this.buffer = ByteBufAllocator.DEFAULT.compositeBuffer();
-        this.outQueue = new ArrayDeque<>();
     }
 
     @Override
-    protected void handleTargetRequest() {
+    protected void decodeChunk() {
 
-        deliverPendingBlocks();
-
-        if (nTargetRequested() > nTargetDelivered() && nSourceRequested() <= nSourceDelivered())
-            doSourceRequest(1);
+        // No-op, current version of CSV decode buffers the full input
     }
 
     @Override
-    protected void handleTargetCancel() {
-
-        releaseBuffer();
-    }
-
-    @Override
-    protected void handleSourceNext(ByteBuf chunk) {
-
-        buffer.addComponent(true, chunk);
-        doSourceRequest(1);
-    }
-
-    @Override
-    protected void handleSourceError(Throwable error) {
-
-        releaseBuffer();
-        doTargetError(error);  // todo
-    }
-
-    @Override
-    protected void handleSourceComplete() {
-
-        decodeInput();
-        releaseBuffer();
-
-        deliverPendingBlocks();
-    }
-
-    private void deliverPendingBlocks() {
-
-        while (nTargetDelivered() < nTargetRequested()) {
-
-            var block = outQueue.poll();
-
-            if (block == END_OF_STREAM)
-                doTargetComplete();
-
-            else if (block != null)
-                doTargetNext(block);
-
-            else
-                return;
-        }
-    }
-
-    private void releaseBuffer() {
-
-        var releaseOk = buffer.release();
-
-        if (!releaseOk && buffer.capacity() > 0)
-            log.warn("CSV decode buffer was not released (this could indicate a memory leak)");
-    }
-
-    private void decodeInput() {
+    protected void decodeLastChunk() {
 
         outQueue.add(DataBlock.forSchema(this.arrowSchema));
 
@@ -245,8 +180,6 @@ public class CsvDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implemen
         catch (Throwable e)  {
 
             log.error("CSV Decode error", e);
-
-            int x = 0;
 
             doTargetError(e);
         }

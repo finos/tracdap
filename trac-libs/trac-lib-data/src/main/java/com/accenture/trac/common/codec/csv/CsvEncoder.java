@@ -16,13 +16,10 @@
 
 package com.accenture.trac.common.codec.csv;
 
-import com.accenture.trac.common.codec.ICodec;
+import com.accenture.trac.common.codec.BaseEncoder;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
 import com.accenture.trac.common.codec.arrow.ArrowValues;
-import com.accenture.trac.common.concurrent.flow.CommonBaseProcessor;
-import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.exception.ETracInternal;
-import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.util.ByteOutputStream;
 import com.accenture.trac.metadata.SchemaDefinition;
 
@@ -35,19 +32,15 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorLoader;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Schema;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Queue;
-import java.util.concurrent.CompletionException;
 
 
-public class CsvEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> implements ICodec.Encoder {
-
-    private static final ByteBuf END_OF_STREAM = new EmptyByteBuf(ByteBufAllocator.DEFAULT);
+public class CsvEncoder extends BaseEncoder {
 
     private final SchemaDefinition tracSchema;
     private final Schema arrowSchema;
@@ -57,7 +50,6 @@ public class CsvEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> implemen
 
     private CsvMapper mapper = null;
     private SequenceWriter outWriter;
-    private final Queue<ByteBuf> outQueue;
 
     public CsvEncoder(BufferAllocator arrowAllocator, SchemaDefinition tracSchema) {
 
@@ -72,70 +64,10 @@ public class CsvEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> implemen
 
         this.root = new VectorSchemaRoot(fields, vectors);
         this.loader = new VectorLoader(root);  // TODO: No compression support atm
-
-        this.outQueue = new ArrayDeque<>();
     }
 
     @Override
-    protected void handleTargetRequest() {
-
-        deliverPendingChunks();
-
-        if (nTargetRequested() > nTargetDelivered() && nSourceRequested() <= nSourceDelivered())
-            doSourceRequest(1);
-    }
-
-    @Override
-    protected void handleTargetCancel() {
-
-        try {
-            doSourceCancel();
-        }
-        finally {
-            releaseOutQueue();
-        }
-    }
-
-    @Override
-    protected void handleSourceNext(DataBlock block) {
-
-        if (block.arrowSchema != null)
-            encodeSchema(block.arrowSchema);
-
-        else if (block.arrowRecords != null)
-            encodeBatch(block.arrowRecords);
-
-        else
-            throw new EUnexpected();  // TODO: Error
-
-        doSourceRequest(1);
-        deliverPendingChunks();
-    }
-
-    @Override
-    protected void handleSourceComplete() {
-
-        outQueue.add(END_OF_STREAM);
-
-        deliverPendingChunks();
-    }
-
-    @Override
-    protected void handleSourceError(Throwable error) {
-
-        try {
-            var completionError = error instanceof CompletionException
-                    ? error
-                    : new CompletionException(error.getMessage(), error);
-
-            doTargetError(completionError);
-        }
-        finally {
-            releaseOutQueue();
-        }
-    }
-
-    private void encodeSchema(Schema arrowSchema) {
+    protected void encodeSchema(Schema arrowSchema) {
 
         try {
 
@@ -161,7 +93,8 @@ public class CsvEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> implemen
 
     }
 
-    private void encodeBatch(ArrowRecordBatch batch) {
+    @Override
+    protected void encodeRecords(ArrowRecordBatch batch) {
 
         try (batch) {
 
@@ -198,31 +131,9 @@ public class CsvEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> implemen
         }
     }
 
-    private void deliverPendingChunks() {
+    @Override
+    protected void encodeDictionary(ArrowDictionaryBatch batch) {
 
-        while (nTargetDelivered() < nTargetRequested()) {
-
-            var block = outQueue.poll();
-
-            if (block == END_OF_STREAM)
-                doTargetComplete();
-
-            else if (block != null)
-                doTargetNext(block);
-
-            else
-                return;
-        }
-    }
-
-    private void releaseOutQueue() {
-
-        while (!outQueue.isEmpty()) {
-
-            var chunk = outQueue.poll();
-
-            if (chunk != null)
-                chunk.release();
-        }
+        throw new ETracInternal("CSV Dictionary encoding not supported");
     }
 }

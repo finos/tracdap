@@ -16,43 +16,46 @@
 
 package com.accenture.trac.common.data;
 
-import com.accenture.trac.metadata.SchemaDefinition;
 import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Schema;
+
 
 public class DataBlock {
 
     public final Schema arrowSchema;
     public final ArrowRecordBatch arrowRecords;
     public final ArrowDictionaryBatch arrowDictionary;
+    public final boolean eos;
 
-    private static final DataBlock EMPTY = new DataBlock(null, null, null);
+    private static final DataBlock EOS = new DataBlock(null, null, null, true);
 
-    public DataBlock(
+    private DataBlock(
             Schema arrowSchema,
             ArrowRecordBatch arrowRecords,
-            ArrowDictionaryBatch arrowDictionary) {
+            ArrowDictionaryBatch arrowDictionary,
+            boolean eos) {
 
         this.arrowSchema = arrowSchema;
         this.arrowRecords = arrowRecords;
         this.arrowDictionary = arrowDictionary;
+        this.eos = eos;
     }
 
-    public static DataBlock empty() {
-        return EMPTY;
+    public static DataBlock eos() {
+        return EOS;
     }
 
 
     public static DataBlock forSchema(Schema arrowSchema) {
-        return new DataBlock(arrowSchema, null, null);
+        return new DataBlock(arrowSchema, null, null, false);
     }
 
     public static DataBlock forRecords(ArrowRecordBatch arrowRecords) {
-        return new DataBlock(null, arrowRecords, null);
+        return new DataBlock(null, arrowRecords, null, false);
     }
 
     public static DataBlock forDictionary(ArrowDictionaryBatch arrowDictionary) {
-        return new DataBlock(null, null, arrowDictionary);
+        return new DataBlock(null, null, arrowDictionary, false);
     }
 }

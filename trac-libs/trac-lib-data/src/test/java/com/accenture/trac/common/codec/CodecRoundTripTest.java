@@ -17,6 +17,7 @@
 package com.accenture.trac.common.codec;
 
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
+import com.accenture.trac.common.codec.arrow.ArrowStreamCodec;
 import com.accenture.trac.common.codec.csv.CsvCodec;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.data.DataBlock;
@@ -41,6 +42,10 @@ import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 public abstract class CodecRoundTripTest {
+
+    static class ArrowStream extends CodecRoundTripTest {
+        @BeforeEach void setup() { codec = new ArrowStreamCodec(); }
+    }
 
     static class CSV extends CodecRoundTripTest {
         @BeforeEach void setup() { codec = new CsvCodec(); }
