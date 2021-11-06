@@ -23,6 +23,7 @@ import com.accenture.trac.api.config.TracConfig;
 import com.accenture.trac.common.codec.CodecManager;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.concurrent.ExecutionRegister;
+import com.accenture.trac.common.exception.EPluginNotAvailable;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
@@ -52,6 +53,7 @@ public class TracDataService extends CommonServiceBase {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final PluginManager pluginManager;
     private final ConfigManager configManager;
 
     private EventLoopGroup bossGroup;
@@ -59,7 +61,8 @@ public class TracDataService extends CommonServiceBase {
     private ManagedChannel clientChannel;
     private Server server;
 
-    public TracDataService(ConfigManager config) {
+    public TracDataService(PluginManager plugins, ConfigManager config) {
+        this.pluginManager = plugins;
         this.configManager = config;
     }
 
@@ -68,6 +71,15 @@ public class TracDataService extends CommonServiceBase {
 
         RootConfig rootConfig;
         DataServiceConfig dataSvcConfig;
+
+        try {
+            pluginManager.initRegularPlugins();
+        }
+        catch (Exception e) {
+            var errorMessage = "There was a problem loading the plugins: " + e.getMessage();
+            log.error(errorMessage, e);
+            throw new EStartup(errorMessage, e);
+        }
 
         try {
             log.info("Loading TRAC platform config...");
@@ -81,15 +93,12 @@ public class TracDataService extends CommonServiceBase {
         }
         catch (Exception e) {
 
-            var errorMessage = "There was an error loading the platform config: " + e.getMessage();
+            var errorMessage = "There was a problem loading the platform config: " + e.getMessage();
             log.error(errorMessage, e);
             throw new EStartup(errorMessage, e);
         }
 
         try {
-
-            var plugins = new PluginManager();
-            plugins.initPlugins();
 
             var channelType = NioServerSocketChannel.class;
             var clientChannelType = NioSocketChannel.class;
@@ -100,8 +109,8 @@ public class TracDataService extends CommonServiceBase {
 
             var execRegister = new ExecutionRegister(workerGroup);
 
-            var formats = new CodecManager(plugins);
-            var storage = new StorageManager(plugins);
+            var formats = new CodecManager(pluginManager);
+            var storage = new StorageManager(pluginManager);
             storage.initStorage(dataSvcConfig.getStorage(), formats);
 
             var metaClient = prepareMetadataClient(rootConfig.getTrac(), clientChannelType);

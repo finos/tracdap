@@ -17,14 +17,10 @@
 package com.accenture.trac.common.config.file;
 
 import com.accenture.trac.common.config.IConfigLoader;
-import com.accenture.trac.common.config.IConfigPlugin;
-import com.accenture.trac.common.config.StandardArgs;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.plugin.PluginServiceInfo;
 import com.accenture.trac.common.plugin.TracPlugin;
 
-import java.net.URI;
-import java.nio.file.Files;
 import java.util.List;
 import java.util.Properties;
 

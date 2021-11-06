@@ -17,8 +17,6 @@
 package com.accenture.trac.plugins.config.aws;
 
 import com.accenture.trac.common.config.IConfigLoader;
-import com.accenture.trac.common.config.IConfigPlugin;
-import com.accenture.trac.common.config.StandardArgs;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.plugin.PluginServiceInfo;
 import com.accenture.trac.common.plugin.TracPlugin;

@@ -29,8 +29,8 @@ import java.util.Properties;
 
 public class JdbcSetup {
 
-    private static final String DIALECT_PROPERTY = ".dialect";
-    private static final String JDBC_URL_PROPERTY = ".jdbcUrl";
+    private static final String DIALECT_PROPERTY = "dialect";
+    private static final String JDBC_URL_PROPERTY = "jdbcUrl";
 
     public static JdbcDialect getSqlDialect(Properties props, String configBase) {
 
@@ -102,7 +102,7 @@ public class JdbcSetup {
 
         hikariProps.setProperty("poolName", "dal_worker_pool");
 
-        var poolSize = props.getProperty(configBase + ".pool.size");
+        var poolSize = props.getProperty(configBase + "pool.size");
 
         if (poolSize != null && !poolSize.isBlank())
             hikariProps.setProperty("maximumPoolSize", poolSize);
@@ -122,7 +122,7 @@ public class JdbcSetup {
             Properties rootProps, Properties hikariProps,
             String configBase, JdbcDialect dialect) {
 
-        var dialectPrefixFormat = "%s.%s.";  // Trailing dot is required!
+        var dialectPrefixFormat = "%s%s.";  // Trailing dot is required!
         var dialectPrefix = String.format(
                 dialectPrefixFormat,
                 configBase, dialect.name().toLowerCase());

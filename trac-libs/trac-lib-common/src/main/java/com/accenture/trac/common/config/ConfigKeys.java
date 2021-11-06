@@ -14,26 +14,9 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.api.config;
+package com.accenture.trac.common.config;
 
-public class ServicesConfig {
+public class ConfigKeys {
 
-    private MetaServiceConfig meta;
-    private DataServiceConfig data;
-
-    public MetaServiceConfig getMeta() {
-        return meta;
-    }
-
-    public void setMeta(MetaServiceConfig meta) {
-        this.meta = meta;
-    }
-
-    public DataServiceConfig getData() {
-        return data;
-    }
-
-    public void setData(DataServiceConfig data) {
-        this.data = data;
-    }
+    public static final String CONFIG_LOGGING_URL = "logging.url";
 }

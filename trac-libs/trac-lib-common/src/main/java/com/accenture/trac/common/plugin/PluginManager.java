@@ -16,11 +16,13 @@
 
 package com.accenture.trac.common.plugin;
 
+import com.accenture.trac.common.config.IConfigLoader;
 import com.accenture.trac.common.exception.EPluginNotAvailable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 public class PluginManager implements IPluginManager {
@@ -33,7 +35,30 @@ public class PluginManager implements IPluginManager {
         plugins = new HashMap<>();
     }
 
-    public void initPlugins() {
+    public void initConfigPlugins() {
+
+        log.info("Loading config plugins...");
+
+        var availablePlugins = ServiceLoader.load(ITracPlugin.class);
+
+        for (var plugin: availablePlugins) {
+
+            var services = plugin.serviceInfo();
+
+            var configServices = services.stream()
+                    .filter(si -> si.serviceClass() == IConfigLoader.class)
+                    .collect(Collectors.toList());
+
+            if (!configServices.isEmpty()) {
+
+                log.info("Plugin: [{}]", plugin.pluginName());
+
+                registerServices(plugin, configServices);
+            }
+        }
+    }
+
+    public void initRegularPlugins() {
 
         log.info("Loading plugins...");
 
@@ -41,23 +66,37 @@ public class PluginManager implements IPluginManager {
 
         for (var plugin: availablePlugins) {
 
-            log.info("Plugin: [{}]", plugin.pluginName());
+            var services = plugin.serviceInfo();
 
-            for (var service : plugin.serviceInfo()) {
+            var regularServices = services.stream()
+                    .filter(si -> si.serviceClass() != IConfigLoader.class)
+                    .collect(Collectors.toList());
 
-                var prettyServiceType = prettyTypeName(service.serviceTypeName());
-                var protocols = String.join(", ", service.protocols());
+            if (!regularServices.isEmpty()) {
 
-                log.info("    {}: [{}] (protocols: {})",
-                        prettyServiceType,
-                        service.serviceName(),
-                        protocols);
+                log.info("Plugin: [{}]", plugin.pluginName());
 
-                for (var protocol : service.protocols()) {
+                registerServices(plugin, regularServices);
+            }
+        }
+    }
 
-                    var pluginKey = new PluginKey(service.serviceClass(), protocol);
-                    plugins.put(pluginKey, plugin);
-                }
+    private void registerServices(ITracPlugin plugin, List<PluginServiceInfo> services) {
+
+        for (var service : services) {
+
+            var prettyServiceType = prettyTypeName(service.serviceTypeName());
+            var protocols = String.join(", ", service.protocols());
+
+            log.info(" |-> {}: [{}] (protocols: {})",
+                    prettyServiceType,
+                    service.serviceName(),
+                    protocols);
+
+            for (var protocol : service.protocols()) {
+
+                var pluginKey = new PluginKey(service.serviceClass(), protocol);
+                plugins.put(pluginKey, plugin);
             }
         }
     }

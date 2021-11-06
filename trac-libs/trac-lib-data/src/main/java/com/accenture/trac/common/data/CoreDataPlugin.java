@@ -40,11 +40,11 @@ public class CoreDataPlugin extends TracPlugin {
     private static final String LOCAL_FILE_STORAGE_NAME = "LOCAL_STORAGE";
 
     private static final List<PluginServiceInfo> psi = List.of(
+            new PluginServiceInfo(PLUGIN_NAME, IFileStorage.class, LOCAL_FILE_STORAGE_NAME, List.of("LOCAL", "file")),
             new PluginServiceInfo(PLUGIN_NAME, ICodec.class, ARROW_STREAM_CODEC_NAME, List.of("ARROW_STREAM", "application/vnd.apache.arrow.stream", "application/x-apache-arrow-stream")),
             new PluginServiceInfo(PLUGIN_NAME, ICodec.class, ARROW_FILE_CODEC_NAME, List.of("ARROW_FILE", "application/vnd.apache.arrow.file", "application/x-apache-arrow-file")),
             new PluginServiceInfo(PLUGIN_NAME, ICodec.class, CSV_CODEC_NAME, List.of("CSV", "text/csv")),
-            new PluginServiceInfo(PLUGIN_NAME, ICodec.class, JSON_CODEC_NAME, List.of("JSON", "text/json")),
-            new PluginServiceInfo(PLUGIN_NAME, IFileStorage.class, LOCAL_FILE_STORAGE_NAME, List.of("LOCAL", "file")));
+            new PluginServiceInfo(PLUGIN_NAME, ICodec.class, JSON_CODEC_NAME, List.of("JSON", "text/json")));
 
 
     @Override

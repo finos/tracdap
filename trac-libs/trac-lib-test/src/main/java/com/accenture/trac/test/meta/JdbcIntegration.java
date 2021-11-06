@@ -16,21 +16,21 @@
 
 package com.accenture.trac.test.meta;
 
-import com.accenture.trac.common.config.ConfigManager;
-import com.accenture.trac.common.config.StandardArgs;
+import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.exception.EStartup;
+import com.accenture.trac.common.startup.Startup;
 import com.accenture.trac.common.util.InterfaceLogging;
 import com.accenture.trac.common.db.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
 
-import com.accenture.trac.test.meta.IDalTestable;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.*;
 
 import javax.sql.DataSource;
 import java.nio.file.Paths;
+import java.util.Properties;
 
 
 public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback, AfterAllCallback {
@@ -56,15 +56,15 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
         if (configFile == null || configFile.isBlank())
             throw new EStartup("Missing environment variable for integration testing: " + TRAC_CONFIG_FILE);
 
-        var integrationArgs = new StandardArgs(workingDir, configFile, keystoreKey);
-        var configManager = new ConfigManager(integrationArgs);
-        configManager.initConfigPlugins();
-        configManager.initLogging();
+        var configManager = Startup.quickConfig(workingDir, configFile, keystoreKey);
+        var rootConfig = configManager.loadRootConfig(RootConfig.class);
+        var metaConfig = rootConfig.getTrac().getServices().getMeta();
 
-        var rootProperties = configManager.loadRootProperties();
+        var dalProps = new Properties();
+        dalProps.putAll(metaConfig.getDalProps());
 
-        dialect = JdbcSetup.getSqlDialect(rootProperties, "trac.svc.meta.db.sql");
-        source = JdbcSetup.createDatasource(rootProperties, "trac.svc.meta.db.sql");
+        dialect = JdbcSetup.getSqlDialect(dalProps, "");
+        source = JdbcSetup.createDatasource(dalProps, "");
     }
 
     @Override

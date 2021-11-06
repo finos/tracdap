@@ -51,7 +51,7 @@ ext {
 
     // Logging
     slf4j_version = '1.7.30'
-    log4j_version = '2.13.3'
+    log4j_version = '2.14.1'
 
 
     // Flyway (database deploy tool)

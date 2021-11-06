@@ -17,6 +17,8 @@
 package com.accenture.trac.common.config;
 
 import com.accenture.trac.common.config.test.TestConfigPlugin;
+import com.accenture.trac.common.plugin.PluginManager;
+import com.accenture.trac.common.startup.Startup;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -47,7 +49,11 @@ public class ConfigParserTest {
                 .toString()
                 .replace("\\", "/");
 
-        var config = ConfigBootstrap.useConfigFile(configFilePath);
+        var configPlugins = new PluginManager();
+        configPlugins.initConfigPlugins();
+
+        var args = new StandardArgs(Paths.get("."), configFilePath, "password");
+        var config = new ConfigManager(args, configPlugins);
         var configText = config.loadRootConfigAsText();
 
         var configRoot = ConfigParser.parseStructuredConfig(configText, ConfigFormat.YAML, RootConfig.class);

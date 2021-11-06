@@ -36,8 +36,8 @@ import java.util.List;
  * <p>For an example of a config loader, see FilesystemConfigLoader.</p>
  *
  * @see ConfigManager
- * @see IConfigPlugin
  * @see com.accenture.trac.common.config.file.FilesystemConfigLoader
+ * @see com.accenture.trac.common.plugin.TracPlugin
  */
 public interface IConfigLoader {
 

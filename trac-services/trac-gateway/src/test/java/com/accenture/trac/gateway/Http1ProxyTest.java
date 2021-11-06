@@ -16,7 +16,7 @@
 
 package com.accenture.trac.gateway;
 
-import com.accenture.trac.common.config.ConfigBootstrap;
+import com.accenture.trac.common.startup.Startup;
 
 import io.netty.handler.codec.http.*;
 import org.junit.jupiter.api.*;
@@ -85,7 +85,7 @@ public class Http1ProxyTest {
                 .toString()
                 .replace("\\", "/");
 
-        var config = ConfigBootstrap.useConfigFile(TracPlatformGateway.class, rootDir, configPath, "");
+        var config = Startup.useConfigFile(TracPlatformGateway.class, rootDir, configPath, "");
 
         gateway = new TracPlatformGateway(config);
         gateway.start();

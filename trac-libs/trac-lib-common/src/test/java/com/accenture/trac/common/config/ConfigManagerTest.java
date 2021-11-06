@@ -18,6 +18,8 @@ package com.accenture.trac.common.config;
 
 import com.accenture.trac.common.config.test.TestConfigPlugin;
 import com.accenture.trac.common.exception.EStartup;
+import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.plugin.PluginManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,11 +42,16 @@ class ConfigManagerTest {
             "/config_mgr_test/extra.xml",
             "/config_mgr_test/log-test.xml");
 
+    PluginManager plugins;
+
     @TempDir
     Path tempDir;
 
     @BeforeEach
-    void setupConfigDir() throws Exception {
+    void setup() throws Exception {
+
+        plugins = new PluginManager();
+        plugins.initConfigPlugins();
 
         Files.createDirectory(tempDir.resolve("config_dir"));
 
@@ -55,6 +62,9 @@ class ConfigManagerTest {
 
             try (var inputStream = getClass().getResourceAsStream(sourceFile);
                  var outputStream = Files.newOutputStream(targetPath)) {
+
+                if (inputStream == null)
+                    throw new EUnexpected();
 
                 inputStream.transferTo(outputStream);
             }
@@ -67,7 +77,7 @@ class ConfigManagerTest {
     void configRoot_file() {
 
         var args = new StandardArgs(tempDir, "config_dir/root.properties", "password");
-        var manager = new ConfigManager(args);
+        var manager = new ConfigManager(args, plugins);
 
         var configRoot = Paths.get(manager.configRoot()).normalize();
         var expectedRoot = tempDir.resolve("config_dir").normalize();
@@ -81,7 +91,7 @@ class ConfigManagerTest {
     void configRoot_nonFile() {
 
         var args = new StandardArgs(tempDir, "test://config_svr/config_dir/root.properties", "password");
-        var manager = new ConfigManager(args);
+        var manager = new ConfigManager(args, plugins);
 
         var configRoot = manager.configRoot();
         var expectedRoot = URI.create("test://config_svr/config_dir/");
@@ -93,12 +103,18 @@ class ConfigManagerTest {
     void initPlugins() {
 
         var args = new StandardArgs(tempDir, "not_used.properties", "password");
-        var manager = new ConfigManager(args);
 
+        // Config manager should not report any available protocols before config plugins are loaded
+
+        var testPlugins = new PluginManager();
+
+        var manager = new ConfigManager(args, testPlugins);
         var protocolsNoPlugins = manager.protocols();
         assertTrue(protocolsNoPlugins.isEmpty());
 
-        manager.initConfigPlugins();
+        // Now load the config plugins and try again
+
+        testPlugins.initConfigPlugins();
 
         var protocols = manager.protocols();
         assertTrue(protocols.size() >= 2);
@@ -110,20 +126,14 @@ class ConfigManagerTest {
     void initLogging() {
 
         var args1 = new StandardArgs(tempDir, "config_dir/root.properties", "password");
-        var manager1 = new ConfigManager(args1);
-
-        manager1.initConfigPlugins();
-        manager1.initLogging();
+        var manager1 = new ConfigManager(args1, plugins);
 
         assertDoesNotThrow(() -> LoggerFactory
                 .getLogger(getClass())
                 .info("Logging test completed"));
 
         var args2 = new StandardArgs(tempDir, "config_dir/secondary.properties", "password");
-        var manager2 = new ConfigManager(args2);
-
-        manager2.initConfigPlugins();
-        manager2.initLogging();
+        var manager2 = new ConfigManager(args2, plugins);
 
         assertDoesNotThrow(() -> LoggerFactory
                 .getLogger(getClass())
@@ -136,8 +146,7 @@ class ConfigManagerTest {
         // Using file loader
 
         var args = new StandardArgs(tempDir, "config_dir/root.properties", "password");
-        var manager = new ConfigManager(args);
-        manager.initConfigPlugins();
+        var manager = new ConfigManager(args, plugins);
 
         var absolutePath = tempDir.resolve("config_dir/secondary.properties")
                 .toAbsolutePath()
@@ -155,8 +164,7 @@ class ConfigManagerTest {
         // Using test-protocol loader
 
         var args2 = new StandardArgs(tempDir, "test://config_svr/config_dir/root.properties", "password");
-        var manager2 = new ConfigManager(args2);
-        manager2.initConfigPlugins();
+        var manager2 = new ConfigManager(args2, plugins);
 
         var contentsFromFile2 = manager2.loadTextFile(absolutePath);
         assertFalse(contentsFromFile2.isBlank());
@@ -171,8 +179,7 @@ class ConfigManagerTest {
         // Missing protocol interpreted as "file" protocol for absolute paths
 
         var args = new StandardArgs(tempDir, "config_dir/root.properties", "password");
-        var manager = new ConfigManager(args);
-        manager.initConfigPlugins();
+        var manager = new ConfigManager(args, plugins);
 
         var absoluteUrl = "//config_svr/config_dir/secondary.properties";
 
@@ -183,8 +190,7 @@ class ConfigManagerTest {
     void loadText_absolutePathUnknownProtocol() {
 
         var args = new StandardArgs(tempDir, "config_dir/root.properties", "password");
-        var manager = new ConfigManager(args);
-        manager.initConfigPlugins();
+        var manager = new ConfigManager(args, plugins);
 
         var absoluteUrl = "unknown://config_svr/config_dir/secondary.properties";
 
@@ -197,8 +203,7 @@ class ConfigManagerTest {
         // Using file loader
 
         var args = new StandardArgs(tempDir, "config_dir/root.properties", "password");
-        var manager = new ConfigManager(args);
-        manager.initConfigPlugins();
+        var manager = new ConfigManager(args, plugins);
 
         var relativePath = "secondary.properties";
 
@@ -208,8 +213,7 @@ class ConfigManagerTest {
         // Using test-protocol loader
 
         var args2 = new StandardArgs(tempDir, "test://config_svr/config_dir/root.properties", "password");
-        var manager2 = new ConfigManager(args2);
-        manager2.initConfigPlugins();
+        var manager2 = new ConfigManager(args2, plugins);
 
         var relativePath2 = "secondary.properties";
 
@@ -223,8 +227,7 @@ class ConfigManagerTest {
         // Using file loader
 
         var args = new StandardArgs(tempDir, "config_dir/root.properties", "password");
-        var manager = new ConfigManager(args);
-        manager.initConfigPlugins();
+        var manager = new ConfigManager(args, plugins);
 
         var relativePath = "file:./secondary.properties";
 
@@ -233,8 +236,7 @@ class ConfigManagerTest {
         // Using test-protocol loader
 
         var args2 = new StandardArgs(tempDir, "test://config_svr/config_dir/root.properties", "password");
-        var manager2 = new ConfigManager(args2);
-        manager2.initConfigPlugins();
+        var manager2 = new ConfigManager(args2, plugins);
 
         var relativePath2 = "test:./secondary.properties";
 
@@ -247,8 +249,7 @@ class ConfigManagerTest {
         // Using file loader
 
         var args = new StandardArgs(tempDir, "config_dir/root.properties", "password");
-        var manager = new ConfigManager(args);
-        manager.initConfigPlugins();
+        var manager = new ConfigManager(args, plugins);
 
         var relativePath = "missing.properties";
 
@@ -257,8 +258,7 @@ class ConfigManagerTest {
         // Using test-protocol loader
 
         var args2 = new StandardArgs(tempDir, "test://config_svr/config_dir/root.properties", "password");
-        var manager2 = new ConfigManager(args2);
-        manager2.initConfigPlugins();
+        var manager2 = new ConfigManager(args2, plugins);
 
         assertThrows(EStartup.class, () -> manager2.loadTextFile(relativePath));
     }
@@ -267,8 +267,7 @@ class ConfigManagerTest {
     void loadText_nullOrBlankUrl() {
 
         var args = new StandardArgs(tempDir, "config_dir/root.properties", "password");
-        var manager = new ConfigManager(args);
-        manager.initConfigPlugins();
+        var manager = new ConfigManager(args, plugins);
 
         assertThrows(EStartup.class, () -> manager.loadTextFile(null));
         assertThrows(EStartup.class, () -> manager.loadTextFile(""));
@@ -280,8 +279,7 @@ class ConfigManagerTest {
     void loadText_invalidUrl() {
 
         var args = new StandardArgs(tempDir, "config_dir/root.properties", "password");
-        var manager = new ConfigManager(args);
-        manager.initConfigPlugins();
+        var manager = new ConfigManager(args, plugins);
 
         assertThrows(EStartup.class, () -> manager.loadTextFile("file:::-:"));
         assertThrows(EStartup.class, () -> manager.loadTextFile("//_>>@"));
@@ -297,8 +295,7 @@ class ConfigManagerTest {
         // Using file loader
 
         var args = new StandardArgs(tempDir, "config_dir/root.properties", "password");
-        var manager = new ConfigManager(args);
-        manager.initConfigPlugins();
+        var manager = new ConfigManager(args, plugins);
 
         var relativePath = "secondary.properties";
 
@@ -309,8 +306,7 @@ class ConfigManagerTest {
         // Using test-protocol loader
 
         var args2 = new StandardArgs(tempDir, "test://config_svr/config_dir/root.properties", "password");
-        var manager2 = new ConfigManager(args2);
-        manager2.initConfigPlugins();
+        var manager2 = new ConfigManager(args2, plugins);
 
         var props2 = manager2.loadProperties(relativePath);
         var prop2 = props2.getProperty("secondary.prop2");
@@ -323,8 +319,7 @@ class ConfigManagerTest {
         // Using file loader
 
         var args = new StandardArgs(tempDir, "config_dir/root.properties", "password");
-        var manager = new ConfigManager(args);
-        manager.initConfigPlugins();
+        var manager = new ConfigManager(args, plugins);
 
         var relativePath = "missing.properties";
 
@@ -333,8 +328,7 @@ class ConfigManagerTest {
         // Using test-protocol loader
 
         var args2 = new StandardArgs(tempDir, "test://config_svr/config_dir/root.properties", "password");
-        var manager2 = new ConfigManager(args2);
-        manager2.initConfigPlugins();
+        var manager2 = new ConfigManager(args2, plugins);
 
         assertThrows(EStartup.class, () -> manager2.loadProperties(relativePath));
     }
@@ -345,20 +339,18 @@ class ConfigManagerTest {
         // Using file loader
 
         var args = new StandardArgs(tempDir, "config_dir/root.properties", "password");
-        var manager = new ConfigManager(args);
-        manager.initConfigPlugins();
+        var manager = new ConfigManager(args, plugins);
 
-        var props = manager.loadRootProperties();
+        var props = manager.loadProperties(args.getConfigFile());
         var prop1 = props.getProperty("root.prop1");
         assertEquals("hello", prop1);
 
         // Using test-protocol loader
 
         var args2 = new StandardArgs(tempDir, "test://config_svr/config_dir/root.properties", "password");
-        var manager2 = new ConfigManager(args2);
-        manager2.initConfigPlugins();
+        var manager2 = new ConfigManager(args2, plugins);
 
-        var props2 = manager2.loadRootProperties();
+        var props2 = manager2.loadProperties(args.getConfigFile());
         var prop2 = props2.getProperty("root.prop2");
         assertEquals("42", prop2);
     }
@@ -369,43 +361,41 @@ class ConfigManagerTest {
         // Using file loader
 
         var args = new StandardArgs(tempDir, "config_dir/missing.properties", "password");
-        var manager = new ConfigManager(args);
-        manager.initConfigPlugins();
+        var manager = new ConfigManager(args, plugins);
 
-        assertThrows(EStartup.class, manager::loadRootProperties);
+        assertThrows(EStartup.class, () -> manager.loadProperties(args.getConfigFile()));
 
         // Using test-protocol loader
 
         var args2 = new StandardArgs(tempDir, "test://config_svr/config_dir/missing.properties", "password");
-        var manager2 = new ConfigManager(args2);
-        manager2.initConfigPlugins();
+        var manager2 = new ConfigManager(args2, plugins);
 
-        assertThrows(EStartup.class, manager2::loadRootProperties);
+        assertThrows(EStartup.class, () -> manager2.loadProperties(args.getConfigFile()));
     }
 
     @Test
     void loadRootConfig_nullOrBlankUrl() {
 
         var args1 = new StandardArgs(tempDir, null, "password");
-        assertThrows(EStartup.class, () -> new ConfigManager(args1));
+        assertThrows(EStartup.class, () -> new ConfigManager(args1, plugins));
 
         var args2 = new StandardArgs(tempDir, "", "password");
-        assertThrows(EStartup.class, () -> new ConfigManager(args2));
+        assertThrows(EStartup.class, () -> new ConfigManager(args2, plugins));
 
         var args3 = new StandardArgs(tempDir, " ", "password");
-        assertThrows(EStartup.class, () -> new ConfigManager(args3));
+        assertThrows(EStartup.class, () -> new ConfigManager(args3, plugins));
 
         var args4 = new StandardArgs(tempDir, "\n", "password");
-        assertThrows(EStartup.class, () -> new ConfigManager(args4));
+        assertThrows(EStartup.class, () -> new ConfigManager(args4, plugins));
     }
 
     @Test
     void loadRootConfig_invalidUrl() {
 
         var args1 = new StandardArgs(tempDir, "file:::-:", "password");
-        assertThrows(EStartup.class, () -> new ConfigManager(args1).loadRootProperties());
+        assertThrows(EStartup.class, () -> new ConfigManager(args1, plugins).loadProperties(args1.getConfigFile()));
 
         var args2 = new StandardArgs(tempDir, "//_>>@", "password");
-        assertThrows(EStartup.class, () -> new ConfigManager(args2).loadRootProperties());
+        assertThrows(EStartup.class, () -> new ConfigManager(args2, plugins).loadProperties(args2.getConfigFile()));
     }
 }

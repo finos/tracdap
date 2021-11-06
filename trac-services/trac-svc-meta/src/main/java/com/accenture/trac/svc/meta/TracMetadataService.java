@@ -16,9 +16,11 @@
 
 package com.accenture.trac.svc.meta;
 
+import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.exception.*;
+import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
 import com.accenture.trac.common.util.InterfaceLogging;
 import com.accenture.trac.svc.meta.api.*;
@@ -57,16 +59,15 @@ public class TracMetadataService extends CommonServiceBase {
     // It would be good to tie this into health reporting and load balancing
     // That is not for this first quick implementation!
 
-    private static final String PORT_CONFIG_KEY = "trac.svc.meta.api.port";
-    private static final String DB_CONFIG_ROOT = "trac.svc.meta.db.sql";
-    private static final String POOL_SIZE_KEY = DB_CONFIG_ROOT + ".pool.size";
-    private static final String POOL_OVERFLOW_KEY = DB_CONFIG_ROOT + ".pool.overflow";
+    private static final String POOL_SIZE_KEY = "pool.size";
+    private static final String POOL_OVERFLOW_KEY = "pool.overflow";
 
     private static final int DEFAULT_POOL_SIZE = 20;
     private static final int DEFAULT_OVERFLOW_SIZE = 10;
 
     private final Logger log;
 
+    private final PluginManager pluginManager;
     private final ConfigManager configManager;
 
     private DataSource dataSource;
@@ -74,10 +75,11 @@ public class TracMetadataService extends CommonServiceBase {
     private JdbcMetadataDal dal;
     private Server server;
 
-    public TracMetadataService(ConfigManager configManager) {
+    public TracMetadataService(PluginManager pluginManager, ConfigManager configManager) {
 
         this.log = LoggerFactory.getLogger(getClass());
 
+        this.pluginManager = pluginManager;
         this.configManager = configManager;
     }
 
@@ -88,15 +90,20 @@ public class TracMetadataService extends CommonServiceBase {
 
             // Use the -db library to set up a datasource
             // Handles different SQL dialects and authentication mechanisms etc.
-            var properties = configManager.loadRootProperties();
-            var dialect = JdbcSetup.getSqlDialect(properties, DB_CONFIG_ROOT);
-            dataSource = JdbcSetup.createDatasource(properties, DB_CONFIG_ROOT);
+            var config = configManager.loadRootConfig(RootConfig.class);
+            var metaConfig = config.getTrac().getServices().getMeta();
+
+            var dalProps = new Properties();
+            dalProps.putAll(metaConfig.getDalProps());
+
+            var dialect = JdbcSetup.getSqlDialect(dalProps, "");
+            dataSource = JdbcSetup.createDatasource(dalProps, "");
 
             // Construct the DAL using a direct executor, as per the comments above
             dal = new JdbcMetadataDal(dialect, dataSource, Runnable::run);
             dal.startup();
 
-            executor = createPrimaryExecutor(properties);
+            executor = createPrimaryExecutor(dalProps);
 
             // Set up services and APIs
             var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
@@ -110,7 +117,7 @@ public class TracMetadataService extends CommonServiceBase {
 
             // Create the main server
 
-            var servicePort = readConfigInt(properties, PORT_CONFIG_KEY, null);
+            var servicePort = metaConfig.getPort();
 
             this.server = ServerBuilder
                     .forPort(servicePort)

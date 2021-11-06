@@ -16,13 +16,14 @@
 
 package com.accenture.trac.deploy.metadb;
 
+import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.config.StandardArgs;
-import com.accenture.trac.common.config.StandardArgsProcessor;
 import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.exception.EStartup;
 
 import com.accenture.trac.common.exception.ETrac;
+import com.accenture.trac.common.startup.Startup;
 import com.accenture.trac.common.util.VersionInfo;
 import org.flywaydb.core.Flyway;
 
@@ -32,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Properties;
 
 
 public class DeployMetaDB {
@@ -39,7 +41,6 @@ public class DeployMetaDB {
     public final static String DEPLOY_SCHEMA_TASK_NAME = "deploy_schema";
     public final static String ADD_TENANT_TASK_NAME = "add_tenant";
 
-    private final static String DB_CONFIG_ROOT = "trac.svc.meta.db.sql";
     private final static String SCHEMA_LOCATION = "classpath:%s";
 
     private final static List<StandardArgs.Task> METADB_TASKS = List.of(
@@ -61,8 +62,13 @@ public class DeployMetaDB {
         var componentVersion = VersionInfo.getComponentVersion(DeployMetaDB.class);
         log.info("{} {}", componentName, componentVersion);
 
-        var properties = configManager.loadRootProperties();
-        var dialect = JdbcSetup.getSqlDialect(properties, DB_CONFIG_ROOT);
+        var rootConfig = configManager.loadRootConfig(RootConfig.class);
+        var metaConfig = rootConfig.getTrac().getServices().getMeta();
+
+        var dalProps = new Properties();
+        dalProps.putAll(metaConfig.getDalProps());
+
+        var dialect = JdbcSetup.getSqlDialect(dalProps, "");
 
         // Pick up DB deploy scripts depending on the SQL dialect
         var scriptsLocation = String.format(SCHEMA_LOCATION, dialect.name().toLowerCase());
@@ -70,7 +76,7 @@ public class DeployMetaDB {
         log.info("SQL Dialect: " + dialect);
         log.info("Scripts location: " + scriptsLocation);
 
-        var dataSource = JdbcSetup.createDatasource(properties, DB_CONFIG_ROOT);
+        var dataSource = JdbcSetup.createDatasource(dalProps, "");
 
         try {
 
@@ -153,23 +159,14 @@ public class DeployMetaDB {
 
         try {
 
-            var componentName = VersionInfo.getComponentName(DeployMetaDB.class);
-            var componentVersion = VersionInfo.getComponentVersion(DeployMetaDB.class);
-            var startupBanner = String.format(">>> %s %s", componentName, componentVersion);
-            System.out.println(startupBanner);
+            var startup = Startup.useCommandLine(DeployMetaDB.class, args, METADB_TASKS);
+            startup.runStartupSequence();
 
-            var standardArgs = StandardArgsProcessor.processArgs(componentName, args, METADB_TASKS);
+            var config = startup.getConfig();
+            var tasks = startup.getTasks();
 
-            System.out.println(">>> Working directory: " + standardArgs.getWorkingDir());
-            System.out.println(">>> Config file: " + standardArgs.getConfigFile());
-            System.out.println();
-
-            var configManager = new ConfigManager(standardArgs);
-            configManager.initConfigPlugins();
-            configManager.initLogging();
-
-            var deploy = new DeployMetaDB(configManager);
-            deploy.runDeployment(standardArgs.getTasks());
+            var deploy = new DeployMetaDB(config);
+            deploy.runDeployment(tasks);
 
             System.exit(0);
         }

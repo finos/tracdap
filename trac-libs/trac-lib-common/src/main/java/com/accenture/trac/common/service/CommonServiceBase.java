@@ -16,10 +16,12 @@
 
 package com.accenture.trac.common.service;
 
-import com.accenture.trac.common.config.ConfigBootstrap;
+import com.accenture.trac.common.plugin.PluginManager;
+import com.accenture.trac.common.startup.Startup;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.ETrac;
+import com.accenture.trac.common.startup.StartupSequence;
 import com.accenture.trac.common.util.VersionInfo;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
@@ -186,10 +188,14 @@ public abstract class CommonServiceBase {
 
         try {
 
-            var config = ConfigBootstrap.useCommandLine(svcClass, args);
+            var startup = Startup.useCommandLine(svcClass, args);
+            startup.runStartupSequence();
 
-            var constructor = svcClass.getConstructor(ConfigManager.class);
-            var service = constructor.newInstance(config);
+            var plugins = startup.getPlugins();
+            var config = startup.getConfig();
+
+            var constructor = svcClass.getConstructor(PluginManager.class, ConfigManager.class);
+            var service = constructor.newInstance(plugins, config);
 
             service.start(true);
 

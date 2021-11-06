@@ -20,7 +20,7 @@ import com.accenture.trac.api.TracDataApiGrpc;
 import com.accenture.trac.api.TrustedMetadataApiGrpc;
 import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.codec.CodecManager;
-import com.accenture.trac.common.config.ConfigBootstrap;
+import com.accenture.trac.common.startup.Startup;
 import com.accenture.trac.common.config.StandardArgs;
 import com.accenture.trac.common.concurrent.ExecutionContext;
 import com.accenture.trac.common.concurrent.ExecutionRegister;
@@ -91,7 +91,7 @@ abstract  class DataApiTestBase {
 
         var keystoreKey = "";  // not yet used
 
-        var testConfig = ConfigBootstrap.useConfigFile(
+        var testConfig = Startup.quickConfig(
                 TracMetadataService.class, staticTempDir,
                 configPath.toString(), keystoreKey);
 
@@ -151,7 +151,7 @@ abstract  class DataApiTestBase {
 
         var keystoreKey = "";  // not yet used
 
-        var configManager = ConfigBootstrap.useConfigFile(
+        var configManager = Startup.quickConfig(
                 TracDataService.class, tempDir,
                 configPath.toString(), keystoreKey);
 
@@ -159,7 +159,7 @@ abstract  class DataApiTestBase {
         var dataSvcConfig = rootConfig.getTrac().getServices().getData();
 
         var plugins = new PluginManager();
-        plugins.initPlugins();
+        plugins.initRegularPlugins();
 
         formats = new CodecManager(plugins);
         storage = new StorageManager(plugins);

@@ -16,24 +16,35 @@
 
 package com.accenture.trac.api.config;
 
-public class ServicesConfig {
+import java.util.Map;
 
-    private MetaServiceConfig meta;
-    private DataServiceConfig data;
+public class MetaServiceConfig {
 
-    public MetaServiceConfig getMeta() {
-        return meta;
+    private short port;
+    private String dalType;
+    private Map<String, String> dalProps = Map.of();
+
+    public short getPort() {
+        return port;
     }
 
-    public void setMeta(MetaServiceConfig meta) {
-        this.meta = meta;
+    public void setPort(short port) {
+        this.port = port;
     }
 
-    public DataServiceConfig getData() {
-        return data;
+    public String getDalType() {
+        return dalType;
     }
 
-    public void setData(DataServiceConfig data) {
-        this.data = data;
+    public void setDalType(String dalType) {
+        this.dalType = dalType;
+    }
+
+    public Map<String, String> getDalProps() {
+        return dalProps;
+    }
+
+    public void setDalProps(Map<String, String> dalProps) {
+        this.dalProps = dalProps;
     }
 }
