@@ -29,7 +29,6 @@ import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.svc.data.EventLoopChannel;
-import com.accenture.trac.svc.data.TracDataService;
 import com.accenture.trac.svc.data.service.DataRwService;
 import com.accenture.trac.svc.data.service.FileRwService;
 import com.accenture.trac.svc.meta.TracMetadataService;
@@ -62,8 +61,7 @@ import java.util.concurrent.TimeUnit;
 
 abstract  class DataApiTestBase {
 
-    protected static final String TRAC_UNIT_CONFIG = "config/trac-unit.properties";
-    protected static final String TRAC_UNIT_CONFIG_YAML = "config/trac-unit.yaml";
+    protected static final String TRAC_UNIT_CONFIG = "config/trac-unit.yaml";
     protected static final short METADATA_SVC_PORT = 8081;
     protected static final String STORAGE_ROOT_DIR = "unit_test_storage";
 
@@ -91,17 +89,19 @@ abstract  class DataApiTestBase {
 
         var keystoreKey = "";  // not yet used
 
-        var testConfig = Startup.quickConfig(
-                TracMetadataService.class, staticTempDir,
-                configPath.toString(), keystoreKey);
+        var startup = Startup.useConfigFile(TracMetadataService.class, staticTempDir, configPath.toString(), keystoreKey);
+        startup.runStartupSequence();
+
+        var plugins = startup.getPlugins();
+        var config = startup.getConfig();
 
         var deploy_schema_task = StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK_NAME, "", "");
         var add_tenant_task = StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, TEST_TENANT, "");
         var add_tenant_2_task = StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, TEST_TENANT_2, "");
-        var deployDb = new DeployMetaDB(testConfig);
+        var deployDb = new DeployMetaDB(config);
         deployDb.runDeployment(List.of(deploy_schema_task, add_tenant_task, add_tenant_2_task));
 
-        metaSvc = new TracMetadataService(testConfig);
+        metaSvc = new TracMetadataService(plugins, config);
         metaSvc.start();
 
         metaClientChannel = NettyChannelBuilder.forAddress("localhost", METADATA_SVC_PORT)
@@ -145,16 +145,11 @@ abstract  class DataApiTestBase {
 
         var substitutions = Map.of("${TRAC_RUN_DIR}", tempDir.toString().replace("\\", "\\\\"));
 
-        var configPath = ConfigHelpers.prepareConfig(
-                TRAC_UNIT_CONFIG_YAML, tempDir,
-                substitutions);
+        var configPath = ConfigHelpers.prepareConfig(TRAC_UNIT_CONFIG, tempDir, substitutions);
 
         var keystoreKey = "";  // not yet used
 
-        var configManager = Startup.quickConfig(
-                TracDataService.class, tempDir,
-                configPath.toString(), keystoreKey);
-
+        var configManager = Startup.quickConfig(tempDir, configPath.toString(), keystoreKey);
         var rootConfig = configManager.loadRootConfigObject(RootConfig.class);
         var dataSvcConfig = rootConfig.getTrac().getServices().getData();
 
