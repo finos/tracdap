@@ -25,10 +25,10 @@ import com.accenture.trac.common.startup.StandardArgs;
 import com.accenture.trac.common.concurrent.ExecutionContext;
 import com.accenture.trac.common.concurrent.ExecutionRegister;
 import com.accenture.trac.common.concurrent.IExecutionContext;
-import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.svc.data.EventLoopChannel;
+import com.accenture.trac.svc.data.TracDataService;
 import com.accenture.trac.svc.data.service.DataRwService;
 import com.accenture.trac.svc.data.service.FileRwService;
 import com.accenture.trac.svc.meta.TracMetadataService;
@@ -51,6 +51,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -89,20 +90,8 @@ abstract  class DataApiTestBase {
 
         var keystoreKey = "";  // not yet used
 
-        var startup = Startup.useConfigFile(TracMetadataService.class, staticTempDir, configPath.toString(), keystoreKey);
-        startup.runStartupSequence();
-
-        var plugins = startup.getPlugins();
-        var config = startup.getConfig();
-
-        var deploy_schema_task = StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK_NAME, "", "");
-        var add_tenant_task = StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, TEST_TENANT, "");
-        var add_tenant_2_task = StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, TEST_TENANT_2, "");
-        var deployDb = new DeployMetaDB(config);
-        deployDb.runDeployment(List.of(deploy_schema_task, add_tenant_task, add_tenant_2_task));
-
-        metaSvc = new TracMetadataService(plugins, config);
-        metaSvc.start();
+        runDbDeploy(configPath, keystoreKey);
+        startMetadataSvc(configPath, keystoreKey);
 
         metaClientChannel = NettyChannelBuilder.forAddress("localhost", METADATA_SVC_PORT)
             .directExecutor()
@@ -110,6 +99,33 @@ abstract  class DataApiTestBase {
             .build();
 
         metaClient = TrustedMetadataApiGrpc.newFutureStub(metaClientChannel);
+    }
+
+    private static void runDbDeploy(URL configPath, String keystoreKey) {
+
+        var startup = Startup.useConfigFile(TracMetadataService.class, staticTempDir, configPath.toString(), keystoreKey);
+        startup.runStartupSequence();
+
+        var config = startup.getConfig();
+        var deployDb = new DeployMetaDB(config);
+
+        var deploy_schema_task = StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK_NAME, "", "");
+        var add_tenant_task = StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, TEST_TENANT, "");
+        var add_tenant_2_task = StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, TEST_TENANT_2, "");
+
+        deployDb.runDeployment(List.of(deploy_schema_task, add_tenant_task, add_tenant_2_task));
+    }
+
+    private static void startMetadataSvc(URL configPath, String keystoreKey) {
+
+        var startup = Startup.useConfigFile(TracMetadataService.class, staticTempDir, configPath.toString(), keystoreKey);
+        startup.runStartupSequence();
+
+        var plugins = startup.getPlugins();
+        var config = startup.getConfig();
+
+        metaSvc = new TracMetadataService(plugins, config);
+        metaSvc.start();
     }
 
     @AfterAll
@@ -149,12 +165,15 @@ abstract  class DataApiTestBase {
 
         var keystoreKey = "";  // not yet used
 
-        var configManager = Startup.quickConfig(tempDir, configPath.toString(), keystoreKey);
-        var rootConfig = configManager.loadRootConfigObject(RootConfig.class);
-        var dataSvcConfig = rootConfig.getTrac().getServices().getData();
+        var startup = Startup.useConfigFile(TracDataService.class, tempDir, configPath.toString(), keystoreKey);
+        startup.runStartupSequence();
 
-        var plugins = new PluginManager();
+        var plugins = startup.getPlugins();
         plugins.initRegularPlugins();
+
+        var config = startup.getConfig();
+        var rootConfig = config.loadRootConfigObject(RootConfig.class);
+        var dataSvcConfig = rootConfig.getTrac().getServices().getData();
 
         formats = new CodecManager(plugins);
         storage = new StorageManager(plugins);
