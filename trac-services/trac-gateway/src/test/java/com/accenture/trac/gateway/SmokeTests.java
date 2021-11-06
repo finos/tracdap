@@ -23,6 +23,7 @@ import com.accenture.trac.common.startup.StandardArgs;
 
 import java.nio.file.Paths;
 
+import com.accenture.trac.common.startup.Startup;
 import io.grpc.ManagedChannelBuilder;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -193,12 +194,13 @@ public class SmokeTests {
     @Test @Disabled
     void grpcSmokeTest() throws Exception {
 
-        var args = new StandardArgs(Paths.get("."), "etc/trac-devlocal-gw.properties", "");
-        var config = new ConfigManager(args);
-        config.initConfigPlugins();
-        config.initLogging();
+        var startup = Startup.useConfigFile(TracPlatformGateway.class, "etc/trac-devlocal-gw.properties");
+        startup.runStartupSequence();
 
-        var gw = new TracPlatformGateway(config);
+        var plugins = startup.getPlugins();
+        var config = startup.getConfig();
+
+        var gw = new TracPlatformGateway(plugins, config);
 
         var log = LoggerFactory.getLogger(this.getClass());
         log.info("Before run");

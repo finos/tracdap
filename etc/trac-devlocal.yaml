@@ -13,7 +13,7 @@
 # limitations under the License.
 
 config:
-  logging.url: trac-logging.xml
+  logging: trac-logging.xml
 
   keystore:
     type: PKCS12

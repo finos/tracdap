@@ -85,9 +85,13 @@ public class Http1ProxyTest {
                 .toString()
                 .replace("\\", "/");
 
-        var config = Startup.useConfigFile(TracPlatformGateway.class, rootDir, configPath, "");
+        var startup = Startup.useConfigFile(TracPlatformGateway.class, rootDir, configPath, "");
+        startup.runStartupSequence();
 
-        gateway = new TracPlatformGateway(config);
+        var plugins = startup.getPlugins();
+        var config = startup.getConfig();
+
+        gateway = new TracPlatformGateway(plugins, config);
         gateway.start();
     }
 

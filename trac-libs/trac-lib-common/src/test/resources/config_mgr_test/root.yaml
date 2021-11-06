@@ -13,7 +13,7 @@
 # limitations under the License.
 
 config:
-  logging.url: log-test.xml
+  logging: log-test.xml
 
 test:
   prop1: hello

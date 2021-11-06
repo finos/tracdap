@@ -16,6 +16,7 @@
 
 package com.accenture.trac.common.service;
 
+import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.startup.Startup;
 import com.accenture.trac.common.config.ConfigManager;
@@ -225,6 +226,14 @@ public abstract class CommonServiceBase {
             Thread.currentThread().interrupt();
 
             System.exit(-2);
+        }
+        catch (NoSuchMethodException e) {
+
+            System.err.println("Service failed to start: Missing required service constructor for svcMain (this is a bug)");
+            System.err.println(e.getMessage());
+            e.printStackTrace(System.err);
+
+            System.exit(-3);
         }
         catch (Exception e) {
 

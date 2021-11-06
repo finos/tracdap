@@ -18,6 +18,7 @@ package com.accenture.trac.gateway;
 
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.exception.EStartup;
+import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
 import com.accenture.trac.gateway.config.*;
 import com.accenture.trac.gateway.config.helpers.ConfigTranslator;
@@ -55,14 +56,16 @@ public class TracPlatformGateway extends CommonServiceBase {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final PluginManager pluginManager;
     private final ConfigManager configManager;
 
     private EventLoopGroup bossGroup = null;
     private EventLoopGroup workerGroup = null;
 
 
-    public TracPlatformGateway(ConfigManager configManager) {
+    public TracPlatformGateway(PluginManager pluginManager, ConfigManager configManager) {
 
+        this.pluginManager = pluginManager;
         this.configManager = configManager;
     }
 

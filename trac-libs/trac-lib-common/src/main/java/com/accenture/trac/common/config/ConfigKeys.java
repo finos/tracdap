@@ -18,5 +18,6 @@ package com.accenture.trac.common.config;
 
 public class ConfigKeys {
 
-    public static final String CONFIG_LOGGING_URL = "logging.url";
+    public static final String EXTERNAL_CONFIG_KEY = "config";
+    public static final String LOGGING_CONFIG_KEY = "logging";
 }

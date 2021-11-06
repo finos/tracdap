@@ -16,10 +16,10 @@
 
 package com.accenture.trac.common.startup;
 
-import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.config.ConfigKeys;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.exception.EStartup;
+import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.util.VersionInfo;
@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 public class StartupSequence {
 
@@ -39,6 +40,7 @@ public class StartupSequence {
     private final StandardArgs standardArgs;
     private final boolean doPrintBanner;
 
+    private boolean sequenceComplete = false;
     private PluginManager plugins;
     private ConfigManager config;
 
@@ -64,14 +66,23 @@ public class StartupSequence {
         loadConfig();
 
         initLogging();
-        //initPlugins();
+
+        sequenceComplete = true;
     }
 
     public PluginManager getPlugins() {
+
+        if (!sequenceComplete)
+            throw new ETracInternal("Startup sequence has not been run");
+
         return plugins;
     }
 
     public ConfigManager getConfig() {
+
+        if (!sequenceComplete)
+            throw new ETracInternal("Startup sequence has not been run");
+
         return config;
     }
 
@@ -144,10 +155,8 @@ public class StartupSequence {
         // Logger configured using initStartupLogging
         var log = LoggerFactory.getLogger(getClass());
 
-        var rootConfig = config.loadRootConfigObject(RootConfig.class);
-        var extraConfig = rootConfig.getConfig();
-        var loggingConfigRaw = extraConfig.get(ConfigKeys.CONFIG_LOGGING_URL);
-        var loggingConfigUrl = loggingConfigRaw != null ? loggingConfigRaw.toString() : null;
+        var rootConfigMap = config.loadRootConfigObject(Map.class);
+        String loggingConfigUrl = lookupLoggingConfigUrl(rootConfigMap);
 
         if (loggingConfigUrl != null && !loggingConfigUrl.isBlank()) {
 
@@ -175,11 +184,26 @@ public class StartupSequence {
         Configurator.reconfigure();
     }
 
-    public void initPlugins() {
+    private String lookupLoggingConfigUrl(Map<?, ?> rootConfigMap) {
 
-        // TODO: Is this part of startup?
+        if (!rootConfigMap.containsKey(ConfigKeys.EXTERNAL_CONFIG_KEY))
+            return null;
 
-        plugins = new PluginManager();
-        plugins.initRegularPlugins();
+        var externalConfig = rootConfigMap.get(ConfigKeys.EXTERNAL_CONFIG_KEY);
+
+        if (!(externalConfig instanceof Map))
+            return null;
+
+        var externalConfigMap = (Map<?, ?>) externalConfig;
+
+        if (!externalConfigMap.containsKey(ConfigKeys.LOGGING_CONFIG_KEY))
+            return null;
+
+        var loggingConfig = externalConfigMap.get(ConfigKeys.LOGGING_CONFIG_KEY);
+
+        if (loggingConfig == null)
+            return null;
+
+        return loggingConfig.toString();
     }
 }
