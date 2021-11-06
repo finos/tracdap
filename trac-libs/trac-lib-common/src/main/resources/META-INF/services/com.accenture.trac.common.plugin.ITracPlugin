@@ -13,4 +13,4 @@
 # limitations under the License.
 
 # Config loader supporting local files is available as part of the core implementation
-com.accenture.trac.common.config.CoreConfigPlugin
+com.accenture.trac.common.config.local.LocalConfigPlugin

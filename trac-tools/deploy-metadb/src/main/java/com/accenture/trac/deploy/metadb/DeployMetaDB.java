@@ -18,7 +18,7 @@ package com.accenture.trac.deploy.metadb;
 
 import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.config.ConfigManager;
-import com.accenture.trac.common.config.StandardArgs;
+import com.accenture.trac.common.startup.StandardArgs;
 import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.exception.EStartup;
 
@@ -62,7 +62,7 @@ public class DeployMetaDB {
         var componentVersion = VersionInfo.getComponentVersion(DeployMetaDB.class);
         log.info("{} {}", componentName, componentVersion);
 
-        var rootConfig = configManager.loadRootConfig(RootConfig.class);
+        var rootConfig = configManager.loadRootConfigObject(RootConfig.class);
         var metaConfig = rootConfig.getTrac().getServices().getMeta();
 
         var dalProps = new Properties();

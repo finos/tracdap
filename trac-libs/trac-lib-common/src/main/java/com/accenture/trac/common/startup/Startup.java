@@ -17,17 +17,8 @@
 package com.accenture.trac.common.startup;
 
 import com.accenture.trac.common.config.ConfigManager;
-import com.accenture.trac.common.config.StandardArgs;
-import com.accenture.trac.common.config.StandardArgsProcessor;
-import com.accenture.trac.common.exception.EStartup;
-import com.accenture.trac.common.plugin.IPluginManager;
 import com.accenture.trac.common.util.VersionInfo;
-import org.apache.logging.log4j.core.config.ConfigurationSource;
-import org.apache.logging.log4j.core.config.Configurator;
-import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;

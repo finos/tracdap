@@ -18,7 +18,6 @@ package com.accenture.trac.common.config;
 
 import com.accenture.trac.common.config.test.TestConfigPlugin;
 import com.accenture.trac.common.plugin.PluginManager;
-import com.accenture.trac.common.startup.Startup;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -52,28 +51,27 @@ public class ConfigParserTest {
         var configPlugins = new PluginManager();
         configPlugins.initConfigPlugins();
 
-        var args = new StandardArgs(Paths.get("."), configFilePath, "password");
-        var config = new ConfigManager(args, configPlugins);
-        var configText = config.loadRootConfigAsText();
+        var config = new ConfigManager(configFilePath, Paths.get("."), configPlugins);
+        var configText = config.loadRootConfigFile();
 
-        var configRoot = ConfigParser.parseStructuredConfig(configText, ConfigFormat.YAML, RootConfig.class);
+        var configRoot = ConfigParser.parseStructuredConfig(configText, ConfigFormat.YAML, SampleConfig.class);
         Assertions.assertNotNull(config);
 
-        var sample = configRoot.root;
+        var sample = configRoot.test;
         Assertions.assertNotNull(sample);
         Assertions.assertEquals("hello", sample.getProp1());
         Assertions.assertEquals(42, sample.getProp2());
     }
 
 
-    public static class RootConfig {
+    public static class SampleConfig {
 
         public Map<String, Object> config;
-        public SampleConfig root;
+        public TestConfig test;
     }
 
 
-    public static class SampleConfig {
+    public static class TestConfig {
 
         private String prop1;
         private int prop2;

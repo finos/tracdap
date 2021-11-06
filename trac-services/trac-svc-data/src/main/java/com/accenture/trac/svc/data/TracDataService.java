@@ -23,7 +23,6 @@ import com.accenture.trac.api.config.TracConfig;
 import com.accenture.trac.common.codec.CodecManager;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.concurrent.ExecutionRegister;
-import com.accenture.trac.common.exception.EPluginNotAvailable;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
@@ -84,7 +83,7 @@ public class TracDataService extends CommonServiceBase {
         try {
             log.info("Loading TRAC platform config...");
 
-            rootConfig = configManager.loadRootConfig(RootConfig.class);
+            rootConfig = configManager.loadRootConfigObject(RootConfig.class);
             dataSvcConfig = rootConfig.getTrac().getServices().getData();
 
             // TODO: Config validation

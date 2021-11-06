@@ -1,4 +1,3 @@
-#
 # Copyright 2020 Accenture Global Solutions Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,12 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
 config:
-  logging:
-    url: log-test.xml
+  logging.url: log-test.xml
 
-root:
+test:
   prop1: hello
   prop2: 42

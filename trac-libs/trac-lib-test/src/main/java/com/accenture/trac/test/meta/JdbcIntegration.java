@@ -57,7 +57,7 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
             throw new EStartup("Missing environment variable for integration testing: " + TRAC_CONFIG_FILE);
 
         var configManager = Startup.quickConfig(workingDir, configFile, keystoreKey);
-        var rootConfig = configManager.loadRootConfig(RootConfig.class);
+        var rootConfig = configManager.loadRootConfigObject(RootConfig.class);
         var metaConfig = rootConfig.getTrac().getServices().getMeta();
 
         var dalProps = new Properties();

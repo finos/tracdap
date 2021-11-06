@@ -19,7 +19,6 @@ package com.accenture.trac.common.startup;
 import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.config.ConfigKeys;
 import com.accenture.trac.common.config.ConfigManager;
-import com.accenture.trac.common.config.StandardArgs;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.plugin.PluginManager;
@@ -118,16 +117,19 @@ public class StartupSequence {
 
     private void loadConfig() {
 
-        config = new ConfigManager(standardArgs, plugins);
+        var configFile = standardArgs.getConfigFile();
+        var workingDir = standardArgs.getWorkingDir();
+
+        config = new ConfigManager(configFile, workingDir, plugins);
     }
 
 
     /**
      * Initialize the logging framework.
      *
-     * <p>Logging can be configured by setting the property config.logging.url in the
-     * root property file to point to the location of a logging config file. TRAC
-     * uses Log4j2 as a backend for slf4j, so the logging config file must be a valid
+     * <p>Logging can be configured by setting the property logging.url in the config
+     * section of the root configuration, to point to the location of a logging config file.
+     * TRAC uses Log4j2 as a backend for slf4j, so the logging config file must be a valid
      * log4j2 config file. If no logging config is provided, messages will be logged
      * to stdout.</p>
      *
@@ -142,14 +144,14 @@ public class StartupSequence {
         // Logger configured using initStartupLogging
         var log = LoggerFactory.getLogger(getClass());
 
-        var rootConfig = config.loadRootConfig(RootConfig.class);
+        var rootConfig = config.loadRootConfigObject(RootConfig.class);
         var extraConfig = rootConfig.getConfig();
         var loggingConfigRaw = extraConfig.get(ConfigKeys.CONFIG_LOGGING_URL);
         var loggingConfigUrl = loggingConfigRaw != null ? loggingConfigRaw.toString() : null;
 
         if (loggingConfigUrl != null && !loggingConfigUrl.isBlank()) {
 
-            var loggingConfig = config.loadTextFile(loggingConfigUrl);
+            var loggingConfig = config.loadConfigFile(loggingConfigUrl);
 
             try (var configStream = new ByteArrayInputStream(loggingConfig.getBytes())) {
 
@@ -174,6 +176,8 @@ public class StartupSequence {
     }
 
     public void initPlugins() {
+
+        // TODO: Is this part of startup?
 
         plugins = new PluginManager();
         plugins.initRegularPlugins();

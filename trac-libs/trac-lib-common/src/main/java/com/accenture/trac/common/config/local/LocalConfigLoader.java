@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.config.file;
+package com.accenture.trac.common.config.local;
 
 import com.accenture.trac.common.config.IConfigLoader;
 import com.accenture.trac.common.exception.EStartup;
@@ -30,7 +30,7 @@ import java.util.List;
 /**
  * A config loader implementation for loading from the local filesystem.
  */
-public class FilesystemConfigLoader implements IConfigLoader {
+public class LocalConfigLoader implements IConfigLoader {
 
     @Override
     public String loaderName() {

@@ -19,16 +19,11 @@ package com.accenture.trac.gateway;
 import com.accenture.trac.api.MetadataSearchRequest;
 import com.accenture.trac.api.TracMetadataApiGrpc;
 import com.accenture.trac.common.config.ConfigManager;
-import com.accenture.trac.common.config.StandardArgs;
+import com.accenture.trac.common.startup.StandardArgs;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.URL;
 import java.nio.file.Paths;
-import java.util.stream.Collectors;
 
 import io.grpc.ManagedChannelBuilder;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;

@@ -22,24 +22,23 @@ import com.accenture.trac.common.plugin.IPluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.StringReader;
 import java.net.URI;
 import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
 
 
 /**
- * <p>ConfigManager allows config files, secrets and other config resources to be loaded
- * in a uniform manner across different deployment environments.</p>
+ * <p>ConfigManager provides capabilities to load config files, secrets and other config resources.
+ * It uses config loader plugins to provide the same capabilities in a uniform manner across
+ * different deployment environments.</p>
  *
- * <p>To create a ConfigManager you must supply an instance of StandardArgs, which provides
- * the location of the root config file and the master key for unlocking secrets. Use a
- * StandardArgsProcessor to read the required command line arguments. ConfigManager will
- * determine the root config directory, which is just the directory containing the root config
- * file. Before reading any config, initialize the ConfigManager by calling initConfigPlugins()
- * and initLogging().</p>
+ * <p>These easiest way to create a ConfigManager instance is using the Startup class to create
+ * a startup sequence. The startup sequence is standard for all TRAC components, it handles
+ * loading any required config plugins, logging during the and provides a ConfigManager with
+ * he root config loaded and ready to go. If you don't need the startup sequence it is fine
+ * to construct a ConfigManager directly, so long as you supply a plugin manager with the
+ * required config plugins loaded.</p>
  *
  * <p>Read the root config file by calling loadRootProperties(). To read additional config
  * files, use the load* functions and specify a config URL for the file you want to load.
@@ -55,30 +54,31 @@ import java.util.*;
  * config plugins on the classpath will be loaded whe initConfigPlugins() is called.
  * See IConfigPlugin for details of how to implement a config plugin.</p>
  *
- * @see StandardArgsProcessor
+ * @see com.accenture.trac.common.startup.Startup
+ * @see com.accenture.trac.common.startup.StartupSequence
  */
 public class ConfigManager {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final StandardArgs args;
     private final IPluginManager plugins;
 
     private final URI configRootFile;
     private final URI configRootDir;
 
     /**
-     * Create a ConfigManager for the given standard command line args.
+     * Create a ConfigManager for the root config URL
      *
-     * @param args Standard command line args, as produced by StandardArgsProcessor
-     * @throws EStartup The supplied args are not valid
+     * @param configUrl URL for the root config file, as supplied by the user (e.g. on the command line)
+     * @param workingDir Working dir of the current process, used to resolve relative URLs for local files
+     * @param plugins Plugin manager, used to obtain config loaders depending on the protocol of the config URL
+     * @throws EStartup The supplied settings are not valid
      */
-    public ConfigManager(StandardArgs args, IPluginManager plugins) {
+    public ConfigManager(String configUrl, Path workingDir, IPluginManager plugins) {
 
-        this.args = args;
         this.plugins = plugins;
 
-        configRootFile = resolveConfigRootFile();
+        configRootFile = resolveConfigRootFile(configUrl, workingDir);
         configRootDir = configRootFile.resolve(".").normalize();
 
         if ("file".equals(configRootDir.getScheme()))
@@ -96,70 +96,103 @@ public class ConfigManager {
         return configRootDir;
     }
 
-    /**
-     * Get the list of supported URL protocols for config loading.
-     *
-     * <p>The list is determined by the currently loaded set of config plugins.</p>
-     *
-     * @return List of supported URL protocols for config loading
-     */
-    public List<String> protocols() {
-
-        return plugins.availableProtocols(IConfigLoader.class);
-    }
-
 
     // -----------------------------------------------------------------------------------------------------------------
     // Config loading
     // -----------------------------------------------------------------------------------------------------------------
 
     /**
-     * Load the root configuration as a structured object
-     *
-     * The configuration must match the structure of the class provided and the file must be in known config format.
-     *
-     * @return The root configuration as a structured object
-     * @throws EStartup The root configuration file could not be loaded or parsed for any reason
-     */
-    public <TConfig> TConfig loadRootConfig(Class<TConfig> configClass) {
-
-        var configFormat = ConfigFormat.fromExtension(configRootFile);
-        var configData = loadTextFile(configRootFile.toString());
-
-        return ConfigParser.parseStructuredConfig(configData, configFormat, configClass);
-    }
-
-    /**
-     * Load the root configuration as plain text, for processing by a separate parser
-     *
-     * @return The root configuration text as a single string
-     * @throws EStartup The root configuration file could not be loaded for any reason
-     */
-    public String loadRootConfigAsText() {
-
-        return loadTextFile(configRootFile.toString());
-    }
-
-    /**
-     * Load a secondary config file as text.
+     * Load a config file as plain text
      *
      * <p>Config URLs may be relative or absolute. Relative URLs are resolved relative to the
      * root config directory, absolute URLs may either be a local file path or a full URL
-     * including a protocol.</p>
+     * including a protocol. Absolute URLs can use a different protocol from the root config
+     * file, so long as a config loader is available that can handle that protocol and the required
+     * access has been set up.</p>
      *
      * @param configUrl URL of the config file to load
      * @return The contents of the requested config file, as text
      * @throws EStartup The requested config file could not be loaded for any reason
      */
-    public String loadTextFile(String configUrl) {
+    public String loadConfigFile(String configUrl) {
 
         if (configUrl == null || configUrl.isBlank())
             throw new EStartup("Config URL is missing or blank");
 
         var requestedUrl = parseUrl(configUrl);
-        var resolvedUrl = resolveUrl(requestedUrl);
 
+        return loadConfigFromUrl(requestedUrl);
+    }
+
+    /**
+     * Load a config file and convert it into an object using the config parser
+     *
+     * <p>Config URLs may be relative or absolute. Relative URLs are resolved relative to the
+     * root config directory, absolute URLs may either be a local file path or a full URL
+     * including a protocol. Absolute URLs can use a different protocol from the root config
+     * file, so long as a config loader is available that can handle that protocol and the required
+     * access has been set up.</p>
+     *
+     * <p>Once the config file has been read it is parsed using the ConfigParser.
+     * The configuration must match the structure of the class provided and the file
+     * must be in known config format.</p>
+     *
+     * @param configUrl URL of the config file to load
+     * @param configClass the object class to convert the configuration into
+     * @return A config object of the requested class
+     * @throws EStartup The requested config file could not be loaded or parsed for any reason
+     *
+     * @see ConfigParser
+     */
+    public <TConfig> TConfig loadConfigObject(String configUrl, Class<TConfig> configClass) {
+
+        if (configUrl == null || configUrl.isBlank())
+            throw new EStartup("Config URL is missing or blank");
+
+        var requestedUrl = parseUrl(configUrl);
+
+        var configData = loadConfigFromUrl(requestedUrl);
+        var configFormat = ConfigFormat.fromExtension(requestedUrl);
+
+        return ConfigParser.parseStructuredConfig(configData, configFormat, configClass);
+    }
+
+    /**
+     * Load the root config file as plain text
+     *
+     * @return The contents of the root config file, as text
+     * @throws EStartup The root configuration file could not be loaded for any reason
+     */
+    public String loadRootConfigFile() {
+
+        return loadConfigFile(configRootFile.toString());
+    }
+
+    /**
+     * Load the root config file and convert it into an object using the config parser
+     *
+     * <p>Once the config file has been read it is parsed using the ConfigParser.
+     * The configuration must match the structure of the class provided and the file
+     * must be in known config format.</p>
+     *
+     * @return The root configuration as a structured object
+     * @throws EStartup The root configuration file could not be loaded or parsed for any reason
+     */
+    public <TConfig> TConfig loadRootConfigObject(Class<TConfig> configClass) {
+
+        return loadConfigObject(configRootFile.toString(), configClass);
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------------------------------------------------
+
+    private String loadConfigFromUrl(URI requestedUrl) {
+
+        var resolvedUrl = resolveUrl(requestedUrl);
         var relativeUrl = configRootDir.relativize(resolvedUrl);
+
         log.info("Loading config file: {}", relativeUrl);
 
         var protocol = resolvedUrl.getScheme();
@@ -168,19 +201,14 @@ public class ConfigManager {
         return loader.loadTextFile(resolvedUrl);
     }
 
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------------------------------------------------
-
-    private URI resolveConfigRootFile() {
+    private URI resolveConfigRootFile(String suppliedConfigUrl, Path workingDir) {
 
         try {
 
-            if (args.getConfigFile() == null || args.getConfigFile().isBlank())
+            if (suppliedConfigUrl == null || suppliedConfigUrl.isBlank())
                 throw new EStartup("URL for root config file is missing or blank");
 
-            var configUrl = URI.create(args.getConfigFile());
+            var configUrl = URI.create(suppliedConfigUrl);
             var configProtocol = configUrl.getScheme();
 
             // Special handling if the config URI is for a file
@@ -190,7 +218,7 @@ public class ConfigManager {
                 if (configUrl.isAbsolute())
                     return configUrl;
 
-                var configPath = args.getWorkingDir().resolve(configUrl.getPath());
+                var configPath = workingDir.resolve(configUrl.getPath());
                 return configPath.toUri();
             }
 
@@ -198,7 +226,7 @@ public class ConfigManager {
         }
         catch (IllegalArgumentException e) {
 
-            var message = String.format("URL for root config file is invalid: [%s]", args.getConfigFile());
+            var message = String.format("URL for root config file is invalid: [%s]", suppliedConfigUrl);
             throw new EStartup(message);
         }
     }
@@ -276,8 +304,6 @@ public class ConfigManager {
 
             var message = String.format("No config loader available for protocol [%s]", protocol);
 
-            // Logging system may not be initialized while loading config!
-            // Use stderr for error messages
             log.error(message);
             throw new EStartup(message);
         }

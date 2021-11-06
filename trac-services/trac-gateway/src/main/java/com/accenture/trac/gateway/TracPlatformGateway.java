@@ -76,7 +76,7 @@ public class TracPlatformGateway extends CommonServiceBase {
         try {
             log.info("Preparing gateway config...");
 
-            var rawConfig = configManager.loadRootConfig(RootConfig.class);
+            var rawConfig = configManager.loadRootConfigObject(RootConfig.class);
             var config = ConfigTranslator.translateServiceRoutes(rawConfig);
 
             gatewayConfig = config.getTrac().getGateway();

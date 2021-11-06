@@ -33,10 +33,10 @@ import java.util.List;
  * absolute URL (relative URLs are resolved in ConfigManager). If there
  * are any problems loading a config file, throw an EStartup exception.</p>
  *
- * <p>For an example of a config loader, see FilesystemConfigLoader.</p>
+ * <p>For an example of a config loader, see LocalConfigLoader.</p>
  *
  * @see ConfigManager
- * @see com.accenture.trac.common.config.file.FilesystemConfigLoader
+ * @see com.accenture.trac.common.config.local.LocalConfigLoader;
  * @see com.accenture.trac.common.plugin.TracPlugin
  */
 public interface IConfigLoader {

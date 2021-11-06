@@ -90,7 +90,7 @@ public class TracMetadataService extends CommonServiceBase {
 
             // Use the -db library to set up a datasource
             // Handles different SQL dialects and authentication mechanisms etc.
-            var config = configManager.loadRootConfig(RootConfig.class);
+            var config = configManager.loadRootConfigObject(RootConfig.class);
             var metaConfig = config.getTrac().getServices().getMeta();
 
             var dalProps = new Properties();

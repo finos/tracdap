@@ -21,7 +21,7 @@ import com.accenture.trac.api.TrustedMetadataApiGrpc;
 import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.codec.CodecManager;
 import com.accenture.trac.common.startup.Startup;
-import com.accenture.trac.common.config.StandardArgs;
+import com.accenture.trac.common.startup.StandardArgs;
 import com.accenture.trac.common.concurrent.ExecutionContext;
 import com.accenture.trac.common.concurrent.ExecutionRegister;
 import com.accenture.trac.common.concurrent.IExecutionContext;
@@ -155,7 +155,7 @@ abstract  class DataApiTestBase {
                 TracDataService.class, tempDir,
                 configPath.toString(), keystoreKey);
 
-        var rootConfig = configManager.loadRootConfig(RootConfig.class);
+        var rootConfig = configManager.loadRootConfigObject(RootConfig.class);
         var dataSvcConfig = rootConfig.getTrac().getServices().getData();
 
         var plugins = new PluginManager();

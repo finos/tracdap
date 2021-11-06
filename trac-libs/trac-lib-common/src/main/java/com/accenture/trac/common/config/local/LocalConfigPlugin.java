@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.config;
+package com.accenture.trac.common.config.local;
 
-import com.accenture.trac.common.config.file.FilesystemConfigLoader;
+import com.accenture.trac.common.config.IConfigLoader;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.plugin.PluginServiceInfo;
 import com.accenture.trac.common.plugin.TracPlugin;
@@ -25,9 +25,9 @@ import java.util.List;
 import java.util.Properties;
 
 
-public class CoreConfigPlugin extends TracPlugin {
+public class LocalConfigPlugin extends TracPlugin {
 
-    private static final String PLUGIN_NAME = "CORE_CONFIG";
+    private static final String PLUGIN_NAME = "LOCAL_CONFIG";
     private static final String SERVICE_NAME = "LOCAL_CONFIG";
 
     private static final PluginServiceInfo psi = new PluginServiceInfo(
@@ -48,7 +48,7 @@ public class CoreConfigPlugin extends TracPlugin {
     protected <T> T createService(String serviceName, Properties properties) {
 
         if (serviceName.equals(SERVICE_NAME))
-            return (T) new FilesystemConfigLoader();
+            return (T) new LocalConfigLoader();
 
         throw new EUnexpected();
     }
