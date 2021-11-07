@@ -349,7 +349,7 @@ public class DataRwService {
     private StorageDefinition buildStorageDef(DataWriteRequest request, String dataItem) {
 
         var storageKey = config.getDefaultStorage();
-        var storageFormat = "text/csv";  // TODO  application/vnd.apache.arrow.file
+        var storageFormat = "application/vnd.apache.arrow.file";  // TODO: Constants and config
         var incarnationIndex = 0;
 
         var copy = StorageCopy.newBuilder()

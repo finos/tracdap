@@ -18,30 +18,24 @@ package com.accenture.trac.common.codec.arrow;
 
 import com.accenture.trac.common.codec.BaseDecoder;
 import com.accenture.trac.common.data.DataBlock;
-import com.accenture.trac.common.data.IDataContext;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.util.ByteSeekableChannel;
-import io.netty.buffer.ByteBufInputStream;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorLoader;
-import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.VectorUnloader;
-import org.apache.arrow.vector.ipc.ArrowStreamReader;
-import org.apache.arrow.vector.ipc.ArrowStreamWriter;
+import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 
-public class ArrowStreamDecoder extends BaseDecoder {
+public class ArrowFileDecoder extends BaseDecoder {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final BufferAllocator arrowAllocator;
 
-    public ArrowStreamDecoder(BufferAllocator arrowAllocator) {
+    public ArrowFileDecoder(BufferAllocator arrowAllocator) {
 
         this.arrowAllocator = arrowAllocator;
     }
@@ -55,7 +49,7 @@ public class ArrowStreamDecoder extends BaseDecoder {
     protected void decodeLastChunk() {
 
         try (var stream = new ByteSeekableChannel(buffer);
-             var reader = new ArrowStreamReader(stream, arrowAllocator)) {
+             var reader = new ArrowFileReader(stream, arrowAllocator)) {
 
             var schema = reader.getVectorSchemaRoot().getSchema();
             outQueue.add(DataBlock.forSchema(schema));

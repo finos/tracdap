@@ -32,6 +32,11 @@ public class CodecManager implements ICodecManager {
     @Override
     public ICodec getCodec(String format) {
 
+        if (plugins.isServiceAvailable(ICodec.class, format))
+            return plugins.createService(ICodec.class, format);
+
+
+
         try {
 
             return plugins.createService(ICodec.class, format);

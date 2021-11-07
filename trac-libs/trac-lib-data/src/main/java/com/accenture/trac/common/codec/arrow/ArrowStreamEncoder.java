@@ -19,6 +19,7 @@ package com.accenture.trac.common.codec.arrow;
 import com.accenture.trac.common.codec.BaseEncoder;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.exception.ETracInternal;
+import com.accenture.trac.common.util.ByteOutputChannel;
 import com.accenture.trac.common.util.ByteOutputStream;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
@@ -66,7 +67,7 @@ public class ArrowStreamEncoder extends BaseEncoder {
         this.root = new VectorSchemaRoot(fields, vectors);
         this.loader = new VectorLoader(root);  // TODO: No compression support atm
 
-        var out = new ByteOutputStream(outQueue::add);
+        var out = new ByteOutputChannel(outQueue::add);
         this.writer = new ArrowStreamWriter(root, /* dictionary provider = */ null, out);
 
         try {

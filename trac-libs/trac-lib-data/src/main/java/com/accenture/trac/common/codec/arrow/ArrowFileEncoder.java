@@ -16,129 +16,122 @@
 
 package com.accenture.trac.common.codec.arrow;
 
+import com.accenture.trac.common.codec.BaseEncoder;
 import com.accenture.trac.common.concurrent.flow.CommonBaseProcessor;
 import com.accenture.trac.common.data.DataBlock;
+import com.accenture.trac.common.exception.ETracInternal;
+import com.accenture.trac.common.util.ByteOutputChannel;
+import com.accenture.trac.common.util.ByteOutputStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorLoader;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.ipc.ArrowFileWriter;
+import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
 import org.apache.arrow.vector.ipc.message.ArrowMessage;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
+import org.apache.arrow.vector.types.pojo.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 
 
-public class ArrowFileEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> {
+public class ArrowFileEncoder extends BaseEncoder {
 
-    private final Queue<ByteBuf> outQueue;
-    private final WritableByteChannel outChannel;
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final VectorSchemaRoot root;
-    private final VectorLoader loader;
-    private final ArrowFileWriter arrowWriter;
+    private final BufferAllocator arrowAllocator;
+    private VectorSchemaRoot root;
+    private VectorLoader loader;
+    private ArrowFileWriter writer;
 
+    public ArrowFileEncoder(BufferAllocator arrowAllocator) {
 
-    public ArrowFileEncoder() {
-
-        outQueue = new ArrayDeque<>();
-        outChannel = new ByteBufChannel();
-
-        root = new VectorSchemaRoot(List.of(), List.of());  // TODO: schema and empty vectors
-        loader = new VectorLoader(root);
-        arrowWriter = new ArrowFileWriter(root, null, outChannel);
+        this.arrowAllocator = arrowAllocator;
     }
 
     @Override
-    protected void handleTargetRequest() {
+    protected void encodeSchema(Schema arrowSchema) {
 
-        while (nTargetDelivered() < nTargetRequested() && !outQueue.isEmpty()) {
-            var chunk = outQueue.remove();
-            doTargetNext(chunk);
-        }
-
-        if (nTargetDelivered() < nTargetRequested()) {
-
-            if (outChannel.isOpen())
-                doSourceRequest(1);  // TODO: How many batches?
-
-            else
-                doTargetComplete();
-        }
+        createRoot(arrowSchema);
     }
 
-    @Override
-    protected void handleSourceNext(DataBlock block) {
+    void createRoot(Schema arrowSchema) {
+
+        var fields = arrowSchema.getFields();
+        var vectors = new ArrayList<FieldVector>(fields.size());
+
+        for (var field : fields)
+            vectors.add(field.createVector(arrowAllocator));
+
+        this.root = new VectorSchemaRoot(fields, vectors);
+        this.loader = new VectorLoader(root);  // TODO: No compression support atm
+
+        var out = new ByteOutputChannel(outQueue::add);
+        this.writer = new ArrowFileWriter(root, /* dictionary provider = */ null, out);
 
         try {
-
-            var batch = block.arrowRecords;
-
-            loader.load(batch);
-            arrowWriter.writeBatch();
-
-            root.clear();
-            batch.close();
-
-            while (nTargetDelivered() < nTargetRequested() && !outQueue.isEmpty()) {
-                var chunk = outQueue.remove();
-                doTargetNext(chunk);
-            }
-
-            // if (nTargetDelivered() < nTargetRequested())
+            writer.start();
         }
         catch (IOException e) {
 
-            // TODO
+            // todo
+            log.error(e.getMessage(), e);
+            throw new ETracInternal(e.getMessage(), e);
         }
     }
 
     @Override
-    protected void handleSourceComplete() {
+    protected void encodeRecords(ArrowRecordBatch batch) {
 
-        try {
-            arrowWriter.end();
+        try (batch) {  // This will release the batch
 
-            while (nTargetDelivered() < nTargetRequested() && !outQueue.isEmpty()) {
-                var chunk = outQueue.remove();
-                doTargetNext(chunk);
-            }
-
-            if (outQueue.isEmpty())
-                doTargetComplete();
+            loader.load(batch);  // This retains data in the VSR, must be matched by root.clear()
+            writer.writeBatch();
         }
         catch (IOException e) {
 
-            // TODO
+            // todo
+            log.error(e.getMessage(), e);
+            throw new ETracInternal(e.getMessage(), e);
+        }
+        finally {
+
+            root.clear();  // Release data that was retained in VSR by the loader
         }
     }
 
-    private class ByteBufChannel implements WritableByteChannel {
+    @Override
+    protected void encodeDictionary(ArrowDictionaryBatch batch) {
 
-        @Override
-        public int write(ByteBuffer src) throws IOException {
+        throw new ETracInternal("Arrow stream dictionary encoding not supported");
+    }
 
-            var outBuf = Unpooled.wrappedBuffer(src);
-            outQueue.add(outBuf);
+    @Override
+    protected void encodeEos() {
 
-            return outBuf.readableBytes();
+        try {
+            writer.end();
         }
+        catch (IOException e) {
 
-        @Override
-        public boolean isOpen() {
-            return true;
+            // todo
+            log.error(e.getMessage(), e);
+            throw new ETracInternal(e.getMessage(), e);
         }
-
-        @Override
-        public void close() {
-
+        finally {
+            writer.close();
         }
     }
 }

@@ -16,6 +16,7 @@
 
 package com.accenture.trac.common.codec;
 
+import com.accenture.trac.common.codec.arrow.ArrowFileCodec;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
 import com.accenture.trac.common.codec.arrow.ArrowStreamCodec;
 import com.accenture.trac.common.codec.csv.CsvCodec;
@@ -45,6 +46,10 @@ public abstract class CodecRoundTripTest {
 
     static class ArrowStream extends CodecRoundTripTest {
         @BeforeEach void setup() { codec = new ArrowStreamCodec(); }
+    }
+
+    static class ArrowFile extends CodecRoundTripTest {
+        @BeforeEach void setup() { codec = new ArrowFileCodec(); }
     }
 
     static class CSV extends CodecRoundTripTest {

@@ -99,6 +99,8 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
 
         try {
 
+            log.error(error.getMessage(), error);
+
             doTargetError(error);  // todo
         }
         finally {
