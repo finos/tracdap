@@ -26,13 +26,11 @@ import com.fasterxml.jackson.dataformat.csv.CsvParser;
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.VarCharVector;
-import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.*;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.util.Text;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -119,13 +117,13 @@ class DataRoundTripTest extends DataApiTestBase {
     }
 
     @Test
-    void roundTrip_arrowBasic() throws Exception {
+    void roundTrip_arrowStream() throws Exception {
 
         // Create a single batch of Arrow data
 
         var allocator = new RootAllocator();
         var varcharVector = new VarCharVector("string_field", allocator);
-        var intVector = new IntVector("int_field", allocator);
+        var intVector = new BigIntVector("int_field", allocator);
 
         var nRows = 10;
 
@@ -162,8 +160,8 @@ class DataRoundTripTest extends DataApiTestBase {
             writer.end();
         }
 
-        roundTripTest(writeChannel.getChunks(), "ARROW", "ARROW", this::decodeArrow, BASIC_TEST_DATA, true);
-        roundTripTest(writeChannel.getChunks(), "ARROW", "ARROW", this::decodeArrow, BASIC_TEST_DATA, false);
+        roundTripTest(writeChannel.getChunks(), "ARROW_STREAM", "ARROW_STREAM", this::decodeArrow, BASIC_TEST_DATA, true);
+        roundTripTest(writeChannel.getChunks(), "ARROW_STREAM", "ARROW_STREAM", this::decodeArrow, BASIC_TEST_DATA, false);
     }
 
     @Test
@@ -377,7 +375,7 @@ class DataRoundTripTest extends DataApiTestBase {
             result.values = new ArrayList<>(nCols);
 
             for(var j = 0; j < nCols; j++)
-                result.values.set(j, new Vector<>());
+                result.values.add(j, new Vector<>());
 
             while (reader.loadNextBatch()) {
 
@@ -386,8 +384,13 @@ class DataRoundTripTest extends DataApiTestBase {
                     var resultCol = result.values.get(j);
                     var arrowCol = rtBatch.getVector(j);
 
-                    for (int i = 0; i < rtBatch.getRowCount(); i++)
-                        resultCol.add(arrowCol.getObject(i));
+                    for (int i = 0; i < rtBatch.getRowCount(); i++) {
+                        var arrowValue = arrowCol.getObject(i);
+                        if (arrowValue instanceof Text)
+                            resultCol.add(arrowValue.toString());
+                        else
+                            resultCol.add(arrowValue);
+                    }
                 }
             }
 

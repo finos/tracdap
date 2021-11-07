@@ -17,6 +17,7 @@
 package com.accenture.trac.common.data;
 
 import com.accenture.trac.common.codec.ICodec;
+import com.accenture.trac.common.codec.arrow.ArrowStreamCodec;
 import com.accenture.trac.common.codec.csv.CsvCodec;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
@@ -62,14 +63,13 @@ public class CoreDataPlugin extends TracPlugin {
 
         switch (serviceName) {
 
+            case LOCAL_FILE_STORAGE_NAME: return (T) new LocalFileStorage(properties);
+            case ARROW_STREAM_CODEC_NAME: return (T) new ArrowStreamCodec();
             case CSV_CODEC_NAME: return (T) new CsvCodec();
 
             case JSON_CODEC_NAME:
-            case ARROW_STREAM_CODEC_NAME:
             case ARROW_FILE_CODEC_NAME:
                 throw new ETracInternal("Not implemented yet");
-
-            case LOCAL_FILE_STORAGE_NAME: return (T) new LocalFileStorage(properties);
 
             default:
                 throw new EUnexpected();
