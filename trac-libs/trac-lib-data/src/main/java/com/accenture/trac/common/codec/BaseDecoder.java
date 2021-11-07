@@ -38,7 +38,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
     protected final Queue<DataBlock> outQueue;
     private boolean started = false;
 
-    protected abstract void decodeFirstChunk();
+    protected abstract void decodeStart();
     protected abstract void decodeChunk();
     protected abstract void decodeLastChunk();
 
@@ -81,14 +81,17 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
 
         try {
             buffer.addComponent(true, chunk);
-            doSourceRequest(1);
 
             if (!started) {
                 started = true;
-                decodeFirstChunk();
+                decodeStart();
             }
-            else
-                decodeChunk();
+
+            decodeChunk();
+            deliverPendingBlocks();
+
+            if (nTargetRequested() > nTargetDelivered() && nSourceRequested() <= nSourceDelivered())
+                doSourceRequest(1);
         }
         catch (Throwable e) {
             releaseBuffer();

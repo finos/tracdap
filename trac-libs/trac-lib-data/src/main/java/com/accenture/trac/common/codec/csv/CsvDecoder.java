@@ -43,47 +43,39 @@ import java.util.*;
 public class CsvDecoder extends BaseDecoder {
 
     private static final int BATCH_SIZE = 1024;
-    private static final DataBlock END_OF_STREAM = DataBlock.eos();
 
     private static final boolean DEFAULT_HEADER_FLAG = true;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final BufferAllocator arrowAllocator;
     private final SchemaDefinition tracSchema;
-    private final Schema arrowSchema;
 
-    private final VectorSchemaRoot root;
-    private final VectorUnloader unloader;
+    private final Schema arrowSchema;
+    private VectorSchemaRoot root;
+    private VectorUnloader unloader;
 
     private final boolean headerFlag = DEFAULT_HEADER_FLAG;
 
     public CsvDecoder(BufferAllocator arrowAllocator, SchemaDefinition schema) {
 
+        this.arrowAllocator = arrowAllocator;
         this.tracSchema = schema;
+
+        // Schema cannot be inferred from CSV, so it must always be set from a TRAC schema
         this.arrowSchema = ArrowSchema.tracToArrow(this.tracSchema);
+    }
 
-        var fields = arrowSchema.getFields();
-        var vectors = new ArrayList<FieldVector>(fields.size());
+    @Override
+    protected void decodeStart() {
 
-        for (var field : fields) {
-
-            var vector = field.createVector(arrowAllocator);
-            vector.setInitialCapacity(BATCH_SIZE);
-
-            vectors.add(vector);
-        }
-
-        this.root = new VectorSchemaRoot(fields, vectors);
+        this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, BATCH_SIZE);
         this.unloader = new VectorUnloader(root);  // TODO: No compression support atm
     }
 
     @Override
-    protected void decodeFirstChunk() {
-        // No-op, current version of CSV decode buffers the full input
-    }
-
-    @Override
     protected void decodeChunk() {
+
         // No-op, current version of CSV decode buffers the full input
     }
 

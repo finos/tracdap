@@ -20,6 +20,9 @@ import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.BasicType;
 import com.accenture.trac.metadata.SchemaDefinition;
 import com.accenture.trac.metadata.SchemaType;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.types.DateUnit;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.TimeUnit;
@@ -73,5 +76,28 @@ public class ArrowSchema {
         }
 
         return new Schema(arrowFields);
+    }
+
+    public static VectorSchemaRoot createRoot(Schema arrowSchema, BufferAllocator arrowAllocator) {
+
+        return createRoot(arrowSchema, arrowAllocator, 0);
+    }
+
+    public static VectorSchemaRoot createRoot(Schema arrowSchema, BufferAllocator arrowAllocator, int initialCapacity) {
+
+        var fields = arrowSchema.getFields();
+        var vectors = new ArrayList<FieldVector>(fields.size());
+
+        for (var field : fields) {
+
+            var vector = field.createVector(arrowAllocator);
+
+            if (initialCapacity > 0)
+                vector.setInitialCapacity(initialCapacity);
+
+            vectors.add(vector);
+        }
+
+        return new VectorSchemaRoot(fields, vectors);
     }
 }

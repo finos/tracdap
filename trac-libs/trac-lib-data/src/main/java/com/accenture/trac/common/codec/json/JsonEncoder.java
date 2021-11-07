@@ -17,6 +17,7 @@
 package com.accenture.trac.common.codec.json;
 
 import com.accenture.trac.common.codec.BaseEncoder;
+import com.accenture.trac.common.codec.arrow.ArrowSchema;
 import com.accenture.trac.common.codec.arrow.ArrowValues;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
@@ -28,7 +29,6 @@ import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorLoader;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
@@ -39,7 +39,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
 
 
 public class JsonEncoder extends BaseEncoder {
@@ -65,7 +64,7 @@ public class JsonEncoder extends BaseEncoder {
         try {
 
             this.arrowSchema = arrowSchema;
-            this.root = createRoot(arrowSchema);
+            this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator);
             this.loader = new VectorLoader(root);  // TODO: No compression support atm
 
             out = new ByteOutputStream(outQueue::add);
@@ -137,17 +136,6 @@ public class JsonEncoder extends BaseEncoder {
 
             throw new ETracInternal(e.getMessage(), e);  // todo
         }
-    }
-
-    private VectorSchemaRoot createRoot(Schema arrowSchema) {
-
-        var fields = arrowSchema.getFields();
-        var vectors = new ArrayList<FieldVector>(fields.size());
-
-        for (var field : fields)
-            vectors.add(field.createVector(arrowAllocator));
-
-        return new VectorSchemaRoot(fields, vectors);
     }
 
     private void writeField(VectorSchemaRoot root, int row, int col) throws IOException {
