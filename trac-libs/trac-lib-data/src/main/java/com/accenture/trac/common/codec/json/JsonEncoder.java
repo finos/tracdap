@@ -152,11 +152,8 @@ public class JsonEncoder extends BaseEncoder {
 
     private void writeField(VectorSchemaRoot root, int row, int col) throws IOException {
 
-
-        var schema = this.arrowSchema;
-        var field = schema.getFields().get(col);
+        var field = arrowSchema.getFields().get(col);
         var fieldName = field.getName();
-        var minorType = root.getVector(col).getMinorType();
 
         var value = ArrowValues.getValue(root, row, col);
 
@@ -164,6 +161,8 @@ public class JsonEncoder extends BaseEncoder {
             generator.writeNullField(fieldName);
             return;
         }
+
+        var minorType = root.getVector(col).getMinorType();
 
         switch (minorType) {
 

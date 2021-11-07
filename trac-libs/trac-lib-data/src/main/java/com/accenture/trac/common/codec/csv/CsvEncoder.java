@@ -17,17 +17,16 @@
 package com.accenture.trac.common.codec.csv;
 
 import com.accenture.trac.common.codec.BaseEncoder;
-import com.accenture.trac.common.codec.arrow.ArrowSchema;
 import com.accenture.trac.common.codec.arrow.ArrowValues;
 import com.accenture.trac.common.exception.ETracInternal;
+import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.util.ByteOutputStream;
 import com.accenture.trac.metadata.SchemaDefinition;
 
-import com.fasterxml.jackson.databind.SequenceWriter;
-import com.fasterxml.jackson.dataformat.csv.CsvMapper;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.EmptyByteBuf;
+import com.fasterxml.jackson.core.JsonEncoding;
+import com.fasterxml.jackson.dataformat.csv.CsvFactory;
+import com.fasterxml.jackson.dataformat.csv.CsvGenerator;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorLoader;
@@ -35,35 +34,35 @@ import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 
 
 public class CsvEncoder extends BaseEncoder {
 
-    private final SchemaDefinition tracSchema;
-    private final Schema arrowSchema;
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final BufferAllocator arrowAllocator;
+    private final SchemaDefinition tracSchema;
+
+    private  Schema arrowSchema;
     private VectorSchemaRoot root;
     private VectorLoader loader;
 
-    private CsvMapper mapper = null;
-    private SequenceWriter outWriter;
+    private OutputStream out;
+    private CsvGenerator generator;
+
 
     public CsvEncoder(BufferAllocator arrowAllocator, SchemaDefinition tracSchema) {
 
+        this.arrowAllocator = arrowAllocator;
         this.tracSchema = tracSchema;
-        this.arrowSchema = ArrowSchema.tracToArrow(this.tracSchema);
-
-        var fields = arrowSchema.getFields();
-        var vectors = new ArrayList<FieldVector>(fields.size());
-
-        for (var field : fields)
-            vectors.add(field.createVector(arrowAllocator));
-
-        this.root = new VectorSchemaRoot(fields, vectors);
-        this.loader = new VectorLoader(root);  // TODO: No compression support atm
     }
 
     @Override
@@ -73,24 +72,26 @@ public class CsvEncoder extends BaseEncoder {
 
             // TODO: Compare schema to trac schema if available
 
+            this.arrowSchema = arrowSchema;
+            this.root = createRoot(arrowSchema);
+            this.loader = new VectorLoader(root);  // TODO: No compression support atm
+
+            var factory = new CsvFactory();
+
             var csvSchema = CsvSchemaMapping
                     .arrowToCsv(arrowSchema)
                     .setUseHeader(true)  // tODO header
-                    .build();
+                    .build()
+                    .withHeader();
 
-            var csvWriter = CsvMapper.builder().build()
-                    .writerFor(Object.class)
-                    .with(csvSchema);
-
-            var outStream = new ByteOutputStream(outQueue::add);
-
-            this.outWriter = csvWriter.writeValuesAsArray(outStream);
+            out = new ByteOutputStream(outQueue::add);
+            generator = factory.createGenerator(out, JsonEncoding.UTF8);
+            generator.setSchema(csvSchema);
         }
         catch (IOException e) {
 
             throw new ETracInternal(e.getMessage(), e);  // TODO: Error
         }
-
     }
 
     @Override
@@ -98,30 +99,24 @@ public class CsvEncoder extends BaseEncoder {
 
         try (batch) {
 
-            // Todo: when to call this
-            if (outWriter == null)
-                encodeSchema(this.arrowSchema);
-
             loader.load(batch);
 
-            var nRows = root.getRowCount();
-            var nCols = root.getFieldVectors().size();
+            var nRows = batch.getLength();
+            var nCols = arrowSchema.getFields().size();
 
-            var csvValues = new Object[nCols];
+            for (var row = 0; row < nRows; row++) {
 
-            for (int row = 0; row < nRows; row++) {
+                generator.writeStartArray();
 
-                for (int col = 0; col < nCols; col++) {
-                    var csvValue = ArrowValues.getValue(root, row, col);
-                    csvValues[col] = csvValue;
-                }
+                for (var col = 0; col < nCols; col++)
+                    writeField(root, row, col);
 
-                outWriter.write(csvValues);
+                generator.writeEndArray();
             }
-
-            outWriter.flush();
         }
         catch (IOException e) {
+
+            log.error(e.getMessage(), e);
 
             // TODO: Error
         }
@@ -140,6 +135,80 @@ public class CsvEncoder extends BaseEncoder {
     @Override
     protected void encodeEos() {
 
-        // no-op
+        try {
+
+            if (arrowSchema == null)
+                throw new EUnexpected();  // TODO: Data error, invalid stream, in base encoder
+
+            //generator.writeEndArray();
+            generator.close();
+            generator = null;
+
+            out.close();
+            out = null;
+        }
+        catch (IOException e) {
+
+            throw new ETracInternal(e.getMessage(), e);  // todo
+        }
+    }
+
+    private VectorSchemaRoot createRoot(Schema arrowSchema) {
+
+        var fields = arrowSchema.getFields();
+        var vectors = new ArrayList<FieldVector>(fields.size());
+
+        for (var field : fields)
+            vectors.add(field.createVector(arrowAllocator));
+
+        return new VectorSchemaRoot(fields, vectors);
+    }
+
+    private void writeField(VectorSchemaRoot root, int row, int col) throws IOException {
+
+        var value = ArrowValues.getValue(root, row, col);
+
+        if (value == null) {
+            generator.writeNull();
+            return;
+        }
+
+        var minorType = root.getVector(col).getMinorType();
+
+        switch (minorType) {
+
+            case BIT: generator.writeBoolean((boolean) value); break;
+
+            case BIGINT: generator.writeNumber((long) value); break;
+            case INT: generator.writeNumber((int) value); break;
+            case SMALLINT: generator.writeNumber((short) value); break;
+            case TINYINT: generator.writeNumber((byte) value); break;
+
+            case FLOAT8: generator.writeNumber((double) value); break;
+            case FLOAT4: generator.writeNumber((float) value); break;
+
+            case DECIMAL:
+            case DECIMAL256:
+                var decimal = (BigDecimal) value;
+                generator.writeString(decimal.toString());
+                break;
+
+            case VARCHAR:
+                generator.writeString(value.toString());
+                break;
+
+            case DATEDAY:
+            case DATEMILLI:
+                var dateValue = (LocalDate) value;
+                var dateIso = MetadataCodec.ISO_DATE_FORMAT.format(dateValue);
+                generator.writeString(dateIso);
+                break;
+
+            // TODO: Datetime type
+
+            default:
+
+                throw new EUnexpected();  // TODO: data error, field type not supported
+        }
     }
 }
