@@ -28,7 +28,7 @@ public class ArrowFileCodec implements ICodec {
 
     @Override
     public List<String> options() {
-        return null;
+        return List.of();
     }
 
     @Override

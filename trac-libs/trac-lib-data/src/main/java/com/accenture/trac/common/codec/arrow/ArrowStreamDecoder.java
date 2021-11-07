@@ -47,8 +47,13 @@ public class ArrowStreamDecoder extends BaseDecoder {
     }
 
     @Override
-    protected void decodeChunk() {
+    protected void decodeFirstChunk() {
+        // No-op, current version of CSV decode buffers the full input
+    }
 
+    @Override
+    protected void decodeChunk() {
+        // No-op, current version of CSV decode buffers the full input
     }
 
     @Override
@@ -67,6 +72,9 @@ public class ArrowStreamDecoder extends BaseDecoder {
 
                 var batch = unloader.getRecordBatch();
                 outQueue.add(DataBlock.forRecords(batch));
+
+                // Release memory retained in VSR (batch still has a reference)
+                root.clear();
             }
         }
         catch (IOException e) {

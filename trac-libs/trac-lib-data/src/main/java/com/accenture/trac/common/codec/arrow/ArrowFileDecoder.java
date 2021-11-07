@@ -41,8 +41,13 @@ public class ArrowFileDecoder extends BaseDecoder {
     }
 
     @Override
-    protected void decodeChunk() {
+    protected void decodeFirstChunk() {
+        // No-op, current version of CSV decode buffers the full input
+    }
 
+    @Override
+    protected void decodeChunk() {
+        // No-op, current version of CSV decode buffers the full input
     }
 
     @Override

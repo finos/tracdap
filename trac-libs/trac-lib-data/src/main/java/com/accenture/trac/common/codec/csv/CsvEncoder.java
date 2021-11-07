@@ -134,7 +134,7 @@ public class CsvEncoder extends BaseEncoder {
     @Override
     protected void encodeDictionary(ArrowDictionaryBatch batch) {
 
-        throw new ETracInternal("CSV Dictionary encoding not supported");
+        throw new ETracInternal("CSV dictionary encoding not supported");
     }
 
     @Override

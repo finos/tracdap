@@ -121,6 +121,7 @@ public class ArrowStreamEncoder extends BaseEncoder {
         }
         finally {
             writer.close();
+            root.close();
         }
     }
 }

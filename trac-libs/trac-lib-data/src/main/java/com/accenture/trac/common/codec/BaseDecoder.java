@@ -36,7 +36,9 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
 
     protected final CompositeByteBuf buffer;
     protected final Queue<DataBlock> outQueue;
+    private boolean started = false;
 
+    protected abstract void decodeFirstChunk();
     protected abstract void decodeChunk();
     protected abstract void decodeLastChunk();
 
@@ -49,21 +51,26 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
     @Override
     protected void handleTargetRequest() {
 
-        deliverPendingBlocks();
+        try {
+            deliverPendingBlocks();
 
-        if (nTargetRequested() > nTargetDelivered() && nSourceRequested() <= nSourceDelivered())
-            doSourceRequest(1);
+            if (nTargetRequested() > nTargetDelivered() && nSourceRequested() <= nSourceDelivered())
+                doSourceRequest(1);
+        }
+        catch (Throwable e) {
+            releaseBuffer();
+            releasePendingChunks();
+            throw e;
+        }
     }
 
     @Override
     protected void handleTargetCancel() {
 
         try {
-
             doSourceCancel();
         }
         finally {
-
             releaseBuffer();
             releasePendingChunks();
         }
@@ -72,10 +79,22 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
     @Override
     protected void handleSourceNext(ByteBuf chunk) {
 
-        buffer.addComponent(true, chunk);
-        doSourceRequest(1);
+        try {
+            buffer.addComponent(true, chunk);
+            doSourceRequest(1);
 
-        decodeChunk();
+            if (!started) {
+                started = true;
+                decodeFirstChunk();
+            }
+            else
+                decodeChunk();
+        }
+        catch (Throwable e) {
+            releaseBuffer();
+            releasePendingChunks();
+            throw e;
+        }
     }
 
     @Override
@@ -88,8 +107,10 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
 
             deliverPendingBlocks();
         }
+        catch (Throwable e) {
+            releasePendingChunks();
+        }
         finally {
-
             releaseBuffer();
         }
     }
@@ -98,19 +119,17 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
     protected void handleSourceError(Throwable error) {
 
         try {
-
             log.error(error.getMessage(), error);
 
             doTargetError(error);  // todo
         }
         finally {
-
             releaseBuffer();
             releasePendingChunks();
         }
     }
 
-    protected void deliverPendingBlocks() {
+    private void deliverPendingBlocks() {
 
         while (nTargetDelivered() < nTargetRequested()) {
 
