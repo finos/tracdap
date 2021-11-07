@@ -163,8 +163,6 @@ public class CsvDecoder extends BaseDecoder {
                 nBatches++;
             }
 
-            outQueue.add(END_OF_STREAM);
-
             log.info("CSV Codec: Decoded {} rows in {} batches", nRowsTotal, nBatches);
         }
         catch (IOException | ParseException e) {

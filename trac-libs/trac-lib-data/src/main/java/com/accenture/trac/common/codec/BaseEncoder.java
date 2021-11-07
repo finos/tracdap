@@ -40,6 +40,7 @@ public abstract class BaseEncoder extends CommonBaseProcessor<DataBlock, ByteBuf
     protected abstract void encodeSchema(Schema arrowSchema);
     protected abstract void encodeRecords(ArrowRecordBatch batch);
     protected abstract void encodeDictionary(ArrowDictionaryBatch batch);
+    protected abstract void encodeEos();
 
     protected BaseEncoder() {
 
@@ -85,6 +86,7 @@ public abstract class BaseEncoder extends CommonBaseProcessor<DataBlock, ByteBuf
     @Override
     protected void handleSourceComplete() {
 
+        encodeEos();
         outQueue.add(END_OF_STREAM);
 
         deliverPendingChunks();

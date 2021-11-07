@@ -136,4 +136,10 @@ public class CsvEncoder extends BaseEncoder {
 
         throw new ETracInternal("CSV Dictionary encoding not supported");
     }
+
+    @Override
+    protected void encodeEos() {
+
+        // no-op
+    }
 }

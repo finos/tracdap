@@ -106,8 +106,9 @@ public abstract class CodecRoundTripTest {
 
         var unloader = new VectorUnloader(root);
         var batch = unloader.getRecordBatch();
-        var block = DataBlock.forRecords(batch);
-        var blockStream = Flows.publish(Stream.of(block));
+        var schemaBlock = DataBlock.forSchema(arrowSchema);
+        var dataBlock = DataBlock.forRecords(batch);
+        var blockStream = Flows.publish(Stream.of(schemaBlock, dataBlock));
 
         var encoder = codec.getEncoder(allocator, BASIC_SCHEMA, Map.of());
         var decoder = codec.getDecoder(allocator, BASIC_SCHEMA, Map.of());

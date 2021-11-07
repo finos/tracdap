@@ -133,7 +133,7 @@ public class PluginManager implements IPluginManager {
         var pluginKey = new PluginKey(serviceClass, protocol);
 
         if (!plugins.containsKey(pluginKey))
-            throw new EPluginNotAvailable("");  // TODO: Plugin err message
+            throw new EPluginNotAvailable(protocol);  // TODO: Plugin err message
 
         var plugin = plugins.get(pluginKey);
 

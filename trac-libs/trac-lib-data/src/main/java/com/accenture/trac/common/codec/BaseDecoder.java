@@ -84,6 +84,8 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
         try {
 
             decodeLastChunk();
+            outQueue.add(END_OF_STREAM);
+
             deliverPendingBlocks();
         }
         finally {
