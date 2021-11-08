@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvParser;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.*;
@@ -74,7 +75,7 @@ public class CsvDecoder extends BaseDecoder {
     }
 
     @Override
-    protected void decodeChunk() {
+    protected void decodeChunk(ByteBuf chunk) {
 
         // No-op, current version of CSV decode buffers the full input
     }

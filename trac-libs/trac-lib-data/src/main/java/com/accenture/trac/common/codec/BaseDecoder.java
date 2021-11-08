@@ -37,9 +37,10 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
     protected final CompositeByteBuf buffer;
     protected final Queue<DataBlock> outQueue;
     private boolean started = false;
+    private boolean released = false;
 
     protected abstract void decodeStart();
-    protected abstract void decodeChunk();
+    protected abstract void decodeChunk(ByteBuf chunk);
     protected abstract void decodeLastChunk();
 
     protected BaseDecoder() {
@@ -87,7 +88,16 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
                 decodeStart();
             }
 
-            decodeChunk();
+            var sliceSize = 64;
+            for (int i = 0; i * sliceSize < buffer.readableBytes(); i++) {
+
+                var thisSliceSize = Math.min(sliceSize, buffer.readableBytes() - (i * sliceSize));
+                var slice = buffer.slice(i * sliceSize, thisSliceSize);
+                decodeChunk(slice);
+            }
+
+
+            // decodeChunk(buffer);
             deliverPendingBlocks();
 
             if (nTargetRequested() > nTargetDelivered() && nSourceRequested() <= nSourceDelivered())
@@ -96,7 +106,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
         catch (Throwable e) {
             releaseBuffer();
             releasePendingChunks();
-            throw e;
+            throw e;  // todo
         }
     }
 
@@ -105,6 +115,11 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
 
         try {
 
+            if (!started) {
+                started = true;
+                decodeStart();
+            }
+
             decodeLastChunk();
             outQueue.add(END_OF_STREAM);
 
@@ -112,6 +127,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
         }
         catch (Throwable e) {
             releasePendingChunks();
+            throw e;  // todo
         }
         finally {
             releaseBuffer();
@@ -151,10 +167,14 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
 
     private void releaseBuffer() {
 
-        var releaseOk = buffer.release();
+        if (!released) {
 
-        if (!releaseOk && buffer.capacity() > 0)
-            log.warn("CSV decode buffer was not released (this could indicate a memory leak)");
+            var releaseOk = buffer.release();
+            released = true;
+
+            if (!releaseOk && buffer.capacity() > 0)
+                log.warn("CSV decode buffer was not released (this could indicate a memory leak)");
+        }
     }
 
     private void releasePendingChunks() {

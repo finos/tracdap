@@ -37,6 +37,6 @@ public class JsonCodec implements ICodec {
 
     @Override
     public Decoder getDecoder(BufferAllocator arrowAllocator, SchemaDefinition schema, Map<String, String> options) {
-        return null;
+        return new JsonDecoder(arrowAllocator, schema);
     }
 }

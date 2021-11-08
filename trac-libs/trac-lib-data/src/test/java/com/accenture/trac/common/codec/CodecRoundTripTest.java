@@ -20,6 +20,7 @@ import com.accenture.trac.common.codec.arrow.ArrowFileCodec;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
 import com.accenture.trac.common.codec.arrow.ArrowStreamCodec;
 import com.accenture.trac.common.codec.csv.CsvCodec;
+import com.accenture.trac.common.codec.json.JsonCodec;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.metadata.*;
@@ -44,17 +45,11 @@ import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 public abstract class CodecRoundTripTest {
 
-    static class ArrowStream extends CodecRoundTripTest {
-        @BeforeEach void setup() { codec = new ArrowStreamCodec(); }
-    }
-
-    static class ArrowFile extends CodecRoundTripTest {
-        @BeforeEach void setup() { codec = new ArrowFileCodec(); }
-    }
-
-    static class CSV extends CodecRoundTripTest {
-        @BeforeEach void setup() { codec = new CsvCodec(); }
-    }
+    // Concrete test cases for codecs included in CORE_DATA
+    static class ArrowStream extends CodecRoundTripTest { @BeforeEach void setup() { codec = new ArrowStreamCodec(); } }
+    static class ArrowFile extends CodecRoundTripTest { @BeforeEach void setup() { codec = new ArrowFileCodec(); } }
+    static class CSV extends CodecRoundTripTest { @BeforeEach void setup() { codec = new CsvCodec(); } }
+    static class JSON extends CodecRoundTripTest { @BeforeEach void setup() { codec = new JsonCodec(); } }
 
     private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
 

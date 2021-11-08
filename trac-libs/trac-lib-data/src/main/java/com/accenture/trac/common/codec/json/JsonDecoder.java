@@ -18,6 +18,7 @@ package com.accenture.trac.common.codec.json;
 
 import com.accenture.trac.common.codec.BaseDecoder;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
+import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.SchemaDefinition;
 
@@ -25,26 +26,34 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.async.ByteArrayFeeder;
+import io.netty.buffer.ByteBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.VectorUnloader;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 
 public class JsonDecoder extends BaseDecoder {
 
     private static final int BATCH_SIZE = 1024;
+    private static final boolean CASE_INSENSITIVE = false;
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final BufferAllocator arrowAllocator;
     private final SchemaDefinition tracSchema;
 
     private final Schema arrowSchema;
-    private VectorSchemaRoot root;
-    private VectorUnloader unloader;
+
     private ByteArrayFeeder feeder;
-    private JsonParser parser;
+    private JsonParser lexer;
+    private JsonParserBase parser;
+
 
     public JsonDecoder(BufferAllocator arrowAllocator, SchemaDefinition tracSchema) {
 
@@ -64,8 +73,12 @@ public class JsonDecoder extends BaseDecoder {
             this.unloader = new VectorUnloader(root);  // TODO: No compression support atm
 
             var factory = new JsonFactory();
-            this.parser = factory.createNonBlockingByteArrayParser();
-            this.feeder = (ByteArrayFeeder) parser.getNonBlockingInputFeeder();
+            this.lexer = factory.createNonBlockingByteArrayParser();
+            this.feeder = (ByteArrayFeeder) lexer.getNonBlockingInputFeeder();
+
+            this.parser = new JsonTableParser(
+                    arrowSchema, lexer, CASE_INSENSITIVE,
+                    root, BATCH_SIZE, this::dispatchBatch);
         }
         catch (IOException e) {
 
@@ -74,35 +87,57 @@ public class JsonDecoder extends BaseDecoder {
     }
 
     @Override
-    protected void decodeChunk() {
+    protected void decodeChunk(ByteBuf chunk) {
 
         try {
 
             if (!feeder.needMoreInput() && buffer.readableBytes() > 0)
                 throw new EUnexpected(); // TODO: EDataInvalidStream
 
-            var bytes = new byte[buffer.readableBytes()];
-            buffer.readBytes(bytes);
+            log.info("Next chunk");
+
+            var bytes = new byte[chunk.readableBytes()];
+            chunk.readBytes(bytes);
+
+            var text = new String(bytes, StandardCharsets.UTF_8);
+            log.info(text);
+
+
             feeder.feedInput(bytes, 0, bytes.length);
 
             JsonToken token;
 
-            while ((token = parser.nextToken()) != JsonToken.NOT_AVAILABLE) {
+            while ((token = lexer.nextToken()) != JsonToken.NOT_AVAILABLE) {
 
-                // TODO: Parser impl
+                log.info("JSON Token: {}", token);
+                parser.acceptToken(token);
             }
+
+            log.info("Chunk done");
         }
         catch (IOException e) {
 
             throw new EUnexpected(e);  // TODO
         }
         finally {
-            buffer.release();
+            // buffer.release();
         }
     }
 
     @Override
     protected void decodeLastChunk() {
 
+        throw new RuntimeException("Not done yet");
+    }
+
+    private void dispatchBatch(VectorSchemaRoot root) {
+
+        var batch = unloader.getRecordBatch();
+        var block = DataBlock.forRecords(batch);
+        outQueue.add(block);
+
+        // Release memory in the root
+        // Memory is still referenced by the batch, until the batch is consumed
+        root.clear();
     }
 }

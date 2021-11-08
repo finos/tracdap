@@ -21,6 +21,7 @@ import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.data.IDataContext;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.util.ByteSeekableChannel;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.VectorLoader;
@@ -52,7 +53,7 @@ public class ArrowStreamDecoder extends BaseDecoder {
     }
 
     @Override
-    protected void decodeChunk() {
+    protected void decodeChunk(ByteBuf chunk) {
         // No-op, current version of CSV decode buffers the full input
     }
 
