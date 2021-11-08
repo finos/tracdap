@@ -29,7 +29,14 @@ public class ArrowValues {
     public static void setValue(VectorSchemaRoot root, int row, int col, Object obj) {
 
         var vector = root.getVector(col);
+        var nullable = vector.getField().isNullable();
         var arrowTypeId = vector.getField().getType().getTypeID();
+
+        if (obj == null && !nullable) {
+
+            var fieldName = vector.getField().getName();
+            throw new EUnexpected();  // todo: edatavalidity, field "" cannot be null
+        }
 
         var isSet = (obj != null) ? 1 : 0;
 
@@ -124,8 +131,14 @@ public class ArrowValues {
 
         var isNull = vector.isNull(row);
 
-        if (isNull)
+        if (isNull) {
+
+            if (!vector.getField().isNullable())
+                throw new EUnexpected(); // todo: EDataValidity
+
             return null;
+        }
+
 
         switch (arrowTypeId) {
 
