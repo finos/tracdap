@@ -18,14 +18,14 @@ package com.accenture.trac.common.codec.csv;
 
 import com.accenture.trac.common.codec.BaseDecoder;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
-import com.accenture.trac.common.codec.arrow.ArrowValues;
+import com.accenture.trac.common.codec.json.JacksonValues;
 import com.accenture.trac.common.data.DataBlock;
+import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.SchemaDefinition;
 
-import com.fasterxml.jackson.databind.MappingIterator;
-import com.fasterxml.jackson.dataformat.csv.CsvMapper;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.dataformat.csv.CsvFactory;
 import com.fasterxml.jackson.dataformat.csv.CsvParser;
-import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import org.apache.arrow.memory.BufferAllocator;
@@ -36,9 +36,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.text.NumberFormat;
-import java.text.ParseException;
-import java.util.*;
 
 
 public class CsvDecoder extends BaseDecoder {
@@ -81,75 +78,75 @@ public class CsvDecoder extends BaseDecoder {
     @Override
     protected void decodeChunk(ByteBuf chunk) {
 
-
-        // TODO: Parser to String[] instead of Map
-        // Map is created for every row, and updated / referenced for every field
+        var csvFactory = new CsvFactory();
 
         var csvSchema =  CsvSchemaMapping
                 .arrowToCsv(this.arrowSchema)
                 .build()
                 .withHeader();
 
-        var csvReader = CsvMapper.builder().build()
-                .readerForMapOf(String.class)
-                .with(csvSchema)
-                .with(CsvParser.Feature.WRAP_AS_ARRAY);
-
         try (var stream = new ByteBufInputStream(chunk);
-             MappingIterator<Map<String, String>> itr = csvReader.readValues((InputStream) stream)) {
+             var parser = (CsvParser) csvFactory.createParser((InputStream) stream)) {
+
+            parser.setSchema(csvSchema);
 
             var nRowsTotal = 0;
             var nRowsBatch = 0;
             var nBatches = 0;
             var nCols = arrowSchema.getFields().size();
+            int col = 0;
 
-            while (itr.hasNextValue()) {
+            JsonToken token;
 
-                // If this is a new batch, allocator memory in the root container
-                // (memory of the previous batch is no longer owned by the root container)
+            while ((token = parser.nextToken()) != null) {
 
-                if (nRowsBatch == 0) {
+                // For CSV files, a null field name is produced for every field
+                if (token == JsonToken.FIELD_NAME)
+                    continue;
 
-                    for (var vector : root.getFieldVectors())
-                        vector.allocateNew();
+                if (token.isScalarValue()) {
+
+                    var vector = root.getVector(col);
+                    JacksonValues.parseAndSet(vector, nRowsBatch, parser, token);
+                    col++;
+
+                    continue;
                 }
 
-                // Write the next row of values into the arrow root container
+                if (token == JsonToken.START_OBJECT) {
 
-                var row = nRowsBatch;
-                var csvValues = (Map<String, String>) itr.nextValue();
-
-                for (int col = 0; col < nCols; col++) {
-
-                    var csvCol = csvSchema.column(col);
-                    var csvValue = csvValues.get(csvCol.getName());
-
-                    if (csvCol.getType() == CsvSchema.ColumnType.NUMBER) {
-                        var numericValue = NumberFormat.getInstance().parse(csvValue.trim());
-                        ArrowValues.setValue(root, row, col, numericValue);
+                    if (nRowsBatch == 0) {
+                        for (var vector : root.getFieldVectors())
+                            vector.allocateNew();
                     }
-                    else
-                        ArrowValues.setValue(root, row, col, csvValue);
+
+                    continue;
                 }
 
-                nRowsTotal++;
-                nRowsBatch++;
+                if (token == JsonToken.END_OBJECT) {
 
-                // When the batch is full, dispatch it
+                    nRowsBatch++;
+                    nRowsTotal++;
+                    col = 0;
 
-                if (nRowsBatch == BATCH_SIZE) {
+                    if (nRowsBatch == BATCH_SIZE) {
 
-                    root.setRowCount(nRowsBatch);
-                    dispatchBatch(root);
+                        root.setRowCount(nRowsBatch);
+                        dispatchBatch(root);
 
-                    nRowsBatch = 0;
-                    nBatches++;
+                        nRowsBatch = 0;
+                        nBatches++;
+                    }
+
+                    continue;
                 }
+
+                throw new EUnexpected();  // todo
             }
 
             // Check if there is a final batch that needs dispatching
 
-            if (nRowsBatch > 0) {
+            if (nRowsBatch > 0 || col > 0) {
 
                 root.setRowCount(nRowsBatch);
                 dispatchBatch(root);
@@ -159,7 +156,7 @@ public class CsvDecoder extends BaseDecoder {
 
             log.info("CSV Codec: Decoded {} rows in {} batches", nRowsTotal, nBatches);
         }
-        catch (IOException | ParseException e) {
+        catch (IOException e) {
 
             log.error("CSV Decode error", e);
 
