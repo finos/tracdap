@@ -30,6 +30,7 @@ import io.netty.buffer.ByteBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.VectorUnloader;
+import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,16 +70,19 @@ public class JsonDecoder extends BaseDecoder {
 
         try {
 
-            this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, BATCH_SIZE);
-            this.unloader = new VectorUnloader(root);  // TODO: No compression support atm
+//            this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, BATCH_SIZE);
+//            this.unloader = new VectorUnloader(root);  // TODO: No compression support atm
 
             var factory = new JsonFactory();
             this.lexer = factory.createNonBlockingByteArrayParser();
             this.feeder = (ByteArrayFeeder) lexer.getNonBlockingInputFeeder();
 
             this.parser = new JsonTableParser(
-                    arrowSchema, lexer, CASE_INSENSITIVE,
-                    root, BATCH_SIZE, this::dispatchBatch);
+                    arrowSchema, arrowAllocator,
+                    lexer, CASE_INSENSITIVE,
+                    this::dispatchBatch, BATCH_SIZE);
+
+            outQueue.add(DataBlock.forSchema(this.arrowSchema));
         }
         catch (IOException e) {
 
@@ -127,17 +131,23 @@ public class JsonDecoder extends BaseDecoder {
     @Override
     protected void decodeLastChunk() {
 
-        throw new RuntimeException("Not done yet");
+        // throw new RuntimeException("Not done yet");
     }
 
-    private void dispatchBatch(VectorSchemaRoot root) {
+//    private void dispatchBatch(VectorSchemaRoot root) {
+//
+//        var batch = unloader.getRecordBatch();
+//        var block = DataBlock.forRecords(batch);
+//        outQueue.add(block);
+//
+//        // Release memory in the root
+//        // Memory is still referenced by the batch, until the batch is consumed
+//        root.clear();
+//    }
 
-        var batch = unloader.getRecordBatch();
+    private void dispatchBatch(ArrowRecordBatch batch) {
+
         var block = DataBlock.forRecords(batch);
         outQueue.add(block);
-
-        // Release memory in the root
-        // Memory is still referenced by the batch, until the batch is consumed
-        root.clear();
     }
 }

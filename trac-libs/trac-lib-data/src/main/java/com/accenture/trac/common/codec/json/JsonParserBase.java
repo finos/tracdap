@@ -52,21 +52,35 @@ abstract class JsonParserBase {
         this.lexer = lexer;
 
         this.parseStack = new ParseState[MAX_PARSE_DEPTH];
-        this.parseDepth = 0;
+
+        for (int i = 0; i < MAX_PARSE_DEPTH; i++)
+            parseStack[i] = new ParseState();
+
+        parseStack[0].stateType = ParseStateType.ROOT;
+        parseDepth = 0;
     }
 
     public void acceptToken(JsonToken token) throws IOException {
 
-        var stateType = parseDepth > 0
-                ? parseStack[parseDepth].stateType
-                : ParseStateType.ROOT;
+        var stateType = parseStack[parseDepth].stateType;
 
         switch (stateType) {
 
-            case FIELD: acceptFieldValue(token); break;
-            case OBJECT: acceptObjectContinue(token); break;
-            case ARRAY: acceptArrayContinue(token); break;
-            case ROOT: acceptRootToken(token); break;
+            case FIELD:
+                acceptFieldValue(token);
+                break;
+
+            case OBJECT:
+                acceptObjectContinue(token);
+                break;
+
+            case ARRAY:
+                acceptArrayContinue(token);
+                break;
+
+            case ROOT:
+                acceptRootToken(token);
+                break;
 
             default:
                 throw new EUnexpected();
@@ -77,8 +91,13 @@ abstract class JsonParserBase {
 
         switch (token) {
 
-            case START_OBJECT: acceptStartObject();
-            case START_ARRAY: acceptStartArray();
+            case START_OBJECT:
+                acceptStartObject();
+                break;
+
+            case START_ARRAY:
+                acceptStartArray();
+                break;
 
             default:
                 throw new EUnexpected();  // todo: invalid json
@@ -113,9 +132,18 @@ abstract class JsonParserBase {
         }
 
         switch (token) {
-            case START_OBJECT: acceptStartObject(); break;
-            case START_ARRAY: acceptStartArray(); break;
-            case END_ARRAY: acceptEndArray();
+
+            case START_OBJECT:
+                acceptStartObject();
+                break;
+
+            case START_ARRAY:
+                acceptStartArray();
+                break;
+
+            case END_ARRAY:
+                acceptEndArray();
+                break;
 
             default:
                 throw new EUnexpected(); // todo: invalid json
@@ -144,8 +172,13 @@ abstract class JsonParserBase {
 
         switch (token) {
 
-            case FIELD_NAME: acceptFieldName();
-            case END_OBJECT: acceptEndObject();
+            case FIELD_NAME:
+                acceptFieldName();
+                break;
+
+            case END_OBJECT:
+                acceptEndObject();
+                break;
 
             default:
                 throw new EUnexpected();  // todo: invalid json
@@ -166,18 +199,26 @@ abstract class JsonParserBase {
         var parseState = parseStack[parseDepth];
 
         if (token.isScalarValue()) {
+
             handleFieldValue(parseState, parseDepth);
-            return;
         }
+        else { switch (token) {
 
-        switch (token) {
+            case START_OBJECT:
+                acceptStartObject();
+                break;
 
-            case START_OBJECT: acceptStartObject(); break;
-            case START_ARRAY: acceptStartArray(); break;
+            case START_ARRAY:
+                acceptStartArray();
+                break;
 
             default:
                 throw new EUnexpected();  // todo: invalid json
-        }
+
+        }}
+
+        if (parseStack[parseDepth].stateType == ParseStateType.FIELD)
+            parseDepth--;
     }
 
     static class ParseState {

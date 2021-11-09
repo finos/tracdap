@@ -17,20 +17,16 @@
 package com.accenture.trac.common.codec.json;
 
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
-import com.accenture.trac.common.codec.arrow.ArrowValues;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.common.metadata.MetadataCodec;
+
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.VectorUnloader;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
-import org.apache.arrow.vector.types.Types;
 import org.apache.arrow.vector.types.pojo.Schema;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Consumer;
@@ -111,7 +107,9 @@ class JsonTableParser extends JsonParserBase {
     void handleFieldValue(ParseState state, int depth) throws IOException {
 
         var col = fieldMap.get(state.fieldName);
-        readField(root, batchRow, col, lexer, lexer.currentToken());
+        var vector = root.getVector(col);
+
+        JacksonValues.parseAndSet(vector, batchRow, lexer, lexer.currentToken());
     }
 
     void handleArrayValue(ParseState state, int depth) {
@@ -135,64 +133,6 @@ class JsonTableParser extends JsonParserBase {
             uncasedMap.putAll(casedMap);
 
             return uncasedMap;
-        }
-    }
-
-    private void readField(VectorSchemaRoot root, int row, int col, JsonParser lexer, JsonToken token) throws IOException {
-
-        var vector = root.getVector(col);
-        var fieldType = vector.getField().getFieldType();
-        var minorType = vector.getMinorType();
-
-        if (token == JsonToken.VALUE_NULL) {
-
-            if (!fieldType.isNullable())
-                throw new EUnexpected();  // todo: data validity error
-
-            else {
-                ArrowValues.setValue(root, row, col, null);
-                return;
-            }
-        }
-
-        if (token.isScalarValue()) {
-
-            var value = decodeForMinorType(lexer, minorType);
-            ArrowValues.setValue(root, row, col, value);
-            return;
-        }
-
-        throw new EUnexpected();  // TODO: Error
-    }
-
-    private Object decodeForMinorType(JsonParser lexer, Types.MinorType minorType) throws IOException {
-
-        switch (minorType) {
-
-            case BIT: return lexer.getBooleanValue();
-
-            case BIGINT: return lexer.getLongValue();
-            case INT: return lexer.getIntValue();
-            case SMALLINT: return lexer.getShortValue();
-            case TINYINT: return lexer.getByteValue();
-
-            case FLOAT8: return lexer.getDoubleValue();
-            case FLOAT4: return lexer.getFloatValue();
-
-            case DECIMAL:
-            case DECIMAL256:
-                return lexer.getDecimalValue();
-
-            case VARCHAR:
-                return lexer.getValueAsString();
-
-            case DATEDAY:
-            case DATEMILLI:
-                var dateStr = lexer.getValueAsString();
-                return LocalDate.parse(dateStr, MetadataCodec.ISO_DATE_FORMAT);
-
-            default:
-                throw new EUnexpected();  // todo
         }
     }
 

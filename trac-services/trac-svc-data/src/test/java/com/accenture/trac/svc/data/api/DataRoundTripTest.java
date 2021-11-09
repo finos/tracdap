@@ -21,6 +21,9 @@ import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.concurrent.Futures;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.*;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvParser;
 import com.google.common.collect.Streams;
@@ -30,6 +33,7 @@ import org.apache.arrow.vector.*;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.vector.util.Text;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -39,9 +43,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Vector;
+import java.util.*;
 import java.util.concurrent.Flow;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -239,7 +241,13 @@ class DataRoundTripTest extends DataApiTestBase {
         var roundTripData = decodeFunc.apply(roundTripSchema, List.of(roundTripBytes));
 
         Assertions.assertEquals(BASIC_TEST_SCHEMA, roundTripSchema);
-        Assertions.assertEquals(expectedResult.values, roundTripData.values);
+
+        for (int i = 0; i < roundTripSchema.getTable().getFieldsCount(); i++) {
+
+            Assertions.assertArrayEquals(
+                    expectedResult.values.get(i).toArray(),
+                    roundTripData.values.get(i).toArray());
+        }
     }
 
     private Flow.Publisher<DataWriteRequest> dataWriteRequest(
@@ -289,26 +297,9 @@ class DataRoundTripTest extends DataApiTestBase {
         return defTypeFunc.apply(objDef);
     }
 
-
-
     private TestDataContainer decodeCsv(SchemaDefinition schema, List<ByteString> data) {
 
-        var result = new TestDataContainer();
-
-        result.fieldNames = schema.getTable()
-                .getFieldsList().stream()
-                .map(FieldSchema::getFieldName)
-                .collect(Collectors.toList());
-
-        result.fieldTypes = schema.getTable()
-                .getFieldsList().stream()
-                .map(FieldSchema::getFieldType)
-                .collect(Collectors.toList());
-
-        result.values = IntStream
-                .range(0, result.fieldNames.size())
-                .mapToObj(x -> new Vector<>())
-                .collect(Collectors.toList());
+        var result = schemaResult(schema);
 
         var allData = data.stream().reduce(ByteString.EMPTY, ByteString::concat).toString(StandardCharsets.UTF_8);
 
@@ -352,8 +343,70 @@ class DataRoundTripTest extends DataApiTestBase {
         return result;
     }
 
-    private TestDataContainer decodeJson(SchemaDefinition schema, List<ByteString> data) {
-        return null;
+    private TestDataContainer decodeJson(SchemaDefinition schema, List<ByteString> rawData) {
+
+        var result = schemaResult(schema);
+
+        var fieldMap = new HashMap<String, Integer>();
+        for (int col = 0; col < schema.getTable().getFieldsCount(); col++)
+            fieldMap.put(schema.getTable().getFields(col).getFieldName(), col);
+
+        var allData = rawData.stream().reduce(ByteString.EMPTY, ByteString::concat);
+        var allDataStr = allData.toString(StandardCharsets.UTF_8);
+
+        var genericTableType = new TypeReference<List<Map<String, Object>>>(){};
+
+        try (var reader = new BufferedReader(new StringReader(allDataStr))) {
+
+            var mapper = new ObjectMapper();
+            var jsonData = mapper.readValue(reader, genericTableType);
+
+            int row = 0;
+
+            for (var jsonRow : jsonData) {
+
+                for (var jsonField : jsonRow.entrySet()) {
+
+                    var fieldName = jsonField.getKey();
+                    var fieldIndex = fieldMap.get(fieldName);
+                    var fieldType = result.fieldTypes.get(fieldIndex);
+
+                    var jsonValue = jsonField.getValue();
+                    var objValue = decodeJavaObject(fieldType, jsonValue);
+
+                    result.values.get(fieldIndex).add(row, objValue);
+                }
+
+                row++;
+            }
+
+            return result;
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private TestDataContainer schemaResult(SchemaDefinition schema) {
+
+        var result = new TestDataContainer();
+
+        result.fieldNames = schema.getTable()
+                .getFieldsList().stream()
+                .map(FieldSchema::getFieldName)
+                .collect(Collectors.toList());
+
+        result.fieldTypes = schema.getTable()
+                .getFieldsList().stream()
+                .map(FieldSchema::getFieldType)
+                .collect(Collectors.toList());
+
+        result.values = IntStream
+                .range(0, result.fieldNames.size())
+                .mapToObj(x -> new Vector<>())
+                .collect(Collectors.toList());
+
+        return result;
     }
 
     private TestDataContainer decodeArrow(SchemaDefinition schema, List<ByteString> data) {
