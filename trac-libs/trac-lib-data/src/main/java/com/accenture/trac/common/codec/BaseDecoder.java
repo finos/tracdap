@@ -30,27 +30,36 @@ import java.util.Queue;
 
 public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implements ICodec.Decoder {
 
-    private static final DataBlock END_OF_STREAM = DataBlock.eos();
-
-    private final Logger log = LoggerFactory.getLogger(getClass());
-
-    protected final CompositeByteBuf buffer;
-    protected final Queue<DataBlock> outQueue;
-    private boolean started = false;
-    private boolean released = false;
+    protected static final boolean STREAMING_DECODER = true;
+    protected static final boolean BUFFERED_DECODER = false;
 
     protected abstract void decodeStart();
     protected abstract void decodeChunk(ByteBuf chunk);
     protected abstract void decodeLastChunk();
 
-    protected BaseDecoder() {
+    private static final DataBlock END_OF_STREAM = DataBlock.eos();
 
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
+    private final boolean isStreaming;
+    private final CompositeByteBuf buffer;
+    private final Queue<DataBlock> outQueue;
+    private boolean started = false;
+    private boolean released = false;
+
+    protected BaseDecoder(boolean isStreaming) {
+
+        this.isStreaming = isStreaming;
         this.buffer = ByteBufAllocator.DEFAULT.compositeBuffer();  // todo: allocator needed for composites or no?
         this.outQueue = new ArrayDeque<>();
     }
 
+    protected final void emitBlock(DataBlock block) {
+        outQueue.add(block);
+    }
+
     @Override
-    protected void handleTargetRequest() {
+    protected final void handleTargetRequest() {
 
         try {
             deliverPendingBlocks();
@@ -66,7 +75,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
     }
 
     @Override
-    protected void handleTargetCancel() {
+    protected final void handleTargetCancel() {
 
         try {
             doSourceCancel();
@@ -78,32 +87,34 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
     }
 
     @Override
-    protected void handleSourceNext(ByteBuf chunk) {
+    protected final void handleSourceNext(ByteBuf chunk) {
+
+        var chunkDelivered = false;
 
         try {
-            buffer.addComponent(true, chunk);
 
             if (!started) {
                 started = true;
                 decodeStart();
             }
 
-            var sliceSize = 64;
-            for (int i = 0; i * sliceSize < buffer.readableBytes(); i++) {
+            chunkDelivered = true;
 
-                var thisSliceSize = Math.min(sliceSize, buffer.readableBytes() - (i * sliceSize));
-                var slice = buffer.slice(i * sliceSize, thisSliceSize);
-                decodeChunk(slice);
-            }
+            if (isStreaming)
+                decodeChunk(chunk);
+            else
+                buffer.addComponent(true, chunk);
 
-
-            // decodeChunk(buffer);
             deliverPendingBlocks();
 
             if (nTargetRequested() > nTargetDelivered() && nSourceRequested() <= nSourceDelivered())
                 doSourceRequest(1);
         }
         catch (Throwable e) {
+
+            if (!chunkDelivered)
+                chunk.release();
+
             releaseBuffer();
             releasePendingChunks();
             throw e;  // todo
@@ -111,7 +122,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
     }
 
     @Override
-    protected void handleSourceComplete() {
+    protected final void handleSourceComplete() {
 
         try {
 
@@ -119,6 +130,9 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
                 started = true;
                 decodeStart();
             }
+
+            if (!isStreaming)
+                decodeChunk(buffer.retain());
 
             decodeLastChunk();
             outQueue.add(END_OF_STREAM);
@@ -135,7 +149,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
     }
 
     @Override
-    protected void handleSourceError(Throwable error) {
+    protected final void handleSourceError(Throwable error) {
 
         try {
             log.error(error.getMessage(), error);

@@ -60,6 +60,8 @@ public class CsvDecoder extends BaseDecoder {
 
     public CsvDecoder(BufferAllocator arrowAllocator, SchemaDefinition schema) {
 
+        super(BUFFERED_DECODER);
+
         this.arrowAllocator = arrowAllocator;
         this.tracSchema = schema;
 
@@ -72,18 +74,13 @@ public class CsvDecoder extends BaseDecoder {
 
         this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, BATCH_SIZE);
         this.unloader = new VectorUnloader(root);  // TODO: No compression support atm
+
+        emitBlock(DataBlock.forSchema(this.arrowSchema));
     }
 
     @Override
     protected void decodeChunk(ByteBuf chunk) {
 
-        // No-op, current version of CSV decode buffers the full input
-    }
-
-    @Override
-    protected void decodeLastChunk() {
-
-        outQueue.add(DataBlock.forSchema(this.arrowSchema));
 
         // TODO: Parser to String[] instead of Map
         // Map is created for every row, and updated / referenced for every field
@@ -98,7 +95,7 @@ public class CsvDecoder extends BaseDecoder {
                 .with(csvSchema)
                 .with(CsvParser.Feature.WRAP_AS_ARRAY);
 
-        try (var stream = new ByteBufInputStream(buffer);
+        try (var stream = new ByteBufInputStream(chunk);
              MappingIterator<Map<String, String>> itr = csvReader.readValues((InputStream) stream)) {
 
             var nRowsTotal = 0;
@@ -178,14 +175,23 @@ public class CsvDecoder extends BaseDecoder {
 
             doTargetError(e);
         }
+        finally {
 
+            chunk.release();
+        }
+    }
+
+    @Override
+    protected void decodeLastChunk() {
+
+        // No-op, current version of CSV decoder buffers the full input
     }
 
     private void dispatchBatch(VectorSchemaRoot root) {
 
         var batch = unloader.getRecordBatch();
         var block = DataBlock.forRecords(batch);
-        outQueue.add(block);
+        emitBlock(block);
 
         // Release memory in the root
         // Memory is still referenced by the batch, until the batch is consumed

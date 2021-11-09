@@ -38,6 +38,8 @@ public class ArrowFileDecoder extends BaseDecoder {
 
     public ArrowFileDecoder(BufferAllocator arrowAllocator) {
 
+        super(BUFFERED_DECODER);
+
         this.arrowAllocator = arrowAllocator;
     }
 
@@ -48,17 +50,12 @@ public class ArrowFileDecoder extends BaseDecoder {
 
     @Override
     protected void decodeChunk(ByteBuf chunk) {
-        // No-op, current version of CSV decode buffers the full input
-    }
 
-    @Override
-    protected void decodeLastChunk() {
-
-        try (var stream = new ByteSeekableChannel(buffer);
+        try (var stream = new ByteSeekableChannel(chunk);
              var reader = new ArrowFileReader(stream, arrowAllocator)) {
 
             var schema = reader.getVectorSchemaRoot().getSchema();
-            outQueue.add(DataBlock.forSchema(schema));
+            emitBlock(DataBlock.forSchema(schema));
 
             var root = reader.getVectorSchemaRoot();
             var unloader = new VectorUnloader(root);
@@ -66,7 +63,7 @@ public class ArrowFileDecoder extends BaseDecoder {
             while (reader.loadNextBatch()) {
 
                 var batch = unloader.getRecordBatch();
-                outQueue.add(DataBlock.forRecords(batch));
+                emitBlock(DataBlock.forRecords(batch));
             }
         }
         catch (IOException e) {
@@ -75,6 +72,15 @@ public class ArrowFileDecoder extends BaseDecoder {
             log.error(e.getMessage(), e);
             throw new ETracInternal(e.getMessage(), e);
         }
+        finally {
 
+            chunk.release();
+        }
+    }
+
+    @Override
+    protected void decodeLastChunk() {
+
+        // No-op, current version of arrow file decoder buffers the full input
     }
 }

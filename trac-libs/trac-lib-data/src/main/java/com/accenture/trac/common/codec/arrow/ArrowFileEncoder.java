@@ -78,7 +78,7 @@ public class ArrowFileEncoder extends BaseEncoder {
         this.root = new VectorSchemaRoot(fields, vectors);
         this.loader = new VectorLoader(root);  // TODO: No compression support atm
 
-        var out = new ByteOutputChannel(outQueue::add);
+        var out = new ByteOutputChannel(this::emitChunk);
         this.writer = new ArrowFileWriter(root, /* dictionary provider = */ null, out);
 
         try {

@@ -35,7 +35,7 @@ public abstract class BaseEncoder extends CommonBaseProcessor<DataBlock, ByteBuf
 
     private static final ByteBuf END_OF_STREAM = new EmptyByteBuf(ByteBufAllocator.DEFAULT);
 
-    protected final Queue<ByteBuf> outQueue;
+    private final Queue<ByteBuf> outQueue;
 
     protected abstract void encodeSchema(Schema arrowSchema);
     protected abstract void encodeRecords(ArrowRecordBatch batch);
@@ -47,8 +47,12 @@ public abstract class BaseEncoder extends CommonBaseProcessor<DataBlock, ByteBuf
         this.outQueue = new ArrayDeque<>();
     }
 
+    protected void emitChunk(ByteBuf chunk) {
+        outQueue.add(chunk);
+    }
+
     @Override
-    protected void handleTargetRequest() {
+    protected final void handleTargetRequest() {
 
         deliverPendingChunks();
 
@@ -57,7 +61,7 @@ public abstract class BaseEncoder extends CommonBaseProcessor<DataBlock, ByteBuf
     }
 
     @Override
-    protected void handleTargetCancel() {
+    protected final void handleTargetCancel() {
 
         try {
             doSourceCancel();
@@ -68,7 +72,7 @@ public abstract class BaseEncoder extends CommonBaseProcessor<DataBlock, ByteBuf
     }
 
     @Override
-    protected void handleSourceNext(DataBlock block) {
+    protected final void handleSourceNext(DataBlock block) {
 
         if (block.arrowSchema != null)
             encodeSchema(block.arrowSchema);
@@ -84,7 +88,7 @@ public abstract class BaseEncoder extends CommonBaseProcessor<DataBlock, ByteBuf
     }
 
     @Override
-    protected void handleSourceComplete() {
+    protected final void handleSourceComplete() {
 
         encodeEos();
         outQueue.add(END_OF_STREAM);
@@ -93,7 +97,7 @@ public abstract class BaseEncoder extends CommonBaseProcessor<DataBlock, ByteBuf
     }
 
     @Override
-    protected void handleSourceError(Throwable error) {
+    protected final void handleSourceError(Throwable error) {
 
         try {
             var completionError = error instanceof CompletionException

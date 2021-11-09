@@ -58,6 +58,8 @@ public class JsonDecoder extends BaseDecoder {
 
     public JsonDecoder(BufferAllocator arrowAllocator, SchemaDefinition tracSchema) {
 
+        super(STREAMING_DECODER);
+
         this.arrowAllocator = arrowAllocator;
         this.tracSchema = tracSchema;
 
@@ -82,7 +84,7 @@ public class JsonDecoder extends BaseDecoder {
                     lexer, CASE_INSENSITIVE,
                     this::dispatchBatch, BATCH_SIZE);
 
-            outQueue.add(DataBlock.forSchema(this.arrowSchema));
+            emitBlock(DataBlock.forSchema(this.arrowSchema));
         }
         catch (IOException e) {
 
@@ -95,43 +97,32 @@ public class JsonDecoder extends BaseDecoder {
 
         try {
 
-            if (!feeder.needMoreInput() && buffer.readableBytes() > 0)
+            if (!feeder.needMoreInput() && chunk.readableBytes() > 0)
                 throw new EUnexpected(); // TODO: EDataInvalidStream
-
-            log.info("Next chunk");
 
             var bytes = new byte[chunk.readableBytes()];
             chunk.readBytes(bytes);
-
-            var text = new String(bytes, StandardCharsets.UTF_8);
-            log.info(text);
-
-
             feeder.feedInput(bytes, 0, bytes.length);
 
             JsonToken token;
 
-            while ((token = lexer.nextToken()) != JsonToken.NOT_AVAILABLE) {
-
-                log.info("JSON Token: {}", token);
+            while ((token = lexer.nextToken()) != JsonToken.NOT_AVAILABLE)
                 parser.acceptToken(token);
-            }
-
-            log.info("Chunk done");
         }
         catch (IOException e) {
 
             throw new EUnexpected(e);  // TODO
         }
         finally {
-            // buffer.release();
+
+            chunk.release();
         }
     }
 
     @Override
     protected void decodeLastChunk() {
 
-        // throw new RuntimeException("Not done yet");
+        // No-op
     }
 
 //    private void dispatchBatch(VectorSchemaRoot root) {
@@ -147,7 +138,6 @@ public class JsonDecoder extends BaseDecoder {
 
     private void dispatchBatch(ArrowRecordBatch batch) {
 
-        var block = DataBlock.forRecords(batch);
-        outQueue.add(block);
+        emitBlock(DataBlock.forRecords(batch));
     }
 }

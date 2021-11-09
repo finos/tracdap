@@ -83,7 +83,7 @@ public class CsvEncoder extends BaseEncoder {
                     .build()
                     .withHeader();
 
-            out = new ByteOutputStream(outQueue::add);
+            out = new ByteOutputStream(this::emitChunk);
             generator = factory.createGenerator(out, JsonEncoding.UTF8);
             generator.setSchema(csvSchema);
         }

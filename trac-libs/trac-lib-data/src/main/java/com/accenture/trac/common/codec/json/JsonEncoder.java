@@ -67,7 +67,7 @@ public class JsonEncoder extends BaseEncoder {
             this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator);
             this.loader = new VectorLoader(root);  // TODO: No compression support atm
 
-            out = new ByteOutputStream(outQueue::add);
+            out = new ByteOutputStream(this::emitChunk);
 
             var factory = new JsonFactory();
             generator = factory.createGenerator(out, JsonEncoding.UTF8);
