@@ -96,8 +96,14 @@ public class JsonEncoder extends BaseEncoder {
 
                 generator.writeStartObject();
 
-                for (var col = 0; col < nCols; col++)
-                    writeField(root, row, col);
+                for (var col = 0; col < nCols; col++) {
+
+                    var vector = root.getVector(col);
+                    var fieldName = vector.getName();
+
+                    generator.writeFieldName(fieldName);
+                    JacksonValues.getAndGenerate(vector, row, generator);
+                }
 
                 generator.writeEndObject();
             }
@@ -135,57 +141,6 @@ public class JsonEncoder extends BaseEncoder {
         catch (IOException e) {
 
             throw new ETracInternal(e.getMessage(), e);  // todo
-        }
-    }
-
-    private void writeField(VectorSchemaRoot root, int row, int col) throws IOException {
-
-        var field = arrowSchema.getFields().get(col);
-        var fieldName = field.getName();
-
-        var value = ArrowValues.getValue(root, row, col);
-
-        if (value == null) {
-            generator.writeNullField(fieldName);
-            return;
-        }
-
-        var minorType = root.getVector(col).getMinorType();
-
-        switch (minorType) {
-
-            case BIT: generator.writeBooleanField(fieldName, (boolean) value); break;
-
-            case BIGINT: generator.writeNumberField(fieldName, (long) value); break;
-            case INT: generator.writeNumberField(fieldName, (int) value); break;
-            case SMALLINT: generator.writeNumberField(fieldName, (short) value); break;
-            case TINYINT: generator.writeNumberField(fieldName, (byte) value); break;
-
-            case FLOAT8: generator.writeNumberField(fieldName, (double) value); break;
-            case FLOAT4: generator.writeNumberField(fieldName, (float) value); break;
-
-            case DECIMAL:
-            case DECIMAL256:
-                var decimal = (BigDecimal) value;
-                generator.writeStringField(fieldName, decimal.toString());
-                break;
-
-            case VARCHAR:
-                generator.writeStringField(fieldName, value.toString());
-                break;
-
-            case DATEDAY:
-            case DATEMILLI:
-                var dateValue = (LocalDate) value;
-                var dateIso = MetadataCodec.ISO_DATE_FORMAT.format(dateValue);
-                generator.writeStringField(fieldName, dateIso);
-                break;
-
-            // TODO: Datetime type
-
-            default:
-
-                throw new EUnexpected();  // TODO: data error, field type not supported
         }
     }
 }

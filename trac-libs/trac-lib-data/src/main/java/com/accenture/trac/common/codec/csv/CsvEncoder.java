@@ -19,12 +19,14 @@ package com.accenture.trac.common.codec.csv;
 import com.accenture.trac.common.codec.BaseEncoder;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
 import com.accenture.trac.common.codec.arrow.ArrowValues;
+import com.accenture.trac.common.codec.json.JacksonValues;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.util.ByteOutputStream;
 import com.accenture.trac.metadata.SchemaDefinition;
 
+import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.dataformat.csv.CsvFactory;
 import com.fasterxml.jackson.dataformat.csv.CsvGenerator;
@@ -107,8 +109,11 @@ public class CsvEncoder extends BaseEncoder {
 
                 generator.writeStartArray();
 
-                for (var col = 0; col < nCols; col++)
-                    writeField(root, row, col);
+                for (var col = 0; col < nCols; col++) {
+
+                    var vector = root.getVector(col);
+                    JacksonValues.getAndGenerate(vector, row, generator);
+                }
 
                 generator.writeEndArray();
             }
