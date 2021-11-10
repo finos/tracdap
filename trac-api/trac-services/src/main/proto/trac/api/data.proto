@@ -234,10 +234,10 @@ message DataWriteRequest {
   reserved "schemaHandling";
 
   string format = 9;
-  map<string, metadata.Value> formatOptions = 10;
 
-  optional metadata.PartKey part = 11;
-
+//  map<string, metadata.Value> formatOptions = 10;
+//  optional metadata.PartKey part = 11;
+//  optional bool deltaUpdate = 12;
 
   bytes content = 1000;
 }
@@ -248,11 +248,11 @@ message DataReadRequest {
   metadata.TagSelector selector = 2;
 
   string format = 3;
-  string encoding = 4;
 
-  metadata.PartKey part = 5;
-  optional uint64 offset = 6;
-  optional uint32 limit = 7;
+//  map<string, metadata.Value> formatOptions = 4;
+//  optional metadata.PartKey part = 5;
+//  optional uint64 offset = 6;
+//  optional uint32 limit = 7;
 }
 
 message DataReadResponse {
