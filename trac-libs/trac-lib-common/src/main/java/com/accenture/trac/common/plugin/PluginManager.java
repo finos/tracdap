@@ -18,6 +18,7 @@ package com.accenture.trac.common.plugin;
 
 import com.accenture.trac.common.config.IConfigLoader;
 import com.accenture.trac.common.exception.EPluginNotAvailable;
+import com.accenture.trac.common.exception.EUnexpected;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,7 +86,7 @@ public class PluginManager implements IPluginManager {
 
         for (var service : services) {
 
-            var prettyServiceType = prettyTypeName(service.serviceTypeName());
+            var prettyServiceType = prettyTypeName(service.serviceTypeName(), true);
             var protocols = String.join(", ", service.protocols());
 
             log.info(" |-> {}: [{}] (protocols: {})",
@@ -132,23 +133,37 @@ public class PluginManager implements IPluginManager {
 
         var pluginKey = new PluginKey(serviceClass, protocol);
 
-        if (!plugins.containsKey(pluginKey))
-            throw new EPluginNotAvailable(protocol);  // TODO: Plugin err message
+        if (!PluginServiceInfo.SERVICE_NAMES.containsKey(serviceClass.getName()))
+            throw new EUnexpected();
+
+        if (!plugins.containsKey(pluginKey)) {
+
+            var rawTypeName = PluginServiceInfo.SERVICE_NAMES.get(serviceClass.getName());
+            var message = String.format(
+                    "Plugin not available for %s protocol: [%s]",
+                    prettyTypeName(rawTypeName, false), protocol);
+
+            log.error(message);
+            throw new EPluginNotAvailable(message);
+        }
 
         var plugin = plugins.get(pluginKey);
 
         return plugin.createService(serviceClass, protocol, properties);
     }
 
-    private String prettyTypeName(String rawTypeName) {
+    private String prettyTypeName(String rawTypeName, boolean caps) {
 
         var caseAndSpaces = rawTypeName
                 .toLowerCase()
                 .replace("_", " ")
                 .replace("-", " ");
 
-        var firstLetter = caseAndSpaces.substring(0, 1).toUpperCase();
-
-        return firstLetter + caseAndSpaces.substring(1);
+        if (caps) {
+            var firstLetter = caseAndSpaces.substring(0, 1).toUpperCase();
+            return firstLetter + caseAndSpaces.substring(1);
+        }
+        else
+            return caseAndSpaces;
     }
 }

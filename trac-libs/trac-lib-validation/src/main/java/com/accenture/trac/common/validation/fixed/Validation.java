@@ -264,6 +264,16 @@ public class Validation {
         return ctx;
     }
 
+    static ValidationContext optionalTrue(boolean value, ValidationContext ctx) {
+
+        if (!value) {
+            var err = String.format("Optional field [%s] must either be omitted or set to 'true'", ctx.fieldName());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
     static ValidationContext positive(Object value, ValidationContext ctx) {
 
         boolean positive;

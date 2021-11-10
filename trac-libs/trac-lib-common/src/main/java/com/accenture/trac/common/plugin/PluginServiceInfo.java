@@ -25,7 +25,7 @@ import java.util.Map;
 
 public class PluginServiceInfo {
 
-    private static final Map<String, String> SERVICE_NAMES = Map.ofEntries(
+    static final Map<String, String> SERVICE_NAMES = Map.ofEntries(
             Map.entry("com.accenture.trac.common.config.IConfigLoader", "CONFIG"),
             Map.entry("com.accenture.trac.common.codec.ICodec", "FORMAT"),
             Map.entry("com.accenture.trac.common.storage.IFileStorage", "FILE_STORAGE"),

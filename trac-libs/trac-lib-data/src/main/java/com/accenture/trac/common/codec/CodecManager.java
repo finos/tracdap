@@ -16,12 +16,15 @@
 
 package com.accenture.trac.common.codec;
 
-import com.accenture.trac.common.exception.EDataFormatNotSupported;
 import com.accenture.trac.common.exception.EPluginNotAvailable;
 import com.accenture.trac.common.plugin.IPluginManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class CodecManager implements ICodecManager {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final IPluginManager plugins;
 
@@ -35,15 +38,13 @@ public class CodecManager implements ICodecManager {
         if (plugins.isServiceAvailable(ICodec.class, format))
             return plugins.createService(ICodec.class, format);
 
+        else {
 
-
-        try {
-
-            return plugins.createService(ICodec.class, format);
-        }
-        catch (EPluginNotAvailable e) {
-
-            throw new EDataFormatNotSupported(e.getMessage(), e);
+            // Make a slightly prettier message that the regular plugin not available message
+            // Since this error is likely to be user-facing
+            var message = String.format("Codec not available for data format: [%s]", format);
+            log.error(message);
+            throw new EPluginNotAvailable(message);
         }
     }
 }

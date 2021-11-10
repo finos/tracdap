@@ -28,9 +28,9 @@ import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.data.DataContext;
 import com.accenture.trac.common.data.IDataContext;
-import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.storage.IStorageManager;
+import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.*;
 
 import com.google.protobuf.Message;
@@ -57,6 +57,8 @@ public class DataRwService {
     private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaApi;
 
     private final BufferAllocator arrowAllocator;
+
+    private final Validator validator = new Validator();
 
     public DataRwService(
             DataServiceConfig config,
@@ -129,9 +131,52 @@ public class DataRwService {
     public CompletionStage<TagHeader> updateDataset(
             DataWriteRequest request,
             Flow.Publisher<ByteBuf> contentStream,
-            IExecutionContext execContext) {
+            IExecutionContext execCtx) {
 
-        return CompletableFuture.failedFuture(new ETracInternal("Not implemented yet"));
+        var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
+        var state = new RequestState();
+
+        // Look up the requested data codec
+        // If the codec is unknown the request will fail right away
+        var codec = codecManager.getCodec(request.getFormat());
+        var codecOptions = Map.<String, String>of();
+
+        return CompletableFuture.completedFuture(null)
+
+                // Load metadata for the dataset (DATA, STORAGE)
+                .thenCompose(x -> loadMetadata(request, state))
+
+                // Resolve a concrete schema to use for this save operation
+                // This may fail if it refers to missing or incompatible external objects
+                .thenCompose(x -> resolveSchema(request, state))
+
+                // Validate version increment
+                .thenAccept(x -> validator.validateVersion(state.schema, state.priorSchema))
+                .thenAccept(x -> validator.validateVersion(state.data, state.priorData))
+
+                // Build metadata objects for the dataset that will be saved
+                .thenApply(x -> buildUpdateMetadata(request, state))
+
+                // Decode the data content stream and write it to the storage layer
+                // This is where the main data processing streams are executed
+                // When this future completes, the data processing stream has completed (or failed)
+                .thenCompose(x -> decodeAndSave(
+                        state.schema, contentStream,
+                        codec, codecOptions,
+                        state.copy, dataCtx))
+
+                // A quick sanity check that the data was written successfully
+                .thenApply(rowsSaved -> checkRows(request, rowsSaved))
+
+                // Update metadata objects with results from data processing
+                // (currently just size, but could also include other basic stats)
+                // Metadata tags are also built here
+                .thenAccept(rowsSaved -> finalizeUpdateMetadata(state, rowsSaved))
+
+                // Save metadata to the metadata store
+                // This effectively "commits" the dataset by making it visible
+                .thenCompose(x -> saveMetadata(request, state));
+
     }
 
     public void readDataset(
@@ -190,6 +235,25 @@ public class DataRwService {
                 .thenAccept(tag -> {
                     state.storageId = tag.getHeader();
                     state.storage = tag.getDefinition().getStorage();
+                });
+    }
+
+    private CompletionStage<Void> loadMetadata(DataWriteRequest request, RequestState state) {
+
+        return CompletableFuture.completedFuture(0)
+
+                .thenApply(x -> requestForSelector(request.getTenant(), request.getPriorVersion()))
+                .thenCompose(req -> Futures.javaFuture(metaApi.readObject(req)))
+                .thenAccept(tag -> {
+                    state.priorDataId = tag.getHeader();
+                    state.priorData = tag.getDefinition().getData();
+                })
+
+                .thenApply(x -> requestForSelector(request.getTenant(), state.data.getStorageId()))
+                .thenCompose(req -> Futures.javaFuture(metaApi.readObject(req)))
+                .thenAccept(tag -> {
+                    state.priorStorageId = tag.getHeader();
+                    state.priorStorage = tag.getDefinition().getStorage();
                 });
     }
 
@@ -295,6 +359,11 @@ public class DataRwService {
         return state;
     }
 
+    private RequestState buildUpdateMetadata(DataWriteRequest request, RequestState state) {
+
+        return state;
+    }
+
     private String buildDataItem(DataWriteRequest request, RequestState state) {
 
         var snapIndex = 0;
@@ -375,6 +444,10 @@ public class DataRwService {
     }
 
     private void finalizeMetadata(RequestState state, long rowsSaved) {
+
+    }
+
+    private void finalizeUpdateMetadata(RequestState state, long rowsSaved) {
 
     }
 

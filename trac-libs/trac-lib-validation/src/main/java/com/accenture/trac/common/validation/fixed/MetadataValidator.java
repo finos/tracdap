@@ -35,8 +35,10 @@ public class MetadataValidator {
 
     private static final Descriptors.Descriptor TAG_SELECTOR;
     private static final Descriptors.FieldDescriptor TS_OBJECT_ID;
+    private static final Descriptors.FieldDescriptor TS_LATEST_OBJECT;
     private static final Descriptors.FieldDescriptor TS_OBJECT_VERSION;
     private static final Descriptors.FieldDescriptor TS_OBJECT_ASOF;
+    private static final Descriptors.FieldDescriptor TS_LATEST_TAG;
     private static final Descriptors.FieldDescriptor TS_TAG_VERSION;
     private static final Descriptors.FieldDescriptor TS_TAG_ASOF;
     private static final Descriptors.OneofDescriptor TS_OBJECT_CRITERIA;
@@ -52,8 +54,10 @@ public class MetadataValidator {
 
         TAG_SELECTOR = TagSelector.getDescriptor();
         TS_OBJECT_ID = field(TAG_SELECTOR, TagSelector.OBJECTID_FIELD_NUMBER);
+        TS_LATEST_OBJECT = field(TAG_SELECTOR, TagSelector.LATESTOBJECT_FIELD_NUMBER);
         TS_OBJECT_VERSION = field(TAG_SELECTOR, TagSelector.OBJECTVERSION_FIELD_NUMBER);
-        TS_OBJECT_ASOF =field(TAG_SELECTOR, TagSelector.OBJECTASOF_FIELD_NUMBER);
+        TS_OBJECT_ASOF = field(TAG_SELECTOR, TagSelector.OBJECTASOF_FIELD_NUMBER);
+        TS_LATEST_TAG = field(TAG_SELECTOR, TagSelector.LATESTTAG_FIELD_NUMBER);
         TS_TAG_VERSION = field(TAG_SELECTOR, TagSelector.TAGVERSION_FIELD_NUMBER);
         TS_TAG_ASOF = field(TAG_SELECTOR, TagSelector.TAGASOF_FIELD_NUMBER);
         TS_OBJECT_CRITERIA = TS_OBJECT_VERSION.getContainingOneof();
@@ -97,12 +101,14 @@ public class MetadataValidator {
 
         ctx = ctx.pushOneOf(TS_OBJECT_CRITERIA)
                 .apply(Validation::required)
+                .applyIf(Validation::optionalTrue, Boolean.class, msg.hasField(TS_LATEST_OBJECT))
                 .applyIf(Validation::positive, Integer.class, msg.hasField(TS_OBJECT_VERSION))
                 .applyIf(MetadataValidator::datetimeValue, DatetimeValue.class, msg.hasField(TS_OBJECT_ASOF))
                 .pop();
 
         ctx = ctx.pushOneOf(TS_TAG_CRITERIA)
                 .apply(Validation::required)
+                .applyIf(Validation::optionalTrue, Boolean.class, msg.hasField(TS_LATEST_TAG))
                 .applyIf(Validation::positive, Integer.class, msg.hasField(TS_TAG_VERSION))
                 .applyIf(MetadataValidator::datetimeValue, DatetimeValue.class, msg.hasField(TS_TAG_ASOF))
                 .pop();

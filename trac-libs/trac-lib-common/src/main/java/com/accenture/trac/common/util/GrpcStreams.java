@@ -397,6 +397,13 @@ public class GrpcStreams {
                     .withCause(error);
         }
 
+        if (error instanceof EPluginNotAvailable) {
+
+            return Status.fromCode(Status.Code.UNIMPLEMENTED)
+                    .withDescription(error.getMessage())
+                    .withCause(error);
+        }
+
         // For anything unrecognized, fall back to an internal error
 
         return Status.fromCode(Status.Code.INTERNAL)
