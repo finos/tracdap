@@ -254,6 +254,32 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
+    void createDataset_schemaReservedFields() {
+
+        // Empty schema is an invalid argument
+
+        var reservedNames = List.of("trac_field_name", "_field_name", "__field_name");
+
+        for (var fieldName: reservedNames) {
+
+            var reservedSchema = BASIC_SCHEMA.toBuilder()
+                    .setSchemaType(SchemaType.TABLE)
+                    .setTable(TableSchema.newBuilder()
+                            .addFields(FieldSchema.newBuilder()
+                                    .setFieldName(fieldName)
+                                    .setFieldOrder(0)
+                                    .setFieldType(BasicType.STRING)))
+                    .build();
+
+            var request = BASIC_CREATE_DATASET_REQUEST.toBuilder().setSchema(reservedSchema).build();
+            var response = DataApiTestHelpers.clientStreaming(dataClient::createDataset, request);
+            waitFor(TEST_TIMEOUT, response);
+            var error = assertThrows(StatusRuntimeException.class, () -> resultOf(response));
+            assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+        }
+    }
+
+    @Test
     void createDataset_schemaDoesNotMatch_multipleOptions() {
         Assertions.fail();
     }
