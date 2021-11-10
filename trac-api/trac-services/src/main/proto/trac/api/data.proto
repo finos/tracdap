@@ -20,6 +20,7 @@ package trac.api;
 option java_package = "com.accenture.trac.api";
 option java_multiple_files = true;
 
+import "trac/metadata/type.proto";
 import "trac/metadata/object_id.proto";
 import "trac/metadata/data.proto";
 import "trac/metadata/file.proto";
@@ -198,10 +199,26 @@ service TracDataApi {
 
 message DataWriteRequest {
 
+  /**
+   * Tenant code for the requested operation, always required
+   */
   string tenant = 1;
 
+  /**
+   * Prior object/tag version to use for update operations
+   *
+   * This field should be omitted when creating a new dataset.
+   */
   optional metadata.TagSelector priorVersion = 2;
 
+  /**
+   * Tag update operations to be applied
+   *
+   * Tag updates are applied in exactly the same way as for metadata write requests.
+   *
+   * @see MetadataWriteRequest
+   * @see TracMetadataApi
+   */
   repeated metadata.TagUpdate tagUpdates = 3;
 
 
@@ -210,26 +227,19 @@ message DataWriteRequest {
     metadata.SchemaDefinition schema = 5;
   }
 
-  // Alternative to schemaId or schema, supply schema updates to e.g. add one column
-  reserved 6;
+  // Alternatives to schemaId or schema
+  reserved 6, 7, 8;
+  reserved "inferSchema";
   reserved "schemaUpdates";
+  reserved "schemaHandling";
 
-  bool discreteSchema = 7;
+  string format = 9;
+  map<string, metadata.Value> formatOptions = 10;
 
-  string format = 8;
-  string encoding = 9;
-  map<string, string> options = 10;
+  optional metadata.PartKey part = 11;
 
-  metadata.PartKey part = 11;
 
   bytes content = 1000;
-}
-
-message DataWriteResponse {
-
-  metadata.TagHeader header = 1;
-
-  uint32 size = 2;
 }
 
 message DataReadRequest {
