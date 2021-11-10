@@ -16,11 +16,46 @@
 
 package com.accenture.trac.svc.data.api;
 
+import com.accenture.trac.api.FileWriteRequest;
+import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.metadata.TagOperation;
+import com.accenture.trac.metadata.TagUpdate;
+import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 
-public class DatasetRwOperationsTest {
+
+public class DatasetRwOperationsTest extends DataApiTestBase {
+
+    // Functional test cases for dataset operations in the data API
+    // (createDataset, updateDataset, readDataset)
+
+    static final List<TagUpdate> BASIC_TAG_UPDATES = List.of(
+            TagUpdate.newBuilder()
+                    .setAttrName("app_template")
+                    .setOperation(TagOperation.CREATE_ATTR)
+                    .setValue(MetadataCodec.encodeValue("template_name"))
+                    .build(),
+            TagUpdate.newBuilder()
+                    .setAttrName("description")
+                    .setOperation(TagOperation.CREATE_ATTR)
+                    .setValue(MetadataCodec.encodeValue("Describes what this template does in the app"))
+                    .build());
+
+    static final ByteString BASIC_FILE_CONTENT = ByteString
+            .copyFrom("Sample content\n", StandardCharsets.UTF_8);
+
+    static final FileWriteRequest BASIC_CREATE_FILE_REQUEST = FileWriteRequest.newBuilder()
+            .setTenant(TEST_TENANT)
+            .addAllTagUpdates(BASIC_TAG_UPDATES)
+            .setName("some_file.txt")
+            .setMimeType("text/plain")
+            .setSize(BASIC_FILE_CONTENT.size())
+            .setContent(BASIC_FILE_CONTENT)
+            .build();
 
 
     // -----------------------------------------------------------------------------------------------------------------
