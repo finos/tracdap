@@ -16,9 +16,7 @@
 
 package com.accenture.trac.common.validation;
 
-import com.accenture.trac.api.Data;
-import com.accenture.trac.api.FileReadRequest;
-import com.accenture.trac.api.FileWriteRequest;
+import com.accenture.trac.api.*;
 import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.common.validation.core.ValidationFunction;
 import com.accenture.trac.common.validation.core.ValidationKey;
@@ -40,6 +38,15 @@ public class ValidatorBuilder {
         var validatorMap = new HashMap<ValidationKey, ValidationFunction<?>>();
 
         var dataProto = Data.getDescriptor();
+
+        addValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateCreateDataset,
+                dataProto, "TracDataApi", "createDataset");
+
+        addValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateUpdateDataset,
+                dataProto, "TracDataApi", "updateDataset");
+
+        addValidator(validatorMap, DataReadRequest.class, DataApiValidator::validateReadDataset,
+                dataProto, "TracDataApi", "readDataset");
 
         addValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateCreateFile,
                 dataProto, "TracDataApi", "createFile");

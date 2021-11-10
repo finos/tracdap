@@ -172,7 +172,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             Flow.Publisher<ByteBuf> byteStream,
             IExecutionContext execCtx) {
 
-        // validateRequest(methodName, request);
+        validateRequest(methodName, request);
 
         return dataRwService.createDataset(request, byteStream, execCtx);
     }
@@ -183,7 +183,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             Flow.Publisher<ByteBuf> byteStream,
             IExecutionContext execCtx) {
 
-        // validateRequest(methodName, request);
+        validateRequest(methodName, request);
 
         return dataRwService.updateDataset(request, byteStream, execCtx);
     }
@@ -195,7 +195,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             Flow.Subscriber<ByteBuf> byteStream,
             IExecutionContext execCtx) {
 
-        // validateRequest(methodName, request);
+        validateRequest(methodName, request);
 
         dataRwService.readDataset(request, schema, byteStream, execCtx);
     }

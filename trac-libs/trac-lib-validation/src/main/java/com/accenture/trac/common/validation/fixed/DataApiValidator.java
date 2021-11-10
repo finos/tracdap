@@ -16,6 +16,8 @@
 
 package com.accenture.trac.common.validation.fixed;
 
+import com.accenture.trac.api.DataReadRequest;
+import com.accenture.trac.api.DataWriteRequest;
 import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
 import com.accenture.trac.metadata.ObjectType;
@@ -26,6 +28,17 @@ import com.google.protobuf.Descriptors;
 
 
 public class DataApiValidator {
+
+    private static final Descriptors.Descriptor DATA_WRITE_REQUEST;
+    private static final Descriptors.FieldDescriptor DWR_TENANT;
+    private static final Descriptors.FieldDescriptor DWR_TAG_UPDATES;
+    private static final Descriptors.FieldDescriptor DWR_PRIOR_VERSION;
+    private static final Descriptors.FieldDescriptor DWR_FORMAT;
+
+    private static final Descriptors.Descriptor DATA_READ_REQUEST;
+    private static final Descriptors.FieldDescriptor DRR_TENANT;
+    private static final Descriptors.FieldDescriptor DRR_SELECTOR;
+    private static final Descriptors.FieldDescriptor DRR_FORMAT;
 
     private static final Descriptors.Descriptor FILE_WRITE_REQUEST;
     private static final Descriptors.FieldDescriptor FWR_TENANT;
@@ -40,6 +53,18 @@ public class DataApiValidator {
     private static final Descriptors.FieldDescriptor FRR_SELECTOR;
 
     static {
+
+        DATA_WRITE_REQUEST = DataWriteRequest.getDescriptor();
+        DWR_TENANT = field(DATA_WRITE_REQUEST, DataWriteRequest.TENANT_FIELD_NUMBER);
+        DWR_TAG_UPDATES = field(DATA_WRITE_REQUEST, DataWriteRequest.TAGUPDATES_FIELD_NUMBER);
+        DWR_PRIOR_VERSION = field(DATA_WRITE_REQUEST, DataWriteRequest.PRIORVERSION_FIELD_NUMBER);
+        DWR_FORMAT = field(DATA_WRITE_REQUEST, DataWriteRequest.FORMAT_FIELD_NUMBER);
+
+        DATA_READ_REQUEST = DataReadRequest.getDescriptor();
+        DRR_TENANT = field(DATA_READ_REQUEST, DataReadRequest.TENANT_FIELD_NUMBER);
+        DRR_SELECTOR = field(DATA_READ_REQUEST, DataReadRequest.SELECTOR_FIELD_NUMBER);
+        DRR_FORMAT = field(DATA_READ_REQUEST, DataReadRequest.FORMAT_FIELD_NUMBER);
+
         FILE_WRITE_REQUEST = FileWriteRequest.getDescriptor();
         FWR_TENANT = field(FILE_WRITE_REQUEST, FileWriteRequest.TENANT_FIELD_NUMBER);
         FWR_TAG_UPDATES = field(FILE_WRITE_REQUEST, FileWriteRequest.TAGUPDATES_FIELD_NUMBER);
@@ -55,6 +80,70 @@ public class DataApiValidator {
 
     static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
         return msg.findFieldByNumber(fieldNo);
+    }
+
+    public static ValidationContext validateCreateDataset(DataWriteRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(DWR_PRIOR_VERSION)
+                .apply(Validation::omitted)
+                .pop();
+
+        return createOrUpdateDataset(msg, ctx);
+    }
+
+    public static ValidationContext validateUpdateDataset(DataWriteRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(DWR_PRIOR_VERSION)
+                .apply(Validation::required)
+                .apply(MetadataValidator::validateTagSelector, TagSelector.class)
+                .apply(Validation.selectorType(ObjectType.FILE), TagSelector.class)
+                .pop();
+
+        return createOrUpdateDataset(msg, ctx);
+    }
+
+    private static ValidationContext createOrUpdateDataset(DataWriteRequest msg, ValidationContext ctx) {
+
+        // Restricting tenant keys to be valid identifiers is a very strong restriction!
+        // This could be loosened a bit, perhaps natural language and UTF is ok?
+        // Easier to loosen later hence leaving the strict restriction for now
+
+        ctx = ctx.push(DWR_TENANT)
+                .apply(Validation::required)
+                .apply(Validation::identifier)
+                .pop();
+
+        ctx = ctx.push(DWR_TAG_UPDATES)
+                .applyTypedList(MetadataValidator::validateTagUpdate, TagUpdate.class)
+                .pop();
+
+        ctx = ctx.push(DWR_FORMAT)
+                .apply(Validation::required)
+                .apply(Validation::mimeType)
+                .pop();
+
+        return ctx;
+    }
+
+    public static ValidationContext validateReadDataset(DataReadRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(DRR_TENANT)
+                .apply(Validation::required)
+                .apply(Validation::identifier)
+                .pop();
+
+        ctx = ctx.push(DRR_SELECTOR)
+                .apply(Validation::required)
+                .apply(MetadataValidator::validateTagSelector, TagSelector.class)
+                .apply(Validation.selectorType(ObjectType.DATA), TagSelector.class)
+                .pop();
+
+        ctx = ctx.push(DRR_FORMAT)
+                .apply(Validation::required)
+                .apply(Validation::mimeType)
+                .pop();
+
+        return ctx;
     }
 
     public static ValidationContext validateCreateFile(FileWriteRequest msg, ValidationContext ctx) {
