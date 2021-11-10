@@ -92,6 +92,12 @@ public class JdbcSetup {
 
     private static Properties createHikariProperties(Properties props, String configBase) {
 
+        // Properties may be either qualified or unqualified (i.e. configBase is empty)
+        // Properties for JDBC are specified without a leading dot, to allow for unqualified props
+        // So, the config base is not blank it must end with a dot
+        if (!configBase.isEmpty() && !configBase.endsWith("."))
+            configBase = configBase + ".";
+
         var dialect = getSqlDialect(props, configBase);
         var jdbcUrl = buildJdbcUrl(props, configBase, dialect);
 
