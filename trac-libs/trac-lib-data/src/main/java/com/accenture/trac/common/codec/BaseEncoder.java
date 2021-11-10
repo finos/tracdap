@@ -25,6 +25,8 @@ import io.netty.buffer.EmptyByteBuf;
 import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
 import java.util.Queue;
@@ -35,7 +37,11 @@ public abstract class BaseEncoder extends CommonBaseProcessor<DataBlock, ByteBuf
 
     private static final ByteBuf END_OF_STREAM = new EmptyByteBuf(ByteBufAllocator.DEFAULT);
 
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
     private final Queue<ByteBuf> outQueue;
+    private long nRows;
+    private long nBatches;
 
     protected abstract void encodeSchema(Schema arrowSchema);
     protected abstract void encodeRecords(ArrowRecordBatch batch);
@@ -74,11 +80,19 @@ public abstract class BaseEncoder extends CommonBaseProcessor<DataBlock, ByteBuf
     @Override
     protected final void handleSourceNext(DataBlock block) {
 
-        if (block.arrowSchema != null)
-            encodeSchema(block.arrowSchema);
+        if (block.arrowSchema != null) {
 
-        else if (block.arrowRecords != null)
+            log.info("ENCODE START");
+            encodeSchema(block.arrowSchema);
+        }
+
+        else if (block.arrowRecords != null) {
+
             encodeRecords(block.arrowRecords);
+
+            nRows += block.arrowRecords.getLength();
+            nBatches += 1;
+        }
 
         else
             throw new EUnexpected();  // TODO: Error
@@ -92,6 +106,8 @@ public abstract class BaseEncoder extends CommonBaseProcessor<DataBlock, ByteBuf
 
         encodeEos();
         outQueue.add(END_OF_STREAM);
+
+        log.info("ENCODE SUCCEEDED: {} rows, {} batches", nRows, nBatches);
 
         deliverPendingChunks();
     }

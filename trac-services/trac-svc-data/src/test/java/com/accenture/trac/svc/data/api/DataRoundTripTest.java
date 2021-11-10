@@ -162,8 +162,9 @@ class DataRoundTripTest extends DataApiTestBase {
             writer.end();
         }
 
-        roundTripTest(writeChannel.getChunks(), "ARROW_STREAM", "ARROW_STREAM", this::decodeArrow, BASIC_TEST_DATA, true);
-        roundTripTest(writeChannel.getChunks(), "ARROW_STREAM", "ARROW_STREAM", this::decodeArrow, BASIC_TEST_DATA, false);
+        var mimeType = "application/vnd.apache.arrow.stream";
+        roundTripTest(writeChannel.getChunks(), mimeType, mimeType, this::decodeArrow, BASIC_TEST_DATA, true);
+        roundTripTest(writeChannel.getChunks(), mimeType, mimeType, this::decodeArrow, BASIC_TEST_DATA, false);
     }
 
     @Test
@@ -177,8 +178,9 @@ class DataRoundTripTest extends DataApiTestBase {
         var testDataBytes = testDataStream.readAllBytes();
         var testData = List.of(ByteString.copyFrom(testDataBytes));
 
-        roundTripTest(testData, "CSV", "CSV", this::decodeCsv, BASIC_TEST_DATA, true);
-        roundTripTest(testData, "CSV", "CSV", this::decodeCsv, BASIC_TEST_DATA, false);
+        var mimeType = "text/csv";
+        roundTripTest(testData, mimeType, mimeType, this::decodeCsv, BASIC_TEST_DATA, true);
+        roundTripTest(testData, mimeType, mimeType, this::decodeCsv, BASIC_TEST_DATA, false);
     }
 
     @Test
@@ -192,8 +194,9 @@ class DataRoundTripTest extends DataApiTestBase {
         var testDataBytes = testDataStream.readAllBytes();
         var testData = List.of(ByteString.copyFrom(testDataBytes));
 
-        roundTripTest(testData, "JSON", "JSON", this::decodeJson, BASIC_TEST_DATA, true);
-        roundTripTest(testData, "JSON", "JSON", this::decodeJson, BASIC_TEST_DATA, false);
+        var mimeType = "text/json";
+        roundTripTest(testData, mimeType, mimeType, this::decodeJson, BASIC_TEST_DATA, true);
+        roundTripTest(testData, mimeType, mimeType, this::decodeJson, BASIC_TEST_DATA, false);
     }
 
     private void roundTripTest(

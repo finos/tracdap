@@ -44,8 +44,11 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
     private final boolean isStreaming;
     private final CompositeByteBuf buffer;
     private final Queue<DataBlock> outQueue;
+
     private boolean started = false;
     private boolean released = false;
+    private long nRows;
+    private int nBatches;
 
     protected BaseDecoder(boolean isStreaming) {
 
@@ -55,7 +58,13 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
     }
 
     protected final void emitBlock(DataBlock block) {
+
         outQueue.add(block);
+
+        if (block.arrowRecords != null) {
+            nRows += block.arrowRecords.getLength();
+            nBatches += 1;
+        }
     }
 
     @Override
@@ -93,10 +102,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
 
         try {
 
-            if (!started) {
-                started = true;
-                decodeStart();
-            }
+            checkStarted();
 
             chunkDelivered = true;
 
@@ -126,14 +132,12 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
 
         try {
 
-            if (!started) {
-                started = true;
-                decodeStart();
-            }
+            checkStarted();
 
             if (!isStreaming)
                 decodeChunk(buffer.retain());
 
+            log.info("DECODE SUCCEEDED, {} rows in {} batches", nRows, nBatches);
             decodeLastChunk();
             outQueue.add(END_OF_STREAM);
 
@@ -159,6 +163,15 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
         finally {
             releaseBuffer();
             releasePendingChunks();
+        }
+    }
+
+    private void checkStarted() {
+
+        if (!started) {
+            log.info("DECODE START");
+            started = true;
+            decodeStart();
         }
     }
 

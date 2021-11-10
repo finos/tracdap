@@ -20,12 +20,15 @@ import com.accenture.trac.common.codec.BaseDecoder;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
 import com.accenture.trac.common.codec.json.JacksonValues;
 import com.accenture.trac.common.data.DataBlock;
+import com.accenture.trac.common.exception.EData;
+import com.accenture.trac.common.exception.EDataCorruption;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.SchemaDefinition;
 
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.dataformat.csv.CsvFactory;
 import com.fasterxml.jackson.dataformat.csv.CsvParser;
+import com.fasterxml.jackson.dataformat.csv.CsvReadException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import org.apache.arrow.memory.BufferAllocator;
@@ -155,6 +158,13 @@ public class CsvDecoder extends BaseDecoder {
             }
 
             log.info("CSV Codec: Decoded {} rows in {} batches", nRowsTotal, nBatches);
+        }
+        catch (CsvReadException e) {
+
+            log.error("CSV content could not be decoded: Line {}, {}", e.getLocation().getLineNr(), e.getMessage(), e);
+
+            var err = new EDataCorruption(e.getMessage(), e);  // todo: err
+            doTargetError(err);
         }
         catch (IOException e) {
 

@@ -19,10 +19,14 @@ package com.accenture.trac.common.codec.json;
 import com.accenture.trac.common.codec.BaseDecoder;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
 import com.accenture.trac.common.data.DataBlock;
+import com.accenture.trac.common.exception.EData;
+import com.accenture.trac.common.exception.EDataConstraint;
+import com.accenture.trac.common.exception.EDataCorruption;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.SchemaDefinition;
 
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.async.ByteArrayFeeder;
@@ -108,6 +112,13 @@ public class JsonDecoder extends BaseDecoder {
 
             while ((token = lexer.nextToken()) != JsonToken.NOT_AVAILABLE)
                 parser.acceptToken(token);
+        }
+        catch (JsonParseException e) {
+
+            log.error("JSON content could not be decoded: Line {}, {}", e.getLocation().getLineNr(), e.getMessage(), e);
+
+            var err = new EDataCorruption(e.getMessage(), e);  // todo: err
+            doTargetError(err);
         }
         catch (IOException e) {
 
