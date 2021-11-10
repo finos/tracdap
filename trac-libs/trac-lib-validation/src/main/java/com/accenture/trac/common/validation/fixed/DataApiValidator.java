@@ -33,6 +33,9 @@ public class DataApiValidator {
     private static final Descriptors.FieldDescriptor DWR_TENANT;
     private static final Descriptors.FieldDescriptor DWR_TAG_UPDATES;
     private static final Descriptors.FieldDescriptor DWR_PRIOR_VERSION;
+    private static final Descriptors.FieldDescriptor DWR_SCHEMA_ID;
+    private static final Descriptors.FieldDescriptor DWR_SCHEMA;
+    private static final Descriptors.OneofDescriptor DWR_SCHEMA_DEFINITION;
     private static final Descriptors.FieldDescriptor DWR_FORMAT;
 
     private static final Descriptors.Descriptor DATA_READ_REQUEST;
@@ -58,6 +61,9 @@ public class DataApiValidator {
         DWR_TENANT = field(DATA_WRITE_REQUEST, DataWriteRequest.TENANT_FIELD_NUMBER);
         DWR_TAG_UPDATES = field(DATA_WRITE_REQUEST, DataWriteRequest.TAGUPDATES_FIELD_NUMBER);
         DWR_PRIOR_VERSION = field(DATA_WRITE_REQUEST, DataWriteRequest.PRIORVERSION_FIELD_NUMBER);
+        DWR_SCHEMA_ID = field(DATA_WRITE_REQUEST, DataWriteRequest.SCHEMAID_FIELD_NUMBER);
+        DWR_SCHEMA = field(DATA_WRITE_REQUEST, DataWriteRequest.SCHEMA_FIELD_NUMBER);
+        DWR_SCHEMA_DEFINITION = DWR_SCHEMA.getContainingOneof();
         DWR_FORMAT = field(DATA_WRITE_REQUEST, DataWriteRequest.FORMAT_FIELD_NUMBER);
 
         DATA_READ_REQUEST = DataReadRequest.getDescriptor();
@@ -96,7 +102,7 @@ public class DataApiValidator {
         ctx = ctx.push(DWR_PRIOR_VERSION)
                 .apply(Validation::required)
                 .apply(MetadataValidator::validateTagSelector, TagSelector.class)
-                .apply(Validation.selectorType(ObjectType.FILE), TagSelector.class)
+                .apply(Validation.selectorType(ObjectType.DATA), TagSelector.class)
                 .pop();
 
         return createOrUpdateDataset(msg, ctx);
@@ -115,6 +121,13 @@ public class DataApiValidator {
 
         ctx = ctx.push(DWR_TAG_UPDATES)
                 .applyTypedList(MetadataValidator::validateTagUpdate, TagUpdate.class)
+                .pop();
+
+        ctx = ctx.pushOneOf(DWR_SCHEMA_DEFINITION)
+                .apply(Validation::required)
+                .applyIf(MetadataValidator::validateTagSelector, TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
+                .applyIf(Validation.selectorType(ObjectType.SCHEMA), TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
+                // TODO: Validate embedded schemas
                 .pop();
 
         ctx = ctx.push(DWR_FORMAT)
