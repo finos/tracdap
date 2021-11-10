@@ -42,8 +42,14 @@ public class ValidatorBuilder {
         addValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateCreateDataset,
                 dataProto, "TracDataApi", "createDataset");
 
+        addValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateCreateDataset,
+                dataProto, "TracDataApi", "createSmallDataset");
+
         addValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateUpdateDataset,
                 dataProto, "TracDataApi", "updateDataset");
+
+        addValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateUpdateDataset,
+                dataProto, "TracDataApi", "updateSmallDataset");
 
         addValidator(validatorMap, DataReadRequest.class, DataApiValidator::validateReadDataset,
                 dataProto, "TracDataApi", "readDataset");
@@ -51,8 +57,14 @@ public class ValidatorBuilder {
         addValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateCreateFile,
                 dataProto, "TracDataApi", "createFile");
 
+        addValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateCreateFile,
+                dataProto, "TracDataApi", "createSmallFile");
+
         addValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateUpdateFile,
                 dataProto, "TracDataApi", "updateFile");
+
+        addValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateUpdateFile,
+                dataProto, "TracDataApi", "updateSmallFile");
 
         addValidator(validatorMap, FileReadRequest.class, DataApiValidator::validateReadFile,
                 dataProto, "TracDataApi", "readFile");

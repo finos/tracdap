@@ -52,12 +52,15 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     private static final MethodDescriptor<DataWriteRequest, TagHeader> UPDATE_DATASET_METHOD = TracDataApiGrpc.getUpdateDatasetMethod();
     private static final MethodDescriptor<DataReadRequest, DataReadResponse> READ_DATASET_METHOD = TracDataApiGrpc.getReadDatasetMethod();
 
-    private static final MethodDescriptor<DataWriteRequest, TagHeader> CREATE_DATASET_UNARY_METHOD = TracDataApiGrpc.getCreateDatasetUnaryMethod();
-    private static final MethodDescriptor<DataWriteRequest, TagHeader> UPDATE_DATASET_UNARY_METHOD = TracDataApiGrpc.getUpdateDatasetUnaryMethod();
+    private static final MethodDescriptor<DataWriteRequest, TagHeader> CREATE_SMALL_DATASET_METHOD = TracDataApiGrpc.getCreateSmallDatasetMethod();
+    private static final MethodDescriptor<DataWriteRequest, TagHeader> UPDATE_SMALL_DATASET_METHOD = TracDataApiGrpc.getUpdateSmallDatasetMethod();
 
     private static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_FILE_METHOD = TracDataApiGrpc.getCreateFileMethod();
     private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_FILE_METHOD = TracDataApiGrpc.getUpdateFileMethod();
     private static final MethodDescriptor<FileReadRequest, FileReadResponse> READ_FILE_METHOD = TracDataApiGrpc.getReadFileMethod();
+
+    static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_SMALL_FILE_METHOD = TracDataApiGrpc.getCreateSmallFileMethod();
+    private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_SMALL_FILE_METHOD = TracDataApiGrpc.getUpdateSmallFileMethod();
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -86,9 +89,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     }
 
     @Override
-    public void createDatasetUnary(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
+    public void createSmallDataset(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        var inputStream = clientStreaming(CREATE_DATASET_UNARY_METHOD, responseObserver,
+        var inputStream = clientStreaming(CREATE_SMALL_DATASET_METHOD, responseObserver,
                 DataWriteRequest::getContent,
                 this::doCreateDataset);
 
@@ -105,9 +108,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     }
 
     @Override
-    public void updateDatasetUnary(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
+    public void updateSmallDataset(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        var inputStream = clientStreaming(UPDATE_DATASET_UNARY_METHOD, responseObserver,
+        var inputStream = clientStreaming(UPDATE_SMALL_DATASET_METHOD, responseObserver,
                 DataWriteRequest::getContent,
                 this::doUpdateDataset);
 
@@ -134,11 +137,33 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     }
 
     @Override
+    public void createSmallFile(FileWriteRequest request, StreamObserver<TagHeader> responseObserver) {
+
+        var inputStream = clientStreaming(CREATE_SMALL_FILE_METHOD, responseObserver,
+                FileWriteRequest::getContent,
+                this::doCreateFile);
+
+        inputStream.onNext(request);
+        inputStream.onCompleted();
+    }
+
+    @Override
     public StreamObserver<FileWriteRequest> updateFile(StreamObserver<TagHeader> responseObserver) {
 
         return clientStreaming(UPDATE_FILE_METHOD, responseObserver,
                 FileWriteRequest::getContent,
                 this::doUpdateFile);
+    }
+
+    @Override
+    public void updateSmallFile(FileWriteRequest request, StreamObserver<TagHeader> responseObserver) {
+
+        var inputStream = clientStreaming(UPDATE_SMALL_FILE_METHOD, responseObserver,
+                FileWriteRequest::getContent,
+                this::doUpdateFile);
+
+        inputStream.onNext(request);
+        inputStream.onCompleted();
     }
 
     @Override

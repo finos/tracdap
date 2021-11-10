@@ -49,9 +49,9 @@ service TracDataApi {
 
   /**
    * To support web clients where client-streaming is not available.
-   * The same as createData(), but the data stream is sent as a single blob.
+   * The same as createDataset(), but the data stream is sent as a single blob.
    */
-  rpc createDatasetUnary (DataWriteRequest) returns (metadata.TagHeader);
+  rpc createSmallDataset (DataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Update a dataset by supplying a data update (and optional schema update)
@@ -62,9 +62,9 @@ service TracDataApi {
 
   /**
    * To support web clients where client-streaming is not available.
-   * The same as updateData(), but the data stream is sent as a single blob.
+   * The same as updateDataset(), but the data stream is sent as a single blob.
    */
-  rpc updateDatasetUnary (DataWriteRequest) returns (metadata.TagHeader);
+  rpc updateSmallDataset (DataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Read the contents of a dataset (in whole or in part)
@@ -115,6 +115,8 @@ service TracDataApi {
    */
   rpc createFile (stream FileWriteRequest) returns (metadata.TagHeader);
 
+  rpc createSmallFile (FileWriteRequest) returns (metadata.TagHeader);
+
   /**
    * Upload a new version of an existing file into TRAC
    *
@@ -152,6 +154,8 @@ service TracDataApi {
    * of an error, TRAC will do its best to clean up any partially-written data in the storage layer.
    */
   rpc updateFile (stream FileWriteRequest) returns (metadata.TagHeader);
+
+  rpc updateSmallFile (FileWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Download a file that has been stored in TRAC
