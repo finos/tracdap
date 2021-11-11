@@ -124,12 +124,12 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Test
-    void createDataset_dataOk() {
+    void createDataset_ok_data() {
         Assertions.fail();
     }
 
     @Test
-    void createDataset_metadataOk() {
+    void createDataset_ok_metadata() {
         Assertions.fail();
     }
 
@@ -354,7 +354,62 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     // UPDATE DATASET
     // -----------------------------------------------------------------------------------------------------------------
 
-    // TODO
+    @Test
+    void updateDataset_ok_data() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_ok_metadata() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_versionDuplicated() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_versionMissing() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_priorVersionNull() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_priorVersionInvalid() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_priorVersionWrongType() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_priorVersionNotFound() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_tagUpdateInvalid() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_tagUpdateReserved() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_tagUpdateAttrNotFound() {
+        Assertions.fail();
+    }
+
+    // TODO: Dataset-specific
 
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -362,32 +417,32 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Test
-    void testReadDataset_ok_data() {
+    void readDataset_ok_data() {
         Assertions.fail();
     }
 
     @Test
-    void testReadDataset_ok_metadata() {
+    void readDataset_ok_metadata() {
         Assertions.fail();
     }
 
     @Test
-    void testReadDataset_ok_latestVersion() {
+    void readDataset_ok_latestVersion() {
         Assertions.fail();
     }
 
     @Test
-    void testReadDataset_ok_explicitVersion() {
+    void readDataset_ok_explicitVersion() {
         Assertions.fail();
     }
 
     @Test
-    void testReadDataset_ok_versionAsOf() {
+    void readDataset_ok_versionAsOf() {
         Assertions.fail();
     }
 
     @Test
-    void testReadDataset_selectorTypeOmitted() throws Exception {
+    void readDataset_selectorTypeOmitted() throws Exception {
 
         var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createDataset);
@@ -408,7 +463,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_selectorTypeNotData() throws Exception {
+    void readDataset_selectorTypeNotData() throws Exception {
 
         var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createDataset);
@@ -429,7 +484,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_selectorIdOmitted() throws Exception {
+    void readDataset_selectorIdOmitted() throws Exception {
 
         var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createDataset);
@@ -450,7 +505,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_selectorIdInvalid() throws Exception {
+    void readDataset_selectorIdInvalid() throws Exception {
 
         var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createDataset);
@@ -471,7 +526,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_selectorIdNotFound() throws Exception {
+    void readDataset_selectorIdNotFound() throws Exception {
 
         var objId = UUID.randomUUID().toString();  // non-existent object ID to look for
 
@@ -494,7 +549,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_objectVersionOmitted() throws Exception {
+    void readDataset_objectVersionOmitted() throws Exception {
 
         var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createDataset);
@@ -515,7 +570,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_objectVersionInvalid() throws Exception {
+    void readDataset_objectVersionInvalid() throws Exception {
 
         var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createDataset);
@@ -552,7 +607,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_objectVersionNotFound() throws Exception {
+    void readDataset_objectVersionNotFound() throws Exception {
 
         var objVer = 2;  // non-existent object version to look for
 
@@ -575,7 +630,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_objectVersionNotFoundAsOf() throws Exception {
+    void readDataset_objectVersionNotFoundAsOf() throws Exception {
 
         var timeBeforeTest = Instant.now().atOffset(ZoneOffset.UTC);
         Thread.sleep(10);
@@ -599,7 +654,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_tagVersionOmitted() throws Exception {
+    void readDataset_tagVersionOmitted() throws Exception {
 
         var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createDataset);
@@ -620,7 +675,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_tagVersionInvalid() throws Exception {
+    void readDataset_tagVersionInvalid() throws Exception {
 
         var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createDataset);
@@ -643,7 +698,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_tagVersionNotFound() throws Exception {
+    void readDataset_tagVersionNotFound() throws Exception {
 
         var tagVer = 2;  // non-existent tag version to look for
 
@@ -666,7 +721,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_tagVersionNotFoundAsOf() throws Exception {
+    void readDataset_tagVersionNotFoundAsOf() throws Exception {
 
         var timeBeforeTest = Instant.now().atOffset(ZoneOffset.UTC);
         Thread.sleep(10);
@@ -690,7 +745,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_formatOmitted() throws Exception {
+    void readDataset_formatOmitted() throws Exception {
 
         var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createDataset);
@@ -710,7 +765,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_formatInvalid() throws Exception {
+    void readDataset_formatInvalid() throws Exception {
 
         var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createDataset);
@@ -730,7 +785,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_formatNotSupported() throws Exception {
+    void readDataset_formatNotSupported() throws Exception {
 
         var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createDataset);
