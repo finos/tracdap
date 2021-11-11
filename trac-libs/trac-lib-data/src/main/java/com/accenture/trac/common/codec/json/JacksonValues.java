@@ -344,10 +344,13 @@ public class JacksonValues {
                 DecimalVector decimal128Vec = (DecimalVector) vector;
                 BigDecimal decimal128Val = decimal128Vec.getObject(row);
 
-                if (BigDecimal.ZERO.equals(decimal128Val))
-                    generator.writeString(BigDecimal.ZERO.toPlainString());
+                // This will render zeroes as "0" when the scale is large, preferable to 0e-12
+                // For small scales use the default rendering, particularly currency with scale == 2
+
+                if (decimal128Vec.getScale() > 3 && BigDecimal.ZERO.compareTo(decimal128Val) == 0)
+                    generator.writeString(BigDecimal.ZERO.toString());
                 else
-                    generator.writeString(decimal128Val.toPlainString());
+                    generator.writeString(decimal128Val.toString());
 
                 break;
 
@@ -356,7 +359,7 @@ public class JacksonValues {
                 Decimal256Vector decimal256Vec = (Decimal256Vector) vector;
                 BigDecimal decimal256Val = decimal256Vec.getObject(row);
 
-                if (BigDecimal.ZERO.equals(decimal256Val))
+                if (decimal256Vec.getScale() > 3 && BigDecimal.ZERO.compareTo(decimal256Val) == 0)
                     generator.writeString(BigDecimal.ZERO.toString());
                 else
                     generator.writeString(decimal256Val.toString());
