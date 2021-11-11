@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.data.api;
 
+import com.accenture.trac.api.DataReadRequest;
 import com.accenture.trac.api.DataWriteRequest;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
@@ -28,6 +29,8 @@ import org.junit.jupiter.api.Test;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -384,82 +387,376 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void testReadDataset_selectorTypeOmitted() {
-        Assertions.fail();
+    void testReadDataset_selectorTypeOmitted() throws Exception {
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .clearObjectType())
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_selectorTypeNotData() {
-        Assertions.fail();
+    void testReadDataset_selectorTypeNotData() throws Exception {
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setObjectType(ObjectType.SCHEMA))
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_selectorIdOmitted() {
-        Assertions.fail();
+    void testReadDataset_selectorIdOmitted() throws Exception {
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .clearObjectId())
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_selectorIdInvalid() {
-        Assertions.fail();
+    void testReadDataset_selectorIdInvalid() throws Exception {
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setObjectId("not_a_valid_id"))
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_selectorIdNotFound() {
-        Assertions.fail();
+    void testReadDataset_selectorIdNotFound() throws Exception {
+
+        var objId = UUID.randomUUID().toString();  // non-existent object ID to look for
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setObjectId(objId))
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_objectVersionOmitted() {
-        Assertions.fail();
+    void testReadDataset_objectVersionOmitted() throws Exception {
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .clearObjectVersionCriteria())
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_objectVersionInvalid() {
-        Assertions.fail();
+    void testReadDataset_objectVersionInvalid() throws Exception {
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        // Try to read obj version 0 - versions should start at 1
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setObjectVersion(0))
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+
+        // Try to read as-of an invalid datetime
+
+        var readRequest2 = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setObjectAsOf(DatetimeValue.newBuilder()
+                .setIsoDatetime("2021-10-03T12:34:56+01:00+invalid/part")))
+                .build();
+
+        var readDataset2 = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest2, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset2);
+        var error2 = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset2));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_objectVersionNotFound() {
-        Assertions.fail();
+    void testReadDataset_objectVersionNotFound() throws Exception {
+
+        var objVer = 2;  // non-existent object version to look for
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                        .setObjectVersion(objVer))
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_objectVersionNotFoundAsOf() {
-        Assertions.fail();
+    void testReadDataset_objectVersionNotFoundAsOf() throws Exception {
+
+        var timeBeforeTest = Instant.now().atOffset(ZoneOffset.UTC);
+        Thread.sleep(10);
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setObjectAsOf(MetadataCodec.encodeDatetime(timeBeforeTest)))
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_tagVersionOmitted() {
-        Assertions.fail();
+    void testReadDataset_tagVersionOmitted() throws Exception {
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .clearTagVersionCriteria())
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_tagVersionInvalid() {
-        Assertions.fail();
+    void testReadDataset_tagVersionInvalid() throws Exception {
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        // Try to read obj version 0 - versions should start at 1
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setTagVersion(0))
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_tagVersionNotFound() {
-        Assertions.fail();
+    void testReadDataset_tagVersionNotFound() throws Exception {
+
+        var tagVer = 2;  // non-existent tag version to look for
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setTagVersion(tagVer))
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_tagVersionNotFoundAsOf() {
-        Assertions.fail();
+    void testReadDataset_tagVersionNotFoundAsOf() throws Exception {
+
+        var timeBeforeTest = Instant.now().atOffset(ZoneOffset.UTC);
+        Thread.sleep(10);
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setSelector(basicRequest.getSelector().toBuilder()
+                .setTagAsOf(MetadataCodec.encodeDatetime(timeBeforeTest)))
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_formatOmitted() {
-        Assertions.fail();
+    void testReadDataset_formatOmitted() throws Exception {
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .clearFormat()
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_formatInvalid() {
-        Assertions.fail();
+    void testReadDataset_formatInvalid() throws Exception {
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setFormat("£$T^H$)@--0234509345asd3fg!§")
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void testReadDataset_formatNotSupported() {
-        Assertions.fail();
+    void testReadDataset_formatNotSupported() throws Exception {
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        var basicRequest = readRequest(v1Id);
+
+        var readRequest = basicRequest.toBuilder()
+                .setFormat("audio/mpeg")
+                .build();
+
+        var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
+
+        waitFor(TEST_TIMEOUT, readDataset);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(readDataset));
+        assertEquals(Status.Code.UNIMPLEMENTED, error.getStatus().getCode());
+    }
+
+    static DataReadRequest readRequest(TagHeader fileId) {
+
+        var fileSelector = MetadataUtil.selectorFor(fileId);
+
+        return DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(fileSelector)
+                .setFormat("text/csv")
+                .build();
     }
 }
