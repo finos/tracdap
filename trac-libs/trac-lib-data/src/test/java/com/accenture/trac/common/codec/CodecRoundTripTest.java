@@ -24,8 +24,6 @@ import com.accenture.trac.common.codec.json.JsonCodec;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.test.data.SampleDataFormats;
-import com.google.protobuf.UnsafeByteOperations;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -38,7 +36,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,6 +46,7 @@ import java.util.stream.Stream;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static com.accenture.trac.test.data.SampleDataFormats.generateBasicData;
+import static com.accenture.trac.test.data.SampleDataFormats.loadResource;
 
 
 public abstract class CodecRoundTripTest {
@@ -172,20 +170,6 @@ public abstract class CodecRoundTripTest {
                 for (int i = 0; i < 10; i++)
                     Assertions.assertEquals(vec.getObject(i), rtVec.getObject(i));
             }
-        }
-    }
-
-    private byte[] loadResource(String resourcePath) {
-
-        try (var stream = getClass().getResourceAsStream(resourcePath)) {
-
-            if (stream == null)
-                throw new IOException("Failed to read resource: " + resourcePath);
-
-            return stream.readAllBytes();
-        }
-        catch (IOException e) {
-            throw new RuntimeException(e);
         }
     }
 }

@@ -23,6 +23,7 @@ import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
@@ -114,5 +115,19 @@ public class SampleDataFormats {
         root.setRowCount(10);
 
         return root;
+    }
+
+    public static byte[] loadResource(String resourcePath) {
+
+        try (var stream = SampleDataFormats.class.getResourceAsStream(resourcePath)) {
+
+            if (stream == null)
+                throw new IOException("Failed to read resource: " + resourcePath);
+
+            return stream.readAllBytes();
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

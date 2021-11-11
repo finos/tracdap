@@ -23,6 +23,7 @@ import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.metadata.*;
 
+import com.accenture.trac.test.data.SampleDataFormats;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
@@ -30,17 +31,17 @@ import com.fasterxml.jackson.dataformat.csv.CsvParser;
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.*;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
+import org.apache.arrow.vector.types.Types;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.vector.util.Text;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
@@ -62,11 +63,10 @@ import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 class DataRoundTripTest extends DataApiTestBase {
 
-    private static final String BASIC_CSV_DATA = "/basic_csv_data.csv";
-    private static final String BASIC_JSON_DATA = "/basic_json_data.json";
+    private static final String BASIC_CSV_DATA = "/sample_data_formats/csv_basic.csv";
+    private static final String BASIC_JSON_DATA = "/sample_data_formats/json_basic.json";
 
-    static final ByteString BASIC_CSV_CONTENT = loadTextResource(
-            DataRoundTripTest.class, BASIC_CSV_DATA);
+    static final byte[] BASIC_CSV_CONTENT = SampleDataFormats.loadResource(BASIC_CSV_DATA);
 
     private static class TestDataContainer {
 
@@ -75,82 +75,10 @@ class DataRoundTripTest extends DataApiTestBase {
         List<Vector<Object>> values;
     }
 
-    private static final SchemaDefinition BASIC_TEST_SCHEMA;
-    private static final TestDataContainer BASIC_TEST_DATA;
+    private final TestDataContainer BASIC_TEST_DATA = decodeCsv(
+            SampleDataFormats.BASIC_TABLE_SCHEMA,
+            List.of(ByteString.copyFrom(BASIC_CSV_CONTENT)));
 
-    static {
-
-        BASIC_TEST_SCHEMA = SchemaDefinition.newBuilder()
-                .setSchemaType(SchemaType.TABLE)
-                .setTable(TableSchema.newBuilder()
-                .addFields(FieldSchema.newBuilder()
-                        .setFieldName("boolean_field")
-                        .setFieldOrder(0)
-                        .setFieldType(BasicType.BOOLEAN))
-                .addFields(FieldSchema.newBuilder()
-                        .setFieldName("integer_field")
-                        .setFieldOrder(1)
-                        .setFieldType(BasicType.INTEGER))
-                .addFields(FieldSchema.newBuilder()
-                        .setFieldName("float_field")
-                        .setFieldOrder(2)
-                        .setFieldType(BasicType.FLOAT))
-                .addFields(FieldSchema.newBuilder()
-                        .setFieldName("decimal_field")
-                        .setFieldOrder(3)
-                        .setFieldType(BasicType.DECIMAL))
-                .addFields(FieldSchema.newBuilder()
-                        .setFieldName("string_field")
-                        .setFieldOrder(4)
-                        .setFieldType(BasicType.STRING))
-                .addFields(FieldSchema.newBuilder()
-                        .setFieldName("date_field")
-                        .setFieldOrder(5)
-                        .setFieldType(BasicType.DATE))
-                .addFields(FieldSchema.newBuilder()
-                        .setFieldName("datetime_field")
-                        .setFieldOrder(6)
-                        .setFieldType(BasicType.DATETIME)))
-                .build();
-
-        BASIC_TEST_DATA = decodeCsv(BASIC_TEST_SCHEMA, List.of(BASIC_CSV_CONTENT));
-    }
-
-    private static ByteString loadTextResource(Class<?> clazz, String resourcePath) {
-
-        try (var stream = clazz.getResourceAsStream(resourcePath)) {
-
-            if (stream == null)
-                throw new FileNotFoundException(resourcePath);
-
-            var bytes = stream.readAllBytes();
-            return ByteString.copyFrom(bytes);
-        }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static class ChunkChannel implements WritableByteChannel {
-
-        private final List<ByteString> chunks = new ArrayList<>();
-        private boolean isOpen = true;
-
-        public List<ByteString> getChunks() {
-            return chunks;
-        }
-
-        @Override
-        public int write(ByteBuffer chunk) {
-
-            var copied = ByteString.copyFrom(chunk);
-            chunks.add(copied);
-            return copied.size();
-        }
-
-        @Override public boolean isOpen() { return isOpen; }
-        @Override public void close() { isOpen = false; }
-    }
 
     @Test
     void roundTrip_arrowStream() throws Exception {
@@ -158,38 +86,13 @@ class DataRoundTripTest extends DataApiTestBase {
         // Create a single batch of Arrow data
 
         var allocator = new RootAllocator();
-        var varcharVector = new VarCharVector("string_field", allocator);
-        var intVector = new BigIntVector("int_field", allocator);
-
-        var nRows = 10;
-
-        var originalVarchar = new String[nRows];
-        var originalInt = new int[nRows];
-
-        varcharVector.allocateNew(nRows);
-        intVector.allocateNew(nRows);
-
-        for (int i = 0; i < nRows; i++) {
-
-            originalVarchar[i] = String.format("string_%d", i);
-            originalInt[i] = i;
-
-            varcharVector.set(i, originalVarchar[i].getBytes(StandardCharsets.UTF_8));
-            intVector.set(i, originalInt[i]);
-        }
-
-        varcharVector.setValueCount(nRows);
-        intVector.setValueCount(nRows);
-
-        var fields = List.of(varcharVector.getField(), intVector.getField());
-        var vectors = List.<FieldVector>of(varcharVector, intVector);
-        var batch = new VectorSchemaRoot(fields, vectors);
+        var root = SampleDataFormats.generateBasicData(allocator);
 
         // Use a writer to encode the batch as a stream of chunks (arrow record batches, including the schema)
 
         var writeChannel = new ChunkChannel();
 
-        try (var writer = new ArrowStreamWriter(batch, null, writeChannel)) {
+        try (var writer = new ArrowStreamWriter(root, null, writeChannel)) {
 
             writer.start();
             writer.writeBatch();
@@ -213,8 +116,8 @@ class DataRoundTripTest extends DataApiTestBase {
         var testData = List.of(ByteString.copyFrom(testDataBytes));
 
         var mimeType = "text/csv";
-        roundTripTest(testData, mimeType, mimeType, DataRoundTripTest::decodeCsv, BASIC_TEST_DATA, true);
-        roundTripTest(testData, mimeType, mimeType, DataRoundTripTest::decodeCsv, BASIC_TEST_DATA, false);
+        roundTripTest(testData, mimeType, mimeType, this::decodeCsv, BASIC_TEST_DATA, true);
+        roundTripTest(testData, mimeType, mimeType, this::decodeCsv, BASIC_TEST_DATA, false);
     }
 
     @Test
@@ -240,7 +143,7 @@ class DataRoundTripTest extends DataApiTestBase {
 
         var requestParams = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setSchema(BASIC_TEST_SCHEMA)
+                .setSchema(SampleDataFormats.BASIC_TABLE_SCHEMA)
                 .setFormat(writeFormat)
                 .build();
 
@@ -277,13 +180,21 @@ class DataRoundTripTest extends DataApiTestBase {
 
         var roundTripData = decodeFunc.apply(roundTripSchema, List.of(roundTripBytes));
 
-        Assertions.assertEquals(BASIC_TEST_SCHEMA, roundTripSchema);
+        Assertions.assertEquals(SampleDataFormats.BASIC_TABLE_SCHEMA, roundTripSchema);
 
         for (int i = 0; i < roundTripSchema.getTable().getFieldsCount(); i++) {
 
-            Assertions.assertArrayEquals(
-                    expectedResult.values.get(i).toArray(),
-                    roundTripData.values.get(i).toArray());
+            for (var row = 0; row < expectedResult.values.size(); row++) {
+
+                var expectedVal = expectedResult.values.get(i).get(row);
+                var roundTripVal = roundTripData.values.get(i).get(row);
+
+                // Allow comparing big decimals with different scales
+                if (expectedVal instanceof BigDecimal)
+                    roundTripVal = ((BigDecimal) roundTripVal).setScale(((BigDecimal) expectedVal).scale(), RoundingMode.UNNECESSARY);
+
+                Assertions.assertEquals(expectedVal, roundTripVal);
+            }
         }
     }
 
@@ -334,7 +245,7 @@ class DataRoundTripTest extends DataApiTestBase {
         return defTypeFunc.apply(objDef);
     }
 
-    private static TestDataContainer decodeCsv(SchemaDefinition schema, List<ByteString> data) {
+    private TestDataContainer decodeCsv(SchemaDefinition schema, List<ByteString> data) {
 
         var result = schemaResult(schema);
 
@@ -428,7 +339,7 @@ class DataRoundTripTest extends DataApiTestBase {
         }
     }
 
-    private static TestDataContainer schemaResult(SchemaDefinition schema) {
+    private TestDataContainer schemaResult(SchemaDefinition schema) {
 
         var result = new TestDataContainer();
 
@@ -482,6 +393,8 @@ class DataRoundTripTest extends DataApiTestBase {
                         var arrowValue = arrowCol.getObject(i);
                         if (arrowValue instanceof Text)
                             resultCol.add(arrowValue.toString());
+                        else if (arrowCol.getMinorType() == Types.MinorType.DATEDAY)
+                            resultCol.add(LocalDate.ofEpochDay((int) arrowValue));
                         else
                             resultCol.add(arrowValue);
                     }
@@ -508,12 +421,8 @@ class DataRoundTripTest extends DataApiTestBase {
                 if (rawObject instanceof Boolean)
                     return rawObject;
 
-                if (rawObject instanceof String) {
-                    var b = Boolean.valueOf(rawObject.toString());
-
-                    System.out.println("Str: " + rawObject.toString() + ", val: " + b);
-                    return b;
-                }
+                if (rawObject instanceof String)
+                    return Boolean.valueOf(rawObject.toString());
 
                 throw new EUnexpected();
 
@@ -585,5 +494,26 @@ class DataRoundTripTest extends DataApiTestBase {
 
         throw new EUnexpected();
 
+    }
+
+    private static class ChunkChannel implements WritableByteChannel {
+
+        private final List<ByteString> chunks = new ArrayList<>();
+        private boolean isOpen = true;
+
+        public List<ByteString> getChunks() {
+            return chunks;
+        }
+
+        @Override
+        public int write(ByteBuffer chunk) {
+
+            var copied = ByteString.copyFrom(chunk);
+            chunks.add(copied);
+            return copied.size();
+        }
+
+        @Override public boolean isOpen() { return isOpen; }
+        @Override public void close() { isOpen = false; }
     }
 }

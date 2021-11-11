@@ -344,7 +344,10 @@ public class JacksonValues {
                 DecimalVector decimal128Vec = (DecimalVector) vector;
                 BigDecimal decimal128Val = decimal128Vec.getObject(row);
 
-                generator.writeNumber(decimal128Val);
+                if (BigDecimal.ZERO.equals(decimal128Val))
+                    generator.writeString(BigDecimal.ZERO.toPlainString());
+                else
+                    generator.writeString(decimal128Val.toPlainString());
 
                 break;
 
@@ -353,7 +356,10 @@ public class JacksonValues {
                 Decimal256Vector decimal256Vec = (Decimal256Vector) vector;
                 BigDecimal decimal256Val = decimal256Vec.getObject(row);
 
-                generator.writeNumber(decimal256Val);
+                if (BigDecimal.ZERO.equals(decimal256Val))
+                    generator.writeString(BigDecimal.ZERO.toString());
+                else
+                    generator.writeString(decimal256Val.toString());
 
                 break;
 
