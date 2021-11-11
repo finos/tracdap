@@ -72,15 +72,15 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
             .addFields(FieldSchema.newBuilder()
                     .setFieldName("string_field")
                     .setFieldOrder(4)
-                    .setFieldType(BasicType.DATE))
+                    .setFieldType(BasicType.STRING))
             .addFields(FieldSchema.newBuilder()
                     .setFieldName("date_field")
                     .setFieldOrder(5)
-                    .setFieldType(BasicType.DATETIME))
+                    .setFieldType(BasicType.DATE))
             .addFields(FieldSchema.newBuilder()
                     .setFieldName("datetime_field")
                     .setFieldOrder(6)
-                    .setFieldType(BasicType.BOOLEAN)))
+                    .setFieldType(BasicType.DATETIME)))
             .build();
 
     static final List<TagUpdate> BASIC_TAG_UPDATES = List.of(

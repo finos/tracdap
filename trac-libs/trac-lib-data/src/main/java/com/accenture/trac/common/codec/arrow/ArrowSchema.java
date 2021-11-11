@@ -48,7 +48,7 @@ public class ArrowSchema {
             Map.entry(BasicType.DECIMAL, new ArrowType.Decimal(DECIMAL_PRECISION, DECIMAL_SCALE, DECIMAL_BIT_WIDTH)),
             Map.entry(BasicType.STRING, ArrowType.Utf8.INSTANCE),
             Map.entry(BasicType.DATE, new ArrowType.Date(DateUnit.DAY)),
-            Map.entry(BasicType.DATETIME, new ArrowType.Timestamp(TIMESTAMP_PRECISION, TZ_ZULU)));
+            Map.entry(BasicType.DATETIME, new ArrowType.Timestamp(TIMESTAMP_PRECISION, null)));  // Using type without timezone
 
 
     public static Schema tracToArrow(SchemaDefinition tracSchema) {

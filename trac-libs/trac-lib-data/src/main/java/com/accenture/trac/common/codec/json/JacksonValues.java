@@ -16,22 +16,33 @@
 
 package com.accenture.trac.common.codec.json;
 
-import com.accenture.trac.common.exception.ETracInternal;
+import com.accenture.trac.common.exception.EDataTypeNotSupported;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataCodec;
 
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import org.apache.arrow.vector.*;
+import org.apache.arrow.vector.holders.TimeStampMilliTZHolder;
+import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 
 public class JacksonValues {
+
+    private static final Logger log = LoggerFactory.getLogger(JacksonValues.class);
 
     public static void parseAndSet(
             FieldVector vector, int row,
@@ -60,7 +71,23 @@ public class JacksonValues {
             case BIT:
 
                 BitVector boolVec = (BitVector) vector;
-                int boolVal = (isSet != 0 && parser.getBooleanValue()) ? 1 : 0;
+                int boolVal;
+
+                    if (token == JsonToken.VALUE_TRUE)
+                        boolVal = 1;
+                    else if (token == JsonToken.VALUE_FALSE)
+                        boolVal = 0;
+                    else if (token == JsonToken.VALUE_STRING) {
+                        String boolStr = parser.getValueAsString();
+                        boolVal = Boolean.parseBoolean(boolStr) ? 1 : 0;
+                    }
+                    else if (token == JsonToken.VALUE_NUMBER_INT) {
+                        boolVal = parser.getIntValue();
+                        if (boolVal != 0 && boolVal != 1)
+                            throw new JsonParseException(parser, "Invalid boolean value", parser.currentLocation());
+                    }
+                    else
+                        throw new JsonParseException(parser, "Invalid boolean value", parser.currentLocation());
 
                 boolVec.set(row, isSet, boolVal);
 
@@ -143,7 +170,13 @@ public class JacksonValues {
 
                 else {
                     BigDecimal decimal256Val = parser.getDecimalValue();
-                    decimal256Vec.set(row, decimal256Val);
+
+                    // Scale the decimal to match the scale of the arrow vector, and ensure no data is lost
+                    BigDecimal scaled256Val = decimal256Val.setScale(
+                            decimal256Vec.getScale(),
+                            RoundingMode.UNNECESSARY);
+
+                    decimal256Vec.set(row, scaled256Val);
                 }
 
                 break;
@@ -179,8 +212,43 @@ public class JacksonValues {
 
                 break;
 
+            case TIMESTAMPMILLI:
+
+                TimeStampMilliVector timeStampMVec = (TimeStampMilliVector) vector;
+
+                if (isSet == 0)
+                    timeStampMVec.setNull(row);
+
+                else {
+
+                    String datetimeStr = parser.getValueAsString();
+                    LocalDateTime datetimeVal = LocalDateTime.parse(datetimeStr, MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT);
+                    OffsetDateTime zoneAdjustedVal = datetimeVal.atOffset(ZoneOffset.UTC);
+
+                    long unixEpochMillis =
+                            (zoneAdjustedVal.toEpochSecond() * 1000) +
+                            (zoneAdjustedVal.getNano() / 1000000);
+
+                    timeStampMVec.set(row, unixEpochMillis);
+                }
+
+                break;
+
+                // For handling TZ type:
+                // ArrowType.Timestamp mtzType = (ArrowType.Timestamp) field.getType();
+                // ZoneOffset mtzOffset = ZoneOffset.of(mtzType.getTimezone());
+
             default:
-                throw new EUnexpected();  // TODO: Data type not supported, field name, arrow type, minor type
+
+                // This error does not relate to the data, only to the target column type
+                // So, do not include parse location in the error message
+
+                var err = String.format(
+                        "Data type not supported for field: [%s] %s (%s)",
+                        field.getName(), field.getType(), vector.getMinorType());
+
+                log.error(err);
+                throw new EDataTypeNotSupported(err);
         }
     }
 
@@ -298,11 +366,46 @@ public class JacksonValues {
 
                 break;
 
+            case TIMESTAMPMILLI:
+
+                TimeStampMilliVector timeStampMVec = (TimeStampMilliVector) vector;
+
+                long unixEpochMillis = timeStampMVec.get(row);
+                long unixEpochSec = unixEpochMillis / 1000;
+                int nanos = ((int) (unixEpochMillis - (unixEpochSec * 1000))) * 1000000;
+
+
+                unixEpochSec -= 10;
+
+                if (nanos < 0) {
+                    unixEpochSec -= 1;
+                    nanos += 1000000000;
+                }
+
+                LocalDateTime datetimeVal = LocalDateTime.ofEpochSecond(unixEpochSec, nanos, ZoneOffset.UTC);
+                String datetimeStr = MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT.format(datetimeVal);
+
+                generator.writeString(datetimeStr);
+
+                break;
+
+            // For handling TZ type:
+            // ArrowType.Timestamp mtzType = (ArrowType.Timestamp) field.getType();
+            // ZoneOffset mtzOffset = ZoneOffset.of(mtzType.getTimezone());
+
             default:
 
-                // TODO: Data type not supported, field name, arrow type, minor type
+                // This error does not relate to the data, only to the target column type
+                // So, do not include parse location in the error message
+
                 var field = vector.getField();
-                throw new ETracInternal(field.getName());
+
+                var err = String.format(
+                        "Data type not supported for field: [%s] %s (%s)",
+                        field.getName(), field.getType(), vector.getMinorType());
+
+                log.error(err);
+                throw new EDataTypeNotSupported(err);
         }
     }
 }

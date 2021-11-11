@@ -16,13 +16,21 @@
 
 package com.accenture.trac.common.exception;
 
-public class EDataFormatNotSupported extends EData {
 
-    public EDataFormatNotSupported(String message, Throwable cause) {
+/**
+ * Type not supported for an individual value in a dataset
+ *
+ * For example, a data codec that encounters a blob field and does not have support for blob types
+ * could raise this error, or it could occur trying to map a type that doesn't have a mapping
+ * in the TRAC type system.
+ */
+public class EDataTypeNotSupported extends EData {
+
+    public EDataTypeNotSupported(String message, Throwable cause) {
         super(message, cause);
     }
 
-    public EDataFormatNotSupported(String message) {
+    public EDataTypeNotSupported(String message) {
         super(message);
     }
 }

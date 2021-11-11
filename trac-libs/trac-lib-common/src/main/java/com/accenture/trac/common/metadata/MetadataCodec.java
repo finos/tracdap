@@ -412,5 +412,12 @@ public class MetadataCodec {
             .appendOffsetId()
             .toFormatter();
 
+    public static final DateTimeFormatter ISO_DATETIME_NO_ZONE_FORMAT = new DateTimeFormatterBuilder()
+            .parseCaseInsensitive()
+            .parseLenient()
+            .appendPattern("uuuu-MM-dd'T'kk:mm:ss")
+            .appendFraction(ChronoField.MICRO_OF_SECOND, 0, 9, true)
+            .toFormatter();
+
     // private static final DateTimeFormatter ISO_DATETIME_FORMAT = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 }

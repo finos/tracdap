@@ -25,6 +25,7 @@ import com.accenture.trac.common.exception.EDataCorruption;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.SchemaDefinition;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.dataformat.csv.CsvFactory;
 import com.fasterxml.jackson.dataformat.csv.CsvParser;
@@ -81,7 +82,8 @@ public class CsvDecoder extends BaseDecoder {
     @Override
     protected void decodeChunk(ByteBuf chunk) {
 
-        var csvFactory = new CsvFactory();
+        var csvFactory = new CsvFactory()
+                .enable(CsvParser.Feature.TRIM_SPACES);
 
         var csvSchema =  CsvSchemaMapping
                 .arrowToCsv(this.arrowSchema)
@@ -92,6 +94,7 @@ public class CsvDecoder extends BaseDecoder {
              var parser = (CsvParser) csvFactory.createParser((InputStream) stream)) {
 
             parser.setSchema(csvSchema);
+            parser.enable(CsvParser.Feature.TRIM_SPACES);
 
             var nRowsTotal = 0;
             var nRowsBatch = 0;
@@ -159,7 +162,7 @@ public class CsvDecoder extends BaseDecoder {
 
             log.info("CSV Codec: Decoded {} rows in {} batches", nRowsTotal, nBatches);
         }
-        catch (CsvReadException e) {
+        catch (JsonParseException e) {  // In Jackson JSON is the base class, JSON error is the parent of CSV error
 
             log.error("CSV content could not be decoded: Line {}, {}", e.getLocation().getLineNr(), e.getMessage(), e);
 

@@ -20,6 +20,7 @@ import com.accenture.trac.api.*;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.concurrent.Futures;
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.metadata.*;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -39,10 +40,13 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.Flow;
 import java.util.function.BiFunction;
@@ -61,6 +65,9 @@ class DataRoundTripTest extends DataApiTestBase {
     private static final String BASIC_CSV_DATA = "/basic_csv_data.csv";
     private static final String BASIC_JSON_DATA = "/basic_json_data.json";
 
+    static final ByteString BASIC_CSV_CONTENT = loadTextResource(
+            DataRoundTripTest.class, BASIC_CSV_DATA);
+
     private static class TestDataContainer {
 
         List<String> fieldNames;
@@ -77,23 +84,50 @@ class DataRoundTripTest extends DataApiTestBase {
                 .setSchemaType(SchemaType.TABLE)
                 .setTable(TableSchema.newBuilder()
                 .addFields(FieldSchema.newBuilder()
-                        .setFieldName("string_field")
+                        .setFieldName("boolean_field")
                         .setFieldOrder(0)
+                        .setFieldType(BasicType.BOOLEAN))
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("integer_field")
+                        .setFieldOrder(1)
+                        .setFieldType(BasicType.INTEGER))
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("float_field")
+                        .setFieldOrder(2)
+                        .setFieldType(BasicType.FLOAT))
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("decimal_field")
+                        .setFieldOrder(3)
+                        .setFieldType(BasicType.DECIMAL))
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("string_field")
+                        .setFieldOrder(4)
                         .setFieldType(BasicType.STRING))
                 .addFields(FieldSchema.newBuilder()
-                        .setFieldName("int_field")
-                        .setFieldOrder(1)
-                        .setFieldType(BasicType.INTEGER)))
+                        .setFieldName("date_field")
+                        .setFieldOrder(5)
+                        .setFieldType(BasicType.DATE))
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("datetime_field")
+                        .setFieldOrder(6)
+                        .setFieldType(BasicType.DATETIME)))
                 .build();
 
-        BASIC_TEST_DATA = new TestDataContainer();
-        BASIC_TEST_DATA.fieldNames = List.of("string_field", "int_field");
-        BASIC_TEST_DATA.fieldTypes = List.of(BasicType.STRING, BasicType.INTEGER);
-        BASIC_TEST_DATA.values = List.of(new Vector<>(), new Vector<>());
+        BASIC_TEST_DATA = decodeCsv(BASIC_TEST_SCHEMA, List.of(BASIC_CSV_CONTENT));
+    }
 
-        for (int i = 0; i < 10; i++) {
-            BASIC_TEST_DATA.values.get(0).add("string_" + i);
-            BASIC_TEST_DATA.values.get(1).add((long) i);
+    private static ByteString loadTextResource(Class<?> clazz, String resourcePath) {
+
+        try (var stream = clazz.getResourceAsStream(resourcePath)) {
+
+            if (stream == null)
+                throw new FileNotFoundException(resourcePath);
+
+            var bytes = stream.readAllBytes();
+            return ByteString.copyFrom(bytes);
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -179,8 +213,8 @@ class DataRoundTripTest extends DataApiTestBase {
         var testData = List.of(ByteString.copyFrom(testDataBytes));
 
         var mimeType = "text/csv";
-        roundTripTest(testData, mimeType, mimeType, this::decodeCsv, BASIC_TEST_DATA, true);
-        roundTripTest(testData, mimeType, mimeType, this::decodeCsv, BASIC_TEST_DATA, false);
+        roundTripTest(testData, mimeType, mimeType, DataRoundTripTest::decodeCsv, BASIC_TEST_DATA, true);
+        roundTripTest(testData, mimeType, mimeType, DataRoundTripTest::decodeCsv, BASIC_TEST_DATA, false);
     }
 
     @Test
@@ -300,7 +334,7 @@ class DataRoundTripTest extends DataApiTestBase {
         return defTypeFunc.apply(objDef);
     }
 
-    private TestDataContainer decodeCsv(SchemaDefinition schema, List<ByteString> data) {
+    private static TestDataContainer decodeCsv(SchemaDefinition schema, List<ByteString> data) {
 
         var result = schemaResult(schema);
 
@@ -310,7 +344,11 @@ class DataRoundTripTest extends DataApiTestBase {
 
             reader.readLine();  // skip header
 
-            var csvReader = CsvMapper.builder().build()
+            var csvMapper = CsvMapper.builder()
+                    .enable(CsvParser.Feature.TRIM_SPACES)
+                    .build();
+
+            var csvReader = csvMapper
                     .readerForArrayOf(String.class)
                     .with(CsvParser.Feature.WRAP_AS_ARRAY);
 
@@ -390,7 +428,7 @@ class DataRoundTripTest extends DataApiTestBase {
         }
     }
 
-    private TestDataContainer schemaResult(SchemaDefinition schema) {
+    private static TestDataContainer schemaResult(SchemaDefinition schema) {
 
         var result = new TestDataContainer();
 
@@ -461,7 +499,7 @@ class DataRoundTripTest extends DataApiTestBase {
         }
     }
 
-    private Object decodeJavaObject(BasicType fieldType, Object rawObject) {
+    private static Object decodeJavaObject(BasicType fieldType, Object rawObject) {
 
         switch (fieldType) {
 
@@ -469,6 +507,13 @@ class DataRoundTripTest extends DataApiTestBase {
 
                 if (rawObject instanceof Boolean)
                     return rawObject;
+
+                if (rawObject instanceof String) {
+                    var b = Boolean.valueOf(rawObject.toString());
+
+                    System.out.println("Str: " + rawObject.toString() + ", val: " + b);
+                    return b;
+                }
 
                 throw new EUnexpected();
 
@@ -494,14 +539,51 @@ class DataRoundTripTest extends DataApiTestBase {
 
                 throw new EUnexpected();
 
+            case DECIMAL:
+
+                if (rawObject instanceof BigDecimal) return rawObject;
+
+                if (rawObject instanceof String)
+                    return new BigDecimal(rawObject.toString());
+
+                break;
+
             case STRING:
 
                 return rawObject.toString();
 
+            case DATE:
+
+                if (rawObject instanceof LocalDate) return rawObject;
+
+                if (rawObject instanceof String)
+                    return LocalDate.parse(rawObject.toString());
+
+                break;
+
+            case DATETIME:
+
+                if (rawObject instanceof LocalDateTime) return rawObject;
+
+                if (rawObject instanceof String)
+                    return LocalDateTime.parse(rawObject.toString(), MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT);
+
+                break;
+
             default:
+
+                System.out.println(fieldType);
+                System.out.println(rawObject.getClass());
 
                 throw new EUnexpected();
         }
+
+
+
+        System.out.println(fieldType);
+        System.out.println(rawObject.getClass());
+
+        throw new EUnexpected();
 
     }
 }
