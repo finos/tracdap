@@ -25,8 +25,6 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import org.apache.arrow.vector.*;
-import org.apache.arrow.vector.holders.TimeStampMilliTZHolder;
-import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -155,7 +153,7 @@ public class JacksonValues {
                     decimal128Vec.setNull(row);
 
                 else {
-                    BigDecimal decimal128Val = parser.getDecimalValue();
+                    BigDecimal decimal128Val = parseBigDecimal(parser, token, decimal128Vec.getScale());
                     decimal128Vec.set(row, decimal128Val);
                 }
 
@@ -169,14 +167,8 @@ public class JacksonValues {
                     decimal256Vec.setNull(row);
 
                 else {
-                    BigDecimal decimal256Val = parser.getDecimalValue();
-
-                    // Scale the decimal to match the scale of the arrow vector, and ensure no data is lost
-                    BigDecimal scaled256Val = decimal256Val.setScale(
-                            decimal256Vec.getScale(),
-                            RoundingMode.UNNECESSARY);
-
-                    decimal256Vec.set(row, scaled256Val);
+                    BigDecimal decimal256Val = parseBigDecimal(parser, token, decimal256Vec.getScale());
+                    decimal256Vec.set(row, decimal256Val);
                 }
 
                 break;
@@ -250,6 +242,25 @@ public class JacksonValues {
                 log.error(err);
                 throw new EDataTypeNotSupported(err);
         }
+    }
+
+    static private BigDecimal parseBigDecimal(JsonParser parser, JsonToken token, int scale) throws IOException {
+
+        BigDecimal decimalVal;
+
+        if (token == JsonToken.VALUE_NUMBER_INT || token == JsonToken.VALUE_NUMBER_FLOAT)
+            decimalVal = parser.getDecimalValue();
+        else if (token == JsonToken.VALUE_STRING)
+            decimalVal = new BigDecimal(parser.getValueAsString());
+        else
+            throw new EUnexpected();  // TODO
+
+        if (decimalVal.scale() == scale)
+            return decimalVal;
+
+        else
+            // Scale the decimal to match the scale of the arrow vector
+            return decimalVal.setScale(scale, RoundingMode.UNNECESSARY);
     }
 
     public static void getAndGenerate(FieldVector vector, int row, JsonGenerator generator) throws IOException {
@@ -373,14 +384,6 @@ public class JacksonValues {
                 long unixEpochMillis = timeStampMVec.get(row);
                 long unixEpochSec = unixEpochMillis / 1000;
                 int nanos = ((int) (unixEpochMillis - (unixEpochSec * 1000))) * 1000000;
-
-
-                unixEpochSec -= 10;
-
-                if (nanos < 0) {
-                    unixEpochSec -= 1;
-                    nanos += 1000000000;
-                }
 
                 LocalDateTime datetimeVal = LocalDateTime.ofEpochSecond(unixEpochSec, nanos, ZoneOffset.UTC);
                 String datetimeStr = MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT.format(datetimeVal);

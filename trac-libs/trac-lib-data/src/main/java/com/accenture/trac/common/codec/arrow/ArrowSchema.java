@@ -34,12 +34,14 @@ import java.util.Map;
 
 public class ArrowSchema {
 
+    // Default decimal settings - 38:12 with 128 bit width
     private static final int DECIMAL_PRECISION = 38;
     private static final int DECIMAL_SCALE = 12;
-    private static final int DECIMAL_BIT_WIDTH = 256;
+    private static final int DECIMAL_BIT_WIDTH = 128;
 
+    // Default datetime settings
     private static final TimeUnit TIMESTAMP_PRECISION = TimeUnit.MILLISECOND;
-    private static final String TZ_ZULU = "+00:00";
+    private static final String NO_ZONE = null;
 
     private static final Map<BasicType, ArrowType> TRAC_ARROW_TYPE_MAPPING = Map.ofEntries(
             Map.entry(BasicType.BOOLEAN, ArrowType.Bool.INSTANCE),
@@ -48,7 +50,7 @@ public class ArrowSchema {
             Map.entry(BasicType.DECIMAL, new ArrowType.Decimal(DECIMAL_PRECISION, DECIMAL_SCALE, DECIMAL_BIT_WIDTH)),
             Map.entry(BasicType.STRING, ArrowType.Utf8.INSTANCE),
             Map.entry(BasicType.DATE, new ArrowType.Date(DateUnit.DAY)),
-            Map.entry(BasicType.DATETIME, new ArrowType.Timestamp(TIMESTAMP_PRECISION, null)));  // Using type without timezone
+            Map.entry(BasicType.DATETIME, new ArrowType.Timestamp(TIMESTAMP_PRECISION, NO_ZONE)));  // Using type without timezone
 
 
     public static Schema tracToArrow(SchemaDefinition tracSchema) {
