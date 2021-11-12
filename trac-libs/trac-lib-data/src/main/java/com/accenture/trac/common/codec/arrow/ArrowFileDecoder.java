@@ -18,12 +18,14 @@ package com.accenture.trac.common.codec.arrow;
 
 import com.accenture.trac.common.codec.BaseDecoder;
 import com.accenture.trac.common.data.DataBlock;
-import com.accenture.trac.common.exception.ETracInternal;
+import com.accenture.trac.common.exception.EDataCorruption;
+import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.util.ByteSeekableChannel;
 import io.netty.buffer.ByteBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.VectorUnloader;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
+import org.apache.arrow.vector.ipc.InvalidArrowFileException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,11 +68,34 @@ public class ArrowFileDecoder extends BaseDecoder {
                 emitBlock(DataBlock.forRecords(batch));
             }
         }
-        catch (IOException e) {
+        catch (InvalidArrowFileException e) {
 
-            // todo
-            log.error(e.getMessage(), e);
-            throw new ETracInternal(e.getMessage(), e);
+            // A nice clean validation failure from the Arrow framework
+            // E.g. missing / incorrect magic number at the start (or end) of the file
+
+            var errorMessage = "Arrow file decoding failed, file is invalid: " + e.getMessage();
+
+            log.error(errorMessage, e);
+            doTargetError(new EDataCorruption(errorMessage, e));
+        }
+        catch (IllegalArgumentException | IndexOutOfBoundsException | IOException  e) {
+
+            // These errors occur if the data stream contains bad values for vector sizes, offsets etc.
+            // This may be as a result of a corrupt data stream, or a maliciously crafted message
+
+            // Decoders work on a stream of buffers, "real" IO exceptions should not occur
+
+            var errorMessage = "Arrow file decoding failed, content is garbled";
+
+            log.error(errorMessage, e);
+            doTargetError(new EDataCorruption(errorMessage, e));
+        }
+        catch (Throwable e)  {
+
+            // Ensure unexpected errors are still reported to the Flow API
+
+            log.error("Unexpected error in Arrow file decoding", e);
+            doTargetError(new EUnexpected(e));
         }
         finally {
 

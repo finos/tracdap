@@ -20,7 +20,6 @@ import com.accenture.trac.common.codec.BaseDecoder;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
 import com.accenture.trac.common.codec.json.JacksonValues;
 import com.accenture.trac.common.data.DataBlock;
-import com.accenture.trac.common.exception.EData;
 import com.accenture.trac.common.exception.EDataCorruption;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.SchemaDefinition;
@@ -29,7 +28,6 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.dataformat.csv.CsvFactory;
 import com.fasterxml.jackson.dataformat.csv.CsvParser;
-import com.fasterxml.jackson.dataformat.csv.CsvReadException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import org.apache.arrow.memory.BufferAllocator;
@@ -162,28 +160,35 @@ public class CsvDecoder extends BaseDecoder {
 
             log.info("CSV Codec: Decoded {} rows in {} batches", nRowsTotal, nBatches);
         }
-        catch (JsonParseException e) {  // In Jackson JSON is the base class, JSON error is the parent of CSV error
+        catch (JsonParseException e) {
 
-            log.error("CSV content could not be decoded: Line {}, {}", e.getLocation().getLineNr(), e.getMessage(), e);
+            // In Jackson JSON is the base class, JSON error is the parent of CSV error
+            // This exception is a "well-behaved" parse failure, parse location and message should be meaningful
 
-            var err = new EDataCorruption(e.getMessage(), e);  // todo: err
-            doTargetError(err);
+            var errorMessage = String.format("CSV decoding failed on line %d: %s",
+                    e.getLocation().getLineNr(),
+                    e.getMessage());
+
+            log.error(errorMessage, e);
+            doTargetError(new EDataCorruption(errorMessage, e));
         }
         catch (IOException e) {
 
-            log.error("CSV Decode error", e);
+            // Decoders work on a stream of buffers, "real" IO exceptions should not occur
+            // IO exceptions here indicate parse failures, not file/socket communication errors
+            // This is likely to be a more "badly-behaved" failure, or at least one that was not anticipated
 
-            root.clear();
+            var errorMessage = "CSV decoding failed, content is garbled: " + e.getMessage();
 
-            doTargetError(e);
-
-            // TODO: Error
+            log.error(errorMessage, e);
+            doTargetError(new EDataCorruption(errorMessage, e));
         }
         catch (Throwable e)  {
 
-            log.error("CSV Decode error", e);
+            // Ensure unexpected errors are still reported to the Flow API
 
-            doTargetError(e);
+            log.error("Unexpected error in CSV decoding", e);
+            doTargetError(new EUnexpected(e));
         }
         finally {
 

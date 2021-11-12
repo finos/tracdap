@@ -23,6 +23,7 @@ import com.accenture.trac.common.codec.csv.CsvCodec;
 import com.accenture.trac.common.codec.json.JsonCodec;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.data.DataBlock;
+import com.accenture.trac.common.exception.EDataCorruption;
 import com.accenture.trac.test.data.SampleDataFormats;
 import io.netty.buffer.Unpooled;
 import org.apache.arrow.memory.BufferAllocator;
@@ -40,6 +41,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -119,7 +121,7 @@ public abstract class CodecRoundTripTest {
 
     @Test
     @EnabledIf(value = "basicDataAvailable", disabledReason = "Pre-saved test data not available for this format")
-    void basic_decode() throws Exception {
+    void decode_basic() throws Exception {
 
         var allocator = new RootAllocator();
         var arrowSchema = ArrowSchema.tracToArrow(SampleDataFormats.BASIC_TABLE_SCHEMA);
@@ -145,6 +147,28 @@ public abstract class CodecRoundTripTest {
         rtBatch.close();
         root.close();
     }
+
+    @Test
+    void decode_garbled() {
+
+        var testData = new byte[10000];
+
+        var random = new Random();
+        random.nextBytes(testData);
+
+        var testDataBuf = Unpooled.wrappedBuffer(testData);
+        var testDataStream = Flows.publish(List.of(testDataBuf));
+
+        var allocator = new RootAllocator();
+        var decoder = codec.getDecoder(allocator, SampleDataFormats.BASIC_TABLE_SCHEMA, Map.of());
+        testDataStream.subscribe(decoder);
+
+        var decodeResult = Flows.fold(decoder, (bs, b) -> {bs.add(b); return bs;}, new ArrayList<DataBlock>());
+        waitFor(TEST_TIMEOUT, decodeResult);
+
+        Assertions.assertThrows(EDataCorruption.class, () -> resultOf(decodeResult));
+    }
+
 
     private void compareBatchToRoot(VectorSchemaRoot root, Schema rtSchema, ArrowRecordBatch rtBatch, BufferAllocator allocator) {
 

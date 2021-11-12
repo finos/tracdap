@@ -18,21 +18,16 @@ package com.accenture.trac.common.codec.arrow;
 
 import com.accenture.trac.common.codec.BaseDecoder;
 import com.accenture.trac.common.data.DataBlock;
-import com.accenture.trac.common.data.IDataContext;
-import com.accenture.trac.common.exception.ETracInternal;
+import com.accenture.trac.common.exception.EDataCorruption;
+import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.util.ByteSeekableChannel;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorLoader;
-import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.VectorUnloader;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
-import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 
@@ -75,11 +70,24 @@ public class ArrowStreamDecoder extends BaseDecoder {
                 root.clear();
             }
         }
-        catch (IOException e) {
+        catch (IllegalArgumentException | IndexOutOfBoundsException | IOException  e) {
 
-            // todo
-            log.error(e.getMessage(), e);
-            throw new ETracInternal(e.getMessage(), e);
+            // These errors occur if the data stream contains bad values for vector sizes, offsets etc.
+            // This may be as a result of a corrupt data stream, or a maliciously crafted message
+
+            // Decoders work on a stream of buffers, "real" IO exceptions should not occur
+
+            var errorMessage = "Arrow file decoding failed, content is garbled";
+
+            log.error(errorMessage, e);
+            doTargetError(new EDataCorruption(errorMessage, e));
+        }
+        catch (Throwable e)  {
+
+            // Ensure unexpected errors are still reported to the Flow API
+
+            log.error("Unexpected error in Arrow stream decoding", e);
+            doTargetError(new EUnexpected(e));
         }
         finally {
 

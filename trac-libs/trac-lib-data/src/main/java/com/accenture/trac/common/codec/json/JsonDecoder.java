@@ -19,8 +19,6 @@ package com.accenture.trac.common.codec.json;
 import com.accenture.trac.common.codec.BaseDecoder;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
 import com.accenture.trac.common.data.DataBlock;
-import com.accenture.trac.common.exception.EData;
-import com.accenture.trac.common.exception.EDataConstraint;
 import com.accenture.trac.common.exception.EDataCorruption;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.SchemaDefinition;
@@ -32,15 +30,12 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.async.ByteArrayFeeder;
 import io.netty.buffer.ByteBuf;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.VectorUnloader;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 
 public class JsonDecoder extends BaseDecoder {
@@ -115,14 +110,32 @@ public class JsonDecoder extends BaseDecoder {
         }
         catch (JsonParseException e) {
 
-            log.error("JSON content could not be decoded: Line {}, {}", e.getLocation().getLineNr(), e.getMessage(), e);
+            // This exception is a "well-behaved" parse failure, parse location and message should be meaningful
 
-            var err = new EDataCorruption(e.getMessage(), e);  // todo: err
-            doTargetError(err);
+            var errorMessage = String.format("JSON decoding failed on line %d: %s",
+                    e.getLocation().getLineNr(),
+                    e.getMessage());
+
+            log.error(errorMessage, e);
+            doTargetError(new EDataCorruption(errorMessage, e));
         }
         catch (IOException e) {
 
-            throw new EUnexpected(e);  // TODO
+            // Decoders work on a stream of buffers, "real" IO exceptions should not occur
+            // IO exceptions here indicate parse failures, not file/socket communication errors
+            // This is likely to be a more "badly-behaved" failure, or at least one that was not anticipated
+
+            var errorMessage = "JSON decoding failed, content is garbled: " + e.getMessage();
+
+            log.error(errorMessage, e);
+            doTargetError(new EDataCorruption(errorMessage, e));
+        }
+        catch (Throwable e)  {
+
+            // Ensure unexpected errors are still reported to the Flow API
+
+            log.error("Unexpected error in CSV decoding", e);
+            doTargetError(new EUnexpected(e));
         }
         finally {
 
