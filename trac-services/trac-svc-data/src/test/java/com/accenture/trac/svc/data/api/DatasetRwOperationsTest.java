@@ -17,9 +17,9 @@
 package com.accenture.trac.svc.data.api;
 
 import com.accenture.trac.api.DataReadRequest;
+import com.accenture.trac.api.DataReadResponse;
 import com.accenture.trac.api.DataWriteRequest;
 import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.metadata.*;
 import com.accenture.trac.test.data.SampleDataFormats;
 import com.google.protobuf.ByteString;
@@ -28,11 +28,13 @@ import io.grpc.StatusRuntimeException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
+import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static com.accenture.trac.test.helpers.TestResourceHelpers.loadResourceAsByteString;
@@ -76,7 +78,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Test
-    void createDataset_ok_data() {
+    void createDataset_ok_data() throws Exception {
         Assertions.fail();
     }
 
@@ -101,7 +103,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         var priorId = resultOf(priorResult);
 
         var priorNotNull = BASIC_CREATE_DATASET_REQUEST.toBuilder()
-                .setPriorVersion(MetadataUtil.selectorFor(priorId))
+                .setPriorVersion(selectorFor(priorId))
                 .build();
 
         var priorNotNullResult = DataApiTestHelpers.clientStreaming(dataClient::createDataset, priorNotNull);
@@ -467,8 +469,46 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Test
-    void readDataset_ok_data() {
-        Assertions.fail();
+    void readDataset_ok_data() throws Exception {
+
+        // Create an object to use as the prior, so errors will not come because the prior does not exist
+        var priorResult = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, priorResult);
+        var priorId = resultOf(priorResult);
+
+        var request = readRequest(priorId);
+        var readDataset = DataApiTestHelpers.serverStreaming(dataClient::readDataset, request, execContext);
+        waitFor(TEST_TIMEOUT, readDataset);
+        var responseList = resultOf(readDataset);
+
+        // First response message should contain metadata only, with an empty buffer
+        var response0 = responseList.get(0);
+        Assertions.assertEquals(ByteString.EMPTY, response0.getContent());
+
+        // The remainder of the list should contain the file content
+        var content = responseList.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
+
+        var originalData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(BASIC_CSV_CONTENT));
+        var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
+
+        Assertions.assertEquals(originalData.size(), responseData.size());
+
+        for (var col = 0; col < originalData.size(); col++) {
+            Assertions.assertEquals(originalData.get(col).size(), responseData.get(col).size());
+            for (var row = 0; row < originalData.get(col).size(); row++) {
+
+                var originalVal = originalData.get(col).get(row);
+                var responseVal = responseData.get(col).get(row);
+
+                // Decimals must be checked using compareTo, equals() does not handle equal values with different scale
+                if (originalVal instanceof BigDecimal)
+                    Assertions.assertEquals(0, ((BigDecimal) originalVal).compareTo((BigDecimal) responseVal));
+                else
+                    Assertions.assertEquals(originalVal, responseVal);
+            }
+        }
     }
 
     @Test
@@ -859,13 +899,13 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         assertEquals(Status.Code.UNIMPLEMENTED, error.getStatus().getCode());
     }
 
-    static DataReadRequest readRequest(TagHeader fileId) {
+    static DataReadRequest readRequest(TagHeader dataId) {
 
-        var fileSelector = MetadataUtil.selectorFor(fileId);
+        var dataSelector = selectorFor(dataId);
 
         return DataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setSelector(fileSelector)
+                .setSelector(dataSelector)
                 .setFormat("text/csv")
                 .build();
     }
