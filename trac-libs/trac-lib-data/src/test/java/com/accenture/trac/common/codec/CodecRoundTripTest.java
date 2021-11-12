@@ -151,17 +151,26 @@ public abstract class CodecRoundTripTest {
     @Test
     void decode_garbled() {
 
-        var testData = new byte[10000];
+        // Send a stream of random bytes - 3 chunks worth
+
+        var testData = List.of(
+                new byte[10000],
+                new byte[10000],
+                new byte[10000]);
 
         var random = new Random();
-        random.nextBytes(testData);
+        testData.forEach(random::nextBytes);
 
-        var testDataBuf = Unpooled.wrappedBuffer(testData);
-        var testDataStream = Flows.publish(List.of(testDataBuf));
+        var testDataBuf = testData.stream().map(Unpooled::wrappedBuffer).collect(Collectors.toList());
+        var testDataStream = Flows.publish(testDataBuf);
+
+        // Run the garbage data through the decoder
 
         var allocator = new RootAllocator();
         var decoder = codec.getDecoder(allocator, SampleDataFormats.BASIC_TABLE_SCHEMA, Map.of());
         testDataStream.subscribe(decoder);
+
+        // Decoder should report EDataCorruption
 
         var decodeResult = Flows.fold(decoder, (bs, b) -> {bs.add(b); return bs;}, new ArrayList<DataBlock>());
         waitFor(TEST_TIMEOUT, decodeResult);
