@@ -51,29 +51,29 @@ import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static com.accenture.trac.test.data.SampleDataFormats.generateBasicData;
 
 
-public abstract class CodecRoundTripTest {
+public abstract class CodecTestSuite {
 
     // Concrete test cases for codecs included in CORE_DATA
 
-    static class ArrowStream extends CodecRoundTripTest { @BeforeEach void setup() {
+    static class ArrowStream extends CodecTestSuite { @BeforeEach void setup() {
         codec = new ArrowStreamCodec();
         basicData = null;
     } }
 
-    static class ArrowFile extends CodecRoundTripTest { @BeforeEach void setup() {
+    static class ArrowFile extends CodecTestSuite { @BeforeEach void setup() {
         codec = new ArrowFileCodec();
         basicData = null;
     } }
 
-    static class CSV extends CodecRoundTripTest { @BeforeEach void setup() {
+    static class CSV extends CodecTestSuite { @BeforeEach void setup() {
         codec = new CsvCodec();
-        basicData = "/sample_data_formats/csv_basic.csv";
+        basicData = SampleDataFormats.BASIC_CSV_DATA_RESOURCE;
     } }
 
-    static class JSON extends CodecRoundTripTest { @BeforeAll
+    static class JSON extends CodecTestSuite { @BeforeAll
     static void setup() {
         codec = new JsonCodec();
-        basicData = "/sample_data_formats/json_basic.json";
+        basicData = SampleDataFormats.BASIC_JSON_DATA_RESOURCE;
     } }
 
     private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
