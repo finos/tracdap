@@ -21,14 +21,13 @@ import com.accenture.trac.api.DataWriteRequest;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.metadata.*;
+import com.accenture.trac.test.data.SampleDataFormats;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -36,6 +35,7 @@ import java.util.UUID;
 
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
+import static com.accenture.trac.test.helpers.TestResourceHelpers.loadResourceAsByteString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -45,43 +45,10 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     // Functional test cases for dataset operations in the data API
     // (createDataset, updateDataset, readDataset)
 
-    static final String BASIC_CSV_RESOURCE_PATH = "/basic_csv_data.csv";
+    // Reuse sample data from the test lib
 
-    static final ByteString BASIC_CSV_CONTENT = loadTextResource(
-            DatasetRwOperationsTest.class, BASIC_CSV_RESOURCE_PATH);
-
-    static final SchemaDefinition BASIC_SCHEMA = SchemaDefinition.newBuilder()
-            .setSchemaType(SchemaType.TABLE)
-            .setTable(TableSchema.newBuilder()
-            .addFields(FieldSchema.newBuilder()
-                    .setFieldName("boolean_field")
-                    .setFieldOrder(0)
-                    .setFieldType(BasicType.BOOLEAN))
-            .addFields(FieldSchema.newBuilder()
-                    .setFieldName("integer_field")
-                    .setFieldOrder(1)
-                    .setFieldType(BasicType.INTEGER))
-            .addFields(FieldSchema.newBuilder()
-                    .setFieldName("float_field")
-                    .setFieldOrder(2)
-                    .setFieldType(BasicType.FLOAT))
-            .addFields(FieldSchema.newBuilder()
-                    .setFieldName("decimal_field")
-                    .setFieldOrder(3)
-                    .setFieldType(BasicType.DECIMAL))
-            .addFields(FieldSchema.newBuilder()
-                    .setFieldName("string_field")
-                    .setFieldOrder(4)
-                    .setFieldType(BasicType.STRING))
-            .addFields(FieldSchema.newBuilder()
-                    .setFieldName("date_field")
-                    .setFieldOrder(5)
-                    .setFieldType(BasicType.DATE))
-            .addFields(FieldSchema.newBuilder()
-                    .setFieldName("datetime_field")
-                    .setFieldOrder(6)
-                    .setFieldType(BasicType.DATETIME)))
-            .build();
+    static final SchemaDefinition BASIC_SCHEMA = SampleDataFormats.BASIC_TABLE_SCHEMA;
+    static final ByteString BASIC_CSV_CONTENT = loadResourceAsByteString(SampleDataFormats.BASIC_CSV_DATA_RESOURCE);
 
     static final List<TagUpdate> BASIC_TAG_UPDATES = List.of(
             TagUpdate.newBuilder()
@@ -103,21 +70,6 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
             .setContent(BASIC_CSV_CONTENT)
             .build();
 
-    private static ByteString loadTextResource(Class<?> clazz, String resourcePath) {
-
-        try (var stream = clazz.getResourceAsStream(resourcePath)) {
-
-            if (stream == null)
-                throw new FileNotFoundException(resourcePath);
-
-            var bytes = stream.readAllBytes();
-            return ByteString.copyFrom(bytes);
-        }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
 
     // -----------------------------------------------------------------------------------------------------------------
     // CREATE DATASET
@@ -130,6 +82,11 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
     @Test
     void createDataset_ok_metadata() {
+        Assertions.fail();
+    }
+
+    @Test
+    void createDataset_ok_externalSchema() {
         Assertions.fail();
     }
 
@@ -200,6 +157,16 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, response);
         var error = assertThrows(StatusRuntimeException.class, () -> resultOf(response));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+    }
+
+    @Test
+    void createDataset_schemaIdInvalid() {
+        Assertions.fail();
+    }
+
+    @Test
+    void createDataset_schemaIdNotASchema() {
+        Assertions.fail();
     }
 
     @Test
@@ -283,7 +250,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void createDataset_schemaDoesNotMatch_multipleOptions() {
+    void createDataset_schemaDoesNotMatchData_multipleOptions() {
         Assertions.fail();
     }
 
@@ -325,7 +292,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void createDataset_formatDoesNotMatch() {
+    void createDataset_formatDoesNotMatchData() {
 
         // Format code does not match the supplied data (but is a supported format)
         // This should be detected as data corruption, and reported back as DATA_LOSS
@@ -361,6 +328,11 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
     @Test
     void updateDataset_ok_metadata() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_ok_externalSchema() {
         Assertions.fail();
     }
 
@@ -409,7 +381,85 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         Assertions.fail();
     }
 
-    // TODO: Dataset-specific
+    @Test
+    void updateDataset_schemaOmitted() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_schemaIdInvalid() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_schemaIdNotASchema() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_schemaIdNotFound() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_schemaInvalid() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_schemaEmpty() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_schemaIncompatible_forExternal() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_schemaIncompatible_forEmbedded() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_schemaIncompatible_externalToEmbedded() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_schemaIncompatible_embeddedToExternal() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_schemaDoesNotMatchData_multipleOptions() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_formatBlank() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_formatInvalid() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_formatNotAvailable() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_formatDoesNotMatchData() {
+        Assertions.fail();
+    }
+
+    @Test
+    void updateDataset_noContent() {
+        Assertions.fail();
+    }
 
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -423,6 +473,11 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
     @Test
     void readDataset_ok_metadata() {
+        Assertions.fail();
+    }
+
+    @Test
+    void readDataset_ok_externalSchema() {
         Assertions.fail();
     }
 

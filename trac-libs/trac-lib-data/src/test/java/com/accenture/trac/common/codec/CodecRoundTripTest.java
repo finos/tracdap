@@ -25,6 +25,7 @@ import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.exception.EDataCorruption;
 import com.accenture.trac.test.data.SampleDataFormats;
+import com.accenture.trac.test.helpers.TestResourceHelpers;
 import io.netty.buffer.Unpooled;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -48,7 +49,6 @@ import java.util.stream.Stream;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static com.accenture.trac.test.data.SampleDataFormats.generateBasicData;
-import static com.accenture.trac.test.data.SampleDataFormats.loadResource;
 
 
 public abstract class CodecRoundTripTest {
@@ -127,7 +127,7 @@ public abstract class CodecRoundTripTest {
         var arrowSchema = ArrowSchema.tracToArrow(SampleDataFormats.BASIC_TABLE_SCHEMA);
         var root = generateBasicData(allocator);
 
-        var testData = loadResource(basicData);
+        var testData = TestResourceHelpers.loadResourceAsBytes(basicData);
         var testDataBuf = Unpooled.wrappedBuffer(testData);
         var testDataStream = Flows.publish(List.of(testDataBuf));
 

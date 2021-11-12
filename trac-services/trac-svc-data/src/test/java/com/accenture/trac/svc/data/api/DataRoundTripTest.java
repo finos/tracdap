@@ -24,6 +24,7 @@ import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.metadata.*;
 
 import com.accenture.trac.test.data.SampleDataFormats;
+import com.accenture.trac.test.helpers.TestResourceHelpers;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
@@ -63,10 +64,10 @@ import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 class DataRoundTripTest extends DataApiTestBase {
 
-    private static final String BASIC_CSV_DATA = "/sample_data_formats/csv_basic.csv";
-    private static final String BASIC_JSON_DATA = "/sample_data_formats/json_basic.json";
+    private static final String BASIC_CSV_DATA = SampleDataFormats.BASIC_CSV_DATA_RESOURCE;
+    private static final String BASIC_JSON_DATA = SampleDataFormats.BASIC_JSON_DATA_RESOURCE;
 
-    static final byte[] BASIC_CSV_CONTENT = SampleDataFormats.loadResource(BASIC_CSV_DATA);
+    static final byte[] BASIC_CSV_CONTENT = TestResourceHelpers.loadResourceAsBytes(BASIC_CSV_DATA);
 
     private static class TestDataContainer {
 
