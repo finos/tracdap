@@ -214,12 +214,40 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
     @Test
     void createDataset_schemaIdInvalid() {
-        Assertions.fail();
+
+        var invalidSchemaId = TagSelector.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setObjectId("not_a_valid_id")
+                .setLatestObject(true)
+                .setLatestTag(true);
+
+        var request = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchemaId(invalidSchemaId)
+                .build();
+
+        var response = DataApiTestHelpers.clientStreaming(dataClient::createDataset, request);
+        waitFor(TEST_TIMEOUT, response);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(response));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
     void createDataset_schemaIdNotASchema() {
-        Assertions.fail();
+
+        var notASchemaId = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(UUID.randomUUID().toString())
+                .setLatestObject(true)
+                .setLatestTag(true);
+
+        var request = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchemaId(notASchemaId)
+                .build();
+
+        var response = DataApiTestHelpers.clientStreaming(dataClient::createDataset, request);
+        waitFor(TEST_TIMEOUT, response);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(response));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
@@ -442,7 +470,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void updateDataset_priorVersionNull() throws Exception {
+    void updateDataset_priorVersionNull() {
 
         // prior version not set for an update is an invalid request
 
@@ -617,28 +645,179 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void updateDataset_schemaIdInvalid() {
-        Assertions.fail();
+    void updateDataset_schemaIdInvalid() throws Exception {
+
+        // Create external schema
+        var schemaRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.SCHEMA)
+                        .setSchema(BASIC_SCHEMA)).build();
+
+        var createSchema = Futures.javaFuture(metaClient.createObject(schemaRequest));
+        waitFor(TEST_TIMEOUT, createSchema);
+        var schemaId = resultOf(createSchema);
+
+        // Create V1 using external schema
+
+        var v1Req = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchemaId(selectorFor(schemaId))
+                .build();
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, v1Req);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        // Invalid schema selector
+
+        var invalidSchemaId = selectorFor(schemaId).toBuilder()
+                .setObjectId("not_a_valid_id");
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchemaId(invalidSchemaId)
+                .build();
+
+        var response = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, response);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(response));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_schemaIdNotASchema() {
-        Assertions.fail();
+    void updateDataset_schemaIdNotASchema() throws Exception {
+
+        // Create external schema
+        var schemaRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.SCHEMA)
+                        .setSchema(BASIC_SCHEMA)).build();
+
+        var createSchema = Futures.javaFuture(metaClient.createObject(schemaRequest));
+        waitFor(TEST_TIMEOUT, createSchema);
+        var schemaId = resultOf(createSchema);
+
+        // Create V1 using external schema
+
+        var v1Req = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchemaId(selectorFor(schemaId))
+                .build();
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, v1Req);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        // Use DATA object type for schema selector
+
+        var invalidSchemaId = selectorFor(schemaId).toBuilder()
+                .setObjectType(ObjectType.DATA);
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchemaId(invalidSchemaId)
+                .build();
+
+        var response = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, response);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(response));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_schemaIdNotFound() {
-        Assertions.fail();
+    void updateDataset_schemaIdNotFound() throws Exception {
+
+        // External schema ID cannot be found - should be reported as NOT_FOUND
+
+        // Create external schema
+        var schemaRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.SCHEMA)
+                        .setSchema(BASIC_SCHEMA)).build();
+
+        var createSchema = Futures.javaFuture(metaClient.createObject(schemaRequest));
+        waitFor(TEST_TIMEOUT, createSchema);
+        var schemaId = resultOf(createSchema);
+
+        // Create V1 using external schema
+
+        var v1Req = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchemaId(selectorFor(schemaId))
+                .build();
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, v1Req);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        // Set a random object ID in the schema selector
+
+        var invalidSchemaId = selectorFor(schemaId).toBuilder()
+                .setObjectId(UUID.randomUUID().toString());
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchemaId(invalidSchemaId)
+                .build();
+
+        var response = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, response);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(response));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_schemaInvalid() {
-        Assertions.fail();
+    void updateDataset_schemaInvalid() throws Exception {
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        // Create an invalid schema - add a field with a duplicate field name
+
+        var invalidSchema = BASIC_SCHEMA_V2.toBuilder()
+                .setTable(BASIC_SCHEMA_V2.getTable().toBuilder()
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("string_field")
+                        .setFieldOrder(8)
+                        .setFieldType(BasicType.STRING)))
+                .build();
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchema(invalidSchema)
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_schemaEmpty() {
-        Assertions.fail();
+    void updateDataset_schemaEmpty() throws Exception {
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        var emptySchema = BASIC_SCHEMA_V2.toBuilder()
+                .setTable(BASIC_SCHEMA_V2.getTable().toBuilder()
+                .clearFields())
+                .build();
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchema(emptySchema)
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
