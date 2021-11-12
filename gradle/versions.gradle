@@ -27,7 +27,7 @@ ext {
 
 
     // Data technologies
-    arrow_version = '5.0.0'
+    arrow_version = '6.0.0'
     jackson_version = '2.13.0'
 
 
