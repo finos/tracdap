@@ -138,12 +138,14 @@ public class ArrowStreamDecoder extends BaseDecoder {
         headerBuf.order(ByteOrder.LITTLE_ENDIAN);
 
         stream.position(0);
-        stream.read(headerBuf);
 
+        var prefaceLength = stream.read(headerBuf);
         var continuation = headerBuf.getInt(0);
         var messageSize = headerBuf.getInt(4);
 
-        if (continuation != CONTINUATION_MARKER || messageSize <=0 || messageSize > MAX_FIRST_MESSAGE_SIZE)
+        if (prefaceLength != 8 || continuation != CONTINUATION_MARKER ||
+            messageSize <=0 || messageSize > MAX_FIRST_MESSAGE_SIZE)
+
             throw new NotAnArrowStream();
 
         // Restore original stream position
