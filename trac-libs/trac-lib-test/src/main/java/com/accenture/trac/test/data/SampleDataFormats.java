@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 public class SampleDataFormats {
 
     public static final String BASIC_CSV_DATA_RESOURCE = "/sample_data_formats/csv_basic.csv";
+    public static final String BASIC_CSV_DATA_RESOURCE_V2 = "/sample_data_formats/csv_basic_v2.csv";
     public static final String BASIC_JSON_DATA_RESOURCE = "/sample_data_formats/json_basic.json";
 
     public static final SchemaDefinition BASIC_TABLE_SCHEMA
@@ -67,6 +68,15 @@ public class SampleDataFormats {
                     .setFieldName("datetime_field")
                     .setFieldOrder(6)
                     .setFieldType(BasicType.DATETIME)))
+            .build();
+
+    public static final SchemaDefinition BASIC_TABLE_SCHEMA_V2
+            = BASIC_TABLE_SCHEMA.toBuilder()
+            .setTable(BASIC_TABLE_SCHEMA.getTable().toBuilder()
+            .addFields(FieldSchema.newBuilder()
+                    .setFieldName("extra_string_field")
+                    .setFieldOrder(7)
+                    .setFieldType(BasicType.STRING)))
             .build();
 
     public static VectorSchemaRoot generateBasicData(BufferAllocator arrowAllocator) {

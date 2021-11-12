@@ -16,9 +16,8 @@
 
 package com.accenture.trac.svc.data.api;
 
-import com.accenture.trac.api.DataReadRequest;
-import com.accenture.trac.api.DataReadResponse;
-import com.accenture.trac.api.DataWriteRequest;
+import com.accenture.trac.api.*;
+import com.accenture.trac.common.concurrent.Futures;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.metadata.*;
 import com.accenture.trac.test.data.SampleDataFormats;
@@ -26,6 +25,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -72,6 +72,24 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
             .setContent(BASIC_CSV_CONTENT)
             .build();
 
+    static final SchemaDefinition BASIC_SCHEMA_V2 = SampleDataFormats.BASIC_TABLE_SCHEMA_V2;
+    static final ByteString BASIC_CSV_CONTENT_V2 = loadResourceAsByteString(SampleDataFormats.BASIC_CSV_DATA_RESOURCE_V2);
+
+    static final List<TagUpdate> BASIC_TAG_UPDATES_V2 = List.of(
+            TagUpdate.newBuilder()
+                    .setAttrName("description")
+                    .setOperation(TagOperation.REPLACE_ATTR)
+                    .setValue(MetadataCodec.encodeValue("Describes what is in the V2 template"))
+                    .build());
+
+    static final DataWriteRequest BASIC_UPDATE_DATASET_REQUEST = DataWriteRequest.newBuilder()
+            .setTenant(TEST_TENANT)
+            .addAllTagUpdates(BASIC_TAG_UPDATES_V2)
+            .setSchema(BASIC_SCHEMA_V2)
+            .setFormat("text/csv")
+            .setContent(BASIC_CSV_CONTENT_V2)
+            .build();
+
 
     // -----------------------------------------------------------------------------------------------------------------
     // CREATE DATASET
@@ -79,16 +97,49 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
     @Test
     void createDataset_ok_data() throws Exception {
+
+        // Basic create call
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var dataId = resultOf(createDataset);
+
         Assertions.fail();
     }
 
     @Test
-    void createDataset_ok_metadata() {
+    void createDataset_ok_metadata() throws Exception {
+
+        // Basic create call
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var dataId = resultOf(createDataset);
+
         Assertions.fail();
     }
 
     @Test
-    void createDataset_ok_externalSchema() {
+    void createDataset_ok_externalSchema() throws Exception {
+
+        // Create external schema
+        var schemaRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder().setObjectType(ObjectType.SCHEMA)
+                        .setSchema(BASIC_SCHEMA)).build();
+
+        var createSchema = Futures.javaFuture(metaClient.createObject(schemaRequest));
+        waitFor(TEST_TIMEOUT, createSchema);
+        var schemaId = resultOf(createSchema);
+
+        // Create a dataset using the schema
+        var createRequest = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchemaId(selectorFor(schemaId))
+                .build();
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, createRequest);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var dataId = resultOf(createDataset);
+
         Assertions.fail();
     }
 
@@ -339,53 +390,230 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void updateDataset_versionDuplicated() {
-        Assertions.fail();
+    void updateDataset_versionDuplicated() throws Exception {
+
+        // Basic first version
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        // Use v1 as the prior version
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .build();
+
+        // First update should succeed
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        Assertions.assertDoesNotThrow(() -> resultOf(updateDataset));
+
+        // Second update on the same version number should fail
+
+        var updateDataset2 = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset2);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset2));
+        Assertions.assertEquals(Status.Code.ALREADY_EXISTS, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_versionMissing() {
-        Assertions.fail();
+    void updateDataset_versionMissing() throws Exception {
+
+        // Basic first version
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        // Use v2 as the prior version, which does not exist
+        var v2Id = v1Id.toBuilder()
+                .setObjectVersion(2)
+                .build();
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v2Id))
+                .build();
+
+        // Update should fail with version not found
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_priorVersionNull() {
-        Assertions.fail();
+    void updateDataset_priorVersionNull() throws Exception {
+
+        // prior version not set for an update is an invalid request
+
+        // Basic first version
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        Assertions.assertDoesNotThrow(() -> resultOf(createV1));
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .clearPriorVersion()
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+
     }
 
     @Test
-    void updateDataset_priorVersionInvalid() {
-        Assertions.fail();
+    void updateDataset_priorVersionInvalid() throws Exception {
+
+        // Basic first version
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        var invalidId = v1Id.toBuilder().setObjectId("not_a_valid_id").build();
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder().setPriorVersion(selectorFor(invalidId)).build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_priorVersionWrongType() {
-        Assertions.fail();
+    void updateDataset_priorVersionWrongType() throws Exception {
+
+        // Basic first version
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        var wrongTypeId = v1Id.toBuilder().setObjectType(ObjectType.SCHEMA).build();
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder().setPriorVersion(selectorFor(wrongTypeId)).build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
     void updateDataset_priorVersionNotFound() {
-        Assertions.fail();
+
+        // Look for a complete fictitious dataset, should come back as not found
+
+        var missingDataId = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(UUID.randomUUID().toString())
+                .setLatestObject(true)
+                .setLatestTag(true);
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(missingDataId)
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_tagUpdateInvalid() {
-        Assertions.fail();
+    void updateDataset_tagUpdateInvalid() throws Exception {
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        var invalidTagUpdate = TagUpdate.newBuilder()
+                .setAttrName("£!£$%£$%")
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue("some_value"))
+                .build();
+
+        var updateRequest = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .addTagUpdates(invalidTagUpdate)
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, updateRequest);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_tagUpdateReserved() {
-        Assertions.fail();
+    void updateDataset_tagUpdateReserved() throws Exception {
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        var reservedAttrs = List.of("trac_data_attr", "_data_attr", "__data_attr");
+
+        for (var attrName : reservedAttrs) {
+
+            var invalidTagUpdate = TagUpdate.newBuilder()
+                    .setAttrName(attrName)
+                    .setOperation(TagOperation.CREATE_ATTR)
+                    .setValue(MetadataCodec.encodeValue("some_value"))
+                    .build();
+
+            var updateRequest = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                    .setPriorVersion(selectorFor(v1Id))
+                    .addTagUpdates(invalidTagUpdate)
+                    .build();
+
+            var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, updateRequest);
+            waitFor(TEST_TIMEOUT, updateDataset);
+            var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+            Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+        }
+    }
+
+    @Test @Disabled("Required error handling not implemented yet in metadata service")
+    void updateDataset_tagUpdateAttrNotFound() throws Exception {
+
+        // Attempt to replace an attr that doesn't already exist
+        // Report this as failed_precondition, rather than not_found
+        // not_found would imply the file object/version itself was missing
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        var invalidTagUpdate = TagUpdate.newBuilder()
+                .setAttrName("an_attr_that_is_not_set")
+                .setOperation(TagOperation.REPLACE_ATTR)
+                .setValue(MetadataCodec.encodeValue("some_value"))
+                .build();
+
+        var updateRequest = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .addTagUpdates(invalidTagUpdate)
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, updateRequest);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_tagUpdateAttrNotFound() {
-        Assertions.fail();
-    }
+    void updateDataset_schemaOmitted() throws Exception {
 
-    @Test
-    void updateDataset_schemaOmitted() {
-        Assertions.fail();
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .clearSchemaDefinition()
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
@@ -439,23 +667,81 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void updateDataset_formatBlank() {
-        Assertions.fail();
+    void updateDataset_formatBlank() throws Exception {
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .clearFormat()
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_formatInvalid() {
-        Assertions.fail();
+    void updateDataset_formatInvalid() throws Exception {
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setFormat("|/.,¬!£$$£^")
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_formatNotAvailable() {
-        Assertions.fail();
+    void updateDataset_formatNotAvailable() throws Exception {
+
+        // No format plugin available for the requested upload format
+        // Should be reported as unimplemented
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setFormat("audio/mpeg")
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.UNIMPLEMENTED, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_formatDoesNotMatchData() {
-        Assertions.fail();
+    void updateDataset_formatDoesNotMatchData() throws Exception {
+
+        // Format code does not match the supplied data (but is a supported format)
+        // This should be detected as data corruption, and reported back as DATA_LOSS
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setFormat("application/vnd.apache.arrow.stream")
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.DATA_LOSS, error.getStatus().getCode());
     }
 
     @Test
@@ -471,12 +757,12 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     @Test
     void readDataset_ok_data() throws Exception {
 
-        // Create an object to use as the prior, so errors will not come because the prior does not exist
-        var priorResult = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
-        waitFor(TEST_TIMEOUT, priorResult);
-        var priorId = resultOf(priorResult);
+        // Create an object to read
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var dataId = resultOf(createDataset);
 
-        var request = readRequest(priorId);
+        var request = readRequest(dataId);
         var readDataset = DataApiTestHelpers.serverStreaming(dataClient::readDataset, request, execContext);
         waitFor(TEST_TIMEOUT, readDataset);
         var responseList = resultOf(readDataset);
@@ -512,13 +798,88 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void readDataset_ok_metadata() {
-        Assertions.fail();
+    void readDataset_ok_metadata() throws Exception {
+
+        // Create an object to read
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var dataId = resultOf(createDataset);
+
+        var request = readRequest(dataId);
+        var readDataset = DataApiTestHelpers.serverStreaming(dataClient::readDataset, request, execContext);
+        waitFor(TEST_TIMEOUT, readDataset);
+        var responseList = resultOf(readDataset);
+
+        // First response message should contain the full schema
+        var response0 = responseList.get(0);
+        Assertions.assertEquals(BASIC_SCHEMA, response0.getSchema());
+
+        // No subsequent messages should contain any metadata
+        for (var i = 1; i < responseList.size(); i++) {
+            var msg = responseList.get(i);
+            Assertions.assertFalse(msg.hasSchema());
+        }
     }
 
     @Test
-    void readDataset_ok_externalSchema() {
-        Assertions.fail();
+    void readDataset_ok_externalSchema() throws Exception {
+
+        // Create external schema
+        var schemaRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder().setObjectType(ObjectType.SCHEMA)
+                .setSchema(BASIC_SCHEMA)).build();
+
+        var createSchema = Futures.javaFuture(metaClient.createObject(schemaRequest));
+        waitFor(TEST_TIMEOUT, createSchema);
+        var schemaId = resultOf(createSchema);
+
+        // Create a dataset using the schema
+        var createRequest = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchemaId(selectorFor(schemaId))
+                .build();
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, createRequest);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var dataId = resultOf(createDataset);
+
+        var request = readRequest(dataId);
+        var readDataset = DataApiTestHelpers.serverStreaming(dataClient::readDataset, request, execContext);
+        waitFor(TEST_TIMEOUT, readDataset);
+        var responseList = resultOf(readDataset);
+
+        // First response message should contain the full schema
+        // Even though the schema is an external object, its schema def is still included in the read response
+
+        var response0 = responseList.get(0);
+        Assertions.assertEquals(BASIC_SCHEMA, response0.getSchema());
+
+        // Now also check the data
+
+        var content = responseList.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
+
+        var originalData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(BASIC_CSV_CONTENT));
+        var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
+
+        Assertions.assertEquals(originalData.size(), responseData.size());
+
+        for (var col = 0; col < originalData.size(); col++) {
+            Assertions.assertEquals(originalData.get(col).size(), responseData.get(col).size());
+            for (var row = 0; row < originalData.get(col).size(); row++) {
+
+                var originalVal = originalData.get(col).get(row);
+                var responseVal = responseData.get(col).get(row);
+
+                // Decimals must be checked using compareTo, equals() does not handle equal values with different scale
+                if (originalVal instanceof BigDecimal)
+                    Assertions.assertEquals(0, ((BigDecimal) originalVal).compareTo((BigDecimal) responseVal));
+                else
+                    Assertions.assertEquals(originalVal, responseVal);
+            }
+        }
     }
 
     @Test
