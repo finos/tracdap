@@ -16,12 +16,9 @@
 
 package com.accenture.trac.common.validation.fixed;
 
-import com.accenture.trac.metadata.DatetimeValue;
-import com.accenture.trac.metadata.TagSelector;
-import com.accenture.trac.metadata.TagUpdate;
+import com.accenture.trac.metadata.*;
 import com.accenture.trac.common.validation.core.ValidationContext;
 import com.google.protobuf.Descriptors;
-import com.google.protobuf.ProtocolMessageEnum;
 
 
 public class MetadataValidator {
@@ -31,9 +28,12 @@ public class MetadataValidator {
     // Requires generic handling of all message, enum and primitive types, as well as the TRAC type system
 
     private static final Descriptors.Descriptor TAG_UPDATE;
+    private static final Descriptors.FieldDescriptor TU_OPERATION;
     private static final Descriptors.FieldDescriptor TU_ATTR_NAME;
+    private static final Descriptors.FieldDescriptor TU_VALUE;
 
     private static final Descriptors.Descriptor TAG_SELECTOR;
+    private static final Descriptors.FieldDescriptor TS_OBJECT_TYPE;
     private static final Descriptors.FieldDescriptor TS_OBJECT_ID;
     private static final Descriptors.FieldDescriptor TS_LATEST_OBJECT;
     private static final Descriptors.FieldDescriptor TS_OBJECT_VERSION;
@@ -44,15 +44,15 @@ public class MetadataValidator {
     private static final Descriptors.OneofDescriptor TS_OBJECT_CRITERIA;
     private static final Descriptors.OneofDescriptor TS_TAG_CRITERIA;
 
-    private static final Descriptors.Descriptor DATETIME_VALUE;
-    private static final Descriptors.FieldDescriptor DTV_ISO_DATETIME;
-
     static {
 
         TAG_UPDATE = TagUpdate.getDescriptor();
+        TU_OPERATION = field(TAG_UPDATE, TagUpdate.OPERATION_FIELD_NUMBER);
         TU_ATTR_NAME = field(TAG_UPDATE, TagUpdate.ATTRNAME_FIELD_NUMBER);
+        TU_VALUE = field(TAG_UPDATE, TagUpdate.VALUE_FIELD_NUMBER);
 
         TAG_SELECTOR = TagSelector.getDescriptor();
+        TS_OBJECT_TYPE = field(TAG_SELECTOR, TagSelector.OBJECTTYPE_FIELD_NUMBER);
         TS_OBJECT_ID = field(TAG_SELECTOR, TagSelector.OBJECTID_FIELD_NUMBER);
         TS_LATEST_OBJECT = field(TAG_SELECTOR, TagSelector.LATESTOBJECT_FIELD_NUMBER);
         TS_OBJECT_VERSION = field(TAG_SELECTOR, TagSelector.OBJECTVERSION_FIELD_NUMBER);
@@ -62,9 +62,6 @@ public class MetadataValidator {
         TS_TAG_ASOF = field(TAG_SELECTOR, TagSelector.TAGASOF_FIELD_NUMBER);
         TS_OBJECT_CRITERIA = TS_OBJECT_VERSION.getContainingOneof();
         TS_TAG_CRITERIA = TS_TAG_VERSION.getContainingOneof();
-
-        DATETIME_VALUE = DatetimeValue.getDescriptor();
-        DTV_ISO_DATETIME = field(DATETIME_VALUE, DatetimeValue.ISODATETIME_FIELD_NUMBER);
     }
 
     static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
@@ -74,25 +71,44 @@ public class MetadataValidator {
 
     public static ValidationContext validateTagUpdate(TagUpdate msg, ValidationContext ctx) {
 
-        // TODO: Incomplete validation for TagUpdate
-        // Requires enum validation for TagOperation
-        // Also requires full recursive validation of TRAC Values and TypeDescriptors
-
-        ctx = ctx.push(TU_ATTR_NAME)
+        ctx = ctx.push(TU_OPERATION)
                 .apply(Validation::required)
-                .apply(Validation::identifier)
-                .apply(Validation::notTracReserved)
+                .apply(Validation::recognizedEnum, TagOperation.class)
                 .pop();
+
+        if (msg.getOperation() == TagOperation.CLEAR_ALL_ATTR) {
+
+            ctx = ctx.push(TU_ATTR_NAME)
+                    .apply(Validation::omitted)
+                    .pop();
+
+            ctx = ctx.push(TU_VALUE)
+                    .apply(Validation::omitted)
+                    .pop();
+        }
+        else {
+
+            ctx = ctx.push(TU_ATTR_NAME)
+                    .apply(Validation::required)
+                    .apply(Validation::identifier)
+                    .apply(Validation::notTracReserved)
+                    .pop();
+
+            // TODO: Recursive validation of TRAC Values and TypeDescriptors in TypeSystemValidator
+        }
 
         return ctx;
     }
 
     public static ValidationContext validateTagSelector(TagSelector msg, ValidationContext ctx) {
 
-        // TODO: Incomplete validation for TagSelector
-        // Requires enum validation for ObjectType
-        // There is an issue where protobuf returns EnumValueDescriptor for the field value
-        // A generic way is needed to convert these into the actual enum type
+        // The "required" validation for enums will fail for ordinal = 0
+        // For object types, this is OBJECT_TYPE_NOT_SET
+
+        ctx = ctx.push(TS_OBJECT_TYPE)
+                .apply(Validation::required)
+                .apply(Validation::recognizedEnum, ObjectType.class)
+                .pop();
 
         ctx = ctx.push(TS_OBJECT_ID)
                 .apply(Validation::required)
@@ -103,47 +119,15 @@ public class MetadataValidator {
                 .apply(Validation::required)
                 .applyIf(Validation::optionalTrue, Boolean.class, msg.hasField(TS_LATEST_OBJECT))
                 .applyIf(Validation::positive, Integer.class, msg.hasField(TS_OBJECT_VERSION))
-                .applyIf(MetadataValidator::datetimeValue, DatetimeValue.class, msg.hasField(TS_OBJECT_ASOF))
+                .applyIf(TypeSystemValidator::datetimeValue, DatetimeValue.class, msg.hasField(TS_OBJECT_ASOF))
                 .pop();
 
         ctx = ctx.pushOneOf(TS_TAG_CRITERIA)
                 .apply(Validation::required)
                 .applyIf(Validation::optionalTrue, Boolean.class, msg.hasField(TS_LATEST_TAG))
                 .applyIf(Validation::positive, Integer.class, msg.hasField(TS_TAG_VERSION))
-                .applyIf(MetadataValidator::datetimeValue, DatetimeValue.class, msg.hasField(TS_TAG_ASOF))
+                .applyIf(TypeSystemValidator::datetimeValue, DatetimeValue.class, msg.hasField(TS_TAG_ASOF))
                 .pop();
-
-        return ctx;
-    }
-
-    public static ValidationContext datetimeValue(DatetimeValue msg, ValidationContext ctx) {
-
-        return ctx.push(DTV_ISO_DATETIME)
-                .apply(Validation::required)
-                .apply(Validation::isoDatetime)
-                .pop();
-    }
-
-    public ValidationContext validateEnum(
-            ProtocolMessageEnum enum_,
-            ValidationContext ctx) {
-
-        try {
-            var value = enum_.getNumber();
-
-            if (value == 0) {
-
-                var typeName = enum_.getDescriptorForType().getName();
-                var message = String.format("Value not set for [%s]", typeName);
-                return ctx.error(message);
-            }
-        }
-        catch (IllegalStateException e) {
-
-            var typeName = enum_.getDescriptorForType().getName();
-            var message = String.format("Invalid value for [%s]", typeName);
-            return ctx.error(message);
-        }
 
         return ctx;
     }

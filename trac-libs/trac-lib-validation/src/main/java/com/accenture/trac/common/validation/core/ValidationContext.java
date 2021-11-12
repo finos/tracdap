@@ -17,8 +17,10 @@
 package com.accenture.trac.common.validation.core;
 
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.metadata.BasicType;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
+import com.google.protobuf.ProtocolMessageEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -157,6 +159,14 @@ public class ValidationContext {
         return apply(validator, String.class);
     }
 
+    public <T extends ProtocolMessageEnum>
+    void blah(T obj) {
+
+
+
+    }
+
+    @SuppressWarnings({"unchecked", "rawTypes"})
     public <T>
     ValidationContext apply(ValidationFunction.Typed<T> validator, Class<T> targetClass) {
 
@@ -165,22 +175,38 @@ public class ValidationContext {
 
         var obj = location.peek().target();
 
+        // Simple case - obj is an instance of the expected target class
+
+        if (targetClass.isInstance(obj)) {
+            var target = (T) obj;
+            return validator.apply(target, this);
+        }
+
+        // Protobuf stores enum values as EnumValueDescriptor objects
+        // So, special handling is needed for enums
+
+        if (Enum.class.isAssignableFrom(targetClass)) {
+
+            if (obj instanceof Descriptors.EnumValueDescriptor) {
+
+                var valueDesc = (Descriptors.EnumValueDescriptor) obj;
+                var enumType = (Class<? extends Enum>) targetClass;
+                var enumVal = Enum.valueOf(enumType, valueDesc.getName());
+
+                return validator.apply((T) enumVal, this);
+            }
+        }
+
+        // If obj does not match the expected target type, blow up the validation process
+
         // Type mis-match errors should be detected during development, otherwise the validator won't run
         // In the event of a type mis-match at run time, blow up the validator!
         // I.e. report as an unexpected internal error, validation cannot be completed.
 
-        if (!targetClass.isInstance(obj)) {
+        log.error("Validator type mismatch (this is a bug): expected [{}], got [{}]", targetClass, obj.getClass());
+        log.error("(Expected target class is specified in ctx.apply())");
 
-            log.error("Validator type mismatch (this is a bug): expected [{}], got [{}]", targetClass, obj.getClass());
-            log.error("(Expected target class is specified in ctx.apply())");
-
-            throw new EUnexpected();
-        }
-
-        @SuppressWarnings("unchecked")
-        var target = (T) obj;
-
-        return validator.apply(target, this);
+        throw new EUnexpected();
     }
 
     public ValidationContext apply(ValidationFunction.Version<Object> validator) {
@@ -245,7 +271,7 @@ public class ValidationContext {
     }
 
     public <TMsg extends Message>
-    ValidationContext applyTypedList(ValidationFunction.Typed<TMsg> validator, Class<TMsg> msgClass) {
+    ValidationContext applyList(ValidationFunction.Typed<TMsg> validator, Class<TMsg> msgClass) {
 
         if (done())
             return this;

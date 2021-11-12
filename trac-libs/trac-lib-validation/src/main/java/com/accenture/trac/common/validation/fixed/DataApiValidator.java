@@ -21,6 +21,7 @@ import com.accenture.trac.api.DataWriteRequest;
 import com.accenture.trac.api.FileReadRequest;
 import com.accenture.trac.api.FileWriteRequest;
 import com.accenture.trac.metadata.ObjectType;
+import com.accenture.trac.metadata.SchemaDefinition;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.metadata.TagUpdate;
 import com.accenture.trac.common.validation.core.ValidationContext;
@@ -120,14 +121,14 @@ public class DataApiValidator {
                 .pop();
 
         ctx = ctx.push(DWR_TAG_UPDATES)
-                .applyTypedList(MetadataValidator::validateTagUpdate, TagUpdate.class)
+                .applyList(MetadataValidator::validateTagUpdate, TagUpdate.class)
                 .pop();
 
         ctx = ctx.pushOneOf(DWR_SCHEMA_DEFINITION)
                 .apply(Validation::required)
                 .applyIf(MetadataValidator::validateTagSelector, TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
                 .applyIf(Validation.selectorType(ObjectType.SCHEMA), TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
-                // TODO: Validate embedded schemas
+                .applyIf(SchemaValidator::schema, SchemaDefinition.class, msg.hasField(DWR_SCHEMA))
                 .pop();
 
         ctx = ctx.push(DWR_FORMAT)
@@ -191,7 +192,7 @@ public class DataApiValidator {
                 .pop();
 
         ctx = ctx.push(FWR_TAG_UPDATES)
-                .applyTypedList(MetadataValidator::validateTagUpdate, TagUpdate.class)
+                .applyList(MetadataValidator::validateTagUpdate, TagUpdate.class)
                 .pop();
 
         ctx = ctx.push(FWR_NAME)
