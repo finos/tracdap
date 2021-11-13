@@ -24,7 +24,6 @@ import com.accenture.trac.test.data.SampleDataFormats;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -1057,7 +1056,6 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     @Test
     void readDataset_ok_latestVersion() throws Exception {
 
-
         // Basic first version
         var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createV1);
@@ -1115,13 +1113,137 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void readDataset_ok_explicitVersion() {
-        Assertions.fail();
+    void readDataset_ok_explicitVersion() throws Exception {
+
+        // Basic first version
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        // Now update the dataset to V2
+
+        var updateRequest = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, updateRequest);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var v2Id = resultOf(updateDataset);
+
+        // Explicitly read V2 version
+
+        var v2Selector = selectorFor(v2Id);
+        var v2Request = readRequest(v2Selector);
+        var readDataset2 = DataApiTestHelpers.serverStreaming(dataClient::readDataset, v2Request, execContext);
+        waitFor(TEST_TIMEOUT, readDataset2);
+        var responseList2 = resultOf(readDataset2);
+
+        var response0_2 = responseList2.get(0);
+        var content2 = responseList2.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
+
+        var originalData2 = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA_V2, List.of(BASIC_CSV_CONTENT_V2));
+        var responseData2 = DataApiTestHelpers.decodeCsv(response0_2.getSchema(), List.of(content2));
+
+        Assertions.assertEquals(BASIC_SCHEMA_V2, response0_2.getSchema());
+        assertDataEqual(originalData2, responseData2);
+
+        // Explicitly read V1 version, should be unchanged
+
+        var v1Selector = selectorFor(v1Id);
+        var v1Request = readRequest(v1Selector);
+        var readDataset = DataApiTestHelpers.serverStreaming(dataClient::readDataset, v1Request, execContext);
+        waitFor(TEST_TIMEOUT, readDataset);
+        var responseList = resultOf(readDataset);
+
+        var response0 = responseList.get(0);
+        var content = responseList.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
+
+        var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA, List.of(BASIC_CSV_CONTENT));
+        var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
+
+        Assertions.assertEquals(BASIC_SCHEMA, response0.getSchema());
+        assertDataEqual(originalData, responseData);
     }
 
     @Test
-    void readDataset_ok_versionAsOf() {
-        Assertions.fail();
+    void readDataset_ok_versionAsOf() throws Exception {
+
+        // Basic first version
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        // V1 timestamp
+
+        Thread.sleep(10);
+        var v1Timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+        Thread.sleep(10);
+
+        // Now update the dataset to V2
+
+        var updateRequest = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, updateRequest);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var v2Id = resultOf(updateDataset);
+
+        // V2 timestamp
+
+        Thread.sleep(10);
+        var v2Timestamp = Instant.now().atOffset(ZoneOffset.UTC);
+        Thread.sleep(10);
+
+        // Read V2 by as-of time
+
+        var v2Selector = selectorFor(v2Id).toBuilder()
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v2Timestamp))
+                .setLatestTag(true)
+                .build();
+
+        var v2Request = readRequest(v2Selector);
+        var readDataset2 = DataApiTestHelpers.serverStreaming(dataClient::readDataset, v2Request, execContext);
+        waitFor(TEST_TIMEOUT, readDataset2);
+        var responseList2 = resultOf(readDataset2);
+
+        var response0_2 = responseList2.get(0);
+        var content2 = responseList2.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
+
+        var originalData2 = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA_V2, List.of(BASIC_CSV_CONTENT_V2));
+        var responseData2 = DataApiTestHelpers.decodeCsv(response0_2.getSchema(), List.of(content2));
+
+        Assertions.assertEquals(BASIC_SCHEMA_V2, response0_2.getSchema());
+        assertDataEqual(originalData2, responseData2);
+
+        // Read V1 by as-of time
+
+        var v1Selector = selectorFor(v1Id).toBuilder()
+                .setObjectAsOf(MetadataCodec.encodeDatetime(v1Timestamp))
+                .setLatestTag(true)
+                .build();
+
+        var v1Request = readRequest(v1Selector);
+        var readDataset = DataApiTestHelpers.serverStreaming(dataClient::readDataset, v1Request, execContext);
+        waitFor(TEST_TIMEOUT, readDataset);
+        var responseList = resultOf(readDataset);
+
+        var response0 = responseList.get(0);
+        var content = responseList.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
+
+        var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA, List.of(BASIC_CSV_CONTENT));
+        var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
+
+        Assertions.assertEquals(BASIC_SCHEMA, response0.getSchema());
+        assertDataEqual(originalData, responseData);
     }
 
     @Test
