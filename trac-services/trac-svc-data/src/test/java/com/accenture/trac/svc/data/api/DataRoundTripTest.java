@@ -83,8 +83,8 @@ class DataRoundTripTest extends DataApiTestBase {
         }
 
         var mimeType = "application/vnd.apache.arrow.stream";
-        roundTripTest(writeChannel.getChunks(), mimeType, mimeType, this::decodeArrow, BASIC_TEST_DATA, true);
-        roundTripTest(writeChannel.getChunks(), mimeType, mimeType, this::decodeArrow, BASIC_TEST_DATA, false);
+        roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, BASIC_TEST_DATA, true);
+        roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, BASIC_TEST_DATA, false);
     }
 
     @Test
@@ -226,53 +226,6 @@ class DataRoundTripTest extends DataApiTestBase {
         var objDef = resultOf(tag).getDefinition();
 
         return defTypeFunc.apply(objDef);
-    }
-
-    private List<Vector<Object>> decodeArrow(SchemaDefinition schema, List<ByteString> data) {
-
-        var allocator = new RootAllocator();  // TODO: Pass in an allocator
-
-        var allData = data.stream().reduce(ByteString.EMPTY, ByteString::concat);
-
-        try (var stream = new ByteArrayInputStream(allData.toByteArray());
-             var reader = new ArrowStreamReader(stream, allocator)) {
-
-            var rtBatch = reader.getVectorSchemaRoot();
-            var rtSchema = rtBatch.getSchema();
-            var nCols = rtSchema.getFields().size();
-
-            var result = new ArrayList<Vector<Object>>(nCols);
-            for(var j = 0; j < nCols; j++)
-                result.add(j, new Vector<>());
-
-            while (reader.loadNextBatch()) {
-
-                for (int j = 0; j < nCols; j++) {
-
-                    var resultCol = result.get(j);
-                    var arrowCol = rtBatch.getVector(j);
-
-                    for (int i = 0; i < rtBatch.getRowCount(); i++) {
-                        var arrowValue = arrowCol.getObject(i);
-                        if (arrowValue instanceof Text)
-                            resultCol.add(arrowValue.toString());
-                        else if (arrowCol.getMinorType() == Types.MinorType.DATEDAY)
-                            resultCol.add(LocalDate.ofEpochDay((int) arrowValue));
-                        else
-                            resultCol.add(arrowValue);
-                    }
-                }
-            }
-
-            return result;
-        }
-        catch (Exception e) {
-
-            if (e instanceof RuntimeException)
-                throw (RuntimeException) e;
-            else
-                throw new RuntimeException(e);
-        }
     }
 
     private static class ChunkChannel implements WritableByteChannel {

@@ -22,6 +22,7 @@ import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.concurrent.Flows;
+import com.accenture.trac.common.util.ByteSeekableChannel;
 import com.accenture.trac.common.util.GrpcStreams;
 import com.accenture.trac.metadata.BasicType;
 import com.accenture.trac.metadata.SchemaDefinition;
@@ -32,11 +33,20 @@ import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvParser;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
+import io.netty.buffer.Unpooled;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.ipc.ArrowFileReader;
+import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.apache.arrow.vector.ipc.SeekableReadChannel;
+import org.apache.arrow.vector.types.Types;
+import org.apache.arrow.vector.util.Text;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -131,6 +141,115 @@ class DataApiTestHelpers {
                 .build();
     }
 
+    public static List<Vector<Object>> decodeArrowStream(SchemaDefinition schema, List<ByteString> data) {
+
+        var allocator = new RootAllocator();  // TODO: Pass in an allocator
+
+        var allData = data.stream().reduce(ByteString.EMPTY, ByteString::concat);
+
+        try (var stream = new ByteArrayInputStream(allData.toByteArray());
+             var reader = new ArrowStreamReader(stream, allocator)) {
+
+            var rtBatch = reader.getVectorSchemaRoot();
+            var rtSchema = rtBatch.getSchema();
+            var nCols = rtSchema.getFields().size();
+
+            var result = new ArrayList<Vector<Object>>(nCols);
+            for(var j = 0; j < nCols; j++)
+                result.add(j, new Vector<>());
+
+            while (reader.loadNextBatch()) {
+
+                for (int j = 0; j < nCols; j++) {
+
+                    var resultCol = result.get(j);
+                    var arrowCol = rtBatch.getVector(j);
+
+                    for (int i = 0; i < rtBatch.getRowCount(); i++) {
+                        var arrowValue = arrowCol.getObject(i);
+                        if (arrowValue instanceof Text)
+                            resultCol.add(arrowValue.toString());
+                        else if (arrowCol.getMinorType() == Types.MinorType.DATEDAY)
+                            resultCol.add(LocalDate.ofEpochDay((int) arrowValue));
+                        else
+                            resultCol.add(arrowValue);
+                    }
+                }
+            }
+
+            return result;
+        }
+        catch (Exception e) {
+
+            if (e instanceof RuntimeException)
+                throw (RuntimeException) e;
+            else
+                throw new RuntimeException(e);
+        }
+    }
+
+    public static List<Vector<Object>> decodeArrowFile(SchemaDefinition schema, List<ByteString> data) {
+
+        var allocator = new RootAllocator();  // TODO: Pass in an allocator
+
+        var allData = data.stream().reduce(ByteString.EMPTY, ByteString::concat);
+
+        try (var stream = new ByteSeekableChannel(Unpooled.wrappedBuffer(allData.toByteArray()))) {
+
+            return decodeArrowFile(schema, stream);
+        }
+        catch (Exception e) {
+
+            if (e instanceof RuntimeException)
+                throw (RuntimeException) e;
+            else
+                throw new RuntimeException(e);
+        }
+    }
+
+    public static List<Vector<Object>> decodeArrowFile(SchemaDefinition schema, SeekableByteChannel channel) {
+
+        var allocator = new RootAllocator();  // TODO: Pass in an allocator
+
+        try (var reader = new ArrowFileReader(channel, allocator)) {
+
+            var rtBatch = reader.getVectorSchemaRoot();
+            var rtSchema = rtBatch.getSchema();
+            var nCols = rtSchema.getFields().size();
+
+            var result = new ArrayList<Vector<Object>>(nCols);
+            for(var j = 0; j < nCols; j++)
+                result.add(j, new Vector<>());
+
+            while (reader.loadNextBatch()) {
+
+                for (int j = 0; j < nCols; j++) {
+
+                    var resultCol = result.get(j);
+                    var arrowCol = rtBatch.getVector(j);
+
+                    for (int i = 0; i < rtBatch.getRowCount(); i++) {
+                        var arrowValue = arrowCol.getObject(i);
+                        if (arrowValue instanceof Text)
+                            resultCol.add(arrowValue.toString());
+                        else if (arrowCol.getMinorType() == Types.MinorType.DATEDAY)
+                            resultCol.add(LocalDate.ofEpochDay((int) arrowValue));
+                        else
+                            resultCol.add(arrowValue);
+                    }
+                }
+            }
+
+            return result;
+        }
+        catch (Exception e) {
+
+            if (e instanceof RuntimeException)
+                throw (RuntimeException) e;
+            else
+                throw new RuntimeException(e);
+        }
+    }
 
     public static List<Vector<Object>> decodeCsv(SchemaDefinition schema, List<ByteString> data) {
 

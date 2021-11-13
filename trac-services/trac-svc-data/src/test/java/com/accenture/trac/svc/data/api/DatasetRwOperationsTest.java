@@ -29,11 +29,14 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.Vector;
+import java.util.stream.Collectors;
 
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
@@ -100,12 +103,57 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     @Test
     void createDataset_ok_data() throws Exception {
 
-        // Basic create call
+        // Basic create dataset call
+
         var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createDataset);
         var dataId = resultOf(createDataset);
 
-        Assertions.fail();
+        // Get data and storage def
+
+        var readDataDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(dataId)));
+        waitFor(TEST_TIMEOUT, readDataDef);
+        var dataTag = resultOf(readDataDef);
+        var dataDef = dataTag.getDefinition().getData();
+
+        var readStorageDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(dataDef.getStorageId())));
+        waitFor(TEST_TIMEOUT, readStorageDef);
+        var storageTag = resultOf(readStorageDef);
+        var storageDef = storageTag.getDefinition().getStorage();
+
+        // Get the storage path out of the metadata
+
+        var rootPartKey = "PART_ROOT";  // TODO: Use a defined constant
+        var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
+        var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
+
+        var storageRoot = tempDir.resolve(STORAGE_ROOT_DIR);
+        var copyDir = storageRoot.resolve(copy.getStoragePath());
+
+        var copyFiles = Files.walk(copyDir)
+                .filter(p -> !p.equals(copyDir))  // Do not include the copyDir in the file list
+                .collect(Collectors.toList());
+
+        // Data should be stored in one piece (even if chunking is implemented, dataset is too small to chunk up)
+
+        Assertions.assertEquals(1, copyFiles.size());
+
+        var copyFile = copyFiles.get(0);
+
+        // Check the file exists
+
+        Assertions.assertTrue(Files.isRegularFile(copyFile));
+        Assertions.assertTrue(Files.size(copyFile) > 0);
+
+        // Decode data directly from the file in storage and check against the original
+        // For this test case, data is stored in arrow file format
+
+        var channel = Files.newByteChannel(copyFile, StandardOpenOption.READ);
+        var storedData = DataApiTestHelpers.decodeArrowFile(dataDef.getSchema(), channel);
+
+        var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA, List.of(BASIC_CSV_CONTENT));
+
+        assertDataEqual(originalData, storedData);
     }
 
     @Test
@@ -127,7 +175,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.SCHEMA)
                 .setDefinition(ObjectDefinition.newBuilder().setObjectType(ObjectType.SCHEMA)
-                        .setSchema(BASIC_SCHEMA)).build();
+                .setSchema(BASIC_SCHEMA)).build();
 
         var createSchema = Futures.javaFuture(metaClient.createObject(schemaRequest));
         waitFor(TEST_TIMEOUT, createSchema);
@@ -142,7 +190,53 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createDataset);
         var dataId = resultOf(createDataset);
 
-        Assertions.fail();
+        // Get data and storage def
+
+        var readDataDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(dataId)));
+        waitFor(TEST_TIMEOUT, readDataDef);
+        var dataTag = resultOf(readDataDef);
+        var dataDef = dataTag.getDefinition().getData();
+
+        var readStorageDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(dataDef.getStorageId())));
+        waitFor(TEST_TIMEOUT, readStorageDef);
+        var storageTag = resultOf(readStorageDef);
+        var storageDef = storageTag.getDefinition().getStorage();
+
+        // Get the storage path out of the metadata
+
+        var rootPartKey = "PART_ROOT";  // TODO: Use a defined constant
+        var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
+        var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
+
+        var storageRoot = tempDir.resolve(STORAGE_ROOT_DIR);
+        var copyDir = storageRoot.resolve(copy.getStoragePath());
+
+        var copyFiles = Files.walk(copyDir)
+                .filter(p -> !p.equals(copyDir))  // Do not include the copyDir in the file list
+                .collect(Collectors.toList());
+
+        // Data should be stored in one piece (even if chunking is implemented, dataset is too small to chunk up)
+
+        Assertions.assertEquals(1, copyFiles.size());
+
+        var copyFile = copyFiles.get(0);
+
+        // Check the file exists
+
+        Assertions.assertTrue(Files.isRegularFile(copyFile));
+        Assertions.assertTrue(Files.size(copyFile) > 0);
+
+        // Decode data directly from the file in storage and check against the original
+        // For this test case, data is stored in arrow file format
+
+        var channel = Files.newByteChannel(copyFile, StandardOpenOption.READ);
+        var storedData = DataApiTestHelpers.decodeArrowFile(dataDef.getSchema(), channel);
+
+        var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA, List.of(BASIC_CSV_CONTENT));
+
+        assertDataEqual(originalData, storedData);
+
+        // TODO: External schema metadata check
     }
 
     @Test
@@ -405,8 +499,71 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Test
-    void updateDataset_ok_data() {
-        Assertions.fail();
+    void updateDataset_ok_data() throws Exception {
+
+        // Create V1 dataset
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        // Create V2 dataset
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var v2Id = resultOf(updateDataset);
+
+        // Now check the V2 data
+
+        // Get data and storage def
+
+        var readDataDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(v2Id)));
+        waitFor(TEST_TIMEOUT, readDataDef);
+        var dataTag = resultOf(readDataDef);
+        var dataDef = dataTag.getDefinition().getData();
+
+        var readStorageDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(dataDef.getStorageId())));
+        waitFor(TEST_TIMEOUT, readStorageDef);
+        var storageTag = resultOf(readStorageDef);
+        var storageDef = storageTag.getDefinition().getStorage();
+
+        // Get the storage path out of the metadata
+
+        var rootPartKey = "PART_ROOT";  // TODO: Use a defined constant
+        var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
+        var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
+
+        var storageRoot = tempDir.resolve(STORAGE_ROOT_DIR);
+        var copyDir = storageRoot.resolve(copy.getStoragePath());
+
+        var copyFiles = Files.walk(copyDir)
+                .filter(p -> !p.equals(copyDir))  // Do not include the copyDir in the file list
+                .collect(Collectors.toList());
+
+        // Data should be stored in one piece (even if chunking is implemented, dataset is too small to chunk up)
+
+        Assertions.assertEquals(1, copyFiles.size());
+
+        var copyFile = copyFiles.get(0);
+
+        // Check the file exists
+
+        Assertions.assertTrue(Files.isRegularFile(copyFile));
+        Assertions.assertTrue(Files.size(copyFile) > 0);
+
+        // Decode data directly from the file in storage and check against the original
+        // For this test case, data is stored in arrow file format
+
+        var channel = Files.newByteChannel(copyFile, StandardOpenOption.READ);
+        var storedData = DataApiTestHelpers.decodeArrowFile(dataDef.getSchema(), channel);
+
+        var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA_V2, List.of(BASIC_CSV_CONTENT_V2));
+
+        assertDataEqual(originalData, storedData);
     }
 
     @Test
@@ -957,7 +1114,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
                 .map(DataReadResponse::getContent)
                 .reduce(ByteString.EMPTY, ByteString::concat);
 
-        var originalData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(BASIC_CSV_CONTENT));
+        var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA, List.of(BASIC_CSV_CONTENT));
         var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
 
         assertDataEqual(originalData, responseData);
@@ -1047,7 +1204,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
                 .map(DataReadResponse::getContent)
                 .reduce(ByteString.EMPTY, ByteString::concat);
 
-        var originalData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(BASIC_CSV_CONTENT));
+        var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA, List.of(BASIC_CSV_CONTENT));
         var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
 
         assertDataEqual(originalData, responseData);
@@ -1622,6 +1779,19 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
                 .setTenant(TEST_TENANT)
                 .setSelector(dataSelector)
                 .setFormat("text/csv")
+                .build();
+    }
+
+    static MetadataReadRequest metaReadRequest(TagHeader header) {
+
+        return metaReadRequest(selectorFor(header));
+    }
+
+    static MetadataReadRequest metaReadRequest(TagSelector selector) {
+
+        return MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(selector)
                 .build();
     }
 }
