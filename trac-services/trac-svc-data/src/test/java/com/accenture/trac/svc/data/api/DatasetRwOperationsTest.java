@@ -24,6 +24,7 @@ import com.accenture.trac.test.data.SampleDataFormats;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -33,8 +34,10 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
+import java.util.Vector;
 
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
+import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static com.accenture.trac.test.helpers.TestResourceHelpers.loadResourceAsByteString;
@@ -958,6 +961,11 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         var originalData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(BASIC_CSV_CONTENT));
         var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
 
+        assertDataEqual(originalData, responseData);
+    }
+
+    private void assertDataEqual(List<Vector<Object>> originalData, List<Vector<Object>> responseData) {
+
         Assertions.assertEquals(originalData.size(), responseData.size());
 
         for (var col = 0; col < originalData.size(); col++) {
@@ -1043,27 +1051,67 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         var originalData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(BASIC_CSV_CONTENT));
         var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
 
-        Assertions.assertEquals(originalData.size(), responseData.size());
-
-        for (var col = 0; col < originalData.size(); col++) {
-            Assertions.assertEquals(originalData.get(col).size(), responseData.get(col).size());
-            for (var row = 0; row < originalData.get(col).size(); row++) {
-
-                var originalVal = originalData.get(col).get(row);
-                var responseVal = responseData.get(col).get(row);
-
-                // Decimals must be checked using compareTo, equals() does not handle equal values with different scale
-                if (originalVal instanceof BigDecimal)
-                    Assertions.assertEquals(0, ((BigDecimal) originalVal).compareTo((BigDecimal) responseVal));
-                else
-                    Assertions.assertEquals(originalVal, responseVal);
-            }
-        }
+        assertDataEqual(originalData, responseData);
     }
 
     @Test
-    void readDataset_ok_latestVersion() {
-        Assertions.fail();
+    void readDataset_ok_latestVersion() throws Exception {
+
+
+        // Basic first version
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        // Create a request to read the latest version of the dataset
+
+        var latestSelector = selectorForLatest(v1Id);
+        var latestDataRequest = readRequest(latestSelector);
+
+        // Read latest - should return V1
+
+        var readDataset = DataApiTestHelpers.serverStreaming(dataClient::readDataset, latestDataRequest, execContext);
+        waitFor(TEST_TIMEOUT, readDataset);
+        var responseList = resultOf(readDataset);
+
+        var response0 = responseList.get(0);
+        var content = responseList.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
+
+        var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA, List.of(BASIC_CSV_CONTENT));
+        var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
+
+        Assertions.assertEquals(BASIC_SCHEMA, response0.getSchema());
+        assertDataEqual(originalData, responseData);
+
+        // Now update the dataset to V2
+
+        var updateRequest = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, updateRequest);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        Assertions.assertDoesNotThrow(() -> resultOf(updateDataset));
+
+        // Re-read the dataset with the same request object, i.e. read latest
+        // Should now return V2
+
+        var readDataset2 = DataApiTestHelpers.serverStreaming(dataClient::readDataset, latestDataRequest, execContext);
+        waitFor(TEST_TIMEOUT, readDataset2);
+        var responseList2 = resultOf(readDataset2);
+
+        var response0_2 = responseList2.get(0);
+        var content2 = responseList2.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
+
+        var originalData2 = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA_V2, List.of(BASIC_CSV_CONTENT_V2));
+        var responseData2 = DataApiTestHelpers.decodeCsv(response0_2.getSchema(), List.of(content2));
+
+        Assertions.assertEquals(BASIC_SCHEMA_V2, response0_2.getSchema());
+        assertDataEqual(originalData2, responseData2);
     }
 
     @Test
@@ -1442,6 +1490,11 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     static DataReadRequest readRequest(TagHeader dataId) {
 
         var dataSelector = selectorFor(dataId);
+
+        return readRequest(dataSelector);
+    }
+
+    static DataReadRequest readRequest(TagSelector dataSelector) {
 
         return DataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
