@@ -17,7 +17,6 @@
 package com.accenture.trac.common.validation.core;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.metadata.BasicType;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import com.google.protobuf.ProtocolMessageEnum;
@@ -220,6 +219,7 @@ public class ValidationContext {
         return validator.apply(current, prior, this);
     }
 
+    @SuppressWarnings("unchecked")
     public <T> ValidationContext apply(ValidationFunction.Version<T> validator, Class<T> targetClass) {
 
         if (done())
@@ -228,29 +228,35 @@ public class ValidationContext {
         var current = location.peek().target();
         var prior = location.peek().prior();
 
-        if (!targetClass.isInstance(prior)) {
+        if (targetClass.isInstance(prior) && targetClass.isInstance(current)) {
 
-            log.error("Validator type mismatch (this is a bug): expected [{}], got [{}]", targetClass, prior.getClass());
-            log.error("(Expected target class is specified in ctx.apply())");
+            var typedCurrent = (T) current;
+            var typedPrior = (T) prior;
 
-            throw new EUnexpected();
+            return validator.apply(typedCurrent, typedPrior, this);
         }
 
-        if (!targetClass.isInstance(current)) {
+        if (Enum.class.isAssignableFrom(targetClass)) {
 
-            log.error("Validator type mismatch (this is a bug): expected [{}], got [{}]", targetClass, current.getClass());
-            log.error("(Expected target class is specified in ctx.apply())");
+            if (current instanceof Descriptors.EnumValueDescriptor && prior instanceof Descriptors.EnumValueDescriptor) {
 
-            throw new EUnexpected();
+                var enumType = (Class<? extends Enum>) targetClass;
+
+                var currentDesc = (Descriptors.EnumValueDescriptor) current;
+                var currentVal = Enum.valueOf(enumType, currentDesc.getName());
+                var priorDesc = (Descriptors.EnumValueDescriptor) current;
+                var priorVal = Enum.valueOf(enumType, priorDesc.getName());
+
+                return validator.apply((T) currentVal, (T) priorVal, this);
+            }
         }
 
-        @SuppressWarnings("unchecked")
-        var typedCurrent = (T) current;
+        log.error("Validator type mismatch (this is a bug): expected [{}], got prior = [{}], current = [{}]",
+                targetClass, prior.getClass(), current.getClass());
 
-        @SuppressWarnings("unchecked")
-        var typedPrior = (T) prior;
+        log.error("(Expected target class is specified in ctx.apply())");
 
-        return validator.apply(typedCurrent, typedPrior, this);
+        throw new EUnexpected();
     }
 
     public ValidationContext applyIf(ValidationFunction.Basic validator, boolean condition) {

@@ -17,11 +17,13 @@
 package com.accenture.trac.common.validation;
 
 import com.accenture.trac.api.*;
+import com.accenture.trac.common.validation.version.SchemaVersionValidator;
 import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.common.validation.core.ValidationFunction;
 import com.accenture.trac.common.validation.core.ValidationKey;
 import com.accenture.trac.common.validation.fixed.DataApiValidator;
 import com.accenture.trac.common.validation.version.FileVersionValidator;
+import com.accenture.trac.metadata.SchemaDefinition;
 import com.google.protobuf.Descriptors;
 
 import java.util.HashMap;
@@ -71,6 +73,9 @@ public class ValidatorBuilder {
 
         addVersionValidator(validatorMap, FileDefinition.class, FileVersionValidator::fileVersion,
                 FileDefinition.getDescriptor());
+
+        addVersionValidator(validatorMap, SchemaDefinition.class, SchemaVersionValidator::schema,
+                SchemaDefinition.getDescriptor());
 
         return validatorMap;
     }

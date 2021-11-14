@@ -16,6 +16,7 @@
 
 package com.accenture.trac.common.validation.fixed;
 
+import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.validation.core.ValidationContext;
 import com.accenture.trac.metadata.*;
 import com.google.protobuf.Descriptors;
@@ -74,12 +75,21 @@ public class SchemaValidator {
                 .apply(Validation::recognizedEnum, SchemaType.class)
                 .pop();
 
-        var schemaType = schema.getSchemaType();
-
-        return ctx.pushOneOf(SD_SCHEMA_TYPE_DEFINITION)
+        ctx = ctx.pushOneOf(SD_SCHEMA_TYPE_DEFINITION)
                 .apply(Validation::required)
-                .applyIf(SchemaValidator::tableSchema, TableSchema.class, schemaType == SchemaType.TABLE)
                 .pop();
+
+        if (schema.getSchemaType() == SchemaType.TABLE) {
+
+            return ctx.push(SD_TABLE)
+                    .apply(SchemaValidator::tableSchema, TableSchema.class)
+                    .pop();
+        }
+        else {
+
+            // TABLE is the only schema type available at present
+            throw new EUnexpected();
+        }
     }
 
     public static ValidationContext tableSchema(TableSchema table, ValidationContext ctx) {

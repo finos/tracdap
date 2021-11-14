@@ -34,8 +34,8 @@ class RequestState {
     TagHeader fileId, priorFileId;
     TagHeader storageId, priorStorageId;
 
-    DataDefinition data, priorData;
-    SchemaDefinition schema, priorSchema;
+    DataDefinition data;
+    SchemaDefinition schema;
     FileDefinition file, priorFile;
     StorageDefinition storage, priorStorage;
     StorageCopy copy;

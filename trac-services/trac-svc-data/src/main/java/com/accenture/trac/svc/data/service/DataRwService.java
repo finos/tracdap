@@ -125,7 +125,7 @@ public class DataRwService {
 
                 // Save metadata to the metadata store
                 // This effectively "commits" the dataset by making it visible
-                .thenCompose(x -> saveMetadata(request, state));
+                .thenCompose(x -> saveMetadata(request, state, /* firstVersion = */ true));
     }
 
     public CompletionStage<TagHeader> updateDataset(
@@ -135,6 +135,7 @@ public class DataRwService {
 
         var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
         var state = new RequestState();
+        var prior = new RequestState();
 
         // Look up the requested data codec
         // If the codec is unknown the request will fail right away
@@ -144,18 +145,20 @@ public class DataRwService {
         return CompletableFuture.completedFuture(null)
 
                 // Load metadata for the dataset (DATA, STORAGE)
-                .thenCompose(x -> loadMetadata(request, state))
+                .thenCompose(x -> loadMetadata(request.getTenant(), request.getPriorVersion(), prior))
+                .thenCompose(x -> resolveSchema(request.getTenant(), prior.data, prior))
 
                 // Resolve a concrete schema to use for this save operation
                 // This may fail if it refers to missing or incompatible external objects
                 .thenCompose(x -> resolveSchema(request, state))
 
-                // Validate version increment
-                .thenAccept(x -> validator.validateVersion(state.schema, state.priorSchema))
-                .thenAccept(x -> validator.validateVersion(state.data, state.priorData))
-
                 // Build metadata objects for the dataset that will be saved
                 .thenApply(x -> buildUpdateMetadata(request, state))
+
+                // Validate schema version update
+                // No need to validate data version update here, since data RW service is creating it!
+                // Metadata service will validate the update though
+                .thenAccept(x -> validator.validateVersion(state.schema, prior.schema))
 
                 // Decode the data content stream and write it to the storage layer
                 // This is where the main data processing streams are executed
@@ -175,7 +178,7 @@ public class DataRwService {
 
                 // Save metadata to the metadata store
                 // This effectively "commits" the dataset by making it visible
-                .thenCompose(x -> saveMetadata(request, state));
+                .thenCompose(x -> saveMetadata(request, state, /* firstVersion = */ false));
 
     }
 
@@ -194,12 +197,12 @@ public class DataRwService {
         CompletableFuture.completedFuture(null)
 
                 // Load metadata for the dataset (DATA, STORAGE)
-                .thenCompose(x -> loadMetadata(request, state))
+                .thenCompose(x -> loadMetadata(request.getTenant(), request.getSelector(), state))
 
                 // Resolve a concrete schema to use for this load operation
                 // This should succeed so long as the metadata service is up,
                 // because the schema metadata was validated when the dataset was saved
-                .thenCompose(x -> resolveSchema(request, state))
+                .thenCompose(x -> resolveSchema(request.getTenant(), state.data, state))
 
                 // Select which copy of the data will be read
                 .thenAccept(x -> selectCopy(state))
@@ -219,41 +222,22 @@ public class DataRwService {
                 .exceptionally(error -> Helpers.reportError(error, schema, contentStream));
     }
 
-    private CompletionStage<Void> loadMetadata(DataReadRequest request, RequestState state) {
+    private CompletionStage<Void> loadMetadata(String tenant, TagSelector dataSelector, RequestState state) {
 
         return CompletableFuture.completedFuture(0)
 
-                .thenApply(x -> requestForSelector(request.getTenant(), request.getSelector()))
+                .thenApply(x -> requestForSelector(tenant, dataSelector))
                 .thenCompose(req -> Futures.javaFuture(metaApi.readObject(req)))
                 .thenAccept(tag -> {
                     state.dataId = tag.getHeader();
                     state.data = tag.getDefinition().getData();
                 })
 
-                .thenApply(x -> requestForSelector(request.getTenant(), state.data.getStorageId()))
+                .thenApply(x -> requestForSelector(tenant, state.data.getStorageId()))
                 .thenCompose(req -> Futures.javaFuture(metaApi.readObject(req)))
                 .thenAccept(tag -> {
                     state.storageId = tag.getHeader();
                     state.storage = tag.getDefinition().getStorage();
-                });
-    }
-
-    private CompletionStage<Void> loadMetadata(DataWriteRequest request, RequestState state) {
-
-        return CompletableFuture.completedFuture(0)
-
-                .thenApply(x -> requestForSelector(request.getTenant(), request.getPriorVersion()))
-                .thenCompose(req -> Futures.javaFuture(metaApi.readObject(req)))
-                .thenAccept(tag -> {
-                    state.priorDataId = tag.getHeader();
-                    state.priorData = tag.getDefinition().getData();
-                })
-
-                .thenApply(x -> requestForSelector(request.getTenant(), state.data.getStorageId()))
-                .thenCompose(req -> Futures.javaFuture(metaApi.readObject(req)))
-                .thenAccept(tag -> {
-                    state.priorStorageId = tag.getHeader();
-                    state.priorStorage = tag.getDefinition().getStorage();
                 });
     }
 
@@ -284,9 +268,7 @@ public class DataRwService {
                 .getCopies(copyIndex);
     }
 
-    private CompletionStage<SchemaDefinition> resolveSchema(DataReadRequest request, RequestState state) {
-
-        var dataDef = state.data;
+    private CompletionStage<SchemaDefinition> resolveSchema(String tenant, DataDefinition dataDef, RequestState state) {
 
         if (dataDef.hasSchema()) {
             state.schema = dataDef.getSchema();
@@ -295,7 +277,7 @@ public class DataRwService {
 
         if (dataDef.hasSchemaId()) {
 
-            var schemaReq = MetadataBuilders.requestForSelector(request.getTenant(), dataDef.getSchemaId());
+            var schemaReq = MetadataBuilders.requestForSelector(tenant, dataDef.getSchemaId());
             return Futures
                     .javaFuture(metaApi.readObject(schemaReq))
                     .thenApply(tag -> state.schema = tag.getDefinition().getSchema());
@@ -451,7 +433,7 @@ public class DataRwService {
 
     }
 
-    private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state) {
+    private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state, boolean firstVersion) {
 
        //CompletionStage<TagHeader> saveSchema;
         CompletionStage<TagHeader> saveStorage;
@@ -468,11 +450,11 @@ public class DataRwService {
         return CompletableFuture.completedFuture(0)
 
                 .thenApply(x -> storageReq)
-                .thenApply(state.priorStorage == null ? metaApi::createPreallocatedObject : metaApi::updateObject)
+                .thenApply(firstVersion ? metaApi::createPreallocatedObject : metaApi::updateObject)
                 .thenCompose(Futures::javaFuture)
 
                 .thenApply(x -> dataReq)
-                .thenApply(state.priorData == null ? metaApi::createPreallocatedObject : metaApi::updateObject)
+                .thenApply(firstVersion ? metaApi::createPreallocatedObject : metaApi::updateObject)
                 .thenCompose(Futures::javaFuture);
     }
 
