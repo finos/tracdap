@@ -348,6 +348,35 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
+    void createDataset_schemaIdForLatestObject() throws Exception {
+
+        // Using "latestObject" in the schema selector is not allowed
+        // As this would result in a dataset version with a schema that changed over time
+
+        // Create external schema
+        var schemaRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder().setObjectType(ObjectType.SCHEMA)
+                        .setSchema(BASIC_SCHEMA)).build();
+
+        var createSchema = Futures.javaFuture(metaClient.createObject(schemaRequest));
+        waitFor(TEST_TIMEOUT, createSchema);
+        var schemaId = resultOf(createSchema);
+
+        // Create data using "latestObject" of schema ID
+
+        var request = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchemaId(selectorForLatest(schemaId))
+                .build();
+
+        var response = DataApiTestHelpers.clientStreaming(dataClient::createDataset, request);
+        waitFor(TEST_TIMEOUT, response);
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(response));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+    }
+
+    @Test
     void createDataset_schemaIdNotFound() {
 
         // Create dataset with a schema ID that can't be found, should result in NOT_FOUND error code
@@ -573,8 +602,107 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void updateDataset_ok_externalSchema() {
-        Assertions.fail();
+    void updateDataset_ok_externalSchema() throws Exception {
+
+        // Dataset is updated using an updated version of an external schema
+
+        // Create V1 schema
+
+        var v1SchemaReq = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(BASIC_SCHEMA)).build();
+
+        var v1CreateSchema = Futures.javaFuture(metaClient.createObject(v1SchemaReq));
+        waitFor(TEST_TIMEOUT, v1CreateSchema);
+        var v1SchemaId = resultOf(v1CreateSchema);
+
+        // Create V1 dataset using V1 external schema
+
+        var v1Req = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchemaId(selectorFor(v1SchemaId))
+                .build();
+        var v1Create = DataApiTestHelpers.clientStreaming(dataClient::createDataset, v1Req);
+        waitFor(TEST_TIMEOUT, v1Create);
+        var v1Id = resultOf(v1Create);
+
+        // Create V2 schema
+
+        var v2SchemaReq = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setPriorVersion(selectorFor(v1SchemaId))
+                .setDefinition(ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(BASIC_SCHEMA_V2))
+                .build();
+
+        var v2CreateSchema = Futures.javaFuture(metaClient.updateObject(v2SchemaReq));
+        waitFor(TEST_TIMEOUT, v2CreateSchema);
+        var v2SchemaId = resultOf(v2CreateSchema);
+
+        // Create V2 dataset using V2 external schema
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchemaId(selectorFor(v2SchemaId))
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var v2Id = resultOf(updateDataset);
+
+        // Now check the V2 data
+
+        // Get data and storage def
+
+        var readDataDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(v2Id)));
+        waitFor(TEST_TIMEOUT, readDataDef);
+        var dataTag = resultOf(readDataDef);
+        var dataDef = dataTag.getDefinition().getData();
+
+        var readStorageDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(dataDef.getStorageId())));
+        waitFor(TEST_TIMEOUT, readStorageDef);
+        var storageTag = resultOf(readStorageDef);
+        var storageDef = storageTag.getDefinition().getStorage();
+
+        // Get the storage path out of the metadata
+
+        var rootPartKey = PartKeys.opaqueKey(PartKeys.ROOT);
+        var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
+        var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
+
+        var storageRoot = tempDir.resolve(STORAGE_ROOT_DIR);
+        var copyDir = storageRoot.resolve(copy.getStoragePath());
+
+        var copyFiles = Files.walk(copyDir)
+                .filter(p -> !p.equals(copyDir))  // Do not include the copyDir in the file list
+                .collect(Collectors.toList());
+
+        // Data should be stored in one piece (even if chunking is implemented, dataset is too small to chunk up)
+
+        Assertions.assertEquals(1, copyFiles.size());
+
+        var copyFile = copyFiles.get(0);
+
+        // Check the file exists
+
+        Assertions.assertTrue(Files.isRegularFile(copyFile));
+        Assertions.assertTrue(Files.size(copyFile) > 0);
+
+        // Decode data directly from the file in storage and check against the original
+        // For this test case, data is stored in arrow file format
+
+        var channel = Files.newByteChannel(copyFile, StandardOpenOption.READ);
+        var storedData = DataApiTestHelpers.decodeArrowFile(dataDef.getSchema(), channel);
+
+        var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA_V2, List.of(BASIC_CSV_CONTENT_V2));
+
+        assertDataEqual(originalData, storedData);
+
+        // TODO: Check external schema metadata
     }
 
     @Test
@@ -853,8 +981,8 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.SCHEMA)
                 .setDefinition(ObjectDefinition.newBuilder()
-                        .setObjectType(ObjectType.SCHEMA)
-                        .setSchema(BASIC_SCHEMA)).build();
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(BASIC_SCHEMA)).build();
 
         var createSchema = Futures.javaFuture(metaClient.createObject(schemaRequest));
         waitFor(TEST_TIMEOUT, createSchema);
@@ -887,6 +1015,48 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
+    void updateDataset_schemaIdForLatestObject() throws Exception {
+
+        // Using "latestObject" in the schema selector is not allowed
+        // As this would result in a dataset version with a schema that changed over time
+
+        // Create V1 schema
+
+        var schemaReq = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(BASIC_SCHEMA)).build();
+
+        var createSchema = Futures.javaFuture(metaClient.createObject(schemaReq));
+        waitFor(TEST_TIMEOUT, createSchema);
+        var schemaId = resultOf(createSchema);
+
+        // Create V1 dataset using V1 external schema
+
+        var v1Req = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchemaId(selectorFor(schemaId))
+                .build();
+
+        var v1Create = DataApiTestHelpers.clientStreaming(dataClient::createDataset, v1Req);
+        waitFor(TEST_TIMEOUT, v1Create);
+        var v1Id = resultOf(v1Create);
+
+        // Create V2 dataset using a selector for the latest version of the schema
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchemaId(selectorForLatest(schemaId))
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+    }
+
+    @Test
     void updateDataset_schemaIdNotFound() throws Exception {
 
         // External schema ID cannot be found - should be reported as NOT_FOUND
@@ -896,8 +1066,8 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
                 .setTenant(TEST_TENANT)
                 .setObjectType(ObjectType.SCHEMA)
                 .setDefinition(ObjectDefinition.newBuilder()
-                        .setObjectType(ObjectType.SCHEMA)
-                        .setSchema(BASIC_SCHEMA)).build();
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(BASIC_SCHEMA)).build();
 
         var createSchema = Futures.javaFuture(metaClient.createObject(schemaRequest));
         waitFor(TEST_TIMEOUT, createSchema);
@@ -981,23 +1151,184 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void updateDataset_schemaIncompatible_forExternal() {
-        Assertions.fail();
+    void updateDataset_schemaIncompatible_forExternal() throws Exception {
+
+        // For datasets using an external schema, the schema object ID cannot change between dataset versions
+        // Even if the alternate schema ID is for a compatible schema, this is not (currently) allowed
+        // Reported as a failed precondition
+
+        // Create V1 schema
+
+        var schemaReq = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(BASIC_SCHEMA)).build();
+
+        var createSchema = Futures.javaFuture(metaClient.createObject(schemaReq));
+        waitFor(TEST_TIMEOUT, createSchema);
+        var schemaId = resultOf(createSchema);
+
+        // Create V1 dataset using V1 external schema
+
+        var v1Req = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchemaId(selectorFor(schemaId))
+                .build();
+
+        var v1Create = DataApiTestHelpers.clientStreaming(dataClient::createDataset, v1Req);
+        waitFor(TEST_TIMEOUT, v1Create);
+        var v1Id = resultOf(v1Create);
+
+        // Now create an alternate schema with a new object ID
+
+        var altSchemaReq = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(BASIC_SCHEMA_V2)).build();
+
+        var altCreateSchema = Futures.javaFuture(metaClient.createObject(altSchemaReq));
+        waitFor(TEST_TIMEOUT, altCreateSchema);
+        var altSchemaId = resultOf(altCreateSchema);
+
+        // Create V2 dataset using V2 external schema
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchemaId(selectorFor(altSchemaId))
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_schemaIncompatible_forEmbedded() {
-        Assertions.fail();
+    void updateDataset_schemaIncompatible_forEmbedded() throws Exception {
+
+        // Incompatible schema change in an embedded schema
+        // Reported as failed precondition
+
+        // Create V1 dataset
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        // Create V2 dataset, schema has one field removed
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchema(BASIC_SCHEMA.toBuilder()
+                .setTable(BASIC_SCHEMA.getTable().toBuilder()
+                .removeFields(BASIC_SCHEMA.getTable().getFieldsCount() - 1)))
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
+
+        // Create V2 dataset, schema has one field type changed
+
+        var request2 = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchema(BASIC_SCHEMA.toBuilder()
+                .setTable(BASIC_SCHEMA.getTable().toBuilder()
+                .removeFields(BASIC_SCHEMA.getTable().getFieldsCount() - 1)
+                .addFields(BASIC_SCHEMA.getTable()
+                        .getFields(BASIC_SCHEMA.getTable().getFieldsCount() -1)
+                        .toBuilder()
+                        .setFieldType(BasicType.STRING))))
+                .build();
+
+        var updateDataset2 = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request2);
+        waitFor(TEST_TIMEOUT, updateDataset2);
+        var error2 = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset2));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, error2.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_schemaIncompatible_externalToEmbedded() {
-        Assertions.fail();
+    void updateDataset_schemaIncompatible_externalToEmbedded() throws Exception {
+
+        // Switching from external to embedded schema between versions is not currently supported
+        // Even if the schemas are compatible
+
+        // Create V1 schema
+
+        var schemaReq = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(BASIC_SCHEMA)).build();
+
+        var createSchema = Futures.javaFuture(metaClient.createObject(schemaReq));
+        waitFor(TEST_TIMEOUT, createSchema);
+        var schemaId = resultOf(createSchema);
+
+        // Create V1 dataset using V1 external schema
+
+        var v1Req = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchemaId(selectorFor(schemaId))
+                .build();
+
+        var v1Create = DataApiTestHelpers.clientStreaming(dataClient::createDataset, v1Req);
+        waitFor(TEST_TIMEOUT, v1Create);
+        var v1Id = resultOf(v1Create);
+
+        // Create V2 using a compatible embedded schema
+
+        var request2 = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .build();
+
+        var updateDataset2 = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request2);
+        waitFor(TEST_TIMEOUT, updateDataset2);
+        var error2 = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset2));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, error2.getStatus().getCode());
     }
 
     @Test
-    void updateDataset_schemaIncompatible_embeddedToExternal() {
-        Assertions.fail();
+    void updateDataset_schemaIncompatible_embeddedToExternal() throws Exception {
+
+        // Switching from external to embedded schema between versions is not currently supported
+        // Even if the schemas are compatible
+
+        // Create V1 dataset with embedded schema
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        // Create compativle external schema object
+
+        var schemaReq = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(BASIC_SCHEMA_V2))
+                .build();
+
+        var createSchema = Futures.javaFuture(metaClient.createObject(schemaReq));
+        waitFor(TEST_TIMEOUT, createSchema);
+        var schemaId = resultOf(createSchema);
+
+        // Create V2 dataset using the external schema
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchemaId(selectorFor(schemaId))
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error2 = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, error2.getStatus().getCode());
     }
 
     @Test

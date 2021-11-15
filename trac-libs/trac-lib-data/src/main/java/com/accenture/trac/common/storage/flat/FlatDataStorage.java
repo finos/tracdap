@@ -17,15 +17,12 @@
 package com.accenture.trac.common.storage.flat;
 
 import com.accenture.trac.common.codec.ICodecManager;
-import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.data.IDataContext;
 import com.accenture.trac.common.storage.IDataStorage;
 import com.accenture.trac.common.storage.IFileStorage;
 import com.accenture.trac.metadata.SchemaDefinition;
 import com.accenture.trac.metadata.StorageCopy;
-
-import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -51,7 +48,7 @@ public class FlatDataStorage implements IDataStorage {
         var storagePath = storageCopy.getStoragePath();
         var storageFormat = storageCopy.getStorageFormat();
 
-        var chunkPath = storagePath + "/chunk-1.csv";  // TODO
+        var chunkPath = storagePath + "/chunk-0.dat";  // TODO
 
         var codec = formats.getCodec(storageFormat);
         var codecOptions = Map.<String, String>of();
@@ -73,7 +70,7 @@ public class FlatDataStorage implements IDataStorage {
         var storagePath = storageCopy.getStoragePath();
         var storageFormat = storageCopy.getStorageFormat();
 
-        var chunkPath = storagePath + "/chunk-1.csv";  // TODO
+        var chunkPath = storagePath + "/chunk-0.dat";  // TODO
 
         var codec = formats.getCodec(storageFormat);
         var codecOptions = Map.<String, String>of();
