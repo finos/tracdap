@@ -128,6 +128,7 @@ public class DataApiValidator {
                 .apply(Validation::required)
                 .applyIf(MetadataValidator::validateTagSelector, TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
                 .applyIf(Validation.selectorType(ObjectType.SCHEMA), TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
+                .applyIf(Validation::fixedObjectVersion, TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
                 .applyIf(SchemaValidator::schema, SchemaDefinition.class, msg.hasField(DWR_SCHEMA))
                 .pop();
 

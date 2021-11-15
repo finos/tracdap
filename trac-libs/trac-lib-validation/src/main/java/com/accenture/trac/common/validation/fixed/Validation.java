@@ -351,6 +351,20 @@ public class Validation {
         return ctx;
     }
 
+    public static ValidationContext fixedObjectVersion(TagSelector selector, ValidationContext ctx) {
+
+        if (selector.hasLatestObject()) {
+
+            var err = String.format(
+                    "The [%s] selector must refer to a fixed object version, [latestObject] is not allowed",
+                    ctx.fieldName());
+
+            ctx = ctx.error(err);
+        }
+
+        return ctx;
+    }
+
     public static ValidationContext recognizedEnum(ProtocolMessageEnum protoEnum, ValidationContext ctx) {
 
         if (protoEnum.getNumber() < 0) {
