@@ -30,9 +30,9 @@ class RequestState {
     List<TagUpdate> fileTags;
     List<TagUpdate> storageTags;
 
-    TagHeader dataId, priorDataId;
+    TagHeader dataId, preAllocDataId;
     TagHeader fileId, priorFileId;
-    TagHeader storageId, priorStorageId;
+    TagHeader storageId, preAllocStorageId, priorStorageId;
 
     DataDefinition data;
     SchemaDefinition schema;

@@ -19,6 +19,7 @@ package com.accenture.trac.svc.data.api;
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.concurrent.Futures;
 import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.PartKeys;
 import com.accenture.trac.metadata.*;
 import com.accenture.trac.test.data.SampleDataFormats;
 import com.google.protobuf.ByteString;
@@ -123,7 +124,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
         // Get the storage path out of the metadata
 
-        var rootPartKey = "part-root";  // TODO: Use a defined constant
+        var rootPartKey = PartKeys.opaqueKey(PartKeys.ROOT);
         var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
         var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
 
@@ -204,7 +205,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
         // Get the storage path out of the metadata
 
-        var rootPartKey = "part-root";  // TODO: Use a defined constant
+        var rootPartKey = PartKeys.opaqueKey(PartKeys.ROOT);
         var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
         var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
 
@@ -533,7 +534,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
         // Get the storage path out of the metadata
 
-        var rootPartKey = "part-root";  // TODO: Use a defined constant
+        var rootPartKey = PartKeys.opaqueKey(PartKeys.ROOT);
         var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
         var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
 

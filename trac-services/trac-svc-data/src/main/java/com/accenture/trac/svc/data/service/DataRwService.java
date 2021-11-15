@@ -29,6 +29,7 @@ import com.accenture.trac.common.data.DataContext;
 import com.accenture.trac.common.data.IDataContext;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.PartKeys;
 import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.*;
@@ -248,10 +249,7 @@ public class DataRwService {
 
     private void selectCopy(RequestState state) {
 
-        var rootParKey = PartType.PART_ROOT.name()
-                .toLowerCase()
-                .replace("_", "-");
-
+        var opaqueKey = PartKeys.opaqueKey(PartKeys.ROOT);
         var snapIndex = 0;
         var deltaIndex = 0;
 
@@ -259,7 +257,7 @@ public class DataRwService {
         var copyIndex = 0;
 
         var delta = state.data
-                .getPartsOrThrow(rootParKey)
+                .getPartsOrThrow(opaqueKey)
                 .getSnap()
                 .getDeltas(deltaIndex);
 
@@ -315,10 +313,10 @@ public class DataRwService {
         return CompletableFuture.completedFuture(0)
 
                 .thenCompose(x -> Futures.javaFuture(metaApi.preallocateId(preAllocDataReq)))
-                .thenAccept(dataId -> state.priorDataId = dataId)
+                .thenAccept(dataId -> state.preAllocDataId = dataId)
 
                 .thenCompose(x -> Futures.javaFuture(metaApi.preallocateId(preAllocStorageReq)))
-                .thenAccept(storageId -> state.priorStorageId = storageId);
+                .thenAccept(storageId -> state.preAllocStorageId = storageId);
     }
 
     private RequestState buildMetadata(DataWriteRequest request, RequestState state, OffsetDateTime objectTimestamp) {
@@ -326,18 +324,10 @@ public class DataRwService {
         state.dataTags = request.getTagUpdatesList();  // File tags requested by the client
         state.storageTags = List.of();                 // Storage tags is empty to start with
 
-        state.dataId = bumpVersion(state.priorDataId);
-        state.storageId = bumpVersion(state.priorStorageId);
+        state.dataId = bumpVersion(state.preAllocDataId);
+        state.storageId = bumpVersion(state.preAllocStorageId);
 
-        var opaqueKey = PartType.PART_ROOT.name()
-                .toLowerCase()
-                .replace("_", "-");
-
-        state.part = PartKey.newBuilder()
-                .setPartType(PartType.PART_ROOT)
-                .setOpaqueKey(opaqueKey)
-                .build();
-
+        state.part = PartKeys.ROOT;
         state.snap = 0;
         state.delta = 0;
 
@@ -366,27 +356,19 @@ public class DataRwService {
         state.dataId = bumpVersion(prior.dataId);
         state.storageId = bumpVersion(prior.storageId);
 
-        var opaqueKey = PartType.PART_ROOT.name()
-                .toLowerCase()
-                .replace("_", "-");
-
-        state.part = PartKey.newBuilder()
-                .setPartType(PartType.PART_ROOT)
-                .setOpaqueKey(opaqueKey)
-                .build();
+        state.part = PartKeys.ROOT;
+        state.delta = 0;
 
         if (prior.data.containsParts(state.part.getOpaqueKey())) {
 
-            var existingPart = prior.data.getPartsOrThrow(opaqueKey);
+            var existingPart = prior.data.getPartsOrThrow(state.part.getOpaqueKey());
             var existingSnap = existingPart.getSnap();
 
             // Only "snap" updates supported atm
             state.snap = existingSnap.getSnapIndex() + 1;
-            state.delta = 0;
         }
         else {
             state.snap = 0;
-            state.delta = 0;
         }
 
         var dataItem = buildDataItem(state);
@@ -541,10 +523,10 @@ public class DataRwService {
 
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state) {
 
-        var priorStorageId = selectorFor(state.priorStorageId);
+        var priorStorageId = selectorFor(state.preAllocStorageId);
         var storageReq = buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
 
-        var priorDataId = selectorFor(state.priorDataId);
+        var priorDataId = selectorFor(state.preAllocDataId);
         var dataReq = buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
 
         return CompletableFuture.completedFuture(0)
