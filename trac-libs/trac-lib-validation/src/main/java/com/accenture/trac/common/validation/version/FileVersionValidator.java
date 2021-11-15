@@ -37,6 +37,10 @@ public class FileVersionValidator {
         FILE_STORAGE_ID = field(FILE_DEF, FileDefinition.STORAGEID_FIELD_NUMBER);
     }
 
+    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
+        return msg.findFieldByNumber(fieldNo);
+    }
+
     public static ValidationContext fileVersion(FileDefinition current, FileDefinition prior, ValidationContext ctx) {
 
         ctx = ctx.push(FILE_NAME)
@@ -78,9 +82,5 @@ public class FileVersionValidator {
         }
 
         return ctx;
-    }
-
-    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
-        return msg.findFieldByNumber(fieldNo);
     }
 }

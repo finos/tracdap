@@ -18,8 +18,11 @@ package com.accenture.trac.svc.meta.services;
 
 import com.accenture.trac.metadata.*;
 import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.validation.MetadataValidator;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Message;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -32,7 +35,16 @@ import static com.accenture.trac.svc.meta.services.MetadataConstants.*;
 
 public class MetadataWriteService {
 
+    private static final Descriptors.OneofDescriptor OBJECT_DEFINITION_ONEOF = ObjectDefinition
+            .getDescriptor()
+            .findFieldByNumber(ObjectDefinition.DATA_FIELD_NUMBER)
+            .getContainingOneof();
+
+    private final List<ObjectType> NEW_VALIDATION_TYPES = List.of(ObjectType.FILE, ObjectType.SCHEMA);
+    private final Validator newValidator = new Validator();
+
     private final IMetadataDal dal;
+
 
     public MetadataWriteService(IMetadataDal dal) {
         this.dal = dal;
@@ -44,6 +56,8 @@ public class MetadataWriteService {
             List<TagUpdate> tagUpdates,
             boolean apiTrust) {
 
+        // Original validation
+
         var validator = new MetadataValidator();
 
         var normalDefinition = validator.normalizeObjectType(definition);
@@ -54,6 +68,16 @@ public class MetadataWriteService {
         if (apiTrust == PUBLIC_API) {
             validator.tagAttributesAreNotReserved(tagUpdates);
             validator.checkAndThrowPermissions();
+        }
+
+        // New structured validation is only available for some object types
+
+        if (NEW_VALIDATION_TYPES.contains(objectType)) {
+
+            var objectTypeOneOf = definition.getOneofFieldDescriptor(OBJECT_DEFINITION_ONEOF);
+            var objectTypeDef = (Message) definition.getField(objectTypeOneOf);
+
+            newValidator.validateFixedObject(objectTypeDef);
         }
 
         // Validation complete!
@@ -109,6 +133,16 @@ public class MetadataWriteService {
             validator.checkAndThrowPermissions();
         }
 
+        // New structured validation is only available for some object types
+
+        if (NEW_VALIDATION_TYPES.contains(objectType)) {
+
+            var objectTypeOneOf = definition.getOneofFieldDescriptor(OBJECT_DEFINITION_ONEOF);
+            var objectTypeDef = (Message) definition.getField(objectTypeOneOf);
+
+            newValidator.validateFixedObject(objectTypeDef);
+        }
+
         // Validation complete!
 
 
@@ -124,6 +158,16 @@ public class MetadataWriteService {
             List<TagUpdate> tagUpdates) {
 
         // TODO: Version increment validation
+
+        // New structured validation is only available for some object types
+        if (NEW_VALIDATION_TYPES.contains(definition.getObjectType())) {
+
+            var objectTypeOneOf = definition.getOneofFieldDescriptor(OBJECT_DEFINITION_ONEOF);
+            var currentTypeDef = (Message) definition.getField(objectTypeOneOf);
+            var priorTypeDef = (Message) priorTag.getDefinition().getField(objectTypeOneOf);
+
+            newValidator.validateVersion(currentTypeDef, priorTypeDef);
+        }
 
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 

@@ -31,7 +31,12 @@ public class ValidationKey implements Comparable<ValidationKey> {
     private static final String DISPLAY_NAME_TEMPLATE = "%s %s%s";
     private final String displayName;
 
-    public static ValidationKey fixed(
+    public static ValidationKey fixedObject(Descriptors.Descriptor messageType) {
+
+        return new ValidationKey(ValidationType.FIXED, messageType, null);
+    }
+
+    public static ValidationKey fixedMethod(
             Descriptors.Descriptor messageType,
             Descriptors.MethodDescriptor method) {
 

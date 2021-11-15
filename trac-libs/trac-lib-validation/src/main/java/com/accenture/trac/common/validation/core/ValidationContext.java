@@ -43,14 +43,14 @@ public class ValidationContext {
 
     public static ValidationContext forMethod(Message msg, Descriptors.MethodDescriptor descriptor) {
 
-        var key = ValidationKey.fixed(msg.getDescriptorForType(), descriptor);
+        var key = ValidationKey.fixedMethod(msg.getDescriptorForType(), descriptor);
         var root = new ValidationLocation(null, key, msg, null, null);
         return new ValidationContext(root);
     }
 
     public static ValidationContext forMessage(Message msg) {
 
-        var key = ValidationKey.fixed(msg.getDescriptorForType(), null);
+        var key = ValidationKey.fixedMethod(msg.getDescriptorForType(), null);
         var root = new ValidationLocation(null, key, msg, null, null);
         return new ValidationContext(root);
     }
@@ -158,13 +158,6 @@ public class ValidationContext {
         return apply(validator, String.class);
     }
 
-    public <T extends ProtocolMessageEnum>
-    void blah(T obj) {
-
-
-
-    }
-
     @SuppressWarnings({"unchecked", "rawTypes"})
     public <T>
     ValidationContext apply(ValidationFunction.Typed<T> validator, Class<T> targetClass) {
@@ -193,6 +186,49 @@ public class ValidationContext {
                 var enumVal = Enum.valueOf(enumType, valueDesc.getName());
 
                 return validator.apply((T) enumVal, this);
+            }
+        }
+
+        // If obj does not match the expected target type, blow up the validation process
+
+        // Type mis-match errors should be detected during development, otherwise the validator won't run
+        // In the event of a type mis-match at run time, blow up the validator!
+        // I.e. report as an unexpected internal error, validation cannot be completed.
+
+        log.error("Validator type mismatch (this is a bug): expected [{}], got [{}]", targetClass, obj.getClass());
+        log.error("(Expected target class is specified in ctx.apply())");
+
+        throw new EUnexpected();
+    }
+
+    @SuppressWarnings({"unchecked", "rawTypes"})
+    public <T, U>
+    ValidationContext applyWith(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
+
+        if (done())
+            return this;
+
+        var obj = location.peek().target();
+
+        // Simple case - obj is an instance of the expected target class
+
+        if (targetClass.isInstance(obj)) {
+            var target = (T) obj;
+            return validator.apply(target, arg, this);
+        }
+
+        // Protobuf stores enum values as EnumValueDescriptor objects
+        // So, special handling is needed for enums
+
+        if (Enum.class.isAssignableFrom(targetClass)) {
+
+            if (obj instanceof Descriptors.EnumValueDescriptor) {
+
+                var valueDesc = (Descriptors.EnumValueDescriptor) obj;
+                var enumType = (Class<? extends Enum>) targetClass;
+                var enumVal = Enum.valueOf(enumType, valueDesc.getName());
+
+                return validator.apply((T) enumVal, arg, this);
             }
         }
 

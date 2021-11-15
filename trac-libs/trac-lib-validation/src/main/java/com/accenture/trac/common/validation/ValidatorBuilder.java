@@ -17,6 +17,8 @@
 package com.accenture.trac.common.validation;
 
 import com.accenture.trac.api.*;
+import com.accenture.trac.common.validation.fixed.FileValidator;
+import com.accenture.trac.common.validation.fixed.SchemaValidator;
 import com.accenture.trac.common.validation.version.SchemaVersionValidator;
 import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.common.validation.core.ValidationFunction;
@@ -41,34 +43,37 @@ public class ValidatorBuilder {
 
         var dataProto = Data.getDescriptor();
 
-        addValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateCreateDataset,
+        addObjectValidator(validatorMap, SchemaDefinition.class, SchemaValidator::schema, SchemaDefinition.getDescriptor());
+        addObjectValidator(validatorMap, FileDefinition.class, FileValidator::file, FileDefinition.getDescriptor());
+
+        addMethodValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateCreateDataset,
                 dataProto, "TracDataApi", "createDataset");
 
-        addValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateCreateDataset,
+        addMethodValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateCreateDataset,
                 dataProto, "TracDataApi", "createSmallDataset");
 
-        addValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateUpdateDataset,
+        addMethodValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateUpdateDataset,
                 dataProto, "TracDataApi", "updateDataset");
 
-        addValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateUpdateDataset,
+        addMethodValidator(validatorMap, DataWriteRequest.class, DataApiValidator::validateUpdateDataset,
                 dataProto, "TracDataApi", "updateSmallDataset");
 
-        addValidator(validatorMap, DataReadRequest.class, DataApiValidator::validateReadDataset,
+        addMethodValidator(validatorMap, DataReadRequest.class, DataApiValidator::validateReadDataset,
                 dataProto, "TracDataApi", "readDataset");
 
-        addValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateCreateFile,
+        addMethodValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateCreateFile,
                 dataProto, "TracDataApi", "createFile");
 
-        addValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateCreateFile,
+        addMethodValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateCreateFile,
                 dataProto, "TracDataApi", "createSmallFile");
 
-        addValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateUpdateFile,
+        addMethodValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateUpdateFile,
                 dataProto, "TracDataApi", "updateFile");
 
-        addValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateUpdateFile,
+        addMethodValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateUpdateFile,
                 dataProto, "TracDataApi", "updateSmallFile");
 
-        addValidator(validatorMap, FileReadRequest.class, DataApiValidator::validateReadFile,
+        addMethodValidator(validatorMap, FileReadRequest.class, DataApiValidator::validateReadFile,
                 dataProto, "TracDataApi", "readFile");
 
         addVersionValidator(validatorMap, FileDefinition.class, FileVersionValidator::fileVersion,
@@ -80,7 +85,19 @@ public class ValidatorBuilder {
         return validatorMap;
     }
 
-    private static <T> void addValidator(
+    private static <T> void addObjectValidator(
+            Map<ValidationKey, ValidationFunction<?>> validatorMap,
+            Class<T> targetClass, ValidationFunction.Typed<T> validator,
+            Descriptors.Descriptor messageType) {
+
+        var key = ValidationKey.fixedObject(messageType);
+        var func = new ValidationFunction<T>(validator, targetClass);
+
+        validatorMap.put(key, func);
+    }
+
+
+    private static <T> void addMethodValidator(
             Map<ValidationKey, ValidationFunction<?>> validatorMap,
             Class<T> targetClass, ValidationFunction.Typed<T> validator,
             Descriptors.FileDescriptor file, String serviceName, String methodName) {
@@ -88,7 +105,7 @@ public class ValidatorBuilder {
         var method = file.findServiceByName(serviceName).findMethodByName(methodName);
         var requestType = method.getInputType();
 
-        var key = ValidationKey.fixed(requestType, method);
+        var key = ValidationKey.fixedMethod(requestType, method);
         var func = new ValidationFunction<T>(validator, targetClass);
 
         validatorMap.put(key, func);

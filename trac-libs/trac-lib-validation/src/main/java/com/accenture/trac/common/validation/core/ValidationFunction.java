@@ -26,6 +26,9 @@ public class ValidationFunction<T> {
     public interface Typed<T> { ValidationContext apply(T value, ValidationContext ctx); }
 
     @FunctionalInterface
+    public interface TypedArg<T, U> { ValidationContext apply(T value, U arg, ValidationContext ctx); }
+
+    @FunctionalInterface
     public interface Version<T> { ValidationContext apply(T current, T prior, ValidationContext ctx); }
 
 
