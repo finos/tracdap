@@ -38,5 +38,10 @@ class RequestState {
     SchemaDefinition schema;
     FileDefinition file, priorFile;
     StorageDefinition storage, priorStorage;
+
+    PartKey part;
+    int snap;
+    int delta;
+
     StorageCopy copy;
 }

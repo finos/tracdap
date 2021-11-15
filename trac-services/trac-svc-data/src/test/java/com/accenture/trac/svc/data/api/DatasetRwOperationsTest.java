@@ -123,7 +123,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
         // Get the storage path out of the metadata
 
-        var rootPartKey = "PART_ROOT";  // TODO: Use a defined constant
+        var rootPartKey = "part-root";  // TODO: Use a defined constant
         var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
         var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
 
@@ -204,7 +204,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
         // Get the storage path out of the metadata
 
-        var rootPartKey = "PART_ROOT";  // TODO: Use a defined constant
+        var rootPartKey = "part-root";  // TODO: Use a defined constant
         var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
         var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
 
@@ -533,7 +533,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
         // Get the storage path out of the metadata
 
-        var rootPartKey = "PART_ROOT";  // TODO: Use a defined constant
+        var rootPartKey = "part-root";  // TODO: Use a defined constant
         var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
         var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
 

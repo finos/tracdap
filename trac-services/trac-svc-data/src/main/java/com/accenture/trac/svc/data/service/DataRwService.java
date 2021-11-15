@@ -25,10 +25,10 @@ import com.accenture.trac.common.codec.ICodec;
 import com.accenture.trac.common.codec.ICodecManager;
 import com.accenture.trac.common.concurrent.Futures;
 import com.accenture.trac.common.concurrent.IExecutionContext;
-import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.data.DataContext;
 import com.accenture.trac.common.data.IDataContext;
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.*;
@@ -39,6 +39,9 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.NettyAllocationManager;
 import org.apache.arrow.memory.RootAllocator;
 
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -88,6 +91,7 @@ public class DataRwService {
 
         var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
         var state = new RequestState();
+        var objectTimestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         // Look up the requested data codec
         // If the codec is unknown the request will fail right away
@@ -105,7 +109,7 @@ public class DataRwService {
                 .thenCompose(x -> preallocateIds(request, state))
 
                 // Build metadata objects for the dataset that will be saved
-                .thenApply(x -> buildMetadata(request, state))
+                .thenApply(x -> buildMetadata(request, state, objectTimestamp))
 
                 // Decode the data content stream and write it to the storage layer
                 // This is where the main data processing streams are executed
@@ -125,7 +129,7 @@ public class DataRwService {
 
                 // Save metadata to the metadata store
                 // This effectively "commits" the dataset by making it visible
-                .thenCompose(x -> saveMetadata(request, state, /* firstVersion = */ true));
+                .thenCompose(x -> saveMetadata(request, state));
     }
 
     public CompletionStage<TagHeader> updateDataset(
@@ -136,6 +140,7 @@ public class DataRwService {
         var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
         var state = new RequestState();
         var prior = new RequestState();
+        var objectTimestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         // Look up the requested data codec
         // If the codec is unknown the request will fail right away
@@ -153,7 +158,7 @@ public class DataRwService {
                 .thenCompose(x -> resolveSchema(request, state))
 
                 // Build metadata objects for the dataset that will be saved
-                .thenApply(x -> buildUpdateMetadata(request, state))
+                .thenApply(x -> buildUpdateMetadata(request, state, prior, objectTimestamp))
 
                 // Validate schema version update
                 // No need to validate data version update here, since data RW service is creating it!
@@ -178,7 +183,7 @@ public class DataRwService {
 
                 // Save metadata to the metadata store
                 // This effectively "commits" the dataset by making it visible
-                .thenCompose(x -> saveMetadata(request, state, /* firstVersion = */ false));
+                .thenCompose(x -> saveMetadata(request, state, prior));
 
     }
 
@@ -243,11 +248,9 @@ public class DataRwService {
 
     private void selectCopy(RequestState state) {
 
-        // TODO
-
-        var partKey = PartKey.newBuilder()
-                .setPartType(PartType.PART_ROOT)
-                .setOpaqueKey(PartType.PART_ROOT.name());  // TODO: opaque key
+        var rootParKey = PartType.PART_ROOT.name()
+                .toLowerCase()
+                .replace("_", "-");
 
         var snapIndex = 0;
         var deltaIndex = 0;
@@ -256,7 +259,7 @@ public class DataRwService {
         var copyIndex = 0;
 
         var delta = state.data
-                .getPartsOrThrow(partKey.getOpaqueKey())
+                .getPartsOrThrow(rootParKey)
                 .getSnap()
                 .getDeltas(deltaIndex);
 
@@ -318,7 +321,7 @@ public class DataRwService {
                 .thenAccept(storageId -> state.priorStorageId = storageId);
     }
 
-    private RequestState buildMetadata(DataWriteRequest request, RequestState state) {
+    private RequestState buildMetadata(DataWriteRequest request, RequestState state, OffsetDateTime objectTimestamp) {
 
         state.dataTags = request.getTagUpdatesList();  // File tags requested by the client
         state.storageTags = List.of();                 // Storage tags is empty to start with
@@ -326,9 +329,21 @@ public class DataRwService {
         state.dataId = bumpVersion(state.priorDataId);
         state.storageId = bumpVersion(state.priorStorageId);
 
-        var dataItem = buildDataItem(request, state);
-        var dataDef = buildDataDef(request, state, dataItem);
-        var storageDef = buildStorageDef(request, dataItem);
+        var opaqueKey = PartType.PART_ROOT.name()
+                .toLowerCase()
+                .replace("_", "-");
+
+        state.part = PartKey.newBuilder()
+                .setPartType(PartType.PART_ROOT)
+                .setOpaqueKey(opaqueKey)
+                .build();
+
+        state.snap = 0;
+        state.delta = 0;
+
+        var dataItem = buildDataItem(state);
+        var dataDef = createDataDef(request, state, dataItem);
+        var storageDef = createStorageDef(request, dataItem, objectTimestamp);
 
         state.data = dataDef;
         state.storage = storageDef;
@@ -341,71 +356,165 @@ public class DataRwService {
         return state;
     }
 
-    private RequestState buildUpdateMetadata(DataWriteRequest request, RequestState state) {
+    private RequestState buildUpdateMetadata(
+            DataWriteRequest request, RequestState state, RequestState prior,
+            OffsetDateTime objectTimestamp) {
+
+        state.dataTags = request.getTagUpdatesList();  // File tags requested by the client
+        state.storageTags = List.of();                 // Storage tags is empty to start with
+
+        state.dataId = bumpVersion(prior.dataId);
+        state.storageId = bumpVersion(prior.storageId);
+
+        var opaqueKey = PartType.PART_ROOT.name()
+                .toLowerCase()
+                .replace("_", "-");
+
+        state.part = PartKey.newBuilder()
+                .setPartType(PartType.PART_ROOT)
+                .setOpaqueKey(opaqueKey)
+                .build();
+
+        if (prior.data.containsParts(state.part.getOpaqueKey())) {
+
+            var existingPart = prior.data.getPartsOrThrow(opaqueKey);
+            var existingSnap = existingPart.getSnap();
+
+            // Only "snap" updates supported atm
+            state.snap = existingSnap.getSnapIndex() + 1;
+            state.delta = 0;
+        }
+        else {
+            state.snap = 0;
+            state.delta = 0;
+        }
+
+        var dataItem = buildDataItem(state);
+        state.data = updateDataDef(request, state, dataItem, prior.data);
+        state.storage = updateStorageDef(prior.storage, dataItem, objectTimestamp);
+
+        state.copy = state.storage
+                .getDataItemsOrThrow(dataItem)
+                .getIncarnations(0)
+                .getCopies(0);
 
         return state;
     }
 
-    private String buildDataItem(DataWriteRequest request, RequestState state) {
-
-        var snapIndex = 0;
-        var deltaIndex = 0;
+    private String buildDataItem(RequestState state) {
 
         var dataItemTemplate = "data/table/%s/part-%s/snap-%d/delta-%d";
 
         return String.format(dataItemTemplate,
-                state.dataId.getObjectId(), PartType.PART_ROOT,  // TODO
-                snapIndex, deltaIndex);
+                state.dataId.getObjectId(),
+                state.part.getOpaqueKey(),
+                state.snap, state.delta);
     }
 
-    private DataDefinition buildDataDef(DataWriteRequest request, RequestState state, String dataItem) {
+    private DataDefinition createDataDef(DataWriteRequest request, RequestState state, String dataItem) {
 
-        var partKey = PartKey.newBuilder()
-                .setPartType(PartType.PART_ROOT)
-                .setOpaqueKey(PartType.PART_ROOT.name());  // TODO: opaque key
+        var dataDef = DataDefinition.newBuilder();
 
-        var snapIndex = 0;
-        var deltaIndex = 0;
+        // Schema must be supplied as either ID or full schema (confirmed by validation)
+        if (request.hasSchemaId())
+            dataDef.setSchemaId(request.getSchemaId());
+        else if (request.hasSchema())
+            dataDef.setSchema(request.getSchema());
+        else
+            throw new EUnexpected();
 
-        var storageId = selectorForLatest(state.storageId);
+        // A new data def always means one new part/snap/delta
 
         var delta = DataDefinition.Delta.newBuilder()
-                .setDeltaIndex(deltaIndex)
+                .setDeltaIndex(state.delta)
                 .setDataItem(dataItem);
 
         var snap = DataDefinition.Snap.newBuilder()
-                .setSnapIndex(snapIndex)
-                .addDeltas(deltaIndex, delta);
+                .setSnapIndex(state.snap)
+                .addDeltas(state.delta, delta);
 
         var part = DataDefinition.Part.newBuilder()
-                .setPartKey(partKey)
-                .setSnap(snap)
-                .build();
+                .setPartKey(state.part)
+                .setSnap(snap);
 
-        var dataDef = DataDefinition.newBuilder()
-                .setStorageId(storageId);
+        dataDef.putParts(state.part.getOpaqueKey(), part.build());
 
-        if (request.hasSchema())
-            dataDef.setSchema(request.getSchema());
-        else if (request.hasSchemaId())
+        // Set the storage ID, always points to the latest object/tag of the storage object
+
+        var storageId = selectorForLatest(state.storageId);
+        dataDef.setStorageId(storageId);
+
+        return dataDef.build();
+    }
+
+    private DataDefinition updateDataDef(DataWriteRequest request, RequestState state, String dataItem, DataDefinition priorDef) {
+
+        var dataDef = priorDef.toBuilder();
+
+        // Update schema (or schema ID)
+
+        if (request.hasSchemaId())
             dataDef.setSchemaId(request.getSchemaId());
+        else if (request.hasSchema())
+            dataDef.setSchema(request.getSchema());
         else
-            throw new EUnexpected();  // TODO
+            throw new EUnexpected();
 
-        return dataDef
-                .putParts(partKey.getOpaqueKey(), part)
+        // Add the new part / snap / delta as required
+
+        var opaqueKey = state.part.getOpaqueKey();
+
+        var part = priorDef.containsParts(opaqueKey)
+                ? priorDef.getPartsOrThrow(opaqueKey).toBuilder()
+                : DataDefinition.Part.newBuilder().setPartKey(state.part);
+
+        var snap = part.hasSnap() && part.getSnap().getSnapIndex() == state.snap
+                ? part.getSnap().toBuilder()
+                : DataDefinition.Snap.newBuilder().setSnapIndex(state.snap);
+
+        var delta = DataDefinition.Delta.newBuilder()
+                .setDeltaIndex(state.delta)
+                .setDataItem(dataItem);
+
+        snap.addDeltas(state.delta, delta);
+        part.setSnap(snap);
+        dataDef.putParts(opaqueKey, part.build());
+
+        // Do not update storage ID, as this selector always refers to the latest object / tag
+
+        return dataDef.build();
+    }
+
+    private StorageDefinition createStorageDef(DataWriteRequest request, String dataItem, OffsetDateTime objectTimestamp) {
+
+        var storageItem = buildStorageItem(dataItem, objectTimestamp);
+
+        return StorageDefinition.newBuilder()
+                .putDataItems(dataItem, storageItem)
                 .build();
     }
 
-    private StorageDefinition buildStorageDef(DataWriteRequest request, String dataItem) {
+    private StorageDefinition updateStorageDef(StorageDefinition priorDef, String dataItem, OffsetDateTime objectTimestamp) {
+
+        var storageItem = buildStorageItem(dataItem, objectTimestamp);
+
+        return priorDef.toBuilder()
+                .putDataItems(dataItem, storageItem)
+                .build();
+    }
+
+    private StorageItem buildStorageItem(String dataItem, OffsetDateTime objectTimestamp) {
 
         var storageKey = config.getDefaultStorage();
         var storageFormat = "application/vnd.apache.arrow.file";  // TODO: Constants and config
+
+        // For the time being, data has one incarnation and a single storage copy
+
         var incarnationIndex = 0;
 
         var copy = StorageCopy.newBuilder()
                 .setCopyStatus(CopyStatus.COPY_AVAILABLE)
-                //.setCopyTimestamp(null)  // TODO
+                .setCopyTimestamp(MetadataCodec.encodeDatetime(objectTimestamp))
                 .setStorageKey(storageKey)
                 .setStoragePath(dataItem)
                 .setStorageFormat(storageFormat);
@@ -413,17 +522,14 @@ public class DataRwService {
         var incarnation = StorageIncarnation.newBuilder()
                 .setIncarnationStatus(IncarnationStatus.INCARNATION_AVAILABLE)
                 .setIncarnationIndex(incarnationIndex)
-                //.setIncarnationTimestamp(null)  // todo
+                .setIncarnationTimestamp(MetadataCodec.encodeDatetime(objectTimestamp))
                 .addCopies(copy);
 
-        var storageItem = StorageItem.newBuilder()
+        return StorageItem.newBuilder()
                 .addIncarnations(incarnationIndex, incarnation)
                 .build();
-
-        return StorageDefinition.newBuilder()
-                .putDataItems(dataItem, storageItem)
-                .build();
     }
+
 
     private void finalizeMetadata(RequestState state, long rowsSaved) {
 
@@ -433,13 +539,7 @@ public class DataRwService {
 
     }
 
-    private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state, boolean firstVersion) {
-
-       //CompletionStage<TagHeader> saveSchema;
-        CompletionStage<TagHeader> saveStorage;
-        CompletionStage<TagHeader> saveData;
-
-        //saveSchema = CompletableFuture.completedFuture(null);
+    private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state) {
 
         var priorStorageId = selectorFor(state.priorStorageId);
         var storageReq = buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
@@ -450,11 +550,30 @@ public class DataRwService {
         return CompletableFuture.completedFuture(0)
 
                 .thenApply(x -> storageReq)
-                .thenApply(firstVersion ? metaApi::createPreallocatedObject : metaApi::updateObject)
+                .thenApply(metaApi::createPreallocatedObject)
                 .thenCompose(Futures::javaFuture)
 
                 .thenApply(x -> dataReq)
-                .thenApply(firstVersion ? metaApi::createPreallocatedObject : metaApi::updateObject)
+                .thenApply(metaApi::createPreallocatedObject)
+                .thenCompose(Futures::javaFuture);
+    }
+
+    private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state, RequestState prior) {
+
+        var priorStorageId = selectorFor(prior.storageId);
+        var storageReq = buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
+
+        var priorDataId = selectorFor(prior.dataId);
+        var dataReq = buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
+
+        return CompletableFuture.completedFuture(0)
+
+                .thenApply(x -> storageReq)
+                .thenApply(metaApi::updateObject)
+                .thenCompose(Futures::javaFuture)
+
+                .thenApply(x -> dataReq)
+                .thenApply(metaApi::updateObject)
                 .thenCompose(Futures::javaFuture);
     }
 
@@ -561,28 +680,5 @@ public class DataRwService {
         // TODO: if (request.hasExpectedRows()) { ... }
 
         return rowsSaved;
-    }
-
-
-    private Flow.Publisher<DataBlock> readDataset(
-            DataDefinition dataDef,
-            SchemaDefinition schemaDef,
-            StorageDefinition storageDef,
-            IDataContext execCtx) {
-
-        var partKey = dataDef.getPartsMap().keySet().stream().findFirst().get();  // TODO: Root part
-        var part = dataDef.getPartsOrThrow(partKey);
-        var snap = part.getSnap();
-        var delta = snap.getDeltas(0);
-
-        var dataItem = delta.getDataItem();
-        var storageItem = storageDef.getDataItemsOrThrow(dataItem);
-        var incarnation = storageItem.getIncarnations(storageItem.getIncarnationsCount() - 1);
-        var copy = incarnation.getCopies(0);
-
-        var storageKey = copy.getStorageKey();
-        var storage = storageManager.getDataStorage(storageKey);
-
-        return storage.reader(schemaDef, copy, execCtx);
     }
 }
