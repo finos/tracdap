@@ -384,7 +384,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         var unknownSchemaId = TagSelector.newBuilder()
                 .setObjectType(ObjectType.SCHEMA)
                 .setObjectId(UUID.randomUUID().toString())
-                .setLatestObject(true)
+                .setObjectVersion(1)
                 .setLatestTag(true);
 
         var request = BASIC_CREATE_DATASET_REQUEST.toBuilder().setSchemaId(unknownSchemaId).build();
@@ -1083,14 +1083,14 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createV1);
         var v1Id = resultOf(createV1);
 
-        // Set a random object ID in the schema selector
+        // Set a non-existent schema version and try to use that for the V2 update
 
-        var invalidSchemaId = selectorFor(schemaId).toBuilder()
-                .setObjectId(UUID.randomUUID().toString());
+        var unknownSchemaId = selectorFor(schemaId).toBuilder()
+                .setObjectVersion(2);
 
         var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
                 .setPriorVersion(selectorFor(v1Id))
-                .setSchemaId(invalidSchemaId)
+                .setSchemaId(unknownSchemaId)
                 .build();
 
         var response = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
