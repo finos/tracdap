@@ -19,7 +19,6 @@ package com.accenture.trac.common.validation.core;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
-import com.google.protobuf.ProtocolMessageEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,11 +96,13 @@ public class ValidationContext {
 
         var fd = msg.hasOneof(oneOf) ? msg.getOneofFieldDescriptor(oneOf) : null;
         var name = fd != null ? fd.getName() : oneOf.getName();
-
         var obj = fd != null ? msg.getField(fd) : null;
-        var priorObj = fd != null && priorMsg != null ? priorMsg.getField(fd) : null;
 
-        var loc = new ValidationLocation(parentLoc, null, obj, priorObj, oneOf, fd, name);
+        var priorFd = priorMsg != null && priorMsg.hasOneof(oneOf) ? priorMsg.getOneofFieldDescriptor(oneOf) : null;
+        var priorName = priorFd != null ? priorFd.getName() : oneOf.getName();
+        var priorObj = priorFd != null ? priorMsg.getField(priorFd) : null;
+
+        var loc = new ValidationLocation(parentLoc, null, obj, priorObj, oneOf, fd, name, priorFd, priorName);
 
         if (parentLoc.skipped())
             loc.skip();
@@ -312,6 +313,15 @@ public class ValidationContext {
         return apply(validator, targetClass);
     }
 
+    public <T>
+    ValidationContext applyIf(ValidationFunction.Version<T> validator, Class<T> targetClass, boolean condition) {
+
+        if (!condition)
+            return this;
+
+        return apply(validator, targetClass);
+    }
+
     public <TMsg extends Message>
     ValidationContext applyList(ValidationFunction.Typed<TMsg> validator, Class<TMsg> msgClass) {
 
@@ -391,6 +401,15 @@ public class ValidationContext {
     public String fieldName() {
         return location.peek().fieldName();
     }
+
+    public Descriptors.FieldDescriptor priorField() {
+        return location.peek().priorField();
+    }
+
+    public String priorFieldName() {
+        return location.peek().priorFieldName();
+    }
+
 
     public boolean failed() {
         return location.peek().failed();

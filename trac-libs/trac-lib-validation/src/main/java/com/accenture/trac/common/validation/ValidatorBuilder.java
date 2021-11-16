@@ -19,7 +19,9 @@ package com.accenture.trac.common.validation;
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.validation.fixed.FileValidator;
 import com.accenture.trac.common.validation.fixed.SchemaValidator;
+import com.accenture.trac.common.validation.version.DataVersionValidator;
 import com.accenture.trac.common.validation.version.SchemaVersionValidator;
+import com.accenture.trac.metadata.DataDefinition;
 import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.common.validation.core.ValidationFunction;
 import com.accenture.trac.common.validation.core.ValidationKey;
@@ -81,6 +83,9 @@ public class ValidatorBuilder {
 
         addVersionValidator(validatorMap, SchemaDefinition.class, SchemaVersionValidator::schema,
                 SchemaDefinition.getDescriptor());
+
+        addVersionValidator(validatorMap, DataDefinition.class, DataVersionValidator::data,
+                DataDefinition.getDescriptor());
 
         return validatorMap;
     }

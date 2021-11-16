@@ -35,6 +35,10 @@ class ValidationLocation {
     private final Descriptors.FieldDescriptor field;
     private final String fieldName;
 
+    // For one-of locations, prior field may be different from current
+    private final Descriptors.FieldDescriptor priorField;
+    private final String priorFieldName;
+
 
     private boolean failed;
     private boolean skipped;
@@ -47,7 +51,10 @@ class ValidationLocation {
 
             Descriptors.OneofDescriptor oneOf,
             Descriptors.FieldDescriptor field,
-            String fieldName) {
+            String fieldName,
+
+            Descriptors.FieldDescriptor priorField,
+            String priorFieldName) {
 
         this.parent = parent;
         this.key = key;
@@ -58,8 +65,24 @@ class ValidationLocation {
         this.field = field;
         this.fieldName = fieldName;
 
+        this.priorField = priorField;
+        this.priorFieldName = priorFieldName;
+
         this.failed = false;
         this.skipped = false;
+    }
+
+    public ValidationLocation(
+            ValidationLocation parent,
+            ValidationKey key,
+            Object target,
+            Object prior,
+
+            Descriptors.OneofDescriptor oneOf,
+            Descriptors.FieldDescriptor field,
+            String fieldName) {
+
+        this(parent, key, target, prior, oneOf, field, fieldName, field, fieldName);
     }
 
     public ValidationLocation(
@@ -114,6 +137,14 @@ class ValidationLocation {
 
     public Descriptors.FieldDescriptor field() {
         return field;
+    }
+
+    public Descriptors.FieldDescriptor priorField() {
+        return priorField;
+    }
+
+    public String priorFieldName() {
+        return priorFieldName;
     }
 
     public boolean failed() {
