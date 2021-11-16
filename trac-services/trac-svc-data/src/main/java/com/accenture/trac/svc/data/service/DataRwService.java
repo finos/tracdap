@@ -42,6 +42,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
@@ -52,6 +53,9 @@ import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
 public class DataRwService {
 
+    private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/part-%s/snap-%d/delta-%d-%s";
+    private static final String DATA_ITEM_SUFFIX_TEMPLATE = "x%06x";
+
     private final DataServiceConfig config;
     private final IStorageManager storageManager;
     private final ICodecManager codecManager;
@@ -60,6 +64,7 @@ public class DataRwService {
     private final BufferAllocator arrowAllocator;
 
     private final Validator validator = new Validator();
+    private final Random random = new Random();
 
     public DataRwService(
             DataServiceConfig config,
@@ -407,12 +412,17 @@ public class DataRwService {
 
     private String buildDataItem(RequestState state) {
 
-        var dataItemTemplate = "data/table/%s/part-%s/snap-%d/delta-%d";
+        var suffixBytes = random.nextInt(1 << 24);
+        var suffix = String.format(DATA_ITEM_SUFFIX_TEMPLATE, suffixBytes);
 
-        return String.format(dataItemTemplate,
-                state.dataId.getObjectId(),
-                state.part.getOpaqueKey(),
-                state.snap, state.delta);
+        var dataType = state.schema.getSchemaType().name().toLowerCase();
+        var objectId = state.dataId.getObjectId();
+        var partKey = state.part.getOpaqueKey();
+
+        return String.format(DATA_ITEM_TEMPLATE,
+                dataType, objectId,
+                partKey, state.snap, state.delta,
+                suffix);
     }
 
     private DataDefinition createDataDef(DataWriteRequest request, RequestState state, String dataItem) {
