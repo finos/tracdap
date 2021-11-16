@@ -26,6 +26,9 @@ import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.exception.EDataCorruption;
 import com.accenture.trac.test.data.SampleDataFormats;
 import com.accenture.trac.test.helpers.TestResourceHelpers;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.EmptyByteBuf;
 import io.netty.buffer.Unpooled;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -146,6 +149,39 @@ public abstract class CodecTestSuite {
         var rtBatch = rtBlocks.get(1).arrowRecords;
         rtBatch.close();
         root.close();
+    }
+
+    @Test
+    void decode_empty() {
+
+        var allocator = new RootAllocator();
+
+        // An empty stream (i.e. with no buffers)
+
+        var noBufStream = Flows.publish(List.<ByteBuf>of());
+        var noBufDecoder = codec.getDecoder(allocator, SampleDataFormats.BASIC_TABLE_SCHEMA, Map.of());
+        noBufStream.subscribe(noBufDecoder);
+
+        var noBufResult = Flows.fold(noBufDecoder, (bs, b) -> {bs.add(b); return bs;}, new ArrayList<DataBlock>());
+        waitFor(TEST_TIMEOUT, noBufResult);
+
+        Assertions.assertThrows(EDataCorruption.class, () -> resultOf(noBufResult));
+
+        // A stream containing a series of empty buffers
+
+        var emptyBuffers = List.of(
+                new EmptyByteBuf(ByteBufAllocator.DEFAULT),
+                new EmptyByteBuf(ByteBufAllocator.DEFAULT),
+                new EmptyByteBuf(ByteBufAllocator.DEFAULT));
+
+        var emptyBufStream = Flows.publish(emptyBuffers);
+        var emptyBufDecoder = codec.getDecoder(allocator, SampleDataFormats.BASIC_TABLE_SCHEMA, Map.of());
+        emptyBufStream.subscribe(emptyBufDecoder);
+
+        var emptyBufResult = Flows.fold(emptyBufDecoder, (bs, b) -> {bs.add(b); return bs;}, new ArrayList<DataBlock>());
+        waitFor(TEST_TIMEOUT, emptyBufResult);
+
+        Assertions.assertThrows(EDataCorruption.class, () -> resultOf(emptyBufResult));
     }
 
     @Test

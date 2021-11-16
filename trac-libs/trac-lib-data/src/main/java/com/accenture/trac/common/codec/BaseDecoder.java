@@ -18,6 +18,7 @@ package com.accenture.trac.common.codec;
 
 import com.accenture.trac.common.concurrent.flow.CommonBaseProcessor;
 import com.accenture.trac.common.data.DataBlock;
+import com.accenture.trac.common.exception.EDataCorruption;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
@@ -47,6 +48,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
 
     private boolean started = false;
     private boolean released = false;
+    private long nBytes;
     private long nRows;
     private int nBatches;
 
@@ -78,7 +80,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
         }
         catch (Throwable e) {
             releaseBuffer();
-            releasePendingChunks();
+            releaseOutQueue();
             throw e;
         }
     }
@@ -91,7 +93,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
         }
         finally {
             releaseBuffer();
-            releasePendingChunks();
+            releaseOutQueue();
         }
     }
 
@@ -104,12 +106,16 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
 
             checkStarted();
 
-            chunkDelivered = true;
+            if (chunk.readableBytes() > 0) {
 
-            if (isStreaming)
-                decodeChunk(chunk);
-            else
-                buffer.addComponent(true, chunk);
+                nBytes += chunk.readableBytes();
+                chunkDelivered = true;
+
+                if (isStreaming)
+                    decodeChunk(chunk);
+                else
+                    buffer.addComponent(true, chunk);
+            }
 
             deliverPendingBlocks();
 
@@ -122,7 +128,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
                 chunk.release();
 
             releaseBuffer();
-            releasePendingChunks();
+            releaseOutQueue();
             throw e;  // todo
         }
     }
@@ -134,18 +140,24 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
 
             checkStarted();
 
+            if (nBytes == 0) {
+                log.error("Data stream contains zero bytes");
+                throw new EDataCorruption("Data stream contains zero bytes");
+            }
+
             if (!isStreaming)
                 decodeChunk(buffer.retain());
 
-            log.info("DECODE SUCCEEDED, {} rows in {} batches", nRows, nBatches);
             decodeLastChunk();
             outQueue.add(END_OF_STREAM);
+
+            log.info("DECODE SUCCEEDED, {} rows in {} batches", nRows, nBatches);
 
             deliverPendingBlocks();
         }
         catch (Throwable e) {
-            releasePendingChunks();
-            throw e;  // todo
+            releaseOutQueue();
+            doTargetError(e); // todo
         }
         finally {
             releaseBuffer();
@@ -162,7 +174,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
         }
         finally {
             releaseBuffer();
-            releasePendingChunks();
+            releaseOutQueue();
         }
     }
 
@@ -204,7 +216,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
         }
     }
 
-    private void releasePendingChunks() {
+    private void releaseOutQueue() {
 
         var block = outQueue.poll();
 
