@@ -36,6 +36,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 
 
 public class JacksonValues {
@@ -195,8 +196,8 @@ public class JacksonValues {
                     dateVec.setNull(row);
 
                 else {
-                    String dateStr = parser.getValueAsString();
-                    LocalDate dateVal = LocalDate.parse(dateStr, MetadataCodec.ISO_DATE_FORMAT);
+
+                    LocalDate dateVal = parseLocalDate(parser);
                     int unixEpochDay = (int) dateVal.toEpochDay();
 
                     dateVec.set(row, isSet, unixEpochDay);
@@ -213,10 +214,7 @@ public class JacksonValues {
 
                 else {
 
-                    String datetimeStr = parser.getValueAsString();
-                    LocalDateTime datetimeVal = LocalDateTime.parse(datetimeStr, MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT);
-                    OffsetDateTime zoneAdjustedVal = datetimeVal.atOffset(ZoneOffset.UTC);
-
+                    OffsetDateTime zoneAdjustedVal = parseOffsetDateTime(parser);
                     long unixEpochMillis =
                             (zoneAdjustedVal.toEpochSecond() * 1000) +
                             (zoneAdjustedVal.getNano() / 1000000);
@@ -246,21 +244,50 @@ public class JacksonValues {
 
     static private BigDecimal parseBigDecimal(JsonParser parser, JsonToken token, int scale) throws IOException {
 
-        BigDecimal decimalVal;
+        try {
 
-        if (token == JsonToken.VALUE_NUMBER_INT || token == JsonToken.VALUE_NUMBER_FLOAT)
-            decimalVal = parser.getDecimalValue();
-        else if (token == JsonToken.VALUE_STRING)
-            decimalVal = new BigDecimal(parser.getValueAsString());
-        else
-            throw new EUnexpected();  // TODO
+            BigDecimal decimalVal;
 
-        if (decimalVal.scale() == scale)
-            return decimalVal;
+            if (token == JsonToken.VALUE_NUMBER_INT || token == JsonToken.VALUE_NUMBER_FLOAT)
+                decimalVal = parser.getDecimalValue();
+            else if (token == JsonToken.VALUE_STRING)
+                decimalVal = new BigDecimal(parser.getValueAsString());
+            else
+                throw new EUnexpected();  // TODO
 
-        else
-            // Scale the decimal to match the scale of the arrow vector
-            return decimalVal.setScale(scale, RoundingMode.UNNECESSARY);
+            if (decimalVal.scale() == scale)
+                return decimalVal;
+
+            else
+                // Scale the decimal to match the scale of the arrow vector
+                return decimalVal.setScale(scale, RoundingMode.UNNECESSARY);
+        }
+        catch (NumberFormatException e) {
+            throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
+        }
+    }
+
+    static private LocalDate parseLocalDate(JsonParser parser) throws IOException {
+
+        try {
+            String dateStr = parser.getValueAsString();
+            return LocalDate.parse(dateStr, MetadataCodec.ISO_DATE_FORMAT);
+        }
+        catch (DateTimeParseException e) {
+            throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
+        }
+    }
+
+    static private OffsetDateTime parseOffsetDateTime(JsonParser parser) throws IOException {
+
+        try {
+            String datetimeStr = parser.getValueAsString();
+            LocalDateTime datetimeVal = LocalDateTime.parse(datetimeStr, MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT);
+            return datetimeVal.atOffset(ZoneOffset.UTC);
+        }
+        catch (DateTimeParseException e) {
+            throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
+        }
     }
 
     public static void getAndGenerate(FieldVector vector, int row, JsonGenerator generator) throws IOException {

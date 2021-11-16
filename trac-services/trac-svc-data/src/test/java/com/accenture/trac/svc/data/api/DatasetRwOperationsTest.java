@@ -501,10 +501,10 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
             var reservedSchema = BASIC_SCHEMA.toBuilder()
                     .setSchemaType(SchemaType.TABLE)
                     .setTable(TableSchema.newBuilder()
-                            .addFields(FieldSchema.newBuilder()
-                                    .setFieldName(fieldName)
-                                    .setFieldOrder(0)
-                                    .setFieldType(BasicType.STRING)))
+                    .addFields(FieldSchema.newBuilder()
+                            .setFieldName(fieldName)
+                            .setFieldOrder(0)
+                            .setFieldType(BasicType.STRING)))
                     .build();
 
             var request = BASIC_CREATE_DATASET_REQUEST.toBuilder().setSchema(reservedSchema).build();
@@ -516,8 +516,75 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void createDataset_schemaDoesNotMatchData_multipleOptions() {
-        Assertions.fail();
+    void createDataset_schemaMismatch_fieldType() {
+
+        // Schema mismatch will only be detected in the data codec when it tries to interpret data
+        // This should be reported as DATA_LOSS
+
+        var badSchema = BASIC_SCHEMA.toBuilder()
+                .setTable(BASIC_SCHEMA.getTable().toBuilder()
+                .removeFields(1)
+                .addFields(1, BASIC_SCHEMA.getTable().getFields(1).toBuilder()
+                .setFieldType(BasicType.DATETIME)))
+                .build();
+
+        var request = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchema(badSchema)
+                .build();
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, request);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(createDataset));
+        assertEquals(Status.Code.DATA_LOSS, error.getStatus().getCode());
+    }
+
+    @Test
+    void createDataset_schemaMismatch_extraField() {
+
+        // Extra field in the data that is not described in the schema
+
+        // Schema mismatch will only be detected in the data codec when it tries to interpret data
+        // This should be reported as DATA_LOSS
+
+        var badSchema = BASIC_SCHEMA.toBuilder()
+                .setTable(BASIC_SCHEMA.getTable().toBuilder()
+                .removeFields(BASIC_SCHEMA.getTable().getFieldsCount() - 1))
+                .build();
+
+        var request = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchema(badSchema)
+                .build();
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, request);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(createDataset));
+        assertEquals(Status.Code.DATA_LOSS, error.getStatus().getCode());
+    }
+
+    @Test
+    void createDataset_schemaMismatch_missingField() {
+
+        // Field described in the schema but not present in the data
+
+        // Schema mismatch will only be detected in the data codec when it tries to interpret data
+        // This should be reported as DATA_LOSS
+
+        var badSchema = BASIC_SCHEMA.toBuilder()
+                .setTable(BASIC_SCHEMA.getTable().toBuilder()
+                .addFields(FieldSchema.newBuilder()
+                .setFieldName("an_extra_field")
+                .setFieldOrder(BASIC_SCHEMA.getTable().getFieldsCount())
+                .setFieldType(BasicType.STRING)))
+                .build();
+
+        var request = BASIC_CREATE_DATASET_REQUEST.toBuilder()
+                .setSchema(badSchema)
+                .build();
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, request);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(createDataset));
+        assertEquals(Status.Code.DATA_LOSS, error.getStatus().getCode());
     }
 
     @Test
@@ -1468,8 +1535,96 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void updateDataset_schemaDoesNotMatchData_multipleOptions() {
-        Assertions.fail();
+    void updateDataset_schemaMismatch_fieldType() throws Exception {
+
+        // Schema mismatch will only be detected in the data codec when it tries to interpret data
+        // This should be reported as DATA_LOSS
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        // Make the last field, which is a string, be an integer in the schema
+        // Codec should fail to parse an integer value
+        var badSchema = BASIC_SCHEMA_V2.toBuilder()
+                .setTable(BASIC_SCHEMA_V2.getTable().toBuilder()
+                .removeFields(7)
+                .addFields(7, BASIC_SCHEMA_V2.getTable().getFields(7).toBuilder()
+                .setFieldType(BasicType.INTEGER)))
+                .build();
+
+        var v2Request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchema(badSchema)
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, v2Request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        assertEquals(Status.Code.DATA_LOSS, error.getStatus().getCode());
+    }
+
+    @Test
+    void updateDataset_schemaMismatch_extraField() throws Exception {
+
+        // Extra field in the data that is not described in the schema
+
+        // Schema mismatch will only be detected in the data codec when it tries to interpret data
+        // This should be reported as DATA_LOSS
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        // Remove the last (new) field from the updated schema
+        // Removing a field that exists in V1 would fail version validation upfront
+        var badSchema = BASIC_SCHEMA_V2.toBuilder()
+                .setTable(BASIC_SCHEMA_V2.getTable().toBuilder()
+                .removeFields(7))
+                .build();
+
+        var v2Request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchema(badSchema)
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, v2Request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        assertEquals(Status.Code.DATA_LOSS, error.getStatus().getCode());
+    }
+
+    @Test
+    void updateDataset_schemaMismatch_missingField() throws Exception {
+
+        // Field described in the schema but not present in the data
+
+        // Schema mismatch will only be detected in the data codec when it tries to interpret data
+        // This should be reported as DATA_LOSS
+
+        var createV1 = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createV1);
+        var v1Id = resultOf(createV1);
+
+        // Remove the last (new) field from the updated schema
+        // Removing a field that exists in V1 would fail version validation upfront
+        var badSchema = BASIC_SCHEMA_V2.toBuilder()
+                .setTable(BASIC_SCHEMA_V2.getTable().toBuilder()
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("an_extra_field")
+                        .setFieldOrder(BASIC_SCHEMA_V2.getTable().getFieldsCount())
+                        .setFieldType(BasicType.STRING)))
+                .build();
+
+        var v2Request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .setSchema(badSchema)
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, v2Request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        assertEquals(Status.Code.DATA_LOSS, error.getStatus().getCode());
     }
 
     @Test

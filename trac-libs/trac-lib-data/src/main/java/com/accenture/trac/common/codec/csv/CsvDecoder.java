@@ -81,7 +81,8 @@ public class CsvDecoder extends BaseDecoder {
     protected void decodeChunk(ByteBuf chunk) {
 
         var csvFactory = new CsvFactory()
-                .enable(CsvParser.Feature.TRIM_SPACES);
+                .enable(CsvParser.Feature.TRIM_SPACES)
+                .enable(CsvParser.Feature.FAIL_ON_MISSING_COLUMNS);
 
         var csvSchema =  CsvSchemaMapping
                 .arrowToCsv(this.arrowSchema)
@@ -92,7 +93,6 @@ public class CsvDecoder extends BaseDecoder {
              var parser = (CsvParser) csvFactory.createParser((InputStream) stream)) {
 
             parser.setSchema(csvSchema);
-            parser.enable(CsvParser.Feature.TRIM_SPACES);
 
             var nRowsTotal = 0;
             var nRowsBatch = 0;
