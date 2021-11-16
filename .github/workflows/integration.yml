@@ -69,7 +69,7 @@ jobs:
               DB_PORT: 3306,
               DB_OPTIONS: '--health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3',
               BUILD_sql_mysql: true,
-              TRAC_CONFIG_FILE: '.github/config/trac-int-mysql.properties',
+              TRAC_CONFIG_FILE: '.github/config/trac-int-mysql.yaml',
               MYSQL_DATABASE: trac,
               MYSQL_USER: trac_admin,
               MYSQL_PASSWORD: trac_admin,
@@ -80,7 +80,7 @@ jobs:
               DB_PORT: 3306,
               DB_OPTIONS: '--health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3',
               BUILD_sql_mariadb: true,
-              TRAC_CONFIG_FILE: '.github/config/trac-int-mariadb.properties',
+              TRAC_CONFIG_FILE: '.github/config/trac-int-mariadb.yaml',
               MYSQL_DATABASE: trac,
               MYSQL_USER: trac_admin,
               MYSQL_PASSWORD: trac_admin,
@@ -91,7 +91,7 @@ jobs:
               DB_PORT: 5432,
               DB_OPTIONS: '--health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5',
               BUILD_sql_postgresql: true,
-              TRAC_CONFIG_FILE: '.github/config/trac-int-postgresql.properties',
+              TRAC_CONFIG_FILE: '.github/config/trac-int-postgresql.yaml',
               POSTGRES_DB: trac,
               POSTGRES_USER: trac_admin,
               POSTGRES_PASSWORD: trac_admin }
@@ -101,7 +101,7 @@ jobs:
               DB_PORT: 1433,
               DB_OPTIONS: '-e "NO_DB_OPTIONS=not_used"',  # docker run -e flag sets an env variable, passing '' causes errors
               BUILD_sql_sqlserver: true,
-              TRAC_CONFIG_FILE: '.github/config/trac-int-sqlserver.properties',
+              TRAC_CONFIG_FILE: '.github/config/trac-int-sqlserver.yaml',
               MSSQL_PID: Developer,
               ACCEPT_EULA: Y,
               SA_PASSWORD: "tR4c_aDm!n" }
