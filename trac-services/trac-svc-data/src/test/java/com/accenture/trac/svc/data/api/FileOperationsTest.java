@@ -709,7 +709,7 @@ public class FileOperationsTest extends DataApiTestBase {
         }
     }
 
-    @Test @Disabled("Required error handling not implemented yet in metadata service")
+    @Test
     void testUpdateFile_tagUpdateAttrNotPresent() throws Exception {
 
         // Attempt to replace an attr that doesn't already exist

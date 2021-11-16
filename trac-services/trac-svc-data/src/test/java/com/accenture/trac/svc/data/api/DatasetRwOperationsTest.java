@@ -886,7 +886,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         }
     }
 
-    @Test @Disabled("Required error handling not implemented yet in metadata service")
+    @Test
     void updateDataset_tagUpdateAttrNotFound() throws Exception {
 
         // Attempt to replace an attr that doesn't already exist
