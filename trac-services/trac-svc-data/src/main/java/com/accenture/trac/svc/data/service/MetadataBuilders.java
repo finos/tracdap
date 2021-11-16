@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.data.service;
 
+import com.accenture.trac.api.MetadataBatchRequest;
 import com.accenture.trac.api.MetadataReadRequest;
 import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.metadata.ObjectType;
@@ -38,6 +39,17 @@ public class MetadataBuilders {
                 .setTenant(tenant)
                 .setSelector(selector)
                 .build();
+    }
+
+    static MetadataBatchRequest requestForBatch(String tenant, TagSelector... selectors) {
+
+        var batch = MetadataBatchRequest.newBuilder()
+                .setTenant(tenant);
+
+        for (var selector : selectors)
+            batch.addSelector(selector);
+
+        return batch.build();
     }
 
     static TagHeader bumpVersion(TagHeader priorVersion) {

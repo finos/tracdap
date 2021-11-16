@@ -16,10 +16,7 @@
 
 package com.accenture.trac.svc.data.service;
 
-import com.accenture.trac.api.DataReadRequest;
-import com.accenture.trac.api.DataWriteRequest;
-import com.accenture.trac.api.MetadataWriteRequest;
-import com.accenture.trac.api.TrustedMetadataApiGrpc;
+import com.accenture.trac.api.*;
 import com.accenture.trac.api.config.DataServiceConfig;
 import com.accenture.trac.common.codec.ICodec;
 import com.accenture.trac.common.codec.ICodecManager;
@@ -150,9 +147,8 @@ public class DataRwService {
 
         return CompletableFuture.completedFuture(null)
 
-                // Load metadata for the dataset (DATA, STORAGE)
+                // Load metadata for the prior version (DATA, STORAGE, SCHEMA if external)
                 .thenCompose(x -> loadMetadata(request.getTenant(), request.getPriorVersion(), prior))
-                .thenCompose(x -> resolveSchema(request.getTenant(), prior.data, prior))
 
                 // Resolve a concrete schema to use for this save operation
                 // This may fail if it refers to missing or incompatible external objects
@@ -164,7 +160,7 @@ public class DataRwService {
                 // Validate schema version update
                 // No need to validate data version update here, since data RW service is creating it!
                 // Metadata service will validate the update though
-                .thenAccept(x -> validator.validateVersion(state.schema, prior.schema))
+                .thenAccept(x -> validator.validateVersion(state.data, prior.data))
 
                 // Decode the data content stream and write it to the storage layer
                 // This is where the main data processing streams are executed
@@ -202,13 +198,8 @@ public class DataRwService {
 
         CompletableFuture.completedFuture(null)
 
-                // Load metadata for the dataset (DATA, STORAGE)
+                // Load metadata for the dataset (DATA, STORAGE, SCHEMA if external)
                 .thenCompose(x -> loadMetadata(request.getTenant(), request.getSelector(), state))
-
-                // Resolve a concrete schema to use for this load operation
-                // This should succeed so long as the metadata service is up,
-                // because the schema metadata was validated when the dataset was saved
-                .thenCompose(x -> resolveSchema(request.getTenant(), state.data, state))
 
                 // Select which copy of the data will be read
                 .thenAccept(x -> selectCopy(state))
@@ -230,20 +221,51 @@ public class DataRwService {
 
     private CompletionStage<Void> loadMetadata(String tenant, TagSelector dataSelector, RequestState state) {
 
-        return CompletableFuture.completedFuture(0)
+        var request = requestForSelector(tenant, dataSelector);
 
-                .thenApply(x -> requestForSelector(tenant, dataSelector))
-                .thenCompose(req -> Futures.javaFuture(metaApi.readObject(req)))
+        return Futures
+                .javaFuture(metaApi.readObject(request))
                 .thenAccept(tag -> {
                     state.dataId = tag.getHeader();
                     state.data = tag.getDefinition().getData();
                 })
+                .thenCompose(x -> state.data.hasSchemaId()
+                    ? loadStorageAndExternalSchema(tenant, state)
+                    : loadStorageAndEmbeddedSchema(tenant, state));
+    }
 
-                .thenApply(x -> requestForSelector(tenant, state.data.getStorageId()))
-                .thenCompose(req -> Futures.javaFuture(metaApi.readObject(req)))
+    private CompletionStage<Void> loadStorageAndExternalSchema(String tenant, RequestState state) {
+
+        var request = requestForBatch(tenant, state.data.getStorageId(), state.data.getSchemaId());
+
+        return Futures
+                .javaFuture(metaApi.readBatch(request))
+                .thenAccept(response -> {
+
+                    var storageTag = response.getTag(0);
+                    var schemaTag = response.getTag(1);
+
+                    state.storageId = storageTag.getHeader();
+                    state.storage = storageTag.getDefinition().getStorage();
+
+                    // Schema comes from the external object
+                    state.schema = schemaTag.getDefinition().getSchema();
+                });
+    }
+
+    private CompletionStage<Void> loadStorageAndEmbeddedSchema(String tenant, RequestState state) {
+
+        var request = requestForSelector(tenant, state.data.getStorageId());
+
+        return Futures
+                .javaFuture(metaApi.readObject(request))
                 .thenAccept(tag -> {
+
                     state.storageId = tag.getHeader();
                     state.storage = tag.getDefinition().getStorage();
+
+                    // A schema is still needed! Take a reference to the embedded schema object
+                    state.schema = state.data.getSchema();
                 });
     }
 
