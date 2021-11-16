@@ -953,7 +953,7 @@ public class FileStorageOperationsTest {
         // There are several illegal characters for filenames on Windows!
 
         var invalidPathResult = OS.WINDOWS.isCurrentOs()
-                ? testMethod.apply("£$ N'`¬$£>.)_£\"+\n%", execContext)
+                ? testMethod.apply("@$ N'`$>.)_\"+\n%", execContext)
                 : testMethod.apply("nul\0char", execContext);
 
         waitFor(TEST_TIMEOUT,
