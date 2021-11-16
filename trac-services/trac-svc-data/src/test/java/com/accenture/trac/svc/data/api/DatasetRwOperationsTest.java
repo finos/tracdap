@@ -84,7 +84,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
             TagUpdate.newBuilder()
                     .setAttrName("description")
                     .setOperation(TagOperation.REPLACE_ATTR)
-                    .setValue(MetadataCodec.encodeValue("Describes what is in the V2 template"))
+                    .setValue(MetadataCodec.encodeValue("Describes what is in the V2 dataset"))
                     .build());
 
     static final DataWriteRequest BASIC_UPDATE_DATASET_REQUEST = DataWriteRequest.newBuilder()
@@ -164,7 +164,37 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createDataset);
         var dataId = resultOf(createDataset);
 
-        Assertions.fail();
+        // Retrieve metadata
+
+        var metaRequest = metaReadRequest(dataId);
+        var metaResponse = Futures.javaFuture(metaClient.readObject(metaRequest));
+        waitFor(TEST_TIMEOUT, metaResponse);
+        var tag = resultOf(metaResponse);
+
+        // Explicitly set attrs
+
+        Assertions.assertTrue(tag.containsAttrs("dataset_name"));
+        Assertions.assertTrue(tag.containsAttrs("description"));
+        var appDatasetAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("dataset_name"));
+        var descriptionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("description"));
+        Assertions.assertEquals("test_dataset", appDatasetAttr);
+        Assertions.assertEquals("Describes what this dataset does in the app", descriptionAttr);
+
+        // Check core attributes of the data definition
+
+        var def = tag.getDefinition();
+        Assertions.assertEquals(ObjectType.DATA, def.getObjectType());
+
+        var dataDef = def.getData();
+        Assertions.assertEquals(BASIC_SCHEMA, dataDef.getSchema());
+        Assertions.assertEquals(1, dataDef.getPartsCount());
+
+        // Storage ID should always point to a storage object and refer to the latest object/tag version
+        // This is because storage can evolve independently of logical files/data (e.g. due to retention policy)
+
+        Assertions.assertEquals(ObjectType.STORAGE, dataDef.getStorageId().getObjectType());
+        Assertions.assertTrue(dataDef.getStorageId().getLatestObject());
+        Assertions.assertTrue(dataDef.getStorageId().getLatestTag());
     }
 
     @Test
@@ -236,7 +266,37 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
         assertDataEqual(originalData, storedData);
 
-        // TODO: External schema metadata check
+        // Check the metadata as well
+
+        var metaRequest = metaReadRequest(dataId);
+        var metaResponse = Futures.javaFuture(metaClient.readObject(metaRequest));
+        waitFor(TEST_TIMEOUT, metaResponse);
+        var tag = resultOf(metaResponse);
+
+        // Explicitly set attrs
+
+        Assertions.assertTrue(tag.containsAttrs("dataset_name"));
+        Assertions.assertTrue(tag.containsAttrs("description"));
+        var appDatasetAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("dataset_name"));
+        var descriptionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("description"));
+        Assertions.assertEquals("test_dataset", appDatasetAttr);
+        Assertions.assertEquals("Describes what this dataset does in the app", descriptionAttr);
+
+        // Check core attributes of the data definition
+
+        var def = tag.getDefinition();
+        Assertions.assertEquals(ObjectType.DATA, def.getObjectType());
+
+        var storedDataDef = def.getData();
+        Assertions.assertEquals(selectorFor(schemaId), storedDataDef.getSchemaId());
+        Assertions.assertEquals(1, storedDataDef.getPartsCount());
+
+        // Storage ID should always point to a storage object and refer to the latest object/tag version
+        // This is because storage can evolve independently of logical files/data (e.g. due to retention policy)
+
+        Assertions.assertEquals(ObjectType.STORAGE, storedDataDef.getStorageId().getObjectType());
+        Assertions.assertTrue(storedDataDef.getStorageId().getLatestObject());
+        Assertions.assertTrue(storedDataDef.getStorageId().getLatestTag());
     }
 
     @Test
@@ -596,8 +656,55 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void updateDataset_ok_metadata() {
-        Assertions.fail();
+    void updateDataset_ok_metadata() throws Exception {
+
+        // Create V1 dataset
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        // Create V2 dataset
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var v2Id = resultOf(updateDataset);
+
+        // Retrieve V2 metadata
+
+        var metaRequest = metaReadRequest(v2Id);
+        var metaResponse = Futures.javaFuture(metaClient.readObject(metaRequest));
+        waitFor(TEST_TIMEOUT, metaResponse);
+        var tag = resultOf(metaResponse);
+
+        // Explicitly set attrs
+
+        Assertions.assertTrue(tag.containsAttrs("dataset_name"));
+        Assertions.assertTrue(tag.containsAttrs("description"));
+        var appDatasetAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("dataset_name"));
+        var descriptionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("description"));
+        Assertions.assertEquals("test_dataset", appDatasetAttr);
+        Assertions.assertEquals("Describes what is in the V2 dataset", descriptionAttr);
+
+        // Check core attributes of the data definition
+
+        var def = tag.getDefinition();
+        Assertions.assertEquals(ObjectType.DATA, def.getObjectType());
+
+        var dataDef = def.getData();
+        Assertions.assertEquals(BASIC_SCHEMA_V2, dataDef.getSchema());
+        Assertions.assertEquals(1, dataDef.getPartsCount());
+
+        // Storage ID should always point to a storage object and refer to the latest object/tag version
+        // This is because storage can evolve independently of logical files/data (e.g. due to retention policy)
+
+        Assertions.assertEquals(ObjectType.STORAGE, dataDef.getStorageId().getObjectType());
+        Assertions.assertTrue(dataDef.getStorageId().getLatestObject());
+        Assertions.assertTrue(dataDef.getStorageId().getLatestTag());
     }
 
     @Test
@@ -701,7 +808,37 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
         assertDataEqual(originalData, storedData);
 
-        // TODO: Check external schema metadata
+        // Check the metadata as well
+
+        var metaRequest = metaReadRequest(v2Id);
+        var metaResponse = Futures.javaFuture(metaClient.readObject(metaRequest));
+        waitFor(TEST_TIMEOUT, metaResponse);
+        var tag = resultOf(metaResponse);
+
+        // Explicitly set attrs
+
+        Assertions.assertTrue(tag.containsAttrs("dataset_name"));
+        Assertions.assertTrue(tag.containsAttrs("description"));
+        var appDatasetAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("dataset_name"));
+        var descriptionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("description"));
+        Assertions.assertEquals("test_dataset", appDatasetAttr);
+        Assertions.assertEquals("Describes what is in the V2 dataset", descriptionAttr);
+
+        // Check core attributes of the data definition
+
+        var def = tag.getDefinition();
+        Assertions.assertEquals(ObjectType.DATA, def.getObjectType());
+
+        var storedDataDef = def.getData();
+        Assertions.assertEquals(selectorFor(v2SchemaId), storedDataDef.getSchemaId());
+        Assertions.assertEquals(1, storedDataDef.getPartsCount());
+
+        // Storage ID should always point to a storage object and refer to the latest object/tag version
+        // This is because storage can evolve independently of logical files/data (e.g. due to retention policy)
+
+        Assertions.assertEquals(ObjectType.STORAGE, storedDataDef.getStorageId().getObjectType());
+        Assertions.assertTrue(storedDataDef.getStorageId().getLatestObject());
+        Assertions.assertTrue(storedDataDef.getStorageId().getLatestTag());
     }
 
     @Test

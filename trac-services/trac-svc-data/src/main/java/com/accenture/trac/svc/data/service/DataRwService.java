@@ -26,6 +26,7 @@ import com.accenture.trac.common.data.DataContext;
 import com.accenture.trac.common.data.IDataContext;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.metadata.PartKeys;
 import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.common.validation.Validator;
@@ -34,8 +35,6 @@ import com.accenture.trac.metadata.*;
 import com.google.protobuf.Message;
 import io.netty.buffer.ByteBuf;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.NettyAllocationManager;
-import org.apache.arrow.memory.RootAllocator;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -51,7 +50,10 @@ import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
 import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
+
 public class DataRwService {
+
+    private static final String TRAC_STORAGE_OBJECT_ATTR = "trac_storage_object";
 
     private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/part-%s/snap-%d/delta-%d-%s";
     private static final String DATA_ITEM_SUFFIX_TEMPLATE = "x%06x";
@@ -115,7 +117,7 @@ public class DataRwService {
                         state.copy, dataCtx))
 
                 // A quick sanity check that the data was written successfully
-                .thenApply(rowsSaved -> checkRows(request, rowsSaved))
+                // .thenApply(rowsSaved -> checkRows(request, rowsSaved))
 
                 // Update metadata objects with results from data processing
                 // (currently just size, but could also include other basic stats)
@@ -168,7 +170,7 @@ public class DataRwService {
                         state.copy, dataCtx))
 
                 // A quick sanity check that the data was written successfully
-                .thenApply(rowsSaved -> checkRows(request, rowsSaved))
+                // .thenApply(rowsSaved -> checkRows(request, rowsSaved))
 
                 // Update metadata objects with results from data processing
                 // (currently just size, but could also include other basic stats)
@@ -269,9 +271,13 @@ public class DataRwService {
     private void selectCopy(RequestState state) {
 
         var opaqueKey = PartKeys.opaqueKey(PartKeys.ROOT);
-        var snapIndex = 0;
+
+        // Snap index is not needed, since DataDefinition.Part only holds the current snap
+
+        // Current implementation only supports snap updates, so delta is always zero
         var deltaIndex = 0;
 
+        // Current implementation only creates the first incarnation and copy of each delta
         var incarnationIndex = 0;
         var copyIndex = 0;
 
@@ -286,24 +292,6 @@ public class DataRwService {
                 .getDataItemsOrThrow(dataItem)
                 .getIncarnations(incarnationIndex)
                 .getCopies(copyIndex);
-    }
-
-    private CompletionStage<SchemaDefinition> resolveSchema(String tenant, DataDefinition dataDef, RequestState state) {
-
-        if (dataDef.hasSchema()) {
-            state.schema = dataDef.getSchema();
-            return CompletableFuture.completedFuture(state.schema);
-        }
-
-        if (dataDef.hasSchemaId()) {
-
-            var schemaReq = MetadataBuilders.requestForSelector(tenant, dataDef.getSchemaId());
-            return Futures
-                    .javaFuture(metaClient.readObject(schemaReq))
-                    .thenApply(tag -> state.schema = tag.getDefinition().getSchema());
-        }
-
-        throw new EUnexpected();
     }
 
     private CompletionStage<SchemaDefinition> resolveSchema(DataWriteRequest request, RequestState state) {
@@ -352,7 +340,7 @@ public class DataRwService {
 
         var dataItem = buildDataItem(state);
         var dataDef = createDataDef(request, state, dataItem);
-        var storageDef = createStorageDef(request, dataItem, objectTimestamp);
+        var storageDef = createStorageDef(dataItem, objectTimestamp);
 
         state.data = dataDef;
         state.storage = storageDef;
@@ -491,7 +479,7 @@ public class DataRwService {
         return dataDef.build();
     }
 
-    private StorageDefinition createStorageDef(DataWriteRequest request, String dataItem, OffsetDateTime objectTimestamp) {
+    private StorageDefinition createStorageDef(String dataItem, OffsetDateTime objectTimestamp) {
 
         var storageItem = buildStorageItem(dataItem, objectTimestamp);
 
@@ -539,10 +527,27 @@ public class DataRwService {
 
     private void finalizeMetadata(RequestState state, long rowsSaved) {
 
+        state.storageTags = controlledStorageAttrs(state.dataId);
     }
 
     private void finalizeUpdateMetadata(RequestState state, long rowsSaved) {
 
+        // Currently, a no-op
+    }
+
+    private static List<TagUpdate> controlledStorageAttrs(TagHeader dataId) {
+
+        // TODO: Special metadata Value type for handling tag selectors
+        var selector = MetadataUtil.selectorForLatest(dataId);
+        var storageObjectAttr = String.format("%s:%s", selector.getObjectType(), selector.getObjectId());
+
+        var storageForAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_STORAGE_OBJECT_ATTR)
+                .setOperation(TagOperation.CREATE_ATTR)
+                .setValue(MetadataCodec.encodeValue(storageObjectAttr))
+                .build();
+
+        return List.of(storageForAttr);
     }
 
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state) {
@@ -679,12 +684,5 @@ public class DataRwService {
         decoder.subscribe(writer);
 
         return signal;
-    }
-
-    private long checkRows(DataWriteRequest request, long rowsSaved) {
-
-        // TODO: if (request.hasExpectedRows()) { ... }
-
-        return rowsSaved;
     }
 }
