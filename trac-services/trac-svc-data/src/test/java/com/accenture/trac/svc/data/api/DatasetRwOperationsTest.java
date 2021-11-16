@@ -1706,8 +1706,26 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
     }
 
     @Test
-    void updateDataset_noContent() {
-        Assertions.fail();
+    void updateDataset_noContent() throws Exception {
+
+        // Create V1 dataset
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        // Create V2 dataset
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .clearContent()
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+
+        var error = assertThrows(StatusRuntimeException.class, () -> resultOf(updateDataset));
+        assertEquals(Status.Code.DATA_LOSS, error.getStatus().getCode());
     }
 
 
