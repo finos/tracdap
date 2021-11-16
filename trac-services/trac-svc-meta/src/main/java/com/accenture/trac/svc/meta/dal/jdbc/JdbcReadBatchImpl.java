@@ -22,6 +22,7 @@ import com.accenture.trac.common.exception.EValidationGap;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -399,8 +400,18 @@ class JdbcReadBatchImpl {
                 }
 
                 // Store accumulated attrs for the final tag index
-                if (nTags > 0)
+                if (nTags > 0) {
                     result[currentTagIndex] = currentTagAttrs;
+                    currentTagIndex++;
+                }
+
+                // In the case where some tags have no attrs
+                // Ensure an empty map is created for those tags
+                while (currentTagIndex < nTags) {
+
+                    result[currentTagIndex] = new HashMap<>();
+                    currentTagIndex++;
+                }
 
                 return result;
             }
