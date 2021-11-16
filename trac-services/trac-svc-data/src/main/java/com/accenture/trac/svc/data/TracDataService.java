@@ -39,6 +39,9 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import org.apache.arrow.memory.AllocationManager;
+import org.apache.arrow.memory.NettyAllocationManager;
+import org.apache.arrow.memory.RootAllocator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,13 +111,22 @@ public class TracDataService extends CommonServiceBase {
 
             var execRegister = new ExecutionRegister(workerGroup);
 
+            // TODO: Review setup of Arrow allocator, inc. interaction with Netty / Protobuf allocators
+
+            var arrowAllocatorConfig = RootAllocator
+                    .configBuilder()
+                    .allocationManagerFactory(NettyAllocationManager.FACTORY)
+                    .build();
+
+            var arrowAllocator = new RootAllocator(arrowAllocatorConfig);
+
             var formats = new CodecManager(pluginManager);
             var storage = new StorageManager(pluginManager);
             storage.initStorage(dataSvcConfig.getStorage(), formats);
 
             var metaClient = prepareMetadataClient(rootConfig.getTrac(), clientChannelType);
 
-            var dataSvc = new DataRwService(dataSvcConfig, storage, formats, metaClient);
+            var dataSvc = new DataRwService(dataSvcConfig, arrowAllocator, storage, formats, metaClient);
             var fileSvc = new FileRwService(dataSvcConfig, storage, metaClient);
             var publicApi = new TracDataApi(dataSvc, fileSvc);
 

@@ -104,7 +104,7 @@ message PartKey {
 
 message DataDefinition {
 
-    oneof schemaDefinition {
+    oneof schemaSpec {
 
         TagSelector schemaId = 1;
         SchemaDefinition schema = 2;

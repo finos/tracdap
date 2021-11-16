@@ -57,34 +57,26 @@ public class DataRwService {
     private static final String DATA_ITEM_SUFFIX_TEMPLATE = "x%06x";
 
     private final DataServiceConfig config;
+    private final BufferAllocator arrowAllocator;
     private final IStorageManager storageManager;
     private final ICodecManager codecManager;
-    private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaApi;
-
-    private final BufferAllocator arrowAllocator;
+    private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient;
 
     private final Validator validator = new Validator();
     private final Random random = new Random();
 
     public DataRwService(
             DataServiceConfig config,
+            BufferAllocator arrowAllocator,
             IStorageManager storageManager,
             ICodecManager codecManager,
-            TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaApi) {
+            TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient) {
 
         this.config = config;
+        this.arrowAllocator = arrowAllocator;
         this.storageManager = storageManager;
         this.codecManager = codecManager;
-        this.metaApi = metaApi;
-
-        // TODO: Arrow allocator should probably be owned by the main service class and passed in
-
-        var arrowAllocatorConfig = RootAllocator
-                .configBuilder()
-                .allocationManagerFactory(NettyAllocationManager.FACTORY)
-                .build();
-
-        this.arrowAllocator = new RootAllocator(arrowAllocatorConfig);
+        this.metaClient = metaClient;
     }
 
     public CompletionStage<TagHeader> createDataset(
@@ -229,7 +221,7 @@ public class DataRwService {
         var request = requestForSelector(tenant, dataSelector);
 
         return Futures
-                .javaFuture(metaApi.readObject(request))
+                .javaFuture(metaClient.readObject(request))
                 .thenAccept(tag -> {
                     state.dataId = tag.getHeader();
                     state.data = tag.getDefinition().getData();
@@ -244,7 +236,7 @@ public class DataRwService {
         var request = requestForBatch(tenant, state.data.getStorageId(), state.data.getSchemaId());
 
         return Futures
-                .javaFuture(metaApi.readBatch(request))
+                .javaFuture(metaClient.readBatch(request))
                 .thenAccept(response -> {
 
                     var storageTag = response.getTag(0);
@@ -263,7 +255,7 @@ public class DataRwService {
         var request = requestForSelector(tenant, state.data.getStorageId());
 
         return Futures
-                .javaFuture(metaApi.readObject(request))
+                .javaFuture(metaClient.readObject(request))
                 .thenAccept(tag -> {
 
                     state.storageId = tag.getHeader();
@@ -307,7 +299,7 @@ public class DataRwService {
 
             var schemaReq = MetadataBuilders.requestForSelector(tenant, dataDef.getSchemaId());
             return Futures
-                    .javaFuture(metaApi.readObject(schemaReq))
+                    .javaFuture(metaClient.readObject(schemaReq))
                     .thenApply(tag -> state.schema = tag.getDefinition().getSchema());
         }
 
@@ -325,7 +317,7 @@ public class DataRwService {
 
             var schemaReq = MetadataBuilders.requestForSelector(request.getTenant(), request.getSchemaId());
             return Futures
-                    .javaFuture(metaApi.readObject(schemaReq))
+                    .javaFuture(metaClient.readObject(schemaReq))
                     .thenApply(tag -> state.schema = tag.getDefinition().getSchema());
         }
 
@@ -339,10 +331,10 @@ public class DataRwService {
 
         return CompletableFuture.completedFuture(0)
 
-                .thenCompose(x -> Futures.javaFuture(metaApi.preallocateId(preAllocDataReq)))
+                .thenCompose(x -> Futures.javaFuture(metaClient.preallocateId(preAllocDataReq)))
                 .thenAccept(dataId -> state.preAllocDataId = dataId)
 
-                .thenCompose(x -> Futures.javaFuture(metaApi.preallocateId(preAllocStorageReq)))
+                .thenCompose(x -> Futures.javaFuture(metaClient.preallocateId(preAllocStorageReq)))
                 .thenAccept(storageId -> state.preAllocStorageId = storageId);
     }
 
@@ -564,11 +556,11 @@ public class DataRwService {
         return CompletableFuture.completedFuture(0)
 
                 .thenApply(x -> storageReq)
-                .thenApply(metaApi::createPreallocatedObject)
+                .thenApply(metaClient::createPreallocatedObject)
                 .thenCompose(Futures::javaFuture)
 
                 .thenApply(x -> dataReq)
-                .thenApply(metaApi::createPreallocatedObject)
+                .thenApply(metaClient::createPreallocatedObject)
                 .thenCompose(Futures::javaFuture);
     }
 
@@ -583,11 +575,11 @@ public class DataRwService {
         return CompletableFuture.completedFuture(0)
 
                 .thenApply(x -> storageReq)
-                .thenApply(metaApi::updateObject)
+                .thenApply(metaClient::updateObject)
                 .thenCompose(Futures::javaFuture)
 
                 .thenApply(x -> dataReq)
-                .thenApply(metaApi::updateObject)
+                .thenApply(metaClient::updateObject)
                 .thenCompose(Futures::javaFuture);
     }
 

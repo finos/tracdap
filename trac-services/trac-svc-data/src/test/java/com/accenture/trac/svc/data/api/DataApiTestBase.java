@@ -45,6 +45,8 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
 
+import org.apache.arrow.memory.NettyAllocationManager;
+import org.apache.arrow.memory.RootAllocator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -181,6 +183,13 @@ abstract  class DataApiTestBase {
 
         execContext = new ExecutionContext(new DefaultEventExecutor());
 
+        var arrowAllocatorConfig = RootAllocator
+                .configBuilder()
+                .allocationManagerFactory(NettyAllocationManager.FACTORY)
+                .build();
+
+        var arrowAllocator = new RootAllocator(arrowAllocatorConfig);
+
         var dataSvcName = InProcessServerBuilder.generateName();
 
         workerGroup = new NioEventLoopGroup(6, new DefaultThreadFactory("data-svc"));
@@ -196,7 +205,7 @@ abstract  class DataApiTestBase {
 
         var metaApi = TrustedMetadataApiGrpc.newFutureStub(dataSvcClientChannel);
 
-        var dataRwSvc = new DataRwService(dataSvcConfig, storage, formats, metaApi);
+        var dataRwSvc = new DataRwService(dataSvcConfig, arrowAllocator, storage, formats, metaApi);
         var fileRwSvc = new FileRwService(dataSvcConfig, storage, metaApi);
         var publicApiImpl =  new TracDataApi(dataRwSvc, fileRwSvc);
 
