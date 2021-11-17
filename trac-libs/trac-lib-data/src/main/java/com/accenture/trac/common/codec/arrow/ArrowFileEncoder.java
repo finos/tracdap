@@ -17,34 +17,21 @@
 package com.accenture.trac.common.codec.arrow;
 
 import com.accenture.trac.common.codec.BaseEncoder;
-import com.accenture.trac.common.concurrent.flow.CommonBaseProcessor;
-import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.util.ByteOutputChannel;
-import com.accenture.trac.common.util.ByteOutputStream;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorLoader;
 import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.ipc.ArrowFileWriter;
-import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
-import org.apache.arrow.vector.ipc.message.ArrowMessage;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.WritableByteChannel;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Queue;
 
 
 public class ArrowFileEncoder extends BaseEncoder {

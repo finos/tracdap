@@ -16,7 +16,6 @@
 
 package com.accenture.trac.common.codec;
 
-import com.accenture.trac.common.concurrent.flow.CommonBaseProcessor;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.exception.EDataCorruption;
 import io.netty.buffer.ByteBuf;
@@ -29,7 +28,7 @@ import java.util.ArrayDeque;
 import java.util.Queue;
 
 
-public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock> implements ICodec.Decoder {
+public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> implements ICodec.Decoder {
 
     protected static final boolean STREAMING_DECODER = true;
     protected static final boolean BUFFERED_DECODER = false;
@@ -127,9 +126,9 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
             if (!chunkDelivered)
                 chunk.release();
 
-            releaseBuffer();
             releaseOutQueue();
-            throw e;  // todo
+            releaseBuffer();
+            throw e;
         }
     }
 
@@ -157,7 +156,7 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
         }
         catch (Throwable e) {
             releaseOutQueue();
-            doTargetError(e); // todo
+            throw e;
         }
         finally {
             releaseBuffer();
@@ -173,8 +172,8 @@ public abstract class BaseDecoder extends CommonBaseProcessor<ByteBuf, DataBlock
             doTargetError(error);  // todo
         }
         finally {
-            releaseBuffer();
             releaseOutQueue();
+            releaseBuffer();
         }
     }
 

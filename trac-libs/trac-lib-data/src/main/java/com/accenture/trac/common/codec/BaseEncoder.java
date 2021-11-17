@@ -16,7 +16,6 @@
 
 package com.accenture.trac.common.codec;
 
-import com.accenture.trac.common.concurrent.flow.CommonBaseProcessor;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.exception.EUnexpected;
 import io.netty.buffer.ByteBuf;
@@ -33,7 +32,7 @@ import java.util.Queue;
 import java.util.concurrent.CompletionException;
 
 
-public abstract class BaseEncoder extends CommonBaseProcessor<DataBlock, ByteBuf> implements ICodec.Encoder {
+public abstract class BaseEncoder extends BaseProcessor<DataBlock, ByteBuf> implements ICodec.Encoder {
 
     private static final ByteBuf END_OF_STREAM = new EmptyByteBuf(ByteBufAllocator.DEFAULT);
 

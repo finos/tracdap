@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.concurrent.flow;
+package com.accenture.trac.common.codec;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.util.concurrent.CompletionException;
@@ -24,7 +27,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 
 
-public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Processor<TSource, TTarget> {
+public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<TSource, TTarget> {
 
     protected enum ProcessorStatus {
         NOT_STARTED,
@@ -39,6 +42,11 @@ public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Pro
         INVALID_STATE
     }
 
+    private final Logger log = LoggerFactory.getLogger(getClass());
+
+    private final Lock stateLock;
+    private final LockKeeper stateLockKeeper;
+
     private ProcessorStatus status = ProcessorStatus.NOT_STARTED;
     private long nTargetRequested = 0;
     private long nTargetDelivered = 0;
@@ -49,10 +57,7 @@ public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Pro
     private Flow.Subscription targetSubscription;
     private Flow.Subscriber<? super TTarget> targetSubscriber;
 
-    private final Lock stateLock;
-    private final LockKeeper stateLockKeeper;
-
-    protected CommonBaseProcessor() {
+    protected BaseProcessor() {
 
         stateLock = new NullLock();
         stateLockKeeper = new LockKeeper();
@@ -102,15 +107,16 @@ public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Pro
             switch (status) {
 
                 case RUNNING:
+                case SOURCE_COMPLETE:
                     nTargetRequested += n;
                     doRequest = true;
                     break;
 
-                case SOURCE_COMPLETE:
                 case TARGET_SUBSCRIBED:
                     nTargetRequested += n;
                     break;
 
+                // Already done, ignore request for more
                 case COMPLETE:
                 case FAILED_UPSTREAM:
                 case FAILED_INTERNAL:
@@ -148,6 +154,7 @@ public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Pro
                     status = ProcessorStatus.CANCELLED;
                     break;
 
+                // Already done, ignore cancel request
                 case COMPLETE:
                 case FAILED_UPSTREAM:
                 case FAILED_INTERNAL:
@@ -155,6 +162,7 @@ public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Pro
                     break;
 
                 default:
+                    status = ProcessorStatus.INVALID_STATE;
                     throw new IllegalStateException();
             }
         }
@@ -202,35 +210,179 @@ public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Pro
     @Override
     public final void onNext(TSource item) {
 
-        nSourceDelivered += 1;
+        var doDeliver = false;
+        var doDiscard = false;
 
-        handleSourceNext(item);
-    }
+        try (var lock = reusableLock()) {
 
-    @Override
-    public final void onError(Throwable error) {
+            lock.acquire();
 
-        handleSourceError(error);
+            switch (status) {
+
+                case RUNNING:
+                    doDeliver = true;
+                    nSourceDelivered += 1;
+                    break;
+
+                // Already failed or cancelled, silently ignore onNext
+                case FAILED_UPSTREAM:
+                case FAILED_INTERNAL:
+                case CANCELLED:
+                    doDiscard = true;
+                    break;
+
+                default:
+                    doDiscard = true;
+                    status = ProcessorStatus.INVALID_STATE;
+                    throw new IllegalStateException();
+            }
+        }
+        finally {
+
+            if (doDiscard)
+                ;  // TODO: Discard func
+        }
+
+        if (doDeliver)
+            handleSourceNext(item);
     }
 
     @Override
     public final void onComplete() {
 
-        handleSourceComplete();
-    }
+        var doReportComplete = false;
 
-    private class Subscription implements Flow.Subscription {
+        try (var lock = reusableLock()) {
 
-        @Override
-        public void request(long n) {
-            targetRequest(n);
+            lock.acquire();
+
+            switch (status) {
+
+                case RUNNING:
+                    doReportComplete = true;
+                    status = ProcessorStatus.SOURCE_COMPLETE;
+                    break;
+
+                // Already failed or cancelled, silently ignore onComplete
+                case FAILED_UPSTREAM:
+                case FAILED_INTERNAL:
+                case CANCELLED:
+                    break;
+
+                default:
+                    status = ProcessorStatus.INVALID_STATE;
+                    throw new IllegalStateException();
+            }
         }
 
-        @Override
-        public void cancel() {
-            targetCancel();
+        // todo
+
+        try {
+
+            if (doReportComplete)
+                handleSourceComplete();
+        }
+        catch (Throwable e) {
+
+            doTargetError(e);
         }
     }
+
+    @Override
+    public final void onError(Throwable error) {
+
+        var doReportError = false;
+
+        try (var lock = reusableLock()) {
+
+            lock.acquire();
+
+            switch (status) {
+
+                case RUNNING:
+                    doReportError = true;
+                    status = ProcessorStatus.FAILED_UPSTREAM;
+                    break;
+
+                // Already failed or cancelled, do not report a second error
+                case FAILED_UPSTREAM:
+                case FAILED_INTERNAL:
+                case CANCELLED:
+                    break;
+
+                default:
+                    status = ProcessorStatus.INVALID_STATE;
+                    throw new IllegalStateException();
+            }
+        }
+
+        if (doReportError)
+            handleSourceError(error);
+    }
+
+    protected final void doSourceRequest(long n) {
+
+        var doRequest = false;
+
+        try (var lock = reusableLock()) {
+
+            lock.acquire();
+
+            switch (status) {
+
+                case RUNNING:
+                    nSourceRequested += n;
+                    doRequest = true;
+                    break;
+
+                default:
+                    status = ProcessorStatus.INVALID_STATE;
+                    throw new IllegalStateException();
+            }
+        }
+
+        if (doRequest)
+            sourceSubscription.request(n);
+    }
+
+    protected final void doSourceCancel() {
+
+        sourceSubscription.cancel();
+    }
+
+    protected final void doTargetNext(TTarget item) {
+
+        nTargetDelivered += 1;
+        targetSubscriber.onNext(item);
+    }
+
+    protected final void doTargetComplete() {
+
+        // TODO: State
+
+        targetSubscriber.onComplete();
+    }
+
+    protected final void doTargetError(Throwable error) {
+
+        // todo: state
+
+        try {
+
+            targetSubscriber.onError(error);
+        }
+        catch (Throwable secondaryError) {
+
+            log.warn("Failed to report an error, this is likely to cause hangs or resource leaks");
+            log.warn("Original error: {}", error.getMessage(), error);
+            log.warn("Secondary error: {}", secondaryError.getMessage(), error);
+        }
+    }
+
+    protected final long nTargetRequested() { return nTargetRequested; }
+    protected final long nTargetDelivered() { return nTargetDelivered; }
+    protected final long nSourceRequested() { return nSourceRequested; }
+    protected final long nSourceDelivered() { return nSourceDelivered; }
 
 
 
@@ -267,43 +419,24 @@ public abstract class CommonBaseProcessor <TSource, TTarget> implements Flow.Pro
         doTargetError(completionError);
     }
 
-    protected final void doSourceRequest(long n) {
 
-        nSourceRequested += n;
-        sourceSubscription.request(n);
+
+
+
+
+
+    private class Subscription implements Flow.Subscription {
+
+        @Override
+        public void request(long n) {
+            targetRequest(n);
+        }
+
+        @Override
+        public void cancel() {
+            targetCancel();
+        }
     }
-
-    protected final void doSourceCancel() {
-
-        sourceSubscription.cancel();
-    }
-
-    protected final void doTargetNext(TTarget item) {
-
-        nTargetDelivered += 1;
-        targetSubscriber.onNext(item);
-    }
-
-    protected final void doTargetComplete() {
-
-        // TODO: State
-
-        targetSubscriber.onComplete();
-    }
-
-    protected final void doTargetError(Throwable error) {
-
-        targetSubscriber.onError(error);
-    }
-
-
-    protected final long nTargetRequested() { return nTargetRequested; }
-    protected final long nTargetDelivered() { return nTargetDelivered; }
-    protected final long nSourceRequested() { return nSourceRequested; }
-    protected final long nSourceDelivered() { return nSourceDelivered; }
-
-
-
 
 
 
