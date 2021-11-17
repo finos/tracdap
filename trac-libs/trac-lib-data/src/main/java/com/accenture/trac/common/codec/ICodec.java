@@ -32,6 +32,8 @@ public interface ICodec {
 
     List<String> options();
 
+    String defaultFileExtension();
+
     Encoder getEncoder(
             BufferAllocator arrowAllocator,
             SchemaDefinition schema,

@@ -28,9 +28,16 @@ import java.util.Map;
 
 public class ArrowStreamCodec implements ICodec {
 
+    private static final String DEFAULT_FILE_EXTENSION = "arrows";
+
     @Override
     public List<String> options() {
         return List.of();
+    }
+
+    @Override
+    public String defaultFileExtension() {
+        return DEFAULT_FILE_EXTENSION;
     }
 
     @Override

@@ -25,9 +25,16 @@ import java.util.Map;
 
 public class JsonCodec implements ICodec {
 
+    private static final String DEFAULT_FILE_EXTENSION = "json";
+
     @Override
     public List<String> options() {
         return List.of();
+    }
+
+    @Override
+    public String defaultFileExtension() {
+        return DEFAULT_FILE_EXTENSION;
     }
 
     @Override

@@ -26,9 +26,16 @@ import java.util.Map;
 
 public class ArrowFileCodec implements ICodec {
 
+    private static final String DEFAULT_FILE_EXTENSION = "arrow";
+
     @Override
     public List<String> options() {
         return List.of();
+    }
+
+    @Override
+    public String defaultFileExtension() {
+        return DEFAULT_FILE_EXTENSION;
     }
 
     @Override

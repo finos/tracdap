@@ -16,6 +16,7 @@
 
 package com.accenture.trac.common.storage.flat;
 
+import com.accenture.trac.common.codec.ICodec;
 import com.accenture.trac.common.codec.ICodecManager;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.data.IDataContext;
@@ -31,6 +32,8 @@ import java.util.concurrent.Flow;
 
 public class FlatDataStorage implements IDataStorage {
 
+    private static final String CHUNK_ZERO_STORAGE_PATH = "/chunk-0.%s";
+
     private final IFileStorage fileStorage;
     private final ICodecManager formats;
 
@@ -45,16 +48,13 @@ public class FlatDataStorage implements IDataStorage {
             StorageCopy storageCopy,
             IDataContext dataContext) {
 
-        var storagePath = storageCopy.getStoragePath();
-        var storageFormat = storageCopy.getStorageFormat();
-
-        var chunkPath = storagePath + "/chunk-0.dat";  // TODO
-
-        var codec = formats.getCodec(storageFormat);
+        var codec = formats.getCodec(storageCopy.getStorageFormat());
         var codecOptions = Map.<String, String>of();
-        var decoder = codec.getDecoder(dataContext.arrowAllocator(), schemaDef, codecOptions);
+
+        var chunkPath = chunkPath(storageCopy, codec);
 
         var fileReader = fileStorage.reader(chunkPath, dataContext);
+        var decoder = codec.getDecoder(dataContext.arrowAllocator(), schemaDef, codecOptions);
         fileReader.subscribe(decoder);
 
         return decoder;
@@ -67,16 +67,13 @@ public class FlatDataStorage implements IDataStorage {
             CompletableFuture<Long> signal,
             IDataContext dataContext) {
 
-        var storagePath = storageCopy.getStoragePath();
-        var storageFormat = storageCopy.getStorageFormat();
-
-        var chunkPath = storagePath + "/chunk-0.dat";  // TODO
-
-        var codec = formats.getCodec(storageFormat);
+        var codec = formats.getCodec(storageCopy.getStorageFormat());
         var codecOptions = Map.<String, String>of();
-        var encoder = codec.getEncoder(dataContext.arrowAllocator(), schemaDef, codecOptions);
 
-        var mkdir = fileStorage.mkdir(storagePath, /* recursive = */ true, dataContext);
+        var chunkPath = chunkPath(storageCopy, codec);
+
+        var encoder = codec.getEncoder(dataContext.arrowAllocator(), schemaDef, codecOptions);
+        var mkdir = fileStorage.mkdir(storageCopy.getStoragePath(), /* recursive = */ true, dataContext);
 
         mkdir.whenComplete((result, error) -> {
 
@@ -84,12 +81,19 @@ public class FlatDataStorage implements IDataStorage {
                 signal.completeExceptionally(error);
 
             else {
-
                 var fileWriter = fileStorage.writer(chunkPath, signal, dataContext);
                 encoder.subscribe(fileWriter);
             }
         });
 
         return encoder;
+    }
+
+    private String chunkPath(StorageCopy storageCopy, ICodec codec) {
+
+        var storagePath = storageCopy.getStoragePath();
+        var extension = codec.defaultFileExtension();
+
+        return storagePath + String.format(CHUNK_ZERO_STORAGE_PATH, extension);
     }
 }
