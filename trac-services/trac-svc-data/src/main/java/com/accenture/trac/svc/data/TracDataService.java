@@ -21,11 +21,15 @@ import com.accenture.trac.api.config.DataServiceConfig;
 import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.api.config.TracConfig;
 import com.accenture.trac.common.codec.CodecManager;
+import com.accenture.trac.common.codec.ICodecManager;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.concurrent.ExecutionRegister;
+import com.accenture.trac.common.exception.EPluginNotAvailable;
 import com.accenture.trac.common.exception.EStartup;
+import com.accenture.trac.common.exception.EStorageConfig;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
+import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.common.storage.StorageManager;
 import com.accenture.trac.svc.data.api.TracDataApi;
 import com.accenture.trac.svc.data.service.DataRwService;
@@ -39,7 +43,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
-import org.apache.arrow.memory.AllocationManager;
 import org.apache.arrow.memory.NettyAllocationManager;
 import org.apache.arrow.memory.RootAllocator;
 import org.slf4j.Logger;
@@ -124,6 +127,9 @@ public class TracDataService extends CommonServiceBase {
             var storage = new StorageManager(pluginManager);
             storage.initStorage(dataSvcConfig.getStorage(), formats);
 
+            // Check default storage and format are available
+            checkDefaultStorageAndFormat(storage, formats, dataSvcConfig);
+
             var metaClient = prepareMetadataClient(rootConfig.getTrac(), clientChannelType);
 
             var dataSvc = new DataRwService(dataSvcConfig, arrowAllocator, storage, formats, metaClient);
@@ -152,6 +158,28 @@ public class TracDataService extends CommonServiceBase {
         catch (IOException e) {
 
             throw new EStartup(e.getMessage(), e);
+        }
+    }
+
+    private void checkDefaultStorageAndFormat(IStorageManager storage, ICodecManager formats, DataServiceConfig config) {
+
+        try {
+
+            storage.getFileStorage(config.getDefaultStorageKey());
+            storage.getDataStorage(config.getDefaultStorageKey());
+            formats.getCodec(config.getDefaultStorageFormat());
+        }
+        catch (EStorageConfig e) {
+
+            var msg = String.format("Storage not configured for default storage key: [%s]", config.getDefaultStorageKey());
+            log.error(msg);
+            throw new EStartup(msg, e);
+        }
+        catch (EPluginNotAvailable e) {
+
+            var msg = String.format("Codec not available for default storage format: [%s]", config.getDefaultStorageFormat());
+            log.error(msg);
+            throw new EStartup(msg, e);
         }
     }
 
