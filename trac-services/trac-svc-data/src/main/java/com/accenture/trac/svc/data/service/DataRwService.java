@@ -499,8 +499,8 @@ public class DataRwService {
 
     private StorageItem buildStorageItem(String dataItem, OffsetDateTime objectTimestamp) {
 
-        var storageKey = config.getDefaultStorage();
-        var storageFormat = "application/vnd.apache.arrow.file";  // TODO: Constants and config
+        var storageKey = config.getDefaultStorageKey();
+        var storageFormat = config.getDefaultStorageFormat();
 
         // For the time being, data has one incarnation and a single storage copy
 

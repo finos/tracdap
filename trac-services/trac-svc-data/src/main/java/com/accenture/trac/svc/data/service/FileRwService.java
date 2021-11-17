@@ -16,8 +16,6 @@
 
 package com.accenture.trac.svc.data.service;
 
-import com.accenture.trac.api.MetadataReadRequest;
-import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import com.accenture.trac.api.config.DataServiceConfig;
 import com.accenture.trac.common.concurrent.IExecutionContext;
@@ -31,7 +29,6 @@ import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.*;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,7 +117,7 @@ public class FileRwService {
                 // Build definition objects
                 .thenAccept(x -> req.file = createFileDef(req.fileId, name, mimeType))
                 .thenAccept(x -> req.storage = createStorageDef(
-                        config.getDefaultStorage(),  req.objectTimestamp,
+                        config.getDefaultStorageKey(),  req.objectTimestamp,
                         req.fileId, name, mimeType, random))
 
                 // Write file content stream to the storage layer
@@ -190,7 +187,7 @@ public class FileRwService {
                 // Build definition objects
                 .thenAccept(x -> req.file = updateFileDef(req.priorFile, req.fileId, name, mimeType))
                 .thenAccept(x -> req.storage = updateStorageDef(
-                        req.priorStorage, config.getDefaultStorage(), req.objectTimestamp,
+                        req.priorStorage, config.getDefaultStorageKey(), req.objectTimestamp,
                         req.fileId, name, mimeType, random))
 
                 .thenAccept(x -> validator.validateVersion(req.file, req.priorFile))
@@ -228,7 +225,6 @@ public class FileRwService {
             Flow.Subscriber<ByteBuf> content,
             IExecutionContext execCtx) {
 
-        var allocator = ByteBufAllocator.DEFAULT;
         var state = new RequestState();
 
         CompletableFuture.completedFuture(null)

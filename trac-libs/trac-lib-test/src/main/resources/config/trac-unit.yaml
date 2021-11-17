@@ -38,7 +38,9 @@ trac:
 
     data:
       port: 8082
-      defaultStorage: UNIT_TEST_STORAGE
+
+      defaultStorageKey: UNIT_TEST_STORAGE
+      defaultStorageFormat: ARROW_FILE
 
       storage:
 

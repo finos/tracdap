@@ -51,7 +51,9 @@ trac:
 
     data:
       port: 8082
-      defaultStorage: STORAGE1
+
+      defaultStorageKey: STORAGE1
+      defaultStorageFormat: ARROW_FILE
 
       storage:
 
