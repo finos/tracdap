@@ -18,15 +18,12 @@ package com.accenture.trac.common.codec.csv;
 
 import com.accenture.trac.common.codec.BaseEncoder;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
-import com.accenture.trac.common.codec.arrow.ArrowValues;
 import com.accenture.trac.common.codec.json.JacksonValues;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.util.ByteOutputStream;
 import com.accenture.trac.metadata.SchemaDefinition;
 
-import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.dataformat.csv.CsvFactory;
 import com.fasterxml.jackson.dataformat.csv.CsvGenerator;
@@ -41,8 +38,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.math.BigDecimal;
-import java.time.LocalDate;
 
 
 public class CsvEncoder extends BaseEncoder {
@@ -154,54 +149,6 @@ public class CsvEncoder extends BaseEncoder {
         catch (IOException e) {
 
             throw new ETracInternal(e.getMessage(), e);  // todo
-        }
-    }
-
-    private void writeField(VectorSchemaRoot root, int row, int col) throws IOException {
-
-        var value = ArrowValues.getValue(root, row, col);
-
-        if (value == null) {
-            generator.writeNull();
-            return;
-        }
-
-        var minorType = root.getVector(col).getMinorType();
-
-        switch (minorType) {
-
-            case BIT: generator.writeBoolean((boolean) value); break;
-
-            case BIGINT: generator.writeNumber((long) value); break;
-            case INT: generator.writeNumber((int) value); break;
-            case SMALLINT: generator.writeNumber((short) value); break;
-            case TINYINT: generator.writeNumber((byte) value); break;
-
-            case FLOAT8: generator.writeNumber((double) value); break;
-            case FLOAT4: generator.writeNumber((float) value); break;
-
-            case DECIMAL:
-            case DECIMAL256:
-                var decimal = (BigDecimal) value;
-                generator.writeString(decimal.toString());
-                break;
-
-            case VARCHAR:
-                generator.writeString(value.toString());
-                break;
-
-            case DATEDAY:
-            case DATEMILLI:
-                var dateValue = (LocalDate) value;
-                var dateIso = MetadataCodec.ISO_DATE_FORMAT.format(dateValue);
-                generator.writeString(dateIso);
-                break;
-
-            // TODO: Datetime type
-
-            default:
-
-                throw new EUnexpected();  // TODO: data error, field type not supported
         }
     }
 }

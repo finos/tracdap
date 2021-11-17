@@ -18,10 +18,8 @@ package com.accenture.trac.common.codec.json;
 
 import com.accenture.trac.common.codec.BaseEncoder;
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
-import com.accenture.trac.common.codec.arrow.ArrowValues;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.util.ByteOutputStream;
 import com.accenture.trac.metadata.SchemaDefinition;
 
@@ -37,8 +35,6 @@ import org.apache.arrow.vector.types.pojo.Schema;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.math.BigDecimal;
-import java.time.LocalDate;
 
 
 public class JsonEncoder extends BaseEncoder {

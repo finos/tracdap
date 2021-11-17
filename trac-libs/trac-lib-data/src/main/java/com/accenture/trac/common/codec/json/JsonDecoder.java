@@ -149,17 +149,6 @@ public class JsonDecoder extends BaseDecoder {
         // No-op
     }
 
-//    private void dispatchBatch(VectorSchemaRoot root) {
-//
-//        var batch = unloader.getRecordBatch();
-//        var block = DataBlock.forRecords(batch);
-//        outQueue.add(block);
-//
-//        // Release memory in the root
-//        // Memory is still referenced by the batch, until the batch is consumed
-//        root.clear();
-//    }
-
     private void dispatchBatch(ArrowRecordBatch batch) {
 
         emitBlock(DataBlock.forRecords(batch));

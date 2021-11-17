@@ -17,10 +17,8 @@
 package com.accenture.trac.common.codec.arrow;
 
 import com.accenture.trac.common.codec.BaseEncoder;
-import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.util.ByteOutputChannel;
-import com.accenture.trac.common.util.ByteOutputStream;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorLoader;
