@@ -25,6 +25,7 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
+import java.util.function.Consumer;
 
 
 public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<TSource, TTarget> {
@@ -37,7 +38,7 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
         SOURCE_COMPLETE,
         COMPLETE,
         FAILED_UPSTREAM,
-        FAILED_INTERNAL,
+        FAILED,
         CANCELLED,
         INVALID_STATE
     }
@@ -46,6 +47,7 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
 
     private final Lock stateLock;
     private final LockKeeper stateLockKeeper;
+    private final Consumer<TSource> discardFunc;
 
     private ProcessorStatus status = ProcessorStatus.NOT_STARTED;
     private long nTargetRequested = 0;
@@ -59,9 +61,24 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
 
     protected BaseProcessor() {
 
-        stateLock = new NullLock();
-        stateLockKeeper = new LockKeeper();
+        this.stateLock = new NullLock();
+        this.stateLockKeeper = new LockKeeper();
+        this.discardFunc = null;
     }
+
+    protected BaseProcessor(Consumer<TSource> discardFunc) {
+
+        this.stateLock = new NullLock();
+        this.stateLockKeeper = new LockKeeper();
+        this.discardFunc = discardFunc;
+    }
+
+    protected final ProcessorStatus status() { return status; }
+    protected final long nTargetRequested() { return nTargetRequested; }
+    protected final long nTargetDelivered() { return nTargetDelivered; }
+    protected final long nSourceRequested() { return nSourceRequested; }
+    protected final long nSourceDelivered() { return nSourceDelivered; }
+
 
     @Override
     public final void subscribe(Flow.Subscriber<? super TTarget> subscriber) {
@@ -119,7 +136,7 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
                 // Already done, ignore request for more
                 case COMPLETE:
                 case FAILED_UPSTREAM:
-                case FAILED_INTERNAL:
+                case FAILED:
                 case CANCELLED:
                     break;
 
@@ -157,7 +174,7 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
                 // Already done, ignore cancel request
                 case COMPLETE:
                 case FAILED_UPSTREAM:
-                case FAILED_INTERNAL:
+                case FAILED:
                 case CANCELLED:
                     break;
 
@@ -226,7 +243,7 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
 
                 // Already failed or cancelled, silently ignore onNext
                 case FAILED_UPSTREAM:
-                case FAILED_INTERNAL:
+                case FAILED:
                 case CANCELLED:
                     doDiscard = true;
                     break;
@@ -239,8 +256,8 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
         }
         finally {
 
-            if (doDiscard)
-                ;  // TODO: Discard func
+            if (doDiscard && discardFunc != null)
+                discardFunc.accept(item);
         }
 
         if (doDeliver)
@@ -265,7 +282,7 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
 
                 // Already failed or cancelled, silently ignore onComplete
                 case FAILED_UPSTREAM:
-                case FAILED_INTERNAL:
+                case FAILED:
                 case CANCELLED:
                     break;
 
@@ -306,7 +323,7 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
 
                 // Already failed or cancelled, do not report a second error
                 case FAILED_UPSTREAM:
-                case FAILED_INTERNAL:
+                case FAILED:
                 case CANCELLED:
                     break;
 
@@ -320,7 +337,7 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
             handleSourceError(error);
     }
 
-    protected final void doSourceRequest(long n) {
+    final void doSourceRequest(long n) {
 
         var doRequest = false;
 
@@ -345,31 +362,72 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
             sourceSubscription.request(n);
     }
 
-    protected final void doSourceCancel() {
+    final void doSourceCancel() {
 
         sourceSubscription.cancel();
     }
 
-    protected final void doTargetNext(TTarget item) {
+    final void doTargetNext(TTarget item) {
 
         nTargetDelivered += 1;
         targetSubscriber.onNext(item);
     }
 
-    protected final void doTargetComplete() {
+    final void doTargetComplete() {
 
-        // TODO: State
+        try (var lock = reusableLock()) {
+
+            lock.acquire();
+
+            if (status != ProcessorStatus.SOURCE_COMPLETE) {
+                status = ProcessorStatus.INVALID_STATE;
+                throw new IllegalStateException();
+            }
+
+            status = ProcessorStatus.COMPLETE;
+        }
 
         targetSubscriber.onComplete();
     }
 
-    protected final void doTargetError(Throwable error) {
+    final void doTargetError(Throwable error) {
 
-        // todo: state
+        var doReportError = false;
+
+        try (var lock = reusableLock()) {
+
+            lock.acquire();
+
+            var priorStatus = status;
+
+            switch (priorStatus) {
+
+                case TARGET_SUBSCRIBED:
+                case RUNNING:
+                case SOURCE_COMPLETE:
+                case FAILED_UPSTREAM:
+
+                    status = ProcessorStatus.FAILED;
+                    doReportError = true;
+                    break;
+
+                case CANCELLED:
+                case FAILED:
+                case COMPLETE:
+
+                    log.warn("An error occurred after processing is complete: " + error.getMessage(), error);
+                    break;
+
+                default:
+                    status = ProcessorStatus.INVALID_STATE;
+                    throw new IllegalStateException();
+            }
+        }
 
         try {
 
-            targetSubscriber.onError(error);
+            if (doReportError)
+                targetSubscriber.onError(error);
         }
         catch (Throwable secondaryError) {
 
@@ -379,10 +437,7 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
         }
     }
 
-    protected final long nTargetRequested() { return nTargetRequested; }
-    protected final long nTargetDelivered() { return nTargetDelivered; }
-    protected final long nSourceRequested() { return nSourceRequested; }
-    protected final long nSourceDelivered() { return nSourceDelivered; }
+
 
 
 

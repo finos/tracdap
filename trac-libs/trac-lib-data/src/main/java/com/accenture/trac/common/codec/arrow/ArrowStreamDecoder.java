@@ -88,7 +88,7 @@ public class ArrowStreamDecoder extends BaseDecoder {
             var errorMessage = "Arrow stream decoding failed, content does not look like an Arrow stream";
 
             log.error(errorMessage, e);
-            doTargetError(new EDataCorruption(errorMessage, e));
+            throw new EDataCorruption(errorMessage, e);
         }
         catch (IllegalArgumentException | IndexOutOfBoundsException | IOException  e) {
 
@@ -100,14 +100,14 @@ public class ArrowStreamDecoder extends BaseDecoder {
             var errorMessage = "Arrow stream decoding failed, content is garbled";
 
             log.error(errorMessage, e);
-            doTargetError(new EDataCorruption(errorMessage, e));
+            throw new EDataCorruption(errorMessage, e);
         }
         catch (Throwable e)  {
 
             // Ensure unexpected errors are still reported to the Flow API
 
             log.error("Unexpected error in Arrow stream decoding", e);
-            doTargetError(new EUnexpected(e));
+            throw new EUnexpected(e);
         }
         finally {
 
@@ -116,7 +116,7 @@ public class ArrowStreamDecoder extends BaseDecoder {
     }
 
     @Override
-    protected void decodeLastChunk() {
+    protected void decodeEnd() {
 
         // No-op, current version of arrow file decoder buffers the full input
     }

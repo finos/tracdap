@@ -21,11 +21,13 @@ import com.accenture.trac.common.exception.EDataCorruption;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
+import io.netty.util.ReferenceCounted;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
 import java.util.Queue;
+import java.util.concurrent.CompletionException;
 
 
 public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> implements ICodec.Decoder {
@@ -33,11 +35,7 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
     protected static final boolean STREAMING_DECODER = true;
     protected static final boolean BUFFERED_DECODER = false;
 
-    protected abstract void decodeStart();
-    protected abstract void decodeChunk(ByteBuf chunk);
-    protected abstract void decodeLastChunk();
-
-    private static final DataBlock END_OF_STREAM = DataBlock.eos();
+    private static final DataBlock END_OF_STREAM = DataBlock.forRecords(null);
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -51,10 +49,16 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
     private long nRows;
     private int nBatches;
 
+    protected abstract void decodeStart();
+    protected abstract void decodeChunk(ByteBuf chunk);
+    protected abstract void decodeEnd();
+
     protected BaseDecoder(boolean isStreaming) {
 
+        super(ReferenceCounted::release);
+
         this.isStreaming = isStreaming;
-        this.buffer = ByteBufAllocator.DEFAULT.compositeBuffer();  // todo: allocator needed for composites or no?
+        this.buffer = ByteBufAllocator.DEFAULT.compositeBuffer();
         this.outQueue = new ArrayDeque<>();
     }
 
@@ -77,10 +81,13 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
             if (nTargetRequested() > nTargetDelivered() && nSourceRequested() <= nSourceDelivered())
                 doSourceRequest(1);
         }
-        catch (Throwable e) {
+        catch (Throwable error) {
+
+            log.error("DECODE FAILED: " + error.getMessage());
+
             releaseBuffer();
             releaseOutQueue();
-            throw e;
+            doTargetError(error);
         }
     }
 
@@ -88,6 +95,8 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
     protected final void handleTargetCancel() {
 
         try {
+            log.warn("DECODE CANCELLED");
+
             doSourceCancel();
         }
         finally {
@@ -121,14 +130,17 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
             if (nTargetRequested() > nTargetDelivered() && nSourceRequested() <= nSourceDelivered())
                 doSourceRequest(1);
         }
-        catch (Throwable e) {
+        catch (Throwable error) {
+
+            log.error("DECODE FAILED: " + error.getMessage());
 
             if (!chunkDelivered)
                 chunk.release();
 
-            releaseOutQueue();
             releaseBuffer();
-            throw e;
+            releaseOutQueue();
+
+            doTargetError(error);
         }
     }
 
@@ -147,16 +159,22 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
             if (!isStreaming)
                 decodeChunk(buffer.retain());
 
-            decodeLastChunk();
+            decodeEnd();
             outQueue.add(END_OF_STREAM);
 
             log.info("DECODE SUCCEEDED, {} rows in {} batches", nRows, nBatches);
 
             deliverPendingBlocks();
         }
-        catch (Throwable e) {
+        catch (Throwable error) {
+
+            log.error("DECODE FAILED: " + error.getMessage());
+
+            // Only release the outQueue on error
+            // If there is no error, either all output is sent or it is held until the next request
+
             releaseOutQueue();
-            throw e;
+            doTargetError(error);
         }
         finally {
             releaseBuffer();
@@ -167,13 +185,21 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
     protected final void handleSourceError(Throwable error) {
 
         try {
-            log.error(error.getMessage(), error);
 
-            doTargetError(error);  // todo
+            // Stack trac is logged at original error site and again in outbound gRPC handler
+            // Do not log the same stack trace multiple times
+
+            log.error("DECODE FAILED: Error in source data stream: " + error.getMessage());
+
+            var completionError = error instanceof CompletionException
+                    ? error
+                    : new CompletionException(error.getMessage(), error);
+
+            doTargetError(completionError);
         }
         finally {
-            releaseOutQueue();
             releaseBuffer();
+            releaseOutQueue();
         }
     }
 
@@ -211,7 +237,7 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
             released = true;
 
             if (!releaseOk && buffer.capacity() > 0)
-                log.warn("CSV decode buffer was not released (this could indicate a memory leak)");
+                log.warn("Decode buffer was not released (this could indicate a memory leak)");
         }
     }
 

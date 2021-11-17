@@ -117,7 +117,7 @@ public class JsonDecoder extends BaseDecoder {
                     e.getMessage());
 
             log.error(errorMessage, e);
-            doTargetError(new EDataCorruption(errorMessage, e));
+            throw new EDataCorruption(errorMessage, e);
         }
         catch (IOException e) {
 
@@ -128,14 +128,14 @@ public class JsonDecoder extends BaseDecoder {
             var errorMessage = "JSON decoding failed, content is garbled: " + e.getMessage();
 
             log.error(errorMessage, e);
-            doTargetError(new EDataCorruption(errorMessage, e));
+            throw new EDataCorruption(errorMessage, e);
         }
         catch (Throwable e)  {
 
             // Ensure unexpected errors are still reported to the Flow API
 
             log.error("Unexpected error in CSV decoding", e);
-            doTargetError(new EUnexpected(e));
+            throw new EUnexpected(e);
         }
         finally {
 
@@ -144,7 +144,7 @@ public class JsonDecoder extends BaseDecoder {
     }
 
     @Override
-    protected void decodeLastChunk() {
+    protected void decodeEnd() {
 
         // No-op
     }

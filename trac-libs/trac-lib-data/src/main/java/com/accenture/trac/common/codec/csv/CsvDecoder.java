@@ -94,9 +94,7 @@ public class CsvDecoder extends BaseDecoder {
 
             parser.setSchema(csvSchema);
 
-            var nRowsTotal = 0;
             var nRowsBatch = 0;
-            var nBatches = 0;
             var nCols = arrowSchema.getFields().size();
             int col = 0;
 
@@ -130,7 +128,6 @@ public class CsvDecoder extends BaseDecoder {
                 if (token == JsonToken.END_OBJECT) {
 
                     nRowsBatch++;
-                    nRowsTotal++;
                     col = 0;
 
                     if (nRowsBatch == BATCH_SIZE) {
@@ -139,7 +136,6 @@ public class CsvDecoder extends BaseDecoder {
                         dispatchBatch(root);
 
                         nRowsBatch = 0;
-                        nBatches++;
                     }
 
                     continue;
@@ -154,11 +150,7 @@ public class CsvDecoder extends BaseDecoder {
 
                 root.setRowCount(nRowsBatch);
                 dispatchBatch(root);
-
-                nBatches++;
             }
-
-            log.info("CSV Codec: Decoded {} rows in {} batches", nRowsTotal, nBatches);
         }
         catch (JsonParseException e) {
 
@@ -170,7 +162,7 @@ public class CsvDecoder extends BaseDecoder {
                     e.getMessage());
 
             log.error(errorMessage, e);
-            doTargetError(new EDataCorruption(errorMessage, e));
+            throw new EDataCorruption(errorMessage, e);
         }
         catch (IOException e) {
 
@@ -181,14 +173,14 @@ public class CsvDecoder extends BaseDecoder {
             var errorMessage = "CSV decoding failed, content is garbled: " + e.getMessage();
 
             log.error(errorMessage, e);
-            doTargetError(new EDataCorruption(errorMessage, e));
+            throw new EDataCorruption(errorMessage, e);
         }
         catch (Throwable e)  {
 
             // Ensure unexpected errors are still reported to the Flow API
 
             log.error("Unexpected error in CSV decoding", e);
-            doTargetError(new EUnexpected(e));
+            throw new EUnexpected(e);
         }
         finally {
 
@@ -197,7 +189,7 @@ public class CsvDecoder extends BaseDecoder {
     }
 
     @Override
-    protected void decodeLastChunk() {
+    protected void decodeEnd() {
 
         // No-op, current version of CSV decoder buffers the full input
     }

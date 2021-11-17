@@ -21,41 +21,41 @@ import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Schema;
 
 
-public class DataBlock {
+public class DataBlock implements AutoCloseable {
 
     public final Schema arrowSchema;
     public final ArrowRecordBatch arrowRecords;
     public final ArrowDictionaryBatch arrowDictionary;
-    public final boolean eos;
-
-    private static final DataBlock EOS = new DataBlock(null, null, null, true);
 
     private DataBlock(
             Schema arrowSchema,
             ArrowRecordBatch arrowRecords,
-            ArrowDictionaryBatch arrowDictionary,
-            boolean eos) {
+            ArrowDictionaryBatch arrowDictionary) {
 
         this.arrowSchema = arrowSchema;
         this.arrowRecords = arrowRecords;
         this.arrowDictionary = arrowDictionary;
-        this.eos = eos;
     }
-
-    public static DataBlock eos() {
-        return EOS;
-    }
-
 
     public static DataBlock forSchema(Schema arrowSchema) {
-        return new DataBlock(arrowSchema, null, null, false);
+        return new DataBlock(arrowSchema, null, null);
     }
 
     public static DataBlock forRecords(ArrowRecordBatch arrowRecords) {
-        return new DataBlock(null, arrowRecords, null, false);
+        return new DataBlock(null, arrowRecords, null);
     }
 
     public static DataBlock forDictionary(ArrowDictionaryBatch arrowDictionary) {
-        return new DataBlock(null, null, arrowDictionary, false);
+        return new DataBlock(null, null, arrowDictionary);
+    }
+
+    @Override
+    public void close() {
+
+        if (arrowRecords != null)
+            arrowRecords.close();
+
+        if (arrowDictionary != null)
+            arrowDictionary.close();
     }
 }
