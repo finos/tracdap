@@ -28,6 +28,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.dataformat.csv.CsvFactory;
 import com.fasterxml.jackson.dataformat.csv.CsvParser;
+import com.fasterxml.jackson.dataformat.csv.CsvReadException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import org.apache.arrow.memory.BufferAllocator;
@@ -54,8 +55,6 @@ public class CsvDecoder extends BaseDecoder {
     private final Schema arrowSchema;
     private VectorSchemaRoot root;
     private VectorUnloader unloader;
-
-    private final boolean headerFlag = DEFAULT_HEADER_FLAG;
 
     public CsvDecoder(BufferAllocator arrowAllocator, SchemaDefinition schema) {
 
@@ -86,69 +85,78 @@ public class CsvDecoder extends BaseDecoder {
 
         var csvSchema =  CsvSchemaMapping
                 .arrowToCsv(this.arrowSchema)
-                .build()
-                .withHeader();
+                .build();
+
+        csvSchema = DEFAULT_HEADER_FLAG
+                ? csvSchema.withHeader()
+                : csvSchema.withoutHeader();
 
         try (var stream = new ByteBufInputStream(chunk);
              var parser = (CsvParser) csvFactory.createParser((InputStream) stream)) {
 
             parser.setSchema(csvSchema);
 
-            var nRowsBatch = 0;
-            var nCols = arrowSchema.getFields().size();
-            int col = 0;
+            var row = 0;
+            var col = 0;
 
             JsonToken token;
 
             while ((token = parser.nextToken()) != null) {
 
-                // For CSV files, a null field name is produced for every field
-                if (token == JsonToken.FIELD_NAME)
-                    continue;
+                switch (token) {
 
-                if (token.isScalarValue()) {
+                    // For CSV files, a null field name is produced for every field
+                    case FIELD_NAME:
+                        continue;
 
-                    var vector = root.getVector(col);
-                    JacksonValues.parseAndSet(vector, nRowsBatch, parser, token);
-                    col++;
+                    case VALUE_NULL:
+                    case VALUE_TRUE:
+                    case VALUE_FALSE:
+                    case VALUE_STRING:
+                    case VALUE_NUMBER_INT:
+                    case VALUE_NUMBER_FLOAT:
 
-                    continue;
+                        var vector = root.getVector(col);
+                        JacksonValues.parseAndSet(vector, row, parser, token);
+                        col++;
+
+                        break;
+
+                    case START_OBJECT:
+
+                        if (row == 0)
+                            for (var vector_ : root.getFieldVectors())
+                                vector_.allocateNew();
+
+                        break;
+
+                    case END_OBJECT:
+
+                        row++;
+                        col = 0;
+
+                        if (row == BATCH_SIZE) {
+
+                            root.setRowCount(row);
+                            dispatchBatch(root);
+
+                            row = 0;
+                        }
+
+                        break;
+
+                    default:
+
+                        var msg = String.format("Unexpected token %s", token.name());
+                        throw new CsvReadException(parser, msg, csvSchema);
                 }
-
-                if (token == JsonToken.START_OBJECT) {
-
-                    if (nRowsBatch == 0) {
-                        for (var vector : root.getFieldVectors())
-                            vector.allocateNew();
-                    }
-
-                    continue;
-                }
-
-                if (token == JsonToken.END_OBJECT) {
-
-                    nRowsBatch++;
-                    col = 0;
-
-                    if (nRowsBatch == BATCH_SIZE) {
-
-                        root.setRowCount(nRowsBatch);
-                        dispatchBatch(root);
-
-                        nRowsBatch = 0;
-                    }
-
-                    continue;
-                }
-
-                throw new EUnexpected();  // todo
             }
 
             // Check if there is a final batch that needs dispatching
 
-            if (nRowsBatch > 0 || col > 0) {
+            if (row > 0 || col > 0) {
 
-                root.setRowCount(nRowsBatch);
+                root.setRowCount(row);
                 dispatchBatch(root);
             }
         }
