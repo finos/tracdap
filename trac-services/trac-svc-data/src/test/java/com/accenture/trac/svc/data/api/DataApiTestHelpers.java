@@ -37,7 +37,6 @@ import io.netty.buffer.Unpooled;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
-import org.apache.arrow.vector.ipc.SeekableReadChannel;
 import org.apache.arrow.vector.types.Types;
 import org.apache.arrow.vector.util.Text;
 
@@ -143,19 +142,20 @@ class DataApiTestHelpers {
 
     public static List<Vector<Object>> decodeArrowStream(SchemaDefinition schema, List<ByteString> data) {
 
-        var allocator = new RootAllocator();  // TODO: Pass in an allocator
-
         var allData = data.stream().reduce(ByteString.EMPTY, ByteString::concat);
 
-        try (var stream = new ByteArrayInputStream(allData.toByteArray());
-             var reader = new ArrowStreamReader(stream, allocator)) {
+        // This allocator is for decode only, data will not be fed back into Arrow framework
 
-            var rtBatch = reader.getVectorSchemaRoot();
+        try (var allocator = new RootAllocator();
+             var stream = new ByteArrayInputStream(allData.toByteArray());
+             var reader = new ArrowStreamReader(stream, allocator);
+             var rtBatch = reader.getVectorSchemaRoot()) {
+
             var rtSchema = rtBatch.getSchema();
             var nCols = rtSchema.getFields().size();
 
             var result = new ArrayList<Vector<Object>>(nCols);
-            for(var j = 0; j < nCols; j++)
+            for (var j = 0; j < nCols; j++)
                 result.add(j, new Vector<>());
 
             while (reader.loadNextBatch()) {
@@ -190,8 +190,6 @@ class DataApiTestHelpers {
 
     public static List<Vector<Object>> decodeArrowFile(SchemaDefinition schema, List<ByteString> data) {
 
-        var allocator = new RootAllocator();  // TODO: Pass in an allocator
-
         var allData = data.stream().reduce(ByteString.EMPTY, ByteString::concat);
 
         try (var stream = new ByteSeekableChannel(Unpooled.wrappedBuffer(allData.toByteArray()))) {
@@ -209,16 +207,17 @@ class DataApiTestHelpers {
 
     public static List<Vector<Object>> decodeArrowFile(SchemaDefinition schema, SeekableByteChannel channel) {
 
-        var allocator = new RootAllocator();  // TODO: Pass in an allocator
+        // This allocator is for decode only, data will not be fed back into Arrow framework
 
-        try (var reader = new ArrowFileReader(channel, allocator)) {
+        try (var allocator = new RootAllocator();
+             var reader = new ArrowFileReader(channel, allocator);
+             var rtBatch = reader.getVectorSchemaRoot()) {
 
-            var rtBatch = reader.getVectorSchemaRoot();
             var rtSchema = rtBatch.getSchema();
             var nCols = rtSchema.getFields().size();
 
             var result = new ArrayList<Vector<Object>>(nCols);
-            for(var j = 0; j < nCols; j++)
+            for (var j = 0; j < nCols; j++)
                 result.add(j, new Vector<>());
 
             while (reader.loadNextBatch()) {
