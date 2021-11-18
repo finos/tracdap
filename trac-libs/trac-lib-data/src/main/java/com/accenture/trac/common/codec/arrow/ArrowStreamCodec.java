@@ -17,8 +17,6 @@
 package com.accenture.trac.common.codec.arrow;
 
 import com.accenture.trac.common.codec.ICodec;
-import com.accenture.trac.common.concurrent.IExecutionContext;
-import com.accenture.trac.common.data.IDataContext;
 import com.accenture.trac.metadata.SchemaDefinition;
 import org.apache.arrow.memory.BufferAllocator;
 

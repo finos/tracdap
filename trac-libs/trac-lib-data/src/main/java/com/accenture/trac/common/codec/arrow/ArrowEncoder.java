@@ -14,22 +14,16 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.codec.csv;
+package com.accenture.trac.common.codec.arrow;
 
 import com.accenture.trac.common.codec.BaseEncoder;
-import com.accenture.trac.common.codec.arrow.ArrowSchema;
-import com.accenture.trac.common.codec.json.JacksonValues;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.common.util.ByteOutputStream;
-import com.accenture.trac.metadata.SchemaDefinition;
-
-import com.fasterxml.jackson.core.JsonEncoding;
-import com.fasterxml.jackson.dataformat.csv.CsvFactory;
-import com.fasterxml.jackson.dataformat.csv.CsvGenerator;
 import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorLoader;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.ipc.ArrowWriter;
 import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Schema;
@@ -37,28 +31,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.OutputStream;
+import java.util.ArrayList;
 
+public abstract class ArrowEncoder extends BaseEncoder {
 
-public class CsvEncoder extends BaseEncoder {
+    // Common base encoder for both files and streams
+    // Both receive a data stream and output a byte stream
+
+    // Decoders do not share a common structure
+    // This is because the file decoder requires random access to the byte stream
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final BufferAllocator arrowAllocator;
-    private final SchemaDefinition tracSchema;
-
-    private Schema arrowSchema;
     private VectorSchemaRoot root;
     private VectorLoader loader;
+    private ArrowWriter writer;
 
-    private OutputStream out;
-    private CsvGenerator generator;
+    protected abstract ArrowWriter createWriter(VectorSchemaRoot root);
 
-
-    public CsvEncoder(BufferAllocator arrowAllocator, SchemaDefinition tracSchema) {
+    public ArrowEncoder(BufferAllocator arrowAllocator) {
 
         this.arrowAllocator = arrowAllocator;
-        this.tracSchema = tracSchema;
     }
 
     @Override
@@ -66,36 +60,18 @@ public class CsvEncoder extends BaseEncoder {
 
         try {
 
-            // TODO: Compare schema to trac schema if available
-
-            this.arrowSchema = arrowSchema;
             this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator);
-
-            // Record batches in the TRAC intermediate data stream are always uncompressed
-            // So, there is no need to use a compression codec here
             this.loader = new VectorLoader(root);
+            this.writer = createWriter(root);
 
-            var factory = new CsvFactory();
-
-            var csvSchema = CsvSchemaMapping
-                    .arrowToCsv(arrowSchema)
-                    .build()
-                    .withHeader();
-
-            out = new ByteOutputStream(this::emitChunk);
-            generator = factory.createGenerator(out, JsonEncoding.UTF8);
-            generator.setSchema(csvSchema);
+            writer.start();
         }
         catch (IOException e) {
 
             // Output stream is writing to memory buffers, IO errors are not expected
-
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
 
-            try { releaseEverything(); }
-            catch (IOException secondaryError) { log.error(
-                "There was a secondary error releasing resourced: {}",
-                secondaryError.getMessage(), secondaryError); }
+            releaseEverything();
 
             throw new EUnexpected(e);
         }
@@ -104,41 +80,23 @@ public class CsvEncoder extends BaseEncoder {
     @Override
     protected void encodeRecords(ArrowRecordBatch batch) {
 
-        try (batch) {
+        try (batch) {  // This will release the batch
 
-            loader.load(batch);
-
-            var nRows = batch.getLength();
-            var nCols = arrowSchema.getFields().size();
-
-            for (var row = 0; row < nRows; row++) {
-
-                generator.writeStartArray();
-
-                for (var col = 0; col < nCols; col++) {
-
-                    var vector = root.getVector(col);
-                    JacksonValues.getAndGenerate(vector, row, generator);
-                }
-
-                generator.writeEndArray();
-            }
+            loader.load(batch);  // This retains data in the VSR, must be matched by root.clear()
+            writer.writeBatch();
         }
         catch (IOException e) {
 
             // Output stream is writing to memory buffers, IO errors are not expected
-
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
 
-            try { releaseEverything(); }
-            catch (IOException secondaryError) { log.error(
-                    "There was a secondary error releasing resourced: {}",
-                    secondaryError.getMessage(), secondaryError); }
+            releaseEverything();
 
             throw new EUnexpected(e);
         }
         finally {
 
+            // Release data that was retained in VSR by the loader
             root.clear();
         }
     }
@@ -146,35 +104,32 @@ public class CsvEncoder extends BaseEncoder {
     @Override
     protected void encodeDictionary(ArrowDictionaryBatch batch) {
 
-        throw new ETracInternal("CSV dictionary encoding not supported");
+        throw new ETracInternal("Arrow stream dictionary encoding not supported");
     }
 
     @Override
     protected void encodeEos() {
 
         try {
-
-            releaseEverything();
+            writer.end();
         }
         catch (IOException e) {
 
             // Output stream is writing to memory buffers, IO errors are not expected
-
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
             throw new EUnexpected(e);
         }
+        finally {
+
+            releaseEverything();
+        }
     }
 
-    private void releaseEverything() throws IOException {
+    private void releaseEverything() {
 
-        if (generator != null) {
-            generator.close();
-            generator = null;
-        }
-
-        if (out != null) {
-            out.close();
-            out = null;
+        if (writer != null) {
+            writer.close();
+            writer = null;
         }
 
         if (root != null) {

@@ -71,7 +71,10 @@ public class CsvDecoder extends BaseDecoder {
     protected void decodeStart() {
 
         this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, BATCH_SIZE);
-        this.unloader = new VectorUnloader(root);  // TODO: No compression support atm
+
+        // Record batches in the TRAC intermediate data stream are always uncompressed
+        // So, there is no need to use a compression codec here
+        this.unloader = new VectorUnloader(root);
 
         emitBlock(DataBlock.forSchema(this.arrowSchema));
     }

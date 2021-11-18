@@ -48,8 +48,9 @@ public class CsvSchemaMapping {
 
     public static CsvSchema.Builder tracToCsv(SchemaDefinition tracSchema) {
 
+        // Unexpected error - TABLE is the only TRAC schema type currently available
         if (tracSchema.getSchemaType() != SchemaType.TABLE)
-            throw new EUnexpected();  // TODO: Error
+            throw new EUnexpected();
 
         var tracTableSchema = tracSchema.getTable();
         var csvSchema = CsvSchema.builder();
@@ -59,8 +60,9 @@ public class CsvSchemaMapping {
             var fieldName = tracField.getFieldName();
             var csvType = TRAC_CSV_TYPE_MAPPING.get(tracField.getFieldType());
 
+            // Unexpected error - All TRAC primitive types are mapped
             if (csvType == null)
-                throw new EUnexpected();  // TODO: Error
+                throw new EUnexpected();
 
             csvSchema.addColumn(fieldName, csvType);
         }

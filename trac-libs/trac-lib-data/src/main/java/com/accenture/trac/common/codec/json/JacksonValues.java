@@ -17,7 +17,6 @@
 package com.accenture.trac.common.codec.json;
 
 import com.accenture.trac.common.exception.EDataTypeNotSupported;
-import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataCodec;
 
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -59,7 +58,8 @@ public class JacksonValues {
 
         if (isSet == 0 && !isNullable) {
 
-            throw new EUnexpected();  // todo: edatavalidity, field "" cannot be null, field.getName()
+            var msg = "Parsing failed: Got a null value for non-nullable field [" + vector.getField().getName() + "]";
+            throw new JsonParseException(parser, msg, parser.currentLocation());
         }
 
 
@@ -225,8 +225,8 @@ public class JacksonValues {
                 break;
 
                 // For handling TZ type:
-                // ArrowType.Timestamp mtzType = (ArrowType.Timestamp) field.getType();
-                // ZoneOffset mtzOffset = ZoneOffset.of(mtzType.getTimezone());
+                // 1. ArrowType.Timestamp mtzType = (ArrowType.Timestamp) field.getType();
+                // 2. ZoneOffset mtzOffset = ZoneOffset.of(mtzType.getTimezone());
 
             default:
 
@@ -252,8 +252,11 @@ public class JacksonValues {
                 decimalVal = parser.getDecimalValue();
             else if (token == JsonToken.VALUE_STRING)
                 decimalVal = new BigDecimal(parser.getValueAsString());
-            else
-                throw new EUnexpected();  // TODO
+            else {
+                var msg = "Parsing failed: Excepted a decimal, got [" + token.name() + "]";
+                throw new JsonParseException(parser, msg, parser.currentLocation());
+            }
+
 
             if (decimalVal.scale() == scale)
                 return decimalVal;
@@ -429,8 +432,8 @@ public class JacksonValues {
                 break;
 
             // For handling TZ type:
-            // ArrowType.Timestamp mtzType = (ArrowType.Timestamp) field.getType();
-            // ZoneOffset mtzOffset = ZoneOffset.of(mtzType.getTimezone());
+            // 1. ArrowType.Timestamp mtzType = (ArrowType.Timestamp) field.getType();
+            // 2. ZoneOffset mtzOffset = ZoneOffset.of(mtzType.getTimezone());
 
             default:
 

@@ -162,6 +162,16 @@ public abstract class BaseEncoder extends BaseProcessor<DataBlock, ByteBuf> impl
 
         try {
 
+            // Data stream must contain at least the schema,
+            // but can contain zero record or dictionary blocks
+
+            if (!schemaReceived) {
+
+                var err = "Invalid data stream, schema is missing";
+                log.error(err);
+                throw new EDataCorruption(err);
+            }
+
             encodeEos();
             outQueue.add(END_OF_STREAM);
 

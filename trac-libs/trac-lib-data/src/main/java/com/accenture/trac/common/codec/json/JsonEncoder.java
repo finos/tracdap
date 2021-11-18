@@ -32,12 +32,16 @@ import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
 
 
 public class JsonEncoder extends BaseEncoder {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final BufferAllocator arrowAllocator;
     private final SchemaDefinition tracSchema;
@@ -61,7 +65,10 @@ public class JsonEncoder extends BaseEncoder {
 
             this.arrowSchema = arrowSchema;
             this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator);
-            this.loader = new VectorLoader(root);  // TODO: No compression support atm
+
+            // Record batches in the TRAC intermediate data stream are always uncompressed
+            // So, there is no need to use a compression codec here
+            this.loader = new VectorLoader(root);
 
             out = new ByteOutputStream(this::emitChunk);
 
@@ -71,7 +78,16 @@ public class JsonEncoder extends BaseEncoder {
         }
         catch (IOException e) {
 
-            throw new ETracInternal(e.getMessage(), e);  // todo
+            // Output stream is writing to memory buffers, IO errors are not expected
+
+            log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
+
+            try { releaseEverything(); }
+            catch (IOException secondaryError) { log.error(
+                    "There was a secondary error releasing resourced: {}",
+                    secondaryError.getMessage(), secondaryError); }
+
+            throw new EUnexpected(e);
         }
     }
 
@@ -79,9 +95,6 @@ public class JsonEncoder extends BaseEncoder {
     protected void encodeRecords(ArrowRecordBatch batch) {
 
         try (batch) {
-
-            if (arrowSchema == null)
-                throw new EUnexpected();  // TODO: Data error, invalid stream, in base encoder
 
             loader.load(batch);
 
@@ -106,7 +119,16 @@ public class JsonEncoder extends BaseEncoder {
         }
         catch (IOException e) {
 
-            throw new ETracInternal(e.getMessage(), e);  // todo
+            // Output stream is writing to memory buffers, IO errors are not expected
+
+            log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
+
+            try { releaseEverything(); }
+            catch (IOException secondaryError) { log.error(
+                    "There was a secondary error releasing resourced: {}",
+                    secondaryError.getMessage(), secondaryError); }
+
+            throw new EUnexpected(e);
         }
         finally {
 
@@ -124,19 +146,41 @@ public class JsonEncoder extends BaseEncoder {
     protected void encodeEos() {
 
         try {
-            if (arrowSchema == null)
-                throw new EUnexpected();  // TODO: Data error, invalid stream, in base encoder
 
             generator.writeEndArray();
-            generator.close();
-            generator = null;
 
-            out.close();
-            out = null;
+            releaseEverything();
         }
         catch (IOException e) {
 
-            throw new ETracInternal(e.getMessage(), e);  // todo
+            // Output stream is writing to memory buffers, IO errors are not expected
+
+            log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
+
+            try { releaseEverything(); }
+            catch (IOException secondaryError) { log.error(
+                    "There was a secondary error releasing resourced: {}",
+                    secondaryError.getMessage(), secondaryError); }
+
+            throw new EUnexpected(e);
+        }
+    }
+
+    private void releaseEverything() throws IOException {
+
+        if (generator != null) {
+            generator.close();
+            generator = null;
+        }
+
+        if (out != null) {
+            out.close();
+            out = null;
+        }
+
+        if (root != null) {
+            root.close();
+            root = null;
         }
     }
 }

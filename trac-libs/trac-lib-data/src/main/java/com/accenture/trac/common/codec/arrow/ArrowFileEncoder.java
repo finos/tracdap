@@ -16,109 +16,24 @@
 
 package com.accenture.trac.common.codec.arrow;
 
-import com.accenture.trac.common.codec.BaseEncoder;
-import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.util.ByteOutputChannel;
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.VectorLoader;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowFileWriter;
-import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
-import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
-import org.apache.arrow.vector.types.pojo.Schema;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.ArrayList;
+import org.apache.arrow.vector.ipc.ArrowWriter;
 
 
-public class ArrowFileEncoder extends BaseEncoder {
-
-    private final Logger log = LoggerFactory.getLogger(getClass());
-
-    private final BufferAllocator arrowAllocator;
-    private VectorSchemaRoot root;
-    private VectorLoader loader;
-    private ArrowFileWriter writer;
+public class ArrowFileEncoder extends ArrowEncoder {
 
     public ArrowFileEncoder(BufferAllocator arrowAllocator) {
 
-        this.arrowAllocator = arrowAllocator;
+        super(arrowAllocator);
     }
 
     @Override
-    protected void encodeSchema(Schema arrowSchema) {
-
-        createRoot(arrowSchema);
-    }
-
-    void createRoot(Schema arrowSchema) {
-
-        var fields = arrowSchema.getFields();
-        var vectors = new ArrayList<FieldVector>(fields.size());
-
-        for (var field : fields)
-            vectors.add(field.createVector(arrowAllocator));
-
-        this.root = new VectorSchemaRoot(fields, vectors);
-        this.loader = new VectorLoader(root);  // TODO: No compression support atm
+    protected ArrowWriter createWriter(VectorSchemaRoot root) {
 
         var out = new ByteOutputChannel(this::emitChunk);
-        this.writer = new ArrowFileWriter(root, /* dictionary provider = */ null, out);
-
-        try {
-            writer.start();
-        }
-        catch (IOException e) {
-
-            // todo
-            log.error(e.getMessage(), e);
-            throw new ETracInternal(e.getMessage(), e);
-        }
-    }
-
-    @Override
-    protected void encodeRecords(ArrowRecordBatch batch) {
-
-        try (batch) {  // This will release the batch
-
-            loader.load(batch);  // This retains data in the VSR, must be matched by root.clear()
-            writer.writeBatch();
-        }
-        catch (IOException e) {
-
-            // todo
-            log.error(e.getMessage(), e);
-            throw new ETracInternal(e.getMessage(), e);
-        }
-        finally {
-
-            root.clear();  // Release data that was retained in VSR by the loader
-        }
-    }
-
-    @Override
-    protected void encodeDictionary(ArrowDictionaryBatch batch) {
-
-        throw new ETracInternal("Arrow stream dictionary encoding not supported");
-    }
-
-    @Override
-    protected void encodeEos() {
-
-        try {
-            writer.end();
-        }
-        catch (IOException e) {
-
-            // todo
-            log.error(e.getMessage(), e);
-            throw new ETracInternal(e.getMessage(), e);
-        }
-        finally {
-            writer.close();
-        }
+        return new ArrowFileWriter(root, /* dictionary provider = */ null, out);
     }
 }
