@@ -17,28 +17,16 @@
 package com.accenture.trac.common.codec.json;
 
 import com.accenture.trac.common.exception.EUnexpected;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.async.ByteArrayFeeder;
 
 import java.io.IOException;
 
 
-abstract class JsonParserBase {
-
-    private static final int MAX_PARSE_DEPTH = 4;
-
-    private final JsonParser lexer;
-
-    private final ParseState[] parseStack;
-    private int parseDepth;
-
-    abstract void handlePushArray(ParseState state, ParseState parent, int depth) throws IOException;
-    abstract void handlePopArray(ParseState state, ParseState parent, int depth) throws IOException;
-    abstract void handlePushObject(ParseState state, ParseState parent, int depth) throws IOException;
-    abstract void handlePopObject(ParseState state, ParseState parent, int depth) throws IOException;
-    abstract void handleFieldName(ParseState state, ParseState parent, int depth) throws IOException;
-    abstract void handleFieldValue(ParseState state, int depth) throws IOException;
-    abstract void handleArrayValue(ParseState state, int depth) throws IOException;
+class JsonStreamParser {
 
     enum ParseStateType {
         ROOT,
@@ -47,9 +35,40 @@ abstract class JsonParserBase {
         FIELD
     }
 
-    JsonParserBase(JsonParser lexer) {
+    static class ParseState {
 
-        this.lexer = lexer;
+        ParseStateType stateType;
+        String fieldName;
+    }
+
+    interface Handler {
+
+        void handlePushArray(JsonParser lexer, ParseState state, ParseState parent, int depth) throws IOException;
+        void handlePopArray(JsonParser lexer, ParseState state, ParseState parent, int depth) throws IOException;
+        void handlePushObject(JsonParser lexer, ParseState state, ParseState parent, int depth) throws IOException;
+        void handlePopObject(JsonParser lexer, ParseState state, ParseState parent, int depth) throws IOException;
+        void handleFieldName(JsonParser lexer, ParseState state, ParseState parent, int depth) throws IOException;
+        void handleFieldValue(JsonParser lexer, ParseState state, int depth) throws IOException;
+        void handleArrayValue(JsonParser lexer, ParseState state, int depth) throws IOException;
+
+        void close() throws IOException;
+    }
+
+    private static final int MAX_PARSE_DEPTH = 4;
+
+    private final JsonParser lexer;
+    private final ByteArrayFeeder feeder;
+    private final Handler handler;
+
+    private final ParseState[] parseStack;
+    private int parseDepth;
+
+
+    JsonStreamParser(JsonFactory factory, Handler handler) throws IOException {
+
+        this.lexer = factory.createNonBlockingByteArrayParser();
+        this.feeder = (ByteArrayFeeder) lexer.getNonBlockingInputFeeder();
+        this.handler = handler;
 
         this.parseStack = new ParseState[MAX_PARSE_DEPTH];
 
@@ -58,6 +77,22 @@ abstract class JsonParserBase {
 
         parseStack[0].stateType = ParseStateType.ROOT;
         parseDepth = 0;
+    }
+
+    public void close() throws IOException {
+
+        lexer.close();
+        handler.close();
+    }
+
+    public void feedInput(byte[] data, int offset, int end) throws IOException {
+
+        feeder.feedInput(data, offset, end);
+    }
+
+    public JsonToken nextToken() throws IOException {
+
+        return lexer.nextToken();
     }
 
     public void acceptToken(JsonToken token) throws IOException {
@@ -100,7 +135,9 @@ abstract class JsonParserBase {
                 break;
 
             default:
-                throw new EUnexpected();  // todo: invalid json
+
+                var msg = String.format("Invalid JSON: Expected an object or array, got '%s'", token.name());
+                throw new JsonParseException(lexer, msg, lexer.currentLocation());
         }
     }
 
@@ -109,12 +146,12 @@ abstract class JsonParserBase {
         parseDepth++;
         parseStack[parseDepth].stateType = ParseStateType.ARRAY;
 
-        handlePushArray(parseStack[parseDepth], parseStack[parseDepth-1], parseDepth);
+        handler.handlePushArray(lexer, parseStack[parseDepth], parseStack[parseDepth-1], parseDepth);
     }
 
     private void acceptEndArray() throws IOException {
 
-        handlePopArray(parseStack[parseDepth], parseStack[parseDepth-1], parseDepth);
+        handler.handlePopArray(lexer, parseStack[parseDepth], parseStack[parseDepth-1], parseDepth);
 
         parseDepth--;
 
@@ -127,7 +164,7 @@ abstract class JsonParserBase {
         var parseState = parseStack[parseDepth];
 
         if (token.isScalarValue()) {
-            handleArrayValue(parseState, parseDepth);
+            handler.handleArrayValue(lexer, parseState, parseDepth);
             return;
         }
 
@@ -146,7 +183,9 @@ abstract class JsonParserBase {
                 break;
 
             default:
-                throw new EUnexpected(); // todo: invalid json
+
+                var msg = String.format("Invalid JSON: Expected an array value, got '%s'", token.name());
+                throw new JsonParseException(lexer, msg, lexer.currentLocation());
         }
     }
 
@@ -155,12 +194,12 @@ abstract class JsonParserBase {
         parseDepth++;
         parseStack[parseDepth].stateType = ParseStateType.OBJECT;
 
-        handlePushObject(parseStack[parseDepth], parseStack[parseDepth-1], parseDepth);
+        handler.handlePushObject(lexer, parseStack[parseDepth], parseStack[parseDepth-1], parseDepth);
     }
 
     private void acceptEndObject() throws IOException {
 
-        handlePopObject(parseStack[parseDepth], parseStack[parseDepth-1], parseDepth);
+        handler.handlePopObject(lexer, parseStack[parseDepth], parseStack[parseDepth-1], parseDepth);
 
         parseDepth--;
 
@@ -181,7 +220,9 @@ abstract class JsonParserBase {
                 break;
 
             default:
-                throw new EUnexpected();  // todo: invalid json
+
+                var msg = String.format("Invalid JSON: Expected a field name, got '%s'", token.name());
+                throw new JsonParseException(lexer, msg, lexer.currentLocation());
         }
     }
 
@@ -191,7 +232,7 @@ abstract class JsonParserBase {
         parseStack[parseDepth].stateType = ParseStateType.FIELD;
         parseStack[parseDepth].fieldName = lexer.currentName();
 
-        handleFieldName(parseStack[parseDepth], parseStack[parseDepth-1], parseDepth);
+        handler.handleFieldName(lexer, parseStack[parseDepth], parseStack[parseDepth-1], parseDepth);
     }
 
     private void acceptFieldValue(JsonToken token) throws IOException {
@@ -200,7 +241,7 @@ abstract class JsonParserBase {
 
         if (token.isScalarValue()) {
 
-            handleFieldValue(parseState, parseDepth);
+            handler.handleFieldValue(lexer, parseState, parseDepth);
         }
         else { switch (token) {
 
@@ -213,17 +254,13 @@ abstract class JsonParserBase {
                 break;
 
             default:
-                throw new EUnexpected();  // todo: invalid json
+
+                var msg = String.format("Invalid JSON: Expected a field value, got '%s'", token.name());
+                throw new JsonParseException(lexer, msg, lexer.currentLocation());
 
         }}
 
         if (parseStack[parseDepth].stateType == ParseStateType.FIELD)
             parseDepth--;
-    }
-
-    static class ParseState {
-
-        ParseStateType stateType;
-        String fieldName;
     }
 }

@@ -17,8 +17,10 @@
 package com.accenture.trac.common.codec.json;
 
 import com.accenture.trac.common.codec.arrow.ArrowSchema;
-import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.codec.json.JsonStreamParser.ParseState;
+import com.accenture.trac.common.codec.json.JsonStreamParser.ParseStateType;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
@@ -34,32 +36,23 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 
-class JsonTableParser extends JsonParserBase {
+class JsonTableHandler implements JsonStreamParser.Handler {
 
-    private final JsonParser lexer;
-
-    private final Schema arrowSchema;
     private final Map<String, Integer> fieldMap;
 
-
     private final VectorSchemaRoot root;
-    private VectorUnloader unloader;
+    private final VectorUnloader unloader;
     private final Consumer<ArrowRecordBatch> batchEmitter;
     private final int batchSize;
 
     private int batchRow;
-    private int batchCol;
 
-    JsonTableParser(
-            Schema arrowSchema, BufferAllocator arrowAllocator,
-            JsonParser lexer, boolean isCaseSensitive,
+    JsonTableHandler(
+            BufferAllocator arrowAllocator, Schema arrowSchema, boolean isCaseSensitive,
             Consumer<ArrowRecordBatch> batchEmitter, int batchSize) {
 
-        super(lexer);
-
-        this.lexer = lexer;
-        this.arrowSchema = arrowSchema;
         this.fieldMap = buildFieldMap(arrowSchema, isCaseSensitive);
+
         this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, batchSize);
         this.unloader = new VectorUnloader(root);
 
@@ -67,29 +60,42 @@ class JsonTableParser extends JsonParserBase {
         this.batchSize = batchSize;
     }
 
-    void handlePushArray(ParseState state, ParseState parent, int depth) {
+    @Override
+    public void handlePushArray(JsonParser lexer, ParseState state, ParseState parent, int depth) throws IOException {
 
-        if (parent.stateType != ParseStateType.ROOT || depth != 1)
-            throw new EUnexpected();  // TODO: Nested arrays not allowed
+        if (parent.stateType != ParseStateType.ROOT || depth != 1) {
+
+            var msg = "Invalid JSON table: Nested arrays are not supported";
+            throw new JsonParseException(lexer, msg, lexer.currentLocation());
+        }
     }
 
-    void handlePopArray(ParseState state, ParseState parent, int depth) {
+    @Override
+    public void handlePopArray(JsonParser lexer, ParseState state, ParseState parent, int depth) {
 
         dispatchBatch();
     }
 
-    void handlePushObject(ParseState state, ParseState parent, int depth) {
+    @Override
+    public void handlePushObject(JsonParser lexer, ParseState state, ParseState parent, int depth) throws IOException {
 
-        if (parent.stateType != ParseStateType.ARRAY || depth != 2)
-            throw new EUnexpected();  // TODO: Nested objects not allowed
+        if (parent.stateType != ParseStateType.ARRAY || depth != 2) {
+
+            var msg = depth > 2
+                ? "Invalid JSON table: Nested tables are not supported"
+                : "Invalid JSON table: Root item must be an array";
+
+            throw new JsonParseException(lexer, msg, lexer.currentLocation());
+        }
 
         if (batchRow == 0)
             allocateBatch();
     }
 
-    void handlePopObject(ParseState state, ParseState parent, int depth) {
+    @Override
+    public void handlePopObject(JsonParser lexer, ParseState state, ParseState parent, int depth) throws IOException {
 
-        checkRequiredFields();
+        checkRequiredFields(lexer);
 
         batchRow++;
 
@@ -97,14 +103,14 @@ class JsonTableParser extends JsonParserBase {
             dispatchBatch();
     }
 
-    void handleFieldName(ParseState state, ParseState parent, int depth) {
+    @Override
+    public void handleFieldName(JsonParser lexer, ParseState state, ParseState parent, int depth) {
 
-        // should be guaranteed by requirements on arrays and objects
-        if (depth != 3)
-            throw new EUnexpected();
+        // No-op, wait for value
     }
 
-    void handleFieldValue(ParseState state, int depth) throws IOException {
+    @Override
+    public void handleFieldValue(JsonParser lexer, ParseState state, int depth) throws IOException {
 
         var col = fieldMap.get(state.fieldName);
         var vector = root.getVector(col);
@@ -112,9 +118,17 @@ class JsonTableParser extends JsonParserBase {
         JacksonValues.parseAndSet(vector, batchRow, lexer, lexer.currentToken());
     }
 
-    void handleArrayValue(ParseState state, int depth) {
+    @Override
+    public void handleArrayValue(JsonParser lexer, ParseState state, int depth) throws IOException {
 
-        throw new EUnexpected();  // TODO: Primitive arrays not allowed
+        var msg = "Invalid JSON table: Root array must contain objects, not individual values";
+        throw new JsonParseException(lexer, msg, lexer.currentLocation());
+    }
+
+    @Override
+    public void close() {
+
+        root.close();
     }
 
     private static Map<String, Integer> buildFieldMap(Schema arrowSchema, boolean isCaseSensitive) {
@@ -142,13 +156,15 @@ class JsonTableParser extends JsonParserBase {
             vector.allocateNew();
     }
 
-    private void checkRequiredFields() {
+    private void checkRequiredFields(JsonParser lexer) throws IOException {
 
         for (var vector : root.getFieldVectors()) {
-
             if (!vector.getField().isNullable()) {
-                if (vector.isNull(batchRow))
-                    throw new EUnexpected();  // TODO: EDataValidity Null value for non-null field
+
+                if (vector.isNull(batchRow)) {
+                    var msg = String.format("Invalid JSON table: Missing required field [%s]", vector.getName());
+                    throw new JsonParseException(lexer, msg, lexer.currentLocation());
+                }
             }
         }
     }

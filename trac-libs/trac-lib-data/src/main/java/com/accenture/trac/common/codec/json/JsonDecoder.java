@@ -25,9 +25,7 @@ import com.accenture.trac.metadata.SchemaDefinition;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.core.async.ByteArrayFeeder;
 import io.netty.buffer.ByteBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
@@ -47,13 +45,9 @@ public class JsonDecoder extends BaseDecoder {
 
     private final BufferAllocator arrowAllocator;
     private final SchemaDefinition tracSchema;
-
     private final Schema arrowSchema;
 
-    private ByteArrayFeeder feeder;
-    private JsonParser lexer;
-    private JsonParserBase parser;
-
+    private JsonStreamParser parser;
 
     public JsonDecoder(BufferAllocator arrowAllocator, SchemaDefinition tracSchema) {
 
@@ -71,23 +65,25 @@ public class JsonDecoder extends BaseDecoder {
 
         try {
 
-//            this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, BATCH_SIZE);
-//            this.unloader = new VectorUnloader(root);  // TODO: No compression support atm
-
             var factory = new JsonFactory();
-            this.lexer = factory.createNonBlockingByteArrayParser();
-            this.feeder = (ByteArrayFeeder) lexer.getNonBlockingInputFeeder();
 
-            this.parser = new JsonTableParser(
-                    arrowSchema, arrowAllocator,
-                    lexer, CASE_INSENSITIVE,
+            var tableHandler = new JsonTableHandler(
+                    arrowAllocator, arrowSchema, CASE_INSENSITIVE,
                     this::dispatchBatch, BATCH_SIZE);
+
+            this.parser = new JsonStreamParser(factory, tableHandler);
 
             emitBlock(DataBlock.forSchema(this.arrowSchema));
         }
         catch (IOException e) {
 
-            throw new EUnexpected(e);  // TODO
+            // Output stream is writing to memory buffers, IO errors are not expected
+
+            log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
+
+            releaseEverythingNoThrow();
+
+            throw new EUnexpected(e);
         }
     }
 
@@ -96,16 +92,14 @@ public class JsonDecoder extends BaseDecoder {
 
         try {
 
-            if (!feeder.needMoreInput() && chunk.readableBytes() > 0)
-                throw new EUnexpected(); // TODO: EDataInvalidStream
-
             var bytes = new byte[chunk.readableBytes()];
             chunk.readBytes(bytes);
-            feeder.feedInput(bytes, 0, bytes.length);
+
+            parser.feedInput(bytes, 0, bytes.length);
 
             JsonToken token;
 
-            while ((token = lexer.nextToken()) != JsonToken.NOT_AVAILABLE)
+            while ((token = parser.nextToken()) != JsonToken.NOT_AVAILABLE)
                 parser.acceptToken(token);
         }
         catch (JsonParseException e) {
@@ -117,6 +111,9 @@ public class JsonDecoder extends BaseDecoder {
                     e.getMessage());
 
             log.error(errorMessage, e);
+
+            releaseEverythingNoThrow();
+
             throw new EDataCorruption(errorMessage, e);
         }
         catch (IOException e) {
@@ -126,8 +123,10 @@ public class JsonDecoder extends BaseDecoder {
             // This is likely to be a more "badly-behaved" failure, or at least one that was not anticipated
 
             var errorMessage = "JSON decoding failed, content is garbled: " + e.getMessage();
-
             log.error(errorMessage, e);
+
+            releaseEverythingNoThrow();
+
             throw new EDataCorruption(errorMessage, e);
         }
         catch (Throwable e)  {
@@ -135,6 +134,9 @@ public class JsonDecoder extends BaseDecoder {
             // Ensure unexpected errors are still reported to the Flow API
 
             log.error("Unexpected error in CSV decoding", e);
+
+            releaseEverythingNoThrow();
+
             throw new EUnexpected(e);
         }
         finally {
@@ -152,5 +154,26 @@ public class JsonDecoder extends BaseDecoder {
     private void dispatchBatch(ArrowRecordBatch batch) {
 
         emitBlock(DataBlock.forRecords(batch));
+    }
+
+    private void releaseEverything() throws IOException {
+
+        if (parser != null) {
+            parser.close();
+            parser = null;
+        }
+    }
+
+    private void releaseEverythingNoThrow() {
+
+        try {
+            releaseEverything();
+        }
+        catch (IOException secondaryError) {
+
+            log.error(
+                "There was a secondary error releasing resources: {}",
+                secondaryError.getMessage(), secondaryError);
+        }
     }
 }
