@@ -18,7 +18,6 @@ package com.accenture.trac.svc.data.api;
 
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.concurrent.Flows;
-import com.accenture.trac.common.concurrent.Futures;
 import com.accenture.trac.metadata.*;
 
 import com.accenture.trac.test.data.SampleDataFormats;
@@ -26,24 +25,18 @@ import com.accenture.trac.test.helpers.TestResourceHelpers;
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
-import org.apache.arrow.vector.types.Types;
-import org.apache.arrow.vector.util.Text;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.io.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.Flow;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
@@ -136,13 +129,6 @@ class DataRoundTripTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createDataset);
         var objHeader = resultOf(createDataset);
 
-        // Fetch metadata for the data and storage objects that should be created
-
-        var dataDef = fetchDefinition(selectorFor(objHeader), ObjectDefinition::getData);
-        var storageDef = fetchDefinition(dataDef.getStorageId(), ObjectDefinition::getStorage);
-
-        // TODO: Check definitions
-
         var dataRequest = DataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(selectorFor(objHeader))
@@ -206,26 +192,6 @@ class DataRoundTripTest extends DataApiTestBase {
         return Flows.publish(Streams.concat(
                 Stream.of(requestZero),
                 requestStream));
-    }
-
-    private <TDef>
-    TDef fetchDefinition(
-            TagSelector selector,
-            Function<ObjectDefinition, TDef> defTypeFunc)
-            throws Exception {
-
-        var tagGrpc = metaClient.readObject(MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(selector)
-                .build());
-
-        var tag = Futures.javaFuture(tagGrpc);
-
-        waitFor(TEST_TIMEOUT, tag);
-
-        var objDef = resultOf(tag).getDefinition();
-
-        return defTypeFunc.apply(objDef);
     }
 
     private static class ChunkChannel implements WritableByteChannel {
