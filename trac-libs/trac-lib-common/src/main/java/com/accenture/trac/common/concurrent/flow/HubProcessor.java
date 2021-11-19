@@ -18,6 +18,8 @@ package com.accenture.trac.common.concurrent.flow;
 
 import com.accenture.trac.common.exception.ETracInternal;
 import io.netty.util.concurrent.OrderedEventExecutor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -28,6 +30,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 
 public class HubProcessor<T> implements Flow.Processor<T, T> {
@@ -41,6 +44,8 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
 
     // Hub processor insists that at least one target is subscribed before connecting the source
     // Otherwise source messages would be discarded (including error/complete messages)
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private Flow.Subscription sourceSubscription;
     private final Map<Flow.Subscriber<? super T>, HubTargetState> targets;
@@ -112,9 +117,8 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
         if (!priorSourceOk)
             throw new IllegalStateException("Hub processor subscribed to multiple upstream sources");
 
-        // TODO
         if (targetGuard.isEmpty())
-            throw new ETracInternal("Hub processor connected to source before any targets");
+            throw new IllegalStateException("Hub processor connected to source before any targets");
 
         eventLoop.execute(() -> doSubscribe(subscription));
     }
@@ -169,8 +173,8 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
         var completionError = error instanceof CompletionException
                 ? error : new CompletionException(error.getMessage(), error);
 
-        for (var subscriber: targets.keySet())
-            subscriber.onError(completionError);
+        for (var target: targets.entrySet())
+            sendTargetOnError(target.getKey(), target.getValue(), completionError);
     }
 
     @Override
@@ -205,10 +209,8 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
                 var targetSubscriber = subscriberState.getKey();
                 var target = subscriberState.getValue();
 
-                if (messageIndex == target.receiveIndex && messageIndex < target.requestIndex) {
-                    target.receiveIndex++;
-                    targetSubscriber.onNext(message);
-                }
+                if (messageIndex == target.receiveIndex && messageIndex < target.requestIndex && !target.badError)
+                    sendTargetOnNext(targetSubscriber, target, message);
             }
         }
 
@@ -219,12 +221,18 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
                 var targetSubscriber = subscriberState.getKey();
                 var target = subscriberState.getValue();
 
-                if (target.receiveIndex == messageBufferEnd && !target.completeFlag) {
-                    target.completeFlag = true;
-                    targetSubscriber.onComplete();
-                }
+                if (target.receiveIndex == messageBufferEnd && !target.completeFlag)
+                    sendTargetOnComplete(targetSubscriber, target);
             }
         }
+
+        var failedTargets = targets.entrySet().stream()
+                .filter(x -> x.getValue().badError)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+
+        for (var target: failedTargets)
+            targets.remove(target);
 
         if (targets.isEmpty()) {
             clearBuffer();
@@ -242,6 +250,9 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
                 messageBufferStart++;
             }
         }
+
+        if (targets.isEmpty() && !failedTargets.isEmpty())
+            sourceSubscription.cancel();
     }
 
     private void requestTargetMessages(Flow.Subscriber<? super T> target, long n) {
@@ -268,6 +279,69 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
 
             if (sourceSubscription != null)
                 sourceSubscription.cancel();
+        }
+    }
+
+    private void sendTargetOnNext(Flow.Subscriber<? super T> target, HubTargetState state, T message) {
+
+        try {
+            state.receiveIndex++;
+            target.onNext(message);
+        }
+        catch (Throwable e) {
+
+            state.completeFlag = true;
+            state.badError = true;
+
+            reportUnhandledError(target, e);
+        }
+    }
+
+    private void sendTargetOnComplete(Flow.Subscriber<? super T> target, HubTargetState state) {
+
+        try {
+            state.completeFlag = true;
+            target.onComplete();
+        }
+        catch (Throwable e) {
+
+            state.badError = true;
+
+            reportUnhandledError(target, e);
+        }
+    }
+
+    private void sendTargetOnError(Flow.Subscriber<? super T> target, HubTargetState state, Throwable error) {
+
+        try {
+            state.completeFlag = true;
+            target.onError(error);
+        }
+        catch (Throwable secondaryError) {
+
+            state.badError = true;
+
+            log.warn("Following a previous error, the stream processing pipeline was not successfully notified");
+            log.warn("This is a bug, and may cause hanging and/or resource leaks");
+            log.warn(secondaryError.getMessage(), secondaryError);
+        }
+    }
+
+    private void reportUnhandledError(Flow.Subscriber<? super T> target, Throwable error) {
+
+        var msg = "An error occurred in the stream processing pipeline and has not been handled";
+        var err = new ETracInternal(msg, error);
+
+        log.error(msg, err);
+
+        try {
+            target.onError(err);
+        }
+        catch (Throwable secondaryError) {
+
+            log.warn("Following a previous unhandled error, the stream processing pipeline was not successfully notified");
+            log.warn("This is a bug, and may cause hanging and/or resource leaks");
+            log.warn(secondaryError.getMessage(), secondaryError);
         }
     }
 
@@ -305,5 +379,6 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
         int requestIndex;
         int receiveIndex;
         boolean completeFlag;
+        boolean badError;
     }
 }
