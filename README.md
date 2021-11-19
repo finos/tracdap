@@ -84,12 +84,12 @@ There is a tool provided that can deploy the schema and create tenants. To use
 the "devlocal" setup the supplied config can be used as-is, this will deploy
 the TRAC metadata schema into an H2 database file.
 
-    gradlew :deploy-metadb:run --args="--config etc/trac-devlocal.properties --task deploy_schema"
-    gradlew :deploy-metadb:run --args="--config etc/trac-devlocal.properties --task add_tenant:ACME_CORP"
+    gradlew :deploy-metadb:run --args="--config etc/trac-devlocal.yaml --task deploy_schema"
+    gradlew :deploy-metadb:run --args="--config etc/trac-devlocal.yaml --task add_tenant:ACME_CORP"
 
 Once you have a database prepared you can start the TRAC services.
 
-    gradlew :trac-svc-meta:run --args="--config etc/trac-devlocal.properties"
+    gradlew :trac-svc-meta:run --args="--config etc/trac-devlocal.yaml"
     gradlew :trac-gateway:run --args="--config etc/trac-devlocal-gateway.yaml"
 
 To confirm the platform is working you can use the [example API calls](./examples/rest_calls)
