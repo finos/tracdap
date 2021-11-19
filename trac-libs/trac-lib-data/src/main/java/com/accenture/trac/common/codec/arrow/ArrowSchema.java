@@ -55,8 +55,9 @@ public class ArrowSchema {
 
     public static Schema tracToArrow(SchemaDefinition tracSchema) {
 
+        // Unexpected error - TABLE is the only TRAC schema type currently available
         if (tracSchema.getSchemaType() != SchemaType.TABLE)
-            throw new EUnexpected();  // TODO: Error
+            throw new EUnexpected();
 
         var tracTableSchema = tracSchema.getTable();
         var arrowFields = new ArrayList<Field>(tracTableSchema.getFieldsCount());
@@ -68,8 +69,9 @@ public class ArrowSchema {
 
             var arrowType = TRAC_ARROW_TYPE_MAPPING.get(tracField.getFieldType());
 
+            // Unexpected error - All TRAC primitive types are mapped
             if (arrowType == null)
-                throw new EUnexpected();  // TODO: Error
+                throw new EUnexpected();
 
             var arrowFieldType = new FieldType(nullable, arrowType, /* dictionary = */ null);
             var arrowField = new Field(fieldName, arrowFieldType, /* children = */ null);

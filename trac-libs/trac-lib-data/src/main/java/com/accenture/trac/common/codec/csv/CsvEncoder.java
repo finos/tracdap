@@ -66,8 +66,6 @@ public class CsvEncoder extends BaseEncoder {
 
         try {
 
-            // TODO: Compare schema to trac schema if available
-
             this.arrowSchema = arrowSchema;
             this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator);
 

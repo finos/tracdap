@@ -16,26 +16,15 @@
 
 package com.accenture.trac.common.codec.csv;
 
-import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.metadata.BasicType;
-import com.accenture.trac.metadata.SchemaDefinition;
-import com.accenture.trac.metadata.SchemaType;
+import com.accenture.trac.common.exception.EDataTypeNotSupported;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import org.apache.arrow.vector.types.pojo.ArrowType.ArrowTypeID;
 import org.apache.arrow.vector.types.pojo.Schema;
 
 import java.util.Map;
 
-public class CsvSchemaMapping {
 
-    private static final Map<BasicType, CsvSchema.ColumnType> TRAC_CSV_TYPE_MAPPING = Map.ofEntries(
-            Map.entry(BasicType.BOOLEAN, CsvSchema.ColumnType.BOOLEAN),
-            Map.entry(BasicType.INTEGER, CsvSchema.ColumnType.NUMBER),
-            Map.entry(BasicType.FLOAT, CsvSchema.ColumnType.NUMBER),
-            Map.entry(BasicType.DECIMAL, CsvSchema.ColumnType.NUMBER_OR_STRING),
-            Map.entry(BasicType.STRING, CsvSchema.ColumnType.STRING),
-            Map.entry(BasicType.DATE, CsvSchema.ColumnType.STRING),
-            Map.entry(BasicType.DATETIME, CsvSchema.ColumnType.STRING));
+public class CsvSchemaMapping {
 
     private static final Map<ArrowTypeID, CsvSchema.ColumnType> ARROW_CSV_TYPE_MAPPING = Map.ofEntries(
             Map.entry(ArrowTypeID.Bool, CsvSchema.ColumnType.BOOLEAN),
@@ -46,44 +35,24 @@ public class CsvSchemaMapping {
             Map.entry(ArrowTypeID.Date, CsvSchema.ColumnType.STRING),
             Map.entry(ArrowTypeID.Timestamp, CsvSchema.ColumnType.STRING));
 
-    public static CsvSchema.Builder tracToCsv(SchemaDefinition tracSchema) {
-
-        // Unexpected error - TABLE is the only TRAC schema type currently available
-        if (tracSchema.getSchemaType() != SchemaType.TABLE)
-            throw new EUnexpected();
-
-        var tracTableSchema = tracSchema.getTable();
-        var csvSchema = CsvSchema.builder();
-
-        for (var tracField : tracTableSchema.getFieldsList()) {
-
-            var fieldName = tracField.getFieldName();
-            var csvType = TRAC_CSV_TYPE_MAPPING.get(tracField.getFieldType());
-
-            // Unexpected error - All TRAC primitive types are mapped
-            if (csvType == null)
-                throw new EUnexpected();
-
-            csvSchema.addColumn(fieldName, csvType);
-        }
-
-        return csvSchema;
-    }
-
     public static CsvSchema.Builder arrowToCsv(Schema arrowSchema) {
 
         var csvSchema = CsvSchema.builder();
 
         for (var arrowField : arrowSchema.getFields()) {
 
-            // TODO: Dereference dictionary types
-
             var fieldName = arrowField.getName();
             var arrowType = arrowField.getType().getTypeID();
             var csvType = ARROW_CSV_TYPE_MAPPING.get(arrowType);
 
-            if (csvType == null)
-                throw new EUnexpected();  // TODO: Error
+            if (csvType == null) {
+
+                var err = String.format(
+                        "Data type not supported for field: [%s] %s",
+                        arrowField.getName(), arrowField.getType());
+
+                throw new EDataTypeNotSupported(err);
+            }
 
             csvSchema.addColumn(fieldName, csvType);
         }
