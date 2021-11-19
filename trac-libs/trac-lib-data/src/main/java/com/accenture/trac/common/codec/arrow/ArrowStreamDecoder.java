@@ -58,27 +58,33 @@ public class ArrowStreamDecoder extends BaseDecoder {
     @Override
     protected void decodeChunk(ByteBuf chunk) {
 
-        try (var stream = new ByteSeekableChannel(chunk);
-             var reader = new ArrowStreamReader(stream, arrowAllocator);
-             var root = reader.getVectorSchemaRoot()) {
+        try (var stream = new ByteSeekableChannel(chunk)) {
 
             // Arrow does not attempt to validate the stream before reading
             // This quick validation peeks at the start of the stream for a basic sanity check
             // It should be enough to flag e.g. if data has been sent in a totally different format
+
+            // Make sure to do this check before setting up reader + root,
+            // since that will trigger reading the initial schema message
+
             validateStartOfStream(stream);
 
-            var schema = root.getSchema();
-            emitBlock(DataBlock.forSchema(schema));
+            try (var reader = new ArrowStreamReader(stream, arrowAllocator);
+                 var root = reader.getVectorSchemaRoot()){
 
-            var unloader = new VectorUnloader(root);
+                var schema = root.getSchema();
+                emitBlock(DataBlock.forSchema(schema));
 
-            while (reader.loadNextBatch()) {
+                var unloader = new VectorUnloader(root);
 
-                var batch = unloader.getRecordBatch();
-                emitBlock(DataBlock.forRecords(batch));
+                while (reader.loadNextBatch()) {
 
-                // Release memory retained in VSR (batch still has a reference)
-                root.clear();
+                    var batch = unloader.getRecordBatch();
+                    emitBlock(DataBlock.forRecords(batch));
+
+                    // Release memory retained in VSR (batch still has a reference)
+                    root.clear();
+                }
             }
         }
         catch (NotAnArrowStream e) {
@@ -98,14 +104,12 @@ public class ArrowStreamDecoder extends BaseDecoder {
             // Decoders work on a stream of buffers, "real" IO exceptions should not occur
 
             var errorMessage = "Arrow stream decoding failed, content is garbled";
-
             log.error(errorMessage, e);
             throw new EDataCorruption(errorMessage, e);
         }
         catch (Throwable e)  {
 
             // Ensure unexpected errors are still reported to the Flow API
-
             log.error("Unexpected error in Arrow stream decoding", e);
             throw new EUnexpected(e);
         }
