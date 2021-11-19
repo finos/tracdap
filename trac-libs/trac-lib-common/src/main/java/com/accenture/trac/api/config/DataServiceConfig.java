@@ -21,7 +21,8 @@ import java.util.Map;
 public class DataServiceConfig {
 
     private short port;
-    private String defaultStorage;
+    private String defaultStorageKey;
+    private String defaultStorageFormat;
 
     private Map<String, StorageConfig> storage = Map.of();
 
@@ -33,12 +34,20 @@ public class DataServiceConfig {
         this.port = port;
     }
 
-    public String getDefaultStorage() {
-        return defaultStorage;
+    public String getDefaultStorageKey() {
+        return defaultStorageKey;
     }
 
-    public void setDefaultStorage(String defaultStorage) {
-        this.defaultStorage = defaultStorage;
+    public void setDefaultStorageKey(String defaultStorage) {
+        this.defaultStorageKey = defaultStorage;
+    }
+
+    public String getDefaultStorageFormat() {
+        return defaultStorageFormat;
+    }
+
+    public void setDefaultStorageFormat(String defaultStorageFormat) {
+        this.defaultStorageFormat = defaultStorageFormat;
     }
 
     public Map<String, StorageConfig> getStorage() {

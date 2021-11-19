@@ -18,5 +18,9 @@ package com.accenture.trac.common.storage;
 
 public interface IStorageManager {
 
+    String PROP_STORAGE_KEY = "TRAC_STORAGE_KEY";
+
+    IDataStorage getDataStorage(String storageKey);
+
     IFileStorage getFileStorage(String storageKey);
 }

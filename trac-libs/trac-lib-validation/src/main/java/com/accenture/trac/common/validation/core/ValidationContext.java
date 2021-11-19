@@ -42,14 +42,14 @@ public class ValidationContext {
 
     public static ValidationContext forMethod(Message msg, Descriptors.MethodDescriptor descriptor) {
 
-        var key = ValidationKey.fixed(msg.getDescriptorForType(), descriptor);
+        var key = ValidationKey.fixedMethod(msg.getDescriptorForType(), descriptor);
         var root = new ValidationLocation(null, key, msg, null, null);
         return new ValidationContext(root);
     }
 
     public static ValidationContext forMessage(Message msg) {
 
-        var key = ValidationKey.fixed(msg.getDescriptorForType(), null);
+        var key = ValidationKey.fixedMethod(msg.getDescriptorForType(), null);
         var root = new ValidationLocation(null, key, msg, null, null);
         return new ValidationContext(root);
     }
@@ -96,11 +96,13 @@ public class ValidationContext {
 
         var fd = msg.hasOneof(oneOf) ? msg.getOneofFieldDescriptor(oneOf) : null;
         var name = fd != null ? fd.getName() : oneOf.getName();
-
         var obj = fd != null ? msg.getField(fd) : null;
-        var priorObj = fd != null && priorMsg != null ? priorMsg.getField(fd) : null;
 
-        var loc = new ValidationLocation(parentLoc, null, obj, priorObj, oneOf, fd, name);
+        var priorFd = priorMsg != null && priorMsg.hasOneof(oneOf) ? priorMsg.getOneofFieldDescriptor(oneOf) : null;
+        var priorName = priorFd != null ? priorFd.getName() : oneOf.getName();
+        var priorObj = priorFd != null ? priorMsg.getField(priorFd) : null;
+
+        var loc = new ValidationLocation(parentLoc, null, obj, priorObj, oneOf, fd, name, priorFd, priorName);
 
         if (parentLoc.skipped())
             loc.skip();
@@ -157,6 +159,7 @@ public class ValidationContext {
         return apply(validator, String.class);
     }
 
+    @SuppressWarnings({"unchecked", "rawTypes"})
     public <T>
     ValidationContext apply(ValidationFunction.Typed<T> validator, Class<T> targetClass) {
 
@@ -165,22 +168,81 @@ public class ValidationContext {
 
         var obj = location.peek().target();
 
+        // Simple case - obj is an instance of the expected target class
+
+        if (targetClass.isInstance(obj)) {
+            var target = (T) obj;
+            return validator.apply(target, this);
+        }
+
+        // Protobuf stores enum values as EnumValueDescriptor objects
+        // So, special handling is needed for enums
+
+        if (Enum.class.isAssignableFrom(targetClass)) {
+
+            if (obj instanceof Descriptors.EnumValueDescriptor) {
+
+                var valueDesc = (Descriptors.EnumValueDescriptor) obj;
+                var enumType = (Class<? extends Enum>) targetClass;
+                var enumVal = Enum.valueOf(enumType, valueDesc.getName());
+
+                return validator.apply((T) enumVal, this);
+            }
+        }
+
+        // If obj does not match the expected target type, blow up the validation process
+
         // Type mis-match errors should be detected during development, otherwise the validator won't run
         // In the event of a type mis-match at run time, blow up the validator!
         // I.e. report as an unexpected internal error, validation cannot be completed.
 
-        if (!targetClass.isInstance(obj)) {
+        log.error("Validator type mismatch (this is a bug): expected [{}], got [{}]", targetClass, obj.getClass());
+        log.error("(Expected target class is specified in ctx.apply())");
 
-            log.error("Validator type mismatch (this is a bug): expected [{}], got [{}]", targetClass, obj.getClass());
-            log.error("(Expected target class is specified in ctx.apply())");
+        throw new EUnexpected();
+    }
 
-            throw new EUnexpected();
+    @SuppressWarnings({"unchecked", "rawTypes"})
+    public <T, U>
+    ValidationContext applyWith(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
+
+        if (done())
+            return this;
+
+        var obj = location.peek().target();
+
+        // Simple case - obj is an instance of the expected target class
+
+        if (targetClass.isInstance(obj)) {
+            var target = (T) obj;
+            return validator.apply(target, arg, this);
         }
 
-        @SuppressWarnings("unchecked")
-        var target = (T) obj;
+        // Protobuf stores enum values as EnumValueDescriptor objects
+        // So, special handling is needed for enums
 
-        return validator.apply(target, this);
+        if (Enum.class.isAssignableFrom(targetClass)) {
+
+            if (obj instanceof Descriptors.EnumValueDescriptor) {
+
+                var valueDesc = (Descriptors.EnumValueDescriptor) obj;
+                var enumType = (Class<? extends Enum>) targetClass;
+                var enumVal = Enum.valueOf(enumType, valueDesc.getName());
+
+                return validator.apply((T) enumVal, arg, this);
+            }
+        }
+
+        // If obj does not match the expected target type, blow up the validation process
+
+        // Type mis-match errors should be detected during development, otherwise the validator won't run
+        // In the event of a type mis-match at run time, blow up the validator!
+        // I.e. report as an unexpected internal error, validation cannot be completed.
+
+        log.error("Validator type mismatch (this is a bug): expected [{}], got [{}]", targetClass, obj.getClass());
+        log.error("(Expected target class is specified in ctx.apply())");
+
+        throw new EUnexpected();
     }
 
     public ValidationContext apply(ValidationFunction.Version<Object> validator) {
@@ -194,6 +256,7 @@ public class ValidationContext {
         return validator.apply(current, prior, this);
     }
 
+    @SuppressWarnings("unchecked")
     public <T> ValidationContext apply(ValidationFunction.Version<T> validator, Class<T> targetClass) {
 
         if (done())
@@ -202,29 +265,35 @@ public class ValidationContext {
         var current = location.peek().target();
         var prior = location.peek().prior();
 
-        if (!targetClass.isInstance(prior)) {
+        if (targetClass.isInstance(prior) && targetClass.isInstance(current)) {
 
-            log.error("Validator type mismatch (this is a bug): expected [{}], got [{}]", targetClass, prior.getClass());
-            log.error("(Expected target class is specified in ctx.apply())");
+            var typedCurrent = (T) current;
+            var typedPrior = (T) prior;
 
-            throw new EUnexpected();
+            return validator.apply(typedCurrent, typedPrior, this);
         }
 
-        if (!targetClass.isInstance(current)) {
+        if (Enum.class.isAssignableFrom(targetClass)) {
 
-            log.error("Validator type mismatch (this is a bug): expected [{}], got [{}]", targetClass, current.getClass());
-            log.error("(Expected target class is specified in ctx.apply())");
+            if (current instanceof Descriptors.EnumValueDescriptor && prior instanceof Descriptors.EnumValueDescriptor) {
 
-            throw new EUnexpected();
+                var enumType = (Class<? extends Enum>) targetClass;
+
+                var currentDesc = (Descriptors.EnumValueDescriptor) current;
+                var currentVal = Enum.valueOf(enumType, currentDesc.getName());
+                var priorDesc = (Descriptors.EnumValueDescriptor) current;
+                var priorVal = Enum.valueOf(enumType, priorDesc.getName());
+
+                return validator.apply((T) currentVal, (T) priorVal, this);
+            }
         }
 
-        @SuppressWarnings("unchecked")
-        var typedCurrent = (T) current;
+        log.error("Validator type mismatch (this is a bug): expected [{}], got prior = [{}], current = [{}]",
+                targetClass, prior.getClass(), current.getClass());
 
-        @SuppressWarnings("unchecked")
-        var typedPrior = (T) prior;
+        log.error("(Expected target class is specified in ctx.apply())");
 
-        return validator.apply(typedCurrent, typedPrior, this);
+        throw new EUnexpected();
     }
 
     public ValidationContext applyIf(ValidationFunction.Basic validator, boolean condition) {
@@ -244,8 +313,17 @@ public class ValidationContext {
         return apply(validator, targetClass);
     }
 
+    public <T>
+    ValidationContext applyIf(ValidationFunction.Version<T> validator, Class<T> targetClass, boolean condition) {
+
+        if (!condition)
+            return this;
+
+        return apply(validator, targetClass);
+    }
+
     public <TMsg extends Message>
-    ValidationContext applyTypedList(ValidationFunction.Typed<TMsg> validator, Class<TMsg> msgClass) {
+    ValidationContext applyList(ValidationFunction.Typed<TMsg> validator, Class<TMsg> msgClass) {
 
         if (done())
             return this;
@@ -323,6 +401,15 @@ public class ValidationContext {
     public String fieldName() {
         return location.peek().fieldName();
     }
+
+    public Descriptors.FieldDescriptor priorField() {
+        return location.peek().priorField();
+    }
+
+    public String priorFieldName() {
+        return location.peek().priorFieldName();
+    }
+
 
     public boolean failed() {
         return location.peek().failed();

@@ -128,7 +128,11 @@ public class TestData {
 
             // There is no attempt here to link this to a storage definition
             // Not needed yet to test metadata semantics in isolation
-            .setStorageId("dummy_storage")
+            .setStorageId(TagSelector.newBuilder()
+                    .setObjectType(ObjectType.STORAGE)
+                    .setObjectId(UUID.randomUUID().toString())
+                    .setLatestObject(true)
+                    .setLatestTag(true))
 
             .setSchema(SchemaDefinition.newBuilder()
                 .setSchemaType(SchemaType.TABLE)
@@ -136,22 +140,22 @@ public class TestData {
                 .addFields(FieldSchema.newBuilder()
                         .setFieldName("transaction_id")
                         .setFieldType(BasicType.STRING)
-                        .setFieldOrder(1)
+                        .setFieldOrder(0)
                         .setBusinessKey(true))
                 .addFields(FieldSchema.newBuilder()
                         .setFieldName("customer_id")
                         .setFieldType(BasicType.STRING)
-                        .setFieldOrder(2)
+                        .setFieldOrder(1)
                         .setBusinessKey(true))
                 .addFields(FieldSchema.newBuilder()
                         .setFieldName("order_date")
                         .setFieldType(BasicType.DATE)
-                        .setFieldOrder(3)
+                        .setFieldOrder(2)
                         .setBusinessKey(true))
                 .addFields(FieldSchema.newBuilder()
                         .setFieldName("widgets_ordered")
                         .setFieldType(BasicType.INTEGER)
-                        .setFieldOrder(4)
+                        .setFieldOrder(3)
                         .setBusinessKey(true)))))
             .build();
     }

@@ -216,11 +216,11 @@ class DevModeTranslator:
             opaqueKey="part-root",
             partType=meta.PartType.PART_ROOT)
 
-        data_item_id = f"DATA:{data_id}:{part_key.opaqueKey}:{snap_index}:{delta_index}"
+        data_item = f"DATA:{data_id}:{part_key.opaqueKey}:{snap_index}:{delta_index}"
 
         delta = meta.DataDefinition.Delta(
             deltaIndex=delta_index,
-            dataItemId=data_item_id)
+            dataItem=data_item)
 
         snap = meta.DataDefinition.Snap(
             snapIndex=snap_index,
@@ -231,7 +231,11 @@ class DevModeTranslator:
             snap=snap)
 
         data_def = meta.DataDefinition(parts={})
-        data_def.storageId = str(storage_id)
+
+        data_def.storageId = meta.TagSelector(
+            meta.ObjectType.STORAGE, str(storage_id),
+            latestObject=True, latestTag=True)
+
         data_def.schema = meta.SchemaDefinition(schemaType=meta.SchemaType.TABLE, table=meta.TableSchema())
         data_def.parts[part_key.opaqueKey] = part
 
@@ -251,7 +255,7 @@ class DevModeTranslator:
             incarnations=[storage_incarnation])
 
         storage_def = meta.StorageDefinition(dataItems={})
-        storage_def.dataItems[delta.dataItemId] = storage_item
+        storage_def.dataItems[delta.dataItem] = storage_item
 
         data_obj = meta.ObjectDefinition(objectType=meta.ObjectType.DATA, data=data_def)
         storage_obj = meta.ObjectDefinition(objectType=meta.ObjectType.STORAGE, storage=storage_def)

@@ -1,0 +1,101 @@
+[
+  {
+    "boolean_field": true,
+    "integer_field": 0,
+    "float_field": 0.0,
+    "decimal_field": "0.00",
+    "string_field": "Hello world 0",
+    "date_field": "1970-01-01",
+    "datetime_field": "1970-01-01T00:00:00"
+  },
+
+  {
+    "boolean_field": false,
+    "integer_field": 1,
+    "float_field": 1.0,
+    "decimal_field": "1.00",
+    "string_field": "Hello world 1",
+    "date_field": "1970-01-02",
+    "datetime_field": "1970-01-01T00:00:01"
+  },
+
+  {
+    "boolean_field": true,
+    "integer_field": 2,
+    "float_field": 2.0,
+    "decimal_field": "2.00",
+    "string_field": "Hello world 2",
+    "date_field": "1970-01-03",
+    "datetime_field": "1970-01-01T00:00:02"
+  },
+
+  {
+    "boolean_field": false,
+    "integer_field": 3,
+    "float_field": 3.0,
+    "decimal_field": "3.00",
+    "string_field": "Hello world 3",
+    "date_field": "1970-01-04",
+    "datetime_field": "1970-01-01T00:00:03"
+  },
+
+  {
+    "boolean_field": true,
+    "integer_field": 4,
+    "float_field": 4.0,
+    "decimal_field": "4.00",
+    "string_field": "Hello world 4",
+    "date_field": "1970-01-05",
+    "datetime_field": "1970-01-01T00:00:04"
+  },
+
+  {
+    "boolean_field": false,
+    "integer_field": 5,
+    "float_field": 5.0,
+    "decimal_field": "5.00",
+    "string_field": "Hello world 5",
+    "date_field": "1970-01-06",
+    "datetime_field": "1970-01-01T00:00:05"
+  },
+
+  {
+    "boolean_field": true,
+    "integer_field": 6,
+    "float_field": 6.0,
+    "decimal_field": "6.00",
+    "string_field": "Hello world 6",
+    "date_field": "1970-01-07",
+    "datetime_field": "1970-01-01T00:00:06"
+  },
+
+  {
+    "boolean_field": false,
+    "integer_field": 7,
+    "float_field": 7.0,
+    "decimal_field": "7.00",
+    "string_field": "Hello world 7",
+    "date_field": "1970-01-08",
+    "datetime_field": "1970-01-01T00:00:07"
+  },
+
+  {
+    "boolean_field": true,
+    "integer_field": 8,
+    "float_field": 8.0,
+    "decimal_field": "8.00",
+    "string_field": "Hello world 8",
+    "date_field": "1970-01-09",
+    "datetime_field": "1970-01-01T00:00:08"
+  },
+
+  {
+    "boolean_field": false,
+    "integer_field": 9,
+    "float_field": 9.0,
+    "decimal_field": "9.00",
+    "string_field": "Hello world 9",
+    "date_field": "1970-01-10",
+    "datetime_field": "1970-01-01T00:00:09"
+  }
+]

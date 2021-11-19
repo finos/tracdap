@@ -1,0 +1,11 @@
+boolean_field,  integer_field,  float_field,  decimal_field,  string_field,   date_field,   datetime_field,       extra_string_field
+true,           0,              0.0,          0.00,           Hello world 0,  1970-01-01,   1970-01-01T00:00:00,  Goodbye cruel world 0
+false,          1,              1.0,          1.00,           Hello world 1,  1970-01-02,   1970-01-01T00:00:01,  Goodbye cruel world 1
+true,           2,              2.0,          2.00,           Hello world 2,  1970-01-03,   1970-01-01T00:00:02,  Goodbye cruel world 2
+false,          3,              3.0,          3.00,           Hello world 3,  1970-01-04,   1970-01-01T00:00:03,  Goodbye cruel world 3
+true,           4,              4.0,          4.00,           Hello world 4,  1970-01-05,   1970-01-01T00:00:04,  Goodbye cruel world 4
+false,          5,              5.0,          5.00,           Hello world 5,  1970-01-06,   1970-01-01T00:00:05,  Goodbye cruel world 5
+true,           6,              6.0,          6.00,           Hello world 6,  1970-01-07,   1970-01-01T00:00:06,  Goodbye cruel world 6
+false,          7,              7.0,          7.00,           Hello world 7,  1970-01-08,   1970-01-01T00:00:07,  Goodbye cruel world 7
+true,           8,              8.0,          8.00,           Hello world 8,  1970-01-09,   1970-01-01T00:00:08,  Goodbye cruel world 8
+false,          9,              9.0,          9.00,           Hello world 9,  1970-01-10,   1970-01-01T00:00:09,  Goodbye cruel world 9

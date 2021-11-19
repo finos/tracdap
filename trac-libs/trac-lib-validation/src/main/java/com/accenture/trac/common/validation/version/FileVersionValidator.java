@@ -20,8 +20,6 @@ import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.common.validation.core.ValidationContext;
 import com.google.protobuf.*;
 
-import java.util.Objects;
-
 
 public class FileVersionValidator {
 
@@ -39,6 +37,10 @@ public class FileVersionValidator {
         FILE_STORAGE_ID = field(FILE_DEF, FileDefinition.STORAGEID_FIELD_NUMBER);
     }
 
+    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
+        return msg.findFieldByNumber(fieldNo);
+    }
+
     public static ValidationContext fileVersion(FileDefinition current, FileDefinition prior, ValidationContext ctx) {
 
         ctx = ctx.push(FILE_NAME)
@@ -46,15 +48,15 @@ public class FileVersionValidator {
                 .pop();
 
         ctx = ctx.push(FILE_EXTENSION)
-                .apply(FileVersionValidator::exactMatch)
+                .apply(CommonValidators::exactMatch)
                 .pop();
 
         ctx = ctx.push(FILE_MIME_TYPE)
-                .apply(FileVersionValidator::exactMatch)
+                .apply(CommonValidators::exactMatch)
                 .pop();
 
         ctx = ctx.push(FILE_STORAGE_ID)
-                .apply(FileVersionValidator::exactMatch)
+                .apply(CommonValidators::exactMatch)
                 .pop();
 
         return ctx;
@@ -73,32 +75,12 @@ public class FileVersionValidator {
         if (!priorExt.equals(currentExt)) {
 
             var err = String.format(
-                    "File extension in field [%s] must not change between versions: prior = [%s], current = [%s]",
+                    "File extension in field [%s] changed between versions: prior = [%s], new = [%s]",
                     ctx.fieldName(), priorExt, currentExt);
 
             return ctx.error(err);
         }
 
         return ctx;
-    }
-
-    static ValidationContext exactMatch(Object current, Object prior, ValidationContext ctx) {
-
-        var equal = Objects.equals(prior, current);
-
-        if (!equal) {
-
-            var err = String.format(
-                    "Value of field [%s] must not change between versions: prior = [%s], current = [%s]",
-                    ctx.fieldName(), prior.toString(), current.toString());
-
-            return ctx.error(err);
-        }
-
-        return ctx;
-    }
-
-    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
-        return msg.findFieldByNumber(fieldNo);
     }
 }

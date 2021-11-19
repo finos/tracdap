@@ -18,7 +18,16 @@ package com.accenture.trac.api.config;
 
 public class ServicesConfig {
 
+    private MetaServiceConfig meta;
     private DataServiceConfig data;
+
+    public MetaServiceConfig getMeta() {
+        return meta;
+    }
+
+    public void setMeta(MetaServiceConfig meta) {
+        this.meta = meta;
+    }
 
     public DataServiceConfig getData() {
         return data;

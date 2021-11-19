@@ -16,8 +16,7 @@
   ~ limitations under the License.
   -->
 
-<Configuration strict="true" name="UnitTestLogConfig"
-               packages="org.apache.logging.log4j.test">
+<Configuration strict="true" name="Logging config for config manager tests">
 
     <Appenders>
 

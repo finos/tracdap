@@ -24,9 +24,10 @@ import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.util.GrpcStreams;
 import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.FileDefinition;
+import com.accenture.trac.metadata.SchemaDefinition;
 import com.accenture.trac.metadata.TagHeader;
-import com.accenture.trac.svc.data.service.DataReadService;
-import com.accenture.trac.svc.data.service.DataWriteService;
+import com.accenture.trac.svc.data.service.DataRwService;
+import com.accenture.trac.svc.data.service.FileRwService;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
@@ -37,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.function.BiFunction;
@@ -46,46 +48,84 @@ import java.util.function.Supplier;
 
 public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
+    private static final MethodDescriptor<DataWriteRequest, TagHeader> CREATE_DATASET_METHOD = TracDataApiGrpc.getCreateDatasetMethod();
+    private static final MethodDescriptor<DataWriteRequest, TagHeader> UPDATE_DATASET_METHOD = TracDataApiGrpc.getUpdateDatasetMethod();
+    private static final MethodDescriptor<DataReadRequest, DataReadResponse> READ_DATASET_METHOD = TracDataApiGrpc.getReadDatasetMethod();
+
+    private static final MethodDescriptor<DataWriteRequest, TagHeader> CREATE_SMALL_DATASET_METHOD = TracDataApiGrpc.getCreateSmallDatasetMethod();
+    private static final MethodDescriptor<DataWriteRequest, TagHeader> UPDATE_SMALL_DATASET_METHOD = TracDataApiGrpc.getUpdateSmallDatasetMethod();
+
     private static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_FILE_METHOD = TracDataApiGrpc.getCreateFileMethod();
     private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_FILE_METHOD = TracDataApiGrpc.getUpdateFileMethod();
-    private static final MethodDescriptor<FileReadRequest, FileReadResponse> FILE_READ_METHOD = TracDataApiGrpc.getReadFileMethod();
+    private static final MethodDescriptor<FileReadRequest, FileReadResponse> READ_FILE_METHOD = TracDataApiGrpc.getReadFileMethod();
+
+    static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_SMALL_FILE_METHOD = TracDataApiGrpc.getCreateSmallFileMethod();
+    private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_SMALL_FILE_METHOD = TracDataApiGrpc.getUpdateSmallFileMethod();
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final DataReadService readService;
-    private final DataWriteService writeService;
+    private final DataRwService dataRwService;
+    private final FileRwService fileService;
 
     private final Validator validator = new Validator();
 
 
-    public TracDataApi(DataReadService readService, DataWriteService writeService) {
-        this.readService = readService;
-        this.writeService = writeService;
+    public TracDataApi(DataRwService dataRwService, FileRwService fileService) {
+        this.dataRwService = dataRwService;
+        this.fileService = fileService;
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // API calls
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @Override
+    public StreamObserver<DataWriteRequest> createDataset(StreamObserver<TagHeader> responseObserver) {
+
+        return clientStreaming(CREATE_DATASET_METHOD, responseObserver,
+                DataWriteRequest::getContent,
+                this::doCreateDataset);
     }
 
     @Override
-    public StreamObserver<DataWriteRequest> createData(StreamObserver<DataWriteResponse> responseObserver) {
-        return super.createData(responseObserver);
+    public void createSmallDataset(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
+
+        var inputStream = clientStreaming(CREATE_SMALL_DATASET_METHOD, responseObserver,
+                DataWriteRequest::getContent,
+                this::doCreateDataset);
+
+        inputStream.onNext(request);
+        inputStream.onCompleted();
     }
 
     @Override
-    public void createDataUnary(DataWriteRequest request, StreamObserver<DataWriteResponse> responseObserver) {
-        super.createDataUnary(request, responseObserver);
+    public StreamObserver<DataWriteRequest> updateDataset(StreamObserver<TagHeader> responseObserver) {
+
+        return clientStreaming(UPDATE_DATASET_METHOD, responseObserver,
+                DataWriteRequest::getContent,
+                this::doUpdateDataset);
     }
 
     @Override
-    public StreamObserver<DataWriteRequest> updateData(StreamObserver<DataWriteResponse> responseObserver) {
-        return super.updateData(responseObserver);
+    public void updateSmallDataset(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
+
+        var inputStream = clientStreaming(UPDATE_SMALL_DATASET_METHOD, responseObserver,
+                DataWriteRequest::getContent,
+                this::doUpdateDataset);
+
+        inputStream.onNext(request);
+        inputStream.onCompleted();
     }
 
     @Override
-    public void updateDataUnary(DataWriteRequest request, StreamObserver<DataWriteResponse> responseObserver) {
-        super.updateDataUnary(request, responseObserver);
-    }
+    public void readDataset(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
 
-    @Override
-    public void readData(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
-        super.readData(request, responseObserver);
+        serverStreaming(READ_DATASET_METHOD, request, responseObserver,
+                DataReadResponse::newBuilder,
+                DataReadResponse.Builder::setSchema,
+                DataReadResponse.Builder::setContent,
+                this::doReadDataset);
     }
 
     @Override
@@ -96,26 +136,15 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 this::doCreateFile);
     }
 
-    private CompletionStage<TagHeader> doCreateFile(
-            FileWriteRequest request,
-            Flow.Publisher<ByteBuf> byteStream,
-            IExecutionContext execCtx) {
+    @Override
+    public void createSmallFile(FileWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        validateRequest(CREATE_FILE_METHOD, request);
+        var inputStream = clientStreaming(CREATE_SMALL_FILE_METHOD, responseObserver,
+                FileWriteRequest::getContent,
+                this::doCreateFile);
 
-        var tenant = request.getTenant();
-        var tagUpdates = request.getTagUpdatesList();
-        var fileName = request.getName();
-        var mimeType = request.getMimeType();
-
-        var expectedSize = request.hasSize()
-                ? request.getSize()
-                : null;
-
-        return writeService.createFile(
-                tenant, tagUpdates,
-                fileName, mimeType, expectedSize,
-                byteStream, execCtx);
+        inputStream.onNext(request);
+        inputStream.onCompleted();
     }
 
     @Override
@@ -126,52 +155,25 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 this::doUpdateFile);
     }
 
-    private CompletionStage<TagHeader> doUpdateFile(
-            FileWriteRequest request,
-            Flow.Publisher<ByteBuf> byteStream,
-            IExecutionContext execCtx) {
+    @Override
+    public void updateSmallFile(FileWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        validateRequest(UPDATE_FILE_METHOD, request);
+        var inputStream = clientStreaming(UPDATE_SMALL_FILE_METHOD, responseObserver,
+                FileWriteRequest::getContent,
+                this::doUpdateFile);
 
-        var tenant = request.getTenant();
-        var tagUpdates = request.getTagUpdatesList();
-        var priorVersion = request.getPriorVersion();
-        var fileName = request.getName();
-        var mimeType = request.getMimeType();
-
-        var expectedSize = request.hasSize()
-                ? request.getSize()
-                : null;
-
-        return writeService.updateFile(
-                tenant, tagUpdates,
-                priorVersion, fileName, mimeType, expectedSize,
-                byteStream, execCtx);
+        inputStream.onNext(request);
+        inputStream.onCompleted();
     }
-
 
     @Override
     public void readFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
-        serverStreaming(FILE_READ_METHOD, request, responseObserver,
+        serverStreaming(READ_FILE_METHOD, request, responseObserver,
                 FileReadResponse::newBuilder,
                 FileReadResponse.Builder::setFileDefinition,
                 FileReadResponse.Builder::setContent,
                 this::doReadFile);
-    }
-
-    private void doReadFile(
-            FileReadRequest request,
-            CompletableFuture<FileDefinition> fileDef,
-            Flow.Subscriber<ByteBuf> byteStream,
-            IExecutionContext execCtx) {
-
-        validateRequest(FILE_READ_METHOD, request);
-
-        var tenant = request.getTenant();
-        var selector = request.getSelector();
-
-        readService.readFile(tenant, selector, fileDef, byteStream, execCtx);
     }
 
     @Override
@@ -185,12 +187,119 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     }
 
 
+    // -----------------------------------------------------------------------------------------------------------------
+    // API implementation
+    // -----------------------------------------------------------------------------------------------------------------
+
+    private CompletionStage<TagHeader> doCreateDataset(
+            String methodName,
+            DataWriteRequest request,
+            Flow.Publisher<ByteBuf> byteStream,
+            IExecutionContext execCtx) {
+
+        validateRequest(methodName, request);
+
+        return dataRwService.createDataset(request, byteStream, execCtx);
+    }
+
+    private CompletionStage<TagHeader> doUpdateDataset(
+            String methodName,
+            DataWriteRequest request,
+            Flow.Publisher<ByteBuf> byteStream,
+            IExecutionContext execCtx) {
+
+        validateRequest(methodName, request);
+
+        return dataRwService.updateDataset(request, byteStream, execCtx);
+    }
+
+    private void doReadDataset(
+            String methodName,
+            DataReadRequest request,
+            CompletableFuture<SchemaDefinition> schema,
+            Flow.Subscriber<ByteBuf> byteStream,
+            IExecutionContext execCtx) {
+
+        validateRequest(methodName, request);
+
+        dataRwService.readDataset(request, schema, byteStream, execCtx);
+    }
+
+    private CompletionStage<TagHeader> doCreateFile(
+            String methodName,
+            FileWriteRequest request,
+            Flow.Publisher<ByteBuf> byteStream,
+            IExecutionContext execCtx) {
+
+        validateRequest(methodName, request);
+
+        var tenant = request.getTenant();
+        var tagUpdates = request.getTagUpdatesList();
+        var fileName = request.getName();
+        var mimeType = request.getMimeType();
+
+        var expectedSize = request.hasSize()
+                ? request.getSize()
+                : null;
+
+        return fileService.createFile(
+                tenant, tagUpdates,
+                fileName, mimeType, expectedSize,
+                byteStream, execCtx);
+    }
+
+    private CompletionStage<TagHeader> doUpdateFile(
+            String methodName,
+            FileWriteRequest request,
+            Flow.Publisher<ByteBuf> byteStream,
+            IExecutionContext execCtx) {
+
+        validateRequest(methodName, request);
+
+        var tenant = request.getTenant();
+        var tagUpdates = request.getTagUpdatesList();
+        var priorVersion = request.getPriorVersion();
+        var fileName = request.getName();
+        var mimeType = request.getMimeType();
+
+        var expectedSize = request.hasSize()
+                ? request.getSize()
+                : null;
+
+        return fileService.updateFile(
+                tenant, tagUpdates,
+                priorVersion, fileName, mimeType, expectedSize,
+                byteStream, execCtx);
+    }
+
+    private void doReadFile(
+            String methodName,
+            FileReadRequest request,
+            CompletableFuture<FileDefinition> fileDef,
+            Flow.Subscriber<ByteBuf> byteStream,
+            IExecutionContext execCtx) {
+
+        validateRequest(methodName, request);
+
+        var tenant = request.getTenant();
+        var selector = request.getSelector();
+
+        fileService.readFile(tenant, selector, fileDef, byteStream, execCtx);
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Common scaffolding for client and server streaming
+    // -----------------------------------------------------------------------------------------------------------------
+
     private <TReq extends Message, TResp extends Message>
     StreamObserver<TReq> clientStreaming(
             MethodDescriptor<TReq, TResp> method,
             StreamObserver<TResp> responseObserver,
             Function<TReq, ByteString> getContent,
             ClientStreamingMethod<TReq, TResp> apiMethod) {
+
+        log_start(method);
 
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
 
@@ -199,10 +308,11 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var protoContent = Flows.map(requestHub, getContent);
         var content = Flows.map(protoContent, Bytes::fromProtoBytes);
 
-        var response = message0.thenCompose(msg0 ->
-                apiMethod.execute(msg0, content, execCtx));
+        message0.thenCompose(msg0 -> apiMethod.execute(
+                    method.getBareMethodName(), msg0, content, execCtx))
 
-        response.whenComplete(GrpcStreams.serverResponseHandler(method, responseObserver));
+                .whenComplete(GrpcStreams.serverResponseHandler(method, responseObserver))
+                .whenComplete((result, error) -> log_finish(method, error));
 
         return GrpcStreams.serverRequestStream(requestHub);
     }
@@ -218,6 +328,8 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             BiFunction<TBuilder, TDef, TBuilder> putDefinition,
             BiFunction<TBuilder, ByteString, TBuilder> putContent,
             ServerStreamingMethod<TReq, TDef> apiMethod) {
+
+        log_start(method);
 
         var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
 
@@ -239,7 +351,9 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         response.subscribe(GrpcStreams.serverResponseStream(method, responseObserver));
 
         try {
-            apiMethod.execute(request, definition, byteStream, execCtx);
+            apiMethod.execute(
+                    method.getBareMethodName(), request,
+                    definition, byteStream, execCtx);
         }
         catch (Exception e) {
 
@@ -252,14 +366,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         }
     }
 
-
-    private <TReq extends Message, TResp extends Message>
-    void validateRequest(MethodDescriptor<TReq, TResp> method, TReq msg) {
+    private <TReq extends Message>
+    void validateRequest(String methodName, TReq msg) {
 
         var protoMethod = Data.getDescriptor()
                 .getFile()
                 .findServiceByName("TracDataApi")
-                .findMethodByName(method.getBareMethodName());
+                .findMethodByName(methodName);
 
         validator.validateFixedMethod(msg, protoMethod);
     }
@@ -270,7 +383,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             TResp extends Message> {
 
         CompletionStage<TResp> execute(
-                TReq request,
+                String methodName, TReq request,
                 Flow.Publisher<ByteBuf> byteStream,
                 IExecutionContext execCtx);
     }
@@ -280,9 +393,33 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
             TReq extends Message, TDef extends Message> {
 
         void execute(
-                TReq request,
+                String methodName, TReq request,
                 CompletableFuture<TDef> def,
                 Flow.Subscriber<ByteBuf> byteStream,
                 IExecutionContext execCtx);
+    }
+
+    private void log_start(MethodDescriptor<?, ?> method) {
+
+        log.info("API CALL START [{}] ({})", method.getBareMethodName(), prettyMethodType(method.getType()));
+    }
+
+    private void log_finish(MethodDescriptor<?, ?> method, Throwable error) {
+
+        if (error == null)
+            log.info("API CALL SUCCEEDED [{}]", method.getBareMethodName());
+
+        else if (error instanceof CompletionException) {
+            var innerError = error.getCause();
+            log.error("API CALL FAILED [{}]: {}", method.getBareMethodName(), innerError.getMessage(), innerError);
+        }
+
+        else
+            log.error("API CALL FAILED [{}]: {}", method.getBareMethodName(), error.getMessage(), error);
+    }
+
+    private String prettyMethodType(MethodDescriptor.MethodType methodType) {
+
+        return methodType.name().toLowerCase().replace("_", " ");
     }
 }

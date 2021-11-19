@@ -22,7 +22,6 @@ import com.accenture.trac.common.exception.EStorageRequest;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EValidationGap;
 import com.accenture.trac.common.storage.local.LocalFileStorage;
-import com.accenture.trac.common.storage.local.LocalStoragePlugin;
 import com.accenture.trac.common.concurrent.Flows;
 
 import io.netty.buffer.*;
@@ -75,9 +74,10 @@ public class FileStorageOperationsTest {
     void setupStorage() {
 
         var storageProps = new Properties();
-        storageProps.put(LocalStoragePlugin.CONFIG_ROOT_DIR, storageDir.toString());
+        storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
+        storageProps.put(LocalFileStorage.CONFIG_ROOT_DIR, storageDir.toString());
+        storage = new LocalFileStorage(storageProps);
 
-        storage = new LocalFileStorage("TEST_STORAGE", storageProps);
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
     }
 
@@ -953,7 +953,7 @@ public class FileStorageOperationsTest {
         // There are several illegal characters for filenames on Windows!
 
         var invalidPathResult = OS.WINDOWS.isCurrentOs()
-                ? testMethod.apply("£$ N'`¬$£>.)_£\"+\n%", execContext)
+                ? testMethod.apply("@$ N'`$>.)_\"+\n%", execContext)
                 : testMethod.apply("nul\0char", execContext);
 
         waitFor(TEST_TIMEOUT,

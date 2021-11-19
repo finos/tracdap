@@ -13,7 +13,7 @@
 # limitations under the License.
 
 config:
-  logging.url: trac-logging.xml
+  logging: trac-logging.xml
 
   keystore:
     type: PKCS12
@@ -23,22 +23,24 @@ config:
 trac:
   services:
 
-#    meta:
-#      port: 8081
-#
-#      dalType: JDBC
-#      daLProps:
-#        dialect: H2
-#        jdbcUrl: ${TRAC_RUN_DIR}/trac.meta
-#        h2.user: trac
-#        h2.pass: trac
-#        h2.schema: public
-#        pool.size: 10
-#        pool.overflow: 5
+    meta:
+      port: 8081
+
+      dalType: JDBC
+      dalProps:
+        dialect: H2
+        jdbcUrl: ${TRAC_RUN_DIR}/trac.meta
+        h2.user: trac
+        h2.pass: trac
+        h2.schema: public
+        pool.size: 10
+        pool.overflow: 5
 
     data:
       port: 8082
-      defaultStorage: UNIT_TEST_STORAGE
+
+      defaultStorageKey: UNIT_TEST_STORAGE
+      defaultStorageFormat: ARROW_FILE
 
       storage:
 

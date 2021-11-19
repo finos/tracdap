@@ -16,10 +16,7 @@
 
 package com.accenture.trac.svc.data.service;
 
-import com.accenture.trac.metadata.FileDefinition;
-import com.accenture.trac.metadata.StorageDefinition;
-import com.accenture.trac.metadata.TagHeader;
-import com.accenture.trac.metadata.TagUpdate;
+import com.accenture.trac.metadata.*;
 
 import java.time.Instant;
 import java.util.List;
@@ -29,12 +26,22 @@ class RequestState {
 
     Instant objectTimestamp;
 
+    List<TagUpdate> dataTags;
     List<TagUpdate> fileTags;
     List<TagUpdate> storageTags;
 
+    TagHeader dataId, preAllocDataId;
     TagHeader fileId, priorFileId;
-    TagHeader storageId, priorStorageId;
+    TagHeader storageId, preAllocStorageId, priorStorageId;
 
+    DataDefinition data;
+    SchemaDefinition schema;
     FileDefinition file, priorFile;
     StorageDefinition storage, priorStorage;
+
+    PartKey part;
+    int snap;
+    int delta;
+
+    StorageCopy copy;
 }

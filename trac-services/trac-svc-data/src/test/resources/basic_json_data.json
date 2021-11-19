@@ -1,0 +1,12 @@
+[
+  { "string_field": "string_0", "int_field": 0 },
+  { "string_field": "string_1", "int_field": 1 },
+  { "string_field": "string_2", "int_field": 2 },
+  { "string_field": "string_3", "int_field": 3 },
+  { "string_field": "string_4", "int_field": 4 },
+  { "string_field": "string_5", "int_field": 5 },
+  { "string_field": "string_6", "int_field": 6 },
+  { "string_field": "string_7", "int_field": 7 },
+  { "string_field": "string_8", "int_field": 8 },
+  { "string_field": "string_9", "int_field": 9 }
+]

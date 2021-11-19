@@ -25,11 +25,14 @@ import com.accenture.trac.common.validation.ValidationConstants;
 import com.accenture.trac.common.validation.core.ValidationContext;
 import com.accenture.trac.common.validation.core.ValidationFunction;
 import com.google.protobuf.Descriptors;
+import com.google.protobuf.ProtocolMessageEnum;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -114,6 +117,28 @@ public class Validation {
         }
 
         return ctx;
+    }
+
+    static ValidationContext isoDate(String value, ValidationContext ctx) {
+
+        if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
+            throw new EUnexpected();
+
+        try {
+
+            MetadataCodec.ISO_DATE_FORMAT.parseBest(value,
+                    OffsetDateTime::from,
+                    LocalDateTime::from);
+
+            return ctx;
+        }
+        catch (DateTimeParseException e) {
+
+            var err = String.format("Value of field [%s] is not a valid date: [%s] %s",
+                    ctx.fieldName(), value, e.getMessage());
+
+            return ctx.error(err);
+        }
     }
 
     static ValidationContext isoDatetime(String value, ValidationContext ctx) {
@@ -264,6 +289,16 @@ public class Validation {
         return ctx;
     }
 
+    static ValidationContext optionalTrue(boolean value, ValidationContext ctx) {
+
+        if (!value) {
+            var err = String.format("Optional field [%s] must either be omitted or set to 'true'", ctx.fieldName());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
     static ValidationContext positive(Object value, ValidationContext ctx) {
 
         boolean positive;
@@ -310,6 +345,53 @@ public class Validation {
         if (!selector.getObjectType().equals(requiredType)) {
             var err = String.format("Wrong object type for [%s]: expected [%s], got [%s]",
                     ctx.fieldName(), requiredType, selector.getObjectType());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext fixedObjectVersion(TagSelector selector, ValidationContext ctx) {
+
+        if (selector.hasLatestObject()) {
+
+            var err = String.format(
+                    "The [%s] selector must refer to a fixed object version, [latestObject] is not allowed",
+                    ctx.fieldName());
+
+            ctx = ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext recognizedEnum(ProtocolMessageEnum protoEnum, ValidationContext ctx) {
+
+        if (protoEnum.getNumber() < 0) {
+
+            var err = String.format("Unrecognised value specified for [%s]: [%s]",
+                    ctx.fieldName(), protoEnum.getValueDescriptor().getName());
+
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext listNotEmpty(List<?> list, ValidationContext ctx) {
+
+        if (list.isEmpty()) {
+            var err = String.format("The list [%s] contains no values", ctx.fieldName());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext mapNotEmpty(Map<?, ?> list, ValidationContext ctx) {
+
+        if (list.isEmpty()) {
+            var err = String.format("The map [%s] contains no values", ctx.fieldName());
             return ctx.error(err);
         }
 

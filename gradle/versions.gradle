@@ -27,7 +27,8 @@ ext {
 
 
     // Data technologies
-    arrow_version = '5.0.0'
+    arrow_version = '6.0.0'
+    jackson_version = '2.13.0'
 
 
     // SQL (JDBC) drivers
@@ -50,7 +51,7 @@ ext {
 
     // Logging
     slf4j_version = '1.7.30'
-    log4j_version = '2.13.3'
+    log4j_version = '2.14.1'
 
 
     // Flyway (database deploy tool)

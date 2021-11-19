@@ -26,6 +26,14 @@ dependencies {
 
     api project(':trac-lib-common')
 
+    // Data framework API is in terms of Apache Arrow
+    api group: 'org.apache.arrow', name: 'arrow-vector', version: "$arrow_version"
+    api group: 'org.apache.arrow', name: 'arrow-memory-netty', version: "$arrow_version"
+
+    // Jackson used for implementations of formats included as standard
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
+    implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-csv', version: "$jackson_version"
+
     testImplementation project(':trac-lib-test')
 }
 

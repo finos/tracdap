@@ -30,6 +30,7 @@ public class ApiErrorMapping {
 
             Map.entry(EAuthorization.class, Status.Code.PERMISSION_DENIED),
             Map.entry(EInputValidation.class, Status.Code.INVALID_ARGUMENT),
+            Map.entry(ETagUpdate.class, Status.Code.FAILED_PRECONDITION),
 
             Map.entry(ETenant.class, Status.Code.NOT_FOUND),
             Map.entry(EMissingItem.class, Status.Code.NOT_FOUND),

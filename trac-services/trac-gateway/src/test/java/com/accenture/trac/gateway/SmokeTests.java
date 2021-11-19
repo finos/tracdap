@@ -19,16 +19,12 @@ package com.accenture.trac.gateway;
 import com.accenture.trac.api.MetadataSearchRequest;
 import com.accenture.trac.api.TracMetadataApiGrpc;
 import com.accenture.trac.common.config.ConfigManager;
-import com.accenture.trac.common.config.StandardArgs;
+import com.accenture.trac.common.startup.StandardArgs;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.URL;
 import java.nio.file.Paths;
-import java.util.stream.Collectors;
 
+import com.accenture.trac.common.startup.Startup;
 import io.grpc.ManagedChannelBuilder;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
@@ -198,12 +194,13 @@ public class SmokeTests {
     @Test @Disabled
     void grpcSmokeTest() throws Exception {
 
-        var args = new StandardArgs(Paths.get("."), "etc/trac-devlocal-gw.properties", "");
-        var config = new ConfigManager(args);
-        config.initConfigPlugins();
-        config.initLogging();
+        var startup = Startup.useConfigFile(TracPlatformGateway.class, "etc/trac-devlocal-gw.properties");
+        startup.runStartupSequence();
 
-        var gw = new TracPlatformGateway(config);
+        var plugins = startup.getPlugins();
+        var config = startup.getConfig();
+
+        var gw = new TracPlatformGateway(plugins, config);
 
         var log = LoggerFactory.getLogger(this.getClass());
         log.info("Before run");

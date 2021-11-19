@@ -20,6 +20,7 @@ package trac.api;
 option java_package = "com.accenture.trac.api";
 option java_multiple_files = true;
 
+import "trac/metadata/type.proto";
 import "trac/metadata/object_id.proto";
 import "trac/metadata/data.proto";
 import "trac/metadata/file.proto";
@@ -44,26 +45,26 @@ service TracDataApi {
    * Requires client-streaming, not yet available in gRPC-Web.
    * First message includes all metadata, subsequent are data stream only.
    */
-  rpc createData (stream DataWriteRequest) returns (DataWriteResponse);
+  rpc createDataset (stream DataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * To support web clients where client-streaming is not available.
-   * The same as createData(), but the data stream is sent as a single blob.
+   * The same as createDataset(), but the data stream is sent as a single blob.
    */
-  rpc createDataUnary (DataWriteRequest) returns (DataWriteResponse);
+  rpc createSmallDataset (DataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Update a dataset by supplying a data update (and optional schema update)
    *
    * Mirrors MetadataWriteRequest for specifying prior version and updating tags
    */
-  rpc updateData (stream DataWriteRequest) returns (DataWriteResponse);
+  rpc updateDataset (stream DataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * To support web clients where client-streaming is not available.
-   * The same as updateData(), but the data stream is sent as a single blob.
+   * The same as updateDataset(), but the data stream is sent as a single blob.
    */
-  rpc updateDataUnary (DataWriteRequest) returns (DataWriteResponse);
+  rpc updateSmallDataset (DataWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Read the contents of a dataset (in whole or in part)
@@ -78,7 +79,7 @@ service TracDataApi {
    *
    * Data is returned in a stream, server-streaming is supported in gRPC-Web.
    */
-  rpc readData (DataReadRequest) returns (stream DataReadResponse);
+  rpc readDataset (DataReadRequest) returns (stream DataReadResponse);
 
 
   /**
@@ -113,6 +114,8 @@ service TracDataApi {
    * clean up any partially-written data in the storage layer.
    */
   rpc createFile (stream FileWriteRequest) returns (metadata.TagHeader);
+
+  rpc createSmallFile (FileWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Upload a new version of an existing file into TRAC
@@ -151,6 +154,8 @@ service TracDataApi {
    * of an error, TRAC will do its best to clean up any partially-written data in the storage layer.
    */
   rpc updateFile (stream FileWriteRequest) returns (metadata.TagHeader);
+
+  rpc updateSmallFile (FileWriteRequest) returns (metadata.TagHeader);
 
   /**
    * Download a file that has been stored in TRAC
@@ -198,10 +203,26 @@ service TracDataApi {
 
 message DataWriteRequest {
 
+  /**
+   * Tenant code for the requested operation, always required
+   */
   string tenant = 1;
 
+  /**
+   * Prior object/tag version to use for update operations
+   *
+   * This field should be omitted when creating a new dataset.
+   */
   optional metadata.TagSelector priorVersion = 2;
 
+  /**
+   * Tag update operations to be applied
+   *
+   * Tag updates are applied in exactly the same way as for metadata write requests.
+   *
+   * @see MetadataWriteRequest
+   * @see TracMetadataApi
+   */
   repeated metadata.TagUpdate tagUpdates = 3;
 
 
@@ -210,26 +231,19 @@ message DataWriteRequest {
     metadata.SchemaDefinition schema = 5;
   }
 
-  // Alternative to schemaId or schema, supply schema updates to e.g. add one column
-  reserved 6;
+  // Alternatives to schemaId or schema
+  reserved 6, 7, 8;
+  reserved "inferSchema";
   reserved "schemaUpdates";
+  reserved "schemaHandling";
 
-  bool discreteSchema = 7;
+  string format = 9;
 
-  string format = 8;
-  string encoding = 9;
-  map<string, string> options = 10;
-
-  metadata.PartKey part = 11;
+//  map<string, metadata.Value> formatOptions = 10;
+//  optional metadata.PartKey part = 11;
+//  optional bool deltaUpdate = 12;
 
   bytes content = 1000;
-}
-
-message DataWriteResponse {
-
-  metadata.TagHeader header = 1;
-
-  uint32 size = 2;
 }
 
 message DataReadRequest {
@@ -238,17 +252,16 @@ message DataReadRequest {
   metadata.TagSelector selector = 2;
 
   string format = 3;
-  string encoding = 4;
 
-  metadata.PartKey part = 5;
-  optional uint64 offset = 6;
-  optional uint32 limit = 7;
+//  map<string, metadata.Value> formatOptions = 4;
+//  optional metadata.PartKey part = 5;
+//  optional uint64 offset = 6;
+//  optional uint32 limit = 7;
 }
 
 message DataReadResponse {
 
-  uint32 size = 1;
-  bool finished = 2;
+  optional metadata.SchemaDefinition schema = 1;
 
   bytes content = 1000;
 }

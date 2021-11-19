@@ -378,7 +378,9 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
                 subscription.cancel();
             }
             else
-                log.error("Write operation stopped due to an error: {} [{}]", error.getMessage(), absolutePath, eWrapped);
+                // Do not log stack trace for errors in the source data stream
+                // Stack trace will be logged at the original error site, and again in the final outbound handler
+                log.error("Write operation stopped due to an error: {} [{}]", error.getMessage(), absolutePath);
 
             while (!chunkBuffer.isEmpty()) {
                 var chunk = chunkBuffer.remove();
