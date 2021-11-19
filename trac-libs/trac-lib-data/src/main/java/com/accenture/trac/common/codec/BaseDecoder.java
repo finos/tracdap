@@ -44,7 +44,6 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
     private final Queue<DataBlock> outQueue;
 
     private boolean started = false;
-    private boolean released = false;
     private long nBytes;
     private long nRows;
     private int nBatches;
@@ -81,34 +80,18 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
     @Override
     protected final void handleTargetRequest() {
 
-        try {
-            deliverPendingBlocks();
+        deliverPendingBlocks();
 
-            if (nTargetRequested() > nTargetDelivered() && nSourceRequested() <= nSourceDelivered())
-                doSourceRequest(1);
-        }
-        catch (Throwable error) {
-
-            log.error("DECODE FAILED: " + error.getMessage());
-
-            releaseBuffer();
-            releaseOutQueue();
-            doTargetError(error);
-        }
+        if (nTargetRequested() > nTargetDelivered() && nSourceRequested() <= nSourceDelivered())
+            doSourceRequest(1);
     }
 
     @Override
     protected final void handleTargetCancel() {
 
-        try {
-            log.warn("DECODE CANCELLED");
+        log.warn("DECODE CANCELLED");
 
-            doSourceCancel();
-        }
-        finally {
-            releaseBuffer();
-            releaseOutQueue();
-        }
+        doSourceCancel();
     }
 
     @Override
@@ -149,9 +132,6 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
             if (!chunkDelivered)
                 chunk.release();
 
-            releaseBuffer();
-            releaseOutQueue();
-
             doTargetError(error);
         }
     }
@@ -182,36 +162,47 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
 
             log.error("DECODE FAILED: " + error.getMessage());
 
-            // Only release the outQueue on error
-            // If there is no error, either all output is sent or it is held until the next request
-
-            releaseOutQueue();
             doTargetError(error);
-        }
-        finally {
-            releaseBuffer();
         }
     }
 
     @Override
     protected final void handleSourceError(Throwable error) {
 
-        try {
+        // Stack trac is logged at original error site and again in outbound gRPC handler
+        // Do not log the same stack trace multiple times
 
-            // Stack trac is logged at original error site and again in outbound gRPC handler
-            // Do not log the same stack trace multiple times
+        log.error("DECODE FAILED: Error in source data stream: " + error.getMessage());
 
-            log.error("DECODE FAILED: Error in source data stream: " + error.getMessage());
+        var completionError = error instanceof CompletionException
+                ? error
+                : new CompletionException(error.getMessage(), error);
 
-            var completionError = error instanceof CompletionException
-                    ? error
-                    : new CompletionException(error.getMessage(), error);
+        doTargetError(completionError);
+    }
 
-            doTargetError(completionError);
-        }
-        finally {
-            releaseBuffer();
-            releaseOutQueue();
+    @Override
+    public void close() {
+
+        // Release chunk buffer
+        var releaseOk = buffer.release();
+
+        if (!releaseOk && buffer.capacity() > 0)
+            log.warn("Decode buffer was not released (this could indicate a memory leak)");
+
+        // Release any blocks still in the out queue
+
+        var block = outQueue.poll();
+
+        while (block != null) {
+
+            if (block.arrowRecords != null)
+                block.arrowRecords.close();
+
+            if (block.arrowDictionary != null)
+                block.arrowDictionary.close();
+
+            block = outQueue.poll();
         }
     }
 
@@ -238,34 +229,6 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
 
             else
                 return;
-        }
-    }
-
-    private void releaseBuffer() {
-
-        if (!released) {
-
-            var releaseOk = buffer.release();
-            released = true;
-
-            if (!releaseOk && buffer.capacity() > 0)
-                log.warn("Decode buffer was not released (this could indicate a memory leak)");
-        }
-    }
-
-    private void releaseOutQueue() {
-
-        var block = outQueue.poll();
-
-        while (block != null) {
-
-            if (block.arrowRecords != null)
-                block.arrowRecords.close();
-
-            if (block.arrowDictionary != null)
-                block.arrowDictionary.close();
-
-            block = outQueue.poll();
         }
     }
 }

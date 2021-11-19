@@ -59,17 +59,17 @@ public class ArrowStreamDecoder extends BaseDecoder {
     protected void decodeChunk(ByteBuf chunk) {
 
         try (var stream = new ByteSeekableChannel(chunk);
-             var reader = new ArrowStreamReader(stream, arrowAllocator)) {
+             var reader = new ArrowStreamReader(stream, arrowAllocator);
+             var root = reader.getVectorSchemaRoot()) {
 
             // Arrow does not attempt to validate the stream before reading
             // This quick validation peeks at the start of the stream for a basic sanity check
             // It should be enough to flag e.g. if data has been sent in a totally different format
             validateStartOfStream(stream);
 
-            var schema = reader.getVectorSchemaRoot().getSchema();
+            var schema = root.getSchema();
             emitBlock(DataBlock.forSchema(schema));
 
-            var root = reader.getVectorSchemaRoot();
             var unloader = new VectorUnloader(root);
 
             while (reader.loadNextBatch()) {

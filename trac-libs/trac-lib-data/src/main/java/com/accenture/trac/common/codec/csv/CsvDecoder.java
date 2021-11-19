@@ -86,16 +86,16 @@ public class CsvDecoder extends BaseDecoder {
                 .enable(CsvParser.Feature.TRIM_SPACES)
                 .enable(CsvParser.Feature.FAIL_ON_MISSING_COLUMNS);
 
-        var csvSchema =  CsvSchemaMapping
-                .arrowToCsv(this.arrowSchema)
-                .build();
-
-        csvSchema = DEFAULT_HEADER_FLAG
-                ? csvSchema.withHeader()
-                : csvSchema.withoutHeader();
-
         try (var stream = new ByteBufInputStream(chunk);
              var parser = (CsvParser) csvFactory.createParser((InputStream) stream)) {
+
+            var csvSchema =  CsvSchemaMapping
+                    .arrowToCsv(this.arrowSchema)
+                    .build();
+
+            csvSchema = DEFAULT_HEADER_FLAG
+                    ? csvSchema.withHeader()
+                    : csvSchema.withoutHeader();
 
             parser.setSchema(csvSchema);
 
@@ -203,6 +203,22 @@ public class CsvDecoder extends BaseDecoder {
     protected void decodeEnd() {
 
         // No-op, current version of CSV decoder buffers the full input
+    }
+
+    @Override
+    public void close() {
+
+        try {
+
+            if (root != null) {
+                root.close();
+                root = null;
+            }
+        }
+        finally {
+
+            super.close();
+        }
     }
 
     private void dispatchBatch(VectorSchemaRoot root) {

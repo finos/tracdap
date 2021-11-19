@@ -87,14 +87,7 @@ public class CsvEncoder extends BaseEncoder {
         catch (IOException e) {
 
             // Output stream is writing to memory buffers, IO errors are not expected
-
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
-
-            try { releaseEverything(); }
-            catch (IOException secondaryError) { log.error(
-                "There was a secondary error releasing resourced: {}",
-                secondaryError.getMessage(), secondaryError); }
-
             throw new EUnexpected(e);
         }
     }
@@ -125,14 +118,7 @@ public class CsvEncoder extends BaseEncoder {
         catch (IOException e) {
 
             // Output stream is writing to memory buffers, IO errors are not expected
-
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
-
-            try { releaseEverything(); }
-            catch (IOException secondaryError) { log.error(
-                    "There was a secondary error releasing resourced: {}",
-                    secondaryError.getMessage(), secondaryError); }
-
             throw new EUnexpected(e);
         }
         finally {
@@ -152,32 +138,51 @@ public class CsvEncoder extends BaseEncoder {
 
         try {
 
-            releaseEverything();
+            // Flush and close output
+
+            generator.close();
+            generator = null;
+
+            out.close();
+            out = null;
         }
         catch (IOException e) {
 
             // Output stream is writing to memory buffers, IO errors are not expected
-
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
             throw new EUnexpected(e);
         }
     }
 
-    private void releaseEverything() throws IOException {
+    @Override
+    public void close() {
 
-        if (generator != null) {
-            generator.close();
-            generator = null;
+        try {
+
+            if (generator != null) {
+                generator.close();
+                generator = null;
+            }
+
+            if (out != null) {
+                out.close();
+                out = null;
+            }
+
+            if (root != null) {
+                root.close();
+                root = null;
+            }
         }
+        catch (IOException e) {
 
-        if (out != null) {
-            out.close();
-            out = null;
+            // Output stream is writing to memory buffers, IO errors are not expected
+            log.error("Unexpected error closing encoder: {}", e.getMessage(), e);
+            throw new EUnexpected(e);
         }
+        finally {
 
-        if (root != null) {
-            root.close();
-            root = null;
+            super.close();
         }
     }
 }

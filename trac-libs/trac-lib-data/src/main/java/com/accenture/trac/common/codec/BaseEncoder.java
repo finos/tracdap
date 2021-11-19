@@ -68,32 +68,18 @@ public abstract class BaseEncoder extends BaseProcessor<DataBlock, ByteBuf> impl
     @Override
     protected final void handleTargetRequest() {
 
-        try {
-            deliverPendingChunks();
+        deliverPendingChunks();
 
-            if (nTargetRequested() > nTargetDelivered() && nSourceRequested() <= nSourceDelivered())
-                doSourceRequest(1);
-        }
-        catch (Throwable error) {
-
-            log.error("ENCODE FAILED: " + error.getMessage());
-
-            releaseOutQueue();
-            doTargetError(error);
-        }
+        if (nTargetRequested() > nTargetDelivered() && nSourceRequested() <= nSourceDelivered())
+            doSourceRequest(1);
     }
 
     @Override
     protected final void handleTargetCancel() {
 
-        try {
-            log.warn("ENCODE CANCELLED");
+        log.warn("ENCODE CANCELLED");
 
-            doSourceCancel();
-        }
-        finally {
-            releaseOutQueue();
-        }
+        doSourceCancel();
     }
 
     @Override
@@ -157,14 +143,13 @@ public abstract class BaseEncoder extends BaseProcessor<DataBlock, ByteBuf> impl
             doSourceRequest(1);
             deliverPendingChunks();
         }
-        catch (Throwable error) {
+        catch (Exception error) {
 
             log.error("ENCODE FAILED: " + error.getMessage());
 
             if (!blockDelivered)
                 block.close();
 
-            releaseOutQueue();
             doTargetError(error);
         }
     }
@@ -191,14 +176,10 @@ public abstract class BaseEncoder extends BaseProcessor<DataBlock, ByteBuf> impl
 
             deliverPendingChunks();
         }
-        catch (Throwable error) {
+        catch (Exception error) {
 
             log.error("DECODE FAILED: " + error.getMessage());
 
-            // Only release the outQueue on error
-            // If there is no error, either all output is sent or it is held until the next request
-
-            releaseOutQueue();
             doTargetError(error);
         }
     }
@@ -206,17 +187,24 @@ public abstract class BaseEncoder extends BaseProcessor<DataBlock, ByteBuf> impl
     @Override
     protected final void handleSourceError(Throwable error) {
 
-        try {
-            log.error("ENCODE FAILED: Error in source data stream: " + error.getMessage());
+        log.error("ENCODE FAILED: Error in source data stream: " + error.getMessage());
 
-            var completionError = error instanceof CompletionException
-                    ? error
-                    : new CompletionException(error.getMessage(), error);
+        var completionError = error instanceof CompletionException
+                ? error
+                : new CompletionException(error.getMessage(), error);
 
-            doTargetError(completionError);
-        }
-        finally {
-            releaseOutQueue();
+        doTargetError(completionError);
+    }
+
+    @Override
+    public void close() {
+
+        while (!outQueue.isEmpty()) {
+
+            var chunk = outQueue.poll();
+
+            if (chunk != null)
+                chunk.release();
         }
     }
 
@@ -234,17 +222,6 @@ public abstract class BaseEncoder extends BaseProcessor<DataBlock, ByteBuf> impl
 
             else
                 return;
-        }
-    }
-
-    private void releaseOutQueue() {
-
-        while (!outQueue.isEmpty()) {
-
-            var chunk = outQueue.poll();
-
-            if (chunk != null)
-                chunk.release();
         }
     }
 }

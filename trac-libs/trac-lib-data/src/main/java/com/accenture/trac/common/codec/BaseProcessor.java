@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import java.util.concurrent.Flow;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Consumer;
@@ -31,6 +32,7 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final AtomicBoolean closed = new AtomicBoolean(false);
     private final Lock stateLock;
     private final Consumer<TSource> discardFunc;
 
@@ -57,6 +59,7 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
     protected abstract void handleSourceNext(TSource item);
     protected abstract void handleSourceComplete();
     protected abstract void handleSourceError(Throwable error);
+    protected abstract void close();
 
     protected final long nTargetRequested() { return nTargetRequested; }
     protected final long nTargetDelivered() { return nTargetDelivered; }
@@ -67,40 +70,73 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
     @Override
     public final void subscribe(Flow.Subscriber<? super TTarget> subscriber) {
 
-        var stateAccepted = processTargetSubscribe(subscriber);
+        try {
 
-        if (stateAccepted) {
+            var stateAccepted = processTargetSubscribe(subscriber);
 
-            targetSubscriber.onSubscribe(targetSubscription);
-            handleTargetSubscribe();
+            if (stateAccepted) {
+
+                targetSubscriber.onSubscribe(targetSubscription);
+                handleTargetSubscribe();
+            }
+        }
+        catch (Throwable e) {
+
+            unexpectedError(e);
         }
     }
 
     private void targetRequest(long n) {
 
-        var stateAccepted = processTargetRequest(n);
+        try {
 
-        if (stateAccepted)
-            handleTargetRequest();
+            var stateAccepted = processTargetRequest(n);
+
+            if (stateAccepted)
+                handleTargetRequest();
+        }
+        catch (Throwable e) {
+
+            unexpectedError(e);
+        }
     }
 
     private void targetCancel() {
 
-        var stateAccepted = processTargetCancel();
+        try {
 
-        if (stateAccepted)
-            handleTargetCancel();
+            var stateAccepted = processTargetCancel();
+
+            if (stateAccepted) {
+                handleTargetCancel();
+                closeOnce();
+            }
+        }
+        catch (Throwable e) {
+
+            unexpectedError(e);
+        }
     }
 
     @Override
     public final void onSubscribe(Flow.Subscription subscription) {
 
-        boolean stateAccepted = processSourceSubscribe(subscription);
+        try {
 
-        handleSourceSubscribe();
+            var stateAccepted = processSourceSubscribe(subscription);
 
-        if (stateAccepted)
-            handleTargetRequest();
+            if (stateAccepted) {
+
+                handleSourceSubscribe();
+
+                if (nTargetRequested() > 0)
+                    handleTargetRequest();
+            }
+        }
+        catch (Throwable e) {
+
+            unexpectedError(e);
+        }
     }
 
     @Override
@@ -117,6 +153,10 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
                 handleSourceNext(item);
             }
         }
+        catch (Throwable e) {
+
+            unexpectedError(e);
+        }
         finally {
 
             if (!delivered && discardFunc != null)
@@ -127,8 +167,6 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
     @Override
     public final void onComplete() {
 
-        // todo
-
         try {
 
             var stateAccepted = processSourceOnComplete();
@@ -138,38 +176,64 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
         }
         catch (Throwable e) {
 
-            doTargetError(e);
+            unexpectedError(e);
         }
     }
 
     @Override
     public final void onError(Throwable error) {
 
-        var stateAccepted = processSourceOnError();
+        try {
 
-        if (stateAccepted)
-            handleSourceError(error);
+            var stateAccepted = processSourceOnError();
+
+            if (stateAccepted)
+                handleSourceError(error);
+        }
+        catch (Throwable e) {
+
+            unexpectedError(e);
+        }
     }
 
     protected final void doSourceRequest(long n) {
 
-        var stateAccepted = processSourceRequest(n);
+        try {
 
-        if (stateAccepted)
-            sourceSubscription.request(n);
+            var stateAccepted = processSourceRequest(n);
+
+            if (stateAccepted)
+                sourceSubscription.request(n);
+        }
+        catch (Throwable e) {
+
+            unexpectedError(e);
+        }
     }
 
     final void doSourceCancel() {
 
-        // todo
+        try {
 
-        sourceSubscription.cancel();
+            sourceSubscription.cancel();
+        }
+        catch (Throwable e) {
+
+            unexpectedError(e);
+        }
     }
 
     final void doTargetNext(TTarget item) {
 
-        nTargetDelivered += 1;
-        targetSubscriber.onNext(item);
+        try {
+
+            nTargetDelivered += 1;
+            targetSubscriber.onNext(item);
+        }
+        catch (Throwable e) {
+
+            unexpectedError(e);
+        }
     }
 
     final void doTargetComplete() {
@@ -178,12 +242,14 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
 
             var stateAccepted = processTargetComplete();
 
-            if (stateAccepted)
+            if (stateAccepted) {
                 targetSubscriber.onComplete();
+                closeOnce();
+            }
         }
         catch (Throwable e) {
 
-            doTargetError(e);
+            unexpectedError(e);
         }
     }
 
@@ -191,17 +257,16 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
 
         try {
 
-            var stateAccepted = processTargetError(error);
+            var stateAccepted = processTargetError();
 
-            if (stateAccepted)
+            if (stateAccepted) {
                 targetSubscriber.onError(error);
-
+                closeOnce();
+            }
         }
-        catch (Throwable secondaryError) {
+        catch (Throwable e) {
 
-            log.warn("Failed to report an error, this is likely to cause hangs or resource leaks");
-            log.warn("Original error: {}", error.getMessage(), error);
-            log.warn("Secondary error: {}", secondaryError.getMessage(), error);
+            unexpectedError(e);
         }
     }
 
@@ -283,13 +348,10 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
             switch (priorStatus) {
 
             case RUNNING:
-                status = ProcessorStatus.CANCELLED;
-                return true;
-
             case SOURCE_COMPLETE:
             case TARGET_SUBSCRIBED:
                 status = ProcessorStatus.CANCELLED;
-                return false;  // todo
+                return true;
 
             // Already done, ignore cancel request
             case COMPLETE:
@@ -333,8 +395,6 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
                 status = ProcessorStatus.INVALID_STATE;
                 throw new IllegalStateException();
             }
-
-            // TODO: doRequest = (nTargetRequested > 0);
         }
         finally {
 
@@ -435,13 +495,13 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
 
         try  {
 
-            switch (status) {
+            if (status == ProcessorStatus.RUNNING) {
 
-            case RUNNING:
                 nSourceRequested += n;
                 return true;
+            }
+            else {
 
-            default:
                 status = ProcessorStatus.INVALID_STATE;
                 throw new IllegalStateException();
             }
@@ -472,7 +532,7 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
         }
     }
 
-    private boolean processTargetError(Throwable error) {
+    private boolean processTargetError() {
 
         stateLock.lock();
 
@@ -493,8 +553,6 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
             case CANCELLED:
             case FAILED:
             case COMPLETE:
-
-                log.warn("An error occurred after processing is complete: " + error.getMessage(), error);
                 return false;
 
             default:
@@ -505,6 +563,77 @@ public abstract class BaseProcessor<TSource, TTarget> implements Flow.Processor<
         finally {
 
             stateLock.unlock();
+        }
+    }
+
+    private void closeOnce() {
+
+        var notAlreadyClosed = closed.compareAndSet(false, true);
+
+        if (notAlreadyClosed)
+            close();
+    }
+
+    private void unexpectedError(Throwable error) {
+
+        stateLock.lock();
+        boolean alreadyDone = false;
+        boolean gotSource = false;
+        boolean gotTarget = false;
+
+        try {
+
+            var priorStatus = status;
+
+            switch (priorStatus) {
+
+            case CANCELLED:
+            case FAILED:
+            case COMPLETE:
+                alreadyDone = true;
+                gotSource = true;
+                gotTarget = true;
+                break;
+
+            default:
+
+                if (sourceSubscription != null)
+                    gotSource = true;
+
+                if (targetSubscriber != null) {
+                    gotTarget = true;
+                    status = ProcessorStatus.FAILED;
+                }
+                else
+                    status = ProcessorStatus.INVALID_STATE;
+            }
+        }
+        finally {
+
+            stateLock.unlock();
+        }
+
+        try {
+
+            if (alreadyDone)
+                log.warn("An unexpected error occurred after processing is complete: " + error.getMessage(), error);
+
+            else if (!gotSource || !gotTarget)
+                log.error("An unexpected error occurred before processing began: " + error.getMessage(), error);
+
+            else
+                log.error("An unexpected error occurred during processing: " + error.getMessage(), error);
+
+
+            if (gotTarget && !alreadyDone)
+                targetSubscriber.onError(error);
+
+            if (gotSource && !alreadyDone)
+                sourceSubscription.cancel();
+        }
+        finally {
+
+            closeOnce();
         }
     }
 

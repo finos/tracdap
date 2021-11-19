@@ -54,12 +54,12 @@ public class ArrowFileDecoder extends BaseDecoder {
     protected void decodeChunk(ByteBuf chunk) {
 
         try (var stream = new ByteSeekableChannel(chunk);
-             var reader = new ArrowFileReader(stream, arrowAllocator)) {
+             var reader = new ArrowFileReader(stream, arrowAllocator);
+             var root = reader.getVectorSchemaRoot()) {
 
-            var schema = reader.getVectorSchemaRoot().getSchema();
+            var schema = root.getSchema();
             emitBlock(DataBlock.forSchema(schema));
 
-            var root = reader.getVectorSchemaRoot();
             var unloader = new VectorUnloader(root);
 
             while (reader.loadNextBatch()) {

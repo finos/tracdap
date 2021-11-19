@@ -69,9 +69,6 @@ public abstract class ArrowEncoder extends BaseEncoder {
 
             // Output stream is writing to memory buffers, IO errors are not expected
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
-
-            releaseEverything();
-
             throw new EUnexpected(e);
         }
     }
@@ -88,9 +85,6 @@ public abstract class ArrowEncoder extends BaseEncoder {
 
             // Output stream is writing to memory buffers, IO errors are not expected
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
-
-            releaseEverything();
-
             throw new EUnexpected(e);
         }
         finally {
@@ -110,7 +104,12 @@ public abstract class ArrowEncoder extends BaseEncoder {
     protected void encodeEos() {
 
         try {
+
+            // Flush and close output
+
             writer.end();
+            writer.close();
+            writer = null;
         }
         catch (IOException e) {
 
@@ -118,22 +117,26 @@ public abstract class ArrowEncoder extends BaseEncoder {
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
             throw new EUnexpected(e);
         }
-        finally {
-
-            releaseEverything();
-        }
     }
 
-    private void releaseEverything() {
+    @Override
+    public void close() {
 
-        if (writer != null) {
-            writer.close();
-            writer = null;
+        try {
+
+            if (writer != null) {
+                writer.close();
+                writer = null;
+            }
+
+            if (root != null) {
+                root.close();
+                root = null;
+            }
         }
+        finally {
 
-        if (root != null) {
-            root.close();
-            root = null;
+            super.close();
         }
     }
 }

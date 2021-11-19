@@ -78,11 +78,7 @@ public class JsonDecoder extends BaseDecoder {
         catch (IOException e) {
 
             // Output stream is writing to memory buffers, IO errors are not expected
-
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
-
-            releaseEverythingNoThrow();
-
             throw new EUnexpected(e);
         }
     }
@@ -111,9 +107,6 @@ public class JsonDecoder extends BaseDecoder {
                     e.getMessage());
 
             log.error(errorMessage, e);
-
-            releaseEverythingNoThrow();
-
             throw new EDataCorruption(errorMessage, e);
         }
         catch (IOException e) {
@@ -124,19 +117,12 @@ public class JsonDecoder extends BaseDecoder {
 
             var errorMessage = "JSON decoding failed, content is garbled: " + e.getMessage();
             log.error(errorMessage, e);
-
-            releaseEverythingNoThrow();
-
             throw new EDataCorruption(errorMessage, e);
         }
         catch (Throwable e)  {
 
             // Ensure unexpected errors are still reported to the Flow API
-
-            log.error("Unexpected error in CSV decoding", e);
-
-            releaseEverythingNoThrow();
-
+            log.error("Unexpected error during decoding", e);
             throw new EUnexpected(e);
         }
         finally {
@@ -151,29 +137,30 @@ public class JsonDecoder extends BaseDecoder {
         // No-op
     }
 
+    @Override
+    public void close() {
+
+        try {
+
+            if (parser != null) {
+                parser.close();
+                parser = null;
+            }
+        }
+        catch (IOException e) {
+
+            // Ensure unexpected errors are still reported to the Flow API
+            log.error("Unexpected error closing decoder: {}", e.getMessage(), e);
+            throw new EUnexpected(e);
+        }
+        finally {
+
+            super.close();
+        }
+    }
+
     private void dispatchBatch(ArrowRecordBatch batch) {
 
         emitBlock(DataBlock.forRecords(batch));
-    }
-
-    private void releaseEverything() throws IOException {
-
-        if (parser != null) {
-            parser.close();
-            parser = null;
-        }
-    }
-
-    private void releaseEverythingNoThrow() {
-
-        try {
-            releaseEverything();
-        }
-        catch (IOException secondaryError) {
-
-            log.error(
-                "There was a secondary error releasing resources: {}",
-                secondaryError.getMessage(), secondaryError);
-        }
     }
 }
