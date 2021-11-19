@@ -60,6 +60,12 @@ public abstract class BaseEncoder extends BaseProcessor<DataBlock, ByteBuf> impl
     }
 
     @Override
+    protected final void handleTargetSubscribe() {
+
+        // No-op
+    }
+
+    @Override
     protected final void handleTargetRequest() {
 
         try {
@@ -88,6 +94,12 @@ public abstract class BaseEncoder extends BaseProcessor<DataBlock, ByteBuf> impl
         finally {
             releaseOutQueue();
         }
+    }
+
+    @Override
+    protected final void handleSourceSubscribe() {
+
+        // No-op
     }
 
     @Override

@@ -73,6 +73,12 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
     }
 
     @Override
+    protected final void handleTargetSubscribe() {
+
+        // No-op
+    }
+
+    @Override
     protected final void handleTargetRequest() {
 
         try {
@@ -103,6 +109,12 @@ public abstract class BaseDecoder extends BaseProcessor<ByteBuf, DataBlock> impl
             releaseBuffer();
             releaseOutQueue();
         }
+    }
+
+    @Override
+    protected final void handleSourceSubscribe() {
+
+        // No-op
     }
 
     @Override
