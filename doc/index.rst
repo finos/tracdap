@@ -8,14 +8,14 @@ TRAC Platform Documentation
 	
 
 .. note::
-	We are building the documentation for TRAC in parallel with the open source version of the
-	platform, both are in active deveopment. This documentaiton is presented in the hope that 
-	it will be useful before it is complete!
-	
-	You can see the current development status and roadmap for the platform on the
-	`roadmap page <https://github.com/Accenture/trac/wiki/Development-Roadmap>`_.
-	If you have particular questions or issues, please raise a ticket on our
-	`issue tracker <https://github.com/Accenture/trac/issues>`_.
+    We are building the documentation for TRAC in parallel with the open source version of the
+    platform, both are in active deveopment. This documentaiton is presented in the hope that
+    it will be useful before it is complete!
+
+    You can see the current development status and roadmap for the platform on the
+    `roadmap page <https://github.com/Accenture/trac/wiki/Development-Roadmap>`_.
+    If you have particular questions or issues, please raise a ticket on our
+    `issue tracker <https://github.com/Accenture/trac/issues>`_.
 
 
 .. toctree::
@@ -41,7 +41,7 @@ TRAC Platform Documentation
     Learn about the TRAC platform, starting with the metadata model.
 
     +++
-    .. link-button:: overview/metadata_model
+    .. link-button:: overview/introduction
         :type: ref
         :text: Platform overview
         :classes: btn-outline-primary btn-block stretched-link
