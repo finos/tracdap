@@ -39,14 +39,17 @@ import "google/api/annotations.proto";
 service TracDataApi {
 
   /**
-   * Create a new dataset by supplying the schema and content as a data stream
+   * Create a new dataset, supplying the schema and content as a data stream
    *
-   * This method creates a new primary dataset and a corresponding DATA object
+   * This method creates a new dataset and a corresponding DATA object
    * in the TRAC metadata store. Once a dataset is created it can be used as an
    * input into a model run, it can also be read and queried using the data API.
    * Data can be supplied in any format supported by the platform.
    *
-   * The request must specify a schema for the dataset and incoming data will be
+   * *Although large datasets can be uploaded using this call, data import jobs
+   * are normally used to bring in large volumes of data from external systems.*
+   *
+   * The request must specify a schema for the dataset, incoming data will be
    * verified against the schema. Schemas can be specified using either:
    *
    *    * A full schema definition - if a full schema is supplied, it will be embedded
@@ -79,14 +82,14 @@ service TracDataApi {
   rpc createDataset (stream DataWriteRequest) returns (metadata.TagHeader);
 
   /**
-   * Create a new dataset by supplying the schema and content as a single blob
+   * Create a new dataset, supplying the schema and content as a single blob
    *
-   * This method creates a new primary dataset and a corresponding DATA object
+   * This method creates a new dataset and a corresponding DATA object
    * in the TRAC metadata store. Once a dataset is created it can be used as an
    * input into a model run, it can also be read and queried using the data API.
    * Data can be supplied in any format supported by the platform.
    *
-   * The request must specify a schema for the dataset and incoming data will be
+   * The request must specify a schema for the dataset, incoming data will be
    * verified against the schema. Schemas can be specified using either:
    *
    *    * A full schema definition - if a full schema is supplied, it will be embedded
@@ -116,15 +119,100 @@ service TracDataApi {
   rpc createSmallDataset (DataWriteRequest) returns (metadata.TagHeader);
 
   /**
-   * Update a dataset by supplying a data update (and optional schema update)
+   * Update an existing dataset, supplying the schema and content as a data stream
    *
-   * Mirrors MetadataWriteRequest for specifying prior version and updating tags
+   * This method updates an existing dataset and the corresponding DATA object
+   * in the TRAC metadata store. As per the TRAC immutability guarantee, the original
+   * version of the dataset is not altered. After an update, both the original version
+   * and the new version are available to use as inputs into a model runs and to read
+   * and query using the data API. Data can be supplied in any format supported by the
+   * platform.
+   *
+   * *Although large datasets can be uploaded using this call, data import jobs
+   * are normally used to bring in large volumes of data from external systems.*
+   *
+   * To update a dataset, the priorVersion field must indicate the dataset being updated.
+   * Only the latest version of a dataset can be updated.
+   *
+   * The request must specify a schema for the new version of the dataset, incoming data
+   * will be verified against the schema. The new schema must be compatible with the schema
+   * of the previous version. Schemas can be specified using either:
+   *
+   *    * A full schema definition - Datasets created using an embedded schema must supply
+   *      a full schema for all subsequent versions and each schema version must be compatible
+   *      with the version before. Fields may be added, but not removed or altered.
+   *    * A schema ID - Datasets created using an external schema must use the same external
+   *      schema ID for all subsequent versions. It is permitted for later versions of a
+   *      dataset to use later versions of the external schema, but not earlier versions.
+   *
+   * The "format" parameter describes the format used to upload data. For example,
+   * to upload a CSV file the format would be set to "text/csv" and the file content
+   * can be uploaded directly, or to upload the output of an editor grid in a web
+   * client the format can be set to "text/json" to upload a JSON representation of
+   * the editor contents. It is not necessary for different versions of the same dataset
+   * to be uploaded using the same format. TRAC will apply format conversion before the
+   * data is processed and stored.
+   *
+   * This is a client streaming method. The first message in the request stream
+   * must contain all the request fields and metadata, including a schema specifier.
+   * After the first message all metadata fields should be omitted. Subsequent messages
+   * should contain the content of the dataset as a series of chunks, encoded as per
+   * the "format" field of the first message. Clients may choose whether or not to
+   * include a chunk of data in the first message and empty (i.e. zero-length) chunks
+   * are permitted at any point in the stream.
+   *
+   * This method returns the header of the version of the DATA object. Error conditions
+   * include: Invalid request, unknown tenant, schema not found (if an external schema
+   * ID is used), schema version not compatible, data does not match schema, corrupt or
+   * invalid data stream. Storage errors may also be reported if there is a problem
+   * communicating with the underlying storage technology. In the event of an error,
+   * TRAC will do its best to clean up any partially-written data in the storage layer.
    */
   rpc updateDataset (stream DataWriteRequest) returns (metadata.TagHeader);
 
   /**
-   * To support web clients where client-streaming is not available.
-   * The same as updateDataset(), but the data stream is sent as a single blob.
+   * Update an existing dataset, supplying the schema and content as a single blob
+   *
+   * This method updates an existing dataset and the corresponding DATA object
+   * in the TRAC metadata store. As per the TRAC immutability guarantee, the original
+   * version of the dataset is not altered. After an update, both the original version
+   * and the new version are available to use as inputs into a model runs and to read
+   * and query using the data API. Data can be supplied in any format supported by the
+   * platform.
+   *
+   * To update a dataset, the priorVersion field must indicate the dataset being updated.
+   * Only the latest version of a dataset can be updated.
+   *
+   * The request must specify a schema for the new version of the dataset, incoming data
+   * will be verified against the schema. The new schema must be compatible with the schema
+   * of the previous version. Schemas can be specified using either:
+   *
+   *    * A full schema definition - Datasets created using an embedded schema must supply
+   *      a full schema for all subsequent versions and each schema version must be compatible
+   *      with the version before. Fields may be added, but not removed or altered.
+   *    * A schema ID - Datasets created using an external schema must use the same external
+   *      schema ID for all subsequent versions. It is permitted for later versions of a
+   *      dataset to use later versions of the external schema, but not earlier versions.
+   *
+   * The "format" parameter describes the format used to upload data. For example,
+   * to upload a CSV file the format would be set to "text/csv" and the file content
+   * can be uploaded directly, or to upload the output of an editor grid in a web
+   * client the format can be set to "text/json" to upload a JSON representation of
+   * the editor contents. It is not necessary for different versions of the same dataset
+   * to be uploaded using the same format. TRAC will apply format conversion before the
+   * data is processed and stored.
+   *
+   * This is a unary call, all the request fields and metadata (including schema specifier)
+   * and dataset content encoded as per the "format" field are supplied in a single message.
+   * It is intended for working with small datasets and for use in environments where client
+   * streaming is not available (particularly in gRPC-Web clients).
+   *
+   * This method returns the header of the version of the DATA object. Error conditions
+   * include: Invalid request, unknown tenant, schema not found (if an external schema
+   * ID is used), schema version not compatible, data does not match schema, corrupt or
+   * invalid data stream. Storage errors may also be reported if there is a problem
+   * communicating with the underlying storage technology. In the event of an error,
+   * TRAC will do its best to clean up any partially-written data in the storage layer.
    */
   rpc updateSmallDataset (DataWriteRequest) returns (metadata.TagHeader);
 
