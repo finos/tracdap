@@ -349,23 +349,6 @@ service TracDataApi {
    */
   rpc readFile (FileReadRequest) returns (stream FileReadResponse);
 
-
-  /// Download a dataset in a form that can be mapped to an HTTP GET request
-  rpc getData (DataGetRequest) returns (stream DataGetResponse) {
-    option (google.api.http) = {
-      get: "/{tenant}/DATA/{objectId}/versions/{objectVersion}"
-      response_body: "content"
-    };
-  }
-
-  /// Download a file in a form that can be mapped to an HTTP GET request
-  rpc getFile (DataGetRequest) returns (stream DataGetResponse) {
-    option (google.api.http) = {
-      get: "/{tenant}/FILE/{objectId}/versions/{objectVersion}"
-      response_body: "content"
-    };
-  }
-
 }
 
 
@@ -440,6 +423,8 @@ message DataQueryRequest {
 
   string query = 2;
   map<string, metadata.TagSelector> targets = 3;
+
+  string format = 4;
 }
 
 
@@ -562,25 +547,4 @@ message FileReadResponse {
    * In particular, TRAC guarantees that the chunk in the first message will always be an empty chunk.
    */
   bytes content = 1000;
-}
-
-
-
-message DataGetRequest {
-
-  string tenant = 1;
-  string objectId = 2;
-  optional int32 objectVersion = 3;
-
-  string format = 4;
-  string encoding = 5;
-
-  metadata.PartKey part = 6;
-  optional uint64 offset = 7;
-  optional uint32 limit = 8;
-}
-
-message DataGetResponse {
-
-  bytes content = 1;
 }
