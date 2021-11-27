@@ -74,10 +74,10 @@ service TracDataApi {
    *
    * This method returns the header of the newly created DATA object. Error conditions
    * include: Invalid request, unknown tenant, schema not found (if an external schema
-   * ID is used), data does not match schema, corrupt or invalid data stream.
-   * Storage errors may also be reported if there is a problem communicating with the
-   * underlying storage technology. In the event of an error, TRAC will do its best to
-   * clean up any partially-written data in the storage layer.
+   * ID is used), format not supported, data does not match schema, corrupt or invalid
+   * data stream. Storage errors may also be reported if there is a problem communicating
+   * with the underlying storage technology. In the event of an error, TRAC will do its
+   * best to clean up any partially-written data in the storage layer.
    */
   rpc createDataset (stream DataWriteRequest) returns (metadata.TagHeader);
 
@@ -111,10 +111,10 @@ service TracDataApi {
    *
    * This method returns the header of the newly created DATA object. Error conditions
    * include: Invalid request, unknown tenant, schema not found (if an external schema
-   * ID is used), data does not match schema, corrupt or invalid data stream.
-   * Storage errors may also be reported if there is a problem communicating with the
-   * underlying storage technology. In the event of an error, TRAC will do its best to
-   * clean up any partially-written data in the storage layer.
+   * ID is used), format not supported, data does not match schema, corrupt or invalid
+   * data stream. Storage errors may also be reported if there is a problem communicating
+   * with the underlying storage technology. In the event of an error, TRAC will do its
+   * best to clean up any partially-written data in the storage layer.
    */
   rpc createSmallDataset (DataWriteRequest) returns (metadata.TagHeader);
 
@@ -163,9 +163,9 @@ service TracDataApi {
    *
    * This method returns the header of the version of the DATA object. Error conditions
    * include: Invalid request, unknown tenant, schema not found (if an external schema
-   * ID is used), schema version not compatible, data does not match schema, corrupt or
-   * invalid data stream. Storage errors may also be reported if there is a problem
-   * communicating with the underlying storage technology. In the event of an error,
+   * ID is used), schema version not compatible, format not supported, data does not match
+   * schema, corrupt or invalid data stream. Storage errors may also be reported if there is
+   * a problem communicating with the underlying storage technology. In the event of an error,
    * TRAC will do its best to clean up any partially-written data in the storage layer.
    */
   rpc updateDataset (stream DataWriteRequest) returns (metadata.TagHeader);
@@ -209,28 +209,34 @@ service TracDataApi {
    *
    * This method returns the header of the version of the DATA object. Error conditions
    * include: Invalid request, unknown tenant, schema not found (if an external schema
-   * ID is used), schema version not compatible, data does not match schema, corrupt or
-   * invalid data stream. Storage errors may also be reported if there is a problem
-   * communicating with the underlying storage technology. In the event of an error,
+   * ID is used), schema version not compatible, format not supported, data does not match
+   * schema, corrupt or invalid data stream. Storage errors may also be reported if there is
+   * a problem communicating with the underlying storage technology. In the event of an error,
    * TRAC will do its best to clean up any partially-written data in the storage layer.
    */
   rpc updateSmallDataset (DataWriteRequest) returns (metadata.TagHeader);
 
   /**
-   * Read the contents of a dataset (in whole or in part)
+   * Read the contents of an existing dataset
    *
-   * Mirrors metadata API for object selection.
+   * This method reads the contents of an existing dataset, returning both the schema
+   * and the content in the requested format. Data can be requested in any format
+   * supported by the platform.
    *
-   * Data can be request in any format supported by the data service
-   * The data stream will be translated and returned in that format
+   * The request uses a regular TagSelector to indicate which dataset and version to read.
+   * The format parameter is a mime type and must be a supported data format.
    *
-   * Options available for pagination (offset/limit) and data parts.
-   * Parts are retrieved for the version of the object that is selected.
+   * This is a server streaming method. The first message in the response stream will
+   * contain a schema definition for the dataset (this may come from an embedded schema
+   * or an external schema object). The second and subsequent messages will deliver the
+   * content of the dataset in the requested format. TRAC guarantees that the first message
+   * will always contain an empty chunk of content, which can be safely ignored.
    *
-   * Data is returned in a stream, server-streaming is supported in gRPC-Web.
+   * Error conditions include: Invalid request, unknown tenant, object not found, format
+   * not supported. Storage errors may also be reported if there is a problem communicating
+   * with the underlying storage technology.
    */
   rpc readDataset (DataReadRequest) returns (stream DataReadResponse);
-
 
   /**
    * Upload a new file into TRAC
