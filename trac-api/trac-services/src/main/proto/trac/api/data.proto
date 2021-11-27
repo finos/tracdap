@@ -32,24 +32,86 @@ import "google/api/annotations.proto";
 
 
 /**
- * Experimental design of the data API, for discussion and review
+ * Public API for creating, updating, reading and querying primary data stored in the TRAC platform.
+ *
+ * TODO
  */
 service TracDataApi {
 
   /**
-   * Create a new dataset by supplying both schema and data
+   * Create a new dataset by supplying the schema and content as a data stream
    *
-   * Request object mirrors MetadataWriteRequest for supplying tags
-   * Request also includes schema, format options and the data stream
+   * This method creates a new primary dataset and a corresponding DATA object
+   * in the TRAC metadata store. Once a dataset is created it can be used as an
+   * input into a model run, it can also be read and queried using the data API.
+   * Data can be supplied in any format supported by the platform.
    *
-   * Requires client-streaming, not yet available in gRPC-Web.
-   * First message includes all metadata, subsequent are data stream only.
+   * The request must specify a schema for the dataset and incoming data will be
+   * verified against the schema. Schemas can be specified using either:
+   *
+   *    * A full schema definition - if a full schema is supplied, it will be embedded
+   *      with the dataset and used for this dataset only
+   *    * A schema ID - a tag selector for an existing SCHEMA object, which may be
+   *      shared by multiple datasets
+   *
+   * The "format" parameter describes the format used to upload data. For example,
+   * to upload a CSV file the format would be set to "text/csv" and the file content
+   * can be uploaded directly, or to upload the output of an editor grid in a web
+   * client the format can be set to "text/json" to upload a JSON representation of
+   * the editor contents. TRAC will apply format conversion before the data is
+   * processed and stored.
+   *
+   * This is a client streaming method. The first message in the request stream
+   * must contain all the request fields and metadata, including a schema specifier.
+   * After the first message all metadata fields should be omitted. Subsequent messages
+   * should contain the content of the dataset as a series of chunks, encoded as per
+   * the "format" field of the first message. Clients may choose whether or not to
+   * include a chunk of data in the first message and empty (i.e. zero-length) chunks
+   * are permitted at any point in the stream.
+   *
+   * This method returns the header of the newly created DATA object. Error conditions
+   * include: Invalid request, unknown tenant, schema not found (if an external schema
+   * ID is used), data does not match schema, corrupt or invalid data stream.
+   * Storage errors may also be reported if there is a problem communicating with the
+   * underlying storage technology. In the event of an error, TRAC will do its best to
+   * clean up any partially-written data in the storage layer.
    */
   rpc createDataset (stream DataWriteRequest) returns (metadata.TagHeader);
 
   /**
-   * To support web clients where client-streaming is not available.
-   * The same as createDataset(), but the data stream is sent as a single blob.
+   * Create a new dataset by supplying the schema and content as a single blob
+   *
+   * This method creates a new primary dataset and a corresponding DATA object
+   * in the TRAC metadata store. Once a dataset is created it can be used as an
+   * input into a model run, it can also be read and queried using the data API.
+   * Data can be supplied in any format supported by the platform.
+   *
+   * The request must specify a schema for the dataset and incoming data will be
+   * verified against the schema. Schemas can be specified using either:
+   *
+   *    * A full schema definition - if a full schema is supplied, it will be embedded
+   *      with the dataset and used for this dataset only
+   *    * A schema ID - a tag selector for an existing SCHEMA object, which may be
+   *      shared by multiple datasets
+   *
+   * The "format" parameter describes the format used to upload data. For example,
+   * to upload a CSV file the format would be set to "text/csv" and the file content
+   * can be uploaded directly, or to upload the output of an editor grid in a web
+   * client the format can be set to "text/json" to upload a JSON representation of
+   * the editor contents. TRAC will apply format conversion before the data is
+   * processed and stored.
+   *
+   * This is a unary call, all the request fields and metadata (including schema specifier)
+   * and dataset content encoded as per the "format" field are supplied in a single message.
+   * It is intended for working with small datasets and for use in environments where client
+   * streaming is not available (particularly in gRPC-Web clients).
+   *
+   * This method returns the header of the newly created DATA object. Error conditions
+   * include: Invalid request, unknown tenant, schema not found (if an external schema
+   * ID is used), data does not match schema, corrupt or invalid data stream.
+   * Storage errors may also be reported if there is a problem communicating with the
+   * underlying storage technology. In the event of an error, TRAC will do its best to
+   * clean up any partially-written data in the storage layer.
    */
   rpc createSmallDataset (DataWriteRequest) returns (metadata.TagHeader);
 
@@ -264,6 +326,14 @@ message DataReadResponse {
   optional metadata.SchemaDefinition schema = 1;
 
   bytes content = 1000;
+}
+
+message DataQueryRequest {
+
+  string tenant = 1;
+
+  string query = 2;
+  map<string, metadata.TagSelector> targets = 3;
 }
 
 
