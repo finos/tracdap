@@ -64,6 +64,9 @@ service TracDataApi {
    * the editor contents. TRAC will apply format conversion before the data is
    * processed and stored.
    *
+   * Tag updates can be supplied to tag the newly created dataset, they behave exactly
+   * the same as tag updates in the createObject() call of TracMetadataApi.
+   *
    * This is a client streaming method. The first message in the request stream
    * must contain all the request fields and metadata, including a schema specifier.
    * After the first message all metadata fields should be omitted. Subsequent messages
@@ -103,6 +106,9 @@ service TracDataApi {
    * client the format can be set to "text/json" to upload a JSON representation of
    * the editor contents. TRAC will apply format conversion before the data is
    * processed and stored.
+   *
+   * Tag updates can be supplied to tag the newly created dataset, they behave exactly
+   * the same as tag updates in the createObject() call of TracMetadataApi.
    *
    * This is a unary call, all the request fields and metadata (including schema specifier)
    * and dataset content encoded as per the "format" field are supplied in a single message.
@@ -153,6 +159,9 @@ service TracDataApi {
    * to be uploaded using the same format. TRAC will apply format conversion before the
    * data is processed and stored.
    *
+   * Tag updates can be supplied to tag the new version of the dataset, they behave exactly
+   * the same as tag updates in the updateObject() call of TracMetadataApi.
+   *
    * This is a client streaming method. The first message in the request stream
    * must contain all the request fields and metadata, including a schema specifier.
    * After the first message all metadata fields should be omitted. Subsequent messages
@@ -201,6 +210,9 @@ service TracDataApi {
    * the editor contents. It is not necessary for different versions of the same dataset
    * to be uploaded using the same format. TRAC will apply format conversion before the
    * data is processed and stored.
+   *
+   * Tag updates can be supplied to tag the new version of the dataset, they behave exactly
+   * the same as tag updates in the updateObject() call of TracMetadataApi.
    *
    * This is a unary call, all the request fields and metadata (including schema specifier)
    * and dataset content encoded as per the "format" field are supplied in a single message.
