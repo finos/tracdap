@@ -36,7 +36,7 @@ public class DataApiValidator {
     private static final Descriptors.FieldDescriptor DWR_PRIOR_VERSION;
     private static final Descriptors.FieldDescriptor DWR_SCHEMA_ID;
     private static final Descriptors.FieldDescriptor DWR_SCHEMA;
-    private static final Descriptors.OneofDescriptor DWR_SCHEMA_DEFINITION;
+    private static final Descriptors.OneofDescriptor DWR_SCHEMA_SPECIFIER;
     private static final Descriptors.FieldDescriptor DWR_FORMAT;
 
     private static final Descriptors.Descriptor DATA_READ_REQUEST;
@@ -64,7 +64,7 @@ public class DataApiValidator {
         DWR_PRIOR_VERSION = field(DATA_WRITE_REQUEST, DataWriteRequest.PRIORVERSION_FIELD_NUMBER);
         DWR_SCHEMA_ID = field(DATA_WRITE_REQUEST, DataWriteRequest.SCHEMAID_FIELD_NUMBER);
         DWR_SCHEMA = field(DATA_WRITE_REQUEST, DataWriteRequest.SCHEMA_FIELD_NUMBER);
-        DWR_SCHEMA_DEFINITION = DWR_SCHEMA.getContainingOneof();
+        DWR_SCHEMA_SPECIFIER = DWR_SCHEMA.getContainingOneof();
         DWR_FORMAT = field(DATA_WRITE_REQUEST, DataWriteRequest.FORMAT_FIELD_NUMBER);
 
         DATA_READ_REQUEST = DataReadRequest.getDescriptor();
@@ -124,7 +124,7 @@ public class DataApiValidator {
                 .applyList(MetadataValidator::validateTagUpdate, TagUpdate.class)
                 .pop();
 
-        ctx = ctx.pushOneOf(DWR_SCHEMA_DEFINITION)
+        ctx = ctx.pushOneOf(DWR_SCHEMA_SPECIFIER)
                 .apply(Validation::required)
                 .applyIf(MetadataValidator::validateTagSelector, TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
                 .applyIf(Validation.selectorType(ObjectType.SCHEMA), TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
