@@ -135,8 +135,7 @@ TRAC uses open standards to provide a familiar developer experience and several 
     **Deployment options**
     ^^^^^^^^^^^^^^^^^^^^^^
 
-    * **Using existing tools** that your organization has in place will simplify deployment and maintenance
+    * **Using established patterns** that your organization already has in place will simplify deployment and maintenance
     * **Cloud and tooling vendors** are willing to produce deployment templates for TRAC on their
       platforms (some already have)!
-    * **Accenture CloudBuilder** is a mature option based on Terraform, that can be set up quickly
-      if there is nothing else in place
+    * **Common tools** such as Terraform or Ansible can be set up quickly if there is nothing else in place
