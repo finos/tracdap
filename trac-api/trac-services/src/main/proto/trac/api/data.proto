@@ -34,7 +34,25 @@ import "google/api/annotations.proto";
 /**
  * Public API for creating, updating, reading and querying primary data stored in the TRAC platform.
  *
- * TODO
+ * The TRAC data API provides a standard mechanism for client applications to store and access data
+ * in the TRAC platform. Calls are translated into the underlying storage mechanisms, using push-down
+ * operations where possible for efficient queries on large datasets.
+ *
+ * The data API includes format translation, so data can be uploaded and retrieved in any supported
+ * format. The back-end storage format is controlled by the platform. For example if a user uploads
+ * a CSV file TRAC will convert it to the default storage format (by default Arrow IPC file format).
+ * Later a web application might ask for that data in JSON format and TRAC would again perform the
+ * conversion. The platform uses Apache Arrow as an intermediate representation that other formats
+ * are converted from and to.
+ *
+ * The data API uses streaming operations to support transfer of large datasets and can be used for
+ * both user-facing client applications and system-to-system integration. For regular, high-volume
+ * data transfers there are other options for integration, including data import jobs and direct
+ * back-end integration of the underlying storage technologies. These options can be faster and
+ * reduce storage requirements, at the expense of tighter coupling between systems. A compromise is
+ * to use direct integration and import jobs for a small number of critical feeds containing a
+ * high volume of data, and use the data API for client access and for integration of secondary
+ * and/or low-volume systems.
  */
 service TracDataApi {
 
