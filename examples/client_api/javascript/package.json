@@ -1,0 +1,25 @@
+{
+  "name": "trac-web-examples",
+  "version": "0.0.0-DEVELOPMENT",
+  "description": "Example code for building TRAC web applications",
+  "license": "Apache-2.0",
+  "licenses": [
+    {
+      "type": "Apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    }
+  ],
+  "homepage": "https://github.com/accenture/trac",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/accenture/trac"
+  },
+  "bugs": {
+    "url": "https://github.com/accenture/trac/issues"
+  },
+  "type": "module",
+  "dependencies": {
+    "trac-web-api": "file:../../../trac-api/packages/web",
+    "xhr2": "^0.2.1"
+  }
+}
