@@ -370,22 +370,28 @@ service TracDataApi {
 }
 
 
+/**
+ * Request to create of update a dataset stored in the TRAC platform.
+ *
+ * @see TracDataApi.createDataset
+ * @see TracDataApi.updateDataset
+ */
 message DataWriteRequest {
 
   /**
-   * Tenant code for the requested operation, always required
+   * Tenant code for the requested operation, always required.
    */
   string tenant = 1;
 
   /**
-   * Prior object/tag version to use for update operations
+   * Prior object/tag version to use for update operations.
    *
    * This field should be omitted when creating a new dataset.
    */
   optional metadata.TagSelector priorVersion = 2;
 
   /**
-   * Tag update operations to be applied
+   * Tag update operations to be applied.
    *
    * Tag updates are applied in exactly the same way as for metadata write requests.
    *
@@ -395,8 +401,30 @@ message DataWriteRequest {
   repeated metadata.TagUpdate tagUpdates = 3;
 
 
-  oneof schemaDefinition {
+  oneof schemaSpecifier {
+
+    /**
+     * Specify the schema using an external schema definition.
+     *
+     * If a schema ID is supplied, it must be a valid tag selector for an existing SCHEMA object.
+     * All future versions of the dataset must use either the same schema ID or a later version
+     * of the same schema object.
+     *
+     * TRAC will look up the external schema and validate incoming data to make sure it is conformant.
+     */
     metadata.TagSelector schemaId = 4;
+
+    /**
+     * Specify the schema with an explicit schema definition.
+     *
+     * If an explicit schema is supplied TRAC will save the schema as part of the DATA object,
+     * creating an embedded schema this individual dataset. All future versions of the dataset
+     * must also use an embedded schema which can either be the same schema or a compatible
+     * one, with compatibility following the rules of schema versioning (fields can be added
+     * but not removed or materially altered).
+     *
+     * TRAC will validate incoming data to make sure it is conformant with the schema.
+     */
     metadata.SchemaDefinition schema = 5;
   }
 
@@ -406,15 +434,38 @@ message DataWriteRequest {
   reserved "schemaUpdates";
   reserved "schemaHandling";
 
+  /**
+   * Format that will be used for uploading data.
+   *
+   * This field tells TRAC what format the data will be sent in, it must be the mime type
+   * of a supported data format. Data provided in the "content" field can then be encoded
+   * in this format.
+   *
+   * The "format" field does not affect how TRAC stores data. Incoming data is decoded and
+   * translated into a format recognised by the underlying data platform.
+   */
   string format = 9;
 
 //  map<string, metadata.Value> formatOptions = 10;
 //  optional metadata.PartKey part = 11;
 //  optional bool deltaUpdate = 12;
 
+  /**
+   * The content of the dataset, encoded as per the "format" field.
+   *
+   * For client streaming requests, each message contains a chunk of the encoded dataset.
+   * Empty (i.e. zero-length) chunks can be included in the stream and will be ignored.
+   * For unary requests (createSmallDataset, updateSmallDataset) the encoded content of
+   * the dataset must be included in the request as a single blob.
+   */
   bytes content = 1000;
 }
 
+/**
+ * Request to read a dataset stored in the TRAC platform.
+ *
+ * @see TracDataApi.readDataset
+ */
 message DataReadRequest {
 
   string tenant = 1;
@@ -428,6 +479,11 @@ message DataReadRequest {
 //  optional uint32 limit = 7;
 }
 
+/**
+ * Response to a request to read a dataset stored in the TRAC platform.
+ *
+ * @see TracDataApi.readDataset
+ */
 message DataReadResponse {
 
   optional metadata.SchemaDefinition schema = 1;
@@ -435,22 +491,12 @@ message DataReadResponse {
   bytes content = 1000;
 }
 
-message DataQueryRequest {
-
-  string tenant = 1;
-
-  string query = 2;
-  map<string, metadata.TagSelector> targets = 3;
-
-  string format = 4;
-}
-
 
 /**
- * Request to create or update a FILE and store content to the platform
+ * Request to create or update a FILE and store content to the platform.
  *
- * @see TracDataApi.createFile()
- * @see TracDataApi.updateFile()
+ * @see TracDataApi.createFile
+ * @see TracDataApi.updateFile
  */
 message FileWriteRequest {
 
@@ -527,9 +573,9 @@ message FileWriteRequest {
 
 
 /**
- * Request to read a FILE, i.e. retrieve its content from the platform
+ * Request to read a FILE, i.e. retrieve its content from the platform.
  *
- * @see TracDataApi
+ * @see TracDataApi.readFile
  */
 message FileReadRequest {
 
@@ -546,9 +592,9 @@ message FileReadRequest {
 
 
 /**
- * Response to a request to read a FILE, i.e. retrieve its content from the platform
+ * Response to a request to read a FILE, i.e. retrieve its content from the platform.
  *
- * @see TracDataApi.readFile()
+ * @see TracDataApi.readFile
  */
 message FileReadResponse {
 
