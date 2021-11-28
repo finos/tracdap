@@ -30,10 +30,13 @@ Each of the TRAC services has a single public API class, which can be instantiat
     
         constructor() {
     
-            // 1. Create an RPC implementation, you need one for each API class
-            const metaApiRpcImpl = trac.setup.createWebRpcImpl(trac.api.TracMetadataApi);
+            // Use trac.setup to create an RPC instance, you need one for each API class
+            // This instance is for use in the browser, it will direct calls to the page origin server
 
-            // 2. Create the API instance using the corresponding RPC implementation
+            const metaApiRpcImpl = trac.setup.rpcImplForBrowser(trac.api.TracMetadataApi);
+
+            // Then create the API
+
             this.metaApi = new trac.api.TracMetadataApi(metaApiRpcImpl);
         }
 
@@ -58,7 +61,7 @@ The API methods can be called as JavaScript methods on the API classes, both fut
                 })
                 .catch(err => {
                     // handle error
-                    console.log(err)
+                    console.log(err.message)
                 });
         }
 
@@ -74,7 +77,7 @@ The API methods can be called as JavaScript methods on the API classes, both fut
 
                 if (err) {
                     // handle error
-                    console.log(err);
+                    console.log(err.message);
                 }
                 else {
                     // handle response
@@ -89,28 +92,22 @@ The API methods can be called as JavaScript methods on the API classes, both fut
 
             const exampleSearchParams = {
 
-                objectType: trac.metadata.ObjectType.MODEL,
+                objectType: trac.ObjectType.MODEL,
                 search: { logical: {
         
-                    operator: trac.metadata.LogicalOperator.AND,
+                    operator: trac.LogicalOperator.AND,
                     expr: [
                         { term: {
                             attrName: "model_type",
-                            attrType: trac.metadata.BasicType.STRING,
-                            operator: trac.metadata.SearchOperator.EQ,
-                            searchValue: { 
-                                type: { basicType: trac.metadata.BasicType.STRING }, 
-                                stringValue: "acme_widget_model" 
-                            }
+                            attrType: trac.STRING,
+                            operator: trac.SearchOperator.EQ,
+                            searchValue: { stringValue: "acme_widget_model" }
                         }},
                         { term: {
                             attrName: "model_owner",
-                            attrType: trac.metadata.BasicType.STRING,
-                            operator: trac.metadata.SearchOperator.EQ,
-                            searchValue: { 
-                                type: { basicType: trac.metadata.BasicType.STRING }, 
-                                stringValue: "wile.e.cyote" 
-                            }
+                            attrType: trac.STRING,
+                            operator: trac.SearchOperator.EQ,
+                            searchValue: { stringValue: "wile.e.cyote" }
                         }},
                     ]
                 }}
@@ -207,5 +204,4 @@ This is not normally necessary for app development, but if you want to do it her
 
     npm run tracVersion:windows  # For Windows platforms, requires PowerShell
     npm run tracVersion:posix    # For macOS or Linux
-    npm run pbjs
-    npm run pbts                 # Even if you are using plain JavaScript, this will supply type hints to the IDE
+    npm run buildApi
