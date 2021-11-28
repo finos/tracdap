@@ -66,6 +66,7 @@ public class ConfigTranslator {
         if (services.getMeta() != null) {
 
             var metaApiRoutes = createRoutesForService(
+                    "TRAC Metadata Service",
                     services.getMeta(),
                     "/trac.api.TracMetadataApi/",
                     "/trac-meta/",
@@ -74,31 +75,45 @@ public class ConfigTranslator {
             serviceRoutes.addAll(metaApiRoutes);
         }
 
+        if (services.getData() != null) {
+
+            var metaApiRoutes = createRoutesForService(
+                    "TRAC Data Service",
+                    services.getData(),
+                    "/trac.api.TracDataApi/",
+                    "/trac-data/",
+                    null);
+
+            serviceRoutes.addAll(metaApiRoutes);
+        }
+
         return serviceRoutes;
     }
 
     public static List<RouteConfig> createRoutesForService(
-            ServiceConfig service, String grpcPath, String restPath, RestMapping restMapping) {
+            String routeName, ServiceConfig service,
+            String grpcPath, String restPath, RestMapping restMapping) {
 
         var routes = new ArrayList<RouteConfig>();
 
         if (service.getProtocols().contains(RouteProtocol.GRPC) || service.getProtocols().contains(RouteProtocol.GRPC_WEB))
-            routes.add(createGrpcRoute(service, grpcPath));
+            routes.add(createGrpcRoute(routeName, service, grpcPath));
 
-        if (service.getProtocols().contains(RouteProtocol.REST))
-            routes.add(createRestRoute(service, restPath, restMapping));
+        if (service.getProtocols().contains(RouteProtocol.REST) && restMapping != null)
+            routes.add(createRestRoute(routeName, service, restPath, restMapping));
 
         return routes;
     }
 
-    private static RouteConfig createGrpcRoute(ServiceConfig service, String grpcPath) {
+    private static RouteConfig createGrpcRoute(
+            String routeName, ServiceConfig service, String grpcPath) {
 
         var protocols = service.getProtocols().stream()
                 .filter(p -> List.of(RouteProtocol.GRPC, RouteProtocol.GRPC_WEB).contains(p))
                 .collect(Collectors.toList());
 
         var grpcRoute = new RouteConfig();
-        grpcRoute.setRouteName("TRAC Metadata Service");
+        grpcRoute.setRouteName(routeName);
         grpcRoute.setRouteType(RouteType.GRPC);
         grpcRoute.setProtocols(protocols);
 
@@ -107,10 +122,12 @@ public class ConfigTranslator {
         return grpcRoute;
     }
 
-    private static RouteConfig createRestRoute(ServiceConfig service, String restPath, RestMapping restMapping) {
+    private static RouteConfig createRestRoute(
+            String routeName, ServiceConfig service,
+            String restPath, RestMapping restMapping) {
 
         var restRoute = new RouteConfig();
-        restRoute.setRouteName("TRAC Metadata Service");
+        restRoute.setRouteName(routeName);
         restRoute.setRouteType(RouteType.REST);
         restRoute.setProtocols(List.of(RouteProtocol.REST));
         restRoute.setRestMapping(restMapping);
