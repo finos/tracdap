@@ -29,7 +29,7 @@ import "google/api/annotations.proto";
 
 
 /**
- * Public API reading, writing and searching for objects in the TRAC metadata store.
+ * Public API for creating, updating, reading and searching for objects in the TRAC metadata store.
  *
  * The TRAC metadata API is expressed in terms of Objects and Tags. Objects are
  * structural items (nouns and verbs) such as data, models and jobs that describe

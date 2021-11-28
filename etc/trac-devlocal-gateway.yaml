@@ -25,13 +25,18 @@ trac:
     services:
 
       meta:
-
         protocols: [grpc_web, rest]
-
         target:
           scheme: http
           host: localhost
           port: 8081
+
+      data:
+        protocols: [grpc_web]
+        target:
+          scheme: http
+          host: localhost
+          port: 8082
 
     routes:
 

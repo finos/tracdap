@@ -361,7 +361,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
         // No schema info present at all, this is an invalid request
 
-        var request = BASIC_CREATE_DATASET_REQUEST.toBuilder().clearSchemaDefinition().build();
+        var request = BASIC_CREATE_DATASET_REQUEST.toBuilder().clearSchemaSpecifier().build();
         var response = DataApiTestHelpers.clientStreaming(dataClient::createDataset, request);
         waitFor(TEST_TIMEOUT, response);
         var error = assertThrows(StatusRuntimeException.class, () -> resultOf(response));
@@ -1126,7 +1126,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
         var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
                 .setPriorVersion(selectorFor(v1Id))
-                .clearSchemaDefinition()
+                .clearSchemaSpecifier()
                 .build();
 
         var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);

@@ -61,4 +61,4 @@ trac:
           instances:
             - storageType: LOCAL
               storageProps:
-                rootDir: ./build/run/storage1
+                rootDir: ./build/run

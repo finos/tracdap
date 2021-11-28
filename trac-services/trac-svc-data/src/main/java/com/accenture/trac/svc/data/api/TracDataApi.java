@@ -176,16 +176,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 this::doReadFile);
     }
 
-    @Override
-    public void getData(DataGetRequest request, StreamObserver<DataGetResponse> responseObserver) {
-        super.getData(request, responseObserver);
-    }
-
-    @Override
-    public void getFile(DataGetRequest request, StreamObserver<DataGetResponse> responseObserver) {
-        super.getFile(request, responseObserver);
-    }
-
 
     // -----------------------------------------------------------------------------------------------------------------
     // API implementation

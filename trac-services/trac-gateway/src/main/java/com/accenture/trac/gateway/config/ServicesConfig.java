@@ -19,6 +19,7 @@ package com.accenture.trac.gateway.config;
 public class ServicesConfig {
 
     private ServiceConfig meta;
+    private ServiceConfig data;
 
     public ServiceConfig getMeta() {
         return meta;
@@ -26,5 +27,13 @@ public class ServicesConfig {
 
     public void setMeta(ServiceConfig meta) {
         this.meta = meta;
+    }
+
+    public ServiceConfig getData() {
+        return data;
+    }
+
+    public void setData(ServiceConfig data) {
+        this.data = data;
     }
 }
