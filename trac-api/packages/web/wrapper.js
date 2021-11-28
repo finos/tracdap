@@ -16,12 +16,26 @@
 
 (function(global, factory) { /* global define, require, module */
 
-    /* AMD */ if (typeof define === 'function' && define.amd)
+    if (typeof define === 'function' && define.amd) {
+
+        /* AMD */
+
         define([$DEPENDENCY, 'grpc-web'], factory);
+    }
 
+    else if (typeof require === 'function' && typeof module === 'object' && module && module.exports) {
 
-    /* CommonJS */ else if (typeof require === 'function' && typeof module === 'object' && module && module.exports)
-        module.exports = factory(require($DEPENDENCY), require('grpc-web'));
+        /* CommonJS */
+
+        $root = factory(require($DEPENDENCY), require('grpc-web'));
+
+        // Allow recent NPM versions to auto-detect ES6-style exports
+        module.exports = $root;
+        module.exports.trac = $root.trac;
+        module.exports.trac.api = $root.trac.api;
+        module.exports.trac.metadata = $root.trac.metadata;
+        module.exports.google = $root.google;
+    }
 
 })(this, function($protobuf, grpc) {
 
