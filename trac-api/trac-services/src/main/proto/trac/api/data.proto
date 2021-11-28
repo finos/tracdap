@@ -468,9 +468,22 @@ message DataWriteRequest {
  */
 message DataReadRequest {
 
+  /**
+   * Tenant code for the requested operation, always required.
+   */
   string tenant = 1;
+
+  /**
+   * Selector for the dataset being read
+   */
   metadata.TagSelector selector = 2;
 
+  /**
+   * Format that the dataset will be returned in.
+   *
+   * The format must be the mime type of a supported data format.
+   * Data will be encoded in this format before it is sent back.
+   */
   string format = 3;
 
 //  map<string, metadata.Value> formatOptions = 4;
@@ -486,8 +499,22 @@ message DataReadRequest {
  */
 message DataReadResponse {
 
+  /**
+   * Schema of the dataset being returned.
+   *
+   * The schema is provided in the first message of the response stream.
+   * TRAC will always provide a full schema, regardless of whether the
+   * dataset is using am external schema or an embedded one.
+   */
   optional metadata.SchemaDefinition schema = 1;
 
+  /**
+   * Content of the dataset, encoded in the requested format.
+   *
+   * The first message in the response stream will always contain an empty
+   * content buffer. Subsequent messages will provided the content of the
+   * dataset as a series of chunks.
+   */
   bytes content = 1000;
 }
 
