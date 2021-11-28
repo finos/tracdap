@@ -33,7 +33,9 @@
 
     const WebRpcImpl = (function() {
 
-        function WebRpcImpl(service, namespace) {
+    const METHOD_TYPE_MAP = $METHOD_TYPE_MAPPING;
+
+        function WebRpcImpl(service, namespace, protocol, host, port) {
 
             const trac = $root.trac;
 
@@ -46,6 +48,10 @@
                 ? namespace + '.' + service.name
                 : 'trac.api.' + service.name;
 
+            this.hostAddress = protocol
+                ? protocol + "://" + host + ":" + port
+                : "";
+
             // Empty RPC metadata for now
             this.rpcMetadata = {}
 
@@ -56,10 +62,14 @@
 
             try {
 
-                const methodName = `/${this.serviceName}/${method.name}`;
+                const methodUrl = `${this.hostAddress}/${this.serviceName}/${method.name}`;
+
+                const methodType = (method.name in METHOD_TYPE_MAP)
+                    ? METHOD_TYPE_MAP[method.name]
+                    : grpc.MethodType.UNARY;
 
                 const methodDescriptor = new grpc.MethodDescriptor(
-                    methodName, grpc.MethodType.UNARY,
+                    methodUrl, methodType,
                     Uint8Array, Uint8Array,
                     request => request,
                     response => response);
@@ -77,17 +87,52 @@
 
     $root.trac.setup = (function() {
 
+        /**
+         * Namespace setup.
+         * @memberof trac
+         * @namespace
+         */
         const setup = {};
 
-        setup.createWebRpcImpl = function(service) {
+        /**
+         * Create an rpcImpl for use in a web browser, requests will be sent to the page origin server
+         * @function rpcImplForBrowser
+         * @memberof trac.setup
+         * @param {$protobuf.rpc.Service} serviceClass The service class to create an rpcImpl for
+         * @returns {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
+         */
+        setup.rpcImplForBrowser = function(serviceClass) {
 
-            const rpcImpl = new WebRpcImpl(service, '');
+            const rpcImpl = new WebRpcImpl(serviceClass, '');
+            return rpcImpl.rpcImpl.bind(rpcImpl);
+        }
+
+        /**
+         * Create an rpcImpl that connects to a specific target
+         * @function rpcImplForTarget
+         * @memberof trac.setup
+         * @param {$protobuf.rpc.Service} serviceClass The service class to create an rpcImpl for
+         * @param {string} protocol The protocol to use for connection (either "http" or "https")
+         * @param {string} host The host to connect to
+         * @param {number} port The port to connect to
+         * @returns {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
+         */
+        setup.rpcImplForTarget = function(serviceClass, protocol, host, port) {
+
+            const rpcImpl = new WebRpcImpl(serviceClass, '', protocol, host, port);
             return rpcImpl.rpcImpl.bind(rpcImpl);
         }
 
         return setup;
 
     })();
+
+    const api_mapping = $API_MAPPING;
+
+    $root.trac = {
+        ...$root.trac,
+        ...api_mapping
+    };
 
     return $root;
 });

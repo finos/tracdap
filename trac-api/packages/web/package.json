@@ -15,7 +15,7 @@
     "url": "https://github.com/accenture/trac"
   },
   "bugs": {
-    "url" : "https://github.com/accenture/trac/issues"
+    "url": "https://github.com/accenture/trac/issues"
   },
   "files": [
     "trac.*"
@@ -29,7 +29,6 @@
   "scripts": {
     "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
     "tracVersion:posix": "npm version `../../../dev/version.sh`",
-    "pbjs": "node call-pbjs.js",
-    "pbts": "pbts -o trac.d.ts trac.js"
+    "buildApi": "node api_builder.js"
   }
 }
