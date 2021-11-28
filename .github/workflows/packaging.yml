@@ -99,11 +99,10 @@ jobs:
           cd trac-api/packages/web
           npm run tracVersion:posix
 
-      - name: PBJS code generation
+      - name: Build API
         run: |
           cd trac-api/packages/web
-          npm run pbjs
-          npm run pbts
+          npm run buildApi
 
       - name: Create tarball
         run: |
