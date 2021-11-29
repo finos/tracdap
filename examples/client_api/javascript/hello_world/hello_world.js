@@ -63,7 +63,8 @@ function createSchema() {
         },
 
         tagUpdates: [
-            { attrName: "schema_type", value: { stringValue: "custom_records" } },
+            { attrName: "schema_type", value: { stringValue: "customer_records" } },
+            { attrName: "business_division", value: { stringValue: "WIDGET_SALES" } },
             { attrName: "description", value: { stringValue: "A month-end snapshot of customer accounts" } },
         ]
 
@@ -74,13 +75,89 @@ function createSchema() {
     return metaApi.createObject(request)
 }
 
+function searchForSchemas() {
+
+    const request = trac.api.MetadataSearchRequest.create({
+
+        tenant: "ACME_CORP",
+        searchParams: {
+
+            objectType: trac.ObjectType.SCHEMA,
+
+            search: { logical: {
+
+                operator: trac.LogicalOperator.AND,
+                expr: [
+
+                    { term: {
+
+                        attrName: "schema_type",
+                        attrType: trac.STRING,
+                        operator: trac.SearchOperator.EQ,
+                        searchValue: { stringValue: "customer_records" }
+                    }},
+
+                    { term: {
+
+                        attrName: "business_division",
+                        attrType: trac.STRING,
+                        operator: trac.SearchOperator.IN,
+                        searchValue: { arrayValue: {
+                            items: [
+                                { stringValue: "WIDGET_SALES" },
+                                { stringValue: "WIDGET_SERVICES" },
+                                { stringValue: "NON_WIDGET_ACTIVITIES" }
+                            ]
+                        }}
+                    }},
+                ]
+
+            } }
+        }
+    })
+
+    return metaApi.search(request);
+}
+
+function loadTag(tagHeader) {
+
+    const request = trac.api.MetadataReadRequest.create({
+
+        tenant: "ACME_CORP",
+        selector: tagHeader
+    });
+
+    return metaApi.readObject(request);
+}
+
 async function main() {
 
-    console.log("Creating schema...")
+    try {
 
-    await createSchema()
-        .then(tag => {console.log("Schema ID: " + JSON.stringify(tag)); return tag;})
-        .catch(err => console.log("Error: " + JSON.stringify(err)));
+        console.log("Creating schema...")
+
+        const objectHeader = await createSchema();
+
+        console.log("New schema ID: " + JSON.stringify(objectHeader, null, 2));
+        console.log("Searching for schemas...")
+
+        const searchResponse = await searchForSchemas();
+
+        console.log(`Found ${searchResponse.searchResult.length} matching schemas`);
+        console.log("Loading the first matching schema...")
+
+        const firstMatch = searchResponse.searchResult[0];
+        const schemaTag = await loadTag(firstMatch.header);
+
+        console.log(JSON.stringify(schemaTag, null, 2));
+    }
+    catch (err) {
+
+        if (err.hasOwnProperty("message"))
+            console.log(err.message);
+        else
+            console.log(JSON.stringify(err));
+    }
 }
 
 main();
