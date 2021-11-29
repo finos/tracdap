@@ -268,6 +268,8 @@ service TracDataApi {
    */
   rpc readDataset (DataReadRequest) returns (stream DataReadResponse);
 
+  rpc readSmallDataset (DataReadRequest) returns (DataReadResponse);
+
   /**
    * Upload a new file into TRAC
    *
@@ -366,6 +368,8 @@ service TracDataApi {
    * underlying storage technology.
    */
   rpc readFile (FileReadRequest) returns (stream FileReadResponse);
+
+  rpc readSmallFile (FileReadRequest) returns (FileReadResponse);
 
 }
 

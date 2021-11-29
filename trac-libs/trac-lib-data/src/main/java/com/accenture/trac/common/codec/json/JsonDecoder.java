@@ -104,7 +104,7 @@ public class JsonDecoder extends BaseDecoder {
 
             var errorMessage = String.format("JSON decoding failed on line %d: %s",
                     e.getLocation().getLineNr(),
-                    e.getMessage());
+                    e.getOriginalMessage());
 
             log.error(errorMessage, e);
             throw new EDataCorruption(errorMessage, e);

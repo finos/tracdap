@@ -54,6 +54,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     private static final MethodDescriptor<DataWriteRequest, TagHeader> CREATE_SMALL_DATASET_METHOD = TracDataApiGrpc.getCreateSmallDatasetMethod();
     private static final MethodDescriptor<DataWriteRequest, TagHeader> UPDATE_SMALL_DATASET_METHOD = TracDataApiGrpc.getUpdateSmallDatasetMethod();
+    private static final MethodDescriptor<DataReadRequest, DataReadResponse> READ_SMALL_DATASET_METHOD = TracDataApiGrpc.getReadSmallDatasetMethod();
 
     private static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_FILE_METHOD = TracDataApiGrpc.getCreateFileMethod();
     private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_FILE_METHOD = TracDataApiGrpc.getUpdateFileMethod();
@@ -61,6 +62,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_SMALL_FILE_METHOD = TracDataApiGrpc.getCreateSmallFileMethod();
     private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_SMALL_FILE_METHOD = TracDataApiGrpc.getUpdateSmallFileMethod();
+    private static final MethodDescriptor<FileReadRequest, FileReadResponse> READ_SMALL_FILE_METHOD = TracDataApiGrpc.getReadSmallFileMethod();
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -129,6 +131,16 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     }
 
     @Override
+    public void readSmallDataset(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
+
+        smallServerStreaming(READ_SMALL_DATASET_METHOD, request, responseObserver,
+                DataReadResponse::newBuilder,
+                DataReadResponse.Builder::setSchema,
+                DataReadResponse.Builder::setContent,
+                this::doReadDataset);
+    }
+
+    @Override
     public StreamObserver<FileWriteRequest> createFile(StreamObserver<TagHeader> responseObserver) {
 
         return clientStreaming(CREATE_FILE_METHOD, responseObserver,
@@ -170,6 +182,16 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     public void readFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
         serverStreaming(READ_FILE_METHOD, request, responseObserver,
+                FileReadResponse::newBuilder,
+                FileReadResponse.Builder::setFileDefinition,
+                FileReadResponse.Builder::setContent,
+                this::doReadFile);
+    }
+
+    @Override
+    public void readSmallFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
+
+        smallServerStreaming(READ_SMALL_FILE_METHOD, request, responseObserver,
                 FileReadResponse::newBuilder,
                 FileReadResponse.Builder::setFileDefinition,
                 FileReadResponse.Builder::setContent,
@@ -339,6 +361,55 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         var response = Flows.concat(message0, content);
 
         response.subscribe(GrpcStreams.serverResponseStream(method, responseObserver));
+
+        try {
+            apiMethod.execute(
+                    method.getBareMethodName(), request,
+                    definition, byteStream, execCtx);
+        }
+        catch (Exception e) {
+
+            // Handle synchronous exceptions during validation
+
+            if (!definition.isDone())
+                definition.completeExceptionally(e);
+            else
+                byteStream.onError(e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <
+            TReq extends Message, TResp extends Message,
+            TDef extends Message, TBuilder extends Message.Builder>
+    void smallServerStreaming(
+            MethodDescriptor<TReq, TResp> method, TReq request,
+            StreamObserver<TResp> responseObserver,
+            Supplier<TBuilder> responseSupplier,
+            BiFunction<TBuilder, TDef, TBuilder> putDefinition,
+            BiFunction<TBuilder, ByteString, TBuilder> putContent,
+            ServerStreamingMethod<TReq, TDef> apiMethod) {
+
+        log_start(method);
+
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+
+        var definition = new CompletableFuture<TDef>();
+
+        var byteStream = Flows.<ByteBuf>hub(execCtx);
+        var protoByteStream = Flows.map(byteStream, Bytes::toProtoBytes);
+        var content = Flows.fold(protoByteStream, ByteString::concat, ByteString.EMPTY);
+
+        var responseBuilder = responseSupplier.get();
+
+        var response = definition.thenAcceptBoth(content, (def_, bytes_) -> {
+
+            putDefinition.apply(responseBuilder, def_);
+            putContent.apply(responseBuilder, bytes_);
+
+        }).thenApply(x -> (TResp) responseBuilder.build());
+
+        Flows.publish(response).subscribe(GrpcStreams.serverResponseStream(method, responseObserver));
 
         try {
             apiMethod.execute(
