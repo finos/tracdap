@@ -75,6 +75,17 @@ function createSchema() {
     return metaApi.createObject(request)
 }
 
+function loadTag(tagHeader) {
+
+    const request = trac.api.MetadataReadRequest.create({
+
+        tenant: "ACME_CORP",
+        selector: tagHeader
+    });
+
+    return metaApi.readObject(request);
+}
+
 function searchForSchemas() {
 
     const request = trac.api.MetadataSearchRequest.create({
@@ -117,17 +128,6 @@ function searchForSchemas() {
     })
 
     return metaApi.search(request);
-}
-
-function loadTag(tagHeader) {
-
-    const request = trac.api.MetadataReadRequest.create({
-
-        tenant: "ACME_CORP",
-        selector: tagHeader
-    });
-
-    return metaApi.readObject(request);
 }
 
 async function main() {

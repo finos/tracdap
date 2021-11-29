@@ -7,6 +7,7 @@ App Development
 .. toctree::
     :hidden:
 
+    tutorial/index
     ./web_api_package
     ./rest_examples
     Platform API Listing </autoapi/trac/api/index>
