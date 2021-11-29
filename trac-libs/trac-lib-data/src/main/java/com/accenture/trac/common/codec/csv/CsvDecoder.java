@@ -170,7 +170,7 @@ public class CsvDecoder extends BaseDecoder {
 
             var errorMessage = String.format("CSV decoding failed on line %d: %s",
                     e.getLocation().getLineNr(),
-                    e.getMessage());
+                    e.getOriginalMessage());
 
             log.error(errorMessage, e);
             throw new EDataCorruption(errorMessage, e);
