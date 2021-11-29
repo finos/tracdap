@@ -117,7 +117,7 @@ function searchForSchemas() {
                             items: [
                                 { stringValue: "WIDGET_SALES" },
                                 { stringValue: "WIDGET_SERVICES" },
-                                { stringValue: "NON_WIDGET_ACTIVITIES" }
+                                { stringValue: "WIDGET_RND_ACTIVITIES" }
                             ]
                         }}
                     }},
