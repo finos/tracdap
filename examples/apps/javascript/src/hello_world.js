@@ -16,11 +16,6 @@
 
 import {trac} from 'trac-web-api';
 
-// To run these examples outside of a browser, XMLHttpRequest is required
-import xhr2 from 'xhr2';
-global.XMLHttpRequest = xhr2.XMLHttpRequest;
-
-
 // Use trac.setup to create an RPC instance pointed at your TRAC server
 // For code that will run in the browser, use rpcImplForBrowser to direct requests to the origin server
 const metaApiRpcImpl = trac.setup.rpcImplForTarget(trac.api.TracMetadataApi, "http", "localhost", 8080);
@@ -29,7 +24,7 @@ const metaApiRpcImpl = trac.setup.rpcImplForTarget(trac.api.TracMetadataApi, "ht
 const metaApi = new trac.api.TracMetadataApi(metaApiRpcImpl);
 
 
-function createSchema() {
+export function createSchema() {
 
     // Build the schema definition we want to save
 
@@ -72,10 +67,15 @@ function createSchema() {
 
     // Call createObject on the metadata API
 
-    return metaApi.createObject(request)
+    return metaApi.createObject(request).then(header => {
+
+        console.log("New schema created: " + JSON.stringify(header, null, 2));
+
+        return header;
+    })
 }
 
-function loadTag(tagHeader) {
+export function loadTag(tagHeader) {
 
     const request = trac.api.MetadataReadRequest.create({
 
@@ -86,7 +86,7 @@ function loadTag(tagHeader) {
     return metaApi.readObject(request);
 }
 
-function searchForSchemas() {
+export function searchForSchema() {
 
     const request = trac.api.MetadataSearchRequest.create({
 
@@ -127,27 +127,34 @@ function searchForSchemas() {
         }
     })
 
-    return metaApi.search(request);
+    return metaApi.search(request).then(response => {
+
+        const nResults = response.searchResult.length;
+
+        if (nResults === 0)
+            throw new Error("No matching search results");
+
+        console.log(`Got ${nResults} search result(s), picking the first one`)
+
+        return response.searchResult[0].header;
+    });
 }
 
-async function main() {
+export async function main() {
 
     try {
 
         console.log("Creating schema...")
 
-        const objectHeader = await createSchema();
+        await createSchema();
 
-        console.log("New schema ID: " + JSON.stringify(objectHeader, null, 2));
         console.log("Searching for schemas...")
 
-        const searchResponse = await searchForSchemas();
+        const schemaId = await searchForSchema();
 
-        console.log(`Found ${searchResponse.searchResult.length} matching schemas`);
         console.log("Loading the first matching schema...")
 
-        const firstMatch = searchResponse.searchResult[0];
-        const schemaTag = await loadTag(firstMatch.header);
+        const schemaTag = await loadTag(schemaId);
 
         console.log(JSON.stringify(schemaTag, null, 2));
     }
@@ -159,5 +166,3 @@ async function main() {
             console.log(JSON.stringify(err));
     }
 }
-
-main();

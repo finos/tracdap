@@ -21,5 +21,8 @@
   "dependencies": {
     "trac-web-api": "file:../../../trac-api/packages/web",
     "xhr2": "^0.2.1"
+  },
+  "scripts": {
+    "examples": "node run_examples.js"
   }
 }
