@@ -19,10 +19,11 @@
   },
   "type": "module",
   "dependencies": {
+    "apache-arrow": "^6.0.1",
     "trac-web-api": "file:../../../trac-api/packages/web",
     "xhr2": "^0.2.1"
   },
   "scripts": {
-    "examples": "node run_examples.js"
+    "examples": "node --experimental-specifier-resolution=node run_examples.js"
   }
 }

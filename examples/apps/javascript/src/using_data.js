@@ -16,15 +16,15 @@
 
 import {trac} from 'trac-web-api';
 
-import {searchForSchema} from './hello_world.js';
-import {loadFromDisk} from './util.js';
+import {searchForSchema} from './hello_world';
+import {loadFromDisk} from './util';
 
 // Create the Data API
 const dataApiRpcImpl = trac.setup.rpcImplForTarget(trac.api.TracDataApi, "http", "localhost", 8080);
 const dataApi = new trac.api.TracDataApi(dataApiRpcImpl);
 
 
-function saveDataToTrac(schemaId, csvData) {
+export function saveDataToTrac(schemaId, csvData) {
 
     const request = trac.api.DataWriteRequest.create({
 
@@ -50,7 +50,7 @@ function saveDataToTrac(schemaId, csvData) {
     });
 }
 
-function loadDataFromTrac(dataId) {
+export function loadDataFromTrac(dataId) {
 
     const request = trac.api.DataReadRequest.create({
 
