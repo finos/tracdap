@@ -72,7 +72,7 @@ public class MetadataValidator {
     public static ValidationContext validateTagUpdate(TagUpdate msg, ValidationContext ctx) {
 
         ctx = ctx.push(TU_OPERATION)
-                .apply(Validation::required)
+                .apply(Validation::optional)
                 .apply(Validation::recognizedEnum, TagOperation.class)
                 .pop();
 
