@@ -33,6 +33,7 @@ build/
 /trac-runtime/python/*.egg-info
 
 /examples/models/python/data/outputs/**
+/examples/apps/javascript/node_modules/**
 
 .DS_Store
 __pycache__/
