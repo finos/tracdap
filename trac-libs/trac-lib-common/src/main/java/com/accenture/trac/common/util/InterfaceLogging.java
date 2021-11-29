@@ -16,16 +16,23 @@
 
 package com.accenture.trac.common.util;
 
+import com.accenture.trac.metadata.TagHeader;
+import com.accenture.trac.metadata.TagSelector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.*;
 import java.util.Collection;
+import java.util.Set;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 
 
 public class InterfaceLogging implements InvocationHandler {
+
+    private static final Set<Class<?>> LOGGABLE_METADATA_TYPES = Set.of(
+            TagSelector.class,
+            TagHeader.class);
 
     private final Object impl;
     private final Logger log;
@@ -89,6 +96,17 @@ public class InterfaceLogging implements InvocationHandler {
 
         if (arg == null)
             return "(null)";
+
+        // For some small, common metadata classes (IDs and selectors) it is helpful to log them out
+        if (LOGGABLE_METADATA_TYPES.contains(arg.getClass())) {
+
+            var oneLiner = arg.toString()
+                    .stripTrailing()
+                    .replaceAll(": ", " = ")
+                    .replaceAll("\n", ", ");
+
+            return arg.getClass().getSimpleName() + " (" + oneLiner + ")";
+        }
 
         // Do not log full contents of generated protobuf classes, they can be big!
         if (arg instanceof com.google.protobuf.Message)

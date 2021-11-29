@@ -39,8 +39,8 @@ class JdbcSearchImpl {
                 ? queryBuilder.buildPriorSearchQuery(tenantId, searchParameters)
                 : queryBuilder.buildSearchQuery(tenantId, searchParameters);
 
-        log.info("Running search query: \n{}", query.getQuery());
-
+        if (log.isDebugEnabled())
+            log.debug("Running search query: \n{}", query.getQuery());
 
         var pks = new long[MAX_SEARCH_RESULT];
 
