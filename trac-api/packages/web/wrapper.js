@@ -88,11 +88,35 @@
                     request => request,
                     response => response);
 
-                return this.grpcWeb.rpcCall(method.name, request, this.rpcMetadata, methodDescriptor, callback);
+                if (methodType === grpc.MethodType.SERVER_STREAMING)
+                    this.serverStreaming(method, methodDescriptor, request, callback);
+
+                else
+                    this.unaryCall(method, methodDescriptor, request, callback);
             }
             catch (error) {
+                console.log(JSON.stringify(error));
                 callback(error, null);
             }
+        }
+
+        WebRpcImpl.prototype.unaryCall = function(method, descriptor, request, callback) {
+
+            this.grpcWeb.rpcCall(method.name, request, this.rpcMetadata, descriptor, callback);
+        }
+
+        WebRpcImpl.prototype.serverStreaming = function(method, descriptor, request, callback) {
+
+            const stream = this.grpcWeb.serverStreaming(method.name, request, this.rpcMetadata, descriptor);
+
+            stream.on("data", msg => callback(null, msg));
+            stream.on("end", () => callback(null, null));
+            stream.on("error", err => callback(err, null));
+
+            // TODO: Do we need to do anything with these two messages?
+
+            stream.on("metadata", metadata => console.log("gRPC Metadata: " + JSON.stringify(metadata)));
+            stream.on("status", status => console.log("gRPC Status: " + JSON.stringify(status)));
         }
 
         return WebRpcImpl;
