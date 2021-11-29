@@ -63,6 +63,9 @@ public class ValidatorBuilder {
         addMethodValidator(validatorMap, DataReadRequest.class, DataApiValidator::validateReadDataset,
                 dataProto, "TracDataApi", "readDataset");
 
+        addMethodValidator(validatorMap, DataReadRequest.class, DataApiValidator::validateReadDataset,
+                dataProto, "TracDataApi", "readSmallDataset");
+
         addMethodValidator(validatorMap, FileWriteRequest.class, DataApiValidator::validateCreateFile,
                 dataProto, "TracDataApi", "createFile");
 
@@ -77,6 +80,9 @@ public class ValidatorBuilder {
 
         addMethodValidator(validatorMap, FileReadRequest.class, DataApiValidator::validateReadFile,
                 dataProto, "TracDataApi", "readFile");
+
+        addMethodValidator(validatorMap, FileReadRequest.class, DataApiValidator::validateReadFile,
+                dataProto, "TracDataApi", "readSmallFile");
 
         addVersionValidator(validatorMap, FileDefinition.class, FileVersionValidator::fileVersion,
                 FileDefinition.getDescriptor());
@@ -96,7 +102,7 @@ public class ValidatorBuilder {
             Descriptors.Descriptor messageType) {
 
         var key = ValidationKey.fixedObject(messageType);
-        var func = new ValidationFunction<T>(validator, targetClass);
+        var func = new ValidationFunction<>(validator, targetClass);
 
         validatorMap.put(key, func);
     }
@@ -111,7 +117,7 @@ public class ValidatorBuilder {
         var requestType = method.getInputType();
 
         var key = ValidationKey.fixedMethod(requestType, method);
-        var func = new ValidationFunction<T>(validator, targetClass);
+        var func = new ValidationFunction<>(validator, targetClass);
 
         validatorMap.put(key, func);
     }
@@ -122,7 +128,7 @@ public class ValidatorBuilder {
             Descriptors.Descriptor messageType) {
 
         var key = ValidationKey.version(messageType);
-        var func = new ValidationFunction<T>(validator, targetClass);
+        var func = new ValidationFunction<>(validator, targetClass);
 
         validatorMap.put(key, func);
 
