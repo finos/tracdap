@@ -71,6 +71,18 @@ export function loadDataFromTrac(dataId) {
     });
 }
 
+export function displayTable(schema, data) {
+
+    const fields = schema.table.fields;
+
+    const accessor = (data_, row, col) => {
+        const fieldName = fields[col].fieldName;
+        return data_[row][fieldName];
+    }
+
+    renderTable(schema, data, accessor);
+}
+
 export function renderTable(schema, data, accessor) {
 
     const CELL_WIDTH = 10;
@@ -116,10 +128,5 @@ export async function main() {
 
     const {schema, data} = await loadDataFromTrac(dataId);
 
-    const accessor = (table, row, col) => {
-        const fieldName = schema.table.fields[col].fieldName;
-        return table[row][fieldName];
-    }
-
-    renderTable(schema, data, accessor);
+    displayTable(schema, data);
 }

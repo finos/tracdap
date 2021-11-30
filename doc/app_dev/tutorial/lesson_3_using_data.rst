@@ -128,6 +128,20 @@ this is easily done using a ``TextDecoder`` and ``JSON.parse()``, which will cre
 The response also includes the full schema of the dataset, in this example we are returning both the
 schema and the decoded data.
 
+Exactly how the data is rendered on the screen will depend on the application framework being used.
+One common approach is to use an "accessor" method, which allows a renderer to access elements of the
+dataset that it needs to display by row and column index. We can create an accessor function for the
+decoded dataset like this:
+
+.. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
+    :language: JavaScript
+    :lines: 74 - 84
+    :linenos:
+    :lineno-start: 74
+
+Here rows are looked up by index, for columns we must find the field name for the column and then
+do a dictionary lookup.
+
 Saving data from memory
 =======================
 
