@@ -33,13 +33,25 @@ export function createSchema() {
         table: {
             fields: [
                 {
-                    fieldName: "field_one",
-                    fieldType: trac.STRING
+                    fieldName: "customer_id", fieldType: trac.STRING, businessKey: true,
+                    label: "Unique customer account number"
                 },
                 {
-                    fieldName: "field_two",
-                    fieldType: trac.FLOAT
+                    fieldName: "customer_type", fieldType: trac.STRING, categorical: true,
+                    label: "Is the customer an individual, company, govt agency or something else"
                 },
+                {
+                    fieldName: "customer_name", fieldType: trac.STRING,
+                    label: "Customer's common name"
+                },
+                {
+                    fieldName: "account_open_date", fieldType: trac.DATE,
+                    label: "Date the customer account was opened"
+                },
+                {
+                    fieldName: "credit_limit", fieldType: trac.DECIMAL,
+                    label: "Ordinary credit limit on the customer account, in USD"
+                }
             ]
         }
     });
@@ -63,11 +75,11 @@ export function createSchema() {
     });
 
     // Use the metadata API to create the object
-    return metaApi.createObject(request).then(header => {
+    return metaApi.createObject(request).then(schemaId => {
 
-        console.log("New schema created: " + JSON.stringify(header, null, 2));
+        console.log(`Created schema ${schemaId.objectId} version ${schemaId.objectVersion}`);
 
-        return header;
+        return schemaId;
     });
 }
 

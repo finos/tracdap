@@ -120,30 +120,35 @@ Suppose we want to create a schema, that we can use to describe some customer ac
 (It is not always necessary to create schemas in this way, but we'll do it for an example).
 
 First we need to build the :class:`SchemaDefinition<trac.metadata.SchemaDefinition>` object.
-A ``.create()`` method is available for every TRAC metadata object, which provides
-auto-complete and type hints in IDEs that support it.
+In real-world applications schemas would be created by automated tools (for example TRAC
+generates schemas during data import jobs), but for this example we can define a simple one
+in code.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 27 - 45
+    :lines: 27 - 57
     :linenos:
     :lineno-start: 27
 
-Here, enums are set using the constants defined in the API package. All enum types are
-available in the trac namespace, so ``trac.SchemaType`` is shorthand for
+The web API package provides structured classes for every type and enum in the ``trac.metadata``
+package. A ``.create()`` method is available for every type, which provides auto-complete and
+type hints in IDEs that support it. Enums are set using the constants defined in the API package.
+All enum types are available in the trac namespace, so ``trac.SchemaType`` is shorthand for
 ``trac.metadata.SchemaType`` and so on. The basic types in the TRAC type system are also
 available, so ``trac.STRING`` is a shorthand for ``trac.metadata.BasicType.STRING``.
 
 Now we want to save the schema into the TRAC metadata store.
 To do that, we use a :class:`MetadataWriteRequest<trac.api.MetadataWriteRequest>`.
+Request objects from the ``trac.api`` package can be created the same way metadata objects from
+``trac.metadata``.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 47 - 63
+    :lines: 59 - 75
     :linenos:
-    :lineno-start: 47
+    :lineno-start: 59
 
-There are several things to call out here! TRAC is a multi-tenant platform and every API
+There are several things to call out here. TRAC is a multi-tenant platform and every API
 request includes a tenant code. By default resources are separated between tenants, so
 tenant A cannot access a resource created in tenant B. For this example we have a single
 tenant called "ACME_CORP".
@@ -164,12 +169,12 @@ to send our request to the TRAC metadata service.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 65 - 72
+    :lines: 77 - 84
     :linenos:
-    :lineno-start: 16
+    :lineno-start: 77
 
-The :meth:`createObject()<trac.api.TracMetadataApi.createObject>` method returns the
-:class:`TagHeader<trac.metadata.TagHeader>` of the newly created object. Headers describe
+The :meth:`createObject()<trac.api.TracMetadataApi.createObject>` method returns the ID of
+the newly created schema as a :class:`TagHeader<trac.metadata.TagHeader>`, which includes the
 object type, ID, version and timestamps.
 
 All the API methods in the web API package are available in both future and callback form.
@@ -192,9 +197,9 @@ We can do this using a :class:`MetadataReadRequest<trac.api.MetadataReadRequest>
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 74 - 80
+    :lines: 86 - 92
     :linenos:
-    :lineno-start: 74
+    :lineno-start: 86
 
 All that is needed is the tenant code and a :class:`TagSelector<trac.metadata.TagSelector>`.
 Tag selectors allow different versions of an object or tag to be selected according to various
@@ -206,9 +211,9 @@ Finally we use :meth:`readObject()<trac.api.TracMetadataApi.readObject>` to send
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 82
+    :lines: 94
     :linenos:
-    :lineno-start: 82
+    :lineno-start: 94
 
 The :meth:`readObject()<trac.api.TracMetadataApi.readObject>`
 method returns a :class:`Tag<trac.metadata.Tag>`,
@@ -227,9 +232,9 @@ a console or IDE. In this example we just create the schema and then load it bac
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 85 -
+    :lines: 96 -
     :linenos:
-    :lineno-start: 85
+    :lineno-start: 96
 
 The last call to ``JSON.stringify()`` will provide a human-readable representation of the
 TRAC object, that can be useful for debugging.

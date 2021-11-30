@@ -40,13 +40,13 @@ export function saveDataToTrac(schemaId, csvData) {
             { attrName: "business_division", value: { stringValue: "WIDGET_SALES" } },
             { attrName: "description", value: { stringValue: "A month-end snapshot of customer accounts" } },
         ]
-    })
+    });
 
-    return dataApi.createSmallDataset(request).then(header => {
+    return dataApi.createSmallDataset(request).then(dataId => {
 
-        console.log(`Created dataset ${header.objectId} version ${header.objectVersion}`);
+        console.log(`Created dataset ${dataId.objectId} version ${dataId.objectVersion}`);
 
-        return header;
+        return dataId;
     });
 }
 
@@ -70,7 +70,6 @@ export function loadDataFromTrac(dataId) {
         return {schema: response.schema, data: data};
     });
 }
-
 
 export function renderTable(schema, data, accessor) {
 
@@ -107,13 +106,12 @@ export function renderTable(schema, data, accessor) {
     process.stdout.write("\n");
 }
 
-
 export async function main() {
 
     console.log("Looking for a schema to use...")
     const schemaId = await searchForSchema();
-
     const csvData = await loadFromDisk("data/customer_data.csv");
+
     const dataId = await saveDataToTrac(schemaId, csvData);
 
     const {schema, data} = await loadDataFromTrac(dataId);
