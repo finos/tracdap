@@ -163,7 +163,7 @@ public class CsvDecoder extends BaseDecoder {
                 dispatchBatch(root);
             }
         }
-        catch (JsonParseException e) {
+        catch (JsonParseException | CsvReadException e) {
 
             // In Jackson JSON is the base class, JSON error is the parent of CSV error
             // This exception is a "well-behaved" parse failure, parse location and message should be meaningful
