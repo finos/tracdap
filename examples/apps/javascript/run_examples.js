@@ -22,7 +22,9 @@ global.XMLHttpRequest = xhr2.XMLHttpRequest;
 
 const ALL_EXAMPLES = [
     "hello_world",
-    "using_data"
+    "metadata_magic",
+    "using_data",
+    "arrow"
 ]
 
 async function runExample(exampleName) {
@@ -37,14 +39,27 @@ async function runExample(exampleName) {
 
 (async () => {
 
-    const examples = process.argv.length > 2
-        ? process.argv.slice(2)
-        : ALL_EXAMPLES;
+    try {
 
-    for (let i = 0; i < examples.length; i++) {
+        const examples = process.argv.length > 2
+            ? process.argv.slice(2)
+            : ALL_EXAMPLES;
 
-        const exampleName = examples[i];
-        await runExample(exampleName);
+        for (let i = 0; i < examples.length; i++) {
+
+            const exampleName = examples[i];
+            await runExample(exampleName);
+        }
+    }
+    catch (err) {
+
+        if (err.hasOwnProperty("message"))
+            console.log(err.message);
+        else
+            console.log(JSON.stringify(err));
+
+        // Ensure errors escape so the process is marked as failed
+        throw err;
     }
 
 })()

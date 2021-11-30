@@ -16,7 +16,7 @@
 
 import {trac} from 'trac-web-api';
 
-import {searchForSchema} from './hello_world';
+import {searchForSchema} from './metadata_mojo';
 import {loadFromDisk} from './util';
 
 // Create the Data API

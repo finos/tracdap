@@ -16,18 +16,17 @@
 
 import {trac} from 'trac-web-api';
 
-// Use trac.setup to create an RPC instance pointed at your TRAC server
+// Use trac.setup to create an RPC connector pointed at your TRAC server
 // For code that will run in the browser, use rpcImplForBrowser to direct requests to the origin server
 const metaApiRpcImpl = trac.setup.rpcImplForTarget(trac.api.TracMetadataApi, "http", "localhost", 8080);
 
-// Create the TRAC API
+// Create a TRAC API instance for the Metadata API
 const metaApi = new trac.api.TracMetadataApi(metaApiRpcImpl);
 
 
 export function createSchema() {
 
     // Build the schema definition we want to save
-
     const schema = trac.metadata.SchemaDefinition.create({
 
         schemaType: trac.SchemaType.TABLE,
@@ -46,7 +45,6 @@ export function createSchema() {
     });
 
     // Build a request object, to save the schema with some informational tags
-
     const request = trac.api.MetadataWriteRequest.create({
 
         tenant: "ACME_CORP",
@@ -62,11 +60,9 @@ export function createSchema() {
             { attrName: "business_division", value: { stringValue: "WIDGET_SALES" } },
             { attrName: "description", value: { stringValue: "A month-end snapshot of customer accounts" } },
         ]
-
     });
 
-    // Call createObject on the metadata API
-
+    // Use the metadata API to create the object
     return metaApi.createObject(request).then(header => {
 
         console.log("New schema created: " + JSON.stringify(header, null, 2));
@@ -86,83 +82,15 @@ export function loadTag(tagHeader) {
     return metaApi.readObject(request);
 }
 
-export function searchForSchema() {
-
-    const request = trac.api.MetadataSearchRequest.create({
-
-        tenant: "ACME_CORP",
-        searchParams: {
-
-            objectType: trac.ObjectType.SCHEMA,
-
-            search: { logical: {
-
-                operator: trac.LogicalOperator.AND,
-                expr: [
-
-                    { term: {
-
-                        attrName: "schema_type",
-                        attrType: trac.STRING,
-                        operator: trac.SearchOperator.EQ,
-                        searchValue: { stringValue: "customer_records" }
-                    }},
-
-                    { term: {
-
-                        attrName: "business_division",
-                        attrType: trac.STRING,
-                        operator: trac.SearchOperator.IN,
-                        searchValue: { arrayValue: {
-                            items: [
-                                { stringValue: "WIDGET_SALES" },
-                                { stringValue: "WIDGET_SERVICES" },
-                                { stringValue: "WIDGET_RND_ACTIVITIES" }
-                            ]
-                        }}
-                    }},
-                ]
-
-            } }
-        }
-    })
-
-    return metaApi.search(request).then(response => {
-
-        const nResults = response.searchResult.length;
-
-        if (nResults === 0)
-            throw new Error("No matching search results");
-
-        console.log(`Got ${nResults} search result(s), picking the first one`)
-
-        return response.searchResult[0].header;
-    });
-}
-
 export async function main() {
 
-    try {
+    console.log("Creating a schema...")
 
-        console.log("Creating schema...")
+    const schemaId = await createSchema();
 
-        await createSchema();
+    console.log("Loading the schema...")
 
-        console.log("Searching for schemas...")
+    const schemaTag = await loadTag(schemaId);
 
-        const schemaId = await searchForSchema();
-
-        console.log("Loading the first matching schema...")
-
-        const schemaTag = await loadTag(schemaId);
-
-        console.log(JSON.stringify(schemaTag, null, 2));
-    }
-    catch (err) {
-
-        if (err.hasOwnProperty("message"))
-            console.log(err.message);
-        else
-            console.log(JSON.stringify(err));
-    }
+    console.log(JSON.stringify(schemaTag, null, 2));
 }
