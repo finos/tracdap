@@ -85,7 +85,7 @@ export function displayTable(schema, data) {
 
 export function renderTable(schema, data, accessor) {
 
-    const CELL_WIDTH = 10;
+    const CELL_WIDTH = 30;
 
     const nCols = schema.table.fields.length;
 

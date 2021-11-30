@@ -16,7 +16,7 @@
 
 import {trac} from 'trac-web-api';
 
-import {searchForSchema} from './hello_world';
+import {searchForSchema} from './metadata_mojo';
 import {saveDataToTrac, renderTable} from './using_data';
 import {loadFromDisk} from './util';
 
