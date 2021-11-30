@@ -17,7 +17,7 @@
 import {trac} from 'trac-web-api';
 
 import {searchForSchema} from './hello_world';
-import {saveDataToTrac} from './using_data';
+import {saveDataToTrac, renderTable} from './using_data';
 import {loadFromDisk} from './util';
 
 import * as arrow from 'apache-arrow';
@@ -41,51 +41,10 @@ function loadArrowData(dataId) {
     return dataApi.readSmallDataset(request).then(response => {
 
         // Create an Arrow table directly from the binary content of the response
-        return arrow.Table.from([response.content]);
+        const table = arrow.Table.from([response.content]);
+
+        return {schema: response.schema, data: table};
     })
-}
-
-function displayTable(table) {
-
-    console.log();
-    console.log("Field names: ", table.schema.fields.map(f => f.name));
-    console.log("Field types: ", table.schema.fields.map(f => f.type.toString()));
-    console.log("First row: ", table.get(0).toString());
-    console.log("First column: ", table.getColumn("field_one").toArray());
-    console.log("Second column: ", table.getColumn("field_two").toArray());
-    console.log();
-
-    const accessor = (row, col) => table.getColumnAt(col).get(row);
-
-    const CELL_WIDTH = 10;
-
-    function printCell(col, cellValue) {
-
-        process.stdout.write(`${cellValue}`.padEnd(CELL_WIDTH))
-
-        if (col < table.numCols - 1)
-            process.stdout.write("| ")
-        else
-            process.stdout.write("\n")
-    }
-
-    for (let row = 0; row < table.count(); row++) {
-        for (let col = 0; col < table.numCols; col++) {
-            const cellValue = accessor(row, col);
-            printCell(col, cellValue);
-        }
-    }
-}
-
-function filterTable(table) {
-
-    const filter1 = arrow.predicate.col("field_one").eq("hello");
-    const filter2 = arrow.predicate.col("field_two").gt(0.5);
-    const filter = arrow.predicate.and(filter1, filter2);
-
-    const df = new arrow.DataFrame(table);
-
-    return df.filter(filter);
 }
 
 export async function main() {
@@ -96,9 +55,21 @@ export async function main() {
     const csvData = await loadFromDisk("data/customer_data.csv");
     const dataId = await saveDataToTrac(schemaId, csvData);
 
-    const arrowTable = await loadArrowData(dataId);
-    displayTable(arrowTable);
+    const {schema, data} = await loadArrowData(dataId);
 
-    const filtered = filterTable(arrowTable);
-    displayTable(filtered);
+    console.log("Displaying arrow data")
+
+    const accessor = (table, row, col) => table.getColumnAt(col).get(row);
+
+    renderTable(schema, data, accessor);
+
+    console.log("Displaying JavaScript data")
+
+    const jsData = data.toArray();
+    const jsAccessor = (table, row, col) => {
+        const fieldName = schema.table.fields[col].fieldName;
+        return table[row][fieldName];
+    }
+
+    renderTable(schema, jsData, jsAccessor);
 }

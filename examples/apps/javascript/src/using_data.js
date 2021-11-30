@@ -52,6 +52,7 @@ export function saveDataToTrac(schemaId, csvData) {
 
 export function loadDataFromTrac(dataId) {
 
+    // Ask for the dataset in JSON format
     const request = trac.api.DataReadRequest.create({
 
         tenant: "ACME_CORP",
@@ -62,14 +63,48 @@ export function loadDataFromTrac(dataId) {
 
     return dataApi.readSmallDataset(request).then(response => {
 
-        const nFields = response.schema.table.fields.length;
-
-        console.log(`Retrieved dataset ${dataId.objectId} version ${dataId.objectVersion}`);
-        console.log(`Schema contains ${nFields} fields`);
-
+        // Decode JSON into an array of Objects
         const text = new TextDecoder().decode(response.content);
-        return JSON.parse(text);
-    })
+        const data = JSON.parse(text);
+
+        return {schema: response.schema, data: data};
+    });
+}
+
+
+export function renderTable(schema, data, accessor) {
+
+    const CELL_WIDTH = 10;
+
+    const nCols = schema.table.fields.length;
+
+    function printCell(col, cellValue) {
+
+        process.stdout.write(`${cellValue}`.padEnd(CELL_WIDTH))
+
+        if (col < nCols - 1)
+            process.stdout.write(" | ")
+        else
+            process.stdout.write("\n")
+    }
+
+    process.stdout.write("\n");
+
+    for (let col = 0; col < nCols; col++)
+        printCell(col, schema.table.fields[col].fieldName)
+
+    for (let col = 0; col < nCols; col++)
+        printCell(col, "".padStart(CELL_WIDTH, "-"))
+
+    for (let row = 0; row < data.length; row++) {
+        for (let col = 0; col < nCols; col++) {
+
+            const cellValue = accessor(data, row, col);
+            printCell(col, cellValue);
+        }
+    }
+
+    process.stdout.write("\n");
 }
 
 
@@ -81,7 +116,12 @@ export async function main() {
     const csvData = await loadFromDisk("data/customer_data.csv");
     const dataId = await saveDataToTrac(schemaId, csvData);
 
-    const dataset = await loadDataFromTrac(dataId);
+    const {schema, data} = await loadDataFromTrac(dataId);
 
-    console.log(JSON.stringify(dataset, null, 2));
+    const accessor = (table, row, col) => {
+        const fieldName = schema.table.fields[col].fieldName;
+        return table[row][fieldName];
+    }
+
+    renderTable(schema, data, accessor);
 }
