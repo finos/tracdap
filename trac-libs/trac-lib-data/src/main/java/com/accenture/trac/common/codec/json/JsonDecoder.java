@@ -23,6 +23,7 @@ import com.accenture.trac.common.exception.EDataCorruption;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.SchemaDefinition;
 
+import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonToken;
@@ -98,7 +99,7 @@ public class JsonDecoder extends BaseDecoder {
             while ((token = parser.nextToken()) != JsonToken.NOT_AVAILABLE)
                 parser.acceptToken(token);
         }
-        catch (JsonParseException e) {
+        catch (JacksonException e) {
 
             // This exception is a "well-behaved" parse failure, parse location and message should be meaningful
 
