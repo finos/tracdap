@@ -145,10 +145,49 @@ do a dictionary lookup.
 Saving data from memory
 =======================
 
-TODO
+To continue the example, let's suppose the data has been displayed on screen, the user has edited
+some values and now wants to save their changes as a new version of the dataset. The modified data
+exists in memory as an array of JavaScript objects, so we need to encoded it before it can be sent
+back. To encode the data using JSON:
+
+.. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
+    :language: JavaScript
+    :lines: 135 - 139
+    :linenos:
+    :lineno-start: 135
+
+Now we need to create a :class:`DataWriteRequest<trac.api.DataWriteRequest>` for the update:
+
+.. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
+    :language: JavaScript
+    :lines: 141 - 158
+    :linenos:
+    :lineno-start: 141
+
+Since we are updating an existing dataset, the ``priorVersion`` field must be used to specify the original
+object ID. This works the same way as for metadata updates: only the latest version of a dataset can be updated.
+So, if we are trying to update version 1 to create version 2, our update will fail if someone has already created
+version 2 before us. In this case, the user would have to reload the latest version and try the update again.
+
+The ``schemaId``, ``format`` and ``content`` fields are specified as normal, in this example the schema has not
+changed, so the schema ID will be the same. (Schema changes are restricted between dataset versions to ensure
+each version is backwards-compatible with the versions that came before).
+
+Since this is an update operation, the existing tags will be carried forward onto the new version of the object.
+We only need to specify tags we want to change in the ``tagUpdates`` field. In this example we add one new
+tag to describe the change.
+
+To send the update to the platform, we use :meth:`updateSmallDataset()<trac.api.TracDataApi.readSmallDataset>`:
+
+.. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
+    :language: JavaScript
+    :lines: 160 - 166
+    :linenos:
+    :lineno-start: 160
 
 
-An example data journey
-=======================
+Again we are assuming that the content of the dataset can be sent as single blob in one message.
+(An equivalent client-streaming method, :meth:`updateDataset()<trac.api.TracDataApi.createDataset>`,
+is available in the platform API but not currently supported over gRPC-Web).
 
-TODO
+The method returns the ID for the updated version of the dataset as a :class:`TagHeader<trac.metadata.TagHeader>`.

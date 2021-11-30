@@ -118,6 +118,53 @@ export function renderTable(schema, data, accessor) {
     process.stdout.write("\n");
 }
 
+export function updateData(originalData) {
+
+    const originalRecord = originalData[0];
+    const originalLimit = originalRecord["credit_limit"];
+
+    const newLimit = parseFloat(originalLimit) + 2000.00;
+    const newRecord = {...originalRecord, credit_limit: newLimit};
+
+    const newData = [...originalData];
+    newData[0] = newRecord;
+
+    return newData;
+}
+
+function saveDataFromMemory(schemaId, originalDataId, newData) {
+
+    // Encode array of JavaScript objects as JSON
+    const json = JSON.stringify(newData);
+    const bytes = new TextEncoder().encode(json);
+
+    const request = trac.api.DataWriteRequest.create({
+
+        tenant: "ACME_CORP",
+
+        // The original version that is being updated
+        priorVersion: originalDataId,
+
+        // Schema, format and content are provided as normal
+        schemaId: schemaId,
+        format: "text/json",
+        content: bytes,
+
+        // Existing tags are retained during updates
+        // Use tag updates if tags need to be added, removed or altered
+        tagUpdates: [
+            { attrName: "change_description", value: { stringValue: "Increase limit for customer A36456" } }
+        ]
+    });
+
+    return dataApi.updateSmallDataset(request).then(dataId => {
+
+        console.log(`Updated dataset ${dataId.objectId} to version ${dataId.objectVersion}`);
+
+        return dataId;
+    });
+}
+
 export async function main() {
 
     console.log("Looking for a schema to use...")
@@ -125,8 +172,11 @@ export async function main() {
     const csvData = await loadFromDisk("data/customer_data.csv");
 
     const dataId = await saveDataToTrac(schemaId, csvData);
-
     const {schema, data} = await loadDataFromTrac(dataId);
 
     displayTable(schema, data);
+
+    const newData = updateData(data);
+
+    await saveDataFromMemory(schemaId, dataId, newData);
 }
