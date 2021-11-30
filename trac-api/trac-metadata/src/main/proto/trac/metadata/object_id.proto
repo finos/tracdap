@@ -130,7 +130,7 @@ message TagSelector {
    */
   string objectId = 2;
 
-  oneof objectVersionCriteria {
+  oneof objectCriteria {
 
     /**
      * Select the latest version of the object (the version that is live now).
@@ -151,7 +151,7 @@ message TagSelector {
     DatetimeValue objectAsOf = 5;
   }
 
-  oneof tagVersionCriteria {
+  oneof tagCriteria {
 
     /**
      * Select the latest version of the tag (the version that is live now).

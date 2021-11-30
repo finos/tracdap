@@ -629,7 +629,7 @@ class JdbcReadBatchImpl {
 
             for (var i = 0; i < objectFk.length; i++) {
 
-                var criteria = selector[i].getObjectVersionCriteriaCase();
+                var criteria = selector[i].getObjectCriteriaCase();
 
                 stmt.clearParameters();
 
@@ -713,7 +713,7 @@ class JdbcReadBatchImpl {
 
             for (var i = 0; i < definitionFk.length; i++) {
 
-                var criteria = selector[i].getTagVersionCriteriaCase();
+                var criteria = selector[i].getTagCriteriaCase();
 
                 stmt.clearParameters();
 

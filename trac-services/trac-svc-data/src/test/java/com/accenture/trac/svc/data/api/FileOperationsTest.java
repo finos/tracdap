@@ -29,7 +29,6 @@ import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -1413,7 +1412,7 @@ public class FileOperationsTest extends DataApiTestBase {
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
-                .clearObjectVersionCriteria())
+                .clearObjectCriteria())
                 .build();
 
         var readFile = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
@@ -1518,7 +1517,7 @@ public class FileOperationsTest extends DataApiTestBase {
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
-                .clearTagVersionCriteria())
+                .clearTagCriteria())
                 .build();
 
         var readFile = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, readRequest, execContext);
