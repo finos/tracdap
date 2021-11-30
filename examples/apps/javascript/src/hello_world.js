@@ -44,7 +44,7 @@ export function createSchema() {
         }
     });
 
-    // Build a request object, to save the schema with some informational tags
+    // Set up a metadata write request, to save the schema with some informational tags
     const request = trac.api.MetadataWriteRequest.create({
 
         tenant: "ACME_CORP",

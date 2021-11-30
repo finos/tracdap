@@ -116,7 +116,12 @@ package available on NPM:
 Creating and saving objects
 ---------------------------
 
-Create a definition object
+Suppose we want to create a schema, that we can use to describe some customer account data.
+(It is not always necessary to create schemas in this way, but we'll do it for an example).
+
+First we need to build the :class:`SchemaDefinition<trac.metadata.SchemaDefinition>` object.
+A ``.create()`` method is available for every TRAC metadata object, which provides
+auto-complete and type hints in IDEs that support it.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
@@ -124,7 +129,13 @@ Create a definition object
     :linenos:
     :lineno-start: 27
 
-Create a MetadataWriteRequest
+Here, enums are set using the constants defined in the API package. All enum types are
+available in the trac namespace, so ``trac.SchemaType`` is shorthand for
+``trac.metadata.SchemaType`` and so on. The basic types in the TRAC type system are also
+available, so ``trac.STRING`` is a shorthand for ``trac.metadata.BasicType.STRING``.
+
+Now we want to save the schema into the TRAC metadata store.
+To do that, we use a :class:`MetadataWriteRequest<trac.api.MetadataWriteRequest>`.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
@@ -132,13 +143,45 @@ Create a MetadataWriteRequest
     :linenos:
     :lineno-start: 47
 
-Call the metadata API
+There are several things to call out here! TRAC is a multi-tenant platform and every API
+request includes a tenant code. By default resources are separated between tenants, so
+tenant A cannot access a resource created in tenant B. For this example we have a single
+tenant called "ACME_CORP".
+
+Objects are the basic resources held in the platform, each object is described by an
+:class:`ObjectDefinition<trac.metadata.ObjectDefinition>` which can hold one of a number
+of types of object. Here we are creating a SCHEMA object, we build the object definition
+using the schema created earlier.
+
+We will want to tag our new schema with some information attributes. These attributes
+describe the schema object and will allow us to find it later using metadata searches.
+Tags can be applied the when objects are created using a list of
+:class:`TagUpdate<trac.metadata.TagUpdate>` instructions. Here we are applying three tags
+to the new object, two are categorical tags and one is descriptive.
+
+The last step is to call :meth:`createObject()<trac.api.TracMetadataApi.createObject>`,
+to send our request to the TRAC metadata service.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
     :lines: 65 - 72
     :linenos:
     :lineno-start: 16
+
+The :meth:`createObject()<trac.api.TracMetadataApi.createObject>` method returns the
+:class:`TagHeader<trac.metadata.TagHeader>` of the newly created object. Headers describe
+object type, ID, version and timestamps.
+
+All the API methods in the web API package are available in both future and callback form.
+This example uses the future form, which allows chaining of ``.then()``, ``.catch()`` and
+``.finally()`` blocks. The equivalent call using a callback would be:
+
+.. code-block:: JavaScript
+
+    metaApi.createObject(request, (err, header) => {
+
+        // Handle error or response
+    });
 
 
 Loading objects
