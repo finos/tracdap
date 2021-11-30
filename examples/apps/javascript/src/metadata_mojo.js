@@ -53,7 +53,7 @@ export function findFirst(searchRequest) {
         if (nResults === 0)
             throw new Error("No matching search results");
 
-        console.log(`Got ${nResults} search result(s), picking the first one`)
+        console.log(`Got ${nResults} search result(s), picking the first one`);
 
         return response.searchResult[0].header;
     });
@@ -85,22 +85,23 @@ export function logicalSearch() {
         }
     });
 
-    const searchRequest = trac.api.MetadataSearchRequest.create({
-
-        tenant: "ACME_CORP",
-        searchParams: {
-
-            objectType: trac.ObjectType.SCHEMA,
-
-            search: { logical: {
-
+    const logicalSearch = trac.metadata.SearchExpression.create({
+        logical: {
             operator: trac.LogicalOperator.AND,
             expr: [
                 schemaTypeCriteria,
                 businessDivisionCriteria
             ]
+        }
+    });
 
-        }}}
+    const searchRequest = trac.api.MetadataSearchRequest.create({
+
+        tenant: "ACME_CORP",
+        searchParams: {
+            objectType: trac.ObjectType.SCHEMA,
+            search: logicalSearch
+        }
     });
 
     return findFirst(searchRequest);
@@ -117,4 +118,10 @@ export async function main() {
     const schemaTag = await loadTag(schemaId);
 
     console.log(JSON.stringify(schemaTag, null, 2));
+
+    console.log("Running logical search expression...")
+
+    const schemaId2 = await logicalSearch();
+
+    console.log(`Logical search found schema ID ${schemaId2.objectId} version ${schemaId2.objectVersion}`);
 }

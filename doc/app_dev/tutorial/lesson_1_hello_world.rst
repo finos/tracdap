@@ -189,6 +189,8 @@ This example uses the future form, which allows chaining of ``.then()``, ``.catc
     });
 
 
+.. _app_hello_loading_objects:
+
 Loading objects
 ---------------
 
