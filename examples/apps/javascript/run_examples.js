@@ -22,7 +22,7 @@ global.XMLHttpRequest = xhr2.XMLHttpRequest;
 
 const ALL_EXAMPLES = [
     "hello_world",
-    "metadata_magic",
+    "metadata_mojo",
     "using_data",
     "arrow"
 ]
