@@ -68,7 +68,7 @@ export function createSchema() {
         console.log("New schema created: " + JSON.stringify(header, null, 2));
 
         return header;
-    })
+    });
 }
 
 export function loadTag(tagHeader) {
@@ -84,11 +84,11 @@ export function loadTag(tagHeader) {
 
 export async function main() {
 
-    console.log("Creating a schema...")
+    console.log("Creating a schema...");
 
     const schemaId = await createSchema();
 
-    console.log("Loading the schema...")
+    console.log("Loading the schema...");
 
     const schemaTag = await loadTag(schemaId);
 

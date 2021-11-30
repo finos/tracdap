@@ -79,7 +79,7 @@ TRAC API class. You can use trac.setup to create an RPC connector that works in 
 
     // Use trac.setup to create an RPC connector pointed at your TRAC server
     // The browser RPC connector will send all requests to the page origin server
-    const metaApiRpcImpl = trac.setup.rpcImplForBrowser(trac.api.TracMetadataApi)
+    const metaApiRpcImpl = trac.setup.rpcImplForBrowser(trac.api.TracMetadataApi);
 
 This assumes you have set up routing through the TRAC gateway as described in the previous section.
 
@@ -153,11 +153,11 @@ Objects are the basic resources held in the platform, each object is described b
 of types of object. Here we are creating a SCHEMA object, we build the object definition
 using the schema created earlier.
 
-We will want to tag our new schema with some information attributes. These attributes
+We also want to tag our new schema with some informational attributes. These attributes
 describe the schema object and will allow us to find it later using metadata searches.
-Tags can be applied the when objects are created using a list of
-:class:`TagUpdate<trac.metadata.TagUpdate>` instructions. Here we are applying three tags
-to the new object, two are categorical tags and one is descriptive.
+Tags can be applied using :class:`TagUpdate<trac.metadata.TagUpdate>` instructions when
+objects are created. Here we are applying three tags to the new object, two are categorical
+tags and one is descriptive.
 
 The last step is to call :meth:`createObject()<trac.api.TracMetadataApi.createObject>`,
 to send our request to the TRAC metadata service.
@@ -187,18 +187,49 @@ This example uses the future form, which allows chaining of ``.then()``, ``.catc
 Loading objects
 ---------------
 
+Now the schema has been saved into TRAC, at some point we will want to retrieve it.
+We can do this using a :class:`MetadataReadRequest<trac.api.MetadataReadRequest>`.
+
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
-    :lines: 74 - 83
+    :lines: 74 - 80
     :linenos:
     :lineno-start: 74
+
+All that is needed is the tenant code and a :class:`TagSelector<trac.metadata.TagSelector>`.
+Tag selectors allow different versions of an object or tag to be selected according to various
+criteria. In this example we already have the tag header, which tells us the exact version that
+should be loaded. The web API package allows headers to be used as selectors, doing this will
+create a selector for the version identified in the header.
+
+Finally we use :meth:`readObject()<trac.api.TracMetadataApi.readObject>` to send the read request.
+
+.. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
+    :language: JavaScript
+    :lines: 82
+    :linenos:
+    :lineno-start: 82
+
+The :meth:`readObject()<trac.api.TracMetadataApi.readObject>`
+method returns a :class:`Tag<trac.metadata.Tag>`,
+which includes the :class:`TagHeader<trac.metadata.TagHeader>`
+and all the tag attributes, as well as the
+:class:`ObjectDefinition<trac.metadata.ObjectDefinition>`.
+Since we used the future form of the call, it will return a promise for the tag.
 
 
 Putting it all together
 -----------------------
+
+In a real-world situation these calls would be built into the framework of an application.
+The example scripts all include ``main()`` functions so they can be tried out easily from
+a console or IDE. In this example we just create the schema and then load it back from TRAC.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
     :lines: 85 -
     :linenos:
     :lineno-start: 85
+
+The last call to ``JSON.stringify()`` will provide a human-readable representation of the
+TRAC object, that can be useful for debugging.
