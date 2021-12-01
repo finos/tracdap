@@ -54,7 +54,7 @@ jobs:
       - name: NVD cache
         uses: actions/cache@v2
         with:
-          key: nvd-dependency-check
+          key: compliance-cache
           path: ./build/compliance-cache
 
       - name: Dependency vulnerability scan
@@ -69,7 +69,7 @@ jobs:
         if: always()
         with:
           name: compliance-reports
-          path: build/reports/**
+          path: build/compliance/**
 
   web_api_compliance:
 
@@ -109,3 +109,11 @@ jobs:
           mkdir -p build/compliance
           cd trac-api/packages/web
           npm run owasp
+
+      # Always save the reports - they are especially needed when the checks have failed!
+      - name: Store compliance reports
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: compliance-reports
+          path: build/compliance/**
