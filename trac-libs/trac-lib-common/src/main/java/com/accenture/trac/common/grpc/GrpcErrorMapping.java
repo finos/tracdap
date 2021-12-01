@@ -118,7 +118,7 @@ public class GrpcErrorMapping {
         return null;
     }
 
-    static final List<Map.Entry<Class<? extends Throwable>, Status.Code>> ERROR_MAPPING = List.of(
+    private static final List<Map.Entry<Class<? extends Throwable>, Status.Code>> ERROR_MAPPING = List.of(
 
             Map.entry(EAuthorization.class, Status.Code.PERMISSION_DENIED),
 
