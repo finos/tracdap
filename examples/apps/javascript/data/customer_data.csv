@@ -1,0 +1,11 @@
+customer_id, customer_type, customer_name, account_open_date, credit_limit
+A36456, PERSON, "John Longhorn", 1995-03-24, 5000.00
+A45845, PERSON, "Henry Richard Arthwaite", 1982-07-15, 5000.00
+C47834, COMPANY, "Longhorn & Arthwaite Ltd.", 1996-05-22, 20000.00
+A53872, PERSON, "Slartibartfast", 1981-03-18, 10000.00
+A48642, PERSON, "James Tiberius Kirk", 1966-09-08, 5000.00
+C29487, COMPANY, "ACME Boomers & Bangers Plc.", 1990-04-08, 50000.00
+G23964, GOVT, "HM Dept. of silly walks, UK", 1969-10-05, 2000.00
+A34523, PERSON, "Lord Voldemort", 1997-06-26, 10000.00
+A56874, PERSON, "Homer Simpson", 1987-04-19, 500.00
+C34631, COMPANY, "Tyrell Corp.", 1982-09-09, 15000.00

@@ -3,19 +3,15 @@
 App Development
 ###############
 
+.. note::
+
+    The `TRAC Web API Package <https://www.npmjs.com/package/trac-web-api/>`_
+    is available to download and install from `npmjs.com <https://www.npmjs.com/>`_.
+
 
 .. toctree::
-    :hidden:
+    :maxdepth: 4
 
-    ./web_api_package
+    tutorial/index
     ./rest_examples
     Platform API Listing </autoapi/trac/api/index>
-
-
-If you are building web apps for the TRAC platform, check out the :doc:`./web_api_package`.
-
-There is a full :doc:`API listing </autoapi/trac/api/index>` available for the platform APIs.
-
-If you are working with REST clients, check out the :doc:`./rest_examples`.
-
-More resources for app development on TRAC will be coming soon!

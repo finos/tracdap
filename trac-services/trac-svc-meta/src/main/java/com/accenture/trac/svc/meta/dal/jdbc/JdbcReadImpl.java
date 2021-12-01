@@ -73,15 +73,15 @@ class JdbcReadImpl {
             long objectPk, TagSelector selector)
             throws SQLException {
 
-        if (selector.getObjectVersionCriteriaCase() == TagSelector.ObjectVersionCriteriaCase.OBJECTVERSION)
+        if (selector.getObjectCriteriaCase() == TagSelector.ObjectCriteriaCase.OBJECTVERSION)
             return readDefinitionByVersion(conn, tenantId, objectPk, selector.getObjectVersion());
 
-        if (selector.getObjectVersionCriteriaCase() == TagSelector.ObjectVersionCriteriaCase.OBJECTASOF) {
+        if (selector.getObjectCriteriaCase() == TagSelector.ObjectCriteriaCase.OBJECTASOF) {
             var objectAsOf = MetadataCodec.decodeDatetime(selector.getObjectAsOf()).toInstant();
             return readDefinitionByAsOf(conn, tenantId, objectPk, objectAsOf);
         }
 
-        if (selector.getObjectVersionCriteriaCase() == TagSelector.ObjectVersionCriteriaCase.LATESTOBJECT)
+        if (selector.getObjectCriteriaCase() == TagSelector.ObjectCriteriaCase.LATESTOBJECT)
             return readDefinitionByLatest(conn, tenantId, objectPk);
 
         throw new EValidationGap("Object version criteria not set in selector");
@@ -192,15 +192,15 @@ class JdbcReadImpl {
             long definitionPk, TagSelector selector)
             throws SQLException {
 
-        if (selector.getTagVersionCriteriaCase() == TagSelector.TagVersionCriteriaCase.TAGVERSION)
+        if (selector.getTagCriteriaCase() == TagSelector.TagCriteriaCase.TAGVERSION)
             return readTagRecordByVersion(conn, tenantId, definitionPk, selector.getTagVersion());
 
-        if (selector.getTagVersionCriteriaCase() == TagSelector.TagVersionCriteriaCase.TAGASOF) {
+        if (selector.getTagCriteriaCase() == TagSelector.TagCriteriaCase.TAGASOF) {
             var tagAsOf = MetadataCodec.decodeDatetime(selector.getTagAsOf()).toInstant();
             return readTagRecordByAsOf(conn, tenantId, definitionPk, tagAsOf);
         }
 
-        if (selector.getTagVersionCriteriaCase() == TagSelector.TagVersionCriteriaCase.LATESTTAG)
+        if (selector.getTagCriteriaCase() == TagSelector.TagCriteriaCase.LATESTTAG)
             return readTagRecordByLatest(conn, tenantId, definitionPk);
 
         throw new EValidationGap("Tag version criteria not set in selector");

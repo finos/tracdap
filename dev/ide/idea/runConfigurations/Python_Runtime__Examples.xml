@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Python Runtime: Examples" type="tests" factoryName="Unittests">
-    <module name="python-model-runtime" />
+    <module name="trac-runtime-py" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />

@@ -163,11 +163,10 @@ jobs:
         cd trac-api/packages/web
         npm install
 
-    - name: PBJS code generation
+    - name: Build API
       run: |
         cd trac-api/packages/web
-        npm run pbjs
-        npm run pbts
+        npm run buildApi
 
 
   documentation:

@@ -2162,7 +2162,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
-                .clearObjectVersionCriteria())
+                .clearObjectCriteria())
                 .build();
 
         var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);
@@ -2267,7 +2267,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
-                .clearTagVersionCriteria())
+                .clearTagCriteria())
                 .build();
 
         var readDataset = DataApiTestHelpers.serverStreamingDiscard(dataClient::readDataset, readRequest, execContext);

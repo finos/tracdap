@@ -24,6 +24,7 @@ import com.accenture.trac.common.exception.EDataCorruption;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.SchemaDefinition;
 
+import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.dataformat.csv.CsvFactory;
@@ -163,9 +164,8 @@ public class CsvDecoder extends BaseDecoder {
                 dispatchBatch(root);
             }
         }
-        catch (JsonParseException e) {
+        catch (JacksonException e) {
 
-            // In Jackson JSON is the base class, JSON error is the parent of CSV error
             // This exception is a "well-behaved" parse failure, parse location and message should be meaningful
 
             var errorMessage = String.format("CSV decoding failed on line %d: %s",

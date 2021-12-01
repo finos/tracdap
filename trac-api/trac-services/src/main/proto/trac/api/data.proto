@@ -247,11 +247,11 @@ service TracDataApi {
   rpc updateSmallDataset (DataWriteRequest) returns (metadata.TagHeader);
 
   /**
-   * Read the contents of an existing dataset
+   * Read an existing dataset, returning the content as a data stream
    *
-   * This method reads the contents of an existing dataset, returning both the schema
-   * and the content in the requested format. Data can be requested in any format
-   * supported by the platform.
+   * This method reads the contents of an existing dataset and returns it in the
+   * requested format, along with a copy of the data schema. Data can be requested
+   * in any format supported by the platform.
    *
    * The request uses a regular TagSelector to indicate which dataset and version to read.
    * The format parameter is a mime type and must be a supported data format.
@@ -268,10 +268,29 @@ service TracDataApi {
    */
   rpc readDataset (DataReadRequest) returns (stream DataReadResponse);
 
+  /**
+   * Read an existing dataset, returning the content as a single blob
+   *
+   * This method reads the contents of an existing dataset and returns it in the
+   * requested format, along with a copy of the data schema. Data can be requested
+   * in any format supported by the platform.
+   *
+   * The request uses a regular TagSelector to indicate which dataset and version to read.
+   * The format parameter is a mime type and must be a supported data format.
+   *
+   * This is a unary call, both the schema and the content of the dataset are returned
+   * in a single response message. The content of the dataset will be encoded in the
+   * requested format. Errors may occur if the content of the dataset is too large to
+   * fit in a single message frame.
+   *
+   * Error conditions include: Invalid request, unknown tenant, object not found, format
+   * not supported. Storage errors may also be reported if there is a problem communicating
+   * with the underlying storage technology.
+   */
   rpc readSmallDataset (DataReadRequest) returns (DataReadResponse);
 
   /**
-   * Upload a new file into TRAC
+   * Upload a new file into TRAC, sending the content as a data stream
    *
    * Calling this method will create a new FILE object in the metadata store.
    * Tag updates can be supplied when creating a FILE, they will be passed on to the
@@ -303,10 +322,34 @@ service TracDataApi {
    */
   rpc createFile (stream FileWriteRequest) returns (metadata.TagHeader);
 
+  /**
+   * Upload a new file into TRAC, sending the content as a single blob
+   *
+   * Calling this method will create a new FILE object in the metadata store.
+   * Tag updates can be supplied when creating a FILE, they will be passed on to the
+   * metadata service. The semantics for tag updates are identical to the createObject()
+   * method in TracMetadataApi.
+   *
+   * This is a unary method. The request must contain all the relevant fields and the
+   * entire content of the file in a single message. Errors may occur if the file is
+   * too large to fit in a single message frame.
+   *
+   * Clients may specify the size of the file being created. When a size is supplied, TRAC
+   * will check the size against the number of bytes stored. If the stored file size does not
+   * match the supplied value, the error will be reported with an error status of DATA_LOSS.
+   * When no size is supplied the check cannot be performed.
+   *
+   * The method returns the header of the newly created FILE object. Error conditions
+   * include: Invalid request, unknown tenant and validation failure, file too large and
+   * data loss (if the number of bytes stored does not match the number specified in the
+   * request). Storage errors may also be reported if there is a problem communicating with
+   * the underlying storage technology. In the event of an error, TRAC will do its best to
+   * clean up any partially-written data in the storage layer.
+   */
   rpc createSmallFile (FileWriteRequest) returns (metadata.TagHeader);
 
   /**
-   * Upload a new version of an existing file into TRAC
+   * Upload a new version of an existing file into TRAC, sending the content as a data stream
    *
    * Calling this method will update the relevant FILE object in the metadata store.
    * The latest version of the FILE must be supplied in the priorVersion field
@@ -343,10 +386,40 @@ service TracDataApi {
    */
   rpc updateFile (stream FileWriteRequest) returns (metadata.TagHeader);
 
+  /**
+   * Upload a new version of an existing file into TRAC, sending the content as a single blob
+   *
+   * Calling this method will update the relevant FILE object in the metadata store.
+   * The latest version of the FILE must be supplied in the priorVersion field
+   * of the request. For example if the latest version of a FILE object is version 2,
+   * the priorVersion field should refer to version 2 and TRAC will create version 3
+   * as a result of the update call. The metadata and content of prior versions
+   * remain unaltered. The file name may be changed between versions, but the extension
+   * and mime type must stay the same. Tag updates can be supplied when updating a FILE,
+   * they will be passed on to the metadata service> The semantics for tag updates are
+   * identical to the updateObject() method in TracMetadataApi.
+   *
+   * This is a unary call. The request must contain all the relevant fields and the
+   * entire content of the file in a single message. Errors may occur if the file is
+   * too large to fit in a single message frame.
+   *
+   * Clients may specify the size of the file being updated. When a size is supplied, TRAC
+   * will check the size against the number of bytes stored. If the stored file size does not
+   * match the supplied value, the error will be reported with an error status of DATA_LOSS.
+   * When no size is supplied the check cannot be performed.
+   *
+   * The call returns the header for the new version of the FILE object. Error conditions
+   * include: Invalid request, unknown tenant, validation failure, failed preconditions
+   * (e.g. extension and mime type changes) file too large and data loss (if the number of
+   * bytes stored does not match the number specified in the request). Storage errors may also
+   * be reported if there is a problem communicating with the underlying storage technology.
+   * In the event of an error, TRAC will do its best to clean up any partially-written data in
+   * the storage layer.
+   */
   rpc updateSmallFile (FileWriteRequest) returns (metadata.TagHeader);
 
   /**
-   * Download a file that has been stored in TRAC
+   * Download a file that has been stored in TRAC and return it as a data stream
    *
    * The request uses a regular TagSelector to indicate which file to read. The
    * semantics of the request are identical to the readObject() method in
@@ -369,6 +442,22 @@ service TracDataApi {
    */
   rpc readFile (FileReadRequest) returns (stream FileReadResponse);
 
+  /**
+   * Download a file that has been stored in TRAC and return it as a single blob
+   *
+   * The request uses a regular TagSelector to indicate which file to read. The
+   * semantics of the request are identical to the readObject() method in
+   * TracMetadataApi.
+   *
+   * This is a unary method, the response will contain the file definition and the
+   * whole content of the file in a single message. Errors may occur if the file is
+   * too large to fit in a single message frame.
+   *
+   * Error conditions include: Invalid request, unknown tenant, unknown object ID,
+   * object type does not match ID, unknown object version, unknown tag version,
+   * file too large. Storage errors may also be reported if there is a problem
+   * communicating with the underlying storage technology.
+   */
   rpc readSmallFile (FileReadRequest) returns (FileReadResponse);
 
 }
