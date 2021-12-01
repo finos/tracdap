@@ -82,6 +82,9 @@ public class GrpcErrorMapping {
             else {
 
                 // For anything unrecognized, fall back to an internal error
+                // Public errors should normally be reported to the client/user, so log this as a warning
+
+                log.warn("No gRPC error code mapping is available for the error {}", error.getClass().getSimpleName());
 
                 return Status.fromCode(Status.Code.INTERNAL)
                         .withDescription(Status.INTERNAL.getDescription())
