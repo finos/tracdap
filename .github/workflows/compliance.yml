@@ -8,7 +8,7 @@ on:
   # Re-run compliance jobs in main, to make sure there are no issues from the merge
   push:
     branches:
-      - *  # run compliance on every push during testing
+      - '**'  # run compliance on every push during testing
 
   # Use the release:publish event to generate compliance reports for releases
   # This lines up with the packaging workflow, so reports will be published when packages are published
