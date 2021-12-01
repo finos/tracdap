@@ -16,7 +16,7 @@
 
 package com.accenture.trac.common.exception;
 
-public class EPluginNotAvailable extends ETracInternal {
+public class EPluginNotAvailable extends ETracPublic {
 
     public EPluginNotAvailable(String message, Throwable cause) {
         super(message, cause);

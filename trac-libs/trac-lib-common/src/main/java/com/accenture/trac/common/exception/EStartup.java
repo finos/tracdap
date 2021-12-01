@@ -27,7 +27,7 @@ package com.accenture.trac.common.exception;
  * Generally EStartup will cause the main thread to exit with a stack trace. Any
  * resources that are already allocated should be closed.
  */
-public class EStartup extends ETrac {
+public class EStartup extends ETracPublic {
 
     private final int exitCode;
     private final boolean quiet;
