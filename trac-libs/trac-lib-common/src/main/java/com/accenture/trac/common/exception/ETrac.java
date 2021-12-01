@@ -16,7 +16,7 @@
 
 package com.accenture.trac.common.exception;
 
-public class ETrac extends RuntimeException {
+public abstract class ETrac extends RuntimeException {
 
     public ETrac(String message, Throwable cause) {
         super(message, cause);

@@ -18,6 +18,7 @@ package com.accenture.trac.deploy.metadb;
 
 import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.config.ConfigManager;
+import com.accenture.trac.common.exception.ETracPublic;
 import com.accenture.trac.common.startup.StandardArgs;
 import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.exception.EStartup;
@@ -150,7 +151,7 @@ public class DeployMetaDB {
         }
         catch (SQLException e) {
 
-            throw new ETrac("Failed to create tenant: " + e.getMessage(), e);
+            throw new ETracPublic("Failed to create tenant: " + e.getMessage(), e);
         }
 
     }
