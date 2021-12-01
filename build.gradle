@@ -40,21 +40,23 @@ subprojects {
 
 dependencyCheck {
 
-    data {
-        directory = rootProject.buildDir.path + '/compliance-cache/nvd/'
-    }
+    outputDirectory = "$projectDir/build/compliance/platform-owasp"
 
     suppressionFiles = ["$projectDir/dev/compliance/owasp-false-positives.xml"]
-
-    outputDirectory = "$projectDir/build/compliance/platform-owasp"
 
     // CVSS score < 4 is "low severity" according to NIST
     // https://nvd.nist.gov/vuln-metrics/cvss
 
     failBuildOnCVSS = 4
+
+    data {
+        directory = rootProject.buildDir.path + '/compliance-cache/nvd/'
+    }
 }
 
 licenseReport {
+
+    outputDir = "$projectDir/build/compliance/platform-licenses"
 
     allowedLicensesFile = new File("$projectDir/dev/compliance/permitted-licenses.json")
 
