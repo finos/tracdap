@@ -34,6 +34,6 @@
     "tracVersion:posix": "npm version `../../../dev/version.sh`",
     "buildApi": "node api_builder.js",
     "compliance-owasp": "owasp-dependency-check --project \"trac-web-api\" --failOnCVSS 4 --data ../../../build/compliance-cache/nvd --out ../../../build/compliance/web-api-owasp/",
-    "compliance-licenses": "license-checker-rseidelsohn --onlyAllow \"MIT; Apache-2.0; BSD; BSD-3-Clause; ISC; BSD-2-Clause; Unlicense\" --json --out ../../../build/compliance/web-api-licenses/license-report.json"
+    "compliance-licenses": "license-checker-rseidelsohn --onlyAllow \"MIT; Apache-2.0; BSD; BSD-3-Clause; ISC; BSD-2-Clause; Unlicense\" --excludePackages \"spdx-exceptions;spdx-license-ids\" --json --out ../../../build/compliance/web-api-licenses/license-report.json"
   }
 }
