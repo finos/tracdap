@@ -89,6 +89,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: trac-api/packages/web/package-lock.json
 
       # Use a cache to save downloading global compliance data on every build (e.g. NVD)
       # Compliance tasks will automatically look for updates and download deltas
