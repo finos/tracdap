@@ -1,7 +1,7 @@
 
-######################
-Lesson 1 - Hello World
-######################
+#######################
+Chapter 1 - Hello World
+#######################
 
 This lesson is based on the *hello_world.js* example, which can be found in the
 `TRAC GitHub Repository <https://github.com/Accenture/trac>`_

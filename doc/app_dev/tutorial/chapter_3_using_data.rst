@@ -1,7 +1,7 @@
 
-#####################
-Lesson 3 - Using Data
-#####################
+######################
+Chapter 3 - Using Data
+######################
 
 This lesson is based on the *using_data.js* example, which can be found in the
 `TRAC GitHub Repository <https://github.com/Accenture/trac>`_
