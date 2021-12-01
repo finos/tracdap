@@ -56,9 +56,9 @@ dependencyCheck {
 
 licenseReport {
 
-    allowedLicensesFile = new File("$projectDir/dev/licenses/permitted-licenses.json")
+    allowedLicensesFile = new File("$projectDir/dev/compliance/permitted-licenses.json")
 
     filters = [
             new LicenseBundleNormalizer(createDefaultTransformationRules: true),
-            new LicenseBundleNormalizer(bundlePath: "$projectDir/dev/licenses/license-normalization.json")]
+            new LicenseBundleNormalizer(bundlePath: "$projectDir/dev/compliance/license-normalization.json")]
 }
