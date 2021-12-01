@@ -57,10 +57,10 @@ jobs:
           key: compliance-cache-data
           path: ./build/compliance-cache
 
-      - name: Dependency vulnerability scan
+      - name: OWASP dependency check
         run: ./gradlew dependencyCheckAggregate
 
-      - name: Dependency license scan
+      - name: License check
         run: ./gradlew checkLicense
 
       # Always save the reports - they are especially needed when the checks have failed!
@@ -108,7 +108,12 @@ jobs:
         run: |
           mkdir -p build/compliance
           cd trac-api/packages/web
-          npm run owasp
+          npm run compliance-owasp
+
+      - name: License check
+        run: |
+          cd trac-api/packages/web
+          npm run compliance-licenses
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
