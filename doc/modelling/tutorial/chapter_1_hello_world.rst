@@ -1,7 +1,11 @@
 
-######################
-Lesson 1 - Hello World
-######################
+#######################
+Chapter 1 - Hello World
+#######################
+
+This tutorial is based on the *hello_world.py* example, which can be found in the
+`TRAC GitHub Repository <https://github.com/Accenture/trac>`_
+under *examples/models/python*.
 
 
 Requirements

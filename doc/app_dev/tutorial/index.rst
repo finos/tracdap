@@ -1,10 +1,10 @@
 
-##########################
-TRAC Applications Tutorial
-##########################
+################
+App Dev Tutorial
+################
 
 .. toctree::
 
-    ./lesson_1_hello_world
-    ./lesson_2_metadata_mojo
-    ./lesson_3_using_data
+    ./chapter_1_hello_world
+    ./chapter_2_metadata_mojo
+    ./chapter_3_using_data

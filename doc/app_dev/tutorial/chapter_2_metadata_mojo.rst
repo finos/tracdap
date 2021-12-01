@@ -1,9 +1,9 @@
 
-########################
-Lesson 2 - Metadata Mojo
-########################
+#########################
+Chapter 2 - Metadata Mojo
+#########################
 
-This lesson is based on the *metadata_mojo.js* example, which can be found in the
+This tutorial is based on the *metadata_mojo.js* example, which can be found in the
 `TRAC GitHub Repository <https://github.com/Accenture/trac>`_
 under *examples/apps/javascript*.
 
