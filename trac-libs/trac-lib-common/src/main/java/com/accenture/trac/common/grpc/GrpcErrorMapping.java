@@ -21,6 +21,8 @@ import com.accenture.trac.common.exception.*;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
@@ -28,6 +30,8 @@ import java.util.concurrent.CompletionException;
 
 
 public class GrpcErrorMapping {
+
+    private static final Logger log = LoggerFactory.getLogger(GrpcErrorMapping.class);
 
     public static StatusRuntimeException processError(Throwable error) {
 
@@ -59,28 +63,43 @@ public class GrpcErrorMapping {
                     .asRuntimeException();
         }
 
-        // For regular errors, try to look up an error code mapping
+        // For "public" errors, try to look up an error code mapping
+        // A public error is an error that has been handled and is considered safe to report to the end client/user
 
-        var errorCode = lookupErrorCode(error);
+        if (error instanceof ETracPublic) {
 
-        if (errorCode != null) {
+            var errorCode = lookupErrorCode(error);
 
-            // If there is an error code mapping, report the error to back to the client with the mapped error code
+            if (errorCode != null) {
 
-            return Status.fromCode(errorCode)
-                    .withDescription(error.getMessage())
-                    .withCause(error)
-                    .asRuntimeException();
+                // If there is an error code mapping, report the error to back to the client with the mapped error code
+
+                return Status.fromCode(errorCode)
+                        .withDescription(error.getMessage())
+                        .withCause(error)
+                        .asRuntimeException();
+            }
+            else {
+
+                // For anything unrecognized, fall back to an internal error
+
+                return Status.fromCode(Status.Code.INTERNAL)
+                        .withDescription(Status.INTERNAL.getDescription())
+                        .withCause(error)
+                        .asRuntimeException();
+            }
         }
-        else {
 
-            // For anything unrecognized, fall back to an internal error
+        // Any error that is not either a TRAC error or a gRPC error means that the error has not been handled
+        // These are still reported as internal errors
+        // Let's log an extra message as well, to make it clear that the error was not handled at source
 
-            return Status.fromCode(Status.Code.INTERNAL)
-                    .withDescription(Status.INTERNAL.getDescription())
-                    .withCause(error)
-                    .asRuntimeException();
-        }
+        log.error("An unhandled error has reached the top level error handler", error);
+
+        return Status.fromCode(Status.Code.INTERNAL)
+                .withDescription(Status.INTERNAL.getDescription())
+                .withCause(error)
+                .asRuntimeException();
     }
 
 
