@@ -54,7 +54,7 @@ jobs:
       - name: NVD cache
         uses: actions/cache@v2
         with:
-          key: compliance-cache
+          key: compliance-cache-data
           path: ./build/compliance-cache
 
       - name: Dependency vulnerability scan
@@ -96,7 +96,7 @@ jobs:
       - name: NVD cache
         uses: actions/cache@v2
         with:
-          key: compliance-cache
+          key: compliance-cache-data
           path: ./build/compliance-cache
 
       - name: Install dependencies
