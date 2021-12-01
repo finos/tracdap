@@ -25,10 +25,14 @@
     "grpc-web": "~1.2.1",
     "protobufjs": "~6.11.2"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "owasp-dependency-check": "0.0.18"
+  },
   "scripts": {
     "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
     "tracVersion:posix": "npm version `../../../dev/version.sh`",
-    "buildApi": "node api_builder.js"
+    "buildApi": "node api_builder.js",
+
+    "owasp": "owasp-dependency-check --project \"trac-web-api\" --failOnCVSS 4 --data ../../../build/compliance-cache/nvd --out ../../../build/compliance/web-api-owasp/"
   }
 }
