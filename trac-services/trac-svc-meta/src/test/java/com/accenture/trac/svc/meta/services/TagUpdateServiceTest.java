@@ -19,7 +19,7 @@ package com.accenture.trac.svc.meta.services;
 import com.accenture.trac.metadata.*;
 import com.accenture.trac.common.metadata.TypeSystem;
 import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.svc.meta.exception.ETagUpdate;
+import com.accenture.trac.svc.meta.exception.EMetadataBadUpdate;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -84,7 +84,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(42))
                 .build();
 
-        assertThrows(ETagUpdate.class, () ->
+        assertThrows(EMetadataBadUpdate.class, () ->
                 TagUpdateService.applyTagUpdates(baseTag, List.of(update1)));
 
     }
@@ -122,7 +122,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(42))
                 .build();
 
-        assertThrows(ETagUpdate.class, () ->
+        assertThrows(EMetadataBadUpdate.class, () ->
                 TagUpdateService.applyTagUpdates(baseTag, List.of(update1)));
     }
 
@@ -139,7 +139,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue("droids_you_are_looking_for"))
                 .build();
 
-        assertThrows(ETagUpdate.class, () ->
+        assertThrows(EMetadataBadUpdate.class, () ->
                 TagUpdateService.applyTagUpdates(baseTag, List.of(update1)));
     }
 
@@ -239,7 +239,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue(43))
                 .build();
 
-        assertThrows(ETagUpdate.class, () ->
+        assertThrows(EMetadataBadUpdate.class, () ->
                 TagUpdateService.applyTagUpdates(baseTag, List.of(update1)));
     }
 
@@ -256,7 +256,7 @@ class TagUpdateServiceTest {
                 .setValue(MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
-        assertThrows(ETagUpdate.class, () ->
+        assertThrows(EMetadataBadUpdate.class, () ->
                 TagUpdateService.applyTagUpdates(baseTag, List.of(update1)));
     }
 
@@ -294,7 +294,7 @@ class TagUpdateServiceTest {
                 .setAttrName("attr_2")
                 .build();
 
-        assertThrows(ETagUpdate.class, () ->
+        assertThrows(EMetadataBadUpdate.class, () ->
                 TagUpdateService.applyTagUpdates(baseTag, List.of(update1)));
     }
 
@@ -503,7 +503,7 @@ class TagUpdateServiceTest {
                 .build();
 
         // Create should fail when attr already exists
-        assertThrows(ETagUpdate.class, () ->
+        assertThrows(EMetadataBadUpdate.class, () ->
                 TagUpdateService.applyTagUpdates(baseTag, List.of(createOp)));
 
         // Applying delete then recreate in one operation should succeed
@@ -529,7 +529,7 @@ class TagUpdateServiceTest {
                 .build();
 
         // Duplicate create op should fail
-        assertThrows(ETagUpdate.class, () ->
+        assertThrows(EMetadataBadUpdate.class, () ->
                 TagUpdateService.applyTagUpdates(baseTag, List.of(createOp, createOp)));
 
         // Retry a single create op - should succeed

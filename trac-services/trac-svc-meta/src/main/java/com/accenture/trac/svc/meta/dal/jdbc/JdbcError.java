@@ -19,9 +19,9 @@ package com.accenture.trac.svc.meta.dal.jdbc;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.common.exception.*;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
-import com.accenture.trac.svc.meta.exception.EDuplicateItem;
-import com.accenture.trac.svc.meta.exception.EMissingItem;
-import com.accenture.trac.svc.meta.exception.EWrongItemType;
+import com.accenture.trac.svc.meta.exception.EMetadataDuplicate;
+import com.accenture.trac.svc.meta.exception.EMetadataNotFound;
+import com.accenture.trac.svc.meta.exception.EMetadataWrongType;
 
 import java.sql.SQLException;
 import java.text.MessageFormat;
@@ -62,7 +62,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.INSERT_DUPLICATE) {
             var message = MessageFormat.format(DUPLICATE_OBJECT_ID, parts.objectId[0]);
-            throw new EDuplicateItem(message, error);
+            throw new EMetadataDuplicate(message, error);
         }
     }
 
@@ -70,7 +70,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.NO_DATA) {
             var message = MessageFormat.format(MISSING_ITEM, "");
-            throw new EMissingItem(message, error);
+            throw new EMetadataNotFound(message, error);
         }
     }
 
@@ -78,7 +78,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(WRONG_OBJECT_TYPE, "");
-            throw new EWrongItemType(message, error);
+            throw new EMetadataWrongType(message, error);
         }
     }
 
@@ -86,7 +86,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(WRONG_OBJECT_TYPE, "");
-            throw new EWrongItemType(message, error);
+            throw new EMetadataWrongType(message, error);
         }
     }
 
@@ -94,7 +94,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(WRONG_OBJECT_TYPE, "");
-            throw new EWrongItemType(message, error);
+            throw new EMetadataWrongType(message, error);
         }
     }
 
@@ -102,7 +102,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.NO_DATA) {
             var message = MessageFormat.format(LOAD_ONE_MISSING_ITEM, "");
-            throw new EMissingItem(message, error);
+            throw new EMetadataNotFound(message, error);
         }
     }
 
@@ -110,7 +110,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(LOAD_ONE_WRONG_OBJECT_TYPE, "");
-            throw new EWrongItemType(message, error);
+            throw new EMetadataWrongType(message, error);
         }
     }
 
@@ -118,7 +118,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.NO_DATA) {
             var message = MessageFormat.format(LOAD_BATCH_MISSING_ITEM, "");
-            throw new EMissingItem(message, error);
+            throw new EMetadataNotFound(message, error);
         }
     }
 
@@ -126,7 +126,7 @@ class JdbcError {
 
         if (code == JdbcErrorCode.WRONG_OBJECT_TYPE) {
             var message = MessageFormat.format(LOAD_BATCH_WRONG_OBJECT_TYPE, "");
-            throw new EWrongItemType(message, error);
+            throw new EMetadataWrongType(message, error);
         }
     }
 }

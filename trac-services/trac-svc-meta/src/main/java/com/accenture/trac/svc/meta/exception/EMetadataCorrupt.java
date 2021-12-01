@@ -16,13 +16,13 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-public class EDuplicateItem extends EMetadata {
+public class EMetadataCorrupt extends EMetadata {
 
-    public EDuplicateItem(String message) {
+    public EMetadataCorrupt(String message) {
         super(message);
     }
 
-    public EDuplicateItem(String message, Throwable cause) {
+    public EMetadataCorrupt(String message, Throwable cause) {
         super(message, cause);
     }
 }

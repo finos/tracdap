@@ -16,13 +16,14 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-public class EWrongItemType extends EMetadata {
 
-    public EWrongItemType(String message) {
+public class EMetadataBadUpdate extends EMetadata {
+
+    public EMetadataBadUpdate(String message) {
         super(message);
     }
 
-    public EWrongItemType(String message, Throwable cause) {
+    public EMetadataBadUpdate(String message, Throwable cause) {
         super(message, cause);
     }
 }

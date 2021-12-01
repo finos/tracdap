@@ -16,13 +16,15 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-public class ECorruptItem extends EMetadata {
+import com.accenture.trac.common.exception.ETracPublic;
 
-    public ECorruptItem(String message) {
-        super(message);
+public class ETenantNotFound extends ETracPublic {
+
+    public ETenantNotFound(String message, Throwable cause) {
+        super(message, cause);
     }
 
-    public ECorruptItem(String message, Throwable cause) {
-        super(message, cause);
+    public ETenantNotFound(String message) {
+        super(message);
     }
 }

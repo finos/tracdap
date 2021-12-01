@@ -236,7 +236,7 @@ public class TagUpdateService {
                     operation.name(), update.getAttrName());
 
             log.error("{} ({})", message, logTagHeader(tag));
-            throw new ETagUpdate(message);
+            throw new EMetadataBadUpdate(message);
         }
     }
 
@@ -250,7 +250,7 @@ public class TagUpdateService {
                     operation.name(), update.getAttrName());
 
             log.error("{} ({})", message, logTagHeader(tag));
-            throw new ETagUpdate(message);
+            throw new EMetadataBadUpdate(message);
         }
     }
 
@@ -268,7 +268,7 @@ public class TagUpdateService {
                     originalType.name(), updateType.name());
 
             log.error("{} ({})", message, logTagHeader(tag));
-            throw new ETagUpdate(message);
+            throw new EMetadataBadUpdate(message);
         }
     }
 

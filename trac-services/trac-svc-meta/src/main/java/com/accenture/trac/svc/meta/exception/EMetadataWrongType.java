@@ -16,15 +16,13 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-import com.accenture.trac.common.exception.ETracPublic;
+public class EMetadataWrongType extends EMetadata {
 
-public class ETenant extends ETracPublic {
-
-    public ETenant(String message, Throwable cause) {
-        super(message, cause);
+    public EMetadataWrongType(String message) {
+        super(message);
     }
 
-    public ETenant(String message) {
-        super(message);
+    public EMetadataWrongType(String message, Throwable cause) {
+        super(message, cause);
     }
 }

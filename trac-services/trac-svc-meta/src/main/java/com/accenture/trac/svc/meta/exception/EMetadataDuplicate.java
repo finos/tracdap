@@ -16,14 +16,13 @@
 
 package com.accenture.trac.svc.meta.exception;
 
+public class EMetadataDuplicate extends EMetadata {
 
-public class ETagUpdate extends EMetadata {
-
-    public ETagUpdate(String message) {
+    public EMetadataDuplicate(String message) {
         super(message);
     }
 
-    public ETagUpdate(String message, Throwable cause) {
+    public EMetadataDuplicate(String message, Throwable cause) {
         super(message, cause);
     }
 }

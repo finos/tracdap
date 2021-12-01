@@ -16,13 +16,13 @@
 
 package com.accenture.trac.svc.meta.exception;
 
-public class EMissingItem extends EMetadata {
+public class EMetadataNotFound extends EMetadata {
 
-    public EMissingItem(String message) {
+    public EMetadataNotFound(String message) {
         super(message);
     }
 
-    public EMissingItem(String message, Throwable cause) {
+    public EMetadataNotFound(String message, Throwable cause) {
         super(message, cause);
     }
 }
