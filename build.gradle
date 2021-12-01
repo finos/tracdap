@@ -46,7 +46,7 @@ dependencyCheck {
 
     suppressionFiles = ["$projectDir/dev/compliance/owasp-false-positives.xml"]
 
-    outputDirectory = "build/compliance/platform-owasp"
+    outputDirectory = "$projectDir/build/compliance/platform-owasp"
 
     // CVSS score < 4 is "low severity" according to NIST
     // https://nvd.nist.gov/vuln-metrics/cvss
