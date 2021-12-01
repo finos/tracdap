@@ -21,7 +21,7 @@ import com.accenture.trac.common.concurrent.ExecutionContext;
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.util.Bytes;
 import com.accenture.trac.common.concurrent.Flows;
-import com.accenture.trac.common.util.GrpcStreams;
+import com.accenture.trac.common.grpc.GrpcStreams;
 import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.FileDefinition;
 import com.accenture.trac.metadata.SchemaDefinition;

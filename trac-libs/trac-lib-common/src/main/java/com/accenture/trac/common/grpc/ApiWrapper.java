@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Accenture Global Solutions Limited
+ * Copyright 2021 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,13 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.util;
+package com.accenture.trac.common.grpc;
 
-import io.grpc.Status;
-import io.grpc.StatusException;
-import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 
 
@@ -33,11 +28,8 @@ public class ApiWrapper {
 
     private final Logger log;
 
-    private final Map<Class<? extends Throwable>, Status.Code> errorMapping;
-
-    public ApiWrapper(Class<?> apiClass, Map<Class<? extends Throwable>, Status.Code> errorMapping) {
+    public ApiWrapper(Class<?> apiClass) {
         this.log = LoggerFactory.getLogger(apiClass);
-        this.errorMapping = errorMapping;
     }
 
     public <T> void unaryCall(StreamObserver<T> response, Supplier<CompletableFuture<T>> futureFunc) {
@@ -64,7 +56,8 @@ public class ApiWrapper {
                     log.error("API CALL FAILED: {}", methodName);
                     log.error(methodName, error);
 
-                    mapErrorResponse(response, error);
+                    var status = GrpcErrorMapping.translateErrorStatus(error);
+                    response.onError(status.asRuntimeException());
                 }
 
                 return null;
@@ -75,45 +68,8 @@ public class ApiWrapper {
             log.error("API CALL FAILED: {}", methodName);
             log.error(methodName, error);
 
-            mapErrorResponse(response, error);
+            var status = GrpcErrorMapping.translateErrorStatus(error);
+            response.onError(status.asRuntimeException());
         }
-    }
-
-    private <T> void mapErrorResponse(StreamObserver<T> response, Throwable error) {
-
-        // Error already as a GRPC status, top level API classes may do this
-        if (error instanceof StatusRuntimeException || error instanceof StatusException) {
-
-            response.onError(error);
-        }
-
-        // Errors wrapped up by the CompletableFuture API, we want to unwrap them
-        else if (error instanceof CompletionException && error.getCause() != null) {
-
-            mapUnwrappedErrorResponse(response, error.getCause());
-        }
-
-        // All other regular errors
-        else {
-
-            mapUnwrappedErrorResponse(response, error);
-        }
-    }
-
-    private <T> void mapUnwrappedErrorResponse(StreamObserver<T> response, Throwable error) {
-
-        var statusCode = error != null
-                ? errorMapping.getOrDefault(error.getClass(), Status.Code.UNKNOWN)
-                : Status.Code.UNKNOWN;
-
-        var errorMessage = statusCode == Status.Code.UNKNOWN
-                ? "There was an unexpected internal error in the TRAC platform"
-                : error.getMessage();
-
-        var status = Status.fromCode(statusCode)
-                .withDescription(errorMessage)
-                .withCause(error);
-
-        response.onError(status.asRuntimeException());
     }
 }

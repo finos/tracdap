@@ -14,18 +14,15 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.util;
+package com.accenture.trac.common.grpc;
 
 import com.accenture.trac.common.exception.*;
 import io.grpc.MethodDescriptor;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -95,7 +92,7 @@ public class GrpcStreams {
             }
             else {
 
-                var status = translateErrorStatus(error);
+                var status = GrpcErrorMapping.translateErrorStatus(error);
                 var statusError = status.asRuntimeException();
 
                 log.error("CLIENT STREAMING CALL FAILED: [{}] {}",
@@ -147,7 +144,7 @@ public class GrpcStreams {
         @Override
         public void onError(Throwable error) {
 
-            var status = translateErrorStatus(error);
+            var status = GrpcErrorMapping.translateErrorStatus(error);
             var statusError = status.asRuntimeException();
 
             log.error("SERVER STREAMING CALL FAILED: [{}] {}",
@@ -341,7 +338,7 @@ public class GrpcStreams {
         @Override
         public void onError(Throwable error) {
 
-            var status = translateErrorStatus(error);
+            var status = GrpcErrorMapping.translateErrorStatus(error);
             var statusError = status.asRuntimeException();
 
             log.error("Client streaming failed in client: {}", statusError.getMessage(), statusError);
@@ -357,57 +354,5 @@ public class GrpcStreams {
 
             grpcObserver.onCompleted();
         }
-    }
-
-    private static Status translateErrorStatus(Throwable error) {
-
-        // Unwrap future/streaming completion errors
-        if (error instanceof CompletionException)
-            error = error.getCause();
-
-        // Status runtime exception is a gRPC exception that is already propagated in the event stream
-        // This is most likely the result of an error when calling into another TRAC service
-        // For now, pass these errors on directly
-        // At some point there may (or may not) be benefit in wrapping/transforming upstream errors
-        // E.g. to handle particular types of expected exception
-        // However a lot of error response translate directly
-        // E.g. for metadata not found or permission denied lower down the stack - there is little benefit to wrapping
-
-        if (error instanceof StatusRuntimeException)
-            return ((StatusRuntimeException) error).getStatus();
-
-        if (error instanceof EInputValidation) {
-
-            return Status.fromCode(Status.Code.INVALID_ARGUMENT)
-                    .withDescription(error.getMessage())
-                    .withCause(error);
-        }
-
-        if (error instanceof EVersionValidation) {
-
-            return Status.fromCode(Status.Code.FAILED_PRECONDITION)
-                    .withDescription(error.getMessage())
-                    .withCause(error);
-        }
-
-        if (error instanceof EData) {
-
-            return Status.fromCode(Status.Code.DATA_LOSS)
-                    .withDescription(error.getMessage())
-                    .withCause(error);
-        }
-
-        if (error instanceof EPluginNotAvailable) {
-
-            return Status.fromCode(Status.Code.UNIMPLEMENTED)
-                    .withDescription(error.getMessage())
-                    .withCause(error);
-        }
-
-        // For anything unrecognized, fall back to an internal error
-
-        return Status.fromCode(Status.Code.INTERNAL)
-                .withDescription(Status.INTERNAL.getDescription())
-                .withCause(error);
     }
 }

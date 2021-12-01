@@ -17,8 +17,9 @@
 package com.accenture.trac.svc.meta.api;
 
 import com.accenture.trac.api.*;
+import com.accenture.trac.common.grpc.GrpcErrorMapping;
 import com.accenture.trac.metadata.*;
-import com.accenture.trac.common.util.ApiWrapper;
+import com.accenture.trac.common.grpc.ApiWrapper;
 
 import com.accenture.trac.svc.meta.services.MetadataReadService;
 import com.accenture.trac.svc.meta.services.MetadataSearchService;
@@ -58,7 +59,7 @@ public class BaseMetadataApi {
             MetadataSearchService searchService,
             boolean apiTrustLevel) {
 
-        this.apiWrapper = new ApiWrapper(getClass(), ApiErrorMapping.ERROR_MAPPING);
+        this.apiWrapper = new ApiWrapper(getClass());
 
         this.readService = readService;
         this.writeService = writeService;

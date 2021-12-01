@@ -23,7 +23,7 @@ import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.util.ByteSeekableChannel;
-import com.accenture.trac.common.util.GrpcStreams;
+import com.accenture.trac.common.grpc.GrpcStreams;
 import com.accenture.trac.metadata.BasicType;
 import com.accenture.trac.metadata.SchemaDefinition;
 import com.accenture.trac.metadata.TagHeader;
