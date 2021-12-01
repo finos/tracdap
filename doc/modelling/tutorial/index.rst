@@ -5,5 +5,5 @@ Modelling Tutorial
 
 .. toctree::
 
-    ./lesson_1_hello_world
-    ./lesson_2_using_data
+    ./chapter_1_hello_world
+    ./chapter_2_using_data

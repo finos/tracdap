@@ -1,7 +1,7 @@
 
-#####################
-Lesson 2 - Using Data
-#####################
+######################
+Chapter 2 - Using Data
+######################
 
 .. literalinclude:: ../../../examples/models/python/using_data/using_data.py
     :caption: using_data.py
