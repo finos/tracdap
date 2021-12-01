@@ -11,7 +11,7 @@ It may be helpful to read the :doc:`metadata model overview </overview/metadata_
 before starting this tutorial.
 
 Searching
----------
+=========
 
 Metadata searches allow you to search the metadata database using tag attributes. Any and all
 tag attributes are searchable. A selection of standard search operators are available, which
@@ -105,3 +105,18 @@ to call the :meth:`search()<trac.api.TracMetadataApi.search>` method of the
     :lines: 98 - 108
     :linenos:
     :lineno-start: 98
+
+
+More Mojo
+=========
+
+Several other metadata features are available in the current release of TRAC, including:
+
+* The ability to update objects and retrieve the full history of object versions
+* Tags can be updated independently of their objects, with a full history of tag updates
+* Point-in-time searches and selectors, providing a historical snapshot across all of TRAC's metadata
+* The metadata type system, which allows attributes to be defined with any supported data type
+* Multi-valued tag attributes
+
+These features can be explored by looking at the documentation for the
+:class:`TracMetadataApi<trac.api.TracMetadataApi>` and the :mod:`Metadata Listing <trac.metadata>`.
