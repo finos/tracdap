@@ -106,5 +106,6 @@ jobs:
 
       - name: OWASP dependency check
         run: |
+          mkdir -p build/compliance
           cd trac-api/packages/web
           npm run owasp
