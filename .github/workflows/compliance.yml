@@ -24,6 +24,7 @@ on:
 env:
   JAVA_VERSION: 11
   JAVA_DISTRIBUTION: zulu
+  NODE_VERSION: 14.x
 
 
 jobs:
@@ -54,7 +55,7 @@ jobs:
         uses: actions/cache@v2
         with:
           key: nvd-dependency-check
-          path: ./build/nvd
+          path: ./build/compliance-cache
 
       - name: Dependency vulnerability scan
         run: ./gradlew dependencyCheckAggregate
@@ -69,3 +70,40 @@ jobs:
         with:
           name: compliance-reports
           path: build/reports/**
+
+  web_api_compliance:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # Use a cache to save downloading global compliance data on every build (e.g. NVD)
+      # Compliance tasks will automatically look for updates and download deltas
+      - name: NVD cache
+        uses: actions/cache@v2
+        with:
+          key: compliance-cache
+          path: ./build/compliance-cache
+
+      - name: Install dependencies
+        run: |
+          cd trac-api/packages/web
+          npm install
+
+      - name: OWASP dependency check
+        run: |
+          cd trac-api/packages/web
+          npm run owasp
