@@ -56,8 +56,8 @@ public class ApiWrapper {
                     log.error("API CALL FAILED: {}", methodName);
                     log.error(methodName, error);
 
-                    var status = GrpcErrorMapping.translateErrorStatus(error);
-                    response.onError(status.asRuntimeException());
+                    var grpcError = GrpcErrorMapping.processError(error);
+                    response.onError(grpcError);
                 }
 
                 return null;
@@ -68,8 +68,8 @@ public class ApiWrapper {
             log.error("API CALL FAILED: {}", methodName);
             log.error(methodName, error);
 
-            var status = GrpcErrorMapping.translateErrorStatus(error);
-            response.onError(status.asRuntimeException());
+            var grpcError = GrpcErrorMapping.processError(error);
+            response.onError(grpcError);
         }
     }
 }

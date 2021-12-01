@@ -92,15 +92,14 @@ public class GrpcStreams {
             }
             else {
 
-                var status = GrpcErrorMapping.translateErrorStatus(error);
-                var statusError = status.asRuntimeException();
+                var grpcError = GrpcErrorMapping.processError(error);
 
                 log.error("CLIENT STREAMING CALL FAILED: [{}] {}",
                         method.getBareMethodName(),
-                        statusError.getMessage(),
-                        statusError);
+                        grpcError.getMessage(),
+                        grpcError);
 
-                grpcObserver.onError(statusError);
+                grpcObserver.onError(grpcError);
             }
         }
     }
@@ -144,15 +143,14 @@ public class GrpcStreams {
         @Override
         public void onError(Throwable error) {
 
-            var status = GrpcErrorMapping.translateErrorStatus(error);
-            var statusError = status.asRuntimeException();
+            var grpcError = GrpcErrorMapping.processError(error);
 
             log.error("SERVER STREAMING CALL FAILED: [{}] {}",
                     method.getBareMethodName(),
-                    statusError.getMessage(),
-                    statusError);
+                    grpcError.getMessage(),
+                    grpcError);
 
-            grpcObserver.onError(statusError);
+            grpcObserver.onError(grpcError);
             subscription.cancel();
         }
 
@@ -338,12 +336,11 @@ public class GrpcStreams {
         @Override
         public void onError(Throwable error) {
 
-            var status = GrpcErrorMapping.translateErrorStatus(error);
-            var statusError = status.asRuntimeException();
+            var grpcError = GrpcErrorMapping.processError(error);
 
-            log.error("Client streaming failed in client: {}", statusError.getMessage(), statusError);
+            log.error("Client streaming failed in client: {}", grpcError.getMessage(), grpcError);
 
-            grpcObserver.onError(statusError);
+            grpcObserver.onError(grpcError);
             subscription.cancel();
         }
 
