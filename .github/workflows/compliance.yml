@@ -115,6 +115,12 @@ jobs:
           cd trac-api/packages/web
           npm run compliance-licenses
 
+      - name: NPM audit
+        run: |
+          mkdir -p build/compliance/web-api-npm-audit
+          cd trac-api/packages/web
+          npm run compliance-audit
+
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
         uses: actions/upload-artifact@v2
