@@ -16,7 +16,7 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
-import com.accenture.trac.svc.meta.exception.ETenantNotFound;
+import com.accenture.trac.common.exception.ETenantNotFound;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

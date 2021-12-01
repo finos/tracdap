@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Accenture Global Solutions Limited
+ * Copyright 2021 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,17 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.meta.exception;
+package com.accenture.trac.common.exception;
 
-public class EMetadataWrongType extends EMetadata {
+import com.accenture.trac.common.exception.ETracPublic;
 
-    public EMetadataWrongType(String message) {
+public class EMetadata extends ETracPublic {
+
+    public EMetadata(String message) {
         super(message);
     }
 
-    public EMetadataWrongType(String message, Throwable cause) {
+    public EMetadata(String message, Throwable cause) {
         super(message, cause);
     }
 }

@@ -17,7 +17,6 @@
 package com.accenture.trac.svc.meta.api;
 
 import com.accenture.trac.common.exception.*;
-import com.accenture.trac.svc.meta.exception.*;
 
 import io.grpc.Status;
 

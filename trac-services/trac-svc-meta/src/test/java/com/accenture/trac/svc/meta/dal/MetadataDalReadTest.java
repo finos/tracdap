@@ -19,8 +19,8 @@ package com.accenture.trac.svc.meta.dal;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.svc.meta.exception.EMetadataNotFound;
-import com.accenture.trac.svc.meta.exception.EMetadataWrongType;
+import com.accenture.trac.common.exception.EMetadataNotFound;
+import com.accenture.trac.common.exception.EMetadataWrongType;
 
 import java.util.List;
 import java.util.UUID;

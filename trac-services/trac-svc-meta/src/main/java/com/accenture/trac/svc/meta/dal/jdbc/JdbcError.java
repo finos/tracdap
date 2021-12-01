@@ -19,9 +19,9 @@ package com.accenture.trac.svc.meta.dal.jdbc;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.common.exception.*;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
-import com.accenture.trac.svc.meta.exception.EMetadataDuplicate;
-import com.accenture.trac.svc.meta.exception.EMetadataNotFound;
-import com.accenture.trac.svc.meta.exception.EMetadataWrongType;
+import com.accenture.trac.common.exception.EMetadataDuplicate;
+import com.accenture.trac.common.exception.EMetadataNotFound;
+import com.accenture.trac.common.exception.EMetadataWrongType;
 
 import java.sql.SQLException;
 import java.text.MessageFormat;

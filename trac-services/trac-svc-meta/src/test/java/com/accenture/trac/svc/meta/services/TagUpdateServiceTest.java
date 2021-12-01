@@ -19,7 +19,7 @@ package com.accenture.trac.svc.meta.services;
 import com.accenture.trac.metadata.*;
 import com.accenture.trac.common.metadata.TypeSystem;
 import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.svc.meta.exception.EMetadataBadUpdate;
+import com.accenture.trac.common.exception.EMetadataBadUpdate;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

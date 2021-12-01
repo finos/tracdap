@@ -17,9 +17,9 @@
 package com.accenture.trac.svc.meta.dal;
 
 import com.accenture.trac.metadata.ObjectType;
-import com.accenture.trac.svc.meta.exception.EMetadataDuplicate;
-import com.accenture.trac.svc.meta.exception.EMetadataNotFound;
-import com.accenture.trac.svc.meta.exception.EMetadataWrongType;
+import com.accenture.trac.common.exception.EMetadataDuplicate;
+import com.accenture.trac.common.exception.EMetadataNotFound;
+import com.accenture.trac.common.exception.EMetadataWrongType;
 import static com.accenture.trac.test.meta.TestData.*;
 
 import java.util.List;
