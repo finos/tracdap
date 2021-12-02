@@ -73,7 +73,7 @@ public class GrpcClientWrap {
 
             var grpcError = GrpcErrorMapping.processError(error);
 
-            log.error("API CALL FAILED: [{}] {}",
+            log.error("CLIENT CALL FAILED: [{}] {}",
                     methodDisplayName(method),
                     grpcError.getMessage(), grpcError);
 
