@@ -69,11 +69,11 @@ public class GrpcServerWrap {
 
             var resultPublisher = methodImpl.apply(request);
 
-            // TODO: Move logging to here
+            var resultLogger = Flows.interceptResult(resultPublisher,
+                    (result, error) -> logResult(method, error));
 
-            var resultSubscriber = new GrpcServerResponseStream<>(method, responseObserver);
-            resultPublisher.subscribe(resultSubscriber);
-
+            var resultSubscriber = new GrpcServerResponseStream<>(responseObserver);
+            resultLogger.subscribe(resultSubscriber);
         }
         catch (Exception error) {
 
@@ -118,7 +118,7 @@ public class GrpcServerWrap {
             StreamObserver<TResponse> responseObserver,
             TResponse result, Throwable error) {
 
-        if (result != null) {
+        if (error == null) {
 
             log.info("API CALL SUCCEEDED: [{}]", method.getBareMethodName());
 
@@ -134,6 +134,20 @@ public class GrpcServerWrap {
         }
 
         return null;
+    }
+
+    private <TResponse>
+    void logResult(MethodDescriptor<?, TResponse> method, Throwable error) {
+
+        if (error == null) {
+
+            log.info("API CALL SUCCEEDED: [{}]", method.getBareMethodName());
+        }
+        else {
+
+            var grpcError = GrpcErrorMapping.processError(error);
+            log.error("API CALL FAILED: [{}] {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
+        }
     }
 
 }

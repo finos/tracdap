@@ -17,15 +17,11 @@
 package com.accenture.trac.common.grpc;
 
 import io.grpc.stub.StreamObserver;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.Flow;
 
 
 public class GrpcServerRequestStream<T> implements StreamObserver<T> {
-
-    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final Flow.Subscriber<T> subscriber;
 
@@ -45,15 +41,11 @@ public class GrpcServerRequestStream<T> implements StreamObserver<T> {
     @Override
     public void onError(Throwable error) {
 
-        log.error("Inbound server stream failed: {}", error.getMessage(), error);
-
         subscriber.onError(error);
     }
 
     @Override
     public void onCompleted() {
-
-        log.info("Inbound server stream complete");
 
         subscriber.onComplete();
     }

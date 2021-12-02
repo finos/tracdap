@@ -17,39 +17,26 @@
 package com.accenture.trac.common.grpc;
 
 import com.accenture.trac.common.exception.ETracInternal;
-import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.Flow;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class GrpcServerResponseStream<TResponse> implements Flow.Subscriber<TResponse> {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
-
-    private final MethodDescriptor<?, TResponse> method;
     private final StreamObserver<TResponse> grpcObserver;
 
-    private final AtomicBoolean subscribed = new AtomicBoolean(false);
     private Flow.Subscription subscription;
 
-    public GrpcServerResponseStream(
-            MethodDescriptor<?, TResponse> method,
-            StreamObserver<TResponse> grpcObserver) {
+    public GrpcServerResponseStream(StreamObserver<TResponse> grpcObserver) {
 
-        this.method = method;
         this.grpcObserver = grpcObserver;
     }
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
 
-        var subscribedOk = this.subscribed.compareAndSet(false, true);
-
-        if (!subscribedOk)
+        if (this.subscription != null)
             throw new ETracInternal("Multiple subscriptions on gRPC observer wrapper");
 
         this.subscription = subscription;
@@ -67,19 +54,12 @@ public class GrpcServerResponseStream<TResponse> implements Flow.Subscriber<TRes
 
         var grpcError = GrpcErrorMapping.processError(error);
 
-        log.error("SERVER STREAMING CALL FAILED: [{}] {}",
-                method.getBareMethodName(),
-                grpcError.getMessage(),
-                grpcError);
-
         grpcObserver.onError(grpcError);
         subscription.cancel();
     }
 
     @Override
     public void onComplete() {
-
-        log.info("SERVER STREAMING CALL SUCCEEDED: [{}]", method.getBareMethodName());
 
         grpcObserver.onCompleted();
     }

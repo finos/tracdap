@@ -22,7 +22,9 @@ import io.netty.util.concurrent.OrderedEventExecutor;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -50,7 +52,16 @@ public class Flows {
     public static <T>
     Flow.Processor<T, T> passThrough() {
 
-        return new PassThroughProcessor<>();
+        return new InterceptProcessor<>(/* resultInterceptor = */ null);
+    }
+
+    public static <T>
+    Flow.Processor<T, T> interceptResult(Flow.Publisher<T> source, BiConsumer<T, Throwable> resultHandler) {
+
+        var interceptor = new InterceptProcessor<T>(resultHandler);
+        source.subscribe(interceptor);
+
+        return interceptor;
     }
 
     public static <T, U>

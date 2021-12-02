@@ -16,31 +16,43 @@
 
 package com.accenture.trac.common.concurrent.flow;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.concurrent.Flow;
+import java.util.function.BiConsumer;
 
-public class PassThroughProcessor <T> implements Flow.Processor<T, T> {
+public class InterceptProcessor<T> implements Flow.Processor<T, T> {
 
-    private Flow.Subscriber<? super T> target;
+    Flow.Subscriber<? super T> target;
+    Flow.Subscription subscription;
+
+    private final BiConsumer<T, Throwable> resultInterceptor;
+
+    public InterceptProcessor(BiConsumer<T, Throwable> resultInterceptor) {
+
+        this.resultInterceptor = resultInterceptor;
+    }
 
     @Override
     public void subscribe(Flow.Subscriber<? super T> subscriber) {
 
         if (target != null)
-            throw new IllegalStateException("Pass-through processor subscribed twice");
+            throw new IllegalStateException("Multiple target subscriptions for intercept processor");
 
         target = subscriber;
+
+        if (subscription != null)
+            target.onSubscribe(subscription);
     }
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
 
-        if (target == null)
-            throw new IllegalStateException("Pass-through processor used before it is subscribed");
+        if (this.subscription != null)
+            throw new IllegalStateException("Multiple source subscriptions for intercept processor");
 
-        target.onSubscribe(subscription);
+        this.subscription = subscription;
+
+        if (target != null)
+            target.onSubscribe(subscription);
     }
 
     @Override
@@ -50,13 +62,19 @@ public class PassThroughProcessor <T> implements Flow.Processor<T, T> {
     }
 
     @Override
-    public void onError(Throwable throwable) {
+    public void onError(Throwable error) {
 
-        target.onError(throwable);
+        if (resultInterceptor != null)
+            resultInterceptor.accept(null, error);
+
+        target.onError(error);
     }
 
     @Override
     public void onComplete() {
+
+        if (resultInterceptor != null)
+            resultInterceptor.accept(null, null);
 
         target.onComplete();
     }
