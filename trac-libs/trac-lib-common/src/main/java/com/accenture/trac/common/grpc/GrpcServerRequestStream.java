@@ -59,7 +59,7 @@ public class GrpcServerRequestStream<T> implements StreamObserver<T> {
     }
 
     // Subscription is ignored, using gRPC automatic flow control
-    // Messages will be published as the come in
+    // Messages will be published as they come in
 
     private static class Subscription implements Flow.Subscription {
         @Override public void request(long n) {}

@@ -46,7 +46,7 @@ public class GrpcServerWrap {
             log.info("API CALL START: [{}]", method.getBareMethodName());
 
             methodImpl.apply(request).handle((result, error) ->
-                    resultHandler(method, responseObserver, result, error));
+                    handleResult(method, responseObserver, result, error));
         }
         catch (Exception error) {
 
@@ -97,7 +97,7 @@ public class GrpcServerWrap {
             var requestStream = Flows.<TRequest>passThrough();
 
             methodImpl.apply(requestStream).handle((result, error) ->
-                    resultHandler(method, responseObserver, result, error));
+                    handleResult(method, responseObserver, result, error));
 
             return new GrpcServerRequestStream<>(requestStream);
         }
@@ -113,7 +113,7 @@ public class GrpcServerWrap {
     }
 
     private <TResponse>
-    Void resultHandler(
+    Void handleResult(
             MethodDescriptor<?, TResponse> method,
             StreamObserver<TResponse> responseObserver,
             TResponse result, Throwable error) {
