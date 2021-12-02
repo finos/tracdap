@@ -23,7 +23,7 @@ import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.util.ByteSeekableChannel;
-import com.accenture.trac.common.grpc.GrpcStreams;
+import com.accenture.trac.test.grpc.GrpcTestStreams;
 import com.accenture.trac.metadata.BasicType;
 import com.accenture.trac.metadata.SchemaDefinition;
 import com.accenture.trac.metadata.TagHeader;
@@ -67,7 +67,7 @@ class DataApiTestHelpers {
             BiConsumer<TReq, StreamObserver<TResp>> grpcMethod,
             TReq request, Flow.Subscriber<TResp> response) {
 
-        var responseGrpc = GrpcStreams.clientResponseStream(response);
+        var responseGrpc = GrpcTestStreams.clientResponseStream(response);
         grpcMethod.accept(request, responseGrpc);
     }
 
@@ -83,7 +83,7 @@ class DataApiTestHelpers {
                 (bs, b) -> {bs.add(b); return bs;},
                 (List<TResp>) new ArrayList<TResp>());
 
-        var responseGrpc = GrpcStreams.clientResponseStream(responseStream);
+        var responseGrpc = GrpcTestStreams.clientResponseStream(responseStream);
         grpcMethod.accept(request, responseGrpc);
 
         return collectList;
@@ -100,7 +100,7 @@ class DataApiTestHelpers {
         var msgStream = Flows.<TResp>hub(execCtx);
         var discard = Flows.fold(msgStream, (acc, msg) -> acc, (Void) null);
 
-        var grpcStream = GrpcStreams.clientResponseStream(msgStream);
+        var grpcStream = GrpcTestStreams.clientResponseStream(msgStream);
         grpcMethod.accept(request, grpcStream);
 
         return discard;
@@ -113,9 +113,9 @@ class DataApiTestHelpers {
 
         var response = new CompletableFuture<TResp>();
 
-        var responseGrpc = GrpcStreams.clientResponseHandler(response);
+        var responseGrpc = GrpcTestStreams.clientResponseHandler(response);
         var requestGrpc = grpcMethod.apply(responseGrpc);
-        var requestSubscriber = GrpcStreams.clientRequestStream(requestGrpc);
+        var requestSubscriber = GrpcTestStreams.clientRequestStream(requestGrpc);
 
         requestPublisher.subscribe(requestSubscriber);
 

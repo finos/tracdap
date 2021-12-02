@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.grpc;
+package com.accenture.trac.test.grpc;
 
 import com.accenture.trac.common.exception.*;
+import com.accenture.trac.common.grpc.GrpcErrorMapping;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 
-public class GrpcStreams {
+public class GrpcTestStreams {
 
     public static <T>
     Flow.Subscriber<T> clientRequestStream(StreamObserver<T> observer) {
