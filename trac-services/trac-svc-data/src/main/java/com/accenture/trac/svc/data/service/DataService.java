@@ -52,7 +52,7 @@ import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
 import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
 
-public class DataRwService {
+public class DataService {
 
     private static final String TRAC_STORAGE_OBJECT_ATTR = "trac_storage_object";
 
@@ -76,7 +76,7 @@ public class DataRwService {
 
     private final GrpcClientWrap grpcWrap = new GrpcClientWrap(getClass());
 
-    public DataRwService(
+    public DataService(
             DataServiceConfig config,
             BufferAllocator arrowAllocator,
             IStorageManager storageManager,

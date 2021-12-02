@@ -48,7 +48,7 @@ import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
 import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
 
-public class FileRwService {
+public class FileService {
 
     private static final String TRAC_FILE_NAME_ATTR = "trac_file_name";
     private static final String TRAC_FILE_EXTENSION_ATTR = "trac_file_extension";
@@ -79,7 +79,7 @@ public class FileRwService {
     private final Validator validator = new Validator();
     private final Random random = new Random();
 
-    public FileRwService(
+    public FileService(
             DataServiceConfig config,
             IStorageManager storageManager,
             TrustedMetadataApiFutureStub metaApi) {
