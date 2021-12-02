@@ -17,17 +17,14 @@
 package com.accenture.trac.common.grpc;
 
 import com.accenture.trac.common.concurrent.Flows;
-import com.accenture.trac.common.concurrent.IExecutionContext;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 
 public class GrpcServerWrap {
@@ -68,7 +65,7 @@ public class GrpcServerWrap {
 
         try {
 
-            log.info("API CALL START: [{}]", method.getBareMethodName());
+            log.info("API CALL START: [{}] (server streaming)", method.getBareMethodName());
 
             var resultPublisher = methodImpl.apply(request);
 
@@ -95,7 +92,7 @@ public class GrpcServerWrap {
 
         try {
 
-            log.info("API CALL START: [{}]", method.getBareMethodName());
+            log.info("API CALL START: [{}] (client streaming)", method.getBareMethodName());
 
             var requestStream = Flows.<TRequest>passThrough();
 
