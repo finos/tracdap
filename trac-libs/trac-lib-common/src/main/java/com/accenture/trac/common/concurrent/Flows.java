@@ -47,6 +47,12 @@ public class Flows {
         return new FutureResultPublisher<>(source);
     }
 
+    public static <T>
+    Flow.Processor<T, T> passThrough() {
+
+        return new PassThroughProcessor<>();
+    }
+
     public static <T, U>
     Flow.Publisher<U> map(Flow.Publisher<T> source, Function<T, U> mapping) {
 

@@ -16,6 +16,8 @@
 
 package com.accenture.trac.common.grpc;
 
+import com.accenture.trac.common.concurrent.Flows;
+import com.accenture.trac.common.concurrent.IExecutionContext;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
@@ -39,46 +41,29 @@ public class GrpcServerWrap {
     public <TRequest, TResponse>
     void unaryCall(
             MethodDescriptor<TRequest, TResponse> method,
-            TRequest request, StreamObserver<TResponse> response,
+            TRequest request, StreamObserver<TResponse> responseObserver,
             Function<TRequest, CompletionStage<TResponse>> methodImpl) {
 
         try {
 
             log.info("API CALL START: [{}]", method.getBareMethodName());
 
-            methodImpl.apply(request).handle((result, error) -> {
-
-                if (result != null) {
-
-                    log.info("API CALL SUCCEEDED: [{}]", method.getBareMethodName());
-
-                    response.onNext(result);
-                    response.onCompleted();
-                }
-                else {
-
-                    var grpcError = GrpcErrorMapping.processError(error);
-
-                    log.error("API CALL FAILED: [{}] {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
-                    response.onError(grpcError);
-                }
-
-                return null;
-            });
+            methodImpl.apply(request).handle((result, error) ->
+                    resultHandler(method, responseObserver, result, error));
         }
         catch (Exception error) {
 
             var grpcError = GrpcErrorMapping.processError(error);
 
             log.error("API CALL FAILED: [{}] {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
-            response.onError(grpcError);
+            responseObserver.onError(grpcError);
         }
     }
 
     public <TRequest, TResponse>
     void serverStreaming(
             MethodDescriptor<TRequest, TResponse> method,
-            TRequest request, StreamObserver<TResponse> response,
+            TRequest request, StreamObserver<TResponse> responseObserver,
             Function<TRequest, Flow.Publisher<TResponse>> methodImpl) {
 
         try {
@@ -89,7 +74,7 @@ public class GrpcServerWrap {
 
             // TODO: Move logging to here
 
-            var resultSubscriber = new GrpcServerResponseStream<>(method, response);
+            var resultSubscriber = new GrpcServerResponseStream<>(method, responseObserver);
             resultPublisher.subscribe(resultSubscriber);
 
         }
@@ -98,8 +83,60 @@ public class GrpcServerWrap {
             var grpcError = GrpcErrorMapping.processError(error);
 
             log.error("API CALL FAILED: [{}] {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
-            response.onError(grpcError);
+            responseObserver.onError(grpcError);
         }
+    }
+
+    public <TRequest, TResponse>
+    StreamObserver<TRequest> clientStreaming(
+            MethodDescriptor<TRequest, TResponse> method,
+            StreamObserver<TResponse> responseObserver,
+            Function<Flow.Publisher<TRequest>, CompletionStage<TResponse>> methodImpl) {
+
+        try {
+
+            log.info("API CALL START: [{}]", method.getBareMethodName());
+
+            var requestStream = Flows.<TRequest>passThrough();
+
+            methodImpl.apply(requestStream).handle((result, error) ->
+                    resultHandler(method, responseObserver, result, error));
+
+            return new GrpcServerRequestStream<>(requestStream);
+        }
+        catch (Exception error) {
+
+            var grpcError = GrpcErrorMapping.processError(error);
+
+            log.error("API CALL FAILED: [{}] {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
+            responseObserver.onError(grpcError);
+
+            return null;
+        }
+    }
+
+    private <TResponse>
+    Void resultHandler(
+            MethodDescriptor<?, TResponse> method,
+            StreamObserver<TResponse> responseObserver,
+            TResponse result, Throwable error) {
+
+        if (result != null) {
+
+            log.info("API CALL SUCCEEDED: [{}]", method.getBareMethodName());
+
+            responseObserver.onNext(result);
+            responseObserver.onCompleted();
+        }
+        else {
+
+            var grpcError = GrpcErrorMapping.processError(error);
+
+            log.error("API CALL FAILED: [{}] {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
+            responseObserver.onError(grpcError);
+        }
+
+        return null;
     }
 
 }
