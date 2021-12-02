@@ -32,7 +32,6 @@ import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.*;
 
-import com.google.protobuf.Message;
 import io.grpc.MethodDescriptor;
 import io.netty.buffer.ByteBuf;
 import org.apache.arrow.memory.BufferAllocator;
@@ -277,6 +276,24 @@ public class DataService {
                 });
     }
 
+    private CompletionStage<SchemaDefinition> resolveSchema(DataWriteRequest request, RequestState state) {
+
+        if (request.hasSchema()) {
+            state.schema = request.getSchema();
+            return CompletableFuture.completedFuture(state.schema);
+        }
+
+        if (request.hasSchemaId()) {
+
+            var schemaReq = MetadataBuilders.requestForSelector(request.getTenant(), request.getSchemaId());
+
+            return grpcWrap.unaryCall(READ_OBJECT_METHOD, schemaReq, metaClient::readObject)
+                    .thenApply(tag -> state.schema = tag.getDefinition().getSchema());
+        }
+
+        throw new EUnexpected();
+    }
+
     private void selectCopy(RequestState state) {
 
         var opaqueKey = PartKeys.opaqueKey(PartKeys.ROOT);
@@ -303,24 +320,6 @@ public class DataService {
                 .getCopies(copyIndex);
     }
 
-    private CompletionStage<SchemaDefinition> resolveSchema(DataWriteRequest request, RequestState state) {
-
-        if (request.hasSchema()) {
-            state.schema = request.getSchema();
-            return CompletableFuture.completedFuture(state.schema);
-        }
-
-        if (request.hasSchemaId()) {
-
-            var schemaReq = MetadataBuilders.requestForSelector(request.getTenant(), request.getSchemaId());
-
-            return grpcWrap.unaryCall(READ_OBJECT_METHOD, schemaReq, metaClient::readObject)
-                    .thenApply(tag -> state.schema = tag.getDefinition().getSchema());
-        }
-
-        throw new EUnexpected();
-    }
-
     private CompletionStage<Void> preallocateIds(DataWriteRequest request, RequestState state) {
 
         var preAllocDataReq = preallocateRequest(request.getTenant(), ObjectType.DATA);
@@ -333,6 +332,34 @@ public class DataService {
 
                 .thenCompose(x -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, preAllocStorageReq, metaClient::preallocateId))
                 .thenAccept(storageId -> state.preAllocStorageId = storageId);
+    }
+
+    private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state) {
+
+        var priorStorageId = selectorFor(state.preAllocStorageId);
+        var storageReq = buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
+
+        var priorDataId = selectorFor(state.preAllocDataId);
+        var dataReq = buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
+
+        return grpcWrap
+                .unaryCall(CREATE_PREALLOCATED_METHOD, storageReq, metaClient::createPreallocatedObject)
+                .thenCompose(x -> grpcWrap
+                        .unaryCall(CREATE_PREALLOCATED_METHOD, dataReq, metaClient::createPreallocatedObject));
+    }
+
+    private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state, RequestState prior) {
+
+        var priorStorageId = selectorFor(prior.storageId);
+        var storageReq = buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
+
+        var priorDataId = selectorFor(prior.dataId);
+        var dataReq = buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
+
+        return grpcWrap
+                .unaryCall(UPDATE_OBJECT_METHOD, storageReq, metaClient::updateObject)
+                .thenCompose(x -> grpcWrap
+                        .unaryCall(UPDATE_OBJECT_METHOD, dataReq, metaClient::updateObject));
     }
 
     private RequestState buildMetadata(DataWriteRequest request, RequestState state, OffsetDateTime objectTimestamp) {
@@ -557,34 +584,6 @@ public class DataService {
                 .build();
 
         return List.of(storageForAttr);
-    }
-
-    private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state) {
-
-        var priorStorageId = selectorFor(state.preAllocStorageId);
-        var storageReq = buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
-
-        var priorDataId = selectorFor(state.preAllocDataId);
-        var dataReq = buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
-
-        return grpcWrap
-                .unaryCall(CREATE_PREALLOCATED_METHOD, storageReq, metaClient::createPreallocatedObject)
-                .thenCompose(x -> grpcWrap
-                .unaryCall(CREATE_PREALLOCATED_METHOD, dataReq, metaClient::createPreallocatedObject));
-    }
-
-    private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state, RequestState prior) {
-
-        var priorStorageId = selectorFor(prior.storageId);
-        var storageReq = buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
-
-        var priorDataId = selectorFor(prior.dataId);
-        var dataReq = buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
-
-        return grpcWrap
-                .unaryCall(UPDATE_OBJECT_METHOD, storageReq, metaClient::updateObject)
-                .thenCompose(x -> grpcWrap
-                .unaryCall(UPDATE_OBJECT_METHOD, dataReq, metaClient::updateObject));
     }
 
     private void loadAndEncode(
