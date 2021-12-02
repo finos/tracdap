@@ -16,18 +16,19 @@
 
 package com.accenture.trac.svc.data.service;
 
+import com.accenture.trac.api.*;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import com.accenture.trac.api.config.DataServiceConfig;
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.exception.EDataSize;
+import com.accenture.trac.common.grpc.GrpcClientWrap;
 import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.storage.IFileStorage;
 import com.accenture.trac.common.storage.IStorageManager;
-import com.accenture.trac.common.concurrent.Futures;
 import com.accenture.trac.common.validation.Validator;
 import com.accenture.trac.metadata.*;
 
+import io.grpc.MethodDescriptor;
 import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +43,8 @@ import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
+import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
 import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
 
@@ -60,12 +63,19 @@ public class FileRwService {
 
     private static final String BACKSLASH = "/";
 
+    private static final MethodDescriptor<MetadataReadRequest, Tag> READ_OBJECT_METHOD = TrustedMetadataApiGrpc.getReadObjectMethod();
+    private static final MethodDescriptor<MetadataBatchRequest, MetadataBatchResponse> READ_BATCH_METHOD = TrustedMetadataApiGrpc.getReadBatchMethod();
+    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> PREALLOCATE_ID_METHOD = TrustedMetadataApiGrpc.getPreallocateIdMethod();
+    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_PREALLOCATED_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectMethod();
+    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getUpdateObjectMethod();
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final DataServiceConfig config;
     private final IStorageManager storageManager;
     private final TrustedMetadataApiFutureStub metaApi;
 
+    private final GrpcClientWrap grpcWrap = new GrpcClientWrap(getClass());
     private final Validator validator = new Validator();
     private final Random random = new Random();
 
@@ -85,9 +95,9 @@ public class FileRwService {
             Flow.Publisher<ByteBuf> contentStream,
             IExecutionContext execContext) {
 
-        var req = new RequestState();
-        req.fileTags = tags;           // File tags requested by the client
-        req.storageTags = List.of();   // Storage tags is empty to start with
+        var state = new RequestState();
+        state.fileTags = tags;           // File tags requested by the client
+        state.storageTags = List.of();   // Storage tags is empty to start with
 
         // This timestamp is set in the storage definition to timestamp storage incarnations/copies
         // It is also used in the physical storage path
@@ -101,51 +111,46 @@ public class FileRwService {
         // letting other TRAC services specify the object timestamp
         // To avoid polluting the public API, this could go into the gRPC call metadata
 
-        req.objectTimestamp = Instant.now();
+        state.objectTimestamp = Instant.now();
 
         return CompletableFuture.completedFuture(null)
 
                 // Call meta svc to preallocate file object ID
                 .thenApply(x -> preallocateRequest(tenant, ObjectType.FILE))
-                .thenApply(metaApi::preallocateId)
-                .thenCompose(Futures::javaFuture)
-                .thenAccept(fileId -> req.priorFileId = fileId)
+                .thenCompose(req -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, req, metaApi::preallocateId))
+                .thenAccept(fileId -> state.preAllocFileId = fileId)
 
                 // Preallocate ID comes back with version 0, bump to get ID for first real version
-                .thenAccept(x -> req.fileId = bumpVersion(req.priorFileId))
+                .thenAccept(x -> state.fileId = bumpVersion(state.preAllocFileId))
+
+                // Also pre-allocate for storage
+                .thenApply(x -> preallocateRequest(tenant, ObjectType.STORAGE))
+                .thenCompose(req -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, req, metaApi::preallocateId))
+                .thenAccept(storageId -> state.preAllocStorageId = storageId)
+                .thenAccept(x -> state.storageId = bumpVersion(state.preAllocStorageId))
 
                 // Build definition objects
-                .thenAccept(x -> req.file = createFileDef(req.fileId, name, mimeType))
-                .thenAccept(x -> req.storage = createStorageDef(
-                        config.getDefaultStorageKey(),  req.objectTimestamp,
-                        req.fileId, name, mimeType, random))
+                .thenAccept(x -> state.file = createFileDef(state.fileId, name, mimeType, state.storageId))
+                .thenAccept(x -> state.storage = createStorageDef(
+                        config.getDefaultStorageKey(),  state.objectTimestamp,
+                        state.fileId, name, mimeType, random))
 
                 // Write file content stream to the storage layer
                 .thenCompose(x -> writeDataItem(
-                        req.storage,
-                        req.file.getDataItem(),
+                        state.storage,
+                        state.file.getDataItem(),
                         contentStream, execContext))
 
                 // Check and record size from storage in file definition
                 .thenApply(size -> checkSize(size, expectedSize))
-                .thenAccept(size -> req.file = recordSize(size, req.file))
+                .thenAccept(size -> state.file = recordSize(size, state.file))
 
                 // Add controlled tag attrs (must be done after file size is known)
-                .thenAccept(x -> req.fileTags = createFileAttrs(req.fileTags, req.file))
-                .thenAccept(x -> req.storageTags = createStorageAttrs(req.storageTags, req.fileId))
+                .thenAccept(x -> state.fileTags = createFileAttrs(state.fileTags, state.file))
+                .thenAccept(x -> state.storageTags = createStorageAttrs(state.storageTags, state.fileId))
 
-                // Save storage metadata
-                .thenCompose(x -> MetadataHelpers.createObject(metaApi,
-                        tenant, tags, ObjectType.STORAGE, req.storage,
-                        ObjectDefinition.Builder::setStorage))
-
-                // Record storage ID in file definition
-                .thenAccept(storageId -> req.file = recordStorageId(storageId, req.file))
-
-                // Save file metadata
-                .thenCompose(x -> MetadataHelpers.createPreallocated(metaApi,
-                        tenant, req.fileTags, req.fileId, req.file,
-                        ObjectDefinition.Builder::setFile));
+                // Save all metadata
+                .thenCompose(x -> saveMetadata(tenant, state));
     }
 
     public CompletionStage<TagHeader> updateFile(
@@ -155,68 +160,46 @@ public class FileRwService {
             Flow.Publisher<ByteBuf> contentStream,
             IExecutionContext execContext) {
 
-        var req = new RequestState();
-        req.fileTags = tags;           // File tags requested by the client
-        req.storageTags = List.of();   // Storage tags is empty to start with
-        req.objectTimestamp = Instant.now();
+        var state = new RequestState();
+        var prior = new RequestState();
+        state.fileTags = tags;           // File tags requested by the client
+        state.storageTags = List.of();   // Storage tags is empty to start with
+        state.objectTimestamp = Instant.now();
 
         return CompletableFuture.completedFuture(null)
 
-                // Read prior file metadata
-                .thenApply(x -> requestForSelector(tenant, priorVersion))
-                .thenApply(metaApi::readObject)
-                .thenCompose(Futures::javaFuture)
-                .thenAccept(priorFile -> {
-                        req.priorFileId = priorFile.getHeader();
-                        req.priorFile = priorFile.getDefinition().getFile();
-                })
-
-                // Read prior storage metadata
-                .thenApply(x -> requestForSelector(tenant, req.priorFile.getStorageId()))
-                .thenApply(metaApi::readObject)
-                .thenCompose(Futures::javaFuture)
-                .thenAccept(priorStorage -> {
-                        req.priorStorageId = priorStorage.getHeader();
-                        req.priorStorage = priorStorage.getDefinition().getStorage();
-                })
+                // Load all prior metadata (file and storage)
+                .thenCompose(x -> loadMetadata(tenant, priorVersion, prior))
 
                 // Bump object versions
-                .thenAccept(x -> req.fileId = bumpVersion(req.priorFileId))
-                .thenAccept(x -> req.storageId = bumpVersion(req.priorStorageId))
+                .thenAccept(x -> state.fileId = bumpVersion(prior.fileId))
+                .thenAccept(x -> state.storageId = bumpVersion(prior.storageId))
 
                 // Build definition objects
-                .thenAccept(x -> req.file = updateFileDef(req.priorFile, req.fileId, name, mimeType))
-                .thenAccept(x -> req.storage = updateStorageDef(
-                        req.priorStorage, config.getDefaultStorageKey(), req.objectTimestamp,
-                        req.fileId, name, mimeType, random))
+                .thenAccept(x -> state.file = updateFileDef(prior.file, state.fileId, name, mimeType))
+                .thenAccept(x -> state.storage = updateStorageDef(
+                        prior.storage, config.getDefaultStorageKey(), state.objectTimestamp,
+                        state.fileId, name, mimeType, random))
 
-                .thenAccept(x -> validator.validateVersion(req.file, req.priorFile))
+                .thenAccept(x -> validator.validateVersion(state.file, prior.file))
 
                 // Write file content stream to the storage layer
                 .thenCompose(x -> writeDataItem(
-                        req.storage,
-                        req.file.getDataItem(),
+                        state.storage,
+                        state.file.getDataItem(),
                         contentStream, execContext))
 
                 // Check and record size from storage in file definition
                 .thenApply(size -> checkSize(size, expectedSize))
-                .thenAccept(size -> req.file = recordSize(size, req.file))
+                .thenAccept(size -> state.file = recordSize(size, state.file))
 
                 // Add controlled tag attrs (must be done after file size is known)
-                .thenAccept(x -> req.fileTags = updateFileAttrs(req.fileTags, req.file))
+                .thenAccept(x -> state.fileTags = updateFileAttrs(state.fileTags, state.file))
 
                 // Storage attrs do not require an explicit update
 
-                // Save storage metadata
-                .thenCompose(x -> MetadataHelpers.updateObject(metaApi,
-                        tenant, MetadataUtil.selectorFor(req.priorStorageId),
-                        req.storage, req.storageTags, ObjectDefinition.Builder::setStorage))
-
-                // Save file metadata
-                .thenCompose(x -> MetadataHelpers.updateObject(metaApi,
-                        tenant, MetadataUtil.selectorFor(req.priorFileId),
-                        req.file, req.fileTags, ObjectDefinition.Builder::setFile));
-
+                // Save all metadata
+                .thenCompose(x -> saveMetadata(tenant, state, prior));
     }
 
     public void readFile(
@@ -229,11 +212,7 @@ public class FileRwService {
 
         CompletableFuture.completedFuture(null)
 
-                .thenCompose(x -> MetadataHelpers.readObject(metaApi, tenant, selector))
-                .thenAccept(obj -> state.file = obj.getDefinition().getFile())
-
-                .thenCompose(x -> MetadataHelpers.readObject(metaApi, tenant, state.file.getStorageId()))
-                .thenAccept(obj -> state.storage = obj.getDefinition().getStorage())
+                .thenCompose(x -> loadMetadata(tenant, selector, state))
 
                 .thenAccept(x -> definition.complete(state.file))
 
@@ -243,7 +222,59 @@ public class FileRwService {
                 .exceptionally(error -> Helpers.reportError(error, definition, content));
     }
 
+    private CompletionStage<Void> loadMetadata(String tenant, TagSelector fileSelector, RequestState state) {
 
+        var request = requestForSelector(tenant, fileSelector);
+
+        return grpcWrap
+                .unaryCall(READ_OBJECT_METHOD, request, metaApi::readObject)
+                .thenAccept(tag -> {
+                    state.fileId = tag.getHeader();
+                    state.file = tag.getDefinition().getFile();
+                })
+                .thenCompose(x ->loadStorageMetadata(tenant, state));
+    }
+
+    private CompletionStage<Void> loadStorageMetadata(String tenant, RequestState state) {
+
+        var request = requestForSelector(tenant, state.file.getStorageId());
+
+        return grpcWrap
+                .unaryCall(READ_OBJECT_METHOD, request, metaApi::readObject)
+                .thenAccept(tag -> {
+
+                    state.storageId = tag.getHeader();
+                    state.storage = tag.getDefinition().getStorage();
+                });
+    }
+
+    private CompletionStage<TagHeader> saveMetadata(String tenant, RequestState state) {
+
+        var priorStorageId = selectorFor(state.preAllocStorageId);
+        var storageReq = buildCreateObjectReq(tenant, priorStorageId, state.storage, state.storageTags);
+
+        var priorFileId = selectorFor(state.preAllocFileId);
+        var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
+
+        return grpcWrap
+                .unaryCall(CREATE_PREALLOCATED_METHOD, storageReq, metaApi::createPreallocatedObject)
+                .thenCompose(x -> grpcWrap
+                .unaryCall(CREATE_PREALLOCATED_METHOD, fileReq, metaApi::createPreallocatedObject));
+    }
+
+    private CompletionStage<TagHeader> saveMetadata(String tenant, RequestState state, RequestState prior) {
+
+        var priorStorageId = selectorFor(prior.storageId);
+        var storageReq = buildCreateObjectReq(tenant, priorStorageId, state.storage, state.storageTags);
+
+        var priorFileId = selectorFor(prior.fileId);
+        var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
+
+        return grpcWrap
+                .unaryCall(UPDATE_OBJECT_METHOD, storageReq, metaApi::updateObject)
+                .thenCompose(x -> grpcWrap
+                .unaryCall(UPDATE_OBJECT_METHOD, fileReq, metaApi::updateObject));
+    }
 
     private CompletionStage<Long> writeDataItem(
             StorageDefinitionOrBuilder storageDef, String dataItem,
@@ -333,21 +364,22 @@ public class FileRwService {
     // -----------------------------------------------------------------------------------------------------------------
 
     private static FileDefinition createFileDef(
-            TagHeader fileHeader, String fileName, String mimeType) {
+            TagHeader fileHeader, String fileName, String mimeType, TagHeader storageId) {
 
-        return buildFileDef(FileDefinition.newBuilder(), fileHeader, fileName, mimeType);
+        return buildFileDef(FileDefinition.newBuilder(), fileHeader, fileName, mimeType, selectorForLatest(storageId));
     }
 
     private static FileDefinition updateFileDef(
             FileDefinition priorFile,
             TagHeader fileHeader, String fileName, String mimeType) {
 
-        return buildFileDef(priorFile.toBuilder(), fileHeader, fileName, mimeType);
+        return buildFileDef(priorFile.toBuilder(), fileHeader, fileName, mimeType, priorFile.getStorageId());
     }
 
     private static FileDefinition buildFileDef(
             FileDefinition.Builder fileDef,
-            TagHeader fileHeader, String fileName, String mimeType) {
+            TagHeader fileHeader, String fileName, String mimeType,
+            TagSelector storageId) {
 
         var fileId = UUID.fromString(fileHeader.getObjectId());
         var fileVersion = fileHeader.getObjectVersion();
@@ -363,6 +395,7 @@ public class FileRwService {
                 .setName(fileName)
                 .setExtension(extension)
                 .setMimeType(mimeType)
+                .setStorageId(storageId)
                 .setDataItem(dataItem)
                 .build();
     }
@@ -492,7 +525,7 @@ public class FileRwService {
     private static List<TagUpdate> createStorageAttrs(List<TagUpdate> tags, TagHeader objectId) {
 
         // TODO: Special metadata Value type for handling tag selectors
-        var selector = MetadataUtil.selectorForLatest(objectId);
+        var selector = selectorForLatest(objectId);
         var storageObjectAttr = String.format("%s:%s", selector.getObjectType(), selector.getObjectId());
 
         var storageForAttr = TagUpdate.newBuilder()
@@ -510,15 +543,6 @@ public class FileRwService {
 
         return fileDef.toBuilder()
                 .setSize(actualSize)
-                .build();
-    }
-
-    private static FileDefinition recordStorageId(TagHeader storageId, FileDefinition fileDef) {
-
-        var storageSelector = MetadataUtil.selectorForLatest(storageId);
-
-        return fileDef.toBuilder()
-                .setStorageId(storageSelector)
                 .build();
     }
 }

@@ -19,9 +19,11 @@ package com.accenture.trac.svc.data.service;
 import com.accenture.trac.api.MetadataBatchRequest;
 import com.accenture.trac.api.MetadataReadRequest;
 import com.accenture.trac.api.MetadataWriteRequest;
-import com.accenture.trac.metadata.ObjectType;
-import com.accenture.trac.metadata.TagHeader;
-import com.accenture.trac.metadata.TagSelector;
+import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.metadata.*;
+import com.google.protobuf.Message;
+
+import java.util.List;
 
 public class MetadataBuilders {
 
@@ -57,6 +59,70 @@ public class MetadataBuilders {
         return priorVersion.toBuilder()
                 .setObjectVersion(priorVersion.getObjectVersion() + 1)
                 .setTagVersion(1)
+                .build();
+    }
+
+    static ObjectDefinition objectOf(Message def) {
+
+        if (def instanceof DataDefinition)
+            return objectOf((DataDefinition) def);
+
+        if (def instanceof FileDefinition)
+            return objectOf((FileDefinition) def);
+
+        if (def instanceof SchemaDefinition)
+            return objectOf((SchemaDefinition) def);
+
+        if (def instanceof StorageDefinition)
+            return objectOf((StorageDefinition) def);
+
+        throw new EUnexpected();
+    }
+
+    static ObjectDefinition objectOf(DataDefinition def) {
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setData(def)
+                .build();
+    }
+
+    static ObjectDefinition objectOf(FileDefinition def) {
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.FILE)
+                .setFile(def)
+                .build();
+    }
+
+    static ObjectDefinition objectOf(SchemaDefinition def) {
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setSchema(def)
+                .build();
+    }
+
+    static ObjectDefinition objectOf(StorageDefinition def) {
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.STORAGE)
+                .setStorage(def)
+                .build();
+    }
+
+    static <TDef extends Message> MetadataWriteRequest buildCreateObjectReq(
+            String tenant, TagSelector priorVersion,
+            TDef definition, List<TagUpdate> tagUpdates) {
+
+        var objectDef = objectOf(definition);
+
+        return MetadataWriteRequest.newBuilder()
+                .setTenant(tenant)
+                .setObjectType(objectDef.getObjectType())
+                .setPriorVersion(priorVersion)
+                .setDefinition(objectDef)
+                .addAllTagUpdates(tagUpdates)
                 .build();
     }
 }
