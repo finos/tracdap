@@ -22,6 +22,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Flow;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -38,7 +40,7 @@ public class GrpcServerWrap {
     void unaryCall(
             MethodDescriptor<TRequest, TResponse> method,
             TRequest request, StreamObserver<TResponse> response,
-            Function<TRequest, CompletableFuture<TResponse>> methodImpl) {
+            Function<TRequest, CompletionStage<TResponse>> methodImpl) {
 
         try {
 
@@ -63,6 +65,33 @@ public class GrpcServerWrap {
 
                 return null;
             });
+        }
+        catch (Exception error) {
+
+            var grpcError = GrpcErrorMapping.processError(error);
+
+            log.error("API CALL FAILED: [{}] {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
+            response.onError(grpcError);
+        }
+    }
+
+    public <TRequest, TResponse>
+    void serverStreaming(
+            MethodDescriptor<TRequest, TResponse> method,
+            TRequest request, StreamObserver<TResponse> response,
+            Function<TRequest, Flow.Publisher<TResponse>> methodImpl) {
+
+        try {
+
+            log.info("API CALL START: [{}]", method.getBareMethodName());
+
+            var resultPublisher = methodImpl.apply(request);
+
+            // TODO: Move logging to here
+
+            var resultSubscriber = new GrpcServerResponseStream<>(method, response);
+            resultPublisher.subscribe(resultSubscriber);
+
         }
         catch (Exception error) {
 

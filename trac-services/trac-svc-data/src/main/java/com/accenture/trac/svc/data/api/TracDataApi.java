@@ -19,6 +19,7 @@ package com.accenture.trac.svc.data.api;
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.concurrent.ExecutionContext;
 import com.accenture.trac.common.concurrent.IExecutionContext;
+import com.accenture.trac.common.grpc.GrpcServerWrap;
 import com.accenture.trac.common.util.Bytes;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.grpc.GrpcStreams;
@@ -41,9 +42,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
-import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 
 public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
@@ -60,7 +59,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_FILE_METHOD = TracDataApiGrpc.getUpdateFileMethod();
     private static final MethodDescriptor<FileReadRequest, FileReadResponse> READ_FILE_METHOD = TracDataApiGrpc.getReadFileMethod();
 
-    static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_SMALL_FILE_METHOD = TracDataApiGrpc.getCreateSmallFileMethod();
+    private static final MethodDescriptor<FileWriteRequest, TagHeader> CREATE_SMALL_FILE_METHOD = TracDataApiGrpc.getCreateSmallFileMethod();
     private static final MethodDescriptor<FileWriteRequest, TagHeader> UPDATE_SMALL_FILE_METHOD = TracDataApiGrpc.getUpdateSmallFileMethod();
     private static final MethodDescriptor<FileReadRequest, FileReadResponse> READ_SMALL_FILE_METHOD = TracDataApiGrpc.getReadSmallFileMethod();
 
@@ -69,12 +68,17 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     private final DataRwService dataRwService;
     private final FileRwService fileService;
 
-    private final Validator validator = new Validator();
+    private final Validator validator;
+    private final GrpcServerWrap grpcWrap;
 
 
     public TracDataApi(DataRwService dataRwService, FileRwService fileService) {
+
         this.dataRwService = dataRwService;
         this.fileService = fileService;
+
+        this.validator = new Validator();
+        this.grpcWrap = new GrpcServerWrap(getClass());
     }
 
 
@@ -123,21 +127,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void readDataset(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
 
-        serverStreaming(READ_DATASET_METHOD, request, responseObserver,
-                DataReadResponse::newBuilder,
-                DataReadResponse.Builder::setSchema,
-                DataReadResponse.Builder::setContent,
-                this::doReadDataset);
+        grpcWrap.serverStreaming(READ_DATASET_METHOD, request, responseObserver, this::readDataset);
     }
 
     @Override
     public void readSmallDataset(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
 
-        smallServerStreaming(READ_SMALL_DATASET_METHOD, request, responseObserver,
-                DataReadResponse::newBuilder,
-                DataReadResponse.Builder::setSchema,
-                DataReadResponse.Builder::setContent,
-                this::doReadDataset);
+        grpcWrap.unaryCall(READ_SMALL_DATASET_METHOD, request, responseObserver, this::readSmallDataset);
     }
 
     @Override
@@ -181,21 +177,13 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void readFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
-        serverStreaming(READ_FILE_METHOD, request, responseObserver,
-                FileReadResponse::newBuilder,
-                FileReadResponse.Builder::setFileDefinition,
-                FileReadResponse.Builder::setContent,
-                this::doReadFile);
+        grpcWrap.serverStreaming(READ_FILE_METHOD, request, responseObserver, this::readFile);
     }
 
     @Override
     public void readSmallFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
-        smallServerStreaming(READ_SMALL_FILE_METHOD, request, responseObserver,
-                FileReadResponse::newBuilder,
-                FileReadResponse.Builder::setFileDefinition,
-                FileReadResponse.Builder::setContent,
-                this::doReadFile);
+        grpcWrap.unaryCall(READ_SMALL_FILE_METHOD, request, responseObserver, this::readSmallFile);
     }
 
 
@@ -225,16 +213,57 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         return dataRwService.updateDataset(request, byteStream, execCtx);
     }
 
-    private void doReadDataset(
-            String methodName,
-            DataReadRequest request,
-            CompletableFuture<SchemaDefinition> schema,
-            Flow.Subscriber<ByteBuf> byteStream,
-            IExecutionContext execCtx) {
+    private Flow.Publisher<DataReadResponse> readDataset(DataReadRequest request) {
 
-        validateRequest(methodName, request);
+        validateRequest(READ_DATASET_METHOD.getBareMethodName(), request);
 
-        dataRwService.readDataset(request, schema, byteStream, execCtx);
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+
+        var schemaResult = new CompletableFuture<SchemaDefinition>();
+        var dataStream = Flows.<ByteBuf>hub(execCtx);
+
+        dataRwService.readDataset(request, schemaResult, dataStream, execCtx);
+
+        var schemaMsg = schemaResult.thenApply(schema ->
+                DataReadResponse.newBuilder()
+                .setSchema(schema)
+                .build());
+
+        var protoDataStream = Flows.map(dataStream, Bytes::toProtoBytes);
+        var dataMsg = Flows.map(protoDataStream, chunk ->
+                DataReadResponse.newBuilder()
+                .setContent(chunk)
+                .build());
+
+        // Flows.concat will only request from the data pipeline if schemaMsg completes successfully
+
+        return Flows.concat(schemaMsg, dataMsg);
+    }
+
+    private CompletionStage<DataReadResponse> readSmallDataset(DataReadRequest request) {
+
+        validateRequest(READ_SMALL_DATASET_METHOD.getBareMethodName(), request);
+
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+
+        var schemaResult = new CompletableFuture<SchemaDefinition>();
+        var dataStream = Flows.<ByteBuf>hub(execCtx);
+
+        dataRwService.readDataset(request, schemaResult, dataStream, execCtx);
+
+        return schemaResult.thenCompose(schema -> {
+
+            // Flows.fold triggers a request from the data pipeline
+            // So, only do this if schemaResult completes successfully
+
+            var protoDataStream = Flows.map(dataStream, Bytes::toProtoBytes);
+            var protoAggregate = Flows.fold(protoDataStream, ByteString::concat, ByteString.EMPTY);
+
+            return protoAggregate.thenApply(data -> DataReadResponse.newBuilder()
+                    .setSchema(schema)
+                    .setContent(data)
+                    .build());
+        });
     }
 
     private CompletionStage<TagHeader> doCreateFile(
@@ -284,19 +313,61 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                 byteStream, execCtx);
     }
 
-    private void doReadFile(
-            String methodName,
-            FileReadRequest request,
-            CompletableFuture<FileDefinition> fileDef,
-            Flow.Subscriber<ByteBuf> byteStream,
-            IExecutionContext execCtx) {
+    private Flow.Publisher<FileReadResponse> readFile(FileReadRequest request) {
 
-        validateRequest(methodName, request);
+        validateRequest(READ_FILE_METHOD.getBareMethodName(), request);
 
-        var tenant = request.getTenant();
-        var selector = request.getSelector();
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
 
-        fileService.readFile(tenant, selector, fileDef, byteStream, execCtx);
+        var fileResult = new CompletableFuture<FileDefinition>();
+        var dataStream = Flows.<ByteBuf>hub(execCtx);
+
+        fileService.readFile(
+                request.getTenant(), request.getSelector(),
+                fileResult, dataStream, execCtx);
+
+        var msg0 = fileResult.thenApply(file ->
+                FileReadResponse.newBuilder()
+                .setFileDefinition(file)
+                .build());
+
+        var protoDataStream = Flows.map(dataStream, Bytes::toProtoBytes);
+        var contentMsg = Flows.map(protoDataStream, chunk ->
+                FileReadResponse.newBuilder()
+                .setContent(chunk)
+                .build());
+
+        // Flows.concat will only request from the data pipeline if msg0 completes successfully
+
+        return Flows.concat(msg0, contentMsg);
+    }
+
+    private CompletionStage<FileReadResponse> readSmallFile(FileReadRequest request) {
+
+        validateRequest(READ_SMALL_FILE_METHOD.getBareMethodName(), request);
+
+        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
+
+        var fileResult = new CompletableFuture<FileDefinition>();
+        var dataStream = Flows.<ByteBuf>hub(execCtx);
+
+        fileService.readFile(
+                request.getTenant(), request.getSelector(),
+                fileResult, dataStream, execCtx);
+
+        return fileResult.thenCompose(file -> {
+
+            // Flows.fold triggers a request from the data pipeline
+            // So, only do this if fileResult completes successfully
+
+            var protoDataStream = Flows.map(dataStream, Bytes::toProtoBytes);
+            var protoAggregate = Flows.fold(protoDataStream, ByteString::concat, ByteString.EMPTY);
+
+            return protoAggregate.thenApply(content -> FileReadResponse.newBuilder()
+                    .setFileDefinition(file)
+                    .setContent(content)
+                    .build());
+        });
     }
 
 
@@ -329,104 +400,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         return GrpcStreams.serverRequestStream(requestHub);
     }
 
-    @SuppressWarnings("unchecked")
-    private <
-            TReq extends Message, TResp extends Message,
-            TDef extends Message, TBuilder extends Message.Builder>
-    void serverStreaming(
-            MethodDescriptor<TReq, TResp> method, TReq request,
-            StreamObserver<TResp> responseObserver,
-            Supplier<TBuilder> responseSupplier,
-            BiFunction<TBuilder, TDef, TBuilder> putDefinition,
-            BiFunction<TBuilder, ByteString, TBuilder> putContent,
-            ServerStreamingMethod<TReq, TDef> apiMethod) {
-
-        log_start(method);
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-
-        var definition = new CompletableFuture<TDef>();
-        var message0 = definition.thenApply(def_ ->
-                (TResp) putDefinition
-                .apply(responseSupplier.get(), def_)
-                .build());
-
-        var byteStream = Flows.<ByteBuf>hub(execCtx);
-        var protoByteStream = Flows.map(byteStream, Bytes::toProtoBytes);
-        var content = Flows.map(protoByteStream, bytes ->
-                (TResp) putContent
-                .apply(responseSupplier.get(), bytes)
-                .build());
-
-        var response = Flows.concat(message0, content);
-
-        response.subscribe(GrpcStreams.serverResponseStream(method, responseObserver));
-
-        try {
-            apiMethod.execute(
-                    method.getBareMethodName(), request,
-                    definition, byteStream, execCtx);
-        }
-        catch (Exception e) {
-
-            // Handle synchronous exceptions during validation
-
-            if (!definition.isDone())
-                definition.completeExceptionally(e);
-            else
-                byteStream.onError(e);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private <
-            TReq extends Message, TResp extends Message,
-            TDef extends Message, TBuilder extends Message.Builder>
-    void smallServerStreaming(
-            MethodDescriptor<TReq, TResp> method, TReq request,
-            StreamObserver<TResp> responseObserver,
-            Supplier<TBuilder> responseSupplier,
-            BiFunction<TBuilder, TDef, TBuilder> putDefinition,
-            BiFunction<TBuilder, ByteString, TBuilder> putContent,
-            ServerStreamingMethod<TReq, TDef> apiMethod) {
-
-        log_start(method);
-
-        var execCtx = ExecutionContext.EXEC_CONTEXT_KEY.get();
-
-        var definition = new CompletableFuture<TDef>();
-
-        var byteStream = Flows.<ByteBuf>hub(execCtx);
-        var protoByteStream = Flows.map(byteStream, Bytes::toProtoBytes);
-        var content = Flows.fold(protoByteStream, ByteString::concat, ByteString.EMPTY);
-
-        var responseBuilder = responseSupplier.get();
-
-        var response = definition.thenAcceptBoth(content, (def_, bytes_) -> {
-
-            putDefinition.apply(responseBuilder, def_);
-            putContent.apply(responseBuilder, bytes_);
-
-        }).thenApply(x -> (TResp) responseBuilder.build());
-
-        Flows.publish(response).subscribe(GrpcStreams.serverResponseStream(method, responseObserver));
-
-        try {
-            apiMethod.execute(
-                    method.getBareMethodName(), request,
-                    definition, byteStream, execCtx);
-        }
-        catch (Exception e) {
-
-            // Handle synchronous exceptions during validation
-
-            if (!definition.isDone())
-                definition.completeExceptionally(e);
-            else
-                byteStream.onError(e);
-        }
-    }
-
     private <TReq extends Message>
     void validateRequest(String methodName, TReq msg) {
 
@@ -446,17 +419,6 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
         CompletionStage<TResp> execute(
                 String methodName, TReq request,
                 Flow.Publisher<ByteBuf> byteStream,
-                IExecutionContext execCtx);
-    }
-
-    @FunctionalInterface
-    private interface ServerStreamingMethod<
-            TReq extends Message, TDef extends Message> {
-
-        void execute(
-                String methodName, TReq request,
-                CompletableFuture<TDef> def,
-                Flow.Subscriber<ByteBuf> byteStream,
                 IExecutionContext execCtx);
     }
 

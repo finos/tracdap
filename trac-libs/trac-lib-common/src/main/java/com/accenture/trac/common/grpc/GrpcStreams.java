@@ -32,27 +32,27 @@ import java.util.function.BiConsumer;
 public class GrpcStreams {
 
     public static <T>
-    BiConsumer<T, Throwable> serverResponseHandler(MethodDescriptor<?, T> method, StreamObserver<T> observer) {
-
-        return new ServerResponseHandler<>(method, observer);
-    }
-
-    public static <T>
-    Flow.Subscriber<T> serverResponseStream(MethodDescriptor<?, T> method, StreamObserver<T> observer) {
-
-        return new ServerResponseStream<>(method, observer);
-    }
-
-    public static <T>
     StreamObserver<T> serverRequestStream(Flow.Subscriber<T> subscriber) {
 
         return new ServerRequestStream<>(subscriber);
     }
 
     public static <T>
-    StreamObserver<T> clientResponseHandler(CompletableFuture<T> result) {
+    Flow.Subscriber<T> serverResponseStream(MethodDescriptor<?, T> method, StreamObserver<T> observer) {
 
-        return new ClientResultHandler<>(result);
+        return new GrpcServerResponseStream<>(method, observer);
+    }
+
+    public static <T>
+    BiConsumer<T, Throwable> serverResponseHandler(MethodDescriptor<?, T> method, StreamObserver<T> observer) {
+
+        return new ServerResponseHandler<>(method, observer);
+    }
+
+    public static <T>
+    Flow.Subscriber<T> clientRequestStream(StreamObserver<T> observer) {
+
+        return new ClientRequestStream<>(observer);
     }
 
     public static <T>
@@ -62,11 +62,10 @@ public class GrpcStreams {
     }
 
     public static <T>
-    Flow.Subscriber<T> clientRequestStream(StreamObserver<T> observer) {
+    StreamObserver<T> clientResponseHandler(CompletableFuture<T> result) {
 
-        return new ClientRequestStream<>(observer);
+        return new ClientResultHandler<>(result);
     }
-
 
     public static class ServerResponseHandler<T> implements BiConsumer<T, Throwable> {
 
@@ -101,65 +100,6 @@ public class GrpcStreams {
 
                 grpcObserver.onError(grpcError);
             }
-        }
-    }
-
-    public static class ServerResponseStream<T> implements Flow.Subscriber<T> {
-
-        private final Logger log = LoggerFactory.getLogger(getClass());
-
-        private final MethodDescriptor<?, T> method;
-        private final StreamObserver<T> grpcObserver;
-
-        private final AtomicBoolean subscribed = new AtomicBoolean(false);
-        private Flow.Subscription subscription;
-
-        public ServerResponseStream(
-                MethodDescriptor<?, T> method,
-                StreamObserver<T> grpcObserver) {
-
-            this.method = method;
-            this.grpcObserver = grpcObserver;
-        }
-
-        @Override
-        public void onSubscribe(Flow.Subscription subscription) {
-
-            var subscribedOk = this.subscribed.compareAndSet(false, true);
-
-            if (!subscribedOk)
-                throw new ETracInternal("Multiple subscriptions on gRPC observer wrapper");
-
-            this.subscription = subscription;
-            subscription.request(1);
-        }
-
-        @Override
-        public void onNext(T item) {
-            grpcObserver.onNext(item);
-            subscription.request(1);
-        }
-
-        @Override
-        public void onError(Throwable error) {
-
-            var grpcError = GrpcErrorMapping.processError(error);
-
-            log.error("SERVER STREAMING CALL FAILED: [{}] {}",
-                    method.getBareMethodName(),
-                    grpcError.getMessage(),
-                    grpcError);
-
-            grpcObserver.onError(grpcError);
-            subscription.cancel();
-        }
-
-        @Override
-        public void onComplete() {
-
-            log.info("SERVER STREAMING CALL SUCCEEDED: [{}]", method.getBareMethodName());
-
-            grpcObserver.onCompleted();
         }
     }
 
