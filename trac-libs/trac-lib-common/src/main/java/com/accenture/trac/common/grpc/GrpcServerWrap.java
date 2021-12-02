@@ -16,47 +16,48 @@
 
 package com.accenture.trac.common.grpc;
 
+import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 
-public class ApiWrapper {
+public class GrpcServerWrap {
 
     private final Logger log;
 
-    public ApiWrapper(Class<?> apiClass) {
+    public GrpcServerWrap(Class<?> apiClass) {
         this.log = LoggerFactory.getLogger(apiClass);
     }
 
-    public <T> void unaryCall(StreamObserver<T> response, Supplier<CompletableFuture<T>> futureFunc) {
-
-        var stack = StackWalker.getInstance();
-        var method = stack.walk(frames -> frames.skip(1).findFirst());
-        var methodName = method.isPresent() ? method.get().getMethodName() : "(unknown API method)";
+    public <TRequest, TResponse>
+    void unaryCall(
+            MethodDescriptor<TRequest, TResponse> method,
+            TRequest request, StreamObserver<TResponse> response,
+            Function<TRequest, CompletableFuture<TResponse>> methodImpl) {
 
         try {
 
-            log.info("API CALL START: {}", methodName);
+            log.info("API CALL START: [{}]", method.getBareMethodName());
 
-            futureFunc.get().handle((result, error) -> {
+            methodImpl.apply(request).handle((result, error) -> {
 
                 if (result != null) {
 
-                    log.info("API CALL SUCCEEDED: {}", methodName);
+                    log.info("API CALL SUCCEEDED: [{}]", method.getBareMethodName());
 
                     response.onNext(result);
                     response.onCompleted();
                 }
                 else {
 
-                    log.error("API CALL FAILED: {}", methodName);
-                    log.error(methodName, error);
-
                     var grpcError = GrpcErrorMapping.processError(error);
+
+                    log.error("API CALL FAILED: [{}] {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
                     response.onError(grpcError);
                 }
 
@@ -65,11 +66,11 @@ public class ApiWrapper {
         }
         catch (Exception error) {
 
-            log.error("API CALL FAILED: {}", methodName);
-            log.error(methodName, error);
-
             var grpcError = GrpcErrorMapping.processError(error);
+
+            log.error("API CALL FAILED: [{}] {}", method.getBareMethodName(), grpcError.getMessage(), grpcError);
             response.onError(grpcError);
         }
     }
+
 }
