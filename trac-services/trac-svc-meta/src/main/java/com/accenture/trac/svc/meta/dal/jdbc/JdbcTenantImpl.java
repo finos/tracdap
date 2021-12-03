@@ -16,7 +16,7 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
-import com.accenture.trac.svc.meta.exception.ETenant;
+import com.accenture.trac.common.exception.ETenantNotFound;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +70,7 @@ class JdbcTenantImpl {
         if (tenantId == null) {
             var message = String.format("Unknown tenant [%s]", tenant);
             log.error(message);
-            throw new ETenant(message);
+            throw new ETenantNotFound(message);
         }
 
         return tenantId;

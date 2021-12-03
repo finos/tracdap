@@ -19,8 +19,8 @@ package com.accenture.trac.svc.meta.dal;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.svc.meta.exception.EMissingItem;
-import com.accenture.trac.svc.meta.exception.EWrongItemType;
+import com.accenture.trac.common.exception.EMetadataNotFound;
+import com.accenture.trac.common.exception.EMetadataWrongType;
 
 import java.util.List;
 import java.util.UUID;
@@ -587,19 +587,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var missing4 = selector.setObjectAsOf(MetadataCodec.encodeDatetime(asOfTime)).setLatestTag(true).build(); // as-of before object creation
 
         // Object should definitely be missing before it is saved!
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing1)));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing2)));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing3)));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing4)));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing1)));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing2)));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing3)));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing4)));
 
         // Save an item
         unwrap(dal.saveNewObject(TEST_TENANT, origTag));
 
         // No selectors should match
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing1)));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing2)));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing3)));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing4)));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing1)));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing2)));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing3)));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObject(TEST_TENANT, missing4)));
     }
 
     @Test
@@ -635,19 +635,19 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var missing4 = selector.setObjectAsOf(MetadataCodec.encodeDatetime(asOfTime)).setLatestTag(true).build(); // as-of before object creation
 
         // Object should definitely be missing before it is saved!
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing1))));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing2))));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing3))));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing4))));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing1))));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing2))));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing3))));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing4))));
 
         // Save an item
         unwrap(dal.saveNewObject(TEST_TENANT, origTag));
 
         // No selectors should match
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing1))));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing2))));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing3))));
-        assertThrows(EMissingItem.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing4))));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing1))));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing2))));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing3))));
+        assertThrows(EMetadataNotFound.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(validSelector, missing4))));
     }
 
     @Test
@@ -666,7 +666,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
                 .setLatestTag(true)
                 .build();
 
-        assertThrows(EWrongItemType.class, () -> unwrap(dal.loadObject(TEST_TENANT, selector)));
+        assertThrows(EMetadataWrongType.class, () -> unwrap(dal.loadObject(TEST_TENANT, selector)));
     }
 
     @Test
@@ -699,6 +699,6 @@ abstract class MetadataDalReadTest implements IDalTestable {
                 .setLatestTag(true)
                 .build();
 
-        assertThrows(EWrongItemType.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(selector, selector2))));
+        assertThrows(EMetadataWrongType.class, () -> unwrap(dal.loadObjects(TEST_TENANT, List.of(selector, selector2))));
     }
 }

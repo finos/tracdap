@@ -31,13 +31,13 @@ class RequestState {
     List<TagUpdate> storageTags;
 
     TagHeader dataId, preAllocDataId;
-    TagHeader fileId, priorFileId;
-    TagHeader storageId, preAllocStorageId, priorStorageId;
+    TagHeader fileId, preAllocFileId;
+    TagHeader storageId, preAllocStorageId;
 
     DataDefinition data;
     SchemaDefinition schema;
-    FileDefinition file, priorFile;
-    StorageDefinition storage, priorStorage;
+    FileDefinition file;
+    StorageDefinition storage;
 
     PartKey part;
     int snap;

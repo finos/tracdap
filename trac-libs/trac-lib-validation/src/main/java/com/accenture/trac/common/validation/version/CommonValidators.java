@@ -22,9 +22,9 @@ import com.accenture.trac.common.validation.core.ValidationContext;
 import com.accenture.trac.metadata.DatetimeValue;
 import com.accenture.trac.metadata.TagSelector;
 import com.google.protobuf.Descriptors;
-import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
+
 
 public class CommonValidators {
 
@@ -102,14 +102,10 @@ public class CommonValidators {
 
     public static ValidationContext sameOneOf(Object current, Object prior, ValidationContext ctx) {
 
-        var log = LoggerFactory.getLogger(CommonValidators.class);
-
         if (!ctx.isOneOf())
             throw new EUnexpected();
 
         if (ctx.field().getNumber() != ctx.priorField().getNumber()) {
-
-            log.info("one of does not match: {}", ctx.oneOf().getName());
 
             var err = String.format(
                     "Selected one of [%s] must not change between versions: prior = [%s], new = [%s]",
@@ -117,10 +113,6 @@ public class CommonValidators {
 
             return ctx.error(err);
         }
-
-
-
-        log.info("one of does match: {}", ctx.oneOf().getName());
 
         return ctx;
     }

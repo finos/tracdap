@@ -17,11 +17,13 @@
 package com.accenture.trac.svc.meta.api;
 
 import com.accenture.trac.api.*;
+import com.accenture.trac.common.grpc.GrpcServerWrap;
 import com.accenture.trac.metadata.Tag;
 import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.svc.meta.services.MetadataReadService;
 import com.accenture.trac.svc.meta.services.MetadataSearchService;
 import com.accenture.trac.svc.meta.services.MetadataWriteService;
+import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
 
 import static com.accenture.trac.svc.meta.services.MetadataConstants.PUBLIC_API;
@@ -29,58 +31,81 @@ import static com.accenture.trac.svc.meta.services.MetadataConstants.PUBLIC_API;
 
 public class TracMetadataApi extends TracMetadataApiGrpc.TracMetadataApiImplBase {
 
-    private final BaseMetadataApi baseApi;
+    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TracMetadataApiGrpc.getCreateObjectMethod();
+    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TracMetadataApiGrpc.getUpdateObjectMethod();
+    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_TAG_METHOD = TracMetadataApiGrpc.getUpdateTagMethod();
+
+    private static final MethodDescriptor<MetadataReadRequest, Tag> READ_OBJECT_METHOD = TracMetadataApiGrpc.getReadObjectMethod();
+    private static final MethodDescriptor<MetadataBatchRequest, MetadataBatchResponse> READ_BATCH_METHOD = TracMetadataApiGrpc.getReadBatchMethod();
+    private static final MethodDescriptor<MetadataSearchRequest, MetadataSearchResponse> SEARCH_METHOD = TracMetadataApiGrpc.getSearchMethod();
+
+    private static final MethodDescriptor<MetadataGetRequest, Tag> GET_OBJECT_METHOD = TracMetadataApiGrpc.getGetObjectMethod();
+    private static final MethodDescriptor<MetadataGetRequest, Tag> GET_LATEST_OBJECT_METHOD = TracMetadataApiGrpc.getGetObjectMethod();
+    private static final MethodDescriptor<MetadataGetRequest, Tag> GET_LATEST_TAG_METHOD = TracMetadataApiGrpc.getGetObjectMethod();
+
+    private final MetadataApiImpl apiImpl;
+    private final GrpcServerWrap grpcWrap;
 
     public TracMetadataApi(
             MetadataReadService readService,
             MetadataWriteService writeService,
             MetadataSearchService searchService) {
 
-        baseApi = new BaseMetadataApi(readService, writeService, searchService, PUBLIC_API);
+        apiImpl = new MetadataApiImpl(readService, writeService, searchService, PUBLIC_API);
+        grpcWrap = new GrpcServerWrap(getClass());
     }
 
     @Override
-    public void createObject(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
-        baseApi.createObject(request, responseObserver);
+    public void createObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
+
+        grpcWrap.unaryCall(CREATE_OBJECT_METHOD, request, response, apiImpl::createObject);
     }
 
     @Override
-    public void updateObject(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
-        baseApi.updateObject(request, responseObserver);
+    public void updateObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
+
+        grpcWrap.unaryCall(UPDATE_OBJECT_METHOD, request, response, apiImpl::updateObject);
     }
 
     @Override
-    public void updateTag(MetadataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
-        baseApi.updateTag(request, responseObserver);
+    public void updateTag(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
+
+        grpcWrap.unaryCall(UPDATE_TAG_METHOD, request, response, apiImpl::updateTag);
     }
 
     @Override
-    public void readObject(MetadataReadRequest request, StreamObserver<Tag> responseObserver) {
-        baseApi.readObject(request, responseObserver);
+    public void readObject(MetadataReadRequest request, StreamObserver<Tag> response) {
+
+        grpcWrap.unaryCall(READ_OBJECT_METHOD, request, response, apiImpl::readObject);
     }
 
     @Override
-    public void readBatch(MetadataBatchRequest request, StreamObserver<MetadataBatchResponse> responseObserver) {
-        baseApi.readBatch(request, responseObserver);
+    public void readBatch(MetadataBatchRequest request, StreamObserver<MetadataBatchResponse> response) {
+
+        grpcWrap.unaryCall(READ_BATCH_METHOD, request, response, apiImpl::readBatch);
     }
 
     @Override
-    public void search(MetadataSearchRequest request, StreamObserver<MetadataSearchResponse> responseObserver) {
-        baseApi.search(request, responseObserver);
+    public void search(MetadataSearchRequest request, StreamObserver<MetadataSearchResponse> response) {
+
+        grpcWrap.unaryCall(SEARCH_METHOD, request, response, apiImpl::search);
     }
 
     @Override
-    public void getObject(MetadataGetRequest request, StreamObserver<Tag> responseObserver) {
-        baseApi.getObject(request, responseObserver);
+    public void getObject(MetadataGetRequest request, StreamObserver<Tag> response) {
+
+        grpcWrap.unaryCall(GET_OBJECT_METHOD, request, response, apiImpl::getObject);
     }
 
     @Override
-    public void getLatestObject(MetadataGetRequest request, StreamObserver<Tag> responseObserver) {
-        baseApi.getLatestObject(request, responseObserver);
+    public void getLatestObject(MetadataGetRequest request, StreamObserver<Tag> response) {
+
+        grpcWrap.unaryCall(GET_LATEST_OBJECT_METHOD, request, response, apiImpl::getLatestObject);
     }
 
     @Override
-    public void getLatestTag(MetadataGetRequest request, StreamObserver<Tag> responseObserver) {
-        baseApi.getLatestTag(request, responseObserver);
+    public void getLatestTag(MetadataGetRequest request, StreamObserver<Tag> response) {
+
+        grpcWrap.unaryCall(GET_LATEST_TAG_METHOD, request, response, apiImpl::getLatestTag);
     }
 }

@@ -19,7 +19,6 @@ package com.accenture.trac.svc.meta.services;
 import com.accenture.trac.metadata.*;
 import com.accenture.trac.common.metadata.TypeSystem;
 import com.accenture.trac.common.exception.*;
-import com.accenture.trac.svc.meta.exception.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -236,7 +235,7 @@ public class TagUpdateService {
                     operation.name(), update.getAttrName());
 
             log.error("{} ({})", message, logTagHeader(tag));
-            throw new ETagUpdate(message);
+            throw new EMetadataBadUpdate(message);
         }
     }
 
@@ -250,7 +249,7 @@ public class TagUpdateService {
                     operation.name(), update.getAttrName());
 
             log.error("{} ({})", message, logTagHeader(tag));
-            throw new ETagUpdate(message);
+            throw new EMetadataBadUpdate(message);
         }
     }
 
@@ -268,7 +267,7 @@ public class TagUpdateService {
                     originalType.name(), updateType.name());
 
             log.error("{} ({})", message, logTagHeader(tag));
-            throw new ETagUpdate(message);
+            throw new EMetadataBadUpdate(message);
         }
     }
 
