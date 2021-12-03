@@ -104,7 +104,7 @@ jobs:
           cd trac-runtime/python
           pip-licenses --format=json > ../../build/compliance/python_runtime_licenses/python_runtime_licenses.json
           pip-licenses --format=html > ../../build/compliance/python_runtime_licenses/python_runtime_licenses.html
-          pip-licenses --allow-only="Apache Software License;BSD License;3-Clause BSD License"
+          pip-licenses --allow-only="Apache Software License;MIT License;BSD License;3-Clause BSD License"
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
