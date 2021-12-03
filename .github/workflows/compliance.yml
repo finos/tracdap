@@ -25,6 +25,7 @@ env:
   JAVA_VERSION: 11
   JAVA_DISTRIBUTION: zulu
   NODE_VERSION: 14.x
+  PYTHON_VERSION: 3.10
 
 
 jobs:
@@ -62,6 +63,48 @@ jobs:
 
       - name: License check
         run: ./gradlew checkLicense
+
+      # Always save the reports - they are especially needed when the checks have failed!
+      - name: Store compliance reports
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: compliance-reports
+          path: build/compliance/**
+
+  python_compliance:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: PIP Upgrade
+        run: python -m pip install --upgrade pip
+
+      - name: Install dependencies
+        run: |
+          cd trac-runtime/python
+          pip install -r requirements.txt
+
+      - name: License check
+        run: |
+          mkdir -p build/compliance
+          cd trac-runtime/python
+          pip-licenses --format=json > build/compliance/python_runtime_licenses/python_runtime_licenses.json
+          pip-licenses --format=html > build/compliance/python_runtime_licenses/python_runtime_licenses.html
+          pip-licenses --allow-only="Apache Software License;MIT License;BSD License;3-Clause BSD License"
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
