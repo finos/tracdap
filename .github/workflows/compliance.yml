@@ -30,7 +30,7 @@ env:
 
 jobs:
 
-  java_compliance:
+  platform_compliance:
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -72,7 +72,7 @@ jobs:
           name: compliance-reports
           path: build/compliance/**
 
-  python_compliance:
+  python_rutnime_compliance:
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
