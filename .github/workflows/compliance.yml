@@ -24,6 +24,7 @@ on:
 env:
   JAVA_VERSION: 11
   JAVA_DISTRIBUTION: zulu
+  NODE_VERSION: 14.x
 
 
 jobs:
@@ -53,13 +54,13 @@ jobs:
       - name: NVD cache
         uses: actions/cache@v2
         with:
-          key: nvd-dependency-check
-          path: ./build/nvd
+          key: compliance-cache-data
+          path: ./build/compliance-cache
 
-      - name: Dependency vulnerability scan
+      - name: OWASP dependency check
         run: ./gradlew dependencyCheckAggregate
 
-      - name: Dependency license scan
+      - name: License check
         run: ./gradlew checkLicense
 
       # Always save the reports - they are especially needed when the checks have failed!
@@ -68,4 +69,62 @@ jobs:
         if: always()
         with:
           name: compliance-reports
-          path: build/reports/**
+          path: build/compliance/**
+
+  web_api_compliance:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: trac-api/packages/web/package-lock.json
+
+      # Use a cache to save downloading global compliance data on every build (e.g. NVD)
+      # Compliance tasks will automatically look for updates and download deltas
+      - name: NVD cache
+        uses: actions/cache@v2
+        with:
+          key: compliance-cache-data
+          path: ./build/compliance-cache
+
+      - name: Install dependencies
+        run: |
+          cd trac-api/packages/web
+          npm install
+
+      - name: OWASP dependency check
+        run: |
+          mkdir -p build/compliance
+          cd trac-api/packages/web
+          npm run compliance-owasp
+
+      - name: License check
+        run: |
+          cd trac-api/packages/web
+          npm run compliance-licenses
+
+      - name: NPM audit
+        run: |
+          mkdir -p build/compliance/web-api-npm-audit
+          cd trac-api/packages/web
+          npm run compliance-audit
+
+      # Always save the reports - they are especially needed when the checks have failed!
+      - name: Store compliance reports
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: compliance-reports
+          path: build/compliance/**

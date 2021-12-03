@@ -40,23 +40,27 @@ subprojects {
 
 dependencyCheck {
 
-    data {
-        directory = rootProject.buildDir.path + '/nvd/'
-    }
+    outputDirectory = "$projectDir/build/compliance/platform-owasp"
 
-    suppressionFiles = ["$projectDir/dev/vulnerabilities/false-positives.xml"]
+    suppressionFiles = ["$projectDir/dev/compliance/owasp-false-positives.xml"]
 
     // CVSS score < 4 is "low severity" according to NIST
     // https://nvd.nist.gov/vuln-metrics/cvss
 
     failBuildOnCVSS = 4
+
+    data {
+        directory = rootProject.buildDir.path + '/compliance-cache/nvd/'
+    }
 }
 
 licenseReport {
 
-    allowedLicensesFile = new File("$projectDir/dev/licenses/permitted-licenses.json")
+    outputDir = "$projectDir/build/compliance/platform-licenses"
+
+    allowedLicensesFile = new File("$projectDir/dev/compliance/permitted-licenses.json")
 
     filters = [
             new LicenseBundleNormalizer(createDefaultTransformationRules: true),
-            new LicenseBundleNormalizer(bundlePath: "$projectDir/dev/licenses/license-normalization.json")]
+            new LicenseBundleNormalizer(bundlePath: "$projectDir/dev/compliance/license-normalization.json")]
 }
