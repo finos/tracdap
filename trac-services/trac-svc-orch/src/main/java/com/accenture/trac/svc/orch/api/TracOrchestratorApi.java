@@ -18,11 +18,30 @@ package com.accenture.trac.svc.orch.api;
 
 import com.accenture.trac.api.JobRequest;
 import com.accenture.trac.api.JobStatus;
+import com.accenture.trac.api.Orchestrator;
 import com.accenture.trac.api.TracOrchestratorApiGrpc;
+import com.accenture.trac.common.grpc.GrpcServerWrap;
 import com.accenture.trac.metadata.TagSelector;
+import com.accenture.trac.svc.orch.service.OrchestratorImpl;
+import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
 
+import java.util.concurrent.CompletionStage;
+
+
 public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestratorApiImplBase {
+
+    private static final MethodDescriptor<JobRequest, JobStatus> VALIDATE_JOB_METHOD = TracOrchestratorApiGrpc.getValidateJobMethod();
+    private static final MethodDescriptor<JobRequest, JobStatus> EXECUTE_JOB_METHOD = TracOrchestratorApiGrpc.getExecuteJobMethod();
+
+    private final OrchestratorImpl orchestrator;
+    private final GrpcServerWrap grpcWrap;
+
+    public TracOrchestratorApi(OrchestratorImpl orchestrator) {
+
+        this.orchestrator = orchestrator;
+        this.grpcWrap = new GrpcServerWrap(getClass());
+    }
 
     @Override
     public void validateJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
@@ -31,7 +50,8 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
     @Override
     public void executeJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
-        super.executeJob(request, responseObserver);
+
+        grpcWrap.unaryCall(EXECUTE_JOB_METHOD, request, responseObserver, this::executeJob);
     }
 
     @Override
@@ -42,5 +62,15 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     @Override
     public void followJob(TagSelector request, StreamObserver<JobStatus> responseObserver) {
         super.followJob(request, responseObserver);
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // API IMPLEMENTATION
+    // -----------------------------------------------------------------------------------------------------------------
+
+    private CompletionStage<JobStatus> executeJob(JobRequest request) {
+
+        return orchestrator.executeJob(request);
     }
 }

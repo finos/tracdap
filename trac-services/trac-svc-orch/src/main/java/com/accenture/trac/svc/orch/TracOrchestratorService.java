@@ -19,6 +19,7 @@ import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
 import com.accenture.trac.svc.orch.api.TracOrchestratorApi;
+import com.accenture.trac.svc.orch.service.OrchestratorImpl;
 import io.grpc.Server;
 import io.grpc.netty.NettyServerBuilder;
 import io.netty.channel.EventLoopGroup;
@@ -62,8 +63,11 @@ public class TracOrchestratorService extends CommonServiceBase {
             workerGroup = new NioEventLoopGroup(workerThreads, new DefaultThreadFactory("orch-svc"));
             bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("orch-boss"));
 
+            var orchestrator = new OrchestratorImpl(null);  // todo: metaClient
+            var orchestratorApi = new TracOrchestratorApi(orchestrator);
+
             this.server = NettyServerBuilder.forPort(DEFAULT_PORT)
-                    .addService(new TracOrchestratorApi())
+                    .addService(orchestratorApi)
                     .channelType(channelType)
                     .bossEventLoopGroup(bossGroup)
                     .workerEventLoopGroup(workerGroup)
