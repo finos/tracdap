@@ -55,10 +55,12 @@ project(":sql-drivers").projectDir = file("trac-libs/sql-drivers")
 
 include 'trac-svc-meta'
 include 'trac-svc-data'
+include 'trac-svc-orch'
 include 'trac-gateway'
 
 project(":trac-svc-meta").projectDir = file("trac-services/trac-svc-meta")
 project(":trac-svc-data").projectDir = file("trac-services/trac-svc-data")
+project(":trac-svc-orch").projectDir = file("trac-services/trac-svc-orch")
 project(":trac-gateway").projectDir = file("trac-services/trac-gateway")
 
 
