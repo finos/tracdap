@@ -100,10 +100,10 @@ jobs:
 
       - name: Safety check
         run: |
-          mkdir -p build/compliance/python-safety
+          mkdir -p build/compliance/python-runtime-safety
           cd trac-runtime/python
-          safety check --full-report --not-bare --output ../../build/compliance/python-safety/python-safety-report.txt
-          safety check --full-report --not-bare --json --output ../../build/compliance/python-safety/python-safety-report.json
+          safety check --full-report --not-bare --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
+          safety check --full-report --not-bare --json --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
 
       - name: License check
         run: |
@@ -182,3 +182,48 @@ jobs:
         with:
           name: compliance-reports
           path: build/compliance/**
+
+  publish_to_github:
+
+    if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+
+    runs-on: ubuntu-latest
+
+    needs:
+      - platform_compliance
+      - python_runtime_compliance
+      - web_api_compliance
+
+    steps:
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Get TRAC version
+        id: trac-version
+        run: |
+          trac_version=`dev/version.sh`
+          echo "trac_version = ${trac_version}"
+          echo "::set-output name=trac_version::${trac_version}"
+
+      - name: Fetch copmliance report artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: compliance-reports
+          path: trac-compliance-reports-${{ steps.trac-version.outputs.trac_version }}
+
+      - name: Build compliance reports tarball
+        run: tar -cvzf trac-compliance-reports-${{ steps.trac-version.outputs.trac_version }}.tgz trac-compliance-reports-${{ steps.trac-version.outputs.trac_version }}/
+
+      - name: Publish compliance reports
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: trac-compliance-reports-${{ steps.trac-version.outputs.trac_version }}.tgz
+          asset_name: trac-compliance-reports-${{ steps.trac-version.outputs.trac_version }}.tgz
+          asset_content_type: application/gzip
