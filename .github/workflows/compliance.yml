@@ -101,6 +101,7 @@ jobs:
       - name: Safety check
         run: |
           mkdir -p build/compliance/python-safety
+          cd trac-runtime/python
           safety check --full-report --not-bare --output ../../build/compliance/python-safety/python-safety-report.txt
           safety check --full-report --not-bare --json --output ../../build/compliance/python-safety/python-safety-report.json
 
