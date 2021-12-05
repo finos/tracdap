@@ -72,7 +72,7 @@ jobs:
           name: compliance-reports
           path: build/compliance/**
 
-  python_rutnime_compliance:
+  python_runtime_compliance:
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
