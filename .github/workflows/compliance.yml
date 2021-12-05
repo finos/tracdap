@@ -98,12 +98,18 @@ jobs:
           cd trac-runtime/python
           pip install -r requirements.txt
 
+      - name: Safety check
+        run: |
+          mkdir -p build/compliance/python-safety
+          safety check --full-report --not-bare --output ../../build/compliance/python-safety/python-safety-report.txt
+          safety check --full-report --not-bare --json --output ../../build/compliance/python-safety/python-safety-report.json
+
       - name: License check
         run: |
-          mkdir -p build/compliance/python_runtime_licenses
+          mkdir -p build/compliance/python-runtime-licenses
           cd trac-runtime/python
-          pip-licenses --format=json > ../../build/compliance/python_runtime_licenses/python_runtime_licenses.json
-          pip-licenses --format=html > ../../build/compliance/python_runtime_licenses/python_runtime_licenses.html
+          pip-licenses --format=json > ../../build/compliance/python-runtime-licenses/python-runtime-licenses.json
+          pip-licenses --format=html > ../../build/compliance/python-runtime-licenses/python-runtime-licenses.html
           pip-licenses --allow-only="Apache Software License;MIT License;BSD License;3-Clause BSD License"
 
       # Always save the reports - they are especially needed when the checks have failed!
