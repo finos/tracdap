@@ -18,7 +18,7 @@ The TRAC runtime for Python has these requirements:
 
 * Python: 3.7 or later
 * Pandas: 1.0 or later
-* PySpark 2.4.x, 3.0.x or 3.1.x
+* PySpark 2.4.x, 3.0.x, 3.1.x or 3.2.x
 
 Not every combination of versions will work, e.g. PySpark 3 requires Python 3.8.
 
