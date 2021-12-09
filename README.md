@@ -39,10 +39,11 @@ https://github.com/Accenture/trac/actions/workflows/integration.yml)
 [![Packaging](https://github.com/Accenture/trac/actions/workflows/packaging.yml/badge.svg)](
 https://github.com/Accenture/trac/actions/workflows/packaging.yml)
 
-The current release series (0.2.x) is intended for reference and experimentation.
-It includes the metadata service, runtime engine for Python and a partial implementation
-of the platform Gateway. This release can be used to prototype client applications (e.g.
-web UIs) and to build and run models in a development sandbox.
+The current release series (0.3.x) is intended for reference and experimentation.
+It includes the metadata service, data service and core data engine, runtime engine
+for Python and a partial implementation of the platform Gateway. This release can
+be used to prototype client applications (e.g. web UIs) and to build and run models
+in a development sandbox.
 
 At the moment TRAC's API calls and metadata structures are subject to change between 
 versions, including between point versions. As the platform evolves these APIs will
