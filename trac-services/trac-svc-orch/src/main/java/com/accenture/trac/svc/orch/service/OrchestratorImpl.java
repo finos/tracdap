@@ -21,12 +21,10 @@ import com.accenture.trac.common.grpc.GrpcClientWrap;
 import com.accenture.trac.metadata.ObjectDefinition;
 import io.grpc.MethodDescriptor;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+
 
 public class OrchestratorImpl {
 
@@ -42,13 +40,81 @@ public class OrchestratorImpl {
     }
 
 
+    public interface IJobExecutor {
+
+        void executeJob(JobConfig)
+    }
+
+    public interface IJobState {
+
+    }
+
+    public interface IJobLogic {
+
+    }
+
+
+    public interface INode {
+
+    }
+
+    public record JobNode (
+            UUID nodeId,
+            int nodeType) {}
+
+
+    public record Graph (
+            Map<String, INode> nodes,
+            List<Map.Entry<String, String>> edges) {}
+
+    public record SubGraph () {}
+
+
+
+
+
     public CompletionStage<JobStatus> executeJob(JobRequest request) {
 
-        var state = new RequestState();
+        var stateRef = new RequestState();
 
-        return CompletableFuture.completedFuture(state)
+        return CompletableFuture.completedFuture(stateRef)
 
-                .thenCompose(state_ -> loadJobMetadata(request, state_))
+                .thenCompose(state -> loadJobMetadata(request, state))
+
+                /*
+
+                - VALIDATED METADATA
+                - BUILD LOGICAL JOB (maybe validate needs to be part of this step anyway)
+                - RESOLVE TREE
+                    * convert to execution tree
+                    * generate node hashes
+                    * check availability of all nodes, prune branches where possible
+                    * for branches with no available inputs, expand back and repeat
+                    * segment the tree into connected execution segments, which will be tasks
+                    * create physical task definitions for each segment
+
+
+                JOB tree node types
+
+                    load external data
+                    load internal data
+                    query internal data
+                    query external data
+                    save data
+                    run internal model
+                    run external model
+                    run task
+                    import model
+
+
+                 */
+
+                // VALIDATE METADATA
+
+                // BUILD LOGICAL JOB (or do together with validate)
+
+                // resolve tree
+                //
 
 
 
