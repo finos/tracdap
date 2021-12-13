@@ -10,3 +10,8 @@ RUN . /opt/trac/runtime-python/venv/bin/activate && pip install `ls /tmp/dist/tr
 
 FROM python:3.10-slim
 COPY --from=builder /opt/trac /opt/trac
+
+WORKDIR /opt/trac
+ENV PATH=/opt/trac/runtime-python/venv/bin:$PATH
+
+ENTRYPOINT ["python", "-m", "trac.rt.launch"]
