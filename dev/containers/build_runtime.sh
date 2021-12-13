@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-pip install --upgrade pip
-pip install -r /mnt/trac/trac-runtime/python/requirements.txt
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
-python /mnt/trac/dev/codegen/protoc-ctrl.py python_runtime --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/domain
-python /mnt/trac/dev/codegen/protoc-ctrl.py python_proto --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/proto
-python /mnt/trac/trac-runtime/python/package-ctrl.py
+git fetch --tags
+git remote | grep upstream >/dev/null && git fetch upstream --tags
+
+docker run --mount "type=bind,source=${SCRIPT_DIR}/../..,target=/mnt/trac" python:3.10 /mnt/trac/dev/containers/build_runtime_inner.sh
