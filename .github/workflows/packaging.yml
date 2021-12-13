@@ -52,7 +52,7 @@ jobs:
 
       - name: Install build environment dependencies
         run: |
-          pip install -r dev/requirements.txt
+          pip install -r trac-runtime/python/requirements.txt
 
       - name: Protoc code generation
         run: |
