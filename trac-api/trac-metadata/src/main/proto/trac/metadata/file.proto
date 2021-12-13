@@ -21,7 +21,6 @@ option java_package = "com.accenture.trac.metadata";
 option java_multiple_files = true;
 
 import "trac/metadata/object_id.proto";
-import "trac/metadata/type.proto";
 
 
 message FileDefinition {
