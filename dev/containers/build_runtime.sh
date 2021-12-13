@@ -15,8 +15,13 @@
 # limitations under the License.
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+TRAC_VERSION=DEVELOPMENT
+
+# TODO: Docker tags complain about version called XXX+devYY
+# $("${SCRIPT_DIR}/../version.sh")
 
 git fetch --tags
 git remote | grep upstream >/dev/null && git fetch upstream --tags
 
 docker run --mount "type=bind,source=${SCRIPT_DIR}/../..,target=/mnt/trac" python:3.10 /mnt/trac/dev/containers/build_runtime_inner.sh
+docker build -t "trac/runtime-python:${TRAC_VERSION}" "${SCRIPT_DIR}/../../trac-runtime/python"
