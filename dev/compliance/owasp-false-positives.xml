@@ -27,4 +27,14 @@
         <cpe>cpe:/a:www-sql_project:www-sql</cpe>
     </suppress>
 
+    <!-- Netty's Tomcat native classes JAR uses a different versioning scheme to the rest of Netty -->
+    <!-- This confuses Dependency Check into thinking an older version of Netty is being used -->
+    <suppress>
+        <notes><![CDATA[
+           file name: netty-tcnative-classes-2.0.46.Final.jar
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/io\.netty/netty\-tcnative\-classes@.*$</packageUrl>
+        <cpe>cpe:/a:netty:netty</cpe>
+    </suppress>
+
 </suppressions>

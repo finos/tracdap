@@ -28,6 +28,10 @@
     {
       "moduleName": "com.fasterxml.jackson:jackson-bom",
       "moduleLicense": null
+    },
+    {
+      "moduleName": "io.netty:netty-tcnative-classes",
+      "moduleLicense": null
     }
   ]
 }
