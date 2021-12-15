@@ -87,7 +87,7 @@ jobs:
               MYSQL_ALLOW_EMPTY_PASSWORD: yes }
 
           - { DB_NAME: PostgreSQL,
-              DB_IMAGE: 'postgres:9.6-alpine',
+              DB_IMAGE: 'postgres:10.19-alpine',
               DB_PORT: 5432,
               DB_OPTIONS: '--health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5',
               BUILD_sql_postgresql: true,

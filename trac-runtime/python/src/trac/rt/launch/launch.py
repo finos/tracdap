@@ -21,6 +21,8 @@ import typing as _tp
 import trac.rt.api as api
 import trac.rt.exec.runtime as runtime
 
+from .cli import cli_args
+
 
 def _resolve_config_file(
         config_path: _tp.Union[str, pathlib.Path],
@@ -85,6 +87,24 @@ def launch_model(
         _sys_config, _job_config,
         dev_mode=True,
         model_class=model_class)
+
+    runtime_instance.pre_start()
+
+    with runtime_instance as rt:
+        rt.submit_batch()
+        rt.wait_for_shutdown()
+
+
+def launch_cli():
+
+    launch_args = cli_args()
+
+    _sys_config = _resolve_config_file(launch_args.sys_config, None)
+    _job_config = _resolve_config_file(launch_args.job_config, None)
+
+    runtime_instance = runtime.TracRuntime(
+        _sys_config, _job_config,
+        dev_mode=launch_args.dev_mode)
 
     runtime_instance.pre_start()
 

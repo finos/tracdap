@@ -21,11 +21,15 @@ import sys
 import packaging.version
 
 
-ROOT_PATH = pathlib.Path(__file__) \
+SCRIPT_DIR = pathlib.Path(__file__) \
     .parent \
     .resolve()
 
-BUILD_PATH = ROOT_PATH \
+ROOT_PATH = SCRIPT_DIR \
+    .parent.parent \
+    .resolve()
+
+BUILD_PATH = SCRIPT_DIR \
     .joinpath("build")
 
 COPY_FILES = [
@@ -48,7 +52,7 @@ def copy_source_files():
 
     for file in COPY_FILES:
 
-        source_path = ROOT_PATH.joinpath(file)
+        source_path = SCRIPT_DIR.joinpath(file)
         target_path = BUILD_PATH.joinpath(file)
 
         if source_path.is_dir():
@@ -62,7 +66,7 @@ def copy_license():
     # Copy the license file out of the project root
 
     shutil.copy(
-        ROOT_PATH.joinpath("../../LICENSE"),
+        SCRIPT_DIR.joinpath("../../LICENSE"),
         BUILD_PATH.joinpath("LICENSE"))
 
 
@@ -73,7 +77,7 @@ def move_generated_into_src():
     # the main source tree
 
     src_metadata_path = BUILD_PATH.joinpath("src/trac/rt/metadata")
-    generated_metadata_path = ROOT_PATH.joinpath("generated/trac/rt_gen/domain/trac/metadata")
+    generated_metadata_path = SCRIPT_DIR.joinpath("generated/trac/rt_gen/domain/trac/metadata")
 
     shutil.rmtree(src_metadata_path)
     shutil.copytree(generated_metadata_path, src_metadata_path)
@@ -88,11 +92,11 @@ def move_generated_into_src():
 def set_trac_version():
 
     if platform.system().lower().startswith("win"):
-        command = ['powershell', '-ExecutionPolicy', 'Bypass', '-File', '..\\..\\dev\\version.ps1']
+        command = ['powershell', '-ExecutionPolicy', 'Bypass', '-File', f'{ROOT_PATH}\\dev\\version.ps1']
     else:
-        command = ['../../dev/version.sh']
+        command = [f'{ROOT_PATH}/dev/version.sh']
 
-    process = subprocess.Popen(command, stdout=subprocess.PIPE)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, cwd=ROOT_PATH)
     output, err = process.communicate()
     exit_code = process.wait()
 

@@ -49,3 +49,47 @@ processResources {
 
     from "${project(':trac-svc-meta').projectDir.path}/src/schema"
 }
+
+
+// As of version 8, Flyway requires some databases are supported by specific Flyway modules
+
+sourceSets {
+
+    h2 {}
+    mysql {}
+    mariadb {}
+    postgresql {}
+    sqlserver {}
+    oracle {}
+}
+
+dependencies {
+
+    // MySQL, Maria and SQL Server have support modules maintained by Flyway
+    mysqlRuntimeOnly group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version"
+    mariadbRuntimeOnly group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version"
+    sqlserverRuntimeOnly group: 'org.flywaydb', name: 'flyway-sqlserver', version: "$flyway_version"
+
+    // Other DBs just require the database driver JAR on the runtime classpath
+    h2RuntimeOnly group: 'com.h2database', name: 'h2', version: "$h2_version"
+    postgresqlRuntimeOnly group: 'org.postgresql', name: 'postgresql', version: "$postgresql_version"
+    oracleRuntimeOnly group: 'com.oracle.database.jdbc', name: 'ojdbc10', version: "$oracle_version"
+}
+
+sourceSets.each { dialect ->
+
+    if (dialect.name != "main" && dialect.name != "test") {
+
+        def key = (String) "sql_${dialect.name}"
+        def buildDriver = isFeatureEnabled(key)
+
+        if (buildDriver) {
+
+            println("Enabling Flyway support for SQL driver: ${dialect.name}")
+
+            dependencies {
+                runtimeOnly dialect.runtimeClasspath
+            }
+        }
+    }
+}

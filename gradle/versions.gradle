@@ -32,7 +32,7 @@ ext {
 
 
     // SQL (JDBC) drivers
-    h2_version = '1.4.200'
+    h2_version = '2.0.202'
     mysql_version = '8.0.27'
     mariadb_version = '2.7.4'
     postgresql_version = '42.3.1'
@@ -55,7 +55,7 @@ ext {
 
 
     // Flyway (database deploy tool)
-    flyway_version = '7.15.0'
+    flyway_version = '8.2.2'
 
     // Plugins
     aws_sdk_version = '1.12.128'
