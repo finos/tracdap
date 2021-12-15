@@ -49,3 +49,39 @@ processResources {
 
     from "${project(':trac-svc-meta').projectDir.path}/src/schema"
 }
+
+
+// Some supported databases require additional Flyway modules
+
+sourceSets {
+
+    mysql {}
+    mariadb {}
+    postgresql {}
+    sqlserver {}
+    oracle {}
+}
+
+dependencies {
+
+    mysqlRuntimeOnly group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version"
+    mariadbRuntimeOnly group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version"
+    // postgresqlRuntimeOnly group: 'org.flywaydb', name: 'postgresql', version: "$flyway_version"
+    sqlserverRuntimeOnly group: 'org.flywaydb', name: 'flyway-sqlserver', version: "$flyway_version"
+    //oracleRuntimeOnly group: 'org.flywaydb', name: 'ojdbc10', version: "$flyway_version"
+}
+
+sourceSets.each { dialect ->
+
+    if (dialect.name != "main" && dialect.name != "test") {
+
+        def key = (String) "sql_${dialect.name}"
+        def buildDriver = isFeatureEnabled(key)
+
+        if (buildDriver) {
+            dependencies {
+                runtimeOnly dialect.runtimeClasspath
+            }
+        }
+    }
+}
