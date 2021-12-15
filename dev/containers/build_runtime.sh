@@ -14,14 +14,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-TRAC_VERSION=DEVELOPMENT
+REPO_DIR=$(cd "$(dirname "$0")/../.." && pwd)
 
-# TODO: Docker tags complain about version called XXX+devYY
-# $("${SCRIPT_DIR}/../version.sh")
+BUILD_IMAGE=python:3.10
+TRAC_IMAGE=trac/runtime-python
+
+
+# Look up TRAC version
+echo Looking up TRAC version...
 
 git fetch --tags
 git remote | grep upstream >/dev/null && git fetch upstream --tags
 
-docker run --mount "type=bind,source=${SCRIPT_DIR}/../..,target=/mnt/trac" python:3.10 /mnt/trac/dev/containers/build_runtime_inner.sh
-docker build -t "trac/runtime-python:${TRAC_VERSION}" "${SCRIPT_DIR}/../../trac-runtime/python"
+TRAC_VERSION=$("${REPO_DIR}/dev/version.sh")
+
+# Docker cannot handle "+dev" version suffixes
+# For anything that is not a tagged release, use version DEVELOPMENT for the image tag
+if test "${TRAC_VERSION#*+dev}" != "${TRAC_VERSION}"
+then
+  TRAC_VERSION=DEVELOPMENT
+fi
+
+echo TRAC version = ${TRAC_VERSION}
+
+
+set -x
+docker run --mount "type=bind,source=${REPO_DIR},target=/mnt/trac" ${BUILD_IMAGE} /mnt/trac/dev/containers/build_runtime_inner.sh
+docker build -t "${TRAC_IMAGE}:${TRAC_VERSION}" "${REPO_DIR}/trac-runtime/python"
