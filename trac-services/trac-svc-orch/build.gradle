@@ -44,6 +44,8 @@ dependencies {
     implementation group: 'io.netty', name: 'netty-handler-proxy', version: "$netty_version"
     implementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
 
+    implementation group: 'io.kubernetes', name: 'client-java', version: "$kube_client_version"
+
     testImplementation project(':trac-lib-test')
 
     // Migration support for JUnit 4 Rules, provided by gRPC for managing test service instances

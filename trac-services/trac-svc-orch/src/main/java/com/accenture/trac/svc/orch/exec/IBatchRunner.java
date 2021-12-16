@@ -16,22 +16,26 @@
 
 package com.accenture.trac.svc.orch.exec;
 
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 
 public interface IBatchRunner {
 
     // Interface for running batch jobs, i.e. a job that runs using one-shot using a one-shot process
 
-    CompletableFuture<Void> createBatchSandbox();
+    CompletionStage<Void> executorStatus();
 
-    CompletableFuture<Void> writeBatchConfig();
+    CompletionStage<Void> createBatchSandbox();
 
-    CompletableFuture<Void> startBatch();
+    CompletionStage<Void> writeBatchConfig(UUID jobId);
 
-    CompletableFuture<Void> getBatchStatus();
+    CompletionStage<Void> startBatch(UUID jobId);
 
-    CompletableFuture<Void> readBatchResult();
+    CompletionStage<Void> getBatchStatus();
 
-    CompletableFuture<Void> cancelBatch();
+    CompletionStage<Void> readBatchResult();
+
+    CompletionStage<Void> cancelBatch();
 }

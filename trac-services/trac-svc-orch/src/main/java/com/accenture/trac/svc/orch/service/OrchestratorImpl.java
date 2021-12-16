@@ -42,7 +42,7 @@ public class OrchestratorImpl {
 
     public interface IJobExecutor {
 
-        void executeJob(JobConfig)
+        // void executeJob(JobConfig)
     }
 
     public interface IJobState {
@@ -57,19 +57,19 @@ public class OrchestratorImpl {
     public interface INode {
 
     }
-
-    public record JobNode (
-            UUID nodeId,
-            int nodeType) {}
-
-
-    public record Graph (
-            Map<String, INode> nodes,
-            List<Map.Entry<String, String>> edges) {}
-
-    public record SubGraph () {}
-
-
+//
+//    public record JobNode (
+//            UUID nodeId,
+//            int nodeType) {}
+//
+//
+//    public record Graph (
+//            Map<String, INode> nodes,
+//            List<Map.Entry<String, String>> edges) {}
+//
+//    public record SubGraph () {}
+//
+//
 
 
 
