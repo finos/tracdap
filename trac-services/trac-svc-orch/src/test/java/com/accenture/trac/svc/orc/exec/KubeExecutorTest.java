@@ -20,6 +20,7 @@ import com.accenture.trac.svc.orch.exec.kube.KubeBatchExecutor;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.UUID;
 
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
@@ -45,8 +46,12 @@ public class KubeExecutorTest {
 
         var jobId = UUID.randomUUID();
 
-        executor.writeBatchConfig(jobId);
-        var batchTask = executor.startBatch(jobId);
+        var configFiles = new HashMap<String, String>();
+        configFiles.put("sys_config.yaml", "");
+        configFiles.put("job_config.yaml", "");
+
+        executor.writeTextConfig(jobId, configFiles);
+        var batchTask = executor.startBatch(jobId, configFiles.keySet());
 
         waitFor(Duration.ofSeconds(10), batchTask);
         resultOf(batchTask);

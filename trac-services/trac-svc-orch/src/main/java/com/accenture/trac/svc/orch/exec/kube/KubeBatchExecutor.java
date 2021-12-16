@@ -29,6 +29,7 @@ import io.kubernetes.client.util.Config;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -98,7 +99,24 @@ public class KubeBatchExecutor implements IBatchRunner {
     }
 
     @Override
-    public CompletionStage<Void> writeBatchConfig(UUID jobId) {
+    public CompletionStage<Void> writeTextConfig(UUID jobId, Map<String, String> configFiles) {
+
+        var configMap = new V1ConfigMap()
+                .data(configFiles);
+
+        return writeConfig(jobId, configMap);
+    }
+
+    @Override
+    public CompletionStage<Void> writeBinaryConfig(UUID jobId, Map<String, byte[]> configFiles) {
+
+        var configMap = new V1ConfigMap()
+                .binaryData(configFiles);
+
+        return writeConfig(jobId, configMap);
+    }
+
+    private CompletionStage<Void> writeConfig(UUID jobId, V1ConfigMap configMap) {
 
         try {
 
@@ -108,23 +126,15 @@ public class KubeBatchExecutor implements IBatchRunner {
                     .name("trac-runtime-config-" + jobId)
                     .namespace(namespace);
 
-            var configFiles = Map.ofEntries(
-                    Map.entry("sys_config", ""),
-                    Map.entry("job_config", ""));
-
-            var configMap = new V1ConfigMap()
-                    .apiVersion("v1")
-                    .kind("ConfigMap")
-                    .metadata(configMetadata)
-                    .data(configFiles);
+            configMap.setApiVersion("v1");
+            configMap.setKind("ConfigMap");
+            configMap.setMetadata(configMetadata);
 
             var configMapResult = new CompletableFuture<Void>();
 
             kubeCoreApi.createNamespacedConfigMapAsync(
-                    namespace, configMap, null, null, null, basicApiCallback(
-                    (fut, result, status, headers) -> fut.complete(null),
-                    (fut, error, status, headers) -> fut.completeExceptionally(error),
-                    configMapResult));
+                    namespace, configMap, null, null, null,
+                    basicApiCallback(this::writeConfigSucceeded, this::writeConfigFailed, configMapResult));
 
             return configMapResult;
         }
@@ -134,8 +144,22 @@ public class KubeBatchExecutor implements IBatchRunner {
         }
     }
 
+    private void writeConfigSucceeded(
+            CompletableFuture<Void> future, V1ConfigMap result,
+            int statusCode, Map<String, List<String>> responseHeaders) {
+
+        future.complete(null);
+    }
+
+    private void writeConfigFailed(
+            CompletableFuture<Void> future, ApiException error,
+            int statusCode, Map<String, List<String>> responseHeaders) {
+
+        future.completeExceptionally(error);
+    }
+
     @Override
-    public CompletionStage<Void> startBatch(UUID jobId) {
+    public CompletionStage<Void> startBatch(UUID jobId, Set<String> configFiles) {
 
         try {
 
@@ -143,16 +167,18 @@ public class KubeBatchExecutor implements IBatchRunner {
                     .name("trac-job-" + jobId)
                     .namespace("default");
 
+            var configSource = new V1ConfigMapVolumeSource();
+            configSource.name("trac-runtime-config-" + jobId);
+
+            for (var configFile : configFiles) {
+                configSource.addItemsItem(new V1KeyToPath()
+                        .key(configFile)
+                        .path(configFile));
+            }
+
             var configVolume = new V1Volume()
                     .name("config-volume")
-                    .configMap(new V1ConfigMapVolumeSource()
-                    .name("trac-runtime-config-" + jobId)
-                    .addItemsItem(new V1KeyToPath()
-                            .key("sys_config")
-                            .path("sys_config.yaml"))
-                    .addItemsItem(new V1KeyToPath()
-                            .key("job_config")
-                            .path("job_config.yaml")));
+                    .configMap(configSource);
 
             var jobContainer = new V1Container()
 

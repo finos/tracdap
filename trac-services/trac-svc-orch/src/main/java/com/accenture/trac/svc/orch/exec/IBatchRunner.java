@@ -16,8 +16,9 @@
 
 package com.accenture.trac.svc.orch.exec;
 
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 
@@ -29,9 +30,11 @@ public interface IBatchRunner {
 
     CompletionStage<Void> createBatchSandbox();
 
-    CompletionStage<Void> writeBatchConfig(UUID jobId);
+    CompletionStage<Void> writeTextConfig(UUID jobId, Map<String, String> configFiles);
 
-    CompletionStage<Void> startBatch(UUID jobId);
+    CompletionStage<Void> writeBinaryConfig(UUID jobId, Map<String, byte[]> configFiles);
+
+    CompletionStage<Void> startBatch(UUID jobId, Set<String> configFiles);
 
     CompletionStage<Void> getBatchStatus();
 
