@@ -17,9 +17,8 @@
 package com.accenture.trac.gateway.proxy.rest;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.gateway.config.RouteConfig;
+import com.accenture.trac.config.GwRoute;
 import com.accenture.trac.gateway.config.rest.MetaApiRestMapping;
-import com.accenture.trac.gateway.routing.Http1RouterLink;
 import com.accenture.trac.gateway.proxy.http.Http1to2Framing;
 
 import io.netty.channel.*;
@@ -37,13 +36,13 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final RouteConfig routeConfig;
+    private final GwRoute routeConfig;
     private final int sourceHttpVersion;
     private final ChannelDuplexHandler routerLink;
     private final EventExecutor executor;
 
     public RestApiProxyBuilder(
-            RouteConfig routeConfig,
+            GwRoute routeConfig,
             int sourceHttpVersion,
             ChannelDuplexHandler routerLink,
             EventExecutor executor) {
@@ -81,7 +80,7 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
         var restApiConfig = MetaApiRestMapping.metaApiRoutes();
 
         var grpcHost = routeConfig.getTarget().getHost();
-        var grpcPort = routeConfig.getTarget().getPort();
+        var grpcPort = (short) routeConfig.getTarget().getPort();
         var restApiProxy = new RestApiProxy(grpcHost, grpcPort, restApiConfig, executor);
         pipeline.addLast(restApiProxy);
 

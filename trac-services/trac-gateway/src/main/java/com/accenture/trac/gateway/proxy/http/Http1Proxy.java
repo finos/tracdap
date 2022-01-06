@@ -17,7 +17,8 @@
 package com.accenture.trac.gateway.proxy.http;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.gateway.config.RouteConfig;
+import com.accenture.trac.config.GwRoute;
+
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -29,10 +30,10 @@ import java.util.regex.Pattern;
 
 public class Http1Proxy extends ChannelDuplexHandler {
 
-    private final RouteConfig routeConfig;
+    private final GwRoute routeConfig;
     private final Pattern matchPath;
 
-    public Http1Proxy(RouteConfig routeConfig) {
+    public Http1Proxy(GwRoute routeConfig) {
         this.routeConfig = routeConfig;
         this.matchPath = Pattern.compile("^" + routeConfig.getMatch().getPath());
     }

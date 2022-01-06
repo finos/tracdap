@@ -18,7 +18,7 @@ package com.accenture.trac.gateway.routing;
 
 import com.accenture.trac.common.exception.EUnexpected;
 
-import com.accenture.trac.gateway.config.RouteConfig;
+import com.accenture.trac.config.GwRoute;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http2.Http2ChannelDuplexHandler;
 import io.netty.handler.codec.http2.Http2Frame;
@@ -33,7 +33,7 @@ public class Http2Router extends Http2ChannelDuplexHandler {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    public Http2Router(List<RouteConfig> routeConfigs) {
+    public Http2Router(List<GwRoute> routeConfigs) {
 
     }
 

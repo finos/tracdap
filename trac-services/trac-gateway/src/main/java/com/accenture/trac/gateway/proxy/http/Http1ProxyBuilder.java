@@ -16,7 +16,7 @@
 
 package com.accenture.trac.gateway.proxy.http;
 
-import com.accenture.trac.gateway.config.RouteConfig;
+import com.accenture.trac.config.GwRoute;
 
 import io.netty.channel.*;
 import io.netty.handler.codec.http.HttpClientCodec;
@@ -28,11 +28,11 @@ public class Http1ProxyBuilder extends ChannelInitializer<Channel> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final RouteConfig routeConfig;
+    private final GwRoute routeConfig;
     ChannelDuplexHandler routerLink;
 
     public Http1ProxyBuilder(
-            RouteConfig routeConfig,
+            GwRoute routeConfig,
             ChannelDuplexHandler routerLink) {
 
         this.routeConfig = routeConfig;

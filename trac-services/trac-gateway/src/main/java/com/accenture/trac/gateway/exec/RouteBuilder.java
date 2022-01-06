@@ -16,7 +16,7 @@
 
 package com.accenture.trac.gateway.exec;
 
-import com.accenture.trac.gateway.config.RouteConfig;
+import com.accenture.trac.config.GwRoute;
 import com.accenture.trac.gateway.config.rest.MetaApiRestMapping;
 import com.accenture.trac.gateway.proxy.rest.RestApiMethod;
 import org.slf4j.Logger;
@@ -31,7 +31,7 @@ public class RouteBuilder {
 
     private static final Logger log = LoggerFactory.getLogger(RouteBuilder.class);
 
-    public static List<Route> buildAll(List<RouteConfig> routeConfigs) {
+    public static List<Route> buildAll(List<GwRoute> routeConfigs) {
 
         log.info("Pre-building the route map...");
 
@@ -41,7 +41,7 @@ public class RouteBuilder {
                 .collect(Collectors.toList());
     }
 
-    public static Route build(RouteConfig config, int routeIndex) {
+    public static Route build(GwRoute config, int routeIndex) {
 
         log.info("Building route: {} ({}) {}",
                 config.getRouteName(), config.getRouteType(),
@@ -58,10 +58,7 @@ public class RouteBuilder {
         return new Route(routeIndex, config, matcher, restMethods);
     }
 
-    private static List<RestApiMethod<?, ?, ?>> lookupRestMethods(RouteConfig config) {
-
-        if (config.getRestMapping() == null)
-            return null;
+    private static List<RestApiMethod<?, ?, ?>> lookupRestMethods(GwRoute config) {
 
         switch (config.getRestMapping()) {
 

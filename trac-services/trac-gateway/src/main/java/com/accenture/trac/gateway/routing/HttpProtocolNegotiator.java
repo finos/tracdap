@@ -17,7 +17,7 @@
 package com.accenture.trac.gateway.routing;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.gateway.config.GatewayConfig;
+import com.accenture.trac.config.GatewayConfig;
 import com.accenture.trac.gateway.exec.Route;
 
 import io.netty.channel.*;
@@ -60,7 +60,7 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
         int idleTimeout;
 
         try {
-            idleTimeout = config.getProxy().getIdleTimeout();
+            idleTimeout = config.getIdleTimeout();
         }
         catch (Exception e) {
             idleTimeout = DEFAULT_TIMEOUT;
@@ -69,7 +69,7 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
         this.idleTimeout = idleTimeout;
 
         this.http1Handler = () -> new Http1Router(routes, nextConnectionId.getAndIncrement());
-        this.http2Handler = () -> new Http2Router(config.getRoutes());
+        this.http2Handler = () -> new Http2Router(config.getRoutesList());
     }
 
     @Override

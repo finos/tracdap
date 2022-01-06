@@ -20,7 +20,8 @@ import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
-import com.accenture.trac.gateway.config.*;
+import com.accenture.trac.config.GatewayConfig;
+
 import com.accenture.trac.gateway.config.helpers.ConfigTranslator;
 import com.accenture.trac.gateway.exec.Route;
 import com.accenture.trac.gateway.exec.RouteBuilder;
@@ -79,13 +80,11 @@ public class TracPlatformGateway extends CommonServiceBase {
         try {
             log.info("Preparing gateway config...");
 
-            var rawConfig = configManager.loadRootConfigObject(RootConfig.class);
-            var config = ConfigTranslator.translateServiceRoutes(rawConfig);
+            var rawConfig = configManager.loadRootConfigObject(GatewayConfig.Builder.class).build();
+            gatewayConfig = ConfigTranslator.translateServiceRoutes(rawConfig);
 
-            gatewayConfig = config.getTrac().getGateway();
-            proxyPort = gatewayConfig.getProxy().getPort();
-
-            routes = RouteBuilder.buildAll(gatewayConfig.getRoutes());
+            proxyPort = (short) gatewayConfig.getPort();
+            routes = RouteBuilder.buildAll(gatewayConfig.getRoutesList());
 
             log.info("Gateway config looks ok");
         }

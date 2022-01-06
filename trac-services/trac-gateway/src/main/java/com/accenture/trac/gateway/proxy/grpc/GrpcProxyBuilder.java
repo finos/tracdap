@@ -17,8 +17,9 @@
 package com.accenture.trac.gateway.proxy.grpc;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.gateway.config.RouteConfig;
+import com.accenture.trac.config.GwRoute;
 import com.accenture.trac.gateway.proxy.http.Http1to2Framing;
+
 import io.netty.channel.*;
 import io.netty.handler.codec.http2.*;
 import io.netty.handler.logging.LogLevel;
@@ -37,12 +38,12 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final RouteConfig routeConfig;
+    private final GwRoute routeConfig;
     private final int sourceHttpVersion;
     private final ChannelDuplexHandler routerLink;
 
     public GrpcProxyBuilder(
-            RouteConfig routeConfig,
+            GwRoute routeConfig,
             int sourceHttpVersion,
             ChannelDuplexHandler routerLink) {
 
