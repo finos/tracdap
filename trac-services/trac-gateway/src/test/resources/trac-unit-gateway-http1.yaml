@@ -1,5 +1,4 @@
-#
-# Copyright 2020 Accenture Global Solutions Limited
+# Copyright 2022 Accenture Global Solutions Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,65 +11,59 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
+port: 8080
 
-trac:
-  gateway:
+routes:
 
-    proxy:
-      port: 8080
+  - routeName: TRAC Metadata Service
+    routeType: GRPC
 
-    routes:
+    match:
+      host: localhost
+      path: /trac.api.TracMetadataApi/.*
 
-      - routeName: TRAC Metadata Service
-        routeType: GRPC
+    target:
+      scheme: http
+      host: localhost
+      port: 8081
+      path: /trac.api.TracMetadataApi/
 
-        match:
-          host: localhost
-          path: /trac.api.TracMetadataApi/.*
+  - routeName: Static Docs
+    routeType: HTTP
 
-        target:
-          scheme: http
-          host: localhost
-          port: 8081
-          path: /trac.api.TracMetadataApi/
+    match:
+      host: localhost
+      path: /static/docs/
 
-      - routeName: Static Docs
-        routeType: HTTP
+    target:
+      scheme: http
+      host: localhost
+      port: 8090
+      path: /
 
-        match:
-          host: localhost
-          path: /static/docs/
+  - routeName: Server timeout
+    routeType: HTTP
 
-        target:
-          scheme: http
-          host: localhost
-          port: 8090
-          path: /
+    match:
+      host: localhost
+      path: /static/server_timeout/
 
-      - routeName: Server timeout
-        routeType: HTTP
+    target:
+      scheme: http
+      host: localhost
+      port: 8091
+      path: /
 
-        match:
-          host: localhost
-          path: /static/server_timeout/
+  - routeName: Server down
+    routeType: HTTP
 
-        target:
-          scheme: http
-          host: localhost
-          port: 8091
-          path: /
+    match:
+      host: localhost
+      path: /static/server_down/
 
-      - routeName: Server down
-        routeType: HTTP
-
-        match:
-          host: localhost
-          path: /static/server_down/
-
-        target:
-          scheme: http
-          host: localhost
-          port: 8092
-          path: /
+    target:
+      scheme: http
+      host: localhost
+      port: 8092
+      path: /
