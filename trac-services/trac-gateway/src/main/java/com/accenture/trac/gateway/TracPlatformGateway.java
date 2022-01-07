@@ -80,7 +80,7 @@ public class TracPlatformGateway extends CommonServiceBase {
         try {
             log.info("Preparing gateway config...");
 
-            var rawConfig = configManager.loadRootConfigObject(GatewayConfig.Builder.class).build();
+            var rawConfig = configManager.loadRootConfigObject(GatewayConfig.class);
             gatewayConfig = ConfigTranslator.translateServiceRoutes(rawConfig);
 
             proxyPort = (short) gatewayConfig.getPort();
