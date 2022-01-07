@@ -21,14 +21,14 @@ ext {
     netty_version = '4.1.72.Final'
 
     // Proto / gRPC (use a consistent set of versions, as defined by gRPC)
-    proto_version = '3.19.1'
+    proto_version = '3.19.2'
     grpc_version = '1.42.0'
     gapi_version = '2.7.0'
 
 
     // Data technologies
     arrow_version = '6.0.1'
-    jackson_version = '2.13.0'
+    jackson_version = '2.13.1'
 
 
     // SQL (JDBC) drivers
