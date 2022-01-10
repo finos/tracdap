@@ -28,8 +28,17 @@ message RuntimeConfig {
   map<string, string> config = 1;
 
   map<string, StorageConfig> storage = 2;
-  StorageSettings storageSettings = 3;
-  SparkSettings sparkSettings = 4;
+  map<string, RepositoryConfig> repositories = 3;
+
+  StorageSettings storageSettings = 4;
+  SparkSettings sparkSettings = 5;
+}
+
+message RepositoryConfig {
+
+  string repoType = 1;
+  string repoUrl = 2;
+  map<string, string> repoProps = 3;
 }
 
 message StorageSettings {
