@@ -74,7 +74,7 @@ public class TracDataService extends CommonServiceBase {
     @Override
     protected void doStartup(Duration startupTimeout) {
 
-        PlatformConfig config;
+        PlatformConfig platformConfig;
         DataServiceConfig dataSvcConfig;
 
         try {
@@ -89,8 +89,8 @@ public class TracDataService extends CommonServiceBase {
         try {
             log.info("Loading TRAC platform config...");
 
-            config = configManager.loadRootConfigObject(PlatformConfig.class);
-            dataSvcConfig = config.getServices().getData();
+            platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+            dataSvcConfig = platformConfig.getServices().getData();
 
             // TODO: Config validation
 
@@ -130,7 +130,7 @@ public class TracDataService extends CommonServiceBase {
             // Check default storage and format are available
             checkDefaultStorageAndFormat(storage, formats, dataSvcConfig);
 
-            var metaClient = prepareMetadataClient(config, clientChannelType);
+            var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
 
             var dataSvc = new DataService(dataSvcConfig, arrowAllocator, storage, formats, metaClient);
             var fileSvc = new FileService(dataSvcConfig, storage, metaClient);
@@ -185,10 +185,10 @@ public class TracDataService extends CommonServiceBase {
 
     private TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub
     prepareMetadataClient(
-            PlatformConfig config,
+            PlatformConfig platformConfig,
             Class<? extends io.netty.channel.Channel> channelType) {
 
-        var metaInstances = config.getInstances().getMetaList();
+        var metaInstances = platformConfig.getInstances().getMetaList();
 
         if (metaInstances.isEmpty()) {
 
