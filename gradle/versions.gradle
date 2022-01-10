@@ -21,14 +21,14 @@ ext {
     netty_version = '4.1.72.Final'
 
     // Proto / gRPC (use a consistent set of versions, as defined by gRPC)
-    proto_version = '3.19.1'
+    proto_version = '3.19.2'
     grpc_version = '1.42.0'
     gapi_version = '2.7.0'
 
 
     // Data technologies
     arrow_version = '6.0.1'
-    jackson_version = '2.13.0'
+    jackson_version = '2.13.1'
 
 
     // SQL (JDBC) drivers
@@ -42,16 +42,12 @@ ext {
     // JDBC Connection pool
     hikari_cp_version = '5.0.0'
 
-
-    // Config
-    snakeyaml_version = '1.29'
-
     // Apache Commons Components
     commons_cli_version = "1.5.0"
 
     // Logging
     slf4j_version = '1.7.32'
-    log4j_version = '2.16.0'
+    log4j_version = '2.17.1'
 
 
     // Flyway (database deploy tool)

@@ -18,7 +18,7 @@ package com.accenture.trac.svc.data.api;
 
 import com.accenture.trac.api.TracDataApiGrpc;
 import com.accenture.trac.api.TrustedMetadataApiGrpc;
-import com.accenture.trac.api.config.RootConfig;
+
 import com.accenture.trac.common.codec.CodecManager;
 import com.accenture.trac.common.startup.Startup;
 import com.accenture.trac.common.startup.StandardArgs;
@@ -26,6 +26,7 @@ import com.accenture.trac.common.concurrent.ExecutionContext;
 import com.accenture.trac.common.concurrent.ExecutionRegister;
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.storage.StorageManager;
+import com.accenture.trac.config.PlatformConfig;
 import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.svc.data.EventLoopChannel;
 import com.accenture.trac.svc.data.TracDataService;
@@ -174,12 +175,12 @@ abstract  class DataApiTestBase {
         plugins.initRegularPlugins();
 
         var config = startup.getConfig();
-        var rootConfig = config.loadRootConfigObject(RootConfig.class);
-        var dataSvcConfig = rootConfig.getTrac().getServices().getData();
+        var platformConfig = config.loadRootConfigObject(PlatformConfig.class);
+        var dataSvcConfig = platformConfig.getServices().getData();
 
         formats = new CodecManager(plugins);
         storage = new StorageManager(plugins);
-        storage.initStorage(dataSvcConfig.getStorage(), formats);
+        storage.initStorage(dataSvcConfig.getStorageMap(), formats);
 
         execContext = new ExecutionContext(new DefaultEventExecutor());
 

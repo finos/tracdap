@@ -16,66 +16,44 @@
 
 package com.accenture.trac.gateway.config.helpers;
 
-import com.accenture.trac.gateway.config.*;
+import com.accenture.trac.config.*;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 
 public class ConfigTranslator {
 
-    public static RootConfig translateServiceRoutes(RootConfig originalConfig) {
+    public static GatewayConfig translateServiceRoutes(com.accenture.trac.config.GatewayConfig originalConfig) {
 
-        var originalServices = originalConfig.getTrac().getGateway().getServices();
-        var originalRoutes = originalConfig.getTrac().getGateway().getRoutes();
+        var serviceRoutes = createRoutesForServices(originalConfig.getServices());
 
-        // There may be no additional routes, just the main services
-        if (originalRoutes == null) originalRoutes = List.of();
-
-        var serviceRoutes = createRoutesForServices(originalServices);
-
-        var allRoutes = Stream.concat(
-                serviceRoutes.stream(),
-                originalRoutes.stream())
-                .collect(Collectors.toList());
-
-        var gatewayConfig = new GatewayConfig();
-        gatewayConfig.setProxy(originalConfig.getTrac().getGateway().getProxy());
-        gatewayConfig.setServices(originalServices);
-        gatewayConfig.setRoutes(allRoutes);
-
-        var tracConfig = new TracConfig();
-        tracConfig.setGateway(gatewayConfig);
-
-        var translatedConfig = new RootConfig();
-        translatedConfig.setConfig(originalConfig.getConfig());
-        translatedConfig.setTrac(tracConfig);
-
-        return translatedConfig;
+        return originalConfig.toBuilder()
+                .addAllRoutes(serviceRoutes)
+                .build();
     }
 
-    public static List<RouteConfig> createRoutesForServices(ServicesConfig services) {
+    public static List<GwRoute> createRoutesForServices(GwServiceMap services) {
 
         if (services == null)
             return List.of();
 
-        var serviceRoutes = new ArrayList<RouteConfig>();
+        var serviceRoutes = new ArrayList<GwRoute>();
 
-        if (services.getMeta() != null) {
+        if (services.hasMeta()) {
 
             var metaApiRoutes = createRoutesForService(
                     "TRAC Metadata Service",
                     services.getMeta(),
                     "/trac.api.TracMetadataApi/",
                     "/trac-meta/",
-                    RestMapping.TRAC_META);
+                    GwRestMapping.TRAC_META);
 
             serviceRoutes.addAll(metaApiRoutes);
         }
 
-        if (services.getData() != null) {
+        if (services.hasData()) {
 
             var metaApiRoutes = createRoutesForService(
                     "TRAC Data Service",
@@ -90,59 +68,59 @@ public class ConfigTranslator {
         return serviceRoutes;
     }
 
-    public static List<RouteConfig> createRoutesForService(
-            String routeName, ServiceConfig service,
-            String grpcPath, String restPath, RestMapping restMapping) {
+    public static List<GwRoute> createRoutesForService(
+            String routeName, GwService service,
+            String grpcPath, String restPath, GwRestMapping restMapping) {
 
-        var routes = new ArrayList<RouteConfig>();
+        var routes = new ArrayList<GwRoute>();
 
-        if (service.getProtocols().contains(RouteProtocol.GRPC) || service.getProtocols().contains(RouteProtocol.GRPC_WEB))
+        if (service.getProtocolsList().contains(GwProtocol.GRPC) || service.getProtocolsList().contains(GwProtocol.GRPC_WEB))
             routes.add(createGrpcRoute(routeName, service, grpcPath));
 
-        if (service.getProtocols().contains(RouteProtocol.REST) && restMapping != null)
+        if (service.getProtocolsList().contains(GwProtocol.REST) && restMapping != null)
             routes.add(createRestRoute(routeName, service, restPath, restMapping));
 
         return routes;
     }
 
-    private static RouteConfig createGrpcRoute(
-            String routeName, ServiceConfig service, String grpcPath) {
+    private static GwRoute createGrpcRoute(
+            String routeName, GwService service, String grpcPath) {
 
-        var protocols = service.getProtocols().stream()
-                .filter(p -> List.of(RouteProtocol.GRPC, RouteProtocol.GRPC_WEB).contains(p))
+        var protocols = service.getProtocolsList().stream()
+                .filter(p -> List.of(GwProtocol.GRPC, GwProtocol.GRPC_WEB).contains(p))
                 .collect(Collectors.toList());
 
-        var grpcRoute = new RouteConfig();
+        var grpcRoute = GwRoute.newBuilder();
         grpcRoute.setRouteName(routeName);
-        grpcRoute.setRouteType(RouteType.GRPC);
-        grpcRoute.setProtocols(protocols);
+        grpcRoute.setRouteType(GwProtocol.GRPC);
+        grpcRoute.addAllProtocols(protocols);
 
         createMatchAndTarget(grpcRoute, service, grpcPath);
 
-        return grpcRoute;
+        return grpcRoute.build();
     }
 
-    private static RouteConfig createRestRoute(
-            String routeName, ServiceConfig service,
-            String restPath, RestMapping restMapping) {
+    private static GwRoute createRestRoute(
+            String routeName, GwService service,
+            String restPath, GwRestMapping restMapping) {
 
-        var restRoute = new RouteConfig();
+        var restRoute = GwRoute.newBuilder();
         restRoute.setRouteName(routeName);
-        restRoute.setRouteType(RouteType.REST);
-        restRoute.setProtocols(List.of(RouteProtocol.REST));
+        restRoute.setRouteType(GwProtocol.REST);
+        restRoute.addProtocols(GwProtocol.REST);
         restRoute.setRestMapping(restMapping);
 
         createMatchAndTarget(restRoute, service, restPath);
 
-        return restRoute;
+        return restRoute.build();
     }
 
-    private static void createMatchAndTarget(RouteConfig route, ServiceConfig service, String path) {
+    private static void createMatchAndTarget(GwRoute.Builder route, GwService service, String path) {
 
-        var match = new MatchConfig();
+        var match = GwMatch.newBuilder();
         match.setPath(path);
 
-        var target = new TargetConfig();
+        var target = GwTarget.newBuilder();
         target.setScheme(service.getTarget().getScheme());
         target.setHost(service.getTarget().getHost());
         target.setPort(service.getTarget().getPort());

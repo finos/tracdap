@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-trac:
-  services:
-    meta:
+services:
+  meta:
 
-      dalType: JDBC
-      dalProps:
-        dialect: POSTGRESQL
-        jdbcUrl: //metadb:5432/trac
-        postgresql.user: trac_admin
-        postgresql.password: trac_admin
-        pool.size: 2
-        pool.overflow: 5
+    dalType: JDBC
+    dalProps:
+      dialect: POSTGRESQL
+      jdbcUrl: //metadb:5432/trac
+      postgresql.user: trac_admin
+      postgresql.password: trac_admin
+      pool.size: 2
+      pool.overflow: 5

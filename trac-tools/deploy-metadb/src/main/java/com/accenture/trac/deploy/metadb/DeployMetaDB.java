@@ -16,16 +16,15 @@
 
 package com.accenture.trac.deploy.metadb;
 
-import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.exception.ETracPublic;
 import com.accenture.trac.common.startup.StandardArgs;
 import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.exception.EStartup;
 
-import com.accenture.trac.common.exception.ETrac;
 import com.accenture.trac.common.startup.Startup;
 import com.accenture.trac.common.util.VersionInfo;
+import com.accenture.trac.config.PlatformConfig;
 import org.flywaydb.core.Flyway;
 
 import org.slf4j.Logger;
@@ -63,11 +62,11 @@ public class DeployMetaDB {
         var componentVersion = VersionInfo.getComponentVersion(DeployMetaDB.class);
         log.info("{} {}", componentName, componentVersion);
 
-        var rootConfig = configManager.loadRootConfigObject(RootConfig.class);
-        var metaConfig = rootConfig.getTrac().getServices().getMeta();
+        var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+        var metaConfig = platformConfig.getServices().getMeta();
 
         var dalProps = new Properties();
-        dalProps.putAll(metaConfig.getDalProps());
+        dalProps.putAll(metaConfig.getDalPropsMap());
 
         var dialect = JdbcSetup.getSqlDialect(dalProps, "");
 

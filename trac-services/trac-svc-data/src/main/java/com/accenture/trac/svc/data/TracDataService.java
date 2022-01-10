@@ -17,9 +17,9 @@
 package com.accenture.trac.svc.data;
 
 import com.accenture.trac.api.TrustedMetadataApiGrpc;
-import com.accenture.trac.api.config.DataServiceConfig;
-import com.accenture.trac.api.config.RootConfig;
-import com.accenture.trac.api.config.TracConfig;
+import com.accenture.trac.config.DataServiceConfig;
+import com.accenture.trac.config.PlatformConfig;
+
 import com.accenture.trac.common.codec.CodecManager;
 import com.accenture.trac.common.codec.ICodecManager;
 import com.accenture.trac.common.config.ConfigManager;
@@ -74,7 +74,7 @@ public class TracDataService extends CommonServiceBase {
     @Override
     protected void doStartup(Duration startupTimeout) {
 
-        RootConfig rootConfig;
+        PlatformConfig platformConfig;
         DataServiceConfig dataSvcConfig;
 
         try {
@@ -89,8 +89,8 @@ public class TracDataService extends CommonServiceBase {
         try {
             log.info("Loading TRAC platform config...");
 
-            rootConfig = configManager.loadRootConfigObject(RootConfig.class);
-            dataSvcConfig = rootConfig.getTrac().getServices().getData();
+            platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+            dataSvcConfig = platformConfig.getServices().getData();
 
             // TODO: Config validation
 
@@ -125,12 +125,12 @@ public class TracDataService extends CommonServiceBase {
 
             var formats = new CodecManager(pluginManager);
             var storage = new StorageManager(pluginManager);
-            storage.initStorage(dataSvcConfig.getStorage(), formats);
+            storage.initStorage(dataSvcConfig.getStorageMap(), formats);
 
             // Check default storage and format are available
             checkDefaultStorageAndFormat(storage, formats, dataSvcConfig);
 
-            var metaClient = prepareMetadataClient(rootConfig.getTrac(), clientChannelType);
+            var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
 
             var dataSvc = new DataService(dataSvcConfig, arrowAllocator, storage, formats, metaClient);
             var fileSvc = new FileService(dataSvcConfig, storage, metaClient);
@@ -185,10 +185,10 @@ public class TracDataService extends CommonServiceBase {
 
     private TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub
     prepareMetadataClient(
-            TracConfig tracConfig,
+            PlatformConfig platformConfig,
             Class<? extends io.netty.channel.Channel> channelType) {
 
-        var metaInstances = tracConfig.getInstances().getMeta();
+        var metaInstances = platformConfig.getInstances().getMetaList();
 
         if (metaInstances.isEmpty()) {
 

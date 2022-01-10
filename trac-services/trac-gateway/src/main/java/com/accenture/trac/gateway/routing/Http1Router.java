@@ -17,8 +17,8 @@
 package com.accenture.trac.gateway.routing;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.gateway.config.RouteConfig;
-import com.accenture.trac.gateway.config.RouteType;
+import com.accenture.trac.config.GwProtocol;
+import com.accenture.trac.config.GwRoute;
 import com.accenture.trac.gateway.exec.Route;
 import com.accenture.trac.gateway.proxy.http.Http1ProxyBuilder;
 import com.accenture.trac.gateway.proxy.grpc.GrpcProxyBuilder;
@@ -382,7 +382,7 @@ public class Http1Router extends ChannelDuplexHandler {
                 route.getConfig(), route.getIndex(),
                 ctx, channelActiveFuture);
 
-        if (route.getConfig().getRouteType() == RouteType.REST) {
+        if (route.getConfig().getRouteType() == GwProtocol.REST) {
 
             target.channel = new EmbeddedChannel(channelInit);
             target.channelOpenFuture = target.channel.newSucceededFuture();
@@ -407,7 +407,7 @@ public class Http1Router extends ChannelDuplexHandler {
     }
 
     private ChannelInitializer<Channel> proxyInitializerForRoute(
-            RouteConfig routeConfig, int routeIndex,
+            GwRoute routeConfig, int routeIndex,
             ChannelHandlerContext routerCtx,
             ChannelPromise routeActivePromise) {
 

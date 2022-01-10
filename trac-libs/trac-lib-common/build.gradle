@@ -29,6 +29,10 @@ dependencies {
     // Google Guava - common lib includes helpers to translate to/from equivalent JDK types
     api group: 'com.google.guava', name: 'guava', version: "$guava_version"
 
+    // Core protobuf for Java
+    api group: 'com.google.protobuf', name: 'protobuf-java', version: "$proto_version"
+    api group: 'com.google.protobuf', name: 'protobuf-java-util', version: "$proto_version"
+
     // gRPC - common lib includes standard wrappers for gRPC stubs and calls
     api group: 'io.grpc', name: 'grpc-api', version: "$grpc_version"
     api group: 'io.grpc', name: 'grpc-stub', version: "$grpc_version"
@@ -40,8 +44,9 @@ dependencies {
     // CLI is implemented with Apache Commons CLI
     implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"
 
-    // Config parser uses SnakeYAML
-    implementation group: 'org.yaml', name: 'snakeyaml', version: "$snakeyaml_version"
+    // Config parser uses Jackson for YAML and JSON
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
+    implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: "$jackson_version"
 
     // Logging facade is an API dependency
     api group: 'org.slf4j', name: 'slf4j-api', version: "$slf4j_version"

@@ -19,10 +19,13 @@ package com.accenture.trac.common.config;
 import com.accenture.trac.common.exception.*;
 
 import com.accenture.trac.common.plugin.IPluginManager;
+import com.google.protobuf.Message;
+import io.netty.buffer.Unpooled;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -144,7 +147,7 @@ public class ConfigManager {
      *
      * @see ConfigParser
      */
-    public <TConfig> TConfig loadConfigObject(String configUrl, Class<TConfig> configClass) {
+    public <TConfig, X extends Message> TConfig loadConfigObject(String configUrl, Class<TConfig> configClass) {
 
         if (configUrl == null || configUrl.isBlank())
             throw new EStartup("Config URL is missing or blank");
@@ -154,7 +157,15 @@ public class ConfigManager {
         var configData = loadConfigFromUrl(requestedUrl);
         var configFormat = ConfigFormat.fromExtension(requestedUrl);
 
-        return ConfigParser.parseStructuredConfig(configData, configFormat, configClass);
+        if (Message.class.isAssignableFrom(configClass)) {
+
+            var configBytes = Unpooled.wrappedBuffer(configData.getBytes(StandardCharsets.UTF_8));
+            var configMsgClass = (Class<? extends Message>) configClass;
+            return (TConfig) ConfigParser.parseConfig(configBytes, configFormat, configMsgClass);
+
+        }
+        else
+            return ConfigParser.parseStructuredConfig(configData, configFormat, configClass);
     }
 
     /**

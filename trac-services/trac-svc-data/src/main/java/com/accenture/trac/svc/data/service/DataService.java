@@ -17,7 +17,9 @@
 package com.accenture.trac.svc.data.service;
 
 import com.accenture.trac.api.*;
-import com.accenture.trac.api.config.DataServiceConfig;
+import com.accenture.trac.config.DataServiceConfig;
+import com.accenture.trac.metadata.*;
+
 import com.accenture.trac.common.codec.ICodec;
 import com.accenture.trac.common.codec.ICodecManager;
 import com.accenture.trac.common.concurrent.IExecutionContext;
@@ -30,7 +32,6 @@ import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.metadata.PartKeys;
 import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.common.validation.Validator;
-import com.accenture.trac.metadata.*;
 
 import io.grpc.MethodDescriptor;
 import io.netty.buffer.ByteBuf;

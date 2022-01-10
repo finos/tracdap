@@ -16,7 +16,7 @@
 
 package com.accenture.trac.gateway.exec;
 
-import com.accenture.trac.gateway.config.RouteConfig;
+import com.accenture.trac.config.GwRoute;
 import com.accenture.trac.gateway.proxy.rest.RestApiMethod;
 
 import java.util.List;
@@ -25,18 +25,18 @@ import java.util.List;
 public class Route {
 
     private final int index;
-    private final RouteConfig config;
+    private final GwRoute config;
 
     private final IRouteMatcher matcher;
 
     private final List<RestApiMethod<?, ?, ?>> restMethods;
 
-    public Route(int index, RouteConfig config, IRouteMatcher matcher) {
+    public Route(int index, GwRoute config, IRouteMatcher matcher) {
         this(index, config, matcher, null);
     }
 
     public Route(
-            int index, RouteConfig config,
+            int index, GwRoute config,
             IRouteMatcher matcher,
             List<RestApiMethod<?, ?, ?>> restMethods) {
 
@@ -50,7 +50,7 @@ public class Route {
         return index;
     }
 
-    public RouteConfig getConfig() {
+    public GwRoute getConfig() {
         return config;
     }
 

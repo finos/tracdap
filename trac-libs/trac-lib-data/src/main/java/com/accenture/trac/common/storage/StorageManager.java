@@ -16,7 +16,7 @@
 
 package com.accenture.trac.common.storage;
 
-import com.accenture.trac.api.config.StorageConfig;
+import com.accenture.trac.config.StorageConfig;
 import com.accenture.trac.common.codec.ICodecManager;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EStorageConfig;
@@ -50,10 +50,10 @@ public class StorageManager implements IStorageManager {
             var config = store.getValue();
             var backend = new StorageBackend();
 
-            for (var instanceConfig : config.getInstances()) {
+            for (var instanceConfig : config.getInstancesList()) {
 
                 var protocol = instanceConfig.getStorageType();
-                var rawProps = instanceConfig.getStorageProps();
+                var rawProps = instanceConfig.getStoragePropsMap();
                 var props = new Properties();
                 props.put(PROP_STORAGE_KEY, storageKey);
                 props.putAll(rawProps);

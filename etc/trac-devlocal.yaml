@@ -14,51 +14,48 @@
 
 config:
   logging: trac-logging.xml
-
-  keystore:
-    type: PKCS12
-    url: trac-devlocal.pfx
+  keystore.type: PKCS12
+  keystore.url: trac-devlocal.pfx
 
 
-trac:
+instances:
 
-  instances:
-
-    meta:
-      - scheme: http
-        host: localhost
-        port: 8081
-
-    data:
-      - scheme: http
-        host: localhost
-        port: 8082
-
-  services:
-
-    meta:
+  meta:
+    - scheme: http
+      host: localhost
       port: 8081
 
-      dalType: JDBC
-      dalProps:
-        dialect: H2
-        jdbcUrl: ./build/run/trac.meta
-        h2.user: trac
-        h2.pass: trac
-        h2.schema: public
-        pool.size: 10
-        pool.overflow: 5
-
-    data:
+  data:
+    - scheme: http
+      host: localhost
       port: 8082
 
-      defaultStorageKey: STORAGE1
-      defaultStorageFormat: ARROW_FILE
 
-      storage:
+services:
 
-        STORAGE1:
-          instances:
-            - storageType: LOCAL
-              storageProps:
-                rootDir: ./build/run
+  meta:
+    port: 8081
+
+    dalType: JDBC
+    dalProps:
+      dialect: H2
+      jdbcUrl: ./build/run/trac.meta
+      h2.user: trac
+      h2.pass: trac
+      h2.schema: public
+      pool.size: 10
+      pool.overflow: 5
+
+  data:
+    port: 8082
+
+    defaultStorageKey: STORAGE1
+    defaultStorageFormat: ARROW_FILE
+
+    storage:
+
+      STORAGE1:
+        instances:
+          - storageType: LOCAL
+            storageProps:
+              rootDir: ./build/run

@@ -1,5 +1,4 @@
-#
-# Copyright 2020 Accenture Global Solutions Limited
+# Copyright 2022 Accenture Global Solutions Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,45 +11,45 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+#config:
+#  logging: trac-logging.xml
+
+
+port: 8080
+idleTimeout: 10
+
+
+services:
+
+  meta:
+    protocols: [GRPC_WEB, REST]
+    target:
+      scheme: http
+      host: localhost
+      port: 8081
+
+  data:
+    protocols: [GRPC_WEB]
+    target:
+      scheme: http
+      host: localhost
+      port: 8082
+
+
+routes:
+
+#  # This route can be used to run a local development environment against the TRAC APIs
 #
-
-
-trac:
-  gateway:
-
-    proxy:
-      port: 8080
-      idleTimeout: 10
-
-    services:
-
-      meta:
-        protocols: [grpc_web, rest]
-        target:
-          scheme: http
-          host: localhost
-          port: 8081
-
-      data:
-        protocols: [grpc_web]
-        target:
-          scheme: http
-          host: localhost
-          port: 8082
-
-    routes:
-
-#      # This route can be used to run a local development environment against the TRAC APIs
+#  - routeName: Local App
+#    routeType: HTTP
 #
-#      - routeName: Local App
-#        routeType: HTTP
+#    match:
+#      host: localhost
+#      path: /local/app
 #
-#        match:
-#          host: localhost
-#          path: /local/app
-#
-#        target:
-#          scheme: http
-#          host: localhost
-#          port: 9090
-#          path: /
+#    target:
+#      scheme: http
+#      host: localhost
+#      port: 9090
+#      path: /

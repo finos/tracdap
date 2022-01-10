@@ -17,7 +17,7 @@
 package com.accenture.trac.gateway.proxy.http;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.gateway.config.RouteConfig;
+import com.accenture.trac.config.GwRoute;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
@@ -36,14 +36,14 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final RouteConfig routeConfig;
+    private final GwRoute routeConfig;
 
     private final Map<Integer, Http2FrameStream> streams;
     private final AtomicInteger nextSeqId;
     private int inboundSeqId;
     private int outboundSeqId;
 
-    public Http1to2Framing(RouteConfig routeConfig) {
+    public Http1to2Framing(GwRoute routeConfig) {
 
         this.routeConfig = routeConfig;
 
