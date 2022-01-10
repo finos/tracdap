@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import trac.rt.config.config as config
+import trac.rt.config as config
 import trac.rt.exceptions as _ex
 
 from .graph import *

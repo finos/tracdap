@@ -39,13 +39,13 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_example_sys_config_ok(self):
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
 
         raw_config_path = PYTHON_EXAMPLES_DIR.joinpath("sys_config.yaml")
         raw_config = parser.load_raw_config(raw_config_path, "system")
         sys_config = parser.parse(raw_config, raw_config_path.name)
 
-        self.assertIsInstance(sys_config, cfg.SystemConfig)
+        self.assertIsInstance(sys_config, cfg.RuntimeConfig)
 
     def test_example_job_config_ok(self):
 
@@ -59,7 +59,7 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_empty_sys_config_ok(self):
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
 
         with tempfile.TemporaryDirectory() as td:
 
@@ -68,14 +68,14 @@ class ConfigParserTest(unittest.TestCase):
 
             raw_config = parser.load_raw_config(yaml_path, "system")
             sys_config = parser.parse(raw_config, yaml_path.name)
-            self.assertIsInstance(sys_config, cfg.SystemConfig)
+            self.assertIsInstance(sys_config, cfg.RuntimeConfig)
 
             json_path = pathlib.Path(td).joinpath("empty.json")
             json_path.write_text("{}")
 
             raw_config = parser.load_raw_config(json_path, "system")
             sys_config = parser.parse(raw_config, json_path.name)
-            self.assertIsInstance(sys_config, cfg.SystemConfig)
+            self.assertIsInstance(sys_config, cfg.RuntimeConfig)
 
     def test_empty_job_config_ok(self):
 
@@ -99,7 +99,7 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_invalid_path(self):
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
 
         self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config(None))      # noqa
         self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config(object()))  # noqa
@@ -111,17 +111,17 @@ class ConfigParserTest(unittest.TestCase):
 
         nonexistent_path = PYTHON_EXAMPLES_DIR.joinpath("nonexistent.yaml")
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
         self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config(nonexistent_path))
 
     def test_config_file_is_a_folder(self):
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
         self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config(PYTHON_EXAMPLES_DIR))
 
     def test_config_file_garbled(self):
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
 
         noise_bytes = 256
         noise = bytearray(random.getrandbits(8) for _ in range(noise_bytes))
@@ -140,7 +140,7 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_config_file_wrong_format(self):
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
 
         with tempfile.TemporaryDirectory() as td:
 
@@ -165,7 +165,7 @@ class ConfigParserTest(unittest.TestCase):
             json_path = pathlib.Path(td).joinpath("garbled.json")
             json_path.write_text('{ "foo": "bar",\n  "bar": 1}')
 
-            sys_parser = cfg_p.ConfigParser(cfg.SystemConfig)
+            sys_parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
             job_parser = cfg_p.ConfigParser(cfg.JobConfig)
 
             sys_yaml_config = sys_parser.load_raw_config(yaml_path)

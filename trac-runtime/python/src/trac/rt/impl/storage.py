@@ -150,7 +150,7 @@ class StorageManager:
         cls.__file_impls[storage_type] = file_impl
         cls.__data_impls[storage_type] = data_impl
 
-    def __init__(self, sys_config: _cfg.SystemConfig, sys_config_dir: tp.Union[str, pathlib.Path]):
+    def __init__(self, sys_config: _cfg.RuntimeConfig, sys_config_dir: tp.Union[str, pathlib.Path]):
 
         self.__log = _util.logger_for_object(self)
         self.__file_storage: tp.Dict[str, IFileStorage] = dict()
