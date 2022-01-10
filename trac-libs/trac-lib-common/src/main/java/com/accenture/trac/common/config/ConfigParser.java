@@ -19,7 +19,6 @@ package com.accenture.trac.common.config;
 import com.accenture.trac.common.exception.EStartup;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.config.GatewayConfig;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
