@@ -39,6 +39,7 @@ sourceSets {
 dependencies {
 
     implementation project(':trac-api-metadata')
+    implementation project(':trac-api-config')
     implementation project(':trac-api-services')
     implementation project(':trac-lib-common')
 
