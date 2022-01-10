@@ -42,10 +42,6 @@ ext {
     // JDBC Connection pool
     hikari_cp_version = '5.0.0'
 
-
-    // Config
-    snakeyaml_version = '1.29'
-
     // Apache Commons Components
     commons_cli_version = "1.5.0"
 
