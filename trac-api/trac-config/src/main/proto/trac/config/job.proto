@@ -20,7 +20,22 @@ package trac.config;
 option java_package = "com.accenture.trac.config";
 option java_multiple_files = true;
 
+import "trac/metadata/type.proto";
+import "trac/metadata/object_id.proto";
+import "trac/metadata/object.proto";;
+import "trac/metadata/job.proto";
+
 
 message JobConfig {
 
+    metadata.TagHeader jobId = 1;
+    metadata.TagHeader target = 2;
+
+    map<string, metadata.Value> parameters = 3;
+    map<string, metadata.TagHeader> inputs = 4;
+    map<string, metadata.TagHeader> outputs = 5;
+
+    map<string, metadata.ObjectDefinition> objects = 6;
+
+    metadata.JobDefinition job = 7;
 }
