@@ -124,8 +124,14 @@ jobs:
 
       - name: Protoc code generation
         run: |
-          python dev/codegen/protoc-ctrl.py python_runtime --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/domain
-          python dev/codegen/protoc-ctrl.py python_proto --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/proto
+          python dev/codegen/protoc-ctrl.py python_runtime \
+            --proto_path trac-api/trac-metadata/src/main/proto \
+            --proto_path trac-api/trac-config/src/main/proto \
+            --out trac-runtime/python/generated/trac/rt_gen/domain
+          python dev/codegen/protoc-ctrl.py python_proto \
+            --proto_path trac-api/trac-metadata/src/main/proto \
+            --proto_path trac-api/trac-config/src/main/proto \
+            --out trac-runtime/python/generated/trac/rt_gen/proto
 
       - name: Unit tests
         run: |
