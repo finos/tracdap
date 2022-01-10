@@ -18,7 +18,9 @@ package com.accenture.trac.svc.data.service;
 
 import com.accenture.trac.api.*;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
-import com.accenture.trac.api.config.DataServiceConfig;
+import com.accenture.trac.config.DataServiceConfig;
+import com.accenture.trac.metadata.*;
+
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.exception.EDataSize;
 import com.accenture.trac.common.grpc.GrpcClientWrap;
@@ -26,7 +28,6 @@ import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.storage.IFileStorage;
 import com.accenture.trac.common.storage.IStorageManager;
 import com.accenture.trac.common.validation.Validator;
-import com.accenture.trac.metadata.*;
 
 import io.grpc.MethodDescriptor;
 import io.netty.buffer.ByteBuf;
