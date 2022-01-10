@@ -20,7 +20,25 @@ package trac.config;
 option java_package = "com.accenture.trac.config";
 option java_multiple_files = true;
 
+import "trac/config/platform.proto";
+
 
 message RuntimeConfig {
 
+  map<string, string> config = 1;
+
+  map<string, StorageConfig> storage = 2;
+  StorageSettings storageSettings = 3;
+  SparkSettings sparkSettings = 4;
+}
+
+message StorageSettings {
+
+  string defaultStorage = 1;
+  string defaultFormat = 2;
+}
+
+message SparkSettings {
+
+  map<string, string> sparkProps = 1;
 }
