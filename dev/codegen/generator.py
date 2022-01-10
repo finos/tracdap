@@ -363,14 +363,17 @@ class TracGenerator:
             file_header = self.FILE_HEADER
             std_imports = self.STD_IMPORTS
 
+            import_proto_pattern = re.compile(r"^trac/[^/]+/(.+)\.proto$")
+
             # Generate imports
             for import_proto in descriptor.dependency:
-                if import_proto.startswith("trac/metadata/"):
 
-                    import_module = import_proto \
-                        .replace("trac/metadata/", "") \
-                        .replace("/", ".") \
-                        .replace(".proto", "")
+                import_match = import_proto_pattern.match(import_proto)
+
+                if import_match:
+
+                    raw_import_module = import_match.group(1)
+                    import_module = raw_import_module.replace("/", ".")
 
                     import_stmt = self.PKG_IMPORT \
                         .replace("{MODULE}", import_module)
@@ -634,8 +637,8 @@ class TracGenerator:
             # If a nested type is found to be a map entry type, then generate a dict
             if nested_type is not None and nested_type.options.map_entry:
 
-                key_type = self.python_base_type(package, nested_type.field[0])
-                value_type = self.python_base_type(package, nested_type.field[1])
+                key_type = self.python_base_type(package, nested_type.field[0], make_relative=True)
+                value_type = self.python_base_type(package, nested_type.field[1], make_relative=True)
                 return f"_tp.Dict[{key_type}, {value_type}]"
 
             # Otherwise repeated fields are generated as lists
