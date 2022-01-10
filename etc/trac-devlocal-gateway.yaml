@@ -23,14 +23,14 @@ idleTimeout: 10
 services:
 
   meta:
-    protocols: [grpc_web, rest]
+    protocols: [GRPC_WEB, REST]
     target:
       scheme: http
       host: localhost
       port: 8081
 
   data:
-    protocols: [grpc_web]
+    protocols: [GRPC_WEB]
     target:
       scheme: http
       host: localhost
