@@ -16,13 +16,13 @@
 
 package com.accenture.trac.svc.meta;
 
-import com.accenture.trac.api.config.RootConfig;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.db.JdbcSetup;
 import com.accenture.trac.common.exception.*;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
 import com.accenture.trac.common.util.InterfaceLogging;
+import com.accenture.trac.config.PlatformConfig;
 import com.accenture.trac.svc.meta.api.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
@@ -90,11 +90,11 @@ public class TracMetadataService extends CommonServiceBase {
 
             // Use the -db library to set up a datasource
             // Handles different SQL dialects and authentication mechanisms etc.
-            var config = configManager.loadRootConfigObject(RootConfig.class);
-            var metaConfig = config.getTrac().getServices().getMeta();
+            var config = configManager.loadRootConfigObject(PlatformConfig.class);
+            var metaConfig = config.getServices().getMeta();
 
             var dalProps = new Properties();
-            dalProps.putAll(metaConfig.getDalProps());
+            dalProps.putAll(metaConfig.getDalPropsMap());
 
             var dialect = JdbcSetup.getSqlDialect(dalProps, "");
             dataSource = JdbcSetup.createDatasource(dalProps, "");
