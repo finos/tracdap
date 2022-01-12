@@ -129,7 +129,13 @@ class TracGenerator:
         "import dataclasses as _dc  # noqa\n"
         "import enum as _enum  # noqa\n\n")
 
-    PKG_IMPORT = (
+    MODULE_IMPORT = (
+        'import {MODULE}\n')
+
+    MODULE_ALIAS_IMPORT = (
+        'import {MODULE} as {ALIAS}\n')
+
+    SCOPE_IMPORT = (
         'from .{MODULE} import *  # noqa\n')
 
     ENUM_TEMPLATE = (
@@ -252,25 +258,28 @@ class TracGenerator:
         return local_types
 
     def generate_package(
-            self, package: str,
+            self, api_package: str,
             files: tp.List[pb_desc.FileDescriptorProto],
             type_map: TYPE_INFO_MAP) \
             -> tp.List[pb_plugin.CodeGeneratorResponse.File]:
 
-        self._log.info(f" [ PKG   ] -> {package} ({len(files)} proto files)")
+        self._log.info(f" [ PKG   ] -> {api_package} ({len(files)} proto files)")
 
         flat_pack = "flat_pack" in self._options
         output_files = []
 
         # Use the protobuf package as the Python package
-        package_path = pathlib.Path(*package.split("."))
+        package_path = pathlib.Path(*api_package.split("."))
         package_imports = ""
 
         for file_descriptor in files:
 
             # Run the generator to produce code for the Python module
             src_locations = file_descriptor.source_code_info.location
-            module_code = self.generate_file(src_locations, 0, file_descriptor, type_map, not flat_pack)
+
+            module_code = self.generate_file(
+                src_locations, 0, file_descriptor,
+                api_package, type_map, not flat_pack)
 
             if flat_pack and len(files) > 0:
 
@@ -278,6 +287,7 @@ class TracGenerator:
                     module_code = self.FILE_HEADER + self.STD_IMPORTS + module_code
                     module_path = package_path.with_suffix(".py")
                 else:
+                    # Setting module path = "" will append module_code to the previous file
                     module_path = ""
 
             else:
@@ -310,10 +320,10 @@ class TracGenerator:
 
         package_filter = self._options.get("packages")
 
-        if package_filter is None or package == package_filter or package.startswith(package_filter + "."):
+        if package_filter is None or api_package == package_filter or api_package.startswith(package_filter + "."):
             return output_files
 
-        elif package_filter.startswith(package + "."):
+        elif package_filter.startswith(api_package + "."):
 
             empty_init_file = pb_plugin.CodeGeneratorResponse.File()
             empty_init_file.name = str(package_path.joinpath("__init__.py"))
@@ -348,37 +358,20 @@ class TracGenerator:
     def generate_file(
             self, src_loc, indent: int,
             descriptor: pb_desc.FileDescriptorProto,
-            type_map: TYPE_INFO_MAP,
+            api_package: str, type_map: TYPE_INFO_MAP,
             include_header: bool = True) -> str:
 
         self._log.info(f" [ FILE  ] -> {descriptor.name}")
 
-        file_header = ""
-        std_imports = ""
-
-        import_stmts = []
-
         if include_header:
-
             file_header = self.FILE_HEADER
             std_imports = self.STD_IMPORTS
+            import_stmts = self.generate_module_imports(descriptor, api_package)
 
-            import_proto_pattern = re.compile(r"^trac/[^/]+/(.+)\.proto$")
-
-            # Generate imports
-            for import_proto in descriptor.dependency:
-
-                import_match = import_proto_pattern.match(import_proto)
-
-                if import_match:
-
-                    raw_import_module = import_match.group(1)
-                    import_module = raw_import_module.replace("/", ".")
-
-                    import_stmt = self.PKG_IMPORT \
-                        .replace("{MODULE}", import_module)
-
-                    import_stmts.append(import_stmt)
+        else:
+            file_header = ""
+            std_imports = ""
+            import_stmts = []
 
         pkg_imports = "".join(import_stmts) + "\n\n" if any(import_stmts) else ""
 
@@ -417,6 +410,52 @@ class TracGenerator:
             .replace("{SERVICES_CODE}", "\n".join(services))
 
         return code
+
+    def generate_module_imports(self, descriptor: pb_desc.FileDescriptorProto, api_package: str):
+
+        import_proto_pattern = re.compile(r"^(trac/.+)/([^/]+)\.proto$")
+
+        import_stmts = []
+        prior_imports = set()
+
+        # Generate imports
+        for import_proto in descriptor.dependency:
+
+            import_match = import_proto_pattern.match(import_proto)
+
+            if import_match:
+
+                import_package = import_match.group(1).replace("/", ".")
+                import_module = import_match.group(2).replace("/", ".")
+
+                if import_package == api_package and import_module not in prior_imports:
+
+                    prior_imports.add(import_module)
+
+                    import_stmt = self.SCOPE_IMPORT \
+                        .replace("{MODULE}", import_module)
+
+                    import_stmts.append(import_stmt)
+
+                elif import_package not in prior_imports:
+
+                    prior_imports.add(import_package)
+
+                    target_package = self._options["target_package"] \
+                        if "target_package" in self._options \
+                        else "trac"
+
+                    sub_package = import_package.replace("trac.", "")
+                    qualified_package = target_package + "." + sub_package
+                    alias = import_package[import_package.rfind(".") + 1:]
+
+                    import_stmt = self.MODULE_ALIAS_IMPORT \
+                        .replace("{MODULE}", qualified_package) \
+                        .replace("{ALIAS}", alias)
+
+                    import_stmts.append(import_stmt)
+
+        return import_stmts
 
     def generate_service_class(
             self, package: str, ctx: LocationContext,
@@ -623,7 +662,7 @@ class TracGenerator:
             field: pb_desc.FieldDescriptorProto,
             message: pb_desc.DescriptorProto):
 
-        base_type = self.python_base_type(package, field, make_relative=True)
+        base_type = self.python_base_type(package, field, make_relative=True, alias=True)
 
         # Repeated fields are either lists or maps - these need special handling
         if field.label == field.Label.LABEL_REPEATED:
@@ -637,8 +676,8 @@ class TracGenerator:
             # If a nested type is found to be a map entry type, then generate a dict
             if nested_type is not None and nested_type.options.map_entry:
 
-                key_type = self.python_base_type(package, nested_type.field[0], make_relative=True)
-                value_type = self.python_base_type(package, nested_type.field[1], make_relative=True)
+                key_type = self.python_base_type(package, nested_type.field[0], make_relative=True, alias=True)
+                value_type = self.python_base_type(package, nested_type.field[1], make_relative=True, alias=True)
                 return f"_tp.Dict[{key_type}, {value_type}]"
 
             # Otherwise repeated fields are generated as lists
@@ -659,14 +698,14 @@ class TracGenerator:
         else:
             return base_type
 
-    def python_base_type(self, package: str, field: pb_desc.FieldDescriptorProto, make_relative=False):
+    def python_base_type(self, package: str, field: pb_desc.FieldDescriptorProto, make_relative=False, alias=False):
 
         # Messages (classes) and enums use the type name declared in the field
         if field.type == field.Type.TYPE_MESSAGE or field.type == field.Type.TYPE_ENUM:
 
-            return self.python_type_name(package, field.type_name, make_relative)
+            return self.python_type_name(package, field.type_name, make_relative, alias)
 
-        # For built in types, use a static mapping of proto type names
+        # For built-in types, use a static mapping of proto type names
         if field.type in self.PRIMITIVE_TYPE_MAPPING:
 
             return self.PRIMITIVE_TYPE_MAPPING[field.type].__name__
@@ -677,12 +716,19 @@ class TracGenerator:
             .format(field.name, field.type))
 
     @staticmethod
-    def python_type_name(package: str, proto_type_name: str, make_relative=False):
+    def python_type_name(package: str, proto_type_name: str, make_relative=False, alias=False):
 
         type_name = proto_type_name[1:] if proto_type_name.startswith(".") else proto_type_name
 
+        # For types in the current package, do not qualify type names if the make_relative flag is set
         if make_relative and type_name.startswith(package):
             type_name = type_name[len(package) + 1:]
+
+        # For TRAC generated types, imports are aliased for each sub package
+        # E.g.: trac.metadata in the API becomes trac.rt.metadata (domain objects) or trac.rt.proto.metadata (proto)
+        # Then import trac.rt.metadata as metadata
+        if alias and type_name.startswith("trac."):
+            type_name = type_name[len("trac."):]
 
         # We are using deferred annotations, with from __future__ import annotations
         # Type names no longer need to be quoted!

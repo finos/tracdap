@@ -148,13 +148,16 @@ def build_protoc_args(generator, proto_paths, output_location, packages):
 
     elif generator == "python_runtime":
 
+        options = "--trac_opt=target_package=trac.rt"
+
+        if packages_option:
+            options += f";{packages_option}"
+
         proto_args = [
             f"--plugin={trac_plugin}",
             f"--trac_out={output_location}",
+            options
         ]
-
-        if packages_option:
-            proto_args.append(f"--trac_opt={packages_option}")
 
     elif generator == "api_doc":
 
