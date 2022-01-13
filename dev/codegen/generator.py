@@ -751,7 +751,7 @@ class TracGenerator:
 
             # Look to see if the base type is a nested type defined in the same message as the field
             nested_type = next(filter(
-                lambda nt: type_name.endswith("{message.name}.{nt.name}"),
+                lambda nt: type_name.endswith(f"{message.name}.{nt.name}"),
                 message.nested_type),
                 None)
 
