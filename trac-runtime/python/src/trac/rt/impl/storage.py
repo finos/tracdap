@@ -168,7 +168,8 @@ class StorageManager:
             self.__log.error(err)
             raise _ex.EStorageConfig(err)
 
-        storage_type = storage_config.storageType
+        storage_instance = storage_config.instances[0]  # Just use the first storage instance
+        storage_type = storage_instance.storageType
 
         file_impl = self.__file_impls.get(storage_type)
         data_impl = self.__data_impls.get(storage_type)
@@ -178,8 +179,8 @@ class StorageManager:
             self.__log.error(err)
             raise _ex.EStorageConfig(err)
 
-        file_storage = file_impl(storage_config, storage_options)
-        data_storage = data_impl(storage_config, file_storage)
+        file_storage = file_impl(storage_instance, storage_options)
+        data_storage = data_impl(storage_instance, file_storage)
 
         self.__file_storage[storage_key] = file_storage
         self.__data_storage[storage_key] = data_storage
@@ -326,12 +327,12 @@ class CommonDataStorage(IDataStorage):
 
 class LocalFileStorage(IFileStorage):
 
-    def __init__(self, config: _cfg.StorageConfig, options: dict = None):
+    def __init__(self, config: _cfg.StorageInstance, options: dict = None):
 
         self._log = _util.logger_for_object(self)
         self._options = options or {}
 
-        root_path_config = config.storageConfig.get("rootPath")  # TODO: Config / constants
+        root_path_config = config.storageProps.get("rootPath")  # TODO: Config / constants
 
         if not root_path_config or root_path_config.isspace():
             err = f"Storage root path not set"
