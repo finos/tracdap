@@ -108,13 +108,15 @@ class TracRuntime:
             # Plugins will be loaded here, before config
 
             # self._log.info("Loading system config...")
-            sys_config_parser = cfg.ConfigParser(config.RuntimeConfig)
+            sys_config_dev_mode = _dev_mode.DEV_MODE_SYS_CONFIG if self._dev_mode else None
+            sys_config_parser = cfg.ConfigParser(config.RuntimeConfig, sys_config_dev_mode)
             sys_config_raw = sys_config_parser.load_raw_config(self._sys_config_path, config_file_name="system")
             self._sys_config = sys_config_parser.parse(sys_config_raw, self._sys_config_path)
 
             if self._batch_mode:
                 # self._log.info("Loading job config...")
-                job_config_parser = cfg.ConfigParser(config.JobConfig)
+                job_config_dev_mode = _dev_mode.DEV_MODE_JOB_CONFIG if self._dev_mode else None
+                job_config_parser = cfg.ConfigParser(config.JobConfig, job_config_dev_mode)
                 job_config_raw = job_config_parser.load_raw_config(self._job_config_path, config_file_name="job")
                 self._job_config = job_config_parser.parse(job_config_raw, self._job_config_path)
 

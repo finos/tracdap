@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import re
 import typing as tp
 import copy
 import pathlib
@@ -26,6 +27,14 @@ import trac.rt.exceptions as _ex
 import trac.rt.impl.repositories as _repos
 import trac.rt.impl.storage as _storage
 import trac.rt.impl.util as util
+
+
+DEV_MODE_JOB_CONFIG = [
+    re.compile(r"parameters\.[\w]+"),
+    re.compile(r"inputs\.[\w]+"),
+    re.compile(r"outputs\.[\w]+")]
+
+DEV_MODE_SYS_CONFIG = []
 
 
 class DevModeTranslator:

@@ -20,6 +20,7 @@ import random
 import trac.rt.config as cfg
 import trac.rt.impl.config_parser as cfg_p
 import trac.rt.impl.util as util
+import trac.rt.exec.dev_mode as dev_mode
 import trac.rt.exceptions as ex
 
 
@@ -49,7 +50,9 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_example_job_config_ok(self):
 
-        parser = cfg_p.ConfigParser(cfg.JobConfig)
+        # Sample job config uses dev mode configuration, so supply DEV_MODE_JOB_CONFIG
+
+        parser = cfg_p.ConfigParser(cfg.JobConfig, dev_mode.DEV_MODE_JOB_CONFIG)
 
         raw_config_path = PYTHON_EXAMPLES_DIR.joinpath("using_data/using_data.yaml")
         raw_config = parser.load_raw_config(raw_config_path, "job")
