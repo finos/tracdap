@@ -2,9 +2,10 @@
 storage:
 
   example_data:
-    storageType: LOCAL_STORAGE
-    storageConfig:
-      rootPath: ./data
+    instances:
+      - storageType: LOCAL_STORAGE
+        storageProps:
+          rootPath: ./data
 
 storageSettings:
   defaultStorage: example_data
@@ -12,7 +13,7 @@ storageSettings:
 
 sparkSettings:
 
-  sparkConfig:
+  sparkProps:
     spark.cores.max: 4
     spark.driver.memory: 2G
     spark.executor.memory: 2G

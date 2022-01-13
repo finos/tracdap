@@ -20,7 +20,7 @@ import pathlib
 import typing as tp
 
 import trac.rt.api as api
-import trac.rt.config.config as config
+import trac.rt.config as config
 import trac.rt.exceptions as _ex
 import trac.rt.impl.config_parser as cfg
 import trac.rt.impl.util as util
@@ -69,7 +69,7 @@ class TracRuntime:
             self._job_config_path = None
             self._batch_mode = False
 
-        self._sys_config: tp.Optional[config.SystemConfig] = None
+        self._sys_config: tp.Optional[config.RuntimeConfig] = None
         self._job_config: tp.Optional[config.JobConfig] = None
 
         self._dev_mode = dev_mode
@@ -108,13 +108,15 @@ class TracRuntime:
             # Plugins will be loaded here, before config
 
             # self._log.info("Loading system config...")
-            sys_config_parser = cfg.ConfigParser(config.SystemConfig)
+            sys_config_dev_mode = _dev_mode.DEV_MODE_SYS_CONFIG if self._dev_mode else None
+            sys_config_parser = cfg.ConfigParser(config.RuntimeConfig, sys_config_dev_mode)
             sys_config_raw = sys_config_parser.load_raw_config(self._sys_config_path, config_file_name="system")
             self._sys_config = sys_config_parser.parse(sys_config_raw, self._sys_config_path)
 
             if self._batch_mode:
                 # self._log.info("Loading job config...")
-                job_config_parser = cfg.ConfigParser(config.JobConfig)
+                job_config_dev_mode = _dev_mode.DEV_MODE_JOB_CONFIG if self._dev_mode else None
+                job_config_parser = cfg.ConfigParser(config.JobConfig, job_config_dev_mode)
                 job_config_raw = job_config_parser.load_raw_config(self._job_config_path, config_file_name="job")
                 self._job_config = job_config_parser.parse(job_config_raw, self._job_config_path)
 

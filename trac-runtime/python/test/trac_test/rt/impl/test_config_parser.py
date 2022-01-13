@@ -20,6 +20,7 @@ import random
 import trac.rt.config as cfg
 import trac.rt.impl.config_parser as cfg_p
 import trac.rt.impl.util as util
+import trac.rt.exec.dev_mode as dev_mode
 import trac.rt.exceptions as ex
 
 
@@ -39,17 +40,19 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_example_sys_config_ok(self):
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
 
         raw_config_path = PYTHON_EXAMPLES_DIR.joinpath("sys_config.yaml")
         raw_config = parser.load_raw_config(raw_config_path, "system")
         sys_config = parser.parse(raw_config, raw_config_path.name)
 
-        self.assertIsInstance(sys_config, cfg.SystemConfig)
+        self.assertIsInstance(sys_config, cfg.RuntimeConfig)
 
     def test_example_job_config_ok(self):
 
-        parser = cfg_p.ConfigParser(cfg.JobConfig)
+        # Sample job config uses dev mode configuration, so supply DEV_MODE_JOB_CONFIG
+
+        parser = cfg_p.ConfigParser(cfg.JobConfig, dev_mode.DEV_MODE_JOB_CONFIG)
 
         raw_config_path = PYTHON_EXAMPLES_DIR.joinpath("using_data/using_data.yaml")
         raw_config = parser.load_raw_config(raw_config_path, "job")
@@ -59,7 +62,7 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_empty_sys_config_ok(self):
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
 
         with tempfile.TemporaryDirectory() as td:
 
@@ -68,14 +71,14 @@ class ConfigParserTest(unittest.TestCase):
 
             raw_config = parser.load_raw_config(yaml_path, "system")
             sys_config = parser.parse(raw_config, yaml_path.name)
-            self.assertIsInstance(sys_config, cfg.SystemConfig)
+            self.assertIsInstance(sys_config, cfg.RuntimeConfig)
 
             json_path = pathlib.Path(td).joinpath("empty.json")
             json_path.write_text("{}")
 
             raw_config = parser.load_raw_config(json_path, "system")
             sys_config = parser.parse(raw_config, json_path.name)
-            self.assertIsInstance(sys_config, cfg.SystemConfig)
+            self.assertIsInstance(sys_config, cfg.RuntimeConfig)
 
     def test_empty_job_config_ok(self):
 
@@ -99,7 +102,7 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_invalid_path(self):
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
 
         self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config(None))      # noqa
         self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config(object()))  # noqa
@@ -111,17 +114,17 @@ class ConfigParserTest(unittest.TestCase):
 
         nonexistent_path = PYTHON_EXAMPLES_DIR.joinpath("nonexistent.yaml")
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
         self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config(nonexistent_path))
 
     def test_config_file_is_a_folder(self):
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
         self.assertRaises(ex.EConfigLoad, lambda: parser.load_raw_config(PYTHON_EXAMPLES_DIR))
 
     def test_config_file_garbled(self):
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
 
         noise_bytes = 256
         noise = bytearray(random.getrandbits(8) for _ in range(noise_bytes))
@@ -140,7 +143,7 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_config_file_wrong_format(self):
 
-        parser = cfg_p.ConfigParser(cfg.SystemConfig)
+        parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
 
         with tempfile.TemporaryDirectory() as td:
 
@@ -165,7 +168,7 @@ class ConfigParserTest(unittest.TestCase):
             json_path = pathlib.Path(td).joinpath("garbled.json")
             json_path.write_text('{ "foo": "bar",\n  "bar": 1}')
 
-            sys_parser = cfg_p.ConfigParser(cfg.SystemConfig)
+            sys_parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
             job_parser = cfg_p.ConfigParser(cfg.JobConfig)
 
             sys_yaml_config = sys_parser.load_raw_config(yaml_path)

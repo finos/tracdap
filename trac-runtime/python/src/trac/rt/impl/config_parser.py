@@ -14,10 +14,12 @@
 
 from __future__ import annotations
 
+import re
 import typing as tp
 import decimal
 import enum
 import inspect
+import dataclasses as _dc
 
 import trac.rt.exceptions as _ex
 import trac.rt.impl.util as _util
@@ -47,9 +49,10 @@ class ConfigParser(tp.Generic[_T]):
         # TODO: Datetime (requires type system)
     }
 
-    def __init__(self, config_class: _T.__class__):
+    def __init__(self, config_class: _T.__class__, dev_mode_locations: tp.List[str] = None):
         self._log = _util.logger_for_object(self)
         self._config_class = config_class
+        self._dev_mode_locations = dev_mode_locations or []
         self._errors = []
 
     def load_raw_config(self, config_file: tp.Union[str, pathlib.Path], config_file_name: str = None):
@@ -134,7 +137,7 @@ class ConfigParser(tp.Generic[_T]):
 
         if any(self._errors):
 
-            message = f"Errors found in config file" + (" " + config_file if config_file is not None else "")
+            message = "Errors found in config file" + (f" [{str(config_file)}]" if config_file is not None else "")
 
             for (location, error) in self._errors:
                 location_info = f" (in {location})" if location else ""
@@ -153,17 +156,31 @@ class ConfigParser(tp.Generic[_T]):
             return self._parse_primitive(location, raw_value, annotation)
 
         # Allow parsing of generic primitives, this allows for e.g. param maps of mixed primitive types
-        if annotation == tp.Any and type(raw_value) in ConfigParser.__primitive_types:
-            return self._parse_primitive(location, raw_value, type(raw_value))
+        if annotation == tp.Any:
+
+            if type(raw_value) in ConfigParser.__primitive_types:
+                return self._parse_primitive(location, raw_value, type(raw_value))
+            else:
+                return self._error(location, f"Expected a primitive value, got '{str(raw_value)}'")
 
         if isinstance(annotation, enum.EnumMeta):
             return self._parse_enum(location, raw_value, annotation)
 
+        if _dc.is_dataclass(annotation):
+
+            if isinstance(raw_value, tp.Dict):
+                return self._parse_simple_class(location, raw_value, annotation)
+            elif self._is_dev_mode_location(location) and type(raw_value) in ConfigParser.__primitive_types:
+                return self._parse_primitive(location, raw_value, type(raw_value))
+            else:
+                return self._error(location, f"Expected type {annotation.__name__}, got '{str(raw_value)}'")
+
         if isinstance(annotation, self.__generic_metaclass):
             return self._parse_generic_class(location, raw_value, annotation)  # noqa
 
-        # If there is no special handling for the given type, try to interpret as a simple Python class
-        return self._parse_simple_class(location, raw_value, annotation)
+    def _is_dev_mode_location(self, location):
+
+        return any(map(lambda pattern: re.match(pattern, location), self._dev_mode_locations))
 
     def _parse_primitive(self, location: str, raw_value: tp.Any, metaclass: type):
 

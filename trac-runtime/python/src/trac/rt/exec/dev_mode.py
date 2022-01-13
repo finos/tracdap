@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import re
 import typing as tp
 import copy
 import pathlib
@@ -28,6 +29,14 @@ import trac.rt.impl.storage as _storage
 import trac.rt.impl.util as util
 
 
+DEV_MODE_JOB_CONFIG = [
+    re.compile(r"parameters\.[\w]+"),
+    re.compile(r"inputs\.[\w]+"),
+    re.compile(r"outputs\.[\w]+")]
+
+DEV_MODE_SYS_CONFIG = []
+
+
 class DevModeTranslator:
 
     _log: tp.Optional[util.logging.Logger] = None
@@ -36,24 +45,24 @@ class DevModeTranslator:
     def translate_dev_mode_config(
             cls,
             sys_config_dir: pathlib.Path,
-            sys_config: cfg.SystemConfig,
+            sys_config: cfg.RuntimeConfig,
             job_config: cfg.JobConfig,
             model_class: tp.Optional[api.TracModel.__class__]) \
-            -> (cfg.JobConfig, cfg.SystemConfig):
+            -> (cfg.JobConfig, cfg.RuntimeConfig):
 
         cls._log.info(f"Applying dev mode config translation")
 
-        if not job_config.job_id:
+        if not job_config.jobId:
 
             job_id = uuid.uuid4()
             job_config = copy.copy(job_config)
-            job_config.job_id = job_id
+            job_config.jobId = job_id
 
-            cls._log.info(f"Assigned dev mode job ID = {job_config.job_id}")
+            cls._log.info(f"Assigned dev mode job ID = {job_config.jobId}")
 
         else:
 
-            cls._log.info(f"Using dev mode job ID = {job_config.job_id}")
+            cls._log.info(f"Using dev mode job ID = {job_config.jobId}")
 
         if model_class is not None:
             job_config, sys_config = cls._generate_integrated_model_definition(model_class, job_config, sys_config)
@@ -155,8 +164,8 @@ class DevModeTranslator:
     def _generate_integrated_model_definition(
             cls, model_class: api.TracModel.__class__,
             job_config: cfg.JobConfig,
-            sys_config: cfg.SystemConfig) \
-            -> (cfg.JobConfig, cfg.SystemConfig):
+            sys_config: cfg.RuntimeConfig) \
+            -> (cfg.JobConfig, cfg.RuntimeConfig):
 
         model_id = uuid.uuid4()
 

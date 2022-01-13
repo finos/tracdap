@@ -72,12 +72,18 @@ def copy_license():
 
 def move_generated_into_src():
 
+    move_generated_package_into_src("src/trac/rt/metadata", "generated/trac/rt_gen/domain/trac/metadata")
+    move_generated_package_into_src("src/trac/rt/config", "generated/trac/rt_gen/domain/trac/config")
+
+
+def move_generated_package_into_src(src_relative_path, generate_rel_path):
+
     # For generated packages, the main source tree contains placeholders that import everything
     # from the generated tree. We want to remove the placeholders and put the generated code into
     # the main source tree
 
-    src_metadata_path = BUILD_PATH.joinpath("src/trac/rt/metadata")
-    generated_metadata_path = SCRIPT_DIR.joinpath("generated/trac/rt_gen/domain/trac/metadata")
+    src_metadata_path = BUILD_PATH.joinpath(src_relative_path)
+    generated_metadata_path = SCRIPT_DIR.joinpath(generate_rel_path)
 
     shutil.rmtree(src_metadata_path)
     shutil.copytree(generated_metadata_path, src_metadata_path)

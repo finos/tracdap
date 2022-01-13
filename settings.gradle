@@ -23,9 +23,11 @@ rootProject.name = 'trac-platform'
 // API components
 
 include 'trac-api-metadata'
+include 'trac-api-config'
 include 'trac-api-services'
 
 project(":trac-api-metadata").projectDir = file("trac-api/trac-metadata")
+project(":trac-api-config").projectDir = file("trac-api/trac-config")
 project(":trac-api-services").projectDir = file("trac-api/trac-services")
 
 

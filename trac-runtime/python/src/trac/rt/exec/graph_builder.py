@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import trac.rt.config.config as config
+import trac.rt.config as config
 import trac.rt.exceptions as _ex
 
 from .graph import *
@@ -34,7 +34,7 @@ class GraphBuilder:
     @classmethod
     def build_calculation_job(cls, job_config: config.JobConfig) -> Graph:
 
-        job_namespace = NodeNamespace(f"job={job_config.job_id}")
+        job_namespace = NodeNamespace(f"job={job_config.jobId}")
         null_graph = Graph({}, NodeId('', job_namespace))
 
         # Create a job context with no dependencies and no external data mappings

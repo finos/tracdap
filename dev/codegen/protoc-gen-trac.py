@@ -25,6 +25,9 @@ import generator as gen
 
 class TracPlugin:
 
+    # TODO: Pass this in as an option
+    TARGET_PACKAGE = "trac.rt"
+
     def __init__(self, pb_request: pb_plugin.CodeGeneratorRequest):
 
         logging_format = f"%(levelname)s %(name)s: %(message)s"
@@ -33,12 +36,19 @@ class TracPlugin:
 
         self._request = pb_request
 
-        options_str = self._request.parameter.split(";")
-        options_kv = map(lambda opt: opt.split("=", 1), options_str)
-        self._options = {opt[0]: opt[1] if len(opt) > 1 else True for opt in options_kv}
+        if self._request.parameter:
 
-        for k, v in self._options.items():
-            self._log.info(f"Option {k} = {v}")
+            options_str = self._request.parameter.split(";")
+            options_kv = map(lambda opt: opt.split("=", 1), options_str)
+            self._options = {opt[0]: opt[1] if len(opt) > 1 else True for opt in options_kv}
+
+            for k, v in self._options.items():
+                self._log.info(f"Option {k} = {v}")
+
+        else:
+
+            self._options = dict()
+            self._log.info(f"No additional options specified")
 
     def generate(self):
 
