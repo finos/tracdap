@@ -20,7 +20,6 @@ package trac.config;
 option java_package = "com.accenture.trac.config";
 option java_multiple_files = true;
 
-import "trac/metadata/type.proto";
 import "trac/metadata/object_id.proto";
 import "trac/metadata/object.proto";;
 import "trac/metadata/job.proto";
