@@ -1,0 +1,11 @@
+
+
+job:
+  jobType: IMPORT_MODEL
+  importModel:
+    language: python
+    repository: trac_integrated
+    path: examples/models/hello_world
+    package: hello_world
+    entryPoint: hello_world.HelloWorldModel
+    version: main
