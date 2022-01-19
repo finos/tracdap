@@ -29,13 +29,7 @@ import "trac/metadata/job.proto";
 message JobConfig {
 
     metadata.TagHeader jobId = 1;
-    metadata.TagHeader target = 2;
+    metadata.JobDefinition job = 2;
 
-    map<string, metadata.Value> parameters = 3;
-    map<string, metadata.TagHeader> inputs = 4;
-    map<string, metadata.TagHeader> outputs = 5;
-
-    map<string, metadata.ObjectDefinition> objects = 6;
-
-    metadata.JobDefinition job = 7;
+    map<string, metadata.ObjectDefinition> objects = 3;
 }
