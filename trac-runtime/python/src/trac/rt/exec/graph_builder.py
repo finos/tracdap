@@ -23,10 +23,10 @@ class GraphBuilder:
     @staticmethod
     def build_job(job_config: config.JobConfig) -> Graph:
 
-        target_def = job_config.objects.get(job_config.target)
+        target_def = job_config.objects.get(job_config.job.target)
 
         if target_def is None:
-            raise _ex.EConfigParse(f"No definition available for job target '{job_config.target}'")
+            raise _ex.EConfigParse(f"No definition available for job target '{job_config.job.target}'")
 
         # Only calculation jobs are supported at present
         return GraphBuilder.build_calculation_job(job_config)
@@ -48,7 +48,7 @@ class GraphBuilder:
         # The root exec node can run directly in the job context, no need to do a context push
         # All input views are already mapped and there is only a single execution target
 
-        job_target_obj = job_config.objects.get(job_config.target)
+        job_target_obj = job_config.objects.get(job_config.job.target)
         job_target_graph = GraphBuilder.build_model_or_flow(
             job_config, job_namespace, input_graph, job_target_obj)
 
@@ -98,7 +98,7 @@ class GraphBuilder:
 
         nodes = {**graph.nodes}
 
-        for input_name, data_id in job_config.inputs.items():
+        for input_name, data_id in job_config.job.inputs.items():
 
             data_def = job_config.objects[data_id].data
 
@@ -135,7 +135,7 @@ class GraphBuilder:
 
         nodes = {**graph.nodes}
 
-        for output_name, data_id in job_config.outputs.items():
+        for output_name, data_id in job_config.job.outputs.items():
 
             data_def = job_config.objects[data_id].data
 

@@ -274,7 +274,7 @@ class ModelFunc(NodeFunction):
         # Run the model against the mapped local context
         trac_ctx = _ctx.TracContextImpl(
             self.node.model_def, self.model_class,
-            parameters=self.job_config.parameters,
+            parameters=self.job_config.job.parameters,
             data=local_ctx)
 
         model = self.model_class()

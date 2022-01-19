@@ -67,8 +67,8 @@ class DevModeTranslator:
         if model_class is not None:
             job_config, sys_config = cls._generate_integrated_model_definition(model_class, job_config, sys_config)
 
-        original_inputs = job_config.inputs
-        original_outputs = job_config.outputs
+        original_inputs = job_config.job.inputs
+        original_outputs = job_config.job.outputs
         original_objects = job_config.objects
 
         translated_inputs = copy.copy(original_inputs)
@@ -103,8 +103,8 @@ class DevModeTranslator:
 
         job_config = copy.copy(job_config)
         job_config.objects = translated_objects
-        job_config.inputs = translated_inputs
-        job_config.outputs = translated_outputs
+        job_config.job.inputs = translated_inputs
+        job_config.job.outputs = translated_outputs
 
         return job_config, sys_config
 
@@ -202,7 +202,7 @@ class DevModeTranslator:
             model=model_def)
 
         translated_job_config = copy.copy(job_config)
-        translated_job_config.target = model_id
+        translated_job_config.job.target = model_id
         translated_job_config.objects = copy.copy(job_config.objects)
         translated_job_config.objects[model_id] = model_object
 
