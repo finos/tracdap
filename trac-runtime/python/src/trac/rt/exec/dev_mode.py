@@ -30,9 +30,9 @@ import trac.rt.impl.util as util
 
 
 DEV_MODE_JOB_CONFIG = [
-    re.compile(r"parameters\.[\w]+"),
-    re.compile(r"inputs\.[\w]+"),
-    re.compile(r"outputs\.[\w]+")]
+    re.compile(r"job\.parameters\.[\w]+"),
+    re.compile(r"job\.inputs\.[\w]+"),
+    re.compile(r"job\.outputs\.[\w]+")]
 
 DEV_MODE_SYS_CONFIG = []
 
