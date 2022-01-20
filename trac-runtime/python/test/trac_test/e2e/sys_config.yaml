@@ -6,11 +6,12 @@ repositories:
 
 storage:
 
+  # TODO: Proper unit test sys config for runtime
   example_data:
     instances:
       - storageType: LOCAL_STORAGE
         storageProps:
-          rootPath: C:\Dev
+          rootPath: .
 
 storageSettings:
   defaultStorage: example_data
