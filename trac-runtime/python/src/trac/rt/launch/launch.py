@@ -95,6 +95,25 @@ def launch_model(
         rt.wait_for_shutdown()
 
 
+def launch_job(
+        job_config: _tp.Union[str, pathlib.Path],
+        sys_config: _tp.Union[str, pathlib.Path],
+        dev_mode: bool = False):
+
+    _sys_config = _resolve_config_file(sys_config, None)
+    _job_config = _resolve_config_file(job_config, None)
+
+    runtime_instance = runtime.TracRuntime(
+        _sys_config, _job_config,
+        dev_mode=dev_mode)
+
+    runtime_instance.pre_start()
+
+    with runtime_instance as rt:
+        rt.submit_batch()
+        rt.wait_for_shutdown()
+
+
 def launch_cli():
 
     launch_args = cli_args()

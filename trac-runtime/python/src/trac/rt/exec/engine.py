@@ -344,7 +344,11 @@ class JobProcessor(actors.Actor):
     This includes setup (GraphBuilder), execution (GraphProcessor) and reporting results
     """
 
-    def __init__(self, job_id, job_config, repositories: repos.Repositories, storage: _storage.StorageManager):
+    def __init__(
+            self, job_id, job_config: config.JobConfig,
+            repositories: repos.Repositories,
+            storage: _storage.StorageManager):
+
         super().__init__()
         self.job_id = job_id
         self.job_config = job_config
@@ -387,7 +391,7 @@ class TracEngine(actors.Actor):
     """
 
     def __init__(
-            self, sys_config: config.SystemConfig,
+            self, sys_config: config.RuntimeConfig,
             repositories: repos.Repositories,
             storage: _storage.StorageManager,
             batch_mode=False):
@@ -411,13 +415,13 @@ class TracEngine(actors.Actor):
         self._log.info("Engine shutdown complete")
 
     @actors.Message
-    def submit_job(self, job_info: object):
+    def submit_job(self, job_config: config.JobConfig):
 
-        job_id = 'test_job'
+        job_id = str(job_config.jobId)
 
-        self._log.info("A job has been submitted")
+        self._log.info(f"Job submitted: [{job_id}]")
 
-        job_actor_id = self.actors().spawn(JobProcessor, job_id, job_info, self._repos, self._storage)
+        job_actor_id = self.actors().spawn(JobProcessor, job_id, job_config, self._repos, self._storage)
 
         jobs = {**self.engine_ctx.jobs, job_id: job_actor_id}
         self.engine_ctx = EngineContext(jobs, self.engine_ctx.data)

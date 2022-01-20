@@ -225,7 +225,22 @@ class SaveDataNode(Node):
 
 
 @dc.dataclass(frozen=True)
-class ModelNode(Node):
+class ImportModelNode(Node):
+
+    import_details: meta.ImportModelJobDetails
+
+    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
+
+    def __post_init__(self, explicit_deps):
+
+        object.__setattr__(self, 'dependencies', {})
+
+        if explicit_deps:
+            self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
+
+
+@dc.dataclass(frozen=True)
+class RunModelNode(Node):
 
     model_def: meta.ModelDefinition
     input_ids: tp.FrozenSet[NodeId]

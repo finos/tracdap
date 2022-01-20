@@ -5,7 +5,7 @@ job:
   importModel:
     language: python
     repository: trac_integrated
-    path: examples/models/hello_world
-    package: hello_world
-    entryPoint: hello_world.HelloWorldModel
+    path: trac-runtime/python/test
+    package: trac_test.e2e.test_import_model
+    entryPoint: trac_test.e2e.test_import_model.SampleModel
     version: main

@@ -20,6 +20,7 @@ import trac.rt.exceptions as _ex
 import trac.rt.impl.repositories as _repos
 import trac.rt.impl.storage as _storage
 import trac.rt.impl.data as _data
+import trac.rt.impl.util as _util
 
 import trac.rt.exec.context as _ctx
 from trac.rt.exec.graph import *
@@ -27,6 +28,7 @@ from trac.rt.exec.graph import *
 import abc
 import typing as tp
 import pathlib
+import json
 
 
 NodeContext = tp.Dict[NodeId, object]  # Available prior node results when a node function is called
@@ -250,9 +252,39 @@ class SaveDataFunc(_LoadSaveDataFunc):
         return True
 
 
-class ModelFunc(NodeFunction):
+class ImportModelFunc(NodeFunction):
 
-    def __init__(self, node: ModelNode, job_config: _config.JobConfig, model_class: _api.TracModel.__class__):
+    def __init__(self, node: ImportModelNode, repositories: _repos.Repositories):
+        self.node = node
+        self._repos = repositories
+
+        self._log = _util.logger_for_object(self)
+
+    def __call__(self, ctx: NodeContext) -> NodeResult:
+
+        stub_model_def = meta.ModelDefinition(
+            language=self.node.import_details.language,
+            repository=self.node.import_details.repository,
+            path=self.node.import_details.path,
+            package=self.node.import_details.package,
+            entryPoint=self.node.import_details.entryPoint,
+            version=self.node.import_details.version)
+
+        model_loader = self._repos.get_model_loader(self.node.import_details.repository)
+        model_class = model_loader.load_model(stub_model_def)
+        model = model_class()
+
+        model_def = stub_model_def
+        model_json = json.dumps(model_def.__dict__, indent=4)
+
+        self._log.info(f"Model definition: \n{model_json}")
+
+        return model_def
+
+
+class RunModelFunc(NodeFunction):
+
+    def __init__(self, node: RunModelNode, job_config: _config.JobConfig, model_class: _api.TracModel.__class__):
         super().__init__()
         self.node = node
         self.job_config = job_config
@@ -316,12 +348,15 @@ class FunctionResolver:
     def resolve_save_data(self, job_config: _config.JobConfig, node: SaveDataNode):
         return SaveDataFunc(node, self._storage)
 
-    def resolve_model_node(self, job_config: _config.JobConfig, node: ModelNode) -> NodeFunction:
+    def resolve_import_model_node(self, job_config: _config.JobConfig, node: ImportModelNode):
+        return ImportModelFunc(node, self._repos)
+
+    def resolve_run_model_node(self, job_config: _config.JobConfig, node: RunModelNode) -> NodeFunction:
 
         model_loader = self._repos.get_model_loader(node.model_def.repository)
         model_class = model_loader.load_model(node.model_def)
 
-        return ModelFunc(node, job_config, model_class)
+        return RunModelFunc(node, job_config, model_class)
 
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
         ContextPushNode: ContextPushFunc,
@@ -335,7 +370,8 @@ class FunctionResolver:
 
         LoadDataNode: resolve_load_data,
         SaveDataNode: resolve_save_data,
-        ModelNode: resolve_model_node,
+        RunModelNode: resolve_run_model_node,
+        ImportModelNode: resolve_import_model_node,
 
         JobOutputMetadataNode: lambda s, j, n: NoopFunc(),
         JobResultMetadataNode: lambda s, j, n: NoopFunc(),
