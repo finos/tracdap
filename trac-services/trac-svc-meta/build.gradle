@@ -26,8 +26,14 @@ ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Metadata Service")
 
 
 application {
+
     mainClass.set("com.accenture.trac.svc.meta.TracMetadataService")
     tasks.run.workingDir = rootProject.projectDir
+
+    // JVM flags needed for Arrow / Netty / gRPC to access native memory
+    tasks.run.jvmArgs("--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED")
+    tasks.run.jvmArgs("--add-opens", "java.base/java.nio=ALL-UNNAMED")
+    tasks.run.systemProperty("io.netty.tryReflectionSetAccessible", true)
 }
 
 dependencies {

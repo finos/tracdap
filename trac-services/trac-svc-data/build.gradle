@@ -24,10 +24,15 @@ apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
 ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Data Service")
 
-
 application {
+
     mainClass.set("com.accenture.trac.svc.data.TracDataService")
     tasks.run.workingDir = rootProject.projectDir
+
+    // JVM flags needed for Arrow / Netty / gRPC to access native memory
+    tasks.run.jvmArgs("--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED")
+    tasks.run.jvmArgs("--add-opens", "java.base/java.nio=ALL-UNNAMED")
+    tasks.run.systemProperty("io.netty.tryReflectionSetAccessible", true)
 }
 
 dependencies {
