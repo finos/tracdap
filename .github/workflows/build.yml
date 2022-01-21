@@ -8,10 +8,7 @@ on:
   pull_request:
 
 
-# Use Java 11 for the baseline build, to avoid dependence on post-11 features
-# It may also be useful to add a set of cross-platform builds, targeting different platforms and Java versions
 env:
-  JAVA_VERSION: 11
   JAVA_DISTRIBUTION: zulu
   NODE_VERSION: 14.x
 
@@ -22,6 +19,12 @@ jobs:
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
+    strategy:
+      matrix:
+        JAVA_VERSION:
+          - 11
+          - 17
 
     steps:
 
@@ -35,7 +38,7 @@ jobs:
       uses: actions/setup-java@v2
       with:
         distribution: ${{ env.JAVA_DISTRIBUTION }}
-        java-version: ${{ env.JAVA_VERSION }}
+        java-version: ${{ matrix.JAVA_VERSION }}
 
         # Turn on Gradle dependency caching
         cache: gradle

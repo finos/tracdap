@@ -45,6 +45,7 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import org.apache.arrow.memory.NettyAllocationManager;
 import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.memory.util.MemoryUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +77,19 @@ public class TracDataService extends CommonServiceBase {
 
         PlatformConfig platformConfig;
         DataServiceConfig dataSvcConfig;
+
+        // Force initialization of Arrow MemoryUtil, rather than waiting until the first API call
+        // This can fail on Java versions >= 16 if the java.nio module is not marked as open
+
+        try {
+            if (MemoryUtil.UNSAFE == null)
+                throw new NullPointerException("MemoryUtil.UNSAFE == null");
+        }
+        catch (RuntimeException e) {
+
+            log.error("Failed to set up native memory access for Apache Arrow", e);
+            throw new EStartup("Failed to set up native memory access for Apache Arrow", e);
+        }
 
         try {
             pluginManager.initRegularPlugins();

@@ -41,6 +41,11 @@ test {
         excludeTags "integration"
         excludeTags "slow"
     }
+
+    // JVM flags needed for Arrow / Netty / gRPC to access native memory
+    jvmArgs("--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED")
+    jvmArgs("--add-opens", "java.base/java.nio=ALL-UNNAMED")
+    systemProperty("io.netty.tryReflectionSetAccessible", true)
 }
 
 task integration(type: Test) {
@@ -60,4 +65,9 @@ task integration(type: Test) {
     useJUnitPlatform {
         includeTags(integrationTags)
     }
+
+    // JVM flags needed for Arrow / Netty / gRPC to access native memory
+    jvmArgs("--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED")
+    jvmArgs("--add-opens", "java.base/java.nio=ALL-UNNAMED")
+    systemProperty("io.netty.tryReflectionSetAccessible", true)
 }
