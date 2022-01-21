@@ -1396,12 +1396,15 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         // Extra object so that will still match after V1 is updated
 
-        var extraObj = nextDataDef(dummyDataDef());
-        var extraTag = TestData.dummyTag(extraObj, INCLUDE_HEADER).toBuilder()
+        var unchangedObj = nextDataDef(dummyDataDef());
+        var unchangedTag = TestData.dummyTag(unchangedObj, INCLUDE_HEADER).toBuilder()
                 .putAttrs("dal_as_of_attr_1", MetadataCodec.encodeValue("initial_value"))
                 .build();
 
-        dal.saveNewObject(TEST_TENANT, extraTag);
+        dal.saveNewObject(TEST_TENANT, unchangedTag);
+
+        // Ensure unchanged tag has a creation timestamp that is before the versioned object
+        Thread.sleep(10);
 
         // Now create the object that will be versioned
 
@@ -1446,7 +1449,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var resultHeader = result.get(0).getHeader();
 
         Assertions.assertEquals(1, result.size());
-        Assertions.assertEquals(extraTag.getHeader(), resultHeader);
+        Assertions.assertEquals(unchangedTag.getHeader(), resultHeader);
 
         // Now search with an as-of time before the update was applied, both objects should come back
         // The object created last should be top of the list
@@ -1456,12 +1459,15 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .build();
 
         var asOfResult = unwrap(dal.search(TEST_TENANT, asOfSearch));
-        var resultHeader2 = asOfResult.get(0).getHeader();
-        var resultHeader1 = asOfResult.get(1).getHeader();
+        var resultHeader1 = asOfResult.get(0).getHeader();
+        var resultHeader2 = asOfResult.get(1).getHeader();
+
+        // The versioned tag should be returned first in the list
+        // This is because results are returned with the most recently updated first
 
         Assertions.assertEquals(2, asOfResult.size());
-        Assertions.assertEquals(extraTag.getHeader(), resultHeader1);
-        Assertions.assertEquals(v1Tag.getHeader(), resultHeader2);
+        Assertions.assertEquals(v1Tag.getHeader(), resultHeader1);
+        Assertions.assertEquals(unchangedTag.getHeader(), resultHeader2);
     }
 
     @Test

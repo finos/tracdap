@@ -392,6 +392,10 @@ abstract class MetadataSearchApiTest implements IDalTestable {
                 .build();
 
         var header1 = writeApi.createObject(create1);
+
+        // Ensure some time elapses between creating the two v1 objects
+        Thread.sleep(10);
+
         var header2 = writeApi.createObject(create1);
 
         // Use a search timestamp after both objects have been created, but before either is updated
@@ -443,12 +447,15 @@ abstract class MetadataSearchApiTest implements IDalTestable {
                 .build();
 
         var asOfResult = searchApi.search(asOfSearch);
-        var resultHeader2 = asOfResult.getSearchResult(0).getHeader();
-        var resultHeader1 = asOfResult.getSearchResult(1).getHeader();
+        var resultHeader1 = asOfResult.getSearchResult(0).getHeader();
+        var resultHeader2 = asOfResult.getSearchResult(1).getHeader();
+
+        // The object for header2 was created last
+        // So, that should be the first result
 
         Assertions.assertEquals(2, asOfResult.getSearchResultCount());
-        Assertions.assertEquals(header1, resultHeader1);
-        Assertions.assertEquals(header2, resultHeader2);
+        Assertions.assertEquals(resultHeader1, header2);
+        Assertions.assertEquals(resultHeader2, header1);
     }
 
     @Test
