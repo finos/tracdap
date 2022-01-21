@@ -50,7 +50,7 @@ dependencyCheck {
     failBuildOnCVSS = 4
 
     data {
-        directory = rootProject.buildDir.path + '/compliance-cache/nvd2/'
+        directory = rootProject.buildDir.path + '/compliance-cache/nvd_platform/'
     }
 }
 
