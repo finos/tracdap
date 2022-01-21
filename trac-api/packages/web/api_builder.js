@@ -68,33 +68,45 @@ function copyProto() {
     }
 }
 
-function generateMapping(mappingDict, valuePrefix) {
+function generateJsMapping(mappingDict, valuePrefix, indent) {
 
     let mappingCode = "{\n";
 
     for (const [mappingKey, mappingValue] of Object.entries(mappingDict)) {
 
-        mappingCode += "\t\t\"" + mappingKey + "\": " + valuePrefix + mappingValue + ",\n";
+        mappingCode += "\t".repeat(indent) + "\t\"" + mappingKey + "\": " + valuePrefix + mappingValue + ",\n";
     }
 
-    mappingCode += "\t}";
+    mappingCode += "\t".repeat(indent) +"}";
 
     return mappingCode;
 }
 
-function generateImportMapping(mappingDict) {
+function generateEnumMapping(mappingDict) {
 
     let mappingCode = "\n";
 
     for (const [mappingKey, mappingValue] of Object.entries(mappingDict)) {
 
-        mappingCode += "\timport " + mappingKey + " = " + mappingValue + ";\n";
+        mappingCode += "\texport import " + mappingKey + " = " + mappingValue + ";\n";
     }
 
     return mappingCode;
 }
 
-function writeApiMapping(methodTypes, apiMapping) {
+function generateBasicTypeMapping(mappingDict) {
+
+    let mappingCode = "\n";
+
+    for (const [mappingKey, mappingValue] of Object.entries(mappingDict)) {
+
+        mappingCode += "\tconst " + mappingKey + " = " + mappingValue + ";\n";
+    }
+
+    return mappingCode;
+}
+
+function writeJsMapping(methodTypes, apiMapping) {
 
     fs.readFile(jsOutFile, 'utf8', function (err, jsCode) {
 
@@ -111,7 +123,7 @@ function writeApiMapping(methodTypes, apiMapping) {
     });
 }
 
-function writeImportMapping(importMapping) {
+function writeTsMapping(importMapping) {
 
     fs.readFile(tsOutFile, 'utf8', function (err, tsCode) {
 
@@ -140,15 +152,18 @@ function main() {
 
     pbjs.main(pbjsArgs, () => {
 
-        const methodTypes = generateMapping(mapping.methodTypes, "");
-        const apiMapping = generateMapping(mapping.apiMapping, "$root.");
-        writeApiMapping(methodTypes, apiMapping);
+        const methodTypes = generateJsMapping(mapping.methodTypes, "", 2);
+        const apiMappingDict = {...mapping.enumMapping, ...mapping.basicTypeMapping};
+        const apiMapping = generateJsMapping(apiMappingDict, "$root.", 1);
+        writeJsMapping(methodTypes, apiMapping);
     });
 
     pbts.main(pbtsArgs, () => {
 
-        const importMapping = generateImportMapping(mapping.apiMapping);
-        writeImportMapping(importMapping);
+        const enumMapping = generateEnumMapping(mapping.enumMapping);
+        const basicTypeMapping = generateBasicTypeMapping(mapping.basicTypeMapping);
+        const tsMapping = enumMapping + basicTypeMapping;
+        writeTsMapping(tsMapping);
     });
 }
 

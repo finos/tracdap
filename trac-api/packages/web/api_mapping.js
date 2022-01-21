@@ -29,7 +29,7 @@ const methodTypes = {
 };
 
 
-const apiMapping = {
+const enumMapping = {
     "BasicType": "trac.metadata.BasicType",
     "ObjectType": "trac.metadata.ObjectType",
     "SchemaType": "trac.metadata.SchemaType",
@@ -40,8 +40,10 @@ const apiMapping = {
     "IncarnationStatus": "trac.metadata.IncarnationStatus",
     "SearchOperator": "trac.metadata.SearchOperator",
     "LogicalOperator": "trac.metadata.LogicalOperator",
-    "TagOperation": "trac.metadata.TagOperation",
+    "TagOperation": "trac.metadata.TagOperation"
+}
 
+const basicTypeMapping = {
     "BOOLEAN": "trac.metadata.BasicType.BOOLEAN",
     "INTEGER": "trac.metadata.BasicType.INTEGER",
     "FLOAT": "trac.metadata.BasicType.FLOAT",
@@ -53,4 +55,5 @@ const apiMapping = {
 
 
 module.exports.methodTypes = methodTypes;
-module.exports.apiMapping = apiMapping;
+module.exports.enumMapping = enumMapping;
+module.exports.basicTypeMapping = basicTypeMapping;

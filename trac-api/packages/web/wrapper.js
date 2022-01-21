@@ -47,7 +47,7 @@
 
     const WebRpcImpl = (function() {
 
-    const METHOD_TYPE_MAP = $METHOD_TYPE_MAPPING;
+        const METHOD_TYPE_MAP = $METHOD_TYPE_MAPPING;
 
         function WebRpcImpl(service, namespace, protocol, host, port) {
 
