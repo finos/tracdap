@@ -24,10 +24,10 @@ https://trac-platform.readthedocs.io/en/stable
 
 The following packages are available:
 
-| Package | Description |
-| ------- | ----------- |
-| [Model runtime for Python](https://pypi.org/project/trac-runtime/) | Build models and test them in a sandbox, ready to deploy to the platform 
-| [Web API package](https://www.npmjs.com/package/trac-web-api) | Build client apps in JavaScript or TypeScript using the TRAC platform APIs |
+| Package                                                            | Description                                                                |
+|--------------------------------------------------------------------|----------------------------------------------------------------------------|
+| [Model runtime for Python](https://pypi.org/project/trac-runtime/) | Build models and test them in a sandbox, ready to deploy to the platform   |
+| [Web API package](https://www.npmjs.com/package/trac-web-api)      | Build client apps in JavaScript or TypeScript using the TRAC platform APIs |
 
 
 ## Development Status
