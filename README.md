@@ -55,8 +55,11 @@ For more information see the
 
 ## Building TRAC
 
-The core platform services require Java 11 or higher, you can download a suitable JDK from
-[AdoptOpenJDK](https://adoptopenjdk.net/).
+The core platform services require Java version 11 or higher, using LTS 11 or LTS 17
+is recommended. Suitable JDKs are available from Azul and Adoptium:
+
+* [Azul - Zulu](https://www.azul.com/downloads/?package=jdk)
+* [Adoptium - Eclipse Temurin](https://adoptium.net/)
 
 To build the TRAC platform, clone the repository and run this command
 in the source directory:
