@@ -13,7 +13,7 @@
 --  limitations under the License.
 
 
-create temporary table key_mapping (
+create local temporary table key_mapping (
 
     -- Primary key, this is the target key being looked up
     -- It will be used for loading records
