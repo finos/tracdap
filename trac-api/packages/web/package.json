@@ -27,7 +27,8 @@
   },
   "devDependencies": {
     "license-checker-rseidelsohn": "^2.2.0",
-    "owasp-dependency-check": "0.0.18"
+    "owasp-dependency-check": "0.0.18",
+    "node-fetch": "^3.2.0"
   },
   "scripts": {
     "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
