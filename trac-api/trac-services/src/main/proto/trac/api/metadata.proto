@@ -378,7 +378,7 @@ message MetadataWriteRequest {
 
 
 /**
- * Request to read an object from the TRAC metadata store.
+ * Request to read an object from the TRAC metadata store. An alternative REST-style GET call is available using MetadataGetRequest.
  *
  * @see TracMetadataApi
  */
@@ -439,7 +439,7 @@ message MetadataSearchResponse {
 
 
 /**
- * Request to get an object from the TRAC metadata store.
+ * Request to get an object from the TRAC metadata store. This is available as an alternative to MetadataGetRequest for use in REST-style GET calls.
  *
  * @see TracMetadataApi
  */
