@@ -227,6 +227,7 @@ class SaveDataNode(Node):
 @dc.dataclass(frozen=True)
 class ImportModelNode(Node):
 
+    model_scope: str
     import_details: meta.ImportModelJobDetails
 
     explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None

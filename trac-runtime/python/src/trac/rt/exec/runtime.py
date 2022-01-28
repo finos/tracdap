@@ -24,8 +24,8 @@ import trac.rt.config as config
 import trac.rt.exceptions as _ex
 import trac.rt.impl.config_parser as cfg
 import trac.rt.impl.util as util
-import trac.rt.impl.repositories as repos
-import trac.rt.impl.storage as storage
+import trac.rt.impl.model_loader as _models
+import trac.rt.impl.storage as _storage
 
 import trac.rt.exec.actors as actors
 import trac.rt.exec.engine as engine
@@ -76,8 +76,8 @@ class TracRuntime:
         self._model_class = model_class
 
         # Top level resources
-        self._repos: tp.Optional[repos.Repositories] = None
-        self._storage: tp.Optional[storage.StorageManager] = None
+        self._models: tp.Optional[_models.ModelLoader] = None
+        self._storage: tp.Optional[_storage.StorageManager] = None
 
         # The execution engine
         self._engine: tp.Optional[engine.TracEngine] = None
@@ -137,10 +137,10 @@ class TracRuntime:
 
             self._log.info("Starting the engine...")
 
-            self._repos = repos.Repositories(self._sys_config)
-            self._storage = storage.StorageManager(self._sys_config, self._sys_config_dir)
+            self._models = _models.ModelLoader(self._sys_config)
+            self._storage = _storage.StorageManager(self._sys_config, self._sys_config_dir)
 
-            self._engine = engine.TracEngine(self._sys_config, self._repos, self._storage, batch_mode=self._batch_mode)
+            self._engine = engine.TracEngine(self._sys_config, self._models, self._storage, batch_mode=self._batch_mode)
             self._system = actors.ActorSystem(self._engine, system_thread="engine")
 
             self._system.start(wait=wait)

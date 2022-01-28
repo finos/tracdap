@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 
 import trac.rt.config as config
 import trac.rt.impl.util as util
-import trac.rt.impl.repositories as repos
+import trac.rt.impl.model_loader as _models
 import trac.rt.impl.storage as _storage
 
 import trac.rt.exec.actors as actors
@@ -70,14 +70,14 @@ class GraphBuilder(actors.Actor):
 
     def __init__(
             self, job_config: config.JobConfig,
-            repositories: repos.Repositories,
+            models: _models.ModelLoader,
             storage: _storage.StorageManager):
 
         super().__init__()
         self.job_config = job_config
         self.graph: tp.Optional[GraphContext] = None
 
-        self._resolver = _func.FunctionResolver(repositories, storage)
+        self._resolver = _func.FunctionResolver(models, storage)
         self._log = util.logger_for_object(self)
 
     def on_start(self):
@@ -346,19 +346,24 @@ class JobProcessor(actors.Actor):
 
     def __init__(
             self, job_id, job_config: config.JobConfig,
-            repositories: repos.Repositories,
+            models: _models.ModelLoader,
             storage: _storage.StorageManager):
 
         super().__init__()
         self.job_id = job_id
         self.job_config = job_config
-        self._repos = repositories
+        self._models = models
         self._storage = storage
         self._log = util.logger_for_object(self)
 
     def on_start(self):
-        self._log.info("Starting job")
-        self.actors().spawn(GraphBuilder, self.job_config, self._repos, self._storage)
+        self._log.info(f"Starting job [{self.job_id}]")
+        self._models.create_scope(f"JOB_SCOPE:{self.job_id}")
+        self.actors().spawn(GraphBuilder, self.job_config, self._models, self._storage)
+
+    def on_stop(self):
+        self._log.info(f"Cleaning up job [{self.job_id}]")
+        self._models.destroy_scope(f"JOB_SCOPE:{self.job_id}")
 
     @actors.Message
     def job_graph(self, graph: GraphContext):
@@ -392,7 +397,7 @@ class TracEngine(actors.Actor):
 
     def __init__(
             self, sys_config: config.RuntimeConfig,
-            repositories: repos.Repositories,
+            models: _models.ModelLoader,
             storage: _storage.StorageManager,
             batch_mode=False):
 
@@ -402,7 +407,7 @@ class TracEngine(actors.Actor):
 
         self._log = util.logger_for_object(self)
         self._sys_config = sys_config
-        self._repos = repositories
+        self._models = models
         self._storage = storage
         self._batch_mode = batch_mode
 
@@ -421,7 +426,7 @@ class TracEngine(actors.Actor):
 
         self._log.info(f"Job submitted: [{job_id}]")
 
-        job_actor_id = self.actors().spawn(JobProcessor, job_id, job_config, self._repos, self._storage)
+        job_actor_id = self.actors().spawn(JobProcessor, job_id, job_config, self._models, self._storage)
 
         jobs = {**self.engine_ctx.jobs, job_id: job_actor_id}
         self.engine_ctx = EngineContext(jobs, self.engine_ctx.data)

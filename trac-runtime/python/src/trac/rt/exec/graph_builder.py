@@ -46,7 +46,9 @@ class GraphBuilder:
 
         import_id = NodeId("trac_import_model", job_namespace)
         import_details = job_config.job.importModel
-        import_node = ImportModelNode(import_id, import_details, explicit_deps=[ctx_push_graph.root_id])
+        model_scope = f"JOB_SCOPE:{job_config.jobId}"
+
+        import_node = ImportModelNode(import_id, model_scope, import_details, explicit_deps=[ctx_push_graph.root_id])
 
         output_metadata_nodes = frozenset([import_id])
 

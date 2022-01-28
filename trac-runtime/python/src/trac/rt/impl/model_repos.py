@@ -15,73 +15,87 @@
 from __future__ import annotations
 
 import abc
-import importlib
 import typing as tp
+import pathlib
 
-import trac.rt.api as _api
 import trac.rt.metadata as _meta
 import trac.rt.config as _cfg
 import trac.rt.exceptions as _ex
 import trac.rt.impl.util as _util
 
 
-class IModelLoader:
+class IModelRepository:
 
     @abc.abstractmethod
-    def load_model(self, model_def: _meta.ModelDefinition) -> _api.TracModel.__class__:
+    def checkout_model(
+            self, model_def: _meta.ModelDefinition,
+            checkout_path: tp.Union[str, pathlib.Path]) \
+            -> tp.Union[pathlib.Path, str, None]:
+
         pass
 
 
-class IntegratedModelLoader(IModelLoader):
+class IntegratedModelRepo(IModelRepository):
 
     def __init__(self, repo_config: _cfg.RepositoryConfig):
         self._repo_config = repo_config
 
-    def load_model(self, model_def: _meta.ModelDefinition) -> _api.TracModel.__class__:
+    def checkout_model(
+            self, model_def: _meta.ModelDefinition,
+            checkout_path: tp.Union[str, pathlib.Path]) \
+            -> None:
 
-        entry_point_parts = model_def.entryPoint.rsplit(".", 1)
-        module_name = entry_point_parts[0]
-        class_name = entry_point_parts[1]
+        # For the integrated repo there is nothing to check out
 
-        model_module = importlib.import_module(module_name)
-        model_class = model_module.__dict__[class_name]
-
-        return model_class
+        return None
 
 
-class LocalModelLoader(IModelLoader):
+class LocalModelLoader(IModelRepository):
 
-    def __init__(self, repo_config: _cfg.StorageConfig):
+    def __init__(self, repo_config: _cfg.RepositoryConfig):
         self._repo_config = repo_config
 
-    def load_model(self, model_def: _meta.ModelDefinition) -> _api.TracModel.__class__:
+    def checkout_model(
+            self, model_def: _meta.ModelDefinition,
+            checkout_path: tp.Union[str, pathlib.Path]) \
+            -> pathlib.Path:
+
+        # For local repos, checkout is a no-op since the model is already local
+        # Return the existing full path to the model package as the checkout dir
+
+        checkout_path = pathlib.Path(self._repo_config.repoUrl).joinpath(model_def.path)
+
+        return checkout_path
+
+
+class GitModelLoader(IModelRepository):
+
+    def __init__(self, repo_config: _cfg.RepositoryConfig):
+        self._repo_config = repo_config
+
+    def checkout_model(
+            self, model_def: _meta.ModelDefinition,
+            checkout_path: tp.Union[str, pathlib.Path]) \
+            -> pathlib.Path:
+
         raise NotImplementedError()
 
 
-class GitModelLoader(IModelLoader):
+class RepositoryManager:
 
-    def __init__(self, repo_config: _cfg.StorageConfig):
-        self._repo_config = repo_config
-
-    def load_model(self, model_def: _meta.ModelDefinition) -> _api.TracModel.__class__:
-        raise NotImplementedError()
-
-
-class Repositories:
-
-    __repo_types: tp.Dict[str, tp.Callable[[_cfg.RepositoryConfig], IModelLoader]] = {
-        "integrated": IntegratedModelLoader,
+    __repo_types: tp.Dict[str, tp.Callable[[_cfg.RepositoryConfig], IModelRepository]] = {
+        "integrated": IntegratedModelRepo,
         "local": LocalModelLoader
     }
 
     @classmethod
-    def register_repo_type(cls, repo_type: str, loader_class: tp.Callable[[_cfg.RepositoryConfig], IModelLoader]):
+    def register_repo_type(cls, repo_type: str, loader_class: tp.Callable[[_cfg.RepositoryConfig], IModelRepository]):
         cls.__repo_types[repo_type] = loader_class
 
-    def __init__(self, sys_config: _cfg.SystemConfig):
+    def __init__(self, sys_config: _cfg.RuntimeConfig):
 
         self._log = _util.logger_for_object(self)
-        self._loaders: tp.Dict[str, IModelLoader] = dict()
+        self._loaders: tp.Dict[str, IModelRepository] = dict()
 
         for repo_name, repo_config in sys_config.repositories.items():
 
@@ -97,7 +111,7 @@ class Repositories:
             loader = loader_class(repo_config)
             self._loaders[repo_name] = loader
 
-    def get_model_loader(self, repo_name: str) -> IModelLoader:
+    def get_repository(self, repo_name: str) -> IModelRepository:
 
         loader = self._loaders.get(repo_name)
 

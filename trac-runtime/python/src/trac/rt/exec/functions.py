@@ -14,10 +14,13 @@
 
 from __future__ import annotations
 
+import copy
+import sys
+
 import trac.rt.api as _api
 import trac.rt.config as _config
 import trac.rt.exceptions as _ex
-import trac.rt.impl.repositories as _repos
+import trac.rt.impl.model_loader as _models
 import trac.rt.impl.storage as _storage
 import trac.rt.impl.data as _data
 import trac.rt.impl.util as _util
@@ -28,7 +31,6 @@ from trac.rt.exec.graph import *
 import abc
 import typing as tp
 import pathlib
-import json
 
 
 NodeContext = tp.Dict[NodeId, object]  # Available prior node results when a node function is called
@@ -252,11 +254,20 @@ class SaveDataFunc(_LoadSaveDataFunc):
         return True
 
 
+class LoadModelFunc(NodeFunction):
+
+    def __init__(self):
+        pass
+
+    def __call__(self, ctx: NodeContext) -> NodeResult:
+        pass
+
+
 class ImportModelFunc(NodeFunction):
 
-    def __init__(self, node: ImportModelNode, repositories: _repos.Repositories):
+    def __init__(self, node: ImportModelNode, models: _models.ModelLoader):
         self.node = node
-        self._repos = repositories
+        self._models = models
 
         self._log = _util.logger_for_object(self)
 
@@ -270,14 +281,23 @@ class ImportModelFunc(NodeFunction):
             entryPoint=self.node.import_details.entryPoint,
             version=self.node.import_details.version)
 
-        model_loader = self._repos.get_model_loader(self.node.import_details.repository)
-        model_class = model_loader.load_model(stub_model_def)
-        model = model_class()
+        model_class = self._models.load_model_class(self.node.model_scope, stub_model_def)
 
-        model_def = stub_model_def
-        model_json = json.dumps(model_def.__dict__, indent=4)
+        for m in sys.modules:
+            if "hello" in m:
+                print(m)
 
-        self._log.info(f"Model definition: \n{model_json}")
+        model: _api.TracModel = model_class()
+        params = model.define_parameters()
+
+        model_def = copy.copy(stub_model_def)
+        model_def.parameters = params
+        # model_json = json.dumps(model_def.__dict__, indent=4)
+
+        for param in model_def.parameters:
+            print(param, model_def.parameters.get(param).paramType)
+
+        # self._log.info(f"Model definition: \n{model_json}")
 
         return model_def
 
@@ -324,8 +344,8 @@ class FunctionResolver:
 
     __ResolveFunc = tp.Callable[['FunctionResolver', _config.JobConfig, Node], NodeFunction]
 
-    def __init__(self, repositories: _repos.Repositories, storage: _storage.StorageManager):
-        self._repos = repositories
+    def __init__(self, models: _models.ModelLoader, storage: _storage.StorageManager):
+        self._models = models
         self._storage = storage
 
     def resolve_node(self, job_config, node: Node) -> NodeFunction:
@@ -349,12 +369,14 @@ class FunctionResolver:
         return SaveDataFunc(node, self._storage)
 
     def resolve_import_model_node(self, job_config: _config.JobConfig, node: ImportModelNode):
-        return ImportModelFunc(node, self._repos)
+        return ImportModelFunc(node, self._models)
 
     def resolve_run_model_node(self, job_config: _config.JobConfig, node: RunModelNode) -> NodeFunction:
 
-        model_loader = self._repos.get_model_loader(node.model_def.repository)
-        model_class = model_loader.load_model(node.model_def)
+        model_scope = f"JOB_SCOPE:{job_config.jobId}"
+        model_class = self._models.load_model_class(model_scope, node.model_def)
+
+        # TODO: Verify model_class against model_def
 
         return RunModelFunc(node, job_config, model_class)
 

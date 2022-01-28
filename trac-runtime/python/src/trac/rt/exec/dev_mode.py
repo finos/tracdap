@@ -24,7 +24,7 @@ import trac.rt.api as api
 import trac.rt.metadata as meta
 import trac.rt.config as cfg
 import trac.rt.exceptions as _ex
-import trac.rt.impl.repositories as _repos
+import trac.rt.impl.model_loader as _models
 import trac.rt.impl.storage as _storage
 import trac.rt.impl.util as util
 
@@ -167,6 +167,13 @@ class DevModeTranslator:
             sys_config: cfg.RuntimeConfig) \
             -> (cfg.JobConfig, cfg.RuntimeConfig):
 
+        # Add the integrated model repo trac_integrated
+
+        repos = copy.copy(sys_config.repositories)
+        repos["trac_integrated"] = cfg.RepositoryConfig("integrated")
+        translated_sys_config = copy.copy(sys_config)
+        translated_sys_config.repositories = repos
+
         model_id = uuid.uuid4()
 
         cls._log.info(f"Generating model definition for '{model_class.__name__}' (assigned ID {model_id})")
@@ -180,8 +187,14 @@ class DevModeTranslator:
             inputs={},
             outputs={})
 
-        loader = _repos.IntegratedModelLoader(cfg.RepositoryConfig(repoType="INTEGRATED", repoUrl=""))
-        model_class = loader.load_model(skeleton_modeL_def)
+        loader = _models.ModelLoader(translated_sys_config)
+
+        try:
+            loader.create_scope("DEV_MODE")
+            model_class = loader.load_model_class("DEV_MODE", skeleton_modeL_def)
+        finally:
+            loader.destroy_scope("DEV_MODE")
+
         model: api.TracModel = model_class()
 
         model_params = model.define_parameters()
@@ -205,12 +218,6 @@ class DevModeTranslator:
         translated_job_config.job.target = model_id
         translated_job_config.objects = copy.copy(job_config.objects)
         translated_job_config.objects[model_id] = model_object
-
-        repos = copy.copy(sys_config.repositories)
-        repos["trac_integrated"] = cfg.RepositoryConfig("integrated")
-
-        translated_sys_config = copy.copy(sys_config)
-        translated_sys_config.repositories = repos
 
         return translated_job_config, translated_sys_config
 
