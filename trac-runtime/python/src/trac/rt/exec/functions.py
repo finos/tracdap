@@ -254,15 +254,6 @@ class SaveDataFunc(_LoadSaveDataFunc):
         return True
 
 
-class LoadModelFunc(NodeFunction):
-
-    def __init__(self):
-        pass
-
-    def __call__(self, ctx: NodeContext) -> NodeResult:
-        pass
-
-
 class ImportModelFunc(NodeFunction):
 
     def __init__(self, node: ImportModelNode, models: _models.ModelLoader):
@@ -282,22 +273,18 @@ class ImportModelFunc(NodeFunction):
             version=self.node.import_details.version)
 
         model_class = self._models.load_model_class(self.node.model_scope, stub_model_def)
+        self._models.scan_model(model_class)
 
-        for m in sys.modules:
-            if "hello" in m:
-                print(m)
 
         model: _api.TracModel = model_class()
+
         params = model.define_parameters()
 
         model_def = copy.copy(stub_model_def)
         model_def.parameters = params
-        # model_json = json.dumps(model_def.__dict__, indent=4)
 
         for param in model_def.parameters:
             print(param, model_def.parameters.get(param).paramType)
-
-        # self._log.info(f"Model definition: \n{model_json}")
 
         return model_def
 
