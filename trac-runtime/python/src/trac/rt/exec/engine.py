@@ -195,21 +195,7 @@ class GraphProcessor(actors.Actor):
         node = copy(old_node)
         node.result = result
 
-        nodes = {**self.graph.nodes, node_id: node}
-
-        active_nodes = copy(self.graph.active_nodes)
-        active_nodes.remove(node_id)
-
-        succeeded_nodes = copy(self.graph.succeeded_nodes)
-        succeeded_nodes.add(node_id)
-
-        new_graph = copy(self.graph)
-        new_graph.nodes = nodes
-        new_graph.active_nodes = active_nodes
-        new_graph.succeeded_nodes = succeeded_nodes
-
-        self.graph = new_graph
-        self.check_job_status()
+        self._node_complete(node_id, node, succeeded=True)
 
     @actors.Message
     def node_failed(self, node_id: NodeId, error):
@@ -218,18 +204,28 @@ class GraphProcessor(actors.Actor):
         node = copy(old_node)
         node.error = error
 
+        self._node_complete(node_id, node, succeeded=False)
+
+    def _node_complete(self, node_id: NodeId, node: GraphContextNode, succeeded: bool):
+
         nodes = {**self.graph.nodes, node_id: node}
-
-        active_nodes = copy(self.graph.active_nodes)
-        active_nodes.remove(node_id)
-
-        failed_nodes = copy(self.graph.failed_nodes)
-        failed_nodes.add(node_id)
 
         new_graph = copy(self.graph)
         new_graph.nodes = nodes
+
+        active_nodes = copy(self.graph.active_nodes)
+        active_nodes.remove(node_id)
         new_graph.active_nodes = active_nodes
-        new_graph.failed_nodes = failed_nodes
+
+        if succeeded:
+            succeeded_nodes = copy(self.graph.succeeded_nodes)
+            succeeded_nodes.add(node_id)
+            new_graph.succeeded_nodes = succeeded_nodes
+
+        else:
+            failed_nodes = copy(self.graph.failed_nodes)
+            failed_nodes.add(node_id)
+            new_graph.failed_nodes = failed_nodes
 
         self.graph = new_graph
         self.check_job_status()
