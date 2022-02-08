@@ -19,7 +19,7 @@ import pathlib
 import trac.rt.api as api
 import trac.rt.metadata as meta
 import trac.rt.config as config
-import trac.rt.impl.model_loader as models
+import trac.rt.impl.models as models
 import trac.rt.impl.util as util
 
 
@@ -55,7 +55,7 @@ class ImportModelTest(unittest.TestCase):
         stub_model_def = meta.ModelDefinition(
             language="python",
             repository="trac_integrated",
-            entryPoint="trac_test.rt.impl.test_model_loader.SampleModel"
+            entryPoint="trac_test.rt.impl.test_models.SampleModel"
         )
 
         loader = models.ModelLoader(sys_config)

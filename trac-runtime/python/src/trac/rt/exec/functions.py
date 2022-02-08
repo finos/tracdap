@@ -20,7 +20,7 @@ import sys
 import trac.rt.api as _api
 import trac.rt.config as _config
 import trac.rt.exceptions as _ex
-import trac.rt.impl.model_loader as _models
+import trac.rt.impl.models as _models
 import trac.rt.impl.storage as _storage
 import trac.rt.impl.data as _data
 import trac.rt.impl.util as _util

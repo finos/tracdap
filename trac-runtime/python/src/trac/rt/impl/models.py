@@ -23,7 +23,7 @@ import trac.rt.api as _api
 import trac.rt.metadata as _meta
 import trac.rt.config as _cfg
 
-import trac.rt.impl.model_repos as _repos
+import trac.rt.impl.repos as _repos
 import trac.rt.impl.model_shim as _shim
 import trac.rt.impl.util as _util
 

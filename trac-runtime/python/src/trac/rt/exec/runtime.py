@@ -24,7 +24,7 @@ import trac.rt.config as config
 import trac.rt.exceptions as _ex
 import trac.rt.impl.config_parser as cfg
 import trac.rt.impl.util as util
-import trac.rt.impl.model_loader as _models
+import trac.rt.impl.models as _models
 import trac.rt.impl.storage as _storage
 
 import trac.rt.exec.actors as actors
