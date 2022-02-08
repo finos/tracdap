@@ -49,12 +49,17 @@ class ModelLoader:
 
     def create_scope(self, scope: str, model_scratch_dir: tp.Union[str, pathlib.Path, types.NoneType] = None):
 
+        # TODO: Use a per-job location for model checkouts, that can be cleaned up?
+
         if model_scratch_dir is None:
             model_scratch_dir = tempfile.mkdtemp()
 
         self.__scopes[scope] = ModelLoader._ScopeState(model_scratch_dir)
 
     def destroy_scope(self, scope: str):
+
+        # TODO: Delete model checkout location
+
         del self.__scopes[scope]
 
     def load_model_class(self, scope: str, model_def: _meta.ModelDefinition) -> _api.TracModel.__class__:
@@ -68,6 +73,8 @@ class ModelLoader:
             return model_class
 
         self.__log.info(f"Loading model [{model_def.entryPoint}] (version=[{model_def.version}], scope=[{scope}])...")
+
+        # TODO: Prevent duplicate checkout per scope
 
         repo = self.__repos.get_repository(model_def.repository)
         checkout_dir = pathlib.Path(state.scratch_dir).joinpath(model_def.repository)

@@ -117,6 +117,38 @@ class ImportModelTest(unittest.TestCase):
 
         loader.destroy_scope(self.test_scope)
 
+    def test_load_git_ok(self):
+
+        trac_repo_url = "https://github.com/accenture/trac"
+        trac_repo_version = "main"  # TODO: Loading models from a branch should be prohibited! Or converted to a hash
+
+        example_repo_config = config.RepositoryConfig(
+            repoType="git",
+            repoUrl=trac_repo_url)
+
+        sys_config = config.RuntimeConfig()
+        sys_config.repositories["example_repo"] = example_repo_config
+
+        stub_model_def = meta.ModelDefinition(
+            language="python",
+            repository="example_repo",
+            path="examples/models/python/hello_world",
+            entryPoint="hello_world.HelloWorldModel",
+            version=trac_repo_version
+        )
+
+        loader = models.ModelLoader(sys_config)
+        loader.create_scope(self.test_scope)
+
+        model_class = loader.load_model_class(self.test_scope, stub_model_def)
+        model = model_class()
+
+        self.assertIsInstance(model_class, api.TracModel.__class__)
+        self.assertIsInstance(model, model_class)
+        self.assertIsInstance(model, api.TracModel)
+
+        loader.destroy_scope(self.test_scope)
+
     def test_scan_model_ok(self):
 
         def _td(basic_type: meta.BasicType) -> meta.TypeDescriptor:

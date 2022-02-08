@@ -17,6 +17,7 @@ from __future__ import annotations
 import abc
 import typing as tp
 import pathlib
+import subprocess as sp
 
 import trac.rt.metadata as _meta
 import trac.rt.config as _cfg
@@ -29,20 +30,20 @@ class IModelRepository:
     @abc.abstractmethod
     def checkout_model(
             self, model_def: _meta.ModelDefinition,
-            checkout_path: tp.Union[str, pathlib.Path]) \
+            checkout_dir: tp.Union[str, pathlib.Path]) \
             -> tp.Union[pathlib.Path, str, None]:
 
         pass
 
 
-class IntegratedModelRepo(IModelRepository):
+class IntegratedSource(IModelRepository):
 
     def __init__(self, repo_config: _cfg.RepositoryConfig):
         self._repo_config = repo_config
 
     def checkout_model(
             self, model_def: _meta.ModelDefinition,
-            checkout_path: tp.Union[str, pathlib.Path]) \
+            checkout_dir: tp.Union[str, pathlib.Path]) \
             -> None:
 
         # For the integrated repo there is nothing to check out
@@ -50,14 +51,14 @@ class IntegratedModelRepo(IModelRepository):
         return None
 
 
-class LocalModelLoader(IModelRepository):
+class LocalRepository(IModelRepository):
 
     def __init__(self, repo_config: _cfg.RepositoryConfig):
         self._repo_config = repo_config
 
     def checkout_model(
             self, model_def: _meta.ModelDefinition,
-            checkout_path: tp.Union[str, pathlib.Path]) \
+            checkout_dir: tp.Union[str, pathlib.Path]) \
             -> pathlib.Path:
 
         # For local repos, checkout is a no-op since the model is already local
@@ -68,24 +69,69 @@ class LocalModelLoader(IModelRepository):
         return checkout_path
 
 
-class GitModelLoader(IModelRepository):
+class GitRepository(IModelRepository):
 
     def __init__(self, repo_config: _cfg.RepositoryConfig):
         self._repo_config = repo_config
+        self._log = _util.logger_for_object(self)
 
     def checkout_model(
             self, model_def: _meta.ModelDefinition,
-            checkout_path: tp.Union[str, pathlib.Path]) \
+            checkout_dir: tp.Union[str, pathlib.Path]) \
             -> pathlib.Path:
 
-        raise NotImplementedError()
+        repo_dir = pathlib.Path(checkout_dir) \
+                .joinpath(model_def.repository) \
+                .joinpath(model_def.version) \
+                .resolve()
+
+        self._log.info(f"Git checkout {model_def.repository} {model_def.version} -> {repo_dir}")
+
+        repo_dir.mkdir(mode=750, parents=True, exist_ok=False)
+
+        git_cli = ["git", "-C", str(repo_dir)]
+
+        git_cmds = [
+            ["init"],
+            ["remote", "add", "origin", self._repo_config.repoUrl],
+            ["fetch", "--depth=1", "origin", model_def.version],
+            ["reset", "--hard", "FETCH_HEAD"]]
+
+        for git_cmd in git_cmds:
+
+            self._log.debug(f"git {' '.join(git_cmd)}")
+
+            cmd = [*git_cli, *git_cmd]
+            cmd_result = sp.run(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
+            cmd_out = str(cmd_result.stdout, 'utf-8').splitlines()
+            cmd_err = str(cmd_result.stderr, 'utf-8').splitlines()
+
+            for line in cmd_out:
+                self._log.info(line)
+
+            if cmd_result.returncode == 0:
+                for line in cmd_err:
+                    self._log.info(line)
+
+            else:
+                for line in cmd_err:
+                    self._log.error(line)
+
+                error_msg = f"Git checkout failed for {model_def.repository} {model_def.version}"
+                self._log.error(error_msg)
+                raise _ex.EModelRepo(error_msg)
+
+        self._log.info(f"Git checkout succeeded for {model_def.repository} {model_def.version}")
+
+        return repo_dir.joinpath(model_def.path)
 
 
 class RepositoryManager:
 
     __repo_types: tp.Dict[str, tp.Callable[[_cfg.RepositoryConfig], IModelRepository]] = {
-        "integrated": IntegratedModelRepo,
-        "local": LocalModelLoader
+        "integrated": IntegratedSource,
+        "local": LocalRepository,
+        "git": GitRepository
     }
 
     @classmethod
@@ -102,7 +148,7 @@ class RepositoryManager:
             if repo_config.repoType not in self.__repo_types:
 
                 msg = f"Model repository type [{repo_config.repoType}] is not recognised" \
-                    + " (this could indicate a missing model loader plugin)"
+                    + " (this could indicate a missing model repository plugin)"
 
                 self._log.error(msg)
                 raise _ex.EModelRepoConfig(msg)
