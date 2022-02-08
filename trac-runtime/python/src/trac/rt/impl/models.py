@@ -32,20 +32,19 @@ import trac.rt.metadata as _meta
 import trac.rt.config as _cfg
 import trac.rt.impl.repos as _repos
 import trac.rt.impl.util as _util
-
-
-class _ModelLoaderState:
-
-    def __init__(self, scratch_dir: tp.Union[pathlib.Path, str]):
-        self.scratch_dir = scratch_dir
-        self.cache: tp.Dict[str, _api.TracModel.__class__] = dict()
+import trac.rt.exceptions as _ex
 
 
 class ModelLoader:
 
+    class _ScopeState:
+        def __init__(self, scratch_dir: tp.Union[pathlib.Path, str]):
+            self.scratch_dir = scratch_dir
+            self.cache: tp.Dict[str, _api.TracModel.__class__] = dict()
+
     def __init__(self, sys_config: _cfg.RuntimeConfig):
         self.__repos = _repos.RepositoryManager(sys_config)
-        self.__scopes: tp.Dict[str, _ModelLoaderState] = dict()
+        self.__scopes: tp.Dict[str, ModelLoader._ScopeState] = dict()
         self.__log = _util.logger_for_object(self)
 
     def create_scope(self, scope: str, model_scratch_dir: tp.Union[str, pathlib.Path, types.NoneType] = None):
@@ -53,7 +52,7 @@ class ModelLoader:
         if model_scratch_dir is None:
             model_scratch_dir = tempfile.mkdtemp()
 
-        self.__scopes[scope] = _ModelLoaderState(model_scratch_dir)
+        self.__scopes[scope] = ModelLoader._ScopeState(model_scratch_dir)
 
     def destroy_scope(self, scope: str):
         del self.__scopes[scope]
@@ -87,15 +86,27 @@ class ModelLoader:
         model_class.__init__(model)
 
         try:
-            params = model.define_parameters()
+
+            parameters = model.define_parameters()
             inputs = model.define_inputs()
             outputs = model.define_outputs()
 
-        # TODO: Error handling
-        except Exception as e:
-            print(e)
+            # TODO: Model validation
 
-        return _meta.ModelDefinition()
+            model_def = _meta.ModelDefinition()
+            model_def.parameters.update(parameters)
+            model_def.inputs.update(inputs)
+            model_def.outputs.update(outputs)
+
+            return model_def
+
+        except Exception as e:
+
+            model_class_name = f"{model_class.__module__}.{model_class.__name__}"
+            msg = f"An error occurred while scanning model class [{model_class_name}]: {str(e)}"
+
+            self.__log.error(msg, exc_info=True)
+            raise _ex.EModelValidation(msg) from e
 
 
 class ModelShim:
