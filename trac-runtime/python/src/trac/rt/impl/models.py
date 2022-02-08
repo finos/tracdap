@@ -14,35 +14,41 @@
 
 from __future__ import annotations
 
-import typing as _tp
-import types as _tps
-import pathlib
+import types
+import typing as tp
+import itertools
 import tempfile
+import logging
+import pathlib
+import sys
+import contextlib
+
+import importlib as _il
+import importlib.util as _ilu
+import importlib.machinery as _ilm
 
 import trac.rt.api as _api
 import trac.rt.metadata as _meta
 import trac.rt.config as _cfg
-
 import trac.rt.impl.repos as _repos
-import trac.rt.impl.model_shim as _shim
 import trac.rt.impl.util as _util
 
 
 class _ModelLoaderState:
 
-    def __init__(self, scratch_dir: _tp.Union[pathlib.Path, str]):
+    def __init__(self, scratch_dir: tp.Union[pathlib.Path, str]):
         self.scratch_dir = scratch_dir
-        self.cache: _tp.Dict[str, _api.TracModel.__class__] = dict()
+        self.cache: tp.Dict[str, _api.TracModel.__class__] = dict()
 
 
 class ModelLoader:
 
     def __init__(self, sys_config: _cfg.RuntimeConfig):
         self.__repos = _repos.RepositoryManager(sys_config)
-        self.__scopes: _tp.Dict[str, _ModelLoaderState] = dict()
+        self.__scopes: tp.Dict[str, _ModelLoaderState] = dict()
         self.__log = _util.logger_for_object(self)
 
-    def create_scope(self, scope: str, model_scratch_dir: _tp.Union[str, pathlib.Path, _tps.NoneType] = None):
+    def create_scope(self, scope: str, model_scratch_dir: tp.Union[str, pathlib.Path, types.NoneType] = None):
 
         if model_scratch_dir is None:
             model_scratch_dir = tempfile.mkdtemp()
@@ -68,9 +74,9 @@ class ModelLoader:
         checkout_dir = pathlib.Path(state.scratch_dir).joinpath(model_def.repository)
         checkout = repo.checkout_model(model_def, checkout_dir)
 
-        with _shim.ModelShim.use_checkout(checkout):
+        with ModelShim.use_checkout(checkout):
 
-            model_class = _shim.ModelShim.load_model_class(model_def.entryPoint)
+            model_class = ModelShim.load_model_class(model_def.entryPoint)
 
             state.cache[model_key] = model_class
             return model_class
@@ -90,3 +96,156 @@ class ModelLoader:
             print(e)
 
         return _meta.ModelDefinition()
+
+
+class ModelShim:
+
+    SHIM_NAMESPACE = "trac.shim"
+
+    _log: tp.Optional[logging.Logger] = None
+
+    __shim_id_seq = itertools.count()
+    __shim_map: tp.Dict[str, pathlib.Path] = dict()
+    __shim: tp.Optional[str] = None
+
+    @classmethod
+    def _init(cls):
+        sys.meta_path.append(ModelShim.ModelShimFinder(cls.__shim_map))
+
+    @classmethod
+    def create_shim(cls, model_import_root: tp.Union[str, pathlib.Path]) -> str:
+
+        shim_id = next(cls.__shim_id_seq)
+        shim_namespace = f"{cls.SHIM_NAMESPACE}._{shim_id}"
+
+        model_import_root = pathlib.Path(model_import_root).resolve()
+
+        cls._log.info(f"Creating model shim [{shim_id}] for path [{model_import_root}]")
+
+        cls.__shim_map[shim_namespace] = model_import_root
+
+        return shim_namespace
+
+    @classmethod
+    def activate_shim(cls, shim: str):
+        cls.__shim = shim
+        sys.meta_path.append(ModelShim.ActiveShimFinder(shim))
+
+    @classmethod
+    def deactivate_shim(cls):
+        cls.__shim = None
+        sys.meta_path.remove(sys.meta_path[-1])
+
+    @classmethod
+    @contextlib.contextmanager
+    def use_checkout(cls, model_checkout: tp.Union[str, pathlib.Path]):
+
+        if model_checkout:
+            shim = cls.create_shim(model_checkout)
+            cls.activate_shim(shim)
+
+        yield
+
+        if model_checkout:
+            cls.deactivate_shim()
+
+    @classmethod
+    def load_model_class(cls, entry_point: str) -> _api.TracModel.__class__:
+
+        entry_point_parts = entry_point.rsplit(".", 1)
+        module_name = entry_point_parts[0]
+        class_name = entry_point_parts[1]
+
+        model_module = _il.import_module(module_name)
+        model_class = model_module.__dict__[class_name]
+
+        return model_class
+
+    class ActiveShimFinder(_ilm.PathFinder):
+
+        def __init__(self, shim_namespace: str):
+            self._shin_namespace = shim_namespace
+
+        def find_spec(
+                self,
+                fullname: str,
+                path: tp.Optional[tp.Sequence[tp.Union[bytes, str]]] = None,
+                target: tp.Optional[types.ModuleType] = None) \
+                -> tp.Optional[_ilm.ModuleSpec]:
+
+            if fullname.startswith(ModelShim.SHIM_NAMESPACE):
+                return None
+
+            shim_module = f"{self._shin_namespace}.{fullname}"
+
+            ModelShim._log.info(f"Shim module map [{fullname}] -> [{shim_module}]")
+
+            return _ilu.find_spec(shim_module)
+
+            # return ModelShim.ModelShimFinder.find_spec(shim_module, path, target)
+
+    class ModelShimFinder(_ilm.PathFinder):
+
+        def __init__(self, shim_map: tp.Dict[str, pathlib.Path]):
+            self._shim_map = shim_map
+
+        def find_spec(
+                self,
+                fullname: str,
+                path: tp.Optional[tp.Sequence[tp.Union[bytes, str]]] = None,
+                target: tp.Optional[types.ModuleType] = None) \
+                -> tp.Optional[_ilm.ModuleSpec]:
+
+            module_parts = fullname.split(".")
+
+            if ".".join(module_parts[:2]) != ModelShim.SHIM_NAMESPACE:
+                return None
+
+            if fullname in sys.modules:
+                return sys.modules[fullname].__spec__
+
+            ModelShim._log.info(f"Shim module load [{fullname}]")
+
+            # Create namespace pkgs for trac.shim and trac.shim._x
+            if len(module_parts) == 2 or len(module_parts) == 3:
+                spec = _ilm.ModuleSpec(fullname, origin=None, is_package=True, loader=None)
+                return spec
+
+            shim_name = ".".join(module_parts[:3])
+            shim_path = pathlib.Path(self._shim_map[shim_name])
+
+            shim_module_path = shim_path.joinpath(module_parts[3] + ".py")
+
+            if shim_module_path.exists() and shim_module_path.is_file():
+
+                shim_module = ".".join(module_parts[:4])
+                shim_module_loader = ModelShim.ModelSourceLoader(shim_module, str(shim_module_path))
+                spec = _ilm.ModuleSpec(shim_module, origin=str(shim_module_path), loader=shim_module_loader)
+                return spec
+
+            return None
+
+    class ModelSourceLoader(_ilm.SourceFileLoader):
+
+        def __init__(self, fullname, path):
+            super(ModelShim.ModelSourceLoader, self).__init__(fullname, path)
+            self._exec_done = False
+
+        def create_module(self, spec: _ilm.ModuleSpec) -> tp.Optional[types.ModuleType]:
+
+            if spec.name in sys.modules:
+                return sys.modules[spec.name]
+
+            ModelShim._log.info(f"Loading model shim module [{spec.name}]")
+
+            return super().create_module(spec)
+
+        def exec_module(self, module: types.ModuleType) -> None:
+
+            if not self._exec_done:
+                self._exec_done = True
+                super().exec_module(module)
+
+
+ModelShim._log = _util.logger_for_class(ModelShim)
+ModelShim._init()  # noqa
