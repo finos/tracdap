@@ -9,6 +9,11 @@ RUN . /opt/trac/runtime-python/venv/bin/activate && pip install `ls /tmp/dist/tr
 
 
 FROM python:3.10-slim
+
+RUN apt update && \
+    apt install -y git && \
+    git config --global init.defaultBranch main
+
 COPY --from=builder /opt/trac /opt/trac
 
 WORKDIR /opt/trac
