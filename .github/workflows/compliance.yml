@@ -104,7 +104,7 @@ jobs:
         run: |
           mkdir -p build/compliance/python-runtime-safety
           cd trac-runtime/python
-          safety safety check --full-report --not-bare --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt -i 44715
+          safety check --full-report --not-bare --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt -i 44715
           safety check --full-report --not-bare --json --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json -i 44715
 
       - name: License check
