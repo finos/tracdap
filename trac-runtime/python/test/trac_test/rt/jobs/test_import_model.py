@@ -45,7 +45,7 @@ class ImportModelTest(unittest.TestCase):
                 language="python",
                 repository="trac_git_repo",
                 path="examples/models/python/hello_world",
-                entryPoint="hello_world.HelloWorld",
+                entryPoint="hello_world.HelloWorldModel",
                 version="main"))
 
         job_config = cfg.JobConfig(job=job_def)
