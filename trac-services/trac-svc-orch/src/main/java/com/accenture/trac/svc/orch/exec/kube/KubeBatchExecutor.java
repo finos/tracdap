@@ -196,9 +196,9 @@ public class KubeBatchExecutor implements IBatchRunner {
                     // Startup args (these are applied to the image ENTRYPOINT)
                     .args(List.of(
                             "--sys-config",
-                            "/mnt/config/sys_config.yaml",
+                            "/mnt/config/sys_config.json",
                             "--job-config",
-                            "/mnt/config/job_config.yaml",
+                            "/mnt/config/job_config.json",
                             "--dev-mode"));
 
             var jobSpec = new V1JobSpec()
