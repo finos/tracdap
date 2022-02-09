@@ -24,15 +24,15 @@ import trac.rt.api as api
 import trac.rt.metadata as meta
 import trac.rt.config as cfg
 import trac.rt.exceptions as _ex
-import trac.rt.impl.repositories as _repos
+import trac.rt.impl.models as _models
 import trac.rt.impl.storage as _storage
 import trac.rt.impl.util as util
 
 
 DEV_MODE_JOB_CONFIG = [
-    re.compile(r"parameters\.[\w]+"),
-    re.compile(r"inputs\.[\w]+"),
-    re.compile(r"outputs\.[\w]+")]
+    re.compile(r"job\.parameters\.[\w]+"),
+    re.compile(r"job\.inputs\.[\w]+"),
+    re.compile(r"job\.outputs\.[\w]+")]
 
 DEV_MODE_SYS_CONFIG = []
 
@@ -67,8 +67,8 @@ class DevModeTranslator:
         if model_class is not None:
             job_config, sys_config = cls._generate_integrated_model_definition(model_class, job_config, sys_config)
 
-        original_inputs = job_config.inputs
-        original_outputs = job_config.outputs
+        original_inputs = job_config.job.inputs
+        original_outputs = job_config.job.outputs
         original_objects = job_config.objects
 
         translated_inputs = copy.copy(original_inputs)
@@ -103,8 +103,8 @@ class DevModeTranslator:
 
         job_config = copy.copy(job_config)
         job_config.objects = translated_objects
-        job_config.inputs = translated_inputs
-        job_config.outputs = translated_outputs
+        job_config.job.inputs = translated_inputs
+        job_config.job.outputs = translated_outputs
 
         return job_config, sys_config
 
@@ -167,6 +167,13 @@ class DevModeTranslator:
             sys_config: cfg.RuntimeConfig) \
             -> (cfg.JobConfig, cfg.RuntimeConfig):
 
+        # Add the integrated model repo trac_integrated
+
+        repos = copy.copy(sys_config.repositories)
+        repos["trac_integrated"] = cfg.RepositoryConfig("integrated")
+        translated_sys_config = copy.copy(sys_config)
+        translated_sys_config.repositories = repos
+
         model_id = uuid.uuid4()
 
         cls._log.info(f"Generating model definition for '{model_class.__name__}' (assigned ID {model_id})")
@@ -180,8 +187,14 @@ class DevModeTranslator:
             inputs={},
             outputs={})
 
-        loader = _repos.IntegratedModelLoader(cfg.RepositoryConfig(repoType="INTEGRATED", repoUrl=""))
-        model_class = loader.load_model(skeleton_modeL_def)
+        loader = _models.ModelLoader(translated_sys_config)
+
+        try:
+            loader.create_scope("DEV_MODE")
+            model_class = loader.load_model_class("DEV_MODE", skeleton_modeL_def)
+        finally:
+            loader.destroy_scope("DEV_MODE")
+
         model: api.TracModel = model_class()
 
         model_params = model.define_parameters()
@@ -202,15 +215,9 @@ class DevModeTranslator:
             model=model_def)
 
         translated_job_config = copy.copy(job_config)
-        translated_job_config.target = model_id
+        translated_job_config.job.target = model_id
         translated_job_config.objects = copy.copy(job_config.objects)
         translated_job_config.objects[model_id] = model_object
-
-        repos = copy.copy(sys_config.repositories)
-        repos["trac_integrated"] = cfg.RepositoryConfig("integrated")
-
-        translated_sys_config = copy.copy(sys_config)
-        translated_sys_config.repositories = repos
 
         return translated_job_config, translated_sys_config
 

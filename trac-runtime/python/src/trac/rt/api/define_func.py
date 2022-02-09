@@ -110,13 +110,8 @@ def declare_input_table(
     :return: A model input schema, suitable for returning from :py:meth:`TracModel.define_inputs`
     """
 
-    if len(fields) == 1 and isinstance(fields[0], list):
-        fields_ = fields[0]
-    else:
-        fields_ = fields
-
-    table_def = _meta.TableSchema([*fields_])
-    schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE, table=table_def)
+    table_schema = _build_table_schema(*fields)
+    schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE, table=table_schema)
 
     return _meta.ModelInputSchema(schema=schema_def)
 
@@ -137,15 +132,26 @@ def declare_output_table(
     :return: A model output schema, suitable for returning from :py:meth:`TracModel.define_outputs`
     """
 
+    table_schema = _build_table_schema(*fields)
+    schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE, table=table_schema)
+
+    return _meta.ModelOutputSchema(schema=schema_def)
+
+
+def _build_table_schema(
+        *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]]) \
+        -> _meta.TableSchema:
+
     if len(fields) == 1 and isinstance(fields[0], list):
         fields_ = fields[0]
     else:
         fields_ = fields
 
-    table_def = _meta.TableSchema([*fields_])
-    schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE, table=table_def)
+    if all(map(lambda f: f.fieldOrder is None, fields_)):
+        for index, field in enumerate(fields_):
+            field.fieldOrder = index
 
-    return _meta.ModelOutputSchema(schema=schema_def)
+    return _meta.TableSchema([*fields_])
 
 
 def declare_field(
@@ -193,11 +199,33 @@ def declare_field(
         formatCode=format_code)
 
 
-def P(*args, **kwargs):  # noqa
+def P(  # noqa
+        param_name: str,
+        param_type: _tp.Union[_meta.TypeDescriptor, _meta.BasicType],
+        label: str,
+        default_value: _tp.Optional[_tp.Any] = None) \
+        -> _Named[_meta.ModelParameter]:
+
     """Shorthand alias for :py:func:`declare_parameter`"""
-    return declare_parameter(*args, **kwargs)
+
+    return declare_parameter(
+        param_name, param_type, label,
+        default_value)
 
 
-def F(*args, **kwargs):  # noqa
+def F(  # noqa
+        field_name: str,
+        field_type: _meta.BasicType,
+        label: str,
+        business_key: bool = False,
+        categorical: bool = False,
+        format_code: _tp.Optional[str] = None,
+        field_order: _tp.Optional[int] = None) \
+        -> _meta.FieldSchema:
+
     """Shorthand alias for :py:func:`declare_field`"""
-    return declare_field(*args, **kwargs)
+
+    return declare_field(
+        field_name, field_type, label,
+        business_key, categorical,
+        format_code, field_order)

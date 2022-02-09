@@ -98,12 +98,14 @@ jobs:
           cd trac-runtime/python
           pip install -r requirements.txt
 
+      # Safety vulnerability 44715 is fixed in numpy 1.22.2, but the safety db is not update yet
+      # https://github.com/numpy/numpy/issues/19038#issuecomment-1029999112
       - name: Safety check
         run: |
           mkdir -p build/compliance/python-runtime-safety
           cd trac-runtime/python
-          safety check --full-report --not-bare --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
-          safety check --full-report --not-bare --json --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
+          safety check --full-report --not-bare --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt -i 44715
+          safety check --full-report --not-bare --json --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json -i 44715
 
       - name: License check
         run: |

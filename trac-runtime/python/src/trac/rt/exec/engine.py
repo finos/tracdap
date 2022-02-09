@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 
 import trac.rt.config as config
 import trac.rt.impl.util as util
-import trac.rt.impl.repositories as repos
+import trac.rt.impl.models as _models
 import trac.rt.impl.storage as _storage
 
 import trac.rt.exec.actors as actors
@@ -70,14 +70,14 @@ class GraphBuilder(actors.Actor):
 
     def __init__(
             self, job_config: config.JobConfig,
-            repositories: repos.Repositories,
+            models: _models.ModelLoader,
             storage: _storage.StorageManager):
 
         super().__init__()
         self.job_config = job_config
         self.graph: tp.Optional[GraphContext] = None
 
-        self._resolver = _func.FunctionResolver(repositories, storage)
+        self._resolver = _func.FunctionResolver(models, storage)
         self._log = util.logger_for_object(self)
 
     def on_start(self):
@@ -195,21 +195,7 @@ class GraphProcessor(actors.Actor):
         node = copy(old_node)
         node.result = result
 
-        nodes = {**self.graph.nodes, node_id: node}
-
-        active_nodes = copy(self.graph.active_nodes)
-        active_nodes.remove(node_id)
-
-        succeeded_nodes = copy(self.graph.succeeded_nodes)
-        succeeded_nodes.add(node_id)
-
-        new_graph = copy(self.graph)
-        new_graph.nodes = nodes
-        new_graph.active_nodes = active_nodes
-        new_graph.succeeded_nodes = succeeded_nodes
-
-        self.graph = new_graph
-        self.check_job_status()
+        self._node_complete(node_id, node, succeeded=True)
 
     @actors.Message
     def node_failed(self, node_id: NodeId, error):
@@ -218,18 +204,28 @@ class GraphProcessor(actors.Actor):
         node = copy(old_node)
         node.error = error
 
+        self._node_complete(node_id, node, succeeded=False)
+
+    def _node_complete(self, node_id: NodeId, node: GraphContextNode, succeeded: bool):
+
         nodes = {**self.graph.nodes, node_id: node}
-
-        active_nodes = copy(self.graph.active_nodes)
-        active_nodes.remove(node_id)
-
-        failed_nodes = copy(self.graph.failed_nodes)
-        failed_nodes.add(node_id)
 
         new_graph = copy(self.graph)
         new_graph.nodes = nodes
+
+        active_nodes = copy(self.graph.active_nodes)
+        active_nodes.remove(node_id)
         new_graph.active_nodes = active_nodes
-        new_graph.failed_nodes = failed_nodes
+
+        if succeeded:
+            succeeded_nodes = copy(self.graph.succeeded_nodes)
+            succeeded_nodes.add(node_id)
+            new_graph.succeeded_nodes = succeeded_nodes
+
+        else:
+            failed_nodes = copy(self.graph.failed_nodes)
+            failed_nodes.add(node_id)
+            new_graph.failed_nodes = failed_nodes
 
         self.graph = new_graph
         self.check_job_status()
@@ -344,17 +340,26 @@ class JobProcessor(actors.Actor):
     This includes setup (GraphBuilder), execution (GraphProcessor) and reporting results
     """
 
-    def __init__(self, job_id, job_config, repositories: repos.Repositories, storage: _storage.StorageManager):
+    def __init__(
+            self, job_id, job_config: config.JobConfig,
+            models: _models.ModelLoader,
+            storage: _storage.StorageManager):
+
         super().__init__()
         self.job_id = job_id
         self.job_config = job_config
-        self._repos = repositories
+        self._models = models
         self._storage = storage
         self._log = util.logger_for_object(self)
 
     def on_start(self):
-        self._log.info("Starting job")
-        self.actors().spawn(GraphBuilder, self.job_config, self._repos, self._storage)
+        self._log.info(f"Starting job [{self.job_id}]")
+        self._models.create_scope(f"JOB_SCOPE:{self.job_id}")
+        self.actors().spawn(GraphBuilder, self.job_config, self._models, self._storage)
+
+    def on_stop(self):
+        self._log.info(f"Cleaning up job [{self.job_id}]")
+        self._models.destroy_scope(f"JOB_SCOPE:{self.job_id}")
 
     @actors.Message
     def job_graph(self, graph: GraphContext):
@@ -387,8 +392,8 @@ class TracEngine(actors.Actor):
     """
 
     def __init__(
-            self, sys_config: config.SystemConfig,
-            repositories: repos.Repositories,
+            self, sys_config: config.RuntimeConfig,
+            models: _models.ModelLoader,
             storage: _storage.StorageManager,
             batch_mode=False):
 
@@ -398,7 +403,7 @@ class TracEngine(actors.Actor):
 
         self._log = util.logger_for_object(self)
         self._sys_config = sys_config
-        self._repos = repositories
+        self._models = models
         self._storage = storage
         self._batch_mode = batch_mode
 
@@ -411,13 +416,13 @@ class TracEngine(actors.Actor):
         self._log.info("Engine shutdown complete")
 
     @actors.Message
-    def submit_job(self, job_info: object):
+    def submit_job(self, job_config: config.JobConfig):
 
-        job_id = 'test_job'
+        job_id = str(job_config.jobId)
 
-        self._log.info("A job has been submitted")
+        self._log.info(f"Job submitted: [{job_id}]")
 
-        job_actor_id = self.actors().spawn(JobProcessor, job_id, job_info, self._repos, self._storage)
+        job_actor_id = self.actors().spawn(JobProcessor, job_id, job_config, self._models, self._storage)
 
         jobs = {**self.engine_ctx.jobs, job_id: job_actor_id}
         self.engine_ctx = EngineContext(jobs, self.engine_ctx.data)

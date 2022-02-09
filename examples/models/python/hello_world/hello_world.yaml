@@ -1,3 +1,4 @@
 
-parameters:
-  meaning_of_life: 42
+job:
+  parameters:
+    meaning_of_life: 42

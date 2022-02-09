@@ -24,14 +24,6 @@ import "trac/metadata/type.proto";
 import "trac/metadata/object_id.proto";
 
 
-enum JobType {
-  JOB_TYPE_NOT_SET = 0;
-  RUN_MODEL = 1;
-  RUN_FLOW = 2;
-  IMPORT_MODEL = 3;
-  IMPORT_DATA = 4;
-}
-
 message JobDefinition {
 
   JobType jobType = 1;
@@ -41,4 +33,26 @@ message JobDefinition {
   map<string, TagSelector> inputs = 4;
   map<string, TagSelector> outputs = 5;
   map<string, TagSelector> models = 6;
+
+  oneof jobDetails {
+    ImportModelJobDetails importModel = 7;
+  }
+}
+
+enum JobType {
+  JOB_TYPE_NOT_SET = 0;
+  RUN_MODEL = 1;
+  RUN_FLOW = 2;
+  IMPORT_MODEL = 3;
+  IMPORT_DATA = 4;
+}
+
+message ImportModelJobDetails {
+
+  string language = 1;
+  string repository = 2;
+  string path = 3;
+  string package = 4;
+  string entryPoint = 5;
+  string version = 6;
 }

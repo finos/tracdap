@@ -14,12 +14,16 @@
 
 from __future__ import annotations
 
+import copy
+import sys
+
 import trac.rt.api as _api
 import trac.rt.config as _config
 import trac.rt.exceptions as _ex
-import trac.rt.impl.repositories as _repos
+import trac.rt.impl.models as _models
 import trac.rt.impl.storage as _storage
 import trac.rt.impl.data as _data
+import trac.rt.impl.util as _util
 
 import trac.rt.exec.context as _ctx
 from trac.rt.exec.graph import *
@@ -250,9 +254,44 @@ class SaveDataFunc(_LoadSaveDataFunc):
         return True
 
 
-class ModelFunc(NodeFunction):
+class ImportModelFunc(NodeFunction):
 
-    def __init__(self, node: ModelNode, job_config: _config.JobConfig, model_class: _api.TracModel.__class__):
+    def __init__(self, node: ImportModelNode, models: _models.ModelLoader):
+        self.node = node
+        self._models = models
+
+        self._log = _util.logger_for_object(self)
+
+    def __call__(self, ctx: NodeContext) -> NodeResult:
+
+        stub_model_def = meta.ModelDefinition(
+            language=self.node.import_details.language,
+            repository=self.node.import_details.repository,
+            path=self.node.import_details.path,
+            package=self.node.import_details.package,
+            entryPoint=self.node.import_details.entryPoint,
+            version=self.node.import_details.version)
+
+        model_class = self._models.load_model_class(self.node.model_scope, stub_model_def)
+        self._models.scan_model(model_class)
+
+
+        model: _api.TracModel = model_class()
+
+        params = model.define_parameters()
+
+        model_def = copy.copy(stub_model_def)
+        model_def.parameters = params
+
+        for param in model_def.parameters:
+            print(param, model_def.parameters.get(param).paramType)
+
+        return model_def
+
+
+class RunModelFunc(NodeFunction):
+
+    def __init__(self, node: RunModelNode, job_config: _config.JobConfig, model_class: _api.TracModel.__class__):
         super().__init__()
         self.node = node
         self.job_config = job_config
@@ -274,7 +313,7 @@ class ModelFunc(NodeFunction):
         # Run the model against the mapped local context
         trac_ctx = _ctx.TracContextImpl(
             self.node.model_def, self.model_class,
-            parameters=self.job_config.parameters,
+            parameters=self.job_config.job.parameters,
             data=local_ctx)
 
         model = self.model_class()
@@ -292,8 +331,8 @@ class FunctionResolver:
 
     __ResolveFunc = tp.Callable[['FunctionResolver', _config.JobConfig, Node], NodeFunction]
 
-    def __init__(self, repositories: _repos.Repositories, storage: _storage.StorageManager):
-        self._repos = repositories
+    def __init__(self, models: _models.ModelLoader, storage: _storage.StorageManager):
+        self._models = models
         self._storage = storage
 
     def resolve_node(self, job_config, node: Node) -> NodeFunction:
@@ -316,12 +355,17 @@ class FunctionResolver:
     def resolve_save_data(self, job_config: _config.JobConfig, node: SaveDataNode):
         return SaveDataFunc(node, self._storage)
 
-    def resolve_model_node(self, job_config: _config.JobConfig, node: ModelNode) -> NodeFunction:
+    def resolve_import_model_node(self, job_config: _config.JobConfig, node: ImportModelNode):
+        return ImportModelFunc(node, self._models)
 
-        model_loader = self._repos.get_model_loader(node.model_def.repository)
-        model_class = model_loader.load_model(node.model_def)
+    def resolve_run_model_node(self, job_config: _config.JobConfig, node: RunModelNode) -> NodeFunction:
 
-        return ModelFunc(node, job_config, model_class)
+        model_scope = f"JOB_SCOPE:{job_config.jobId}"
+        model_class = self._models.load_model_class(model_scope, node.model_def)
+
+        # TODO: Verify model_class against model_def
+
+        return RunModelFunc(node, job_config, model_class)
 
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
         ContextPushNode: ContextPushFunc,
@@ -335,7 +379,8 @@ class FunctionResolver:
 
         LoadDataNode: resolve_load_data,
         SaveDataNode: resolve_save_data,
-        ModelNode: resolve_model_node,
+        RunModelNode: resolve_run_model_node,
+        ImportModelNode: resolve_import_model_node,
 
         JobOutputMetadataNode: lambda s, j, n: NoopFunc(),
         JobResultMetadataNode: lambda s, j, n: NoopFunc(),

@@ -23,13 +23,53 @@ class GraphBuilder:
     @staticmethod
     def build_job(job_config: config.JobConfig) -> Graph:
 
-        target_def = job_config.objects.get(job_config.target)
+        if job_config.job.jobType == meta.JobType.IMPORT_MODEL:
+            return GraphBuilder.build_import_model_job(job_config)
+
+        target_def = job_config.objects.get(job_config.job.target)
 
         if target_def is None:
-            raise _ex.EConfigParse(f"No definition available for job target '{job_config.target}'")
+            raise _ex.EConfigParse(f"No definition available for job target '{job_config.job.target}'")
 
         # Only calculation jobs are supported at present
         return GraphBuilder.build_calculation_job(job_config)
+
+    @classmethod
+    def build_import_model_job(cls, job_config: config.JobConfig) -> Graph:
+
+        job_namespace = NodeNamespace(f"job={job_config.jobId}")
+        null_graph = Graph({}, NodeId('', job_namespace))
+
+        # Create a job context with no dependencies and no external data mappings
+        ctx_push_graph = GraphBuilder.build_context_push(
+            job_namespace, null_graph, input_mapping=dict())
+
+        import_id = NodeId("trac_import_model", job_namespace)
+        import_details = job_config.job.importModel
+        model_scope = f"JOB_SCOPE:{job_config.jobId}"
+
+        import_node = ImportModelNode(import_id, model_scope, import_details, explicit_deps=[ctx_push_graph.root_id])
+
+        output_metadata_nodes = frozenset([import_id])
+
+        job_metadata_id = NodeId("trac_job_metadata", job_namespace)
+        job_metadata_node = JobResultMetadataNode(job_metadata_id, output_metadata_nodes)
+
+        job_node_id = NodeId("trac_job_completion", job_namespace)
+        job_node = JobNode(job_node_id, job_metadata_id, explicit_deps=[import_id])
+
+        job_graph_nodes = {
+            **ctx_push_graph.nodes,
+            import_id: import_node,
+            job_metadata_id: job_metadata_node,
+            job_node_id: job_node}
+
+        job_graph = Graph(job_graph_nodes, job_node_id)
+
+        job_ctx_pop = GraphBuilder.build_context_pop(
+            job_namespace, job_graph, dict())
+
+        return job_ctx_pop
 
     @classmethod
     def build_calculation_job(cls, job_config: config.JobConfig) -> Graph:
@@ -48,7 +88,7 @@ class GraphBuilder:
         # The root exec node can run directly in the job context, no need to do a context push
         # All input views are already mapped and there is only a single execution target
 
-        job_target_obj = job_config.objects.get(job_config.target)
+        job_target_obj = job_config.objects.get(job_config.job.target)
         job_target_graph = GraphBuilder.build_model_or_flow(
             job_config, job_namespace, input_graph, job_target_obj)
 
@@ -98,7 +138,7 @@ class GraphBuilder:
 
         nodes = {**graph.nodes}
 
-        for input_name, data_id in job_config.inputs.items():
+        for input_name, data_id in job_config.job.inputs.items():
 
             data_def = job_config.objects[data_id].data
 
@@ -135,7 +175,7 @@ class GraphBuilder:
 
         nodes = {**graph.nodes}
 
-        for output_name, data_id in job_config.outputs.items():
+        for output_name, data_id in job_config.job.outputs.items():
 
             data_def = job_config.objects[data_id].data
 
@@ -222,7 +262,7 @@ class GraphBuilder:
 
         model_name = model_def.entryPoint.split(".")[-1]  # TODO: Check unique model name
         model_id = node_id_for(model_name)
-        model_node = ModelNode(model_id, model_def, input_ids, explicit_deps=[graph.root_id])
+        model_node = RunModelNode(model_id, model_def, input_ids, explicit_deps=[graph.root_id])
 
         # Create nodes for each model output
         # The model node itself outputs a bundle (dictionary of named outputs)
