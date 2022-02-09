@@ -175,7 +175,17 @@ class ModelShim:
         class_name = entry_point_parts[1]
 
         model_module = _il.import_module(module_name)
-        model_class = model_module.__dict__[class_name]
+        model_class = model_module.__dict__.get(class_name)
+
+        if model_class is None:
+            error_msg = f"Model class [{class_name}] was not found in module [{module_name}]"
+            cls._log.error(error_msg)
+            raise _ex.EModelRepoRequest(error_msg)
+
+        if not isinstance(model_class, _api.TracModel.__class__):
+            error_msg = f"Model class [{class_name}] is not a TRAC model"
+            cls._log.error(error_msg)
+            raise _ex.EModelRepoRequest(error_msg)
 
         return model_class
 
