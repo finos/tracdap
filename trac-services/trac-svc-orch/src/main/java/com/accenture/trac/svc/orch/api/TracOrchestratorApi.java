@@ -18,7 +18,6 @@ package com.accenture.trac.svc.orch.api;
 
 import com.accenture.trac.api.JobRequest;
 import com.accenture.trac.api.JobStatus;
-import com.accenture.trac.api.Orchestrator;
 import com.accenture.trac.api.TracOrchestratorApiGrpc;
 import com.accenture.trac.common.grpc.GrpcServerWrap;
 import com.accenture.trac.metadata.TagSelector;
@@ -33,6 +32,9 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
     private static final MethodDescriptor<JobRequest, JobStatus> VALIDATE_JOB_METHOD = TracOrchestratorApiGrpc.getValidateJobMethod();
     private static final MethodDescriptor<JobRequest, JobStatus> EXECUTE_JOB_METHOD = TracOrchestratorApiGrpc.getExecuteJobMethod();
+    private static final MethodDescriptor<TagSelector, JobStatus> CHECK_JOB_METHOD = TracOrchestratorApiGrpc.getCheckJobMethod();
+    private static final MethodDescriptor<TagSelector, JobStatus> FOLLOW_JOB_METHOD = TracOrchestratorApiGrpc.getFollowJobMethod();
+    private static final MethodDescriptor<TagSelector, JobStatus> CANCEL_JOB_METHOD = TracOrchestratorApiGrpc.getCancelJobMethod();
 
     private final OrchestratorImpl orchestrator;
     private final GrpcServerWrap grpcWrap;
@@ -55,13 +57,18 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     }
 
     @Override
-    public void cancelJob(TagSelector request, StreamObserver<JobStatus> responseObserver) {
-        super.cancelJob(request, responseObserver);
+    public void checkJob(TagSelector request, StreamObserver<JobStatus> responseObserver) {
+        super.followJob(request, responseObserver);
     }
 
     @Override
     public void followJob(TagSelector request, StreamObserver<JobStatus> responseObserver) {
         super.followJob(request, responseObserver);
+    }
+
+    @Override
+    public void cancelJob(TagSelector request, StreamObserver<JobStatus> responseObserver) {
+        super.cancelJob(request, responseObserver);
     }
 
 
