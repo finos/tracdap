@@ -24,6 +24,7 @@ import "trac/metadata/type.proto";
 import "trac/metadata/object_id.proto";
 import "trac/metadata/object.proto";
 import "trac/metadata/tag.proto";
+import "trac/metadata/job.proto";
 
 import "google/api/annotations.proto";
 
@@ -34,18 +35,13 @@ service TracOrchestratorApi {
 
   rpc executeJob (JobRequest) returns (JobStatus);
 
-  rpc cancelJob (metadata.TagSelector) returns (JobStatus);
+  rpc checkJob (metadata.TagSelector) returns (JobStatus);
 
   rpc followJob (metadata.TagSelector) returns (stream JobStatus);
+
+  rpc cancelJob (metadata.TagSelector) returns (JobStatus);
 }
 
-
-enum JobType {
-
-  JOB_TYPE_NOT_SET = 0;
-  RUN_MODEL = 1;
-  RUN_FLOW = 2;
-}
 
 enum JobStatusCode {
 
@@ -64,7 +60,11 @@ message JobRequest {
 
   string tenant = 1;
 
-  JobType jobType = 2;
+  metadata.JobType jobType = 2;
+
+  oneof jobDetails {
+    metadata.ImportModelJobDetails importModel = 6;
+  }
 
   metadata.TagSelector target = 3;
   map<string, metadata.Value> parameters = 4;
