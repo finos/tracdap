@@ -339,7 +339,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             headers.setInt(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
 
             var headersFrame = new DefaultHttp2HeadersFrame(headers, false).stream(stream);
-            var dataFrame = new DefaultHttp2DataFrame(content).stream(stream);
+            var dataFrame = new DefaultHttp2DataFrame(content, true).stream(stream);
 
             ctx.fireChannelRead(headersFrame);
             ctx.fireChannelRead(dataFrame);
