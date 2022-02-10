@@ -17,6 +17,7 @@
 package com.accenture.trac.gateway.exec;
 
 import com.accenture.trac.config.GwRoute;
+import com.accenture.trac.gateway.config.rest.OrchApiRestMapping;
 import com.accenture.trac.gateway.config.rest.MetaApiRestMapping;
 import com.accenture.trac.gateway.proxy.rest.RestApiMethod;
 import org.slf4j.Logger;
@@ -63,6 +64,8 @@ public class RouteBuilder {
         switch (config.getRestMapping()) {
 
             case TRAC_META: return MetaApiRestMapping.metaApiRoutes();
+
+            case TRAC_ORCH: return OrchApiRestMapping.orchApiRoutes();
 
             default:
                 return null;

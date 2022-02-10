@@ -17,8 +17,9 @@
 package com.accenture.trac.svc.orch.exec.kube;
 
 import com.accenture.trac.common.exception.EStartup;
+import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.svc.orch.exec.IBatchRunner;
-import io.kubernetes.client.openapi.ApiCallback;
+
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
@@ -31,8 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 
 public class KubeBatchExecutor implements IBatchRunner {
@@ -44,7 +43,7 @@ public class KubeBatchExecutor implements IBatchRunner {
     public KubeBatchExecutor() {
 
         try {
-            this.kubeClient = Config.defaultClient();
+            this.kubeClient = Config.defaultClient();  // TODO: Timeouts
             this.kubeCoreApi = new CoreV1Api(kubeClient);
             this.kubeBatchApi = new BatchV1Api(kubeClient);
         }
@@ -55,68 +54,45 @@ public class KubeBatchExecutor implements IBatchRunner {
     }
 
     @Override
-    public CompletionStage<Void> executorStatus() {
-
-        var result = new CompletableFuture<Void>();
+    public void executorStatus() {
 
         try {
 
-            // Async method returns a "Call", which is cancellable
-            // If there is a way to plug in to the cancel() method
-            kubeCoreApi.listNodeAsync(
-                    null, null, null, null, null, null, null, null, 10, false,
-                    basicApiCallback(this::executorStatusSuccess, this::executorStatusFailed, result));
-
+            var nodeList = kubeCoreApi.listNode(null, null, null, null, null, null, null, null, 10, false);
+            nodeList.getItems().forEach(System.out::println);
         }
         catch (ApiException e) {
 
             e.printStackTrace();
-
-            result.completeExceptionally(e);
+            throw new ETracInternal("Kubernetes error", e);  // TODO: Error
         }
 
-        return result;
-    }
-
-    private void executorStatusSuccess(
-            CompletableFuture<Void> future, V1NodeList nodeList,
-            int statusCode, Map<String, List<String>> responseHeaders) {
-
-        nodeList.getItems().forEach(System.out::println);
-        future.complete(null);
-    }
-
-    private void executorStatusFailed(
-            CompletableFuture<Void> future, ApiException error,
-            int statusCode, Map<String, List<String>> responseHeaders) {
-
-        future.completeExceptionally(error);
     }
 
     @Override
-    public CompletionStage<Void> createBatchSandbox() {
-        return null;
+    public void createBatchSandbox() {
+
     }
 
     @Override
-    public CompletionStage<Void> writeTextConfig(UUID jobId, Map<String, String> configFiles) {
+    public void writeTextConfig(UUID jobId, Map<String, String> configFiles) {
 
         var configMap = new V1ConfigMap()
                 .data(configFiles);
 
-        return writeConfig(jobId, configMap);
+        writeConfig(jobId, configMap);
     }
 
     @Override
-    public CompletionStage<Void> writeBinaryConfig(UUID jobId, Map<String, byte[]> configFiles) {
+    public void writeBinaryConfig(UUID jobId, Map<String, byte[]> configFiles) {
 
         var configMap = new V1ConfigMap()
                 .binaryData(configFiles);
 
-        return writeConfig(jobId, configMap);
+        writeConfig(jobId, configMap);
     }
 
-    private CompletionStage<Void> writeConfig(UUID jobId, V1ConfigMap configMap) {
+    private void writeConfig(UUID jobId, V1ConfigMap configMap) {
 
         try {
 
@@ -130,36 +106,19 @@ public class KubeBatchExecutor implements IBatchRunner {
             configMap.setKind("ConfigMap");
             configMap.setMetadata(configMetadata);
 
-            var configMapResult = new CompletableFuture<Void>();
+            var configMapResult = kubeCoreApi.createNamespacedConfigMap(namespace, configMap, null, null, null);
 
-            kubeCoreApi.createNamespacedConfigMapAsync(
-                    namespace, configMap, null, null, null,
-                    basicApiCallback(this::writeConfigSucceeded, this::writeConfigFailed, configMapResult));
-
-            return configMapResult;
+            // TODO: Any need to use result?
         }
         catch (ApiException e) {
 
-            return CompletableFuture.failedFuture(e);
+            e.printStackTrace();
+            throw new ETracInternal("Kubernetes error", e);  // TODO: Error
         }
     }
 
-    private void writeConfigSucceeded(
-            CompletableFuture<Void> future, V1ConfigMap result,
-            int statusCode, Map<String, List<String>> responseHeaders) {
-
-        future.complete(null);
-    }
-
-    private void writeConfigFailed(
-            CompletableFuture<Void> future, ApiException error,
-            int statusCode, Map<String, List<String>> responseHeaders) {
-
-        future.completeExceptionally(error);
-    }
-
     @Override
-    public CompletionStage<Void> startBatch(UUID jobId, Set<String> configFiles) {
+    public void startBatch(UUID jobId, Set<String> configFiles) {
 
         try {
 
@@ -215,115 +174,31 @@ public class KubeBatchExecutor implements IBatchRunner {
                     .metadata(jobMetadata)
                     .spec(jobSpec);
 
-            var jobResult = new CompletableFuture<Void>();
+            var jobResult = kubeBatchApi.createNamespacedJob("default", job, null, null, null);
 
-            kubeBatchApi.createNamespacedJobAsync(
-                    "default", job, null, null, null,
-                    basicApiCallback(this::startBatchSucceeded, this::startBatchFailed, jobResult));
-
-            return jobResult;
+            System.out.println(jobResult.toString());
         }
         catch (ApiException error) {
 
             error.printStackTrace();
-
-            return CompletableFuture.failedFuture(error);
+            System.out.println(error.getResponseBody());
+            throw new ETracInternal("Kubernetes error", error);  // TODO: Error
         }
-    }
-
-    public void startBatchSucceeded(
-            CompletableFuture<Void> future, V1Job job,
-            int statusCode, Map<String, List<String>> responseHeaders) {
-
-        System.out.println(job.toString());
-        future.complete(null);
-    }
-
-    public void startBatchFailed(
-            CompletableFuture<Void> future, ApiException error,
-            int statusCode, Map<String, List<String>> responseHeaders) {
-
-        error.printStackTrace();
-
-        System.out.println(error.getResponseBody());
-
-        future.completeExceptionally(error);
     }
 
     @Override
-    public CompletionStage<Void> getBatchStatus() {
-        return null;
+    public void getBatchStatus() {
     }
 
     @Override
-    public CompletionStage<Void> readBatchResult() {
-        return null;
+    public void readBatchResult() {
     }
 
     @Override
-    public CompletionStage<Void> cancelBatch() {
-        return null;
+    public void cancelBatch() {
     }
 
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // CALLBACK HANDLING
-    // -----------------------------------------------------------------------------------------------------------------
-
-    private <TResult, TFuture> ApiCallback<TResult> basicApiCallback(
-            BasicApiCallbackFunc<TResult, TFuture> onSuccess,
-            BasicApiCallbackFunc<ApiException, TFuture> onFailure,
-            CompletableFuture<TFuture> future) {
-
-        return new BasicApiCallback<>(onSuccess, onFailure, future);
-    }
-
-    private static class BasicApiCallback<TResult, TFuture> implements ApiCallback<TResult> {
-
-        private final BasicApiCallbackFunc<TResult, TFuture> onSuccess;
-        private final BasicApiCallbackFunc<ApiException, TFuture> onFailure;
-        private final CompletableFuture<TFuture> future;
-
-        public BasicApiCallback(
-                BasicApiCallbackFunc<TResult, TFuture> onSuccess,
-                BasicApiCallbackFunc<ApiException, TFuture> onFailure,
-                CompletableFuture<TFuture> future) {
-
-            this.onSuccess = onSuccess;
-            this.onFailure = onFailure;
-            this.future = future;
-        }
-
-        @Override
-        public void onSuccess(TResult result, int statusCode, Map<String, List<String>> responseHeaders) {
-
-            onSuccess.callback(future, result, statusCode, responseHeaders);
-        }
-
-        @Override
-        public void onFailure(ApiException error, int statusCode, Map<String, List<String>> responseHeaders) {
-
-            onFailure.callback(future, error, statusCode, responseHeaders);
-        }
-
-        @Override
-        public void onUploadProgress(long bytesWritten, long contentLength, boolean done) {
-
-            // NO-OP
-        }
-
-        @Override
-        public void onDownloadProgress(long bytesRead, long contentLength, boolean done) {
-
-            // NO-OP
-        }
-    }
-
-    @FunctionalInterface
-    private interface BasicApiCallbackFunc<TResult, TFuture> {
-
-        void callback(
-                CompletableFuture<TFuture> future, TResult result,
-                int statusCode, Map<String, List<String>> responseHeaders);
+    @Override
+    public void cleanUpBatch() {
     }
 }

@@ -31,13 +31,28 @@ import "google/api/annotations.proto";
 
 service TracOrchestratorApi {
 
-  rpc validateJob (JobRequest) returns (JobStatus);
+  rpc validateJob (JobRequest) returns (JobStatus) {
+    option (google.api.http) = {
+      post: "/{tenant}/validate-job"
+      body: "*"
+    };
+  }
 
-  rpc executeJob (JobRequest) returns (JobStatus);
+  rpc executeJob (JobRequest) returns (JobStatus) {
+    option (google.api.http) = {
+      post: "/{tenant}/execute-job"
+      body: "*"
+    };
+  }
 
-  rpc checkJob (metadata.TagSelector) returns (JobStatus);
+  rpc checkJob (JobStatusRequest) returns (JobStatus) {
+    option (google.api.http) = {
+      post: "/{tenant}/check-job"
+      body: "selector"
+    };
+  }
 
-  rpc followJob (metadata.TagSelector) returns (stream JobStatus);
+  rpc followJob (JobStatusRequest) returns (stream JobStatus);
 
   rpc cancelJob (metadata.TagSelector) returns (JobStatus);
 }
@@ -69,6 +84,13 @@ message JobRequest {
   metadata.TagSelector target = 3;
   map<string, metadata.Value> parameters = 4;
   map<string, metadata.TagSelector> resources = 5;
+}
+
+
+message JobStatusRequest {
+
+  string tenant = 1;
+  metadata.TagSelector selector = 2;
 }
 
 

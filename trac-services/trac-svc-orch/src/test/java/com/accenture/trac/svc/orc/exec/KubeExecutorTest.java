@@ -44,10 +44,7 @@ public class KubeExecutorTest {
     void testKubeStatus() throws Exception {
 
         var executor = new KubeBatchExecutor();
-        var statusTask = executor.executorStatus();
-
-        waitFor(Duration.ofSeconds(10), statusTask);
-        resultOf(statusTask);
+        executor.executorStatus();
     }
 
     @Test
@@ -62,10 +59,7 @@ public class KubeExecutorTest {
         configFiles.put("job_config.json", "");
 
         executor.writeTextConfig(jobId, configFiles);
-        var batchTask = executor.startBatch(jobId, configFiles.keySet());
-
-        waitFor(Duration.ofSeconds(10), batchTask);
-        resultOf(batchTask);
+        executor.startBatch(jobId, configFiles.keySet());
     }
 
     @Test
@@ -108,9 +102,6 @@ public class KubeExecutorTest {
 
         var executor = new KubeBatchExecutor();
         executor.writeTextConfig(jobUuid, configFiles);
-
-        var batchTask = executor.startBatch(jobUuid, configFiles.keySet());
-        waitFor(Duration.ofSeconds(10), batchTask);
-        resultOf(batchTask);
+        executor.startBatch(jobUuid, configFiles.keySet());
     }
 }

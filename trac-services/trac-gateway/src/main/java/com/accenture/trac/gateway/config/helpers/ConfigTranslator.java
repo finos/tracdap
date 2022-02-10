@@ -55,14 +55,26 @@ public class ConfigTranslator {
 
         if (services.hasData()) {
 
-            var metaApiRoutes = createRoutesForService(
+            var dataApiRoutes = createRoutesForService(
                     "TRAC Data Service",
                     services.getData(),
                     "/trac.api.TracDataApi/",
                     "/trac-data/",
                     null);
 
-            serviceRoutes.addAll(metaApiRoutes);
+            serviceRoutes.addAll(dataApiRoutes);
+        }
+
+        if (services.hasOrch()) {
+
+            var orchApiRoutes = createRoutesForService(
+                    "TRAC Orchestrator Service",
+                    services.getOrch(),
+                    "/trac.api.TracOrchestratorApi/",
+                    "/trac-orch/",
+                    GwRestMapping.TRAC_ORCH);
+
+            serviceRoutes.addAll(orchApiRoutes);
         }
 
         return serviceRoutes;

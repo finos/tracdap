@@ -16,15 +16,16 @@
 
 package com.accenture.trac.svc.orch.api;
 
-import com.accenture.trac.api.JobRequest;
-import com.accenture.trac.api.JobStatus;
-import com.accenture.trac.api.TracOrchestratorApiGrpc;
+import com.accenture.trac.api.*;
+import com.accenture.trac.common.exception.EMetadataNotFound;
+import com.accenture.trac.common.exception.EPluginNotAvailable;
 import com.accenture.trac.common.grpc.GrpcServerWrap;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.svc.orch.service.OrchestratorImpl;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 
@@ -32,8 +33,8 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
     private static final MethodDescriptor<JobRequest, JobStatus> VALIDATE_JOB_METHOD = TracOrchestratorApiGrpc.getValidateJobMethod();
     private static final MethodDescriptor<JobRequest, JobStatus> EXECUTE_JOB_METHOD = TracOrchestratorApiGrpc.getExecuteJobMethod();
-    private static final MethodDescriptor<TagSelector, JobStatus> CHECK_JOB_METHOD = TracOrchestratorApiGrpc.getCheckJobMethod();
-    private static final MethodDescriptor<TagSelector, JobStatus> FOLLOW_JOB_METHOD = TracOrchestratorApiGrpc.getFollowJobMethod();
+    private static final MethodDescriptor<JobStatusRequest, JobStatus> CHECK_JOB_METHOD = TracOrchestratorApiGrpc.getCheckJobMethod();
+    private static final MethodDescriptor<JobStatusRequest, JobStatus> FOLLOW_JOB_METHOD = TracOrchestratorApiGrpc.getFollowJobMethod();
     private static final MethodDescriptor<TagSelector, JobStatus> CANCEL_JOB_METHOD = TracOrchestratorApiGrpc.getCancelJobMethod();
 
     private final OrchestratorImpl orchestrator;
@@ -47,7 +48,8 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
     @Override
     public void validateJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
-        super.validateJob(request, responseObserver);
+
+        grpcWrap.unaryCall(VALIDATE_JOB_METHOD, request, responseObserver, this::validateJob);
     }
 
     @Override
@@ -57,12 +59,12 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     }
 
     @Override
-    public void checkJob(TagSelector request, StreamObserver<JobStatus> responseObserver) {
+    public void checkJob(JobStatusRequest request, StreamObserver<JobStatus> responseObserver) {
         super.followJob(request, responseObserver);
     }
 
     @Override
-    public void followJob(TagSelector request, StreamObserver<JobStatus> responseObserver) {
+    public void followJob(JobStatusRequest request, StreamObserver<JobStatus> responseObserver) {
         super.followJob(request, responseObserver);
     }
 
@@ -75,6 +77,13 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     // -----------------------------------------------------------------------------------------------------------------
     // API IMPLEMENTATION
     // -----------------------------------------------------------------------------------------------------------------
+
+    private CompletionStage<JobStatus> validateJob(JobRequest request) {
+
+        return CompletableFuture.completedFuture(JobStatus.newBuilder()
+                .setStatus(JobStatusCode.NOT_STARTED)
+                .build());
+    }
 
     private CompletionStage<JobStatus> executeJob(JobRequest request) {
 

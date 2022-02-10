@@ -69,12 +69,15 @@ enum GwRestMapping {
 
   REST_MAPPING_NOT_SET = 0;
   TRAC_META = 1;
+  TRAC_DATA = 2;
+  TRAC_ORCH = 3;
 }
 
 message GwServiceMap {
 
   GwService meta = 1;
   GwService data = 2;
+  GwService orch = 3;
 }
 
 message GwService {

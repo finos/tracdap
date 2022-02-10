@@ -30,6 +30,11 @@ instances:
       host: localhost
       port: 8082
 
+  orch:
+    - scheme: http
+      host: localhost
+      port: 8083
+
 
 services:
 

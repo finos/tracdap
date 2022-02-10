@@ -26,19 +26,21 @@ public interface IBatchRunner {
 
     // Interface for running batch jobs, i.e. a job that runs using one-shot using a one-shot process
 
-    CompletionStage<Void> executorStatus();
+    void executorStatus();
 
-    CompletionStage<Void> createBatchSandbox();
+    void createBatchSandbox();
 
-    CompletionStage<Void> writeTextConfig(UUID jobId, Map<String, String> configFiles);
+    void writeTextConfig(UUID jobId, Map<String, String> configFiles);
 
-    CompletionStage<Void> writeBinaryConfig(UUID jobId, Map<String, byte[]> configFiles);
+    void writeBinaryConfig(UUID jobId, Map<String, byte[]> configFiles);
 
-    CompletionStage<Void> startBatch(UUID jobId, Set<String> configFiles);
+    void startBatch(UUID jobId, Set<String> configFiles);
 
-    CompletionStage<Void> getBatchStatus();
+    void getBatchStatus();
 
-    CompletionStage<Void> readBatchResult();
+    void readBatchResult();
 
-    CompletionStage<Void> cancelBatch();
+    void cancelBatch();
+
+    void cleanUpBatch();
 }
