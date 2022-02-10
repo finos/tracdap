@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Accenture Global Solutions Limited
+ * Copyright 2022 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.jobs;
+package com.accenture.trac.svc.orch.service;
 
-
-import com.accenture.trac.api.JobRequest;
-import com.accenture.trac.common.exception.EValidationGap;
-import com.accenture.trac.metadata.JobDefinition;
-import com.accenture.trac.metadata.JobType;
-
-import java.lang.reflect.Constructor;
-import java.util.Map;
-
-public interface IJobLogic {
-
-
-
-    JobDefinition buildJobDefinition(JobRequest jobRequest);
+public class JobPoolService {
 }

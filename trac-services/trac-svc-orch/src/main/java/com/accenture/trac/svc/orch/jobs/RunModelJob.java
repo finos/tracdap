@@ -17,10 +17,18 @@
 package com.accenture.trac.svc.orch.jobs;
 
 
+import com.accenture.trac.api.JobRequest;
+import com.accenture.trac.metadata.JobDefinition;
+import com.accenture.trac.metadata.JobType;
+
+
 public class RunModelJob implements IJobLogic {
 
     @Override
-    public void buildLogicJob() {
+    public JobDefinition buildJobDefinition(JobRequest jobRequest) {
 
+        return JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_MODEL)
+                .build();
     }
 }
