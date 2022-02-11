@@ -21,11 +21,16 @@ import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
-import com.accenture.trac.config.DataServiceConfig;
+import com.accenture.trac.common.util.InterfaceLogging;
 import com.accenture.trac.config.PlatformConfig;
 import com.accenture.trac.svc.orch.api.TracOrchestratorApi;
+import com.accenture.trac.svc.orch.cache.IJobCache;
+import com.accenture.trac.svc.orch.cache.local.LocalJobCache;
+import com.accenture.trac.svc.orch.exec.IBatchRunner;
+import com.accenture.trac.svc.orch.exec.kube.KubeBatchExecutor;
 import com.accenture.trac.svc.orch.service.JobApiService;
 
+import com.accenture.trac.svc.orch.service.JobManagementService;
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.netty.NettyChannelBuilder;
@@ -57,8 +62,13 @@ public class TracOrchestratorService extends CommonServiceBase {
     private EventLoopGroup bossGroup;
     private EventLoopGroup nettyGroup;
     private EventLoopGroup serviceGroup;
+
     private Server server;
     private ManagedChannel clientChannel;
+
+    private IJobCache jobCache;
+    private IBatchRunner jobExecCtrl;
+    private JobManagementService jobMonitor;
 
     public TracOrchestratorService(PluginManager pluginManager, ConfigManager configManager) {
 
@@ -98,7 +108,13 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
 
-            var orchestrator = new JobApiService(metaClient);
+            jobCache = new LocalJobCache();
+            jobCache = InterfaceLogging.wrap(jobCache, IJobCache.class);
+            jobExecCtrl = new KubeBatchExecutor();
+            jobMonitor = new JobManagementService(jobCache, jobExecCtrl, serviceGroup);
+            jobMonitor.start();
+
+            var orchestrator = new JobApiService(jobCache, metaClient);
             var orchestratorApi = new TracOrchestratorApi(orchestrator);
 
             this.server = NettyServerBuilder.forPort(DEFAULT_PORT)
@@ -134,6 +150,12 @@ public class TracOrchestratorService extends CommonServiceBase {
             return clientChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
+        var jobMonitorDown = shutdownResource("Job monitor service", deadline, remaining -> {
+
+            jobMonitor.stop();
+            return true;
+        });
+
         var serviceThreadsDown = shutdownResource("Service thread pool", deadline, remaining -> {
 
             serviceGroup.shutdownGracefully(0, remaining.toMillis(), TimeUnit.MILLISECONDS);
@@ -152,7 +174,8 @@ public class TracOrchestratorService extends CommonServiceBase {
             return bossGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
-        if (serverDown && clientDown && serviceThreadsDown && nettyDown && bossDown)
+        if (serverDown && clientDown && jobMonitorDown &&
+            serviceThreadsDown && nettyDown && bossDown)
             return 0;
 
         if (!serverDown)

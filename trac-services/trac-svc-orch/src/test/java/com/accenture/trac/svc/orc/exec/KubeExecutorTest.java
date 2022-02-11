@@ -58,8 +58,8 @@ public class KubeExecutorTest {
         configFiles.put("sys_config.json", "");
         configFiles.put("job_config.json", "");
 
-        executor.writeTextConfig(jobId, configFiles);
-        executor.startBatch(jobId, configFiles.keySet());
+        executor.writeTextConfig(jobId.toString(), configFiles);
+        executor.startBatch(jobId.toString(), configFiles.keySet());
     }
 
     @Test
@@ -101,7 +101,7 @@ public class KubeExecutorTest {
         configFiles.put("job_config.json", jobConfigJson);
 
         var executor = new KubeBatchExecutor();
-        executor.writeTextConfig(jobUuid, configFiles);
-        executor.startBatch(jobUuid, configFiles.keySet());
+        executor.writeTextConfig(jobUuid.toString(), configFiles);
+        executor.startBatch(jobUuid.toString(), configFiles.keySet());
     }
 }

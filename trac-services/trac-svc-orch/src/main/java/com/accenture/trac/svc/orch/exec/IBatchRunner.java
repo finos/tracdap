@@ -30,11 +30,11 @@ public interface IBatchRunner {
 
     void createBatchSandbox();
 
-    void writeTextConfig(UUID jobId, Map<String, String> configFiles);
+    void writeTextConfig(String jobKey, Map<String, String> configFiles);
 
-    void writeBinaryConfig(UUID jobId, Map<String, byte[]> configFiles);
+    void writeBinaryConfig(String jobKey, Map<String, byte[]> configFiles);
 
-    void startBatch(UUID jobId, Set<String> configFiles);
+    void startBatch(String jobKey, Set<String> configFiles);
 
     void getBatchStatus();
 

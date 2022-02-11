@@ -16,11 +16,30 @@
 
 package com.accenture.trac.svc.orch.cache;
 
+import com.accenture.trac.api.JobRequest;
+import com.accenture.trac.api.JobStatusCode;
+import com.accenture.trac.metadata.JobDefinition;
+import com.accenture.trac.metadata.JobType;
+import com.accenture.trac.metadata.ObjectDefinition;
+import com.accenture.trac.metadata.TagHeader;
+
 import java.io.Serializable;
+import java.util.HashMap;
+import java.util.Map;
 
 
 public class JobState implements Serializable {
 
+    public String tenant;
 
+    public String jobKey;
+    public TagHeader jobId;
+    public JobType jobType;
 
+    public JobRequest jobRequest;
+
+    public JobDefinition definition;
+    public Map<String, ObjectDefinition> resources = new HashMap<>();
+
+    public JobStatusCode statusCode;
 }

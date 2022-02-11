@@ -19,15 +19,18 @@ package com.accenture.trac.svc.orch.jobs;
 
 import com.accenture.trac.api.JobRequest;
 import com.accenture.trac.common.exception.EValidationGap;
+import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.metadata.JobDefinition;
 import com.accenture.trac.metadata.JobType;
+import com.accenture.trac.metadata.ObjectDefinition;
+import com.accenture.trac.metadata.TagHeader;
 
 import java.lang.reflect.Constructor;
 import java.util.Map;
 
 public interface IJobLogic {
 
-
-
     JobDefinition buildJobDefinition(JobRequest jobRequest);
+
+    JobConfig buildJobConfig(TagHeader jobId, JobDefinition job);
 }

@@ -21,8 +21,11 @@ import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.cache.Ticket;
 import com.accenture.trac.svc.orch.cache.TicketRequest;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 
 public class LocalJobCache implements IJobCache {
@@ -56,6 +59,15 @@ public class LocalJobCache implements IJobCache {
     public void deleteJob(String jobId, Ticket ticket) {
 
         var existing = cache.remove(jobId);
+    }
+
+    @Override
+    public List<JobState> pollJobs(Function<JobState, Boolean> filter) {
+
+        return cache.values()
+                .stream()
+                .filter(filter::apply)
+                .collect(Collectors.toList());
     }
 
     @Override

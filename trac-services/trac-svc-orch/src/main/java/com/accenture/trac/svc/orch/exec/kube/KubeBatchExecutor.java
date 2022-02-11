@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 
 public class KubeBatchExecutor implements IBatchRunner {
@@ -75,31 +74,31 @@ public class KubeBatchExecutor implements IBatchRunner {
     }
 
     @Override
-    public void writeTextConfig(UUID jobId, Map<String, String> configFiles) {
+    public void writeTextConfig(String jobKey, Map<String, String> configFiles) {
 
         var configMap = new V1ConfigMap()
                 .data(configFiles);
 
-        writeConfig(jobId, configMap);
+        writeConfig(jobKey, configMap);
     }
 
     @Override
-    public void writeBinaryConfig(UUID jobId, Map<String, byte[]> configFiles) {
+    public void writeBinaryConfig(String jobKey, Map<String, byte[]> configFiles) {
 
         var configMap = new V1ConfigMap()
                 .binaryData(configFiles);
 
-        writeConfig(jobId, configMap);
+        writeConfig(jobKey, configMap);
     }
 
-    private void writeConfig(UUID jobId, V1ConfigMap configMap) {
+    private void writeConfig(String jobKey, V1ConfigMap configMap) {
 
         try {
 
             var namespace = "default";  // TODO: Namespace should be based on tenant? io.trac-platform.runtime.TENANT ?
 
             var configMetadata = new V1ObjectMeta()
-                    .name("trac-runtime-config-" + jobId)
+                    .name("trac-runtime-config-" + jobKey)
                     .namespace(namespace);
 
             configMap.setApiVersion("v1");
@@ -118,16 +117,16 @@ public class KubeBatchExecutor implements IBatchRunner {
     }
 
     @Override
-    public void startBatch(UUID jobId, Set<String> configFiles) {
+    public void startBatch(String jobKey, Set<String> configFiles) {
 
         try {
 
             var jobMetadata = new V1ObjectMeta()
-                    .name("trac-job-" + jobId)
+                    .name("trac-job-" + jobKey)
                     .namespace("default");
 
             var configSource = new V1ConfigMapVolumeSource();
-            configSource.name("trac-runtime-config-" + jobId);
+            configSource.name("trac-runtime-config-" + jobKey);
 
             for (var configFile : configFiles) {
                 configSource.addItemsItem(new V1KeyToPath()

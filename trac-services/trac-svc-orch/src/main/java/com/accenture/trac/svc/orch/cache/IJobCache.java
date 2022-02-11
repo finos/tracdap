@@ -17,16 +17,20 @@
 package com.accenture.trac.svc.orch.cache;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.function.Function;
 
 public interface IJobCache {
 
-    void createJob(String jobId, JobState state);
+    void createJob(String jobKey, JobState state);
 
-    JobState readJob(String jobId);
+    JobState readJob(String jobKey);
 
-    void updateJob(String jobId, JobState state, Ticket ticket);
+    void updateJob(String jobKey, JobState state, Ticket ticket);
 
-    void deleteJob(String jobId, Ticket ticket);
+    void deleteJob(String jobKey, Ticket ticket);
+
+    List<JobState> pollJobs(Function<JobState, Boolean> filter);
 
     Ticket openTicket(TicketRequest request);
 

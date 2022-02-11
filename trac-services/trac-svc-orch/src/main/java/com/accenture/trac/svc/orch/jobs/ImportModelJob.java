@@ -18,17 +18,35 @@ package com.accenture.trac.svc.orch.jobs;
 
 
 import com.accenture.trac.api.JobRequest;
+import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.metadata.JobDefinition;
 import com.accenture.trac.metadata.JobType;
+import com.accenture.trac.metadata.TagHeader;
 
 public class ImportModelJob implements IJobLogic {
 
     @Override
     public JobDefinition buildJobDefinition(JobRequest jobRequest) {
 
+        if (jobRequest.getJobType() != JobType.IMPORT_MODEL)
+            throw new EUnexpected();
+
         return JobDefinition.newBuilder()
                 .setJobType(JobType.IMPORT_MODEL)
                 .setImportModel(jobRequest.getImportModel())
+                .build();
+    }
+
+    @Override
+    public JobConfig buildJobConfig(TagHeader jobId, JobDefinition job) {
+
+        if (job.getJobType() != JobType.IMPORT_MODEL)
+            throw new EUnexpected();
+
+        return JobConfig.newBuilder()
+                .setJobId(jobId)
+                .setJob(job)
                 .build();
     }
 }

@@ -18,8 +18,10 @@ package com.accenture.trac.svc.orch.jobs;
 
 
 import com.accenture.trac.api.JobRequest;
+import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.metadata.JobDefinition;
 import com.accenture.trac.metadata.JobType;
+import com.accenture.trac.metadata.TagHeader;
 
 
 public class RunModelJob implements IJobLogic {
@@ -30,5 +32,11 @@ public class RunModelJob implements IJobLogic {
         return JobDefinition.newBuilder()
                 .setJobType(JobType.RUN_MODEL)
                 .build();
+    }
+
+    @Override
+    public JobConfig buildJobConfig(TagHeader jobId, JobDefinition job) {
+
+        throw new RuntimeException("Not implemented yet");
     }
 }

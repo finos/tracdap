@@ -24,6 +24,8 @@ import com.accenture.trac.metadata.ObjectDefinition;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagHeader;
 
+import com.accenture.trac.svc.orch.cache.IJobCache;
+import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.jobs.JobLogic;
 import io.grpc.MethodDescriptor;
 
@@ -35,11 +37,13 @@ public class JobApiService {
 
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreateObjectMethod();
 
+    private final IJobCache jobCache;
     private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient;
     private final GrpcClientWrap grpcWrap;
 
-    public JobApiService(TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient) {
+    public JobApiService(IJobCache jobCache, TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient) {
 
+        this.jobCache = jobCache;
         this.metaClient = metaClient;
         this.grpcWrap = new GrpcClientWrap(getClass());
     }
@@ -140,7 +144,22 @@ public class JobApiService {
 
     private CompletionStage<RequestState> submitForExecution(RequestState request) {
 
-        return CompletableFuture.completedFuture(request);  // CompletableFuture.failedFuture(new RuntimeException("not implemented yet"));
+        var jobKey = String.format("%s-v%d", request.jobId.getObjectId(), request.jobId.getObjectVersion());
+
+        // TODO: Can RequestState just use a JobState?
+        var jobState = new JobState();
+        jobState.tenant = request.tenant;
+        jobState.jobKey = jobKey;
+        jobState.jobId = request.jobId;
+        jobState.jobType = request.jobType;
+        jobState.definition = request.jobDef;
+        jobState.statusCode = JobStatusCode.QUEUED;
+
+        jobCache.createJob(jobKey, jobState);
+
+        request.statusCode = JobStatusCode.QUEUED;
+
+        return CompletableFuture.completedFuture(request);
     }
 
     private JobStatus reportStatus(RequestState request) {
