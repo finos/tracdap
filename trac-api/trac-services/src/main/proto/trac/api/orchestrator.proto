@@ -61,14 +61,15 @@ service TracOrchestratorApi {
 enum JobStatusCode {
 
   JOB_STATUS_CODE_NOT_SET = 0;
-  NOT_STARTED = 1;
-  PREPARING = 2;
-  QUEUED = 3;
-  SUBMITTED = 4;
-  RUNNING = 5;
-  COMPLETE = 6;
-  FAILED = 7;
-  CANCELLED = 8;
+  PREPARING = 1;
+  VALIDATED = 2;
+  PENDING = 3;
+  QUEUED = 4;
+  SUBMITTED = 5;
+  RUNNING = 6;
+  COMPLETE = 7;
+  FAILED = 8;
+  CANCELLED = 9;
 }
 
 message JobRequest {

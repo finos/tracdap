@@ -38,42 +38,39 @@ public class JobApiService {
     private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient;
     private final GrpcClientWrap grpcWrap;
 
-    private static class RequestState {
-
-        public String tenant;
-        public JobType jobType;
-        public JobRequest jobRequest;
-
-        public JobDefinition jobDef;
-    }
-
     public JobApiService(TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient) {
 
         this.metaClient = metaClient;
         this.grpcWrap = new GrpcClientWrap(getClass());
     }
 
-    CompletableFuture<JobStatus> validateJob(JobRequest request) {
+    public CompletableFuture<JobStatus> validateJob(JobRequest request) {
 
-        // like submit, without submit part
-
-        return CompletableFuture.failedFuture(new RuntimeException("Not implemented yet"));
-    }
-
-    CompletableFuture<JobStatus> submitJob(JobRequest request) {
-
-        var state = new RequestState();
-        state.tenant = request.getTenant();
-        state.jobType = request.getJobType();
-        state.jobRequest = request;
+        var state = new RequestState(request);
 
         return CompletableFuture.completedFuture(state)
 
-                .thenApply(this::buildMetadata)
+                .thenApply(s -> jobStatus(s, JobStatusCode.PREPARING))
 
-                // static validate
-                // load related metadata
-                // semantic validate
+                .thenCompose(this::assembleAndValidate)
+
+                .thenApply(s -> jobStatus(s, JobStatusCode.VALIDATED))
+
+                .thenApply(this::reportStatus);
+    }
+
+    public CompletableFuture<JobStatus> executeJob(JobRequest request) {
+
+        var state = new RequestState(request);
+
+        return CompletableFuture.completedFuture(state)
+
+                .thenApply(s -> jobStatus(s, JobStatusCode.PREPARING))
+
+                .thenCompose(this::assembleAndValidate)
+
+                .thenApply(s -> jobStatus(s, JobStatusCode.VALIDATED))
+                .thenApply(s -> jobStatus(s, JobStatusCode.PENDING))
 
                 .thenCompose(this::saveMetadata)
 
@@ -88,6 +85,24 @@ public class JobApiService {
 
     void getJobResult() {
 
+    }
+
+
+
+    private RequestState jobStatus(RequestState state, JobStatusCode statusCode) {
+
+        state.statusCode = statusCode;
+        return state;
+    }
+
+
+    private CompletionStage<RequestState> assembleAndValidate(RequestState request) {
+
+        // static validate
+        // load related metadata
+        // semantic validate
+
+        return CompletableFuture.completedFuture(buildMetadata(request));
     }
 
     private RequestState buildMetadata(RequestState request) {
@@ -126,8 +141,28 @@ public class JobApiService {
     private JobStatus reportStatus(RequestState request) {
 
         return JobStatus.newBuilder()
-                .setStatus(JobStatusCode.NOT_STARTED)
+                .setStatus(request.statusCode)
                 .setMessage("")
                 .build();
+    }
+
+
+
+    private static class RequestState {
+
+        RequestState(JobRequest request) {
+
+            this.tenant = request.getTenant();
+            this.jobType = request.getJobType();
+            this.jobRequest = request;
+        }
+
+        String tenant;
+        JobType jobType;
+        JobRequest jobRequest;
+
+        JobStatusCode statusCode;
+
+        JobDefinition jobDef;
     }
 }
