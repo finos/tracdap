@@ -123,6 +123,7 @@ public class JobApiService {
 
         var jobWriteReq = MetadataWriteRequest.newBuilder()
                 .setTenant(request.tenant)
+                .setObjectType(ObjectType.JOB)
                 .setDefinition(jobObj)
                 .build();
 
@@ -130,20 +131,28 @@ public class JobApiService {
                 CREATE_OBJECT_METHOD, jobWriteReq,
                 metaClient::createObject);
 
-        return grpcCall.thenApply(x -> request);
+        return grpcCall.thenApply(header -> {
+
+            request.jobId = header;
+            return request;
+        });
     }
 
     private CompletionStage<RequestState> submitForExecution(RequestState request) {
 
-        return CompletableFuture.failedFuture(new RuntimeException("not implemented yet"));
+        return CompletableFuture.completedFuture(request);  // CompletableFuture.failedFuture(new RuntimeException("not implemented yet"));
     }
 
     private JobStatus reportStatus(RequestState request) {
 
-        return JobStatus.newBuilder()
-                .setStatus(request.statusCode)
-                .setMessage("")
-                .build();
+        var status = JobStatus.newBuilder();
+
+        if (request.jobId != null)
+            status.setJobId(request.jobId);
+
+        status.setStatus(request.statusCode);
+
+        return status.build();
     }
 
 
@@ -161,8 +170,9 @@ public class JobApiService {
         JobType jobType;
         JobRequest jobRequest;
 
-        JobStatusCode statusCode;
-
+        TagHeader jobId;
         JobDefinition jobDef;
+
+        JobStatusCode statusCode;
     }
 }

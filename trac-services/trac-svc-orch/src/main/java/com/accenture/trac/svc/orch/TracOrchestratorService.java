@@ -14,18 +14,26 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch;import com.accenture.trac.common.config.ConfigManager;
+package com.accenture.trac.svc.orch;
+
+import com.accenture.trac.api.TrustedMetadataApiGrpc;
+import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
+import com.accenture.trac.config.DataServiceConfig;
+import com.accenture.trac.config.PlatformConfig;
 import com.accenture.trac.svc.orch.api.TracOrchestratorApi;
 import com.accenture.trac.svc.orch.service.JobApiService;
-import com.accenture.trac.svc.orch.service.OrchestratorImpl;
+
+import io.grpc.ManagedChannel;
 import io.grpc.Server;
+import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.NettyServerBuilder;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,9 +43,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
+
 public class TracOrchestratorService extends CommonServiceBase {
 
     private static final short DEFAULT_PORT = 8083;
+    private static final int CONCURRENT_REQUESTS = 30;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -45,8 +55,10 @@ public class TracOrchestratorService extends CommonServiceBase {
     private final ConfigManager configManager;
 
     private EventLoopGroup bossGroup;
-    private EventLoopGroup workerGroup;
+    private EventLoopGroup nettyGroup;
+    private EventLoopGroup serviceGroup;
     private Server server;
+    private ManagedChannel clientChannel;
 
     public TracOrchestratorService(PluginManager pluginManager, ConfigManager configManager) {
 
@@ -57,21 +69,44 @@ public class TracOrchestratorService extends CommonServiceBase {
     @Override
     protected void doStartup(Duration startupTimeout) {
 
+        PlatformConfig platformConfig;
+
+        try {
+            log.info("Loading TRAC platform config...");
+
+            platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+
+            // TODO: Config validation
+
+            log.info("Config looks ok");
+        }
+        catch (Exception e) {
+
+            var errorMessage = "There was a problem loading the platform config: " + e.getMessage();
+            log.error(errorMessage, e);
+            throw new EStartup(errorMessage, e);
+        }
+
         try {
 
             var channelType = NioServerSocketChannel.class;
-            var workerThreads = Runtime.getRuntime().availableProcessors() * 2;
-            workerGroup = new NioEventLoopGroup(workerThreads, new DefaultThreadFactory("orch-svc"));
-            bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("orch-boss"));
+            var clientChannelType = NioSocketChannel.class;
 
-            var orchestrator = new JobApiService(null);  // todo: metaClient
+            bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("orch-boss"));
+            nettyGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("orch-netty"));
+            serviceGroup = new NioEventLoopGroup(CONCURRENT_REQUESTS, new DefaultThreadFactory("orch-svc"));
+
+            var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
+
+            var orchestrator = new JobApiService(metaClient);
             var orchestratorApi = new TracOrchestratorApi(orchestrator);
 
             this.server = NettyServerBuilder.forPort(DEFAULT_PORT)
                     .addService(orchestratorApi)
                     .channelType(channelType)
                     .bossEventLoopGroup(bossGroup)
-                    .workerEventLoopGroup(workerGroup)
+                    .workerEventLoopGroup(nettyGroup)
+                    .executor(serviceGroup)
                     .build();
 
             this.server.start();
@@ -93,10 +128,22 @@ public class TracOrchestratorService extends CommonServiceBase {
             return server.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
-        var workersDown = shutdownResource("Worker thread pool", deadline, remaining -> {
+        var clientDown = shutdownResource("Metadata service client", deadline, remaining -> {
 
-            workerGroup.shutdownGracefully(0, remaining.toMillis(), TimeUnit.MILLISECONDS);
-            return workerGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+            clientChannel.shutdown();
+            return clientChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        var serviceThreadsDown = shutdownResource("Service thread pool", deadline, remaining -> {
+
+            serviceGroup.shutdownGracefully(0, remaining.toMillis(), TimeUnit.MILLISECONDS);
+            return serviceGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        var nettyDown = shutdownResource("Netty thread pool", deadline, remaining -> {
+
+            nettyGroup.shutdownGracefully(0, remaining.toMillis(), TimeUnit.MILLISECONDS);
+            return nettyGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
         var bossDown = shutdownResource("Boss thread pool", deadline, remaining -> {
@@ -105,13 +152,47 @@ public class TracOrchestratorService extends CommonServiceBase {
             return bossGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
-        if (serverDown &&  workersDown && bossDown)
+        if (serverDown && clientDown && serviceThreadsDown && nettyDown && bossDown)
             return 0;
 
         if (!serverDown)
             server.shutdownNow();
 
+        if (!clientDown)
+            clientChannel.shutdownNow();
+
         return -1;
+    }
+
+    private TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub
+    prepareMetadataClient(
+            PlatformConfig platformConfig,
+            Class<? extends io.netty.channel.Channel> channelType) {
+
+        var metaInstances = platformConfig.getInstances().getMetaList();
+
+        if (metaInstances.isEmpty()) {
+
+            var err = "Configuration contains no instances of the metadata service";
+            log.error(err);
+            throw new EStartup(err);
+        }
+
+        var metaInstance = metaInstances.get(0);  // Just use the first instance for now
+
+        log.info("Using metadata service instance at [{}:{}]",
+                metaInstance.getHost(), metaInstance.getPort());
+
+        var clientChannelBuilder = NettyChannelBuilder
+                .forAddress(metaInstance.getHost(), metaInstance.getPort())
+                .channelType(channelType)
+                .eventLoopGroup(nettyGroup)
+                .executor(serviceGroup)
+                .usePlaintext();
+
+        clientChannel = clientChannelBuilder.build();
+
+        return TrustedMetadataApiGrpc.newFutureStub(clientChannel);
     }
 
     public static void main(String[] args) {

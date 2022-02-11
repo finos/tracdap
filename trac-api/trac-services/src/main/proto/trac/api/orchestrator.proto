@@ -97,6 +97,8 @@ message JobStatusRequest {
 
 message JobStatus {
 
-  JobStatusCode status = 1;
-  string message = 2;
+  metadata.TagHeader jobId = 1;
+
+  JobStatusCode status = 2;
+  string message = 3;
 }

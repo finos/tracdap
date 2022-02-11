@@ -34,6 +34,7 @@ message InstantMap {
 
   repeated InstanceConfig meta = 1;
   repeated InstanceConfig data = 2;
+  repeated InstanceConfig orch = 3;
 }
 
 message InstanceConfig {
