@@ -76,7 +76,7 @@ public class JobManagementService {
             log.info("Starting job monitor service...");
 
             pollingTask = executorService.scheduleAtFixedRate(
-                    this::pollJobCache,
+                    this::poll,
                     POLL_INTERVAL.getSeconds(),
                     POLL_INTERVAL.getSeconds(),
                     TimeUnit.SECONDS);
@@ -97,6 +97,12 @@ public class JobManagementService {
         pollingTask.cancel(false);
     }
 
+    public void poll() {
+
+        pollJobCache();
+        pollExecutor();
+    }
+
     public void pollJobCache() {
 
         log.info("Polling job cache...");
@@ -109,6 +115,9 @@ public class JobManagementService {
 
     public void pollExecutor() {
 
+        log.info("Polling executor...");
+
+        jobExecutor.pollAllBatches();
     }
 
     public void submitJob(String jobKey) {

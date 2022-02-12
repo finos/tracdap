@@ -26,6 +26,8 @@ import io.kubernetes.client.openapi.apis.BatchV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.*;
 import io.kubernetes.client.util.Config;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
@@ -34,6 +36,8 @@ import java.util.Set;
 
 
 public class KubeBatchExecutor implements IBatchRunner {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final ApiClient kubeClient;
     private final CoreV1Api kubeCoreApi;
@@ -121,10 +125,6 @@ public class KubeBatchExecutor implements IBatchRunner {
 
         try {
 
-            var jobMetadata = new V1ObjectMeta()
-                    .name("trac-job-" + jobKey)
-                    .namespace("default");
-
             var configSource = new V1ConfigMapVolumeSource();
             configSource.name("trac-runtime-config-" + jobKey);
 
@@ -167,6 +167,10 @@ public class KubeBatchExecutor implements IBatchRunner {
                     .addVolumesItem(configVolume)
                     .addContainersItem(jobContainer)));
 
+            var jobMetadata = new V1ObjectMeta()
+                    .name("trac-job-" + jobKey)
+                    .namespace("default");
+
             var job = new V1Job()
                     .apiVersion("batch/v1")
                     .kind("Job")
@@ -176,6 +180,43 @@ public class KubeBatchExecutor implements IBatchRunner {
             var jobResult = kubeBatchApi.createNamespacedJob("default", job, null, null, null);
 
             System.out.println(jobResult.toString());
+        }
+        catch (ApiException error) {
+
+            error.printStackTrace();
+            System.out.println(error.getResponseBody());
+            throw new ETracInternal("Kubernetes error", error);  // TODO: Error
+        }
+    }
+
+    @Override
+    public void pollAllBatches() {
+
+        try {
+
+            var namespace = "default";
+
+            var jobList = kubeBatchApi.listNamespacedJob(
+                    namespace, null, null, null, null, null, null, null, null, null, false);
+
+            for (var kubeJob : jobList.getItems()) {
+
+                var jobMetadata = kubeJob.getMetadata();
+                var jobStatus = kubeJob.getStatus();
+
+                // TODO: Handle this
+                if (jobMetadata == null || jobStatus == null) {
+                    log.warn("Job has null metadata or status");
+                    continue;
+                }
+
+                log.info("Job [{}] has status [active={}, succeeded={}, failed={}]",
+                        jobMetadata.getName(),
+                        jobStatus.getActive(),
+                        jobStatus.getSucceeded(),
+                        jobStatus.getFailed());
+
+            }
         }
         catch (ApiException error) {
 

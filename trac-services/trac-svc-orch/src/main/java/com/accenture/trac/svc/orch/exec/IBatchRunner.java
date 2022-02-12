@@ -43,4 +43,6 @@ public interface IBatchRunner {
     void cancelBatch();
 
     void cleanUpBatch();
+
+    void pollAllBatches();
 }
