@@ -63,7 +63,7 @@ public class JobApiService {
                 .thenApply(this::reportStatus);
     }
 
-    public CompletableFuture<JobStatus> executeJob(JobRequest request) {
+    public CompletableFuture<JobStatus> submitJob(JobRequest request) {
 
         var state = new RequestState(request);
 

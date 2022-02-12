@@ -38,9 +38,9 @@ service TracOrchestratorApi {
     };
   }
 
-  rpc executeJob (JobRequest) returns (JobStatus) {
+  rpc submitJob (JobRequest) returns (JobStatus) {
     option (google.api.http) = {
-      post: "/{tenant}/execute-job"
+      post: "/{tenant}/submit-job"
       body: "*"
     };
   }

@@ -31,7 +31,7 @@ import java.util.concurrent.CompletionStage;
 public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestratorApiImplBase {
 
     private static final MethodDescriptor<JobRequest, JobStatus> VALIDATE_JOB_METHOD = TracOrchestratorApiGrpc.getValidateJobMethod();
-    private static final MethodDescriptor<JobRequest, JobStatus> EXECUTE_JOB_METHOD = TracOrchestratorApiGrpc.getExecuteJobMethod();
+    private static final MethodDescriptor<JobRequest, JobStatus> SUBMIT_JOB_METHOD = TracOrchestratorApiGrpc.getSubmitJobMethod();
     private static final MethodDescriptor<JobStatusRequest, JobStatus> CHECK_JOB_METHOD = TracOrchestratorApiGrpc.getCheckJobMethod();
     private static final MethodDescriptor<JobStatusRequest, JobStatus> FOLLOW_JOB_METHOD = TracOrchestratorApiGrpc.getFollowJobMethod();
     private static final MethodDescriptor<TagSelector, JobStatus> CANCEL_JOB_METHOD = TracOrchestratorApiGrpc.getCancelJobMethod();
@@ -52,9 +52,9 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     }
 
     @Override
-    public void executeJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
+    public void submitJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
 
-        grpcWrap.unaryCall(EXECUTE_JOB_METHOD, request, responseObserver, orchestrator::executeJob);
+        grpcWrap.unaryCall(SUBMIT_JOB_METHOD, request, responseObserver, orchestrator::submitJob);
     }
 
     @Override

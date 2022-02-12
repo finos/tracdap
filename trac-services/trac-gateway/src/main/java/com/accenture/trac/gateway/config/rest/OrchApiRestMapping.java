@@ -39,8 +39,8 @@ public class OrchApiRestMapping {
                 JobRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-orch/api/v1/{tenant}/execute-job",
-                TracOrchestratorApiGrpc.getExecuteJobMethod(),
+                "/trac-orch/api/v1/{tenant}/submit-job",
+                TracOrchestratorApiGrpc.getSubmitJobMethod(),
                 JobRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
