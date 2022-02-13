@@ -21,10 +21,10 @@ from .graph import *
 class GraphBuilder:
 
     @staticmethod
-    def build_job(job_config: config.JobConfig) -> Graph:
+    def build_job(job_config: config.JobConfig, result_spec: JobResultSpec) -> Graph:
 
         if job_config.job.jobType == meta.JobType.IMPORT_MODEL:
-            return GraphBuilder.build_import_model_job(job_config)
+            return GraphBuilder.build_import_model_job(job_config, result_spec)
 
         target_def = job_config.objects.get(job_config.job.target)
 
@@ -32,10 +32,10 @@ class GraphBuilder:
             raise _ex.EConfigParse(f"No definition available for job target '{job_config.job.target}'")
 
         # Only calculation jobs are supported at present
-        return GraphBuilder.build_calculation_job(job_config)
+        return GraphBuilder.build_calculation_job(job_config, result_spec)
 
     @classmethod
-    def build_import_model_job(cls, job_config: config.JobConfig) -> Graph:
+    def build_import_model_job(cls, job_config: config.JobConfig, result_spec: JobResultSpec) -> Graph:
 
         job_namespace = NodeNamespace(f"job={job_config.jobId}")
         null_graph = Graph({}, NodeId('', job_namespace))
@@ -53,7 +53,7 @@ class GraphBuilder:
         output_metadata_nodes = frozenset([import_id])
 
         job_metadata_id = NodeId("trac_job_metadata", job_namespace)
-        job_metadata_node = JobResultMetadataNode(job_metadata_id, output_metadata_nodes)
+        job_metadata_node = JobResultMetadataNode(job_metadata_id, job_config.jobId, output_metadata_nodes, result_spec)
 
         job_node_id = NodeId("trac_job_completion", job_namespace)
         job_node = JobNode(job_node_id, job_metadata_id, explicit_deps=[import_id])
@@ -72,7 +72,7 @@ class GraphBuilder:
         return job_ctx_pop
 
     @classmethod
-    def build_calculation_job(cls, job_config: config.JobConfig) -> Graph:
+    def build_calculation_job(cls, job_config: config.JobConfig, result_spec: JobResultSpec) -> Graph:
 
         job_namespace = NodeNamespace(f"job={job_config.jobId}")
         null_graph = Graph({}, NodeId('', job_namespace))
@@ -103,7 +103,7 @@ class GraphBuilder:
             if isinstance(n, JobOutputMetadataNode))
 
         job_metadata_id = NodeId("trac_job_metadata", job_namespace)
-        job_metadata_node = JobResultMetadataNode(job_metadata_id, output_metadata_nodes)
+        job_metadata_node = JobResultMetadataNode(job_metadata_id, output_metadata_nodes, result_spec)
 
         job_logs_node = None
         job_metrics_node = None

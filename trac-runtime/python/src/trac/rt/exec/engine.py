@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import pathlib
 import typing as tp
 from copy import copy
 from dataclasses import dataclass, field
@@ -70,11 +71,13 @@ class GraphBuilder(actors.Actor):
 
     def __init__(
             self, job_config: config.JobConfig,
+            result_spec: _graph.JobResultSpec,
             models: _models.ModelLoader,
             storage: _storage.StorageManager):
 
         super().__init__()
         self.job_config = job_config
+        self.result_spec = result_spec
         self.graph: tp.Optional[GraphContext] = None
 
         self._resolver = _func.FunctionResolver(models, storage)
@@ -84,7 +87,7 @@ class GraphBuilder(actors.Actor):
 
         self._log.info("Building execution graph")
 
-        graph_data = _graph.GraphBuilder.build_job(self.job_config)
+        graph_data = _graph.GraphBuilder.build_job(self.job_config, self.result_spec)
         graph_nodes = {node_id: GraphContextNode(node, {}) for node_id, node in graph_data.nodes.items()}
         graph = GraphContext(graph_nodes, pending_nodes=set(graph_nodes.keys()))
 
@@ -342,12 +345,14 @@ class JobProcessor(actors.Actor):
 
     def __init__(
             self, job_id, job_config: config.JobConfig,
+            result_spec: _graph.JobResultSpec,
             models: _models.ModelLoader,
             storage: _storage.StorageManager):
 
         super().__init__()
         self.job_id = job_id
         self.job_config = job_config
+        self.result_spec = result_spec
         self._models = models
         self._storage = storage
         self._log = util.logger_for_object(self)
@@ -355,7 +360,7 @@ class JobProcessor(actors.Actor):
     def on_start(self):
         self._log.info(f"Starting job [{self.job_id}]")
         self._models.create_scope(f"JOB_SCOPE:{self.job_id}")
-        self.actors().spawn(GraphBuilder, self.job_config, self._models, self._storage)
+        self.actors().spawn(GraphBuilder, self.job_config, self.result_spec, self._models, self._storage)
 
     def on_stop(self):
         self._log.info(f"Cleaning up job [{self.job_id}]")
@@ -416,13 +421,22 @@ class TracEngine(actors.Actor):
         self._log.info("Engine shutdown complete")
 
     @actors.Message
-    def submit_job(self, job_config: config.JobConfig):
+    def submit_job(
+            self, job_config: config.JobConfig,
+            job_result_dir: str,
+            job_result_format: str):
 
         job_id = str(job_config.jobId)
 
+        result_needed = bool(job_result_dir is not None)
+        result_spec = _graph.JobResultSpec(result_needed, job_result_dir, job_result_format)
+
         self._log.info(f"Job submitted: [{job_id}]")
 
-        job_actor_id = self.actors().spawn(JobProcessor, job_id, job_config, self._models, self._storage)
+        job_actor_id = self.actors().spawn(
+            JobProcessor, job_id,
+            job_config, result_spec,
+            self._models, self._storage)
 
         jobs = {**self.engine_ctx.jobs, job_id: job_actor_id}
         self.engine_ctx = EngineContext(jobs, self.engine_ctx.data)

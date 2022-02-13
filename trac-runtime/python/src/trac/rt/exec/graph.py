@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import pathlib
 import typing as tp
 import dataclasses as dc
 
@@ -83,6 +84,14 @@ class Graph:
 
     nodes: NodeMap
     root_id: NodeId
+
+
+@dc.dataclass(frozen=True)
+class JobResultSpec:
+
+    save_result: bool = False
+    result_dir: tp.Union[str, pathlib.Path] = None
+    result_format: str = None
 
 
 @dc.dataclass(frozen=True)
@@ -274,7 +283,9 @@ class JobOutputMetadataNode(Node):
 @dc.dataclass(frozen=True)
 class JobResultMetadataNode(Node):
 
+    job_id: meta.TagHeader
     outputs: tp.FrozenSet[NodeId]
+    result_spec: JobResultSpec
 
     def __post_init__(self):
 

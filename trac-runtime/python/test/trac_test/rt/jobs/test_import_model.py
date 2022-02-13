@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import unittest
+import tempfile
 
 import trac.rt.config as cfg
 import trac.rt.metadata as meta
@@ -50,9 +51,15 @@ class ImportModelTest(unittest.TestCase):
 
         job_config = cfg.JobConfig(job=job_def)
 
-        trac_runtime = runtime.TracRuntime(self.sys_config, job_config, dev_mode=True)
-        trac_runtime.pre_start()
+        with tempfile.TemporaryDirectory() as tmpdir:
 
-        with trac_runtime as rt:
-            rt.submit_batch()
-            rt.wait_for_shutdown()
+            trac_runtime = runtime.TracRuntime(
+                self.sys_config, job_config,
+                job_result_dir=tmpdir, job_result_format="json",
+                dev_mode=True)
+
+            trac_runtime.pre_start()
+
+            with trac_runtime as rt:
+                rt.submit_batch()
+                rt.wait_for_shutdown()

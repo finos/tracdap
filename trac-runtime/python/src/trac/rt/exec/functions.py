@@ -15,6 +15,9 @@
 from __future__ import annotations
 
 import copy
+import enum
+from typing import Any
+
 import sys
 
 import trac.rt.api as _api
@@ -31,6 +34,8 @@ from trac.rt.exec.graph import *
 import abc
 import typing as tp
 import pathlib
+import json
+import yaml
 
 
 NodeContext = tp.Dict[NodeId, object]  # Available prior node results when a node function is called
@@ -116,6 +121,57 @@ class KeyedItemFunc(NodeFunction):
         src_node_result = ctx[self.node.src_id].result
         src_item = src_node_result.get(self.node.src_item)
         return src_item
+
+
+class JobResultMetadataFunc(NodeFunction):
+
+    def __init__(self, node: JobResultMetadataNode):
+        super().__init__()
+        self.node = node
+
+    def __call__(self, ctx: NodeContext) -> NodeResult:
+
+        if not self.node.result_spec.save_result:
+            return None
+
+        job_result_id = list(self.node.outputs)[0]
+        job_result = ctx.get(job_result_id).result
+
+        # TODO: Full implementation
+        class Dumper(json.JSONEncoder):
+            def default(self, o: Any) -> str:
+
+                if isinstance(o, enum.Enum):
+                    return o.name
+                elif type(o).__module__.startswith("trac."):
+                    return {**o.__dict__}
+                else:
+                    return super().default(o)
+
+        if self.node.result_spec.result_format == "json":
+            job_result_bytes = bytes(json.dumps(job_result, cls=Dumper, indent=4), "utf-8")
+        elif self.node.result_spec.result_format == "yaml":
+            job_result_bytes = bytes(yaml.dump(job_result), "utf-8")
+        else:
+            raise _ex.EUnexpected(f"Unsupported result format [{self.node.result_spec.result_format}]")
+
+        # TODO: Single standard job key
+        if isinstance(self.node.job_id, meta.TagHeader):
+            job_key = f"{self.node.job_id.objectId}-v{self.node.job_id.objectVersion}"
+        else:
+            job_key = str(self.node.job_id)
+
+        job_result_file = f"job_result_{job_key}.{self.node.result_spec.result_format}"
+        job_result_path = pathlib \
+            .Path(self.node.result_spec.result_dir) \
+            .joinpath(job_result_file)
+
+        _util.logger_for_object(self).info(f"Saving job result to [{job_result_path}]")
+
+        with open(job_result_path, "xb") as result_stream:
+            result_stream.write(job_result_bytes)
+
+        return None
 
 
 class DataViewFunc(NodeFunction):
@@ -373,7 +429,8 @@ class FunctionResolver:
         IdentityNode: IdentityFunc,
         KeyedItemNode: KeyedItemFunc,
         DataViewNode: DataViewFunc,
-        DataItemNode: DataItemFunc}
+        DataItemNode: DataItemFunc,
+        JobResultMetadataNode: JobResultMetadataFunc}
 
     __node_mapping: tp.Dict[Node.__class__, __ResolveFunc] = {
 
