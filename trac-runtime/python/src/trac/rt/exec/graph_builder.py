@@ -103,7 +103,7 @@ class GraphBuilder:
             if isinstance(n, JobOutputMetadataNode))
 
         job_metadata_id = NodeId("trac_job_metadata", job_namespace)
-        job_metadata_node = JobResultMetadataNode(job_metadata_id, output_metadata_nodes, result_spec)
+        job_metadata_node = JobResultMetadataNode(job_metadata_id, job_config.jobId, output_metadata_nodes, result_spec)
 
         job_logs_node = None
         job_metrics_node = None

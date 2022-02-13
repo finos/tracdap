@@ -138,6 +138,11 @@ public class KubeBatchExecutor implements IBatchRunner {
                     .name("config-volume")
                     .configMap(configSource);
 
+//            var resultVolume = new V1Volume()
+//                    .name("result-volume")
+//                    .emptyDir(new V1EmptyDirVolumeSource());
+//                    .medium("Memory"));
+
             var jobContainer = new V1Container()
 
                     // Container name and image
@@ -151,12 +156,16 @@ public class KubeBatchExecutor implements IBatchRunner {
                             .mountPath("/mnt/config")
                             .readOnly(true))
 
+//                    .addVolumeMountsItem(new V1VolumeMount()
+//                            .name("result-volume")
+//                            .mountPath("/mnt/result"))
+
                     // Startup args (these are applied to the image ENTRYPOINT)
                     .args(List.of(
-                            "--sys-config",
-                            "/mnt/config/sys_config.json",
-                            "--job-config",
-                            "/mnt/config/job_config.json",
+                            "--sys-config", "/mnt/config/sys_config.json",
+                            "--job-config", "/mnt/config/job_config.json",
+                            //"--job-result-dir", "/mnt/result",
+                            //"--job-result-format", "json",
                             "--dev-mode"));
 
             var jobSpec = new V1JobSpec()
@@ -165,6 +174,7 @@ public class KubeBatchExecutor implements IBatchRunner {
                     .spec(new V1PodSpec()
                     .restartPolicy("Never")
                     .addVolumesItem(configVolume)
+                    //.addVolumesItem(resultVolume)
                     .addContainersItem(jobContainer)));
 
             var jobMetadata = new V1ObjectMeta()
@@ -197,7 +207,7 @@ public class KubeBatchExecutor implements IBatchRunner {
             var namespace = "default";
 
             var jobList = kubeBatchApi.listNamespacedJob(
-                    namespace, null, null, null, null, null, null, null, null, null, false);
+                    namespace, null, null, null, null /*"status.conditions[?(@.type==\"Complete\")]"*/, null, null, null, null, null, false);
 
             for (var kubeJob : jobList.getItems()) {
 
@@ -216,6 +226,27 @@ public class KubeBatchExecutor implements IBatchRunner {
                         jobStatus.getSucceeded(),
                         jobStatus.getFailed());
 
+
+                log.info(jobStatus.toString());
+
+                var conditions = kubeJob.getStatus().getConditions();
+
+                var complete =
+                        conditions != null &&
+                        conditions.stream().anyMatch(c ->
+                        (c.getType().equals("Complete") || c.getType().equals("Failed")) &&
+                        c.getStatus().equals("True"));
+
+                if (complete) {
+
+                    log.info("Removing completed job....");
+
+                    var deleteStatus = kubeBatchApi.deleteNamespacedJob(
+                            jobMetadata.getName(), namespace,
+                            null, null, 0, null, null, new V1DeleteOptions());
+
+                    log.info(deleteStatus.toString());
+                }
             }
         }
         catch (ApiException error) {

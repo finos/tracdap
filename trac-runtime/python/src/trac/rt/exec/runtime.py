@@ -199,7 +199,10 @@ class TracRuntime:
             self._log.error(msg)
             raise _ex.EJobValidation(msg)
 
-        self._system.send("submit_job", self._job_config, self._job_result_dir, self._job_result_format)
+        self._system.send(
+            "submit_job", self._job_config,
+            str(self._job_result_dir) if self._job_result_dir else "",
+            self._job_result_format if self._job_result_format else "")
 
     # ------------------------------------------------------------------------------------------------------------------
     # Error handling

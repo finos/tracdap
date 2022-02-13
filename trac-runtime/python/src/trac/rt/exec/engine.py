@@ -428,7 +428,7 @@ class TracEngine(actors.Actor):
 
         job_id = str(job_config.jobId)
 
-        result_needed = bool(job_result_dir is not None)
+        result_needed = bool(job_result_dir)
         result_spec = _graph.JobResultSpec(result_needed, job_result_dir, job_result_format)
 
         self._log.info(f"Job submitted: [{job_id}]")
