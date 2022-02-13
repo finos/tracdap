@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import copy
 import enum
-from typing import Any
-
-import sys
+import abc
+import typing as tp
+import pathlib
+import json
+import yaml
+import uuid
 
 import trac.rt.api as _api
 import trac.rt.config as _config
@@ -31,11 +34,7 @@ import trac.rt.impl.util as _util
 import trac.rt.exec.context as _ctx
 from trac.rt.exec.graph import *
 
-import abc
-import typing as tp
-import pathlib
-import json
-import yaml
+
 
 
 NodeContext = tp.Dict[NodeId, object]  # Available prior node results when a node function is called
@@ -134,15 +133,22 @@ class JobResultMetadataFunc(NodeFunction):
         if not self.node.result_spec.save_result:
             return None
 
-        job_result_id = list(self.node.outputs)[0]
-        job_result = ctx.get(job_result_id).result
+        job_result = _config.JobResult()
+        job_result.jobId = self.node.job_id
+        job_result.status = _config.JobStatus.SUCCEEDED
+
+        for output_id in self.node.outputs:
+            output_result = ctx.get(output_id).result
+            job_result.objects[output_id.name] = output_result
 
         # TODO: Full implementation
         class Dumper(json.JSONEncoder):
-            def default(self, o: Any) -> str:
+            def default(self, o: tp.Any) -> str:
 
                 if isinstance(o, enum.Enum):
                     return o.name
+                if isinstance(o, uuid.UUID):
+                    return str(o)
                 elif type(o).__module__.startswith("trac."):
                     return {**o.__dict__}
                 else:
