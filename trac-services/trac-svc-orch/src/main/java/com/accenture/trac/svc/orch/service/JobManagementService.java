@@ -31,6 +31,7 @@ import com.accenture.trac.svc.orch.exec.IBatchExecutor;
 
 import com.accenture.trac.svc.orch.jobs.JobLogic;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.TextFormat;
 import com.google.protobuf.util.JsonFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -220,7 +221,7 @@ public class JobManagementService {
             var jobResult = pollResult.jobResult;
 
             log.info("Record job result [{}]: {}", jobKey, pollResult.statusCode);
-            log.info(jobResult.toString());
+            log.info(TextFormat.printer().printToString(jobResult));
 
             jobExecutor.cleanUpBatch(jobKey, execState);
 

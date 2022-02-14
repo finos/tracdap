@@ -245,6 +245,9 @@ public class LocalBatchExecutor implements IBatchExecutor {
     @Override
     public ExecutorPollResult readBatchResult(String jobKey, ExecutorState jobState) {
 
+        var result = new ExecutorPollResult();
+        result.jobKey = jobKey;
+
         try {
 
             var batchState = validState(jobState);
@@ -252,6 +255,12 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
             if (process == null || process.isAlive())
                 throw new EUnexpected();  // TODO
+
+            if (process.exitValue() != 0) {
+                result.statusCode = JobStatusCode.FAILED;
+                result.errorMessage = "Process terminated with non-zero exit code";
+                return result;
+            }
 
             var batchDir = Paths.get(batchState.getBatchDir());
             var resultDir = batchDir.resolve(JOB_RESULT_SUBDIR);
@@ -262,10 +271,9 @@ public class LocalBatchExecutor implements IBatchExecutor {
             var jobResultString = new String(jobResultBytes, StandardCharsets.UTF_8);
 
             var jobResultBuilder = JobResult.newBuilder();
-            JsonFormat.parser().merge(jobResultString, JobResult.newBuilder());
+            JsonFormat.parser().merge(jobResultString, jobResultBuilder);
 
-            var result = new ExecutorPollResult();
-            result.jobKey = jobKey;
+            result.statusCode = JobStatusCode.COMPLETE;
             result.jobResult = jobResultBuilder.build();
 
             return result;
@@ -274,8 +282,6 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
             log.error("Garbled result from job execution: {}", e.getMessage(), e);
 
-            var result = new ExecutorPollResult();
-            result.jobKey = jobKey;
             result.statusCode = JobStatusCode.FAILED;
             result.errorMessage = "Garbled result from job execution";
 
