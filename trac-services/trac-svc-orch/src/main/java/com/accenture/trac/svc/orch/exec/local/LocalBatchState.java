@@ -16,10 +16,10 @@
 
 package com.accenture.trac.svc.orch.exec.local;
 
-import com.accenture.trac.svc.orch.exec.JobExecState;
+import com.accenture.trac.svc.orch.exec.ExecutorState;
 
 
-public class LocalBatchState extends JobExecState {
+public class LocalBatchState extends ExecutorState {
 
     private String batchDir;
     private long pid;

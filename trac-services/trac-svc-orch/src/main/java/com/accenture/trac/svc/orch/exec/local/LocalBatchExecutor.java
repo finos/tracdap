@@ -16,9 +16,12 @@
 
 package com.accenture.trac.svc.orch.exec.local;
 
+import com.accenture.trac.api.JobStatus;
+import com.accenture.trac.api.JobStatusCode;
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.svc.orch.exec.ExecutorPollResult;
 import com.accenture.trac.svc.orch.exec.IBatchExecutor;
-import com.accenture.trac.svc.orch.exec.JobExecState;
+import com.accenture.trac.svc.orch.exec.ExecutorState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,10 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 
 public class LocalBatchExecutor implements IBatchExecutor {
@@ -40,18 +40,24 @@ public class LocalBatchExecutor implements IBatchExecutor {
     private static final String JOB_CONFIG_SUBDIR = "config";
     private static final String JOB_RESULT_SUBDIR = "result";
 
+    private static final boolean IS_WINDOWS = System.getProperty("os.name").toLowerCase().contains("windows");
+    private static final String ENV_PATH_SEPARATOR = IS_WINDOWS ? ";" : ":";
+    private static final String VENV_BIN_SUBDIR = IS_WINDOWS ? "Scripts" : "bin";
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final Path tracRuntimeVenv;
     private final Path batchRootDir;
 
     private final Map<Long, Process> processMap = new HashMap<>();
 
     public LocalBatchExecutor() {
 
+        this.tracRuntimeVenv = Path.of("C:\\Dev\\Code\\trac\\trac-runtime\\python\\venv");
         this.batchRootDir = null;
     }
 
-    private LocalBatchState validState(JobExecState jobState) {
+    private LocalBatchState validState(ExecutorState jobState) {
 
         if (!(jobState instanceof LocalBatchState))
             throw new EUnexpected();
@@ -65,7 +71,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public JobExecState createBatchSandbox(String jobKey) {
+    public ExecutorState createBatchSandbox(String jobKey) {
 
         try {
 
@@ -95,7 +101,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public JobExecState writeTextConfig(String jobKey, JobExecState jobState, Map<String, String> configFiles) {
+    public ExecutorState writeTextConfig(String jobKey, ExecutorState jobState, Map<String, String> configFiles) {
 
         var binaryMap = new HashMap<String, byte[]>();
 
@@ -109,12 +115,12 @@ public class LocalBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public JobExecState writeBinaryConfig(String jobKey, JobExecState jobState, Map<String, byte[]> configFiles) {
+    public ExecutorState writeBinaryConfig(String jobKey, ExecutorState jobState, Map<String, byte[]> configFiles) {
 
         return writeConfig(jobState, configFiles);
     }
 
-    private JobExecState writeConfig(JobExecState jobState, Map<String, byte[]> configFiles) {
+    private ExecutorState writeConfig(ExecutorState jobState, Map<String, byte[]> configFiles) {
 
         try {
 
@@ -138,7 +144,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public JobExecState startBatch(String jobKey, JobExecState jobState, Set<String> configFiles) {
+    public ExecutorState startBatch(String jobKey, ExecutorState jobState, Set<String> configFiles) {
 
         try {
 
@@ -147,13 +153,14 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
             var sysConfigFile = batchDir.resolve(JOB_CONFIG_SUBDIR).resolve("sys_config.json");
             var jobConfigFile = batchDir.resolve(JOB_CONFIG_SUBDIR).resolve("job_config.json");
+            var jobResultDir = batchDir.resolve(JOB_RESULT_SUBDIR);
 
             var launchArgs = List.of(
                     "python", "-m", "trac.rt.launch",
                     "--sys-config", sysConfigFile.toString(),
                     "--job-config", jobConfigFile.toString(),
-//                            "--job-result-dir", "/mnt/result",
-//                            "--job-result-format", "json",
+                    "--job-result-dir", jobResultDir.toString(),
+                    "--job-result-format", "json",
                     "--dev-mode");
 
             var pb = new ProcessBuilder();
@@ -161,10 +168,25 @@ public class LocalBatchExecutor implements IBatchExecutor {
             pb.directory(batchDir.toFile());
 
             var env = pb.environment();
-            var path = env.get("PATH");
 
-            env.put("PYTHON_HOME", "");
-            env.put("PATH", path);
+            var pathKey = env.keySet().stream()
+                    .filter(key -> key.equalsIgnoreCase("PATH"))
+                    .findFirst()
+                    .orElse("PATH");
+
+            var originalPath = env.get(pathKey);
+            var venvPath = tracRuntimeVenv.resolve(VENV_BIN_SUBDIR);
+            var path = originalPath != null
+                    ? venvPath + ENV_PATH_SEPARATOR + originalPath
+                    : venvPath.toString();
+
+            env.put(pathKey, path);
+
+
+            log.info("PATH: {}", path);
+
+            for (var envEntry : env.entrySet())
+                log.info("ENV: {} = {}", envEntry.getKey(), envEntry.getValue());
 
             var process = pb.start();
 
@@ -181,7 +203,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public void getBatchStatus(String jobKey, JobExecState jobState) {
+    public void getBatchStatus(String jobKey, ExecutorState jobState) {
 
         try {
 
@@ -205,7 +227,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public void readBatchResult(String jobKey, JobExecState jobState) {
+    public void readBatchResult(String jobKey, ExecutorState jobState) {
 
         try {
 
@@ -227,19 +249,49 @@ public class LocalBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public JobExecState cancelBatch(String jobKey, JobExecState jobState) {
+    public ExecutorState cancelBatch(String jobKey, ExecutorState jobState) {
 
         return jobState;
     }
 
     @Override
-    public JobExecState cleanUpBatch(String jobKey, JobExecState jobState) {
+    public ExecutorState cleanUpBatch(String jobKey, ExecutorState jobState) {
 
         return jobState;
     }
 
     @Override
-    public void pollAllBatches() {
+    public List<ExecutorPollResult> pollAllBatches(Map<String, ExecutorState> priorStates) {
 
+        var updates = new ArrayList<ExecutorPollResult>();
+
+        for (var job : priorStates.entrySet()) {
+
+            var priorState = validState(job.getValue());
+            var pid = priorState.getPid();
+            var process = processMap.get(pid);
+
+            if (process == null)
+                throw new EUnexpected();  // TODO
+
+            var currentStatus = process.isAlive()
+                    ? JobStatusCode.RUNNING :
+                    process.exitValue() == 0
+                            ? JobStatusCode.COMPLETE
+                            : JobStatusCode.FAILED;
+
+
+            if (currentStatus == JobStatusCode.COMPLETE || currentStatus == JobStatusCode.FAILED) {
+
+                var result = new ExecutorPollResult();
+                result.jobKey = job.getKey();
+                result.statusCode = currentStatus;
+                result.executorState = job.getValue();
+
+                updates.add(result);
+            }
+        }
+
+        return updates;
     }
 }

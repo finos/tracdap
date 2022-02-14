@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.exec.kube;
+package com.accenture.trac.svc.orch.exec;
 
-import com.accenture.trac.svc.orch.exec.ExecutorState;
+import java.io.Serializable;
 
-public class KubernetesBatchState extends ExecutorState {
+
+public class ExecutorState implements Serializable {
 }

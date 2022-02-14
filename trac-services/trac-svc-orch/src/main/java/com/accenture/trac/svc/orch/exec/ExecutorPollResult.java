@@ -16,8 +16,11 @@
 
 package com.accenture.trac.svc.orch.exec;
 
-import java.io.Serializable;
+import com.accenture.trac.api.JobStatusCode;
 
+public class ExecutorPollResult {
 
-public class JobExecState implements Serializable {
+    public String jobKey;
+    public JobStatusCode statusCode;
+    public ExecutorState executorState;
 }

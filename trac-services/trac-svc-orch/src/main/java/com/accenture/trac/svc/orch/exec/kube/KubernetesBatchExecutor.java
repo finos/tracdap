@@ -18,9 +18,10 @@ package com.accenture.trac.svc.orch.exec.kube;
 
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.ETracInternal;
+import com.accenture.trac.svc.orch.exec.ExecutorPollResult;
 import com.accenture.trac.svc.orch.exec.IBatchExecutor;
 
-import com.accenture.trac.svc.orch.exec.JobExecState;
+import com.accenture.trac.svc.orch.exec.ExecutorState;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
@@ -86,13 +87,13 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public JobExecState createBatchSandbox(String jobKey) {
+    public ExecutorState createBatchSandbox(String jobKey) {
 
         return null;
     }
 
     @Override
-    public JobExecState writeTextConfig(String jobKey, JobExecState jobState, Map<String, String> configFiles) {
+    public ExecutorState writeTextConfig(String jobKey, ExecutorState jobState, Map<String, String> configFiles) {
 
         var configMap = new V1ConfigMap()
                 .data(configFiles);
@@ -101,7 +102,7 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public JobExecState writeBinaryConfig(String jobKey, JobExecState jobState, Map<String, byte[]> configFiles) {
+    public ExecutorState writeBinaryConfig(String jobKey, ExecutorState jobState, Map<String, byte[]> configFiles) {
 
         var configMap = new V1ConfigMap()
                 .binaryData(configFiles);
@@ -109,7 +110,7 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
         return writeConfig(jobKey, jobState, configMap);
     }
 
-    private JobExecState writeConfig(String jobKey, JobExecState jobState, V1ConfigMap configMap) {
+    private ExecutorState writeConfig(String jobKey, ExecutorState jobState, V1ConfigMap configMap) {
 
         try {
 
@@ -141,7 +142,7 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public JobExecState startBatch(String jobKey, JobExecState jobState, Set<String> configFiles) {
+    public ExecutorState startBatch(String jobKey, ExecutorState jobState, Set<String> configFiles) {
 
         try {
 
@@ -291,7 +292,7 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public void pollAllBatches() {
+    public List<ExecutorPollResult> pollAllBatches(Map<String, ExecutorState> priorStates) {
 
         try {
 
@@ -339,6 +340,8 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
                     log.info(deleteStatus.toString());
                 }
             }
+
+            return List.of();  // TODO: Report updates
         }
         catch (ApiException error) {
 
@@ -349,24 +352,24 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public void getBatchStatus(String jobKey, JobExecState jobState) {
+    public void getBatchStatus(String jobKey, ExecutorState jobState) {
     }
 
     @Override
-    public void readBatchResult(String jobKey, JobExecState jobState) {
+    public void readBatchResult(String jobKey, ExecutorState jobState) {
 
 
         // kubeBatchApi.
     }
 
     @Override
-    public JobExecState cancelBatch(String jobKey, JobExecState jobState) {
+    public ExecutorState cancelBatch(String jobKey, ExecutorState jobState) {
 
         return jobState;
     }
 
     @Override
-    public JobExecState cleanUpBatch(String jobKey, JobExecState jobState) {
+    public ExecutorState cleanUpBatch(String jobKey, ExecutorState jobState) {
 
         return jobState;
     }

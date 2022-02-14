@@ -28,6 +28,7 @@ import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.local.LocalJobCache;
 import com.accenture.trac.svc.orch.exec.IBatchExecutor;
 import com.accenture.trac.svc.orch.exec.kube.KubernetesBatchExecutor;
+import com.accenture.trac.svc.orch.exec.local.LocalBatchExecutor;
 import com.accenture.trac.svc.orch.service.JobApiService;
 
 import com.accenture.trac.svc.orch.service.JobManagementService;
@@ -110,7 +111,7 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             jobCache = new LocalJobCache();
             jobCache = InterfaceLogging.wrap(jobCache, IJobCache.class);
-            jobExecCtrl = new KubernetesBatchExecutor();
+            jobExecCtrl = new LocalBatchExecutor();
             jobMonitor = new JobManagementService(jobCache, jobExecCtrl, serviceGroup);
             jobMonitor.start();
 

@@ -16,13 +16,17 @@
 
 package com.accenture.trac.svc.orch.service;
 
+import com.accenture.trac.api.JobStatus;
 import com.accenture.trac.api.JobStatusCode;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.config.Job;
 import com.accenture.trac.config.RepositoryConfig;
 import com.accenture.trac.config.RuntimeConfig;
 import com.accenture.trac.svc.orch.cache.IJobCache;
+import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.cache.TicketRequest;
+import com.accenture.trac.svc.orch.exec.ExecutorState;
 import com.accenture.trac.svc.orch.exec.IBatchExecutor;
 
 import com.accenture.trac.svc.orch.jobs.JobLogic;
@@ -32,11 +36,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 
 public class JobManagementService {
@@ -104,6 +111,12 @@ public class JobManagementService {
 
         log.info("Polling job cache...");
 
+        var completeStates = List.of(JobStatusCode.COMPLETE, JobStatusCode.FAILED, JobStatusCode.CANCELLED);
+        var completeJobs = jobCache.pollJobs(job -> completeStates.contains(job.statusCode));
+
+        for (var job : completeJobs)
+            executorService.schedule(() -> recordJobResult(job.jobKey), 0L, TimeUnit.SECONDS);
+
         var queuedJobs = jobCache.pollJobs(job -> job.statusCode == JobStatusCode.QUEUED);
 
         for (var job : queuedJobs)
@@ -114,7 +127,32 @@ public class JobManagementService {
 
         log.info("Polling executor...");
 
-        jobExecutor.pollAllBatches();
+        var activeStates = List.of(JobStatusCode.SUBMITTED, JobStatusCode.RUNNING);
+        var activeJobs = jobCache.pollJobs(job -> activeStates.contains(job.statusCode));
+
+        var execStateMap = new HashMap<String, ExecutorState>();
+
+        for (var job : activeJobs) {
+            var executorState = JobState.deserialize(job.executorState, ExecutorState.class);
+            execStateMap.put(job.jobKey, executorState);
+        }
+
+        var pollResults = jobExecutor.pollAllBatches(execStateMap);
+
+        if (pollResults.isEmpty())
+            return;
+
+        try (var ctx = jobCache.useTicket(TicketRequest.forJob())) {
+
+            for (var result : pollResults) {
+
+                var job = jobCache.readJob(result.jobKey);
+                job.statusCode = result.statusCode;
+                job.executorState = JobState.serialize(result.executorState);
+
+                jobCache.updateJob(job.jobKey, job, ctx.ticket());
+            }
+        }
     }
 
     public void submitJob(String jobKey) {
@@ -145,21 +183,32 @@ public class JobManagementService {
                     Map.entry("sys_config.json", sysConfigJson));
 
             var execState = jobExecutor.createBatchSandbox(jobKey);
-            jobExecutor.writeTextConfig(jobKey, execState, configMap);
-            jobExecutor.startBatch(jobKey, execState, configMap.keySet());
+            execState = jobExecutor.writeTextConfig(jobKey, execState, configMap);
+            execState = jobExecutor.startBatch(jobKey, execState, configMap.keySet());
 
             jobState.statusCode = JobStatusCode.SUBMITTED;
+            jobState.executorState = JobState.serialize(execState);
 
             jobCache.updateJob(jobKey, jobState, ctx.ticket());
+
+            log.info("Job submitted: [{}]", jobKey);
         }
         catch (InvalidProtocolBufferException e) {
+
+            log.error("Job submit failed: [{}] {}", jobKey, e.getMessage(), e);
 
             // TODO: Error
             throw new EUnexpected(e);
         }
+        catch (RuntimeException e) {
+
+            log.error("Job submit failed: [{}] {}", jobKey, e.getMessage(), e);
+            throw e;
+        }
     }
 
-    public void recordJobResult() {
+    public void recordJobResult(String jobKey) {
 
+        log.info("Record job result [{}]", jobKey);
     }
 }

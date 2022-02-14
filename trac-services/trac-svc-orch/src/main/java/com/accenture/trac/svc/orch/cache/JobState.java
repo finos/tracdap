@@ -18,12 +18,13 @@ package com.accenture.trac.svc.orch.cache;
 
 import com.accenture.trac.api.JobRequest;
 import com.accenture.trac.api.JobStatusCode;
+import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.JobDefinition;
 import com.accenture.trac.metadata.JobType;
 import com.accenture.trac.metadata.ObjectDefinition;
 import com.accenture.trac.metadata.TagHeader;
 
-import java.io.Serializable;
+import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -42,4 +43,39 @@ public class JobState implements Serializable {
     public Map<String, ObjectDefinition> resources = new HashMap<>();
 
     public JobStatusCode statusCode;
+
+    public byte[] executorState;
+
+    public static <T extends Serializable> byte[] serialize(T obj){
+
+        try (var bos = new ByteArrayOutputStream();
+             var oos = new ObjectOutputStream(bos)) {
+
+            oos.writeObject(obj);
+            oos.flush();
+
+            return bos.toByteArray();
+        }
+        catch (IOException e) {
+            throw new EUnexpected();  // TODO
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T extends Serializable> T deserialize(byte[] bytes, Class<T> clazz){
+
+        try (var bis = new ByteArrayInputStream(bytes);
+             var ois = new ObjectInputStream(bis)) {
+
+            var obj = ois.readObject();
+
+            if (!clazz.isInstance(obj))
+                throw new EUnexpected();  // TODO
+
+            return (T) obj;
+        }
+        catch (IOException | ClassNotFoundException e) {
+            throw new EUnexpected();  // TODO
+        }
+    }
 }

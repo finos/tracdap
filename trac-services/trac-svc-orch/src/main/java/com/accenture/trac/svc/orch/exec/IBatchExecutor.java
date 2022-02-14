@@ -16,6 +16,7 @@
 
 package com.accenture.trac.svc.orch.exec;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -26,21 +27,21 @@ public interface IBatchExecutor {
 
     void executorStatus();
 
-    JobExecState createBatchSandbox(String jobKey);
+    ExecutorState createBatchSandbox(String jobKey);
 
-    JobExecState writeTextConfig(String jobKey, JobExecState jobState, Map<String, String> configFiles);
+    ExecutorState writeTextConfig(String jobKey, ExecutorState jobState, Map<String, String> configFiles);
 
-    JobExecState writeBinaryConfig(String jobKey, JobExecState jobState, Map<String, byte[]> configFiles);
+    ExecutorState writeBinaryConfig(String jobKey, ExecutorState jobState, Map<String, byte[]> configFiles);
 
-    JobExecState startBatch(String jobKey, JobExecState jobState, Set<String> configFiles);
+    ExecutorState startBatch(String jobKey, ExecutorState jobState, Set<String> configFiles);
 
-    void getBatchStatus(String jobKey, JobExecState jobState);
+    void getBatchStatus(String jobKey, ExecutorState jobState);
 
-    void readBatchResult(String jobKey, JobExecState jobState);
+    void readBatchResult(String jobKey, ExecutorState jobState);
 
-    JobExecState cancelBatch(String jobKey, JobExecState jobState);
+    ExecutorState cancelBatch(String jobKey, ExecutorState jobState);
 
-    JobExecState cleanUpBatch(String jobKey, JobExecState jobState);
+    ExecutorState cleanUpBatch(String jobKey, ExecutorState jobState);
 
-    void pollAllBatches();
+    List<ExecutorPollResult> pollAllBatches(Map<String, ExecutorState> priorStates);
 }

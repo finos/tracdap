@@ -19,7 +19,7 @@ package com.accenture.trac.svc.orch.service;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.TicketRequest;
 import com.accenture.trac.svc.orch.exec.IBatchExecutor;
-import com.accenture.trac.svc.orch.exec.JobExecState;
+import com.accenture.trac.svc.orch.exec.ExecutorState;
 
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -94,7 +94,7 @@ public class JobPoolService {
             if (ctx.superseded())
                 return;
 
-            var jobState = new JobExecState();
+            var jobState = new ExecutorState();
 
             jobRunner.readBatchResult(jobKey, jobState);
 
