@@ -19,9 +19,12 @@ package com.accenture.trac.svc.orch.exec.local;
 import com.accenture.trac.api.JobStatusCode;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.config.JobResult;
 import com.accenture.trac.svc.orch.exec.ExecutorPollResult;
 import com.accenture.trac.svc.orch.exec.IBatchExecutor;
 import com.accenture.trac.svc.orch.exec.ExecutorState;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -240,7 +243,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public void readBatchResult(String jobKey, ExecutorState jobState) {
+    public ExecutorPollResult readBatchResult(String jobKey, ExecutorState jobState) {
 
         try {
 
@@ -253,8 +256,32 @@ public class LocalBatchExecutor implements IBatchExecutor {
             var batchDir = Paths.get(batchState.getBatchDir());
             var resultDir = batchDir.resolve(JOB_RESULT_SUBDIR);
 
+            var jobResultFile = String.format("job_result_%s.json", jobKey);
+            var jobResultPath = resultDir.resolve(jobResultFile);
+            var jobResultBytes = Files.readAllBytes(jobResultPath);
+            var jobResultString = new String(jobResultBytes, StandardCharsets.UTF_8);
+
+            var jobResultBuilder = JobResult.newBuilder();
+            JsonFormat.parser().merge(jobResultString, JobResult.newBuilder());
+
+            var result = new ExecutorPollResult();
+            result.jobKey = jobKey;
+            result.jobResult = jobResultBuilder.build();
+
+            return result;
         }
-        catch (RuntimeException e) {
+        catch (InvalidProtocolBufferException e) {
+
+            log.error("Garbled result from job execution: {}", e.getMessage(), e);
+
+            var result = new ExecutorPollResult();
+            result.jobKey = jobKey;
+            result.statusCode = JobStatusCode.FAILED;
+            result.errorMessage = "Garbled result from job execution";
+
+            return result;
+        }
+        catch (IOException e) {
             e.printStackTrace();
             // TODO
             throw new RuntimeException("TODO");
@@ -270,7 +297,22 @@ public class LocalBatchExecutor implements IBatchExecutor {
     @Override
     public ExecutorState cleanUpBatch(String jobKey, ExecutorState jobState) {
 
-        return jobState;
+        var batchState = validState(jobState);
+        var process = processMap.get(batchState.getPid());
+
+        if (process == null)
+            throw new EUnexpected();  // TODO
+
+        if (process.isAlive()) {
+            log.warn("Process for job [{}] is not complete, it will be forcibly terminated", jobKey);
+            process.destroyForcibly();
+        }
+
+        // TODO: Remove files depending on config
+
+        processMap.remove(batchState.getPid());
+
+        return batchState;
     }
 
     @Override

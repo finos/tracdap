@@ -37,7 +37,7 @@ public interface IBatchExecutor {
 
     void getBatchStatus(String jobKey, ExecutorState jobState);
 
-    void readBatchResult(String jobKey, ExecutorState jobState);
+    ExecutorPollResult readBatchResult(String jobKey, ExecutorState jobState);
 
     ExecutorState cancelBatch(String jobKey, ExecutorState jobState);
 

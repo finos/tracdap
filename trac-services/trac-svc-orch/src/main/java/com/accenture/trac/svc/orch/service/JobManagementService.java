@@ -209,8 +209,22 @@ public class JobManagementService {
 
     public void recordJobResult(String jobKey) {
 
-        var job = jobCache.readJob(jobKey);
+        try (var ctx = jobCache.useTicket(TicketRequest.forJob())) {
 
-        log.info("Record job result [{}]: {}", jobKey, job.statusCode);
+            if (ctx.superseded())
+                return;
+
+            var job = jobCache.readJob(jobKey);
+            var execState = JobState.deserialize(job.executorState, ExecutorState.class);
+            var pollResult = jobExecutor.readBatchResult(jobKey, execState);
+            var jobResult = pollResult.jobResult;
+
+            log.info("Record job result [{}]: {}", jobKey, pollResult.statusCode);
+            log.info(jobResult.toString());
+
+            jobExecutor.cleanUpBatch(jobKey, execState);
+
+            jobCache.deleteJob(jobKey, ctx.ticket());
+        }
     }
 }
