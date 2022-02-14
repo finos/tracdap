@@ -26,6 +26,7 @@ import com.accenture.trac.metadata.JobType;
 import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.svc.orch.exec.kubernetes.KubernetesBatchExecutor;
 import com.google.protobuf.util.JsonFormat;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -36,6 +37,7 @@ import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 
+@Disabled
 public class KubeExecutorTest {
 
     @Test
