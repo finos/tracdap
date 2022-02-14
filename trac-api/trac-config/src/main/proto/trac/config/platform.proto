@@ -49,6 +49,7 @@ message ServiceMap {
 
   MetaServiceConfig meta = 1;
   DataServiceConfig data = 2;
+  OrchServiceConfig orch = 3;
 }
 
 
@@ -71,6 +72,13 @@ message DataServiceConfig  {
   map<string, StorageConfig> storage = 4;
 }
 
+message OrchServiceConfig {
+
+  uint32 port = 1;
+
+  ExecutorConfig executor = 2;
+}
+
 message StorageConfig {
 
   repeated StorageInstance instances = 1;
@@ -80,4 +88,10 @@ message StorageInstance {
 
   string storageType = 1;
   map<string, string> storageProps = 2;
+}
+
+message ExecutorConfig {
+
+  string executorType = 1;
+  map<string, string> executorProps = 2;
 }

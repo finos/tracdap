@@ -17,6 +17,7 @@
 package com.accenture.trac.svc.orch.exec.local;
 
 import com.accenture.trac.api.JobStatusCode;
+import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.svc.orch.exec.ExecutorPollResult;
 import com.accenture.trac.svc.orch.exec.IBatchExecutor;
@@ -35,6 +36,8 @@ import java.util.*;
 
 public class LocalBatchExecutor implements IBatchExecutor {
 
+    public static final String CONFIG_VENV_PATH = "venvPath";
+
     private static final String JOB_DIR_TEMPLATE = "trac-job-%s";
     private static final String JOB_CONFIG_SUBDIR = "config";
     private static final String JOB_RESULT_SUBDIR = "result";
@@ -52,10 +55,27 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
     private final Map<Long, Process> processMap = new HashMap<>();
 
-    public LocalBatchExecutor() {
+    public LocalBatchExecutor(Properties properties) {
 
-        // this.tracRuntimeVenv = Path.of("C:\\Dev\\Code\\trac\\trac-runtime\\python\\venv");
-        this.tracRuntimeVenv = Path.of("/Volumes/Data/Dev/Tools/trac-local/venv");
+        var venvPath = properties.getProperty(CONFIG_VENV_PATH);
+
+        if (venvPath == null) {
+
+            var err = String.format("Local executor config is missing a required property: [%s]", CONFIG_VENV_PATH);
+            log.error(err);
+            throw new EStartup(err);
+        }
+
+        this.tracRuntimeVenv = Paths.get(venvPath)
+                .toAbsolutePath()
+                .normalize();
+
+        if (!Files.exists(tracRuntimeVenv) || !Files.isDirectory(tracRuntimeVenv)) {
+            var err = String.format("Local executor venv path is not a valid directory: [%s]", tracRuntimeVenv);
+            log.error(err);
+            throw new EStartup(err);
+        }
+
         this.batchRootDir = null;
     }
 

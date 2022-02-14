@@ -22,12 +22,13 @@ import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
 import com.accenture.trac.common.util.InterfaceLogging;
+import com.accenture.trac.config.OrchServiceConfig;
 import com.accenture.trac.config.PlatformConfig;
 import com.accenture.trac.svc.orch.api.TracOrchestratorApi;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.local.LocalJobCache;
+import com.accenture.trac.svc.orch.exec.ExecutionManager;
 import com.accenture.trac.svc.orch.exec.IBatchExecutor;
-import com.accenture.trac.svc.orch.exec.local.LocalBatchExecutor;
 import com.accenture.trac.svc.orch.service.JobApiService;
 
 import com.accenture.trac.svc.orch.service.JobManagementService;
@@ -51,7 +52,6 @@ import java.util.concurrent.TimeUnit;
 
 public class TracOrchestratorService extends CommonServiceBase {
 
-    private static final short DEFAULT_PORT = 8083;
     private static final int CONCURRENT_REQUESTS = 30;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
@@ -80,11 +80,22 @@ public class TracOrchestratorService extends CommonServiceBase {
     protected void doStartup(Duration startupTimeout) {
 
         PlatformConfig platformConfig;
+        OrchServiceConfig orchestratorConfig;
+
+        try {
+            pluginManager.initRegularPlugins();
+        }
+        catch (Exception e) {
+            var errorMessage = "There was a problem loading the plugins: " + e.getMessage();
+            log.error(errorMessage, e);
+            throw new EStartup(errorMessage, e);
+        }
 
         try {
             log.info("Loading TRAC platform config...");
 
             platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+            orchestratorConfig = platformConfig.getServices().getOrch();
 
             // TODO: Config validation
 
@@ -110,14 +121,18 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             jobCache = new LocalJobCache();
             jobCache = InterfaceLogging.wrap(jobCache, IJobCache.class);
-            jobExecCtrl = new LocalBatchExecutor();
+
+            var executors = new ExecutionManager(pluginManager);
+            executors.initExecutor(orchestratorConfig.getExecutor());
+            jobExecCtrl = executors.getExecutor();
+
             jobMonitor = new JobManagementService(jobCache, jobExecCtrl, serviceGroup);
             jobMonitor.start();
 
             var orchestrator = new JobApiService(jobCache, metaClient);
             var orchestratorApi = new TracOrchestratorApi(orchestrator);
 
-            this.server = NettyServerBuilder.forPort(DEFAULT_PORT)
+            this.server = NettyServerBuilder.forPort(orchestratorConfig.getPort())
                     .addService(orchestratorApi)
                     .channelType(channelType)
                     .bossEventLoopGroup(bossGroup)
@@ -126,6 +141,8 @@ public class TracOrchestratorService extends CommonServiceBase {
                     .build();
 
             this.server.start();
+
+            log.info("Orchestrator is listening on port {}", server.getPort());
         }
         catch (IOException e) {
 

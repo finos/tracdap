@@ -60,3 +60,12 @@ dependencies {
 
 ext.pluginDependency("AWS_CONFIG", project(":aws-config"))
 ext.pluginDependency("GCP_CONFIG", project(":gcp-config"))
+
+
+// TODO: Executors should be moved to a separate lib and plugin modules
+
+// Compiling dependent targets does not require processResources to be executed by default
+// E.g. running tests from the IDE will not trigger processResources - this can cause confusion!
+// This dependency ensures resources are always processed, even for partial builds
+
+compileJava.dependsOn(processResources)

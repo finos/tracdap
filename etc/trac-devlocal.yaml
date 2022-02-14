@@ -64,3 +64,12 @@ services:
           - storageType: LOCAL
             storageProps:
               rootDir: ./build/run
+
+  orch:
+    port: 8083
+
+    executor:
+      executorType: LOCAL
+      executorProps:
+        # Set this to the venv of your local TRAC execution environment
+        venvPath: C:\Dev\trac\venv
