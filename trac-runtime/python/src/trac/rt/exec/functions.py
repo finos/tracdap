@@ -348,7 +348,11 @@ class ImportModelFunc(NodeFunction):
         for param in model_def.parameters:
             print(param, model_def.parameters.get(param).paramType)
 
-        return model_def
+        object_def = meta.ObjectDefinition(
+            objectType=meta.ObjectType.MODEL,
+            model=model_def)
+
+        return object_def
 
 
 class RunModelFunc(NodeFunction):
