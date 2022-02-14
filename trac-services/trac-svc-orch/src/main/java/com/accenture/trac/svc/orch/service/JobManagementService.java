@@ -103,8 +103,8 @@ public class JobManagementService {
 
     public void poll() {
 
-        pollJobCache();
         pollExecutor();
+        pollJobCache();
     }
 
     public void pollJobCache() {
@@ -209,6 +209,8 @@ public class JobManagementService {
 
     public void recordJobResult(String jobKey) {
 
-        log.info("Record job result [{}]", jobKey);
+        var job = jobCache.readJob(jobKey);
+
+        log.info("Record job result [{}]: {}", jobKey, job.statusCode);
     }
 }

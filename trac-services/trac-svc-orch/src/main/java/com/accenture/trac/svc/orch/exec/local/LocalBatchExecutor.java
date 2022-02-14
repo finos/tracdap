@@ -16,7 +16,6 @@
 
 package com.accenture.trac.svc.orch.exec.local;
 
-import com.accenture.trac.api.JobStatus;
 import com.accenture.trac.api.JobStatusCode;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.svc.orch.exec.ExecutorPollResult;
@@ -39,10 +38,12 @@ public class LocalBatchExecutor implements IBatchExecutor {
     private static final String JOB_DIR_TEMPLATE = "trac-job-%s";
     private static final String JOB_CONFIG_SUBDIR = "config";
     private static final String JOB_RESULT_SUBDIR = "result";
+    private static final String JOB_LOG_SUBDIR = "log";
 
     private static final boolean IS_WINDOWS = System.getProperty("os.name").toLowerCase().contains("windows");
-    private static final String ENV_PATH_SEPARATOR = IS_WINDOWS ? ";" : ":";
+    private static final String PYTHON_EXE = IS_WINDOWS ? "python.exe" : "python";
     private static final String VENV_BIN_SUBDIR = IS_WINDOWS ? "Scripts" : "bin";
+    private static final String VENV_ENV_VAR = "VIRTUAL_ENV";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -53,7 +54,8 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
     public LocalBatchExecutor() {
 
-        this.tracRuntimeVenv = Path.of("C:\\Dev\\Code\\trac\\trac-runtime\\python\\venv");
+        // this.tracRuntimeVenv = Path.of("C:\\Dev\\Code\\trac\\trac-runtime\\python\\venv");
+        this.tracRuntimeVenv = Path.of("/Volumes/Data/Dev/Tools/trac-local/venv");
         this.batchRootDir = null;
     }
 
@@ -85,6 +87,9 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
             var resultDir = batchDir.resolve(JOB_RESULT_SUBDIR);
             Files.createDirectory(resultDir);
+
+            var logDir = batchDir.resolve(JOB_LOG_SUBDIR);
+            Files.createDirectory(logDir);
 
             var batchState = new LocalBatchState();
             batchState.setBatchDir(batchDir.toString());
@@ -155,8 +160,9 @@ public class LocalBatchExecutor implements IBatchExecutor {
             var jobConfigFile = batchDir.resolve(JOB_CONFIG_SUBDIR).resolve("job_config.json");
             var jobResultDir = batchDir.resolve(JOB_RESULT_SUBDIR);
 
+            var launchExe = tracRuntimeVenv.resolve(VENV_BIN_SUBDIR).resolve(PYTHON_EXE);
             var launchArgs = List.of(
-                    "python", "-m", "trac.rt.launch",
+                    launchExe.toString(), "-m", "trac.rt.launch",
                     "--sys-config", sysConfigFile.toString(),
                     "--job-config", jobConfigFile.toString(),
                     "--job-result-dir", jobResultDir.toString(),
@@ -168,25 +174,12 @@ public class LocalBatchExecutor implements IBatchExecutor {
             pb.directory(batchDir.toFile());
 
             var env = pb.environment();
+            env.put(VENV_ENV_VAR, tracRuntimeVenv.toString());
 
-            var pathKey = env.keySet().stream()
-                    .filter(key -> key.equalsIgnoreCase("PATH"))
-                    .findFirst()
-                    .orElse("PATH");
-
-            var originalPath = env.get(pathKey);
-            var venvPath = tracRuntimeVenv.resolve(VENV_BIN_SUBDIR);
-            var path = originalPath != null
-                    ? venvPath + ENV_PATH_SEPARATOR + originalPath
-                    : venvPath.toString();
-
-            env.put(pathKey, path);
-
-
-            log.info("PATH: {}", path);
-
-            for (var envEntry : env.entrySet())
-                log.info("ENV: {} = {}", envEntry.getKey(), envEntry.getValue());
+            var stdoutPath = batchDir.resolve(JOB_LOG_SUBDIR).resolve("stdout.txt");
+            var stderrPath = batchDir.resolve(JOB_LOG_SUBDIR).resolve("stderr.txt");
+            pb.redirectOutput(stdoutPath.toFile());
+            pb.redirectError(stderrPath.toFile());
 
             var process = pb.start();
 
