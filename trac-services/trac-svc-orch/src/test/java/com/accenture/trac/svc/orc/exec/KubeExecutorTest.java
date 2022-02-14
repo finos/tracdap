@@ -24,7 +24,7 @@ import com.accenture.trac.metadata.ImportModelJobDetails;
 import com.accenture.trac.metadata.JobDefinition;
 import com.accenture.trac.metadata.JobType;
 import com.accenture.trac.metadata.TagHeader;
-import com.accenture.trac.svc.orch.exec.kube.KubernetesBatchExecutor;
+import com.accenture.trac.svc.orch.exec.kubernetes.KubernetesBatchExecutor;
 import com.google.protobuf.util.JsonFormat;
 import org.junit.jupiter.api.Test;
 

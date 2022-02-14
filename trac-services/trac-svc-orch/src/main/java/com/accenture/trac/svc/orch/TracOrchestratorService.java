@@ -27,7 +27,6 @@ import com.accenture.trac.svc.orch.api.TracOrchestratorApi;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.local.LocalJobCache;
 import com.accenture.trac.svc.orch.exec.IBatchExecutor;
-import com.accenture.trac.svc.orch.exec.kube.KubernetesBatchExecutor;
 import com.accenture.trac.svc.orch.exec.local.LocalBatchExecutor;
 import com.accenture.trac.svc.orch.service.JobApiService;
 

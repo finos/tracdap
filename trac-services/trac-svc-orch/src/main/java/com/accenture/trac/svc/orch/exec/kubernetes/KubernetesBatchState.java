@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.exec.kube;
+package com.accenture.trac.svc.orch.exec.kubernetes;
 
 import com.accenture.trac.svc.orch.exec.ExecutorState;
 
