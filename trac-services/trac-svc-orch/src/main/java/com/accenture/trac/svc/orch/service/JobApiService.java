@@ -29,6 +29,10 @@ import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.jobs.JobLogic;
 import io.grpc.MethodDescriptor;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -36,6 +40,7 @@ import java.util.concurrent.CompletionStage;
 public class JobApiService {
 
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreateObjectMethod();
+    private static final MethodDescriptor<MetadataBatchRequest, MetadataBatchResponse> READ_BATCH_METHOD = TrustedMetadataApiGrpc.getReadBatchMethod();
 
     private final IJobCache jobCache;
     private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient;
@@ -191,7 +196,52 @@ public class JobApiService {
 
         TagHeader jobId;
         JobDefinition jobDef;
+        ObjectDefinition target;
+        Map<String, ObjectDefinition> resources = new HashMap<>();
 
         JobStatusCode statusCode;
+    }
+
+
+    private CompletionStage<RequestState>
+    loadJobMetadata(JobRequest request, RequestState state) {
+
+        var batchRequest = MetadataBatchRequest.newBuilder()
+                .setTenant(request.getTenant());
+
+        if (request.hasTarget())
+            batchRequest.addSelector(request.getTarget());
+
+        var orderedResources = new ArrayList<String>(request.getResourcesCount());
+
+        for (var resource : request.getResourcesMap().entrySet()) {
+            orderedResources.add(resource.getKey());
+            batchRequest.addSelector(resource.getValue());
+        }
+
+        var finalBatchRequest = batchRequest.build();
+
+        return grpcWrap
+                .unaryCall(READ_BATCH_METHOD, finalBatchRequest, metaClient::readBatch)
+                .thenApply(batchResponse -> loadJobMetadataResponse(request, batchResponse, orderedResources, state));
+    }
+
+    private RequestState loadJobMetadataResponse(
+            JobRequest jobRequest, MetadataBatchResponse batchResponse,
+            List<String> orderedResources, RequestState state) {
+
+        if (jobRequest.hasTarget())
+            state.target = batchResponse.getTag(0).getDefinition();
+
+        for (var i = 0; i < jobRequest.getResourcesCount(); i++) {
+
+            var resourceKey = orderedResources.get(i);
+            var responseIndex = jobRequest.hasTarget() ? i + 1 : i;
+            var resourceDef = batchResponse.getTag(responseIndex).getDefinition();
+
+            state.resources.put(resourceKey, resourceDef);
+        }
+
+        return state;
     }
 }

@@ -17,15 +17,11 @@
 package com.accenture.trac.svc.orch.api;
 
 import com.accenture.trac.api.*;
-import com.accenture.trac.common.exception.EMetadataNotFound;
 import com.accenture.trac.common.grpc.GrpcServerWrap;
 import com.accenture.trac.metadata.TagSelector;
 import com.accenture.trac.svc.orch.service.JobApiService;
-import com.accenture.trac.svc.orch.service.OrchestratorImpl;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
-
-import java.util.concurrent.CompletionStage;
 
 
 public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestratorApiImplBase {
