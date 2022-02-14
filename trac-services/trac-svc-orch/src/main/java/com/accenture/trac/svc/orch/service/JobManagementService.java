@@ -19,13 +19,11 @@ package com.accenture.trac.svc.orch.service;
 import com.accenture.trac.api.JobStatusCode;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.config.JobStatus;
 import com.accenture.trac.config.RepositoryConfig;
 import com.accenture.trac.config.RuntimeConfig;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.TicketRequest;
-import com.accenture.trac.svc.orch.exec.IBatchRunner;
-import com.accenture.trac.svc.orch.exec.IJobExecutor;
+import com.accenture.trac.svc.orch.exec.IBatchExecutor;
 
 import com.accenture.trac.svc.orch.jobs.JobLogic;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -35,7 +33,6 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -55,13 +52,13 @@ public class JobManagementService {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final IJobCache jobCache;
-    private final IBatchRunner jobExecutor;
+    private final IBatchExecutor jobExecutor;
     private final ScheduledExecutorService executorService;
     private ScheduledFuture<?> pollingTask;
 
     public JobManagementService(
             IJobCache jobCache,
-            IBatchRunner jobExecutor,
+            IBatchExecutor jobExecutor,
             ScheduledExecutorService executorService) {
 
         this.jobCache = jobCache;
@@ -147,9 +144,9 @@ public class JobManagementService {
                     Map.entry("job_config.json", jobConfigJson),
                     Map.entry("sys_config.json", sysConfigJson));
 
-            jobExecutor.createBatchSandbox();
-            jobExecutor.writeTextConfig(jobKey, configMap);
-            jobExecutor.startBatch(jobKey, configMap.keySet());
+            var execState = jobExecutor.createBatchSandbox(jobKey);
+            jobExecutor.writeTextConfig(jobKey, execState, configMap);
+            jobExecutor.startBatch(jobKey, execState, configMap.keySet());
 
             jobState.statusCode = JobStatusCode.SUBMITTED;
 

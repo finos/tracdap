@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Accenture Global Solutions Limited
+ * Copyright 2022 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,29 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.exec;
+package com.accenture.trac.svc.orch.exec.local;
 
-public interface IJobExecutor {
+import com.accenture.trac.svc.orch.exec.JobExecState;
+
+
+public class LocalBatchState extends JobExecState {
+
+    private String batchDir;
+    private long pid;
+
+    public String getBatchDir() {
+        return batchDir;
+    }
+
+    public void setBatchDir(String batchDir) {
+        this.batchDir = batchDir;
+    }
+
+    public long getPid() {
+        return pid;
+    }
+
+    public void setPid(long pid) {
+        this.pid = pid;
+    }
 }

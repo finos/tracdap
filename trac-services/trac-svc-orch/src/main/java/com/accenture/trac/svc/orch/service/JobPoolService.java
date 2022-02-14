@@ -18,7 +18,8 @@ package com.accenture.trac.svc.orch.service;
 
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.TicketRequest;
-import com.accenture.trac.svc.orch.exec.IBatchRunner;
+import com.accenture.trac.svc.orch.exec.IBatchExecutor;
+import com.accenture.trac.svc.orch.exec.JobExecState;
 
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -33,12 +34,12 @@ public class JobPoolService {
 
     private final ScheduledExecutorService executor;
     private final IJobCache jobCache;
-    private final IBatchRunner jobRunner;
+    private final IBatchExecutor jobRunner;
 
     public JobPoolService(
             ScheduledExecutorService executor,
             IJobCache jobCache,
-            IBatchRunner jobRunner) {
+            IBatchExecutor jobRunner) {
 
         this.executor = executor;
         this.jobCache = jobCache;
@@ -66,7 +67,7 @@ public class JobPoolService {
 
     }
 
-    void submitJob() {
+    void submitJob(String jobKey) {
 
         var resourceTicket = TicketRequest.forResources();
         var jobTicket = TicketRequest.forJob();
@@ -76,7 +77,7 @@ public class JobPoolService {
             if (ctx.superseded())
                 return;
 
-            jobRunner.createBatchSandbox();
+            jobRunner.createBatchSandbox(jobKey);
 //            jobRunner.writeTextConfig();
 //            jobRunner.startBatch();
 //
@@ -84,7 +85,7 @@ public class JobPoolService {
         }
     }
 
-    void jobCompleted() {
+    void jobCompleted(String jobKey) {
 
         var jobTicket = TicketRequest.forJob();
 
@@ -93,28 +94,30 @@ public class JobPoolService {
             if (ctx.superseded())
                 return;
 
-            jobRunner.readBatchResult();
+            var jobState = new JobExecState();
+
+            jobRunner.readBatchResult(jobKey, jobState);
 
             // process / record results
 
-            jobRunner.readBatchResult();
-            jobRunner.cleanUpBatch();
+            jobRunner.readBatchResult(jobKey, jobState);
+            jobRunner.cleanUpBatch(jobKey, jobState);
 
 //            jobCache.deleteJob();
         }
     }
 
-    void removeJob(String jobId) {
+    void removeJob(String jobKey) {
 
         try (var ctx = jobCache.useTicket(TicketRequest.forJob())) {
 
             if (ctx.superseded())
                 return;
 
-            jobRunner.createBatchSandbox();
+            jobRunner.createBatchSandbox(jobKey);
 
 
-            jobCache.deleteJob(jobId, ctx.ticket());
+            jobCache.deleteJob(jobKey, ctx.ticket());
         }
     }
 
@@ -137,15 +140,6 @@ public class JobPoolService {
 
 
         }
-
-
-    }
-
-
-    void submitJob(String jobId) {
-
-
-
 
 
     }

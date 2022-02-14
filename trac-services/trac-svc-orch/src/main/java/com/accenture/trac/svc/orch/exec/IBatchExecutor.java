@@ -18,31 +18,29 @@ package com.accenture.trac.svc.orch.exec;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CompletionStage;
 
 
-public interface IBatchRunner {
+public interface IBatchExecutor {
 
     // Interface for running batch jobs, i.e. a job that runs using one-shot using a one-shot process
 
     void executorStatus();
 
-    void createBatchSandbox();
+    JobExecState createBatchSandbox(String jobKey);
 
-    void writeTextConfig(String jobKey, Map<String, String> configFiles);
+    JobExecState writeTextConfig(String jobKey, JobExecState jobState, Map<String, String> configFiles);
 
-    void writeBinaryConfig(String jobKey, Map<String, byte[]> configFiles);
+    JobExecState writeBinaryConfig(String jobKey, JobExecState jobState, Map<String, byte[]> configFiles);
 
-    void startBatch(String jobKey, Set<String> configFiles);
+    JobExecState startBatch(String jobKey, JobExecState jobState, Set<String> configFiles);
 
-    void getBatchStatus();
+    void getBatchStatus(String jobKey, JobExecState jobState);
 
-    void readBatchResult();
+    void readBatchResult(String jobKey, JobExecState jobState);
 
-    void cancelBatch();
+    JobExecState cancelBatch(String jobKey, JobExecState jobState);
 
-    void cleanUpBatch();
+    JobExecState cleanUpBatch(String jobKey, JobExecState jobState);
 
     void pollAllBatches();
 }

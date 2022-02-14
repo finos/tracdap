@@ -24,12 +24,10 @@ import com.accenture.trac.metadata.ImportModelJobDetails;
 import com.accenture.trac.metadata.JobDefinition;
 import com.accenture.trac.metadata.JobType;
 import com.accenture.trac.metadata.TagHeader;
-import com.accenture.trac.svc.orch.exec.kube.KubeBatchExecutor;
-import com.google.protobuf.TextFormat;
+import com.accenture.trac.svc.orch.exec.kube.KubernetesBatchExecutor;
 import com.google.protobuf.util.JsonFormat;
 import org.junit.jupiter.api.Test;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.UUID;
@@ -43,14 +41,14 @@ public class KubeExecutorTest {
     @Test
     void testKubeStatus() throws Exception {
 
-        var executor = new KubeBatchExecutor();
+        var executor = new KubernetesBatchExecutor();
         executor.executorStatus();
     }
 
     @Test
     void startSomething() throws Exception {
 
-        var executor = new KubeBatchExecutor();
+        var executor = new KubernetesBatchExecutor();
 
         var jobId = UUID.randomUUID();
 
@@ -58,8 +56,11 @@ public class KubeExecutorTest {
         configFiles.put("sys_config.json", "");
         configFiles.put("job_config.json", "");
 
-        executor.writeTextConfig(jobId.toString(), configFiles);
-        executor.startBatch(jobId.toString(), configFiles.keySet());
+        var jobKey = jobId.toString();
+        var jobState = executor.createBatchSandbox(jobKey);
+
+        executor.writeTextConfig(jobKey, jobState, configFiles);
+        executor.startBatch(jobKey, jobState, configFiles.keySet());
     }
 
     @Test
@@ -100,8 +101,11 @@ public class KubeExecutorTest {
         configFiles.put("sys_config.json", sysConfigJson);
         configFiles.put("job_config.json", jobConfigJson);
 
-        var executor = new KubeBatchExecutor();
-        executor.writeTextConfig(jobUuid.toString(), configFiles);
-        executor.startBatch(jobUuid.toString(), configFiles.keySet());
+        var executor = new KubernetesBatchExecutor();
+
+        var jobKey = jobId.toString();
+        var jobState = executor.createBatchSandbox(jobKey);
+        executor.writeTextConfig(jobKey, jobState, configFiles);
+        executor.startBatch(jobKey, jobState, configFiles.keySet());
     }
 }
