@@ -22,13 +22,6 @@ import java.util.regex.Pattern;
 
 public class ValidationConstants {
 
-    public static final Pattern VALID_IDENTIFIER = Pattern.compile("\\A[a-zA-Z_]\\w*\\Z");
-
-    // Identifiers starting trac_ or _ are reserved for use by the TRAC platform
-
-    public static final Pattern TRAC_RESERVED_IDENTIFIER = Pattern.compile(
-            "\\A(trac_|_).*", Pattern.CASE_INSENSITIVE);
-
     public static final Pattern MIME_TYPE = Pattern.compile("\\A\\w+/[-.\\w]+(?:\\+[-.\\w]+)?\\Z");
 
     public static final List<String> REGISTERED_MIME_TYPES = List.of(

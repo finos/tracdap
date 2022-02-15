@@ -27,10 +27,10 @@ public class MetadataConstants {
     // Valid identifiers are made up of alphanumeric characters and the underscore, starting with a letter
     // Use \\A - \\Z to match the whole input
     // ^...$ would allow matches like "my_var\n_gotcha"
-    public static final Pattern VALID_IDENTIFIER = Pattern.compile("\\A[a-zA-Z]\\w*\\Z");
+    public static final Pattern VALID_IDENTIFIER = Pattern.compile("\\A[a-zA-Z]\\w*\\Z");   // Leading _ not allowed
 
-    // Identifiers starting trac_ are reserved for use by the TRAC platform
-    public static final Pattern TRAC_RESERVED_IDENTIFIER = Pattern.compile("\\Atrac_.*", Pattern.CASE_INSENSITIVE);
+    // Identifiers starting trac_ or _ are reserved for use by the TRAC platform
+    public static final Pattern TRAC_RESERVED_IDENTIFIER = Pattern.compile("\\A(trac_|_).*", Pattern.CASE_INSENSITIVE);
 
     public static final String TRAC_JOB_TYPE_ATTR = "trac_job_type";
     public static final String TRAC_JOB_STATUS_ATTR = "trac_job_status";

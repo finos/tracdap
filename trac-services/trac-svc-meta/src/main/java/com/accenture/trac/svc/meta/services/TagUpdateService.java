@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 
-import static com.accenture.trac.svc.meta.services.MetadataConstants.TRAC_RESERVED_IDENTIFIER;
+import static com.accenture.trac.common.metadata.MetadataConstants.TRAC_RESERVED_IDENTIFIER;
 
 
 public class TagUpdateService {

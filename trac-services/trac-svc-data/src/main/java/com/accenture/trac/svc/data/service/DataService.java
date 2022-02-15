@@ -47,14 +47,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
+import static com.accenture.trac.common.metadata.MetadataConstants.*;
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
 import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
 
 public class DataService {
-
-    private static final String TRAC_STORAGE_OBJECT_ATTR = "trac_storage_object";
 
     private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/part-%s/snap-%d/delta-%d-%s";
     private static final String DATA_ITEM_SUFFIX_TEMPLATE = "x%06x";

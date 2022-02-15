@@ -44,19 +44,13 @@ import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.accenture.trac.common.metadata.MetadataConstants.*;
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
 import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
 
 public class FileService {
-
-    private static final String TRAC_FILE_NAME_ATTR = "trac_file_name";
-    private static final String TRAC_FILE_EXTENSION_ATTR = "trac_file_extension";
-    private static final String TRAC_FILE_MIME_TYPE_ATTR = "trac_file_mime_type";
-    private static final String TRAC_FILE_SIZE_ATTR = "trac_file_size";
-
-    private static final String TRAC_STORAGE_OBJECT_ATTR = "trac_storage_object";
 
     private static final String FILE_DATA_ITEM_TEMPLATE = "file/%s/version-%d";
     private static final String FILE_STORAGE_PATH_TEMPLATE = "file/%s/version-%d%s/%s";
