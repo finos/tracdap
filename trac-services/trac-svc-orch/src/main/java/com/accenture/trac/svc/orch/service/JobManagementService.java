@@ -125,40 +125,47 @@ public class JobManagementService {
 
     public void pollJobCache() {
 
-        log.info("Polling job cache...");
+        try (var ctx = jobCache.useTicket(TicketRequest.forJob())) {
 
-        var completeStates = List.of(JobStatusCode.COMPLETE, JobStatusCode.FAILED, JobStatusCode.CANCELLED);
-        var completeJobs = jobCache.pollJobs(job -> completeStates.contains(job.statusCode));
+            log.info("Polling job cache...");
 
-        for (var job : completeJobs)
-            executorService.schedule(() -> recordJobResult(job.jobKey), 0L, TimeUnit.SECONDS);
+            var completeStates = List.of(JobStatusCode.COMPLETE, JobStatusCode.FAILED, JobStatusCode.CANCELLED);
+            var completeJobs = jobCache.pollJobs(job -> completeStates.contains(job.statusCode));
 
-        var queuedJobs = jobCache.pollJobs(job -> job.statusCode == JobStatusCode.QUEUED);
+            for (var job : completeJobs)
+                executorService.schedule(() -> recordJobResult(job.jobKey), 0L, TimeUnit.SECONDS);
 
-        for (var job : queuedJobs)
-            executorService.schedule(() -> submitJob(job.jobKey), 0L, TimeUnit.SECONDS);
+            var queuedJobs = jobCache.pollJobs(job -> job.statusCode == JobStatusCode.QUEUED);
+
+            for (var job : queuedJobs)
+                executorService.schedule(() -> submitJob(job.jobKey), 0L, TimeUnit.SECONDS);
+        }
+        catch (Exception e) {
+
+            log.error("Unexpected error polling job cache: {}", e.getMessage(), e);
+        }
     }
 
     public void pollExecutor() {
 
-        log.info("Polling executor...");
-
-        var activeStates = List.of(JobStatusCode.SUBMITTED, JobStatusCode.RUNNING);
-        var activeJobs = jobCache.pollJobs(job -> activeStates.contains(job.statusCode));
-
-        var execStateMap = new HashMap<String, ExecutorState>();
-
-        for (var job : activeJobs) {
-            var executorState = JobState.deserialize(job.executorState, ExecutorState.class);
-            execStateMap.put(job.jobKey, executorState);
-        }
-
-        var pollResults = jobExecutor.pollAllBatches(execStateMap);
-
-        if (pollResults.isEmpty())
-            return;
-
         try (var ctx = jobCache.useTicket(TicketRequest.forJob())) {
+
+            log.info("Polling executor...");
+
+            var activeStates = List.of(JobStatusCode.SUBMITTED, JobStatusCode.RUNNING);
+            var activeJobs = jobCache.pollJobs(job -> activeStates.contains(job.statusCode));
+
+            var execStateMap = new HashMap<String, ExecutorState>();
+
+            for (var job : activeJobs) {
+                var executorState = JobState.deserialize(job.executorState, ExecutorState.class);
+                execStateMap.put(job.jobKey, executorState);
+            }
+
+            var pollResults = jobExecutor.pollAllBatches(execStateMap);
+
+            if (pollResults.isEmpty())
+                return;
 
             for (var result : pollResults) {
 
@@ -168,6 +175,10 @@ public class JobManagementService {
 
                 jobCache.updateJob(job.jobKey, job, ctx.ticket());
             }
+        }
+        catch (Exception e) {
+
+            log.error("Unexpected error polling executor: {}", e.getMessage(), e);
         }
     }
 
@@ -211,14 +222,14 @@ public class JobManagementService {
         }
         catch (InvalidProtocolBufferException e) {
 
-            log.error("Job submit failed: [{}] {}", jobKey, e.getMessage(), e);
+            log.error("Submit job to executor failed: [{}] {}", jobKey, e.getMessage(), e);
 
             // TODO: Error
             throw new EUnexpected(e);
         }
-        catch (RuntimeException e) {
+        catch (Exception e) {
 
-            log.error("Job submit failed: [{}] {}", jobKey, e.getMessage(), e);
+            log.error("Submit job to executor failed: [{}] {}", jobKey, e.getMessage(), e);
             throw e;
         }
     }
@@ -238,7 +249,6 @@ public class JobManagementService {
             var jobResult = pollResult.jobResult;
 
             log.info("Record job result [{}]: {}", jobKey, pollResult.statusCode);
-            log.info(TextFormat.printer().printToString(jobResult));
 
             var metaUpdates = jobLogic.buildResultMetadata(jobState.tenant, jobState.jobRequest, jobResult);
             var jobUpdate = buildJobSucceededUpdate(jobState);
@@ -266,6 +276,11 @@ public class JobManagementService {
             jobExecutor.cleanUpBatch(jobKey, execState);
 
             jobCache.deleteJob(jobKey, ctx.ticket());
+        }
+        catch (Exception e) {
+
+            log.error("Record job result failed: [{}] {}", jobKey, e.getMessage(), e);
+            throw e;
         }
     }
 

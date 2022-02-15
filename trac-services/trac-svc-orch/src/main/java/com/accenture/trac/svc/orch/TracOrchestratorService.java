@@ -122,7 +122,7 @@ public class TracOrchestratorService extends CommonServiceBase {
             var metaClientBlocking = TrustedMetadataApiGrpc.newBlockingStub(clientChannel);
 
             jobCache = new LocalJobCache();
-            jobCache = InterfaceLogging.wrap(jobCache, IJobCache.class);
+            // jobCache = InterfaceLogging.wrap(jobCache, IJobCache.class);
 
             var executors = new ExecutionManager(pluginManager);
             executors.initExecutor(orchestratorConfig.getExecutor());
