@@ -18,14 +18,17 @@ package com.accenture.trac.svc.orch.jobs;
 
 
 import com.accenture.trac.api.JobRequest;
+import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.common.exception.EValidationGap;
 import com.accenture.trac.config.JobConfig;
+import com.accenture.trac.config.JobResult;
 import com.accenture.trac.metadata.JobDefinition;
 import com.accenture.trac.metadata.JobType;
 import com.accenture.trac.metadata.ObjectDefinition;
 import com.accenture.trac.metadata.TagHeader;
 
 import java.lang.reflect.Constructor;
+import java.util.List;
 import java.util.Map;
 
 public interface IJobLogic {
@@ -33,4 +36,6 @@ public interface IJobLogic {
     JobDefinition buildJobDefinition(JobRequest jobRequest);
 
     JobConfig buildJobConfig(TagHeader jobId, JobDefinition job);
+
+    List<MetadataWriteRequest> buildResultMetadata(String tenant, JobRequest request, JobResult result);
 }

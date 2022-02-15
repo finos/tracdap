@@ -16,13 +16,17 @@
 
 package com.accenture.trac.svc.orch.service;
 
-import com.accenture.trac.api.JobStatus;
 import com.accenture.trac.api.JobStatusCode;
+import com.accenture.trac.api.MetadataWriteRequest;
+import com.accenture.trac.api.TrustedMetadataApiGrpc;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.config.Job;
+import com.accenture.trac.common.metadata.MetadataConstants;
 import com.accenture.trac.config.RepositoryConfig;
 import com.accenture.trac.config.RuntimeConfig;
+import com.accenture.trac.metadata.ObjectType;
+import com.accenture.trac.metadata.TagHeader;
+import com.accenture.trac.metadata.TagUpdate;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.cache.TicketRequest;
@@ -30,6 +34,7 @@ import com.accenture.trac.svc.orch.exec.ExecutorState;
 import com.accenture.trac.svc.orch.exec.IBatchExecutor;
 
 import com.accenture.trac.svc.orch.jobs.JobLogic;
+import com.google.common.collect.Streams;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
 import com.google.protobuf.util.JsonFormat;
@@ -45,6 +50,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static com.accenture.trac.common.metadata.MetadataCodec.encodeValue;
+import static com.accenture.trac.common.metadata.MetadataConstants.TRAC_JOB_STATUS_ATTR;
+import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
 
 
 public class JobManagementService {
@@ -62,16 +72,21 @@ public class JobManagementService {
     private final IJobCache jobCache;
     private final IBatchExecutor jobExecutor;
     private final ScheduledExecutorService executorService;
+    private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient;
+
     private ScheduledFuture<?> pollingTask;
 
     public JobManagementService(
             IJobCache jobCache,
             IBatchExecutor jobExecutor,
-            ScheduledExecutorService executorService) {
+            ScheduledExecutorService executorService,
+            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient) {
 
         this.jobCache = jobCache;
         this.jobExecutor = jobExecutor;
         this.executorService = executorService;
+
+        this.metaClient = metaClient;
     }
 
     public void start() {
@@ -215,17 +230,58 @@ public class JobManagementService {
             if (ctx.superseded())
                 return;
 
-            var job = jobCache.readJob(jobKey);
-            var execState = JobState.deserialize(job.executorState, ExecutorState.class);
+            var jobState = jobCache.readJob(jobKey);
+            var jobLogic = JobLogic.forJobType(jobState.jobType);
+
+            var execState = JobState.deserialize(jobState.executorState, ExecutorState.class);
             var pollResult = jobExecutor.readBatchResult(jobKey, execState);
             var jobResult = pollResult.jobResult;
 
             log.info("Record job result [{}]: {}", jobKey, pollResult.statusCode);
             log.info(TextFormat.printer().printToString(jobResult));
 
+            var metaUpdates = jobLogic.buildResultMetadata(jobState.tenant, jobState.jobRequest, jobResult);
+            var jobUpdate = buildJobSucceededUpdate(jobState);
+
+            for (var update : Streams.concat(metaUpdates.stream(), Stream.of(jobUpdate)).collect(Collectors.toList())) {
+
+                TagHeader updateResult;
+
+                if (!update.hasDefinition())
+                    updateResult = metaClient.updateTag(update);
+                else if (!update.hasPriorVersion())
+                    updateResult = metaClient.createObject(update);
+                else if (update.getPriorVersion().getObjectVersion() < MetadataConstants.OBJECT_FIRST_VERSION)
+                    updateResult = metaClient.createPreallocatedObject(update);
+                else
+                    updateResult = metaClient.updateObject(update);
+
+                log.info("Saved metadata for {} [{}], version {}, tag {}",
+                        updateResult.getObjectType(),
+                        updateResult.getObjectId(),
+                        updateResult.getObjectVersion(),
+                        updateResult.getTagVersion());
+            }
+
             jobExecutor.cleanUpBatch(jobKey, execState);
 
             jobCache.deleteJob(jobKey, ctx.ticket());
         }
+    }
+
+    private MetadataWriteRequest buildJobSucceededUpdate(JobState jobState) {
+
+        var attrUpdates = List.of(
+                TagUpdate.newBuilder()
+                        .setAttrName(TRAC_JOB_STATUS_ATTR)
+                        .setValue(encodeValue(jobState.statusCode.toString()))
+                        .build());
+
+        return MetadataWriteRequest.newBuilder()
+                .setTenant(jobState.tenant)
+                .setObjectType(ObjectType.JOB)
+                .setPriorVersion(selectorFor(jobState.jobId))
+                .addAllTagUpdates(attrUpdates)
+                .build();
     }
 }

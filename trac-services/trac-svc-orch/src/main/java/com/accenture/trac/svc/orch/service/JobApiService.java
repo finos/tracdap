@@ -18,12 +18,10 @@ package com.accenture.trac.svc.orch.service;
 
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.grpc.GrpcClientWrap;
-import com.accenture.trac.metadata.JobDefinition;
-import com.accenture.trac.metadata.JobType;
-import com.accenture.trac.metadata.ObjectDefinition;
-import com.accenture.trac.metadata.ObjectType;
-import com.accenture.trac.metadata.TagHeader;
+import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.metadata.*;
 
+import com.accenture.trac.metadata.JobType;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.jobs.JobLogic;
@@ -35,6 +33,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+
+import static com.accenture.trac.common.metadata.MetadataConstants.TRAC_JOB_STATUS_ATTR;
+import static com.accenture.trac.common.metadata.MetadataConstants.TRAC_JOB_TYPE_ATTR;
 
 
 public class JobApiService {
@@ -130,10 +131,21 @@ public class JobApiService {
                 .setJob(request.jobDef)
                 .build();
 
+        var jobAttrs = List.of(
+                TagUpdate.newBuilder()
+                        .setAttrName(TRAC_JOB_TYPE_ATTR)
+                        .setValue(MetadataCodec.encodeValue(request.jobType.toString()))
+                        .build(),
+                TagUpdate.newBuilder()
+                        .setAttrName(TRAC_JOB_STATUS_ATTR)
+                        .setValue(MetadataCodec.encodeValue(request.statusCode.toString()))
+                        .build());
+
         var jobWriteReq = MetadataWriteRequest.newBuilder()
                 .setTenant(request.tenant)
                 .setObjectType(ObjectType.JOB)
                 .setDefinition(jobObj)
+                .addAllTagUpdates(jobAttrs)
                 .build();
 
         var grpcCall = grpcWrap.unaryCall(
@@ -157,6 +169,7 @@ public class JobApiService {
         jobState.jobKey = jobKey;
         jobState.jobId = request.jobId;
         jobState.jobType = request.jobType;
+        jobState.jobRequest = request.jobRequest;
         jobState.definition = request.jobDef;
         jobState.statusCode = JobStatusCode.QUEUED;
 

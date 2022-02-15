@@ -117,7 +117,9 @@ public class TracOrchestratorService extends CommonServiceBase {
             nettyGroup = new NioEventLoopGroup(2, new DefaultThreadFactory("orch-netty"));
             serviceGroup = new NioEventLoopGroup(CONCURRENT_REQUESTS, new DefaultThreadFactory("orch-svc"));
 
-            var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
+            prepareMetadataClientChannel(platformConfig, clientChannelType);
+            var metaClient = TrustedMetadataApiGrpc.newFutureStub(clientChannel);
+            var metaClientBlocking = TrustedMetadataApiGrpc.newBlockingStub(clientChannel);
 
             jobCache = new LocalJobCache();
             jobCache = InterfaceLogging.wrap(jobCache, IJobCache.class);
@@ -126,7 +128,7 @@ public class TracOrchestratorService extends CommonServiceBase {
             executors.initExecutor(orchestratorConfig.getExecutor());
             jobExecCtrl = executors.getExecutor();
 
-            jobMonitor = new JobManagementService(jobCache, jobExecCtrl, serviceGroup);
+            jobMonitor = new JobManagementService(jobCache, jobExecCtrl, serviceGroup, metaClientBlocking);
             jobMonitor.start();
 
             var orchestrator = new JobApiService(jobCache, metaClient);
@@ -204,8 +206,7 @@ public class TracOrchestratorService extends CommonServiceBase {
         return -1;
     }
 
-    private TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub
-    prepareMetadataClient(
+    private void prepareMetadataClientChannel(
             PlatformConfig platformConfig,
             Class<? extends io.netty.channel.Channel> channelType) {
 
@@ -231,8 +232,6 @@ public class TracOrchestratorService extends CommonServiceBase {
                 .usePlaintext();
 
         clientChannel = clientChannelBuilder.build();
-
-        return TrustedMetadataApiGrpc.newFutureStub(clientChannel);
     }
 
     public static void main(String[] args) {

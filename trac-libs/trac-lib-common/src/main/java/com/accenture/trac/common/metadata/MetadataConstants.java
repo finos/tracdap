@@ -43,4 +43,10 @@ public class MetadataConstants {
     public static final String TRAC_FILE_SIZE_ATTR = "trac_file_size";
 
     public static final String TRAC_STORAGE_OBJECT_ATTR = "trac_storage_object";
+
+    public static final String TRAC_MODEL_LANGUAGE = "trac_model_language";
+    public static final String TRAC_MODEL_REPOSITORY = "trac_model_repository";
+    public static final String TRAC_MODEL_PATH = "trac_model_path";
+    public static final String TRAC_MODEL_ENTRY_POINT = "trac_model_entry_point";
+    public static final String TRAC_MODEL_VERSION = "trac_model_version";
 }

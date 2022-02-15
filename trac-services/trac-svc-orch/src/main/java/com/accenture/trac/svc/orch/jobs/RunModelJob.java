@@ -18,10 +18,14 @@ package com.accenture.trac.svc.orch.jobs;
 
 
 import com.accenture.trac.api.JobRequest;
+import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.config.JobConfig;
+import com.accenture.trac.config.JobResult;
 import com.accenture.trac.metadata.JobDefinition;
 import com.accenture.trac.metadata.JobType;
 import com.accenture.trac.metadata.TagHeader;
+
+import java.util.List;
 
 
 public class RunModelJob implements IJobLogic {
@@ -38,5 +42,11 @@ public class RunModelJob implements IJobLogic {
     public JobConfig buildJobConfig(TagHeader jobId, JobDefinition job) {
 
         throw new RuntimeException("Not implemented yet");
+    }
+
+    @Override
+    public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobRequest request, JobResult result) {
+
+        return List.of();
     }
 }

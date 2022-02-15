@@ -22,6 +22,7 @@ option java_multiple_files = true;
 
 import "trac/metadata/type.proto";
 import "trac/metadata/object_id.proto";
+import "trac/metadata/tag_update.proto";
 
 
 message JobDefinition {
@@ -55,4 +56,6 @@ message ImportModelJobDetails {
   string package = 4;
   string entryPoint = 5;
   string version = 6;
+
+  repeated TagUpdate modelAttrs = 7;
 }
