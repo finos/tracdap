@@ -78,14 +78,15 @@ message JobRequest {
   string tenant = 1;
 
   metadata.JobType jobType = 2;
+  repeated metadata.TagUpdate jobAttrs = 3;
 
   oneof jobDetails {
-    metadata.ImportModelJobDetails importModel = 6;
+    metadata.ImportModelJobDetails importModel = 7;
   }
 
-  metadata.TagSelector target = 3;
-  map<string, metadata.Value> parameters = 4;
-  map<string, metadata.TagSelector> resources = 5;
+  metadata.TagSelector target = 4;
+  map<string, metadata.Value> parameters = 5;
+  map<string, metadata.TagSelector> resources = 6;
 }
 
 

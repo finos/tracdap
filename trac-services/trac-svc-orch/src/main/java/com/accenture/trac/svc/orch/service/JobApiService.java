@@ -131,7 +131,7 @@ public class JobApiService {
                 .setJob(request.jobDef)
                 .build();
 
-        var jobAttrs = List.of(
+        var ctrlJobAttrs = List.of(
                 TagUpdate.newBuilder()
                         .setAttrName(TRAC_JOB_TYPE_ATTR)
                         .setValue(MetadataCodec.encodeValue(request.jobType.toString()))
@@ -141,11 +141,14 @@ public class JobApiService {
                         .setValue(MetadataCodec.encodeValue(request.statusCode.toString()))
                         .build());
 
+        var freeJobAttrs = request.jobRequest.getJobAttrsList();
+
         var jobWriteReq = MetadataWriteRequest.newBuilder()
                 .setTenant(request.tenant)
                 .setObjectType(ObjectType.JOB)
                 .setDefinition(jobObj)
-                .addAllTagUpdates(jobAttrs)
+                .addAllTagUpdates(ctrlJobAttrs)
+                .addAllTagUpdates(freeJobAttrs)
                 .build();
 
         var grpcCall = grpcWrap.unaryCall(
