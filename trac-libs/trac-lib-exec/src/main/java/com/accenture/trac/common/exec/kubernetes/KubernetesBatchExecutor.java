@@ -356,7 +356,7 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public ExecutorPollResult readBatchResult(String jobKey, ExecutorState jobState) {
+    public byte[] readBatchResult(String jobKey, ExecutorState jobState) {
 
 
         // kubeBatchApi.

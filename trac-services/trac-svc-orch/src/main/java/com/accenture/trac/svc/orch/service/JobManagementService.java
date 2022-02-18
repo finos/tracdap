@@ -16,6 +16,8 @@
 
 package com.accenture.trac.svc.orch.service;
 
+import com.accenture.trac.common.exception.ETracInternal;
+import com.accenture.trac.config.JobResult;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.metadata.TagUpdate;
@@ -41,6 +43,7 @@ import com.google.protobuf.util.JsonFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -245,10 +248,15 @@ public class JobManagementService {
             var jobLogic = JobLogic.forJobType(jobState.jobType);
 
             var execState = JobState.deserialize(jobState.executorState, ExecutorState.class);
-            var pollResult = jobExecutor.readBatchResult(jobKey, execState);
-            var jobResult = pollResult.jobResult;
+            var jobResultBytes = jobExecutor.readBatchResult(jobKey, execState);
 
-            log.info("Record job result [{}]: {}", jobKey, pollResult.statusCode);
+            var jobResultString = new String(jobResultBytes, StandardCharsets.UTF_8);
+            var jobResultBuilder = JobResult.newBuilder();
+            JsonFormat.parser().merge(jobResultString, jobResultBuilder);
+
+            var jobResult = jobResultBuilder.build();
+
+            log.info("Record job result [{}]: {}", jobKey, jobState.statusCode);
 
             var metaUpdates = jobLogic.buildResultMetadata(jobState.tenant, jobState.jobRequest, jobResult);
             var jobUpdate = buildJobSucceededUpdate(jobState);
@@ -276,6 +284,11 @@ public class JobManagementService {
             jobExecutor.cleanUpBatch(jobKey, execState);
 
             jobCache.deleteJob(jobKey, ctx.ticket());
+        }
+        catch (InvalidProtocolBufferException e) {
+
+            log.error("Garbled result from job execution: {}", e.getMessage(), e);
+            throw new ETracInternal("Garbled result from job execution", e);  // TODO: err
         }
         catch (Exception e) {
 

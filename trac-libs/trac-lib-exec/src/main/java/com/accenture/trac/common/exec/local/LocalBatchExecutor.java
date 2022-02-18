@@ -18,6 +18,7 @@ package com.accenture.trac.common.exec.local;
 
 import com.accenture.trac.api.JobStatusCode;
 import com.accenture.trac.common.exception.EStartup;
+import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.exec.IBatchExecutor;
 import com.accenture.trac.config.JobResult;
@@ -243,7 +244,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public ExecutorPollResult readBatchResult(String jobKey, ExecutorState jobState) {
+    public byte[] readBatchResult(String jobKey, ExecutorState jobState) {
 
         var result = new ExecutorPollResult();
         result.jobKey = jobKey;
@@ -257,35 +258,20 @@ public class LocalBatchExecutor implements IBatchExecutor {
                 throw new EUnexpected();  // TODO
 
             if (process.exitValue() != 0) {
-                result.statusCode = JobStatusCode.FAILED;
-                result.errorMessage = "Process terminated with non-zero exit code";
-                return result;
+
+                var err = String.format(
+                        "Attempt to read result of failed job [%s] (pid = %d, exit code = %d)",
+                        jobKey, process.pid(), process.exitValue());
+
+                log.error(err);
+                throw new ETracInternal(err);  // TODO: Should this be an execution error?
             }
 
             var batchDir = Paths.get(batchState.getBatchDir());
             var resultDir = batchDir.resolve(JOB_RESULT_SUBDIR);
-
-            var jobResultFile = String.format("job_result_%s.json", jobKey);
-            var jobResultPath = resultDir.resolve(jobResultFile);
-            var jobResultBytes = Files.readAllBytes(jobResultPath);
-            var jobResultString = new String(jobResultBytes, StandardCharsets.UTF_8);
-
-            var jobResultBuilder = JobResult.newBuilder();
-            JsonFormat.parser().merge(jobResultString, jobResultBuilder);
-
-            result.statusCode = JobStatusCode.COMPLETE;
-            result.jobResult = jobResultBuilder.build();
-
-            return result;
-        }
-        catch (InvalidProtocolBufferException e) {
-
-            log.error("Garbled result from job execution: {}", e.getMessage(), e);
-
-            result.statusCode = JobStatusCode.FAILED;
-            result.errorMessage = "Garbled result from job execution";
-
-            return result;
+            var resultFile = String.format("job_result_%s.json", jobKey);
+            var resultPath = resultDir.resolve(resultFile);
+            return Files.readAllBytes(resultPath);
         }
         catch (IOException e) {
             e.printStackTrace();
