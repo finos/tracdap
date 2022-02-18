@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.exec.local;
+package com.accenture.trac.common.exec.local;
 
 import com.accenture.trac.api.JobStatusCode;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.exec.IBatchExecutor;
 import com.accenture.trac.config.JobResult;
-import com.accenture.trac.svc.orch.exec.ExecutorPollResult;
-import com.accenture.trac.svc.orch.exec.IBatchExecutor;
-import com.accenture.trac.svc.orch.exec.ExecutorState;
+import com.accenture.trac.common.exec.ExecutorPollResult;
+import com.accenture.trac.common.exec.ExecutorState;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import org.slf4j.Logger;

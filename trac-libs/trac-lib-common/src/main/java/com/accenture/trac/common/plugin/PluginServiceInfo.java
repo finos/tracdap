@@ -30,7 +30,7 @@ public class PluginServiceInfo {
             Map.entry("com.accenture.trac.common.codec.ICodec", "FORMAT"),
             Map.entry("com.accenture.trac.common.storage.IFileStorage", "FILE_STORAGE"),
             Map.entry("com.accenture.trac.common.storage.IDataStorage", "DATA_STORAGE"),
-            Map.entry("com.accenture.trac.svc.orch.exec.IBatchExecutor", "BATCH_EXECUTOR"));
+            Map.entry("com.accenture.trac.common.exec.IBatchExecutor", "BATCH_EXECUTOR"));
 
     private final String pluginName;
     private final Class<?> serviceClass;

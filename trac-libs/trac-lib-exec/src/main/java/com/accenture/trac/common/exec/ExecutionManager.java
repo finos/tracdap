@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.exec;
+package com.accenture.trac.common.exec;
 
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.plugin.PluginManager;

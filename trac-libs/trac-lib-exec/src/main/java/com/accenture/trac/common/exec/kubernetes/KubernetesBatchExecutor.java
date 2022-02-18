@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Accenture Global Solutions Limited
+ * Copyright 2022 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.exec.kubernetes;
+package com.accenture.trac.common.exec.kubernetes;
 
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.ETracInternal;
-import com.accenture.trac.svc.orch.exec.ExecutorPollResult;
-import com.accenture.trac.svc.orch.exec.IBatchExecutor;
+import com.accenture.trac.common.exec.ExecutorPollResult;
+import com.accenture.trac.common.exec.IBatchExecutor;
 
-import com.accenture.trac.svc.orch.exec.ExecutorState;
+import com.accenture.trac.common.exec.ExecutorState;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;

@@ -14,29 +14,10 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.exec.local;
+package com.accenture.trac.common.exec;
 
-import com.accenture.trac.svc.orch.exec.ExecutorState;
+import java.io.Serializable;
 
 
-public class LocalBatchState extends ExecutorState {
-
-    private String batchDir;
-    private long pid;
-
-    public String getBatchDir() {
-        return batchDir;
-    }
-
-    public void setBatchDir(String batchDir) {
-        this.batchDir = batchDir;
-    }
-
-    public long getPid() {
-        return pid;
-    }
-
-    public void setPid(long pid) {
-        this.pid = pid;
-    }
+public class ExecutorState implements Serializable {
 }

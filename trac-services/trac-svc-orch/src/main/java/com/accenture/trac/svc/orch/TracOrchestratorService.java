@@ -21,14 +21,13 @@ import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
-import com.accenture.trac.common.util.InterfaceLogging;
 import com.accenture.trac.config.OrchServiceConfig;
 import com.accenture.trac.config.PlatformConfig;
 import com.accenture.trac.svc.orch.api.TracOrchestratorApi;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.local.LocalJobCache;
-import com.accenture.trac.svc.orch.exec.ExecutionManager;
-import com.accenture.trac.svc.orch.exec.IBatchExecutor;
+import com.accenture.trac.common.exec.ExecutionManager;
+import com.accenture.trac.common.exec.IBatchExecutor;
 import com.accenture.trac.svc.orch.service.JobApiService;
 
 import com.accenture.trac.svc.orch.service.JobManagementService;

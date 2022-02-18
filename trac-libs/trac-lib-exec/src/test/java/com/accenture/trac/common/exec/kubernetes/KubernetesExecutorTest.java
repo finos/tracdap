@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Accenture Global Solutions Limited
+ * Copyright 2022 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orc.exec;
+package com.accenture.trac.common.exec.kubernetes;
 
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.config.JobConfig;
@@ -24,7 +24,6 @@ import com.accenture.trac.metadata.ImportModelJobDetails;
 import com.accenture.trac.metadata.JobDefinition;
 import com.accenture.trac.metadata.JobType;
 import com.accenture.trac.metadata.TagHeader;
-import com.accenture.trac.svc.orch.exec.kubernetes.KubernetesBatchExecutor;
 import com.google.protobuf.util.JsonFormat;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -38,7 +37,7 @@ import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 
 @Disabled
-public class KubeExecutorTest {
+public class KubernetesExecutorTest {
 
     @Test
     void testKubeStatus() throws Exception {

@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.exec.local;
+package com.accenture.trac.common.exec.local;
 
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.plugin.PluginServiceInfo;
 import com.accenture.trac.common.plugin.TracPlugin;
-import com.accenture.trac.svc.orch.exec.IBatchExecutor;
+import com.accenture.trac.common.exec.IBatchExecutor;
 
 import java.util.List;
 import java.util.Properties;

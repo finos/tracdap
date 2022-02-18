@@ -14,9 +14,16 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.exec.kubernetes;
+package com.accenture.trac.common.exec;
 
-import com.accenture.trac.svc.orch.exec.ExecutorState;
+import com.accenture.trac.api.JobStatusCode;
+import com.accenture.trac.config.JobResult;
 
-public class KubernetesBatchState extends ExecutorState {
+public class ExecutorPollResult {
+
+    public String jobKey;
+    public JobStatusCode statusCode;
+    public String errorMessage;
+    public JobResult jobResult;
+    public ExecutorState executorState;
 }

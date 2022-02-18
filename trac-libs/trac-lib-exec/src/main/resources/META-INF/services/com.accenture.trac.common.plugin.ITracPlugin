@@ -13,4 +13,4 @@
 # limitations under the License.
 
 # Core data plugin supplies core formats and local file storage
-com.accenture.trac.svc.orch.exec.local.LocalExecutorPlugin
+com.accenture.trac.common.exec.local.LocalExecutorPlugin
