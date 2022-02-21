@@ -14,35 +14,22 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.exec.local;
-
-import com.accenture.trac.common.exec.ExecutorState;
-
-import java.util.ArrayList;
-import java.util.List;
+package com.accenture.trac.common.exec;
 
 
-public class LocalBatchState extends ExecutorState {
+public class LaunchCmd {
 
-    private String batchDir;
-    private List<String> volumes = new ArrayList<>();
-    private long pid;
-
-    String getBatchDir() {
-        return batchDir;
+    public static LaunchCmd trac() {
+        return new LaunchCmd(true);
     }
 
-    void setBatchDir(String batchDir) {
-        this.batchDir = batchDir;
+    private LaunchCmd(boolean isTrac) {
+        this.isTrac = isTrac;
     }
 
-    long getPid() {
-        return pid;
+    public boolean isTrac() {
+        return this.isTrac;
     }
 
-    void setPid(long pid) {
-        this.pid = pid;
-    }
-
-    List<String> getVolumes() { return volumes; }
+    private final boolean isTrac;
 }

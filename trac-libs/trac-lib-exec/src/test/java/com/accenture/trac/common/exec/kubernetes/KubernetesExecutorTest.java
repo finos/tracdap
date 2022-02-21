@@ -16,6 +16,9 @@
 
 package com.accenture.trac.common.exec.kubernetes;
 
+import com.accenture.trac.common.exec.ExecutorVolumeType;
+import com.accenture.trac.common.exec.LaunchArg;
+import com.accenture.trac.common.exec.LaunchCmd;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.RepositoryConfig;
@@ -28,40 +31,39 @@ import com.google.protobuf.util.JsonFormat;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
-
-import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
-import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 
 @Disabled
 public class KubernetesExecutorTest {
 
     @Test
-    void testKubeStatus() throws Exception {
+    void testKubeStatus() {
 
         var executor = new KubernetesBatchExecutor();
         executor.executorStatus();
     }
 
     @Test
-    void startSomething() throws Exception {
+    void startSomething() {
 
         var executor = new KubernetesBatchExecutor();
 
         var jobId = UUID.randomUUID();
 
-        var configFiles = new HashMap<String, String>();
-        configFiles.put("sys_config.json", "");
-        configFiles.put("job_config.json", "");
-
         var jobKey = jobId.toString();
-        var jobState = executor.createBatchSandbox(jobKey);
+        var jobState = executor.createBatch(jobKey);
 
-        executor.writeTextConfig(jobKey, jobState, configFiles);
-        executor.startBatch(jobKey, jobState, configFiles.keySet());
+        var launchCmd = LaunchCmd.trac();
+        var launchArgs = List.of(
+                LaunchArg.string("--sys-config"), LaunchArg.path("CONFIG", "job_config.json"),
+                LaunchArg.string("--job-config"), LaunchArg.path("CONFIG", "sys_config.json"),
+                LaunchArg.string("--dev-mode"));
+
+        executor.startBatch(jobState, launchCmd, launchArgs);
     }
 
     @Test
@@ -95,18 +97,24 @@ public class KubernetesExecutorTest {
                 .setRepoUrl("https://github.com/accenture/trac")
                 .build()).build();
 
-        var jobConfigJson = JsonFormat.printer().print(jobConfig);
-        var sysConfigJson = JsonFormat.printer().print(sysConfig);
-
-        var configFiles = new HashMap<String, String>();
-        configFiles.put("sys_config.json", sysConfigJson);
-        configFiles.put("job_config.json", jobConfigJson);
+        var jobConfigJson = JsonFormat.printer().print(jobConfig).getBytes(StandardCharsets.UTF_8);
+        var sysConfigJson = JsonFormat.printer().print(sysConfig).getBytes(StandardCharsets.UTF_8);
 
         var executor = new KubernetesBatchExecutor();
 
         var jobKey = jobId.toString();
-        var jobState = executor.createBatchSandbox(jobKey);
-        executor.writeTextConfig(jobKey, jobState, configFiles);
-        executor.startBatch(jobKey, jobState, configFiles.keySet());
+        var state = executor.createBatch(jobKey);
+        state = executor.createVolume(state, "config", ExecutorVolumeType.CONFIG_DIR);
+        state = executor.createVolume(state, "results", ExecutorVolumeType.RESULT_DIR);
+        state = executor.writeFile(state, "config", "sys_config.json", sysConfigJson);
+        state = executor.writeFile(state, "config", "job_config.json", jobConfigJson);
+
+        var launchCmd = LaunchCmd.trac();
+        var launchArgs = List.of(
+                LaunchArg.string("--sys-config"), LaunchArg.path("CONFIG", "job_config.json"),
+                LaunchArg.string("--job-config"), LaunchArg.path("CONFIG", "sys_config.json"),
+                LaunchArg.string("--dev-mode"));
+
+        executor.startBatch(state, launchCmd, launchArgs);
     }
 }

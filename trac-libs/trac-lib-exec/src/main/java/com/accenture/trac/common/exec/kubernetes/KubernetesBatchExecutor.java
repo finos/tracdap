@@ -18,10 +18,8 @@ package com.accenture.trac.common.exec.kubernetes;
 
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.ETracInternal;
-import com.accenture.trac.common.exec.ExecutorPollResult;
-import com.accenture.trac.common.exec.IBatchExecutor;
+import com.accenture.trac.common.exec.*;
 
-import com.accenture.trac.common.exec.ExecutorState;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
@@ -87,66 +85,38 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public ExecutorState createBatchSandbox(String jobKey) {
+    public ExecutorState createBatch(String jobKey) {
 
         return null;
     }
 
     @Override
-    public ExecutorState writeTextConfig(String jobKey, ExecutorState jobState, Map<String, String> configFiles) {
+    public void destroyBatch(String jobKey, ExecutorState jobState) {
 
-        var configMap = new V1ConfigMap()
-                .data(configFiles);
-
-        return writeConfig(jobKey, jobState, configMap);
     }
 
     @Override
-    public ExecutorState writeBinaryConfig(String jobKey, ExecutorState jobState, Map<String, byte[]> configFiles) {
-
-        var configMap = new V1ConfigMap()
-                .binaryData(configFiles);
-
-        return writeConfig(jobKey, jobState, configMap);
-    }
-
-    private ExecutorState writeConfig(String jobKey, ExecutorState jobState, V1ConfigMap configMap) {
-
-        try {
-
-            var namespace = "default";  // TODO: Namespace should be based on tenant? io.trac-platform.runtime.TENANT ?
-
-            var configVolName = String.format(JOB_CONFIG_VOL_NAME_TEMPLATE, jobKey);
-            var configMetadata = new V1ObjectMeta()
-                    .name(configVolName)
-                    .namespace(namespace);
-
-            configMap.setApiVersion("v1");
-            configMap.setKind("ConfigMap");
-            configMap.setMetadata(configMetadata);
-
-            var configMapResult = kubeCoreApi.createNamespacedConfigMap(namespace, configMap, null, null, null);
-
-            // TODO: Any need to use result?
-
-            return jobState;
-        }
-        catch (ApiException e) {
-
-            if (e.getCode() == 409)
-                return jobState;
-
-            e.printStackTrace();
-            throw new ETracInternal("Kubernetes error", e);  // TODO: Error
-        }
+    public ExecutorState createVolume(ExecutorState state, String volumeName, ExecutorVolumeType volumeType) {
+        return null;
     }
 
     @Override
-    public ExecutorState startBatch(String jobKey, ExecutorState jobState, Set<String> configFiles) {
+    public ExecutorState writeFile(ExecutorState state, String volumeName, String fileName, byte[] fileContent) {
+        return null;
+    }
+
+    @Override
+    public byte[] readFile(ExecutorState state, String volumeName, String fileName) {
+        return new byte[0];
+    }
+
+    @Override
+    public ExecutorState startBatch(ExecutorState jobState, LaunchCmd launchCmd, List<LaunchArg> launchArgs) {
 
         try {
 
             var namespace = "default";
+            var jobKey = "";  // TODO
 
             var configVolName = String.format(JOB_CONFIG_VOL_NAME_TEMPLATE, jobKey);
             var resultVolName = String.format(JOB_CONFIG_VOL_NAME_TEMPLATE, jobKey);
@@ -155,6 +125,8 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
 
             var configSource = new V1ConfigMapVolumeSource();
             configSource.name(configVolName);
+
+            var configFiles = List.<String>of();  // TODO
 
             for (var configFile : configFiles) {
                 configSource.addItemsItem(new V1KeyToPath()
@@ -352,27 +324,64 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public void getBatchStatus(String jobKey, ExecutorState jobState) {
-    }
-
-    @Override
-    public byte[] readBatchResult(String jobKey, ExecutorState jobState) {
-
-
-        // kubeBatchApi.
-
-        return null;
-    }
-
-    @Override
-    public ExecutorState cancelBatch(String jobKey, ExecutorState jobState) {
+    public ExecutorState cancelBatch(ExecutorState jobState) {
 
         return jobState;
     }
 
     @Override
-    public ExecutorState cleanUpBatch(String jobKey, ExecutorState jobState) {
-
-        return jobState;
+    public void pollBatch(ExecutorState jobState) {
     }
+
+
+/*
+    @Override
+    public ExecutorState writeTextConfig(String jobKey, ExecutorState jobState, Map<String, String> configFiles) {
+
+        var configMap = new V1ConfigMap()
+                .data(configFiles);
+
+        return writeConfig(jobKey, jobState, configMap);
+    }
+
+    @Override
+    public ExecutorState writeBinaryConfig(String jobKey, ExecutorState jobState, Map<String, byte[]> configFiles) {
+
+        var configMap = new V1ConfigMap()
+                .binaryData(configFiles);
+
+        return writeConfig(jobKey, jobState, configMap);
+    }
+
+    private ExecutorState writeConfig(String jobKey, ExecutorState jobState, V1ConfigMap configMap) {
+
+        try {
+
+            var namespace = "default";  // TODO: Namespace should be based on tenant? io.trac-platform.runtime.TENANT ?
+
+            var configVolName = String.format(JOB_CONFIG_VOL_NAME_TEMPLATE, jobKey);
+            var configMetadata = new V1ObjectMeta()
+                    .name(configVolName)
+                    .namespace(namespace);
+
+            configMap.setApiVersion("v1");
+            configMap.setKind("ConfigMap");
+            configMap.setMetadata(configMetadata);
+
+            var configMapResult = kubeCoreApi.createNamespacedConfigMap(namespace, configMap, null, null, null);
+
+            // TODO: Any need to use result?
+
+            return jobState;
+        }
+        catch (ApiException e) {
+
+            if (e.getCode() == 409)
+                return jobState;
+
+            e.printStackTrace();
+            throw new ETracInternal("Kubernetes error", e);  // TODO: Error
+        }
+    }
+    */
 }

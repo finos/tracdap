@@ -14,35 +14,11 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.exec.local;
+package com.accenture.trac.common.exec;
 
-import com.accenture.trac.common.exec.ExecutorState;
+public enum ExecutorVolumeType {
 
-import java.util.ArrayList;
-import java.util.List;
-
-
-public class LocalBatchState extends ExecutorState {
-
-    private String batchDir;
-    private List<String> volumes = new ArrayList<>();
-    private long pid;
-
-    String getBatchDir() {
-        return batchDir;
-    }
-
-    void setBatchDir(String batchDir) {
-        this.batchDir = batchDir;
-    }
-
-    long getPid() {
-        return pid;
-    }
-
-    void setPid(long pid) {
-        this.pid = pid;
-    }
-
-    List<String> getVolumes() { return volumes; }
+    CONFIG_DIR,
+    RESULT_DIR,
+    SCRATCH_DIR
 }

@@ -27,21 +27,21 @@ public interface IBatchExecutor {
 
     void executorStatus();
 
-    ExecutorState createBatchSandbox(String jobKey);
+    ExecutorState createBatch(String jobKey);
 
-    ExecutorState writeTextConfig(String jobKey, ExecutorState jobState, Map<String, String> configFiles);
+    void destroyBatch(String jobKey, ExecutorState jobState);
 
-    ExecutorState writeBinaryConfig(String jobKey, ExecutorState jobState, Map<String, byte[]> configFiles);
+    ExecutorState createVolume(ExecutorState state, String volumeName, ExecutorVolumeType volumeType);
 
-    ExecutorState startBatch(String jobKey, ExecutorState jobState, Set<String> configFiles);
+    ExecutorState writeFile(ExecutorState state, String volumeName, String fileName, byte[] fileContent);
 
-    void getBatchStatus(String jobKey, ExecutorState jobState);
+    byte[] readFile(ExecutorState state, String volumeName, String fileName);
 
-    byte[] readBatchResult(String jobKey, ExecutorState jobState);
+    ExecutorState startBatch(ExecutorState jobState, LaunchCmd launchCmd, List<LaunchArg> launchArgs);
 
-    ExecutorState cancelBatch(String jobKey, ExecutorState jobState);
+    ExecutorState cancelBatch(ExecutorState jobState);
 
-    ExecutorState cleanUpBatch(String jobKey, ExecutorState jobState);
+    void pollBatch(ExecutorState jobState);
 
     List<ExecutorPollResult> pollAllBatches(Map<String, ExecutorState> priorStates);
 }

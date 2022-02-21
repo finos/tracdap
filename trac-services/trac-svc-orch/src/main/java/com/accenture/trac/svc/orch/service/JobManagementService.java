@@ -17,6 +17,7 @@
 package com.accenture.trac.svc.orch.service;
 
 import com.accenture.trac.common.exception.ETracInternal;
+import com.accenture.trac.common.exec.*;
 import com.accenture.trac.config.JobResult;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagHeader;
@@ -30,8 +31,6 @@ import com.accenture.trac.api.TrustedMetadataApiGrpc;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataConstants;
-import com.accenture.trac.common.exec.ExecutorState;
-import com.accenture.trac.common.exec.IBatchExecutor;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.cache.TicketRequest;
@@ -200,25 +199,34 @@ public class JobManagementService {
             var jobState = jobCache.readJob(jobKey);
             var jobLogic = JobLogic.forJobType(jobState.jobType);
 
-            var jobConfig = jobLogic.buildJobConfig(jobState.jobId, jobState.definition);
-            var sysConfig = rtc;  // TODO: Real sys config for model runtime
+            var execState = jobExecutor.createBatch(jobKey);
+            execState = jobExecutor.createVolume(execState, "config", ExecutorVolumeType.CONFIG_DIR);
+            execState = jobExecutor.createVolume(execState, "result", ExecutorVolumeType.RESULT_DIR);
+            execState = jobExecutor.createVolume(execState, "log", ExecutorVolumeType.RESULT_DIR);
+            execState = jobExecutor.createVolume(execState, "scratch", ExecutorVolumeType.SCRATCH_DIR);
 
             // TODO: Config format and file names
+            var jobConfig = jobLogic.buildJobConfig(jobState.jobId, jobState.definition);
+            var sysConfig = rtc;  // TODO: Real sys config for model runtime
+            var jobConfigJson = JsonFormat.printer().print(jobConfig).getBytes(StandardCharsets.UTF_8);
+            var sysConfigJson = JsonFormat.printer().print(sysConfig).getBytes(StandardCharsets.UTF_8);
 
-            var jobConfigJson = JsonFormat.printer().print(jobConfig);
-            var sysConfigJson = JsonFormat.printer().print(sysConfig);
+            execState = jobExecutor.writeFile(execState, "config", "job_config.json", jobConfigJson);
+            execState = jobExecutor.writeFile(execState, "config", "sys_config.json", sysConfigJson);
 
-            var configMap = Map.ofEntries(
-                    Map.entry("job_config.json", jobConfigJson),
-                    Map.entry("sys_config.json", sysConfigJson));
+            var launchCmd = LaunchCmd.trac();
 
-            var execState = jobExecutor.createBatchSandbox(jobKey);
-            execState = jobExecutor.writeTextConfig(jobKey, execState, configMap);
-            execState = jobExecutor.startBatch(jobKey, execState, configMap.keySet());
+            var launchArgs = List.of(
+                    LaunchArg.string("--sys-config"), LaunchArg.path("config", "sys_config.json"),
+                    LaunchArg.string("--job-config"), LaunchArg.path("config", "job_config.json"),
+                    LaunchArg.string("--job-result-dir"), LaunchArg.path("result", "."),
+                    LaunchArg.string("--job-result-format"), LaunchArg.string("json"),
+                    LaunchArg.string("--dev-mode"));
+
+            execState = jobExecutor.startBatch(execState, launchCmd, launchArgs);
 
             jobState.statusCode = JobStatusCode.SUBMITTED;
             jobState.executorState = JobState.serialize(execState);
-
             jobCache.updateJob(jobKey, jobState, ctx.ticket());
 
             log.info("Job submitted: [{}]", jobKey);
@@ -248,7 +256,8 @@ public class JobManagementService {
             var jobLogic = JobLogic.forJobType(jobState.jobType);
 
             var execState = JobState.deserialize(jobState.executorState, ExecutorState.class);
-            var jobResultBytes = jobExecutor.readBatchResult(jobKey, execState);
+            var jobResultFile = String.format("job_result_%s.json", jobKey);
+            var jobResultBytes = jobExecutor.readFile(execState, "result", jobResultFile);
 
             var jobResultString = new String(jobResultBytes, StandardCharsets.UTF_8);
             var jobResultBuilder = JobResult.newBuilder();
@@ -281,7 +290,7 @@ public class JobManagementService {
                         updateResult.getTagVersion());
             }
 
-            jobExecutor.cleanUpBatch(jobKey, execState);
+            jobExecutor.destroyBatch(jobKey, execState);
 
             jobCache.deleteJob(jobKey, ctx.ticket());
         }
