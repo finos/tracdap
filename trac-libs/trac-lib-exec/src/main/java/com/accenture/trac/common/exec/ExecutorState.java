@@ -20,4 +20,14 @@ import java.io.Serializable;
 
 
 public class ExecutorState implements Serializable {
+
+    private final String jobKey;
+
+    protected ExecutorState(String jobKey) {
+        this.jobKey = jobKey;
+    }
+
+    public String getJobKey() {
+        return jobKey;
+    }
 }

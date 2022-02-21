@@ -14,13 +14,18 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.exec.kubernetes;
+package com.accenture.trac.common.exception;
 
-import com.accenture.trac.common.exec.ExecutorState;
+/**
+ * The executor failed to respond, or the response was gabled
+ */
+public class EExecutorCommunication extends EExecutor {
 
-public class KubernetesBatchState extends ExecutorState {
+    public EExecutorCommunication(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-    public KubernetesBatchState(String jobKey) {
-        super(jobKey);
+    public EExecutorCommunication(String message) {
+        super(message);
     }
 }

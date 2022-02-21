@@ -17,19 +17,14 @@
 package com.accenture.trac.common.exec.local;
 
 import com.accenture.trac.api.JobStatusCode;
-import com.accenture.trac.common.exception.EStartup;
-import com.accenture.trac.common.exception.ETracInternal;
-import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.exception.*;
 import com.accenture.trac.common.exec.*;
 import com.accenture.trac.common.metadata.MetadataConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -101,17 +96,32 @@ public class LocalBatchExecutor implements IBatchExecutor {
                     ? Files.createTempDirectory(batchRootDir, batchDirPrefix)
                     : Files.createTempDirectory(batchDirPrefix);
 
-            var batchState = new LocalBatchState();
+            var batchState = new LocalBatchState(jobKey);
             batchState.setBatchDir(batchDir.toString());
 
             log.info("Job [{}] sandbox directory created: [{}]", jobKey, batchDir);
 
             return batchState;
         }
+        catch (AccessDeniedException e) {
+
+            // Permissions errors reported as executor access error
+
+            var errorMessage = String.format(
+                    "Job [%s] failed to create sandbox directory: %s",
+                    jobKey, e.getMessage());
+
+            log.error(errorMessage, e);
+            throw new EExecutorAccess(errorMessage, e);
+        }
         catch (IOException e) {
 
-            // TODO
-            throw new RuntimeException("TODO", e);
+            var errorMessage = String.format(
+                    "Job [%s] failed to create sandbox directory: %s",
+                    jobKey, e.getMessage());
+
+            log.error(errorMessage, e);
+            throw new EExecutorFailure(errorMessage, e);
         }
     }
 
@@ -145,15 +155,23 @@ public class LocalBatchExecutor implements IBatchExecutor {
             var isReserved = MetadataConstants.TRAC_RESERVED_IDENTIFIER.matcher(volumeName);
 
             if (!isValid.matches()) {
-                var errorMsg = String.format("Requested volume name is not a valid identifier: [%s]", volumeName);
+
+                var errorMsg = String.format(
+                        "Job [%s] requested volume name is not a valid identifier: [%s]",
+                        state.getJobKey(), volumeName);
+
                 log.error(errorMsg);
-                throw new ETracInternal(errorMsg);
+                throw new EExecutorValidation(errorMsg);
             }
 
             if (isReserved.matches()) {
-                var errorMsg = String.format("Requested volume name is a reserved identifier: [%s]", volumeName);
+
+                var errorMsg = String.format(
+                        "Job [%s] requested volume name is a reserved identifier: [%s]",
+                        state.getJobKey(), volumeName);
+
                 log.error(errorMsg);
-                throw new ETracInternal(errorMsg);
+                throw new EExecutorValidation(errorMsg);
             }
 
             // Since volumeName is an identifier, it cannot be an absolute path
@@ -167,10 +185,25 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
             return batchState;
         }
+        catch (AccessDeniedException e) {
+
+            // Permissions errors reported as executor access error
+
+            var errorMessage = String.format(
+                    "Job [%s] failed to create batch volume [%s]: %s",
+                    state.getJobKey(), volumeName, e.getMessage());
+
+            log.error(errorMessage, e);
+            throw new EExecutorAccess(errorMessage, e);
+        }
         catch (IOException e) {
 
-            // TODO
-            throw new RuntimeException("TODO", e);
+            var errorMessage = String.format(
+                    "Job [%s] failed to create batch volume [%s]: %s",
+                    state.getJobKey(), volumeName, e.getMessage());
+
+            log.error(errorMessage, e);
+            throw new EExecutorFailure(errorMessage, e);
         }
     }
 
@@ -200,6 +233,11 @@ public class LocalBatchExecutor implements IBatchExecutor {
             Files.write(filePath, fileContent, StandardOpenOption.CREATE_NEW);
 
             return batchState;
+        }
+        catch (FileAlreadyExistsException e) {
+
+            // TODO
+            throw new RuntimeException("TODO", e);
         }
         catch (IOException e) {
 
@@ -232,6 +270,11 @@ public class LocalBatchExecutor implements IBatchExecutor {
             var filePath = volumeDir.resolve(fileName);
 
             return Files.readAllBytes(filePath);
+        }
+        catch (NoSuchFileException e) {
+
+            // TODO
+            throw new RuntimeException("TODO", e);
         }
         catch (IOException e) {
 

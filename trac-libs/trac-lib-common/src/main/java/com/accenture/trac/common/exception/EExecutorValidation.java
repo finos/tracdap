@@ -14,13 +14,19 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.exec.kubernetes;
+package com.accenture.trac.common.exception;
 
-import com.accenture.trac.common.exec.ExecutorState;
 
-public class KubernetesBatchState extends ExecutorState {
+/**
+ * An illegal request has been made to the executor
+ */
+public class EExecutorValidation extends EExecutor {
 
-    public KubernetesBatchState(String jobKey) {
-        super(jobKey);
+    public EExecutorValidation(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public EExecutorValidation(String message) {
+        super(message);
     }
 }

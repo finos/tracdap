@@ -14,13 +14,19 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.common.exec.kubernetes;
+package com.accenture.trac.common.exception;
 
-import com.accenture.trac.common.exec.ExecutorState;
 
-public class KubernetesBatchState extends ExecutorState {
+/**
+ * The executor is responding, but reported a failure during execution
+ */
+public class EExecutorFailure extends EExecutor {
 
-    public KubernetesBatchState(String jobKey) {
-        super(jobKey);
+    public EExecutorFailure(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public EExecutorFailure(String message) {
+        super(message);
     }
 }

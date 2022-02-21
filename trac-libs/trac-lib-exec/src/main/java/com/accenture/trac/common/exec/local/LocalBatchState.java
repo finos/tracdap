@@ -28,6 +28,10 @@ public class LocalBatchState extends ExecutorState {
     private List<String> volumes = new ArrayList<>();
     private long pid;
 
+    public LocalBatchState(String jobKey) {
+        super(jobKey);
+    }
+
     String getBatchDir() {
         return batchDir;
     }
