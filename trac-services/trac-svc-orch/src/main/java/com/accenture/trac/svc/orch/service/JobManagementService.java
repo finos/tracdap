@@ -18,6 +18,7 @@ package com.accenture.trac.svc.orch.service;
 
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exec.*;
+import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.JobResult;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagHeader;
@@ -205,12 +206,20 @@ public class JobManagementService {
             execState = jobExecutor.createVolume(execState, "log", ExecutorVolumeType.RESULT_DIR);
             execState = jobExecutor.createVolume(execState, "scratch", ExecutorVolumeType.SCRATCH_DIR);
 
-            // TODO: Config format and file names
-            var jobConfig = jobLogic.buildJobConfig(jobState.jobId, jobState.definition);
+            // No specialisation is needed to build the job config
+            // This may change in the future, in which case add IJobLogic.buildJobConfig()
+
+            var jobConfig = JobConfig.newBuilder()
+                    .setJobId(jobState.jobId)
+                    .setJob(jobState.definition)
+                    .putAllResources(jobState.resources)
+                    .build();
+
             var sysConfig = rtc;  // TODO: Real sys config for model runtime
+
+            // TODO: Config format and file names
             var jobConfigJson = JsonFormat.printer().print(jobConfig).getBytes(StandardCharsets.UTF_8);
             var sysConfigJson = JsonFormat.printer().print(sysConfig).getBytes(StandardCharsets.UTF_8);
-
             execState = jobExecutor.writeFile(execState, "config", "job_config.json", jobConfigJson);
             execState = jobExecutor.writeFile(execState, "config", "sys_config.json", sysConfigJson);
 

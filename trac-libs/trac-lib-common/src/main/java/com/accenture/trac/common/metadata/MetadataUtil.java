@@ -22,6 +22,8 @@ import com.accenture.trac.metadata.TagSelector;
 
 public class MetadataUtil {
 
+    private static final String OBJECT_KEY_TEMPLATE = "%s:%s:%d";
+
     public static TagSelector selectorFor(TagHeader header) {
         return selectorFor(header, false, false);
     }
@@ -47,5 +49,13 @@ public class MetadataUtil {
             selector.setTagVersion(header.getTagVersion());
 
         return selector.build();
+    }
+
+    public static String objectKey(TagHeader header) {
+
+        return String.format(OBJECT_KEY_TEMPLATE,
+                header.getObjectType(),
+                header.getObjectId(),
+                header.getObjectVersion());
     }
 }

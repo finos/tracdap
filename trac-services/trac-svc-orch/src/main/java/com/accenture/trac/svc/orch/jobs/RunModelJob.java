@@ -20,17 +20,12 @@ package com.accenture.trac.svc.orch.jobs;
 import com.accenture.trac.api.JobRequest;
 import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.JobResult;
-import com.accenture.trac.metadata.JobDefinition;
-import com.accenture.trac.metadata.JobType;
-import com.accenture.trac.metadata.TagHeader;
-import com.accenture.trac.metadata.TagSelector;
+import com.accenture.trac.metadata.*;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 
 public class RunModelJob implements IJobLogic {
@@ -53,14 +48,31 @@ public class RunModelJob implements IJobLogic {
     }
 
     @Override
-    public JobConfig buildJobConfig(TagHeader jobId, JobDefinition job) {
+    public JobDefinition freezeResources(JobDefinition job, Map<String, TagHeader> resources) {
 
-        throw new RuntimeException("Not implemented yet");
+        var runModelJob = job.getRunModel().toBuilder();
+
+        var modelId = resources.get(TRAC_MODEL_RESOURCE_KEY);
+        var modelSelector = MetadataUtil.selectorFor(modelId);
+
+        runModelJob.setModel(modelSelector);
+
+        for (var input : runModelJob.getInputsMap().entrySet()) {
+
+            var resourceId = resources.get(input.getKey());
+            var resourceSelector = MetadataUtil.selectorFor(resourceId);
+
+            input.setValue(resourceSelector);
+        }
+
+        return job.toBuilder()
+                .setRunModel(runModelJob)
+                .build();
     }
 
     @Override
     public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobRequest request, JobResult result) {
 
-        return List.of();
+        throw new RuntimeException("Not implemented yet");
     }
 }

@@ -42,15 +42,11 @@ public class ImportModelJob implements IJobLogic {
     }
 
     @Override
-    public JobConfig buildJobConfig(TagHeader jobId, JobDefinition job) {
+    public JobDefinition freezeResources(JobDefinition job, Map<String, TagHeader> resources) {
 
-        if (job.getJobType() != JobType.IMPORT_MODEL)
-            throw new EUnexpected();
+        // NO-OP, IMPORT_MODEL does not use any resources
 
-        return JobConfig.newBuilder()
-                .setJobId(jobId)
-                .setJob(job)
-                .build();
+        return job;
     }
 
     @Override

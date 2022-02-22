@@ -22,7 +22,6 @@ import com.accenture.trac.common.grpc.GrpcClientWrap;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.metadata.*;
 
-import com.accenture.trac.metadata.JobType;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.jobs.JobLogic;
@@ -33,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -61,9 +59,9 @@ public class JobApiService {
 
     public CompletableFuture<JobStatus> validateJob(JobRequest request) {
 
-        var state = new RequestState(request);
+        var jobState = newJob(request);
 
-        return CompletableFuture.completedFuture(state)
+        return CompletableFuture.completedFuture(jobState)
 
                 .thenApply(s -> jobStatus(s, JobStatusCode.PREPARING))
 
@@ -76,9 +74,9 @@ public class JobApiService {
 
     public CompletableFuture<JobStatus> submitJob(JobRequest request) {
 
-        var state = new RequestState(request);
+        var jobState = newJob(request);
 
-        return CompletableFuture.completedFuture(state)
+        return CompletableFuture.completedFuture(jobState)
 
                 .thenApply(s -> jobStatus(s, JobStatusCode.PREPARING))
 
@@ -103,55 +101,65 @@ public class JobApiService {
     }
 
 
+    private JobState newJob(JobRequest request) {
 
-    private RequestState jobStatus(RequestState state, JobStatusCode statusCode) {
+        var jobState = new JobState();
+        jobState.tenant = request.getTenant();
+        jobState.jobType = request.getJob().getJobType();
+        jobState.definition = request.getJob();
+        jobState.jobRequest = request;
 
-        state.statusCode = statusCode;
-        return state;
+        return jobState;
+    }
+
+    private JobState jobStatus(JobState jobState, JobStatusCode statusCode) {
+
+        jobState.statusCode = statusCode;
+        return jobState;
     }
 
 
-    private CompletionStage<RequestState> assembleAndValidate(RequestState state) {
+    private CompletionStage<JobState> assembleAndValidate(JobState jobState) {
 
-        return CompletableFuture.completedFuture(state)
+        return CompletableFuture.completedFuture(jobState)
 
-                .thenCompose(this::loadJobMetadata);
+                .thenCompose(this::loadResources);
 
         // static validate
         // load related metadata
         // semantic validate
     }
 
-    private RequestState buildMetadata(RequestState request) {
+    private JobState buildMetadata(JobState jobState) {
 
-        var jobLogic = JobLogic.forJobType(request.jobType);
+        var jobLogic = JobLogic.forJobType(jobState.jobType);
 
 
 
-        return request;
+        return jobState;
     }
 
-    private CompletionStage<RequestState> saveMetadata(RequestState request) {
+    private CompletionStage<JobState> saveMetadata(JobState jobState) {
 
         var jobObj = ObjectDefinition.newBuilder()
                 .setObjectType(ObjectType.JOB)
-                .setJob(request.jobDef)
+                .setJob(jobState.definition)
                 .build();
 
         var ctrlJobAttrs = List.of(
                 TagUpdate.newBuilder()
                         .setAttrName(TRAC_JOB_TYPE_ATTR)
-                        .setValue(MetadataCodec.encodeValue(request.jobType.toString()))
+                        .setValue(MetadataCodec.encodeValue(jobState.jobType.toString()))
                         .build(),
                 TagUpdate.newBuilder()
                         .setAttrName(TRAC_JOB_STATUS_ATTR)
-                        .setValue(MetadataCodec.encodeValue(request.statusCode.toString()))
+                        .setValue(MetadataCodec.encodeValue(jobState.statusCode.toString()))
                         .build());
 
-        var freeJobAttrs = request.jobRequest.getJobAttrsList();
+        var freeJobAttrs = jobState.jobRequest.getJobAttrsList();
 
         var jobWriteReq = MetadataWriteRequest.newBuilder()
-                .setTenant(request.tenant)
+                .setTenant(jobState.tenant)
                 .setObjectType(ObjectType.JOB)
                 .setDefinition(jobObj)
                 .addAllTagUpdates(ctrlJobAttrs)
@@ -164,76 +172,44 @@ public class JobApiService {
 
         return grpcCall.thenApply(header -> {
 
-            request.jobId = header;
-            return request;
+            jobState.jobId = header;
+            return jobState;
         });
     }
 
-    private CompletionStage<RequestState> submitForExecution(RequestState request) {
+    private CompletionStage<JobState> submitForExecution(JobState jobState) {
 
-        var jobKey = String.format("%s-v%d", request.jobId.getObjectId(), request.jobId.getObjectVersion());
+        // TODO: Centralize this
+        var jobKey = String.format("%s-v%d", jobState.jobId.getObjectId(), jobState.jobId.getObjectVersion());
 
-        // TODO: Can RequestState just use a JobState?
-        var jobState = new JobState();
-        jobState.tenant = request.tenant;
         jobState.jobKey = jobKey;
-        jobState.jobId = request.jobId;
-        jobState.jobType = request.jobType;
-        jobState.jobRequest = request.jobRequest;
-        jobState.definition = request.jobDef;
         jobState.statusCode = JobStatusCode.QUEUED;
 
         jobCache.createJob(jobKey, jobState);
 
-        request.statusCode = JobStatusCode.QUEUED;
-
-        return CompletableFuture.completedFuture(request);
+        return CompletableFuture.completedFuture(jobState);
     }
 
-    private JobStatus reportStatus(RequestState request) {
+    private JobStatus reportStatus(JobState jobState) {
 
         var status = JobStatus.newBuilder();
 
-        if (request.jobId != null)
-            status.setJobId(request.jobId);
+        if (jobState.jobId != null)
+            status.setJobId(jobState.jobId);
 
-        status.setStatus(request.statusCode);
+        status.setStatus(jobState.statusCode);
 
         return status.build();
     }
 
+    private CompletionStage<JobState> loadResources(JobState jobState) {
 
-
-    private static class RequestState {
-
-        RequestState(JobRequest request) {
-
-            this.tenant = request.getTenant();
-            this.jobType = request.getJob().getJobType();
-            this.jobDef = request.getJob();
-            this.jobRequest = request;
-        }
-
-        String tenant;
-        JobType jobType;
-        JobDefinition jobDef;
-        JobRequest jobRequest;
-
-        TagHeader jobId;
-        ObjectDefinition target;
-        Map<String, ObjectDefinition> resources = new HashMap<>();
-
-        JobStatusCode statusCode;
-    }
-
-    private CompletionStage<RequestState> loadJobMetadata(RequestState state) {
-
-        var jobLogic = JobLogic.forJobType(state.jobType);
-        var resources = jobLogic.requiredMetadata(state.jobDef);
+        var jobLogic = JobLogic.forJobType(jobState.jobType);
+        var resources = jobLogic.requiredMetadata(jobState.definition);
 
         if (resources.isEmpty()) {
             log.info("No additional metadata required");
-            return CompletableFuture.completedFuture(state);
+            return CompletableFuture.completedFuture(jobState);
         }
 
         log.info("Loading additional required metadata...");
@@ -247,31 +223,40 @@ public class JobApiService {
         }
 
         var batchRequest = MetadataBatchRequest.newBuilder()
-                .setTenant(state.tenant)
+                .setTenant(jobState.tenant)
                 .addAllSelector(orderedSelectors)
                 .build();
 
         return grpcWrap
                 .unaryCall(READ_BATCH_METHOD, batchRequest, metaClient::readBatch)
-                .thenApply(batchResponse -> loadJobMetadataResponse(batchResponse, orderedKeys, state));
+                .thenApply(batchResponse -> loadResourcesResponse(batchResponse, orderedKeys, jobState));
     }
 
-    private RequestState loadJobMetadataResponse(
+    private JobState loadResourcesResponse(
             MetadataBatchResponse batchResponse,
             List<String> orderedKeys,
-            RequestState state) {
+            JobState jobState) {
 
         if (batchResponse.getTagCount() != orderedKeys.size())
             throw new EUnexpected();
 
+        var jobLogic = JobLogic.forJobType(jobState.jobType);
+
+        var resourceMapping = new HashMap<String, TagHeader>(orderedKeys.size());
+        var resourceDefinitions = new HashMap<String, ObjectDefinition>(orderedKeys.size());
+
         for (var resourceIndex = 0; resourceIndex < orderedKeys.size(); resourceIndex++) {
 
             var resourceKey = orderedKeys.get(resourceIndex);
-            var resourceDef = batchResponse.getTag(resourceIndex).getDefinition();
+            var resource = batchResponse.getTag(resourceIndex);
 
-            state.resources.put(resourceKey, resourceDef);
+            resourceMapping.put(resourceKey, resource.getHeader());
+            resourceDefinitions.put(resourceKey, resource.getDefinition());
         }
 
-        return state;
+        jobState.resources = resourceDefinitions;
+        jobState.definition = jobLogic.freezeResources(jobState.definition, resourceMapping);
+
+        return jobState;
     }
 }
