@@ -28,15 +28,11 @@ import "trac/metadata/tag_update.proto";
 message JobDefinition {
 
   JobType jobType = 1;
-  TagSelector target = 2;
-
-  map<string, Value> parameters = 3;
-  map<string, TagSelector> inputs = 4;
-  map<string, TagSelector> outputs = 5;
-  map<string, TagSelector> models = 6;
 
   oneof jobDetails {
-    ImportModelJobDetails importModel = 7;
+    RunModelJob runModel = 2;
+    RunFlowJob runFlow = 3;
+    ImportModelJob importModel = 4;
   }
 }
 
@@ -48,7 +44,30 @@ enum JobType {
   IMPORT_DATA = 4;
 }
 
-message ImportModelJobDetails {
+message RunModelJob {
+
+  TagSelector model = 1;
+
+  map<string, Value> parameters = 2;
+  map<string, TagSelector> inputs = 3;
+  map<string, TagSelector> outputs = 4;
+
+  repeated TagUpdate outputAttrs = 5;
+}
+
+message RunFlowJob {
+
+  TagSelector flow = 1;
+
+  map<string, Value> parameters = 2;
+  map<string, TagSelector> inputs = 3;
+  map<string, TagSelector> outputs = 4;
+  map<string, TagSelector> models = 5;
+
+  repeated TagUpdate outputAttrs = 6;
+}
+
+message ImportModelJob {
 
   string language = 1;
   string repository = 2;
