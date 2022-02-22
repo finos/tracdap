@@ -33,8 +33,6 @@ import java.util.Map;
 
 public interface IJobLogic {
 
-    JobDefinition buildJobDefinition(JobRequest jobRequest);
-
     JobConfig buildJobConfig(TagHeader jobId, JobDefinition job);
 
     List<MetadataWriteRequest> buildResultMetadata(String tenant, JobRequest request, JobResult result);

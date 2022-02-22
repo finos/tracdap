@@ -112,14 +112,14 @@ public class JobApiService {
         // load related metadata
         // semantic validate
 
-        return CompletableFuture.completedFuture(buildMetadata(request));
+        return CompletableFuture.completedFuture(request);  //buildMetadata(request));
     }
 
     private RequestState buildMetadata(RequestState request) {
 
         var jobLogic = JobLogic.forJobType(request.jobType);
 
-        request.jobDef = jobLogic.buildJobDefinition(request.jobRequest);
+
 
         return request;
     }
@@ -202,23 +202,24 @@ public class JobApiService {
         RequestState(JobRequest request) {
 
             this.tenant = request.getTenant();
-            this.jobType = request.getJobType();
+            this.jobType = request.getJob().getJobType();
+            this.jobDef = request.getJob();
             this.jobRequest = request;
         }
 
         String tenant;
         JobType jobType;
+        JobDefinition jobDef;
         JobRequest jobRequest;
 
         TagHeader jobId;
-        JobDefinition jobDef;
         ObjectDefinition target;
         Map<String, ObjectDefinition> resources = new HashMap<>();
 
         JobStatusCode statusCode;
     }
 
-
+/*
     private CompletionStage<RequestState>
     loadJobMetadata(JobRequest request, RequestState state) {
 
@@ -259,5 +260,5 @@ public class JobApiService {
         }
 
         return state;
-    }
+    }*/
 }

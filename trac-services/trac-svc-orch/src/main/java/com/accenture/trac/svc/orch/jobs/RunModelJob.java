@@ -31,14 +31,6 @@ import java.util.List;
 public class RunModelJob implements IJobLogic {
 
     @Override
-    public JobDefinition buildJobDefinition(JobRequest jobRequest) {
-
-        return JobDefinition.newBuilder()
-                .setJobType(JobType.RUN_MODEL)
-                .build();
-    }
-
-    @Override
     public JobConfig buildJobConfig(TagHeader jobId, JobDefinition job) {
 
         throw new RuntimeException("Not implemented yet");

@@ -32,18 +32,6 @@ import static com.accenture.trac.common.metadata.MetadataConstants.*;
 public class ImportModelJob implements IJobLogic {
 
     @Override
-    public JobDefinition buildJobDefinition(JobRequest jobRequest) {
-
-        if (jobRequest.getJobType() != JobType.IMPORT_MODEL)
-            throw new EUnexpected();
-
-        return JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_MODEL)
-                .setImportModel(jobRequest.getImportModel())
-                .build();
-    }
-
-    @Override
     public JobConfig buildJobConfig(TagHeader jobId, JobDefinition job) {
 
         if (job.getJobType() != JobType.IMPORT_MODEL)
@@ -93,12 +81,16 @@ public class ImportModelJob implements IJobLogic {
                         .setValue(encodeValue(modelDef.getVersion()))
                         .build());
 
+        var suppliedAttrs = request.getJob()
+                .getImportModel()
+                .getModelAttrsList();
+
         var modelReq = MetadataWriteRequest.newBuilder()
                 .setTenant(tenant)
                 .setObjectType(ObjectType.MODEL)
                 .setDefinition(modelObj)
-                .addAllTagUpdates(request.getImportModel().getModelAttrsList())
                 .addAllTagUpdates(controlledAttrs)
+                .addAllTagUpdates(suppliedAttrs)
                 .build();
 
         return List.of(modelReq);
