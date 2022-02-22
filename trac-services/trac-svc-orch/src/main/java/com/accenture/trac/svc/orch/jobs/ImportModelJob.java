@@ -25,11 +25,21 @@ import com.accenture.trac.config.JobResult;
 import com.accenture.trac.metadata.*;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.accenture.trac.common.metadata.MetadataCodec.encodeValue;
 import static com.accenture.trac.common.metadata.MetadataConstants.*;
 
+
 public class ImportModelJob implements IJobLogic {
+
+    @Override
+    public Map<String, TagSelector> requiredMetadata(JobDefinition job) {
+
+        // No extra metadata needed for an import_model job
+
+        return Map.of();
+    }
 
     @Override
     public JobConfig buildJobConfig(TagHeader jobId, JobDefinition job) {

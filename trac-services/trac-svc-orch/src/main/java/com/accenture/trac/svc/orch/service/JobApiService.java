@@ -17,6 +17,7 @@
 package com.accenture.trac.svc.orch.service;
 
 import com.accenture.trac.api.*;
+import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.grpc.GrpcClientWrap;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.metadata.*;
@@ -26,6 +27,8 @@ import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.jobs.JobLogic;
 import io.grpc.MethodDescriptor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,6 +45,8 @@ public class JobApiService {
 
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreateObjectMethod();
     private static final MethodDescriptor<MetadataBatchRequest, MetadataBatchResponse> READ_BATCH_METHOD = TrustedMetadataApiGrpc.getReadBatchMethod();
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final IJobCache jobCache;
     private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient;
@@ -106,13 +111,15 @@ public class JobApiService {
     }
 
 
-    private CompletionStage<RequestState> assembleAndValidate(RequestState request) {
+    private CompletionStage<RequestState> assembleAndValidate(RequestState state) {
+
+        return CompletableFuture.completedFuture(state)
+
+                .thenCompose(this::loadJobMetadata);
 
         // static validate
         // load related metadata
         // semantic validate
-
-        return CompletableFuture.completedFuture(request);  //buildMetadata(request));
     }
 
     private RequestState buildMetadata(RequestState request) {
@@ -219,46 +226,52 @@ public class JobApiService {
         JobStatusCode statusCode;
     }
 
-/*
-    private CompletionStage<RequestState>
-    loadJobMetadata(JobRequest request, RequestState state) {
+    private CompletionStage<RequestState> loadJobMetadata(RequestState state) {
 
-        var batchRequest = MetadataBatchRequest.newBuilder()
-                .setTenant(request.getTenant());
+        var jobLogic = JobLogic.forJobType(state.jobType);
+        var resources = jobLogic.requiredMetadata(state.jobDef);
 
-        if (request.hasTarget())
-            batchRequest.addSelector(request.getTarget());
-
-        var orderedResources = new ArrayList<String>(request.getResourcesCount());
-
-        for (var resource : request.getResourcesMap().entrySet()) {
-            orderedResources.add(resource.getKey());
-            batchRequest.addSelector(resource.getValue());
+        if (resources.isEmpty()) {
+            log.info("No additional metadata required");
+            return CompletableFuture.completedFuture(state);
         }
 
-        var finalBatchRequest = batchRequest.build();
+        log.info("Loading additional required metadata...");
+
+        var orderedKeys = new ArrayList<String>(resources.size());
+        var orderedSelectors = new ArrayList<TagSelector>(resources.size());
+
+        for (var resource : resources.entrySet()) {
+            orderedKeys.add(resource.getKey());
+            orderedSelectors.add(resource.getValue());
+        }
+
+        var batchRequest = MetadataBatchRequest.newBuilder()
+                .setTenant(state.tenant)
+                .addAllSelector(orderedSelectors)
+                .build();
 
         return grpcWrap
-                .unaryCall(READ_BATCH_METHOD, finalBatchRequest, metaClient::readBatch)
-                .thenApply(batchResponse -> loadJobMetadataResponse(request, batchResponse, orderedResources, state));
+                .unaryCall(READ_BATCH_METHOD, batchRequest, metaClient::readBatch)
+                .thenApply(batchResponse -> loadJobMetadataResponse(batchResponse, orderedKeys, state));
     }
 
     private RequestState loadJobMetadataResponse(
-            JobRequest jobRequest, MetadataBatchResponse batchResponse,
-            List<String> orderedResources, RequestState state) {
+            MetadataBatchResponse batchResponse,
+            List<String> orderedKeys,
+            RequestState state) {
 
-        if (jobRequest.hasTarget())
-            state.target = batchResponse.getTag(0).getDefinition();
+        if (batchResponse.getTagCount() != orderedKeys.size())
+            throw new EUnexpected();
 
-        for (var i = 0; i < jobRequest.getResourcesCount(); i++) {
+        for (var resourceIndex = 0; resourceIndex < orderedKeys.size(); resourceIndex++) {
 
-            var resourceKey = orderedResources.get(i);
-            var responseIndex = jobRequest.hasTarget() ? i + 1 : i;
-            var resourceDef = batchResponse.getTag(responseIndex).getDefinition();
+            var resourceKey = orderedKeys.get(resourceIndex);
+            var resourceDef = batchResponse.getTag(resourceIndex).getDefinition();
 
             state.resources.put(resourceKey, resourceDef);
         }
 
         return state;
-    }*/
+    }
 }

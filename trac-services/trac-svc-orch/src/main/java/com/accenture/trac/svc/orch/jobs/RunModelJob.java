@@ -19,16 +19,38 @@ package com.accenture.trac.svc.orch.jobs;
 
 import com.accenture.trac.api.JobRequest;
 import com.accenture.trac.api.MetadataWriteRequest;
+import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.JobResult;
 import com.accenture.trac.metadata.JobDefinition;
 import com.accenture.trac.metadata.JobType;
 import com.accenture.trac.metadata.TagHeader;
+import com.accenture.trac.metadata.TagSelector;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 public class RunModelJob implements IJobLogic {
+
+    private static final String TRAC_MODEL_RESOURCE_KEY = "trac_model";
+
+    @Override
+    public Map<String, TagSelector> requiredMetadata(JobDefinition job) {
+
+        if (job.getJobType() != JobType.RUN_MODEL)
+            throw new EUnexpected();
+
+        var runModel = job.getRunModel();
+
+        var resources = new HashMap<String, TagSelector>(runModel.getInputsCount() + 1);
+        resources.putAll(runModel.getInputsMap());
+        resources.put(TRAC_MODEL_RESOURCE_KEY, runModel.getModel());
+
+        return resources;
+    }
 
     @Override
     public JobConfig buildJobConfig(TagHeader jobId, JobDefinition job) {
