@@ -321,7 +321,8 @@ public class TestData {
                 .setObjectType(ObjectType.JOB)
                 .setJob(JobDefinition.newBuilder()
                 .setJobType(JobType.RUN_MODEL)
-                .setTarget(targetSelector))
+                .setRunModel( RunModelJob.newBuilder()
+                .setModel(targetSelector)))
                 .build();
     }
 
