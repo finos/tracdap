@@ -426,7 +426,7 @@ class FunctionResolver:
 
     def resolve_run_model_node(self, job_config: _config.JobConfig, node: RunModelNode) -> NodeFunction:
 
-        model_scope = f"JOB_SCOPE:{job_config.jobId}"
+        model_scope = _util.object_key(job_config.jobId)
         model_class = self._models.load_model_class(model_scope, node.model_def)
 
         # TODO: Verify model_class against model_def

@@ -17,6 +17,9 @@ from __future__ import annotations
 import logging
 import sys
 
+import trac.rt.metadata as meta
+import typing as tp
+
 
 class ColorFormatter(logging.Formatter):
 
@@ -123,3 +126,8 @@ def logger_for_class(clazz: type) -> logging.Logger:
 
 def logger_for_namespace(namespace: str) -> logging.Logger:
     return logging.getLogger(namespace)
+
+
+def object_key(object_id: tp.Union[meta.TagHeader, meta.TagSelector]):
+
+    return f"{object_id.objectType.name}-{object_id.objectId}-v{object_id.objectVersion}"

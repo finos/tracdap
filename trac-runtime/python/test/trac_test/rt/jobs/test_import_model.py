@@ -42,7 +42,7 @@ class ImportModelTest(unittest.TestCase):
 
         job_def = meta.JobDefinition(
             jobType=meta.JobType.IMPORT_MODEL,
-            importModel=meta.ImportModelJobDetails(
+            importModel=meta.ImportModelJob(
                 language="python",
                 repository="trac_git_repo",
                 path="examples/models/python/hello_world",

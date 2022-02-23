@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import pathlib
 import typing as tp
 from copy import copy
 from dataclasses import dataclass, field
@@ -344,13 +343,13 @@ class JobProcessor(actors.Actor):
     """
 
     def __init__(
-            self, job_id, job_config: config.JobConfig,
+            self, job_key, job_config: config.JobConfig,
             result_spec: _graph.JobResultSpec,
             models: _models.ModelLoader,
             storage: _storage.StorageManager):
 
         super().__init__()
-        self.job_id = job_id
+        self.job_key = job_key
         self.job_config = job_config
         self.result_spec = result_spec
         self._models = models
@@ -358,13 +357,13 @@ class JobProcessor(actors.Actor):
         self._log = util.logger_for_object(self)
 
     def on_start(self):
-        self._log.info(f"Starting job [{self.job_id}]")
-        self._models.create_scope(f"JOB_SCOPE:{self.job_id}")
+        self._log.info(f"Starting job [{self.job_key}]")
+        self._models.create_scope(self.job_key)
         self.actors().spawn(GraphBuilder, self.job_config, self.result_spec, self._models, self._storage)
 
     def on_stop(self):
-        self._log.info(f"Cleaning up job [{self.job_id}]")
-        self._models.destroy_scope(f"JOB_SCOPE:{self.job_id}")
+        self._log.info(f"Cleaning up job [{self.job_key}]")
+        self._models.destroy_scope(self.job_key)
 
     @actors.Message
     def job_graph(self, graph: GraphContext):
@@ -373,13 +372,13 @@ class JobProcessor(actors.Actor):
 
     @actors.Message
     def job_succeeded(self):
-        self._log.info(f"Job succeeded {self.job_id}")
-        self.actors().send_parent("job_succeeded", self.job_id)
+        self._log.info(f"Job succeeded {self.job_key}")
+        self.actors().send_parent("job_succeeded", self.job_key)
 
     @actors.Message
     def job_failed(self, error: Exception):
-        self._log.error(f"Job failed {self.job_id}")
-        self.actors().send_parent("job_failed", self.job_id, error)
+        self._log.error(f"Job failed {self.job_key}")
+        self.actors().send_parent("job_failed", self.job_key, error)
 
 
 @dataclass
@@ -426,19 +425,19 @@ class TracEngine(actors.Actor):
             job_result_dir: str,
             job_result_format: str):
 
-        job_id = str(job_config.jobId)
+        job_key = util.object_key(job_config.jobId)
 
         result_needed = bool(job_result_dir)
         result_spec = _graph.JobResultSpec(result_needed, job_result_dir, job_result_format)
 
-        self._log.info(f"Job submitted: [{job_id}]")
+        self._log.info(f"Job submitted: [{job_key}]")
 
         job_actor_id = self.actors().spawn(
-            JobProcessor, job_id,
+            JobProcessor, job_key,
             job_config, result_spec,
             self._models, self._storage)
 
-        jobs = {**self.engine_ctx.jobs, job_id: job_actor_id}
+        jobs = {**self.engine_ctx.jobs, job_key: job_actor_id}
         self.engine_ctx = EngineContext(jobs, self.engine_ctx.data)
 
     @actors.Message
