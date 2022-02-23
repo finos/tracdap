@@ -27,6 +27,7 @@ import trac.rt.config as cfg
 import trac.rt.exceptions as _ex
 import trac.rt.impl.models as _models
 import trac.rt.impl.storage as _storage
+import trac.rt.impl.type_system as _types
 import trac.rt.impl.util as util
 
 
@@ -61,6 +62,9 @@ class DevModeTranslator:
 
         if model_class is not None:
             job_config, sys_config = cls._process_model_definition(model_class, job_config, sys_config)
+
+        if job_config.job.jobType in [meta.JobType.RUN_MODEL, meta.JobType.RUN_FLOW]:
+            job_config = cls._process_parameters(job_config)
 
         if job_config.job.jobType != meta.JobType.RUN_MODEL:
             return job_config, sys_config
@@ -172,6 +176,72 @@ class DevModeTranslator:
         job_config.job = job_def
 
         return job_config
+
+    @classmethod
+    def _process_parameters(cls, job_config: cfg.JobConfig) -> cfg.JobConfig:
+
+        if job_config.job.jobType == meta.JobType.RUN_MODEL:
+
+            job_details = job_config.job.runModel
+            model_key = util.object_key(job_details.model)
+            model_or_flow = job_config.resources[model_key].model
+
+        elif job_config.job.jobType == meta.JobType.RUN_FLOW:
+
+            job_details = job_config.job.runFlow
+            flow_key = util.object_key(job_details.flow)
+            model_or_flow = job_config.resources[flow_key].flow
+
+        else:
+            raise _ex.EUnexpected()
+
+        param_specs = model_or_flow.parameters
+        param_values = job_details.parameters
+
+        encoded_params = cls._process_parameters_dict(param_specs, param_values)
+
+        job_details = copy.copy(job_details)
+        job_def = copy.copy(job_config.job)
+        job_config = copy.copy(job_config)
+
+        if job_config.job.jobType == meta.JobType.RUN_MODEL:
+            job_def.runModel = job_details
+        else:
+            job_def.runFlow = job_details
+
+        job_details.parameters = encoded_params
+        job_config.job = job_def
+
+        return job_config
+
+    @classmethod
+    def _process_parameters_dict(
+            cls, param_specs: tp.Dict[str, meta.ModelParameter],
+            param_values: tp.Dict[str, meta.Value]) -> tp.Dict[str, meta.Value]:
+
+        unknown_params = list(filter(lambda p: p not in param_specs, param_values))
+
+        if any(unknown_params):
+            msg = f"Unknown parameters cannot be translated: [{', '.join(unknown_params)}]"
+            cls._log.error(msg)
+            raise _ex.EConfigParse(msg)
+
+        encoded_values = dict()
+
+        for p_name, p_value in param_values.items():
+
+            if isinstance(p_value, meta.Value):
+                encoded_values[p_name] = p_value
+
+            else:
+                p_spec = param_specs[p_name]
+
+                cls._log.info(f"Encoding parameter [{p_name}] as {p_spec.paramType.basicType}")
+
+                encoded_value = _types.convert_value(p_value, p_spec.paramType)
+                encoded_values[p_name] = encoded_value
+
+        return encoded_values
 
     @classmethod
     def _process_model_definition(

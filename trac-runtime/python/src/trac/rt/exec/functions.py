@@ -17,8 +17,6 @@ from __future__ import annotations
 import copy
 import enum
 import abc
-import typing as tp
-import pathlib
 import json
 import yaml
 import uuid
@@ -30,11 +28,10 @@ import trac.rt.impl.models as _models
 import trac.rt.impl.storage as _storage
 import trac.rt.impl.data as _data
 import trac.rt.impl.util as _util
+import trac.rt.impl.type_system as _types
 
 import trac.rt.exec.context as _ctx
 from trac.rt.exec.graph import *
-
-
 
 
 NodeContext = tp.Dict[NodeId, object]  # Available prior node results when a node function is called
@@ -178,6 +175,26 @@ class JobResultMetadataFunc(NodeFunction):
             result_stream.write(job_result_bytes)
 
         return None
+
+
+class SetParametersFunc(NodeFunction):
+
+    def __init__(self, node: SetParametersNode):
+        super().__init__()
+        self.node = node
+
+    def __call__(self, ctx: NodeContext) -> NodeResult:
+
+        log = _util.logger_for_object(self)
+
+        native_params = dict()
+
+        for p_name, p_value in self.node.parameters.items():
+            native_value = _types.decode_value(p_value)
+            native_params[p_name] = native_value
+            log.info(f"Set parameter [{p_name}] = {native_value} ({p_value.type.basicType.name})")
+
+        return native_params
 
 
 class DataViewFunc(NodeFunction):
@@ -337,7 +354,6 @@ class ImportModelFunc(NodeFunction):
         model_class = self._models.load_model_class(self.node.model_scope, stub_model_def)
         self._models.scan_model(model_class)
 
-
         model: _api.TracModel = model_class()
 
         params = model.define_parameters()
@@ -365,22 +381,29 @@ class RunModelFunc(NodeFunction):
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
 
-        # Create a context containing only items in the current namespace, addressed by name
-        local_ctx = {
-            nid.name: n.result for nid, n in ctx.items()
-            if nid.namespace == self.node.id.namespace}
+        model_def = self.node.model_def
+
+        # Create a context containing only declared items in the current namespace, addressed by name
+
+        def filter_ctx(node_id: NodeId):
+            if node_id.namespace != self.node.id.namespace:
+                return False
+            if node_id.name in model_def.parameters or node_id in model_def.inputs:
+                return True
+            return False
+
+        local_ctx = {nid.name: n.result for nid, n in ctx.items() if filter_ctx(nid)}
 
         # Add empty data views to the local context to hold model outputs
         # Assuming outputs are all defined with static schemas
-        local_ctx.update({
-            output_name: _data.DataView(schema=self.node.model_def.outputs[output_name].schema, parts={})
-            for output_name in self.node.model_def.outputs})
+
+        for output_name in model_def.outputs:
+            blank_data_view = _data.DataView(schema=self.node.model_def.outputs[output_name].schema, parts={})
+            local_ctx[output_name] = blank_data_view
 
         # Run the model against the mapped local context
-        trac_ctx = _ctx.TracContextImpl(
-            self.node.model_def, self.model_class,
-            parameters=self.job_config.job.parameters,
-            data=local_ctx)
+
+        trac_ctx = _ctx.TracContextImpl(self.node.model_def, self.model_class, local_ctx)
 
         model = self.model_class()
         model.run_model(trac_ctx)
@@ -438,6 +461,7 @@ class FunctionResolver:
         ContextPopNode: ContextPopFunc,
         IdentityNode: IdentityFunc,
         KeyedItemNode: KeyedItemFunc,
+        SetParametersNode: SetParametersFunc,
         DataViewNode: DataViewFunc,
         DataItemNode: DataItemFunc,
         JobResultMetadataNode: JobResultMetadataFunc}

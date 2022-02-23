@@ -174,14 +174,26 @@ class KeyedItemNode(MappingNode):
 
 
 @dc.dataclass(frozen=True)
+class SetParametersNode(Node):
+
+    parameters: tp.Dict[str, meta.Value]
+
+    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
+
+    def __post_init__(self, explicit_deps):
+        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
+        object.__setattr__(self, 'dependencies', dependencies)
+
+
+@dc.dataclass(frozen=True)
 class DataViewNode(MappingNode):
 
     schema: meta.SchemaDefinition
     root_item: NodeId
 
     def __post_init__(self):
-        eager_data_deps = {self.root_item: DependencyType.HARD}
-        object.__setattr__(self, 'dependencies', eager_data_deps)
+        dependencies = {self.root_item: DependencyType.HARD}
+        object.__setattr__(self, 'dependencies', dependencies)
 
 
 @dc.dataclass(frozen=True)
@@ -193,7 +205,8 @@ class DataItemNode(MappingNode):
     data_item: str
 
     def __post_init__(self):
-        object.__setattr__(self, 'dependencies', {self.data_view_id: DependencyType.HARD})
+        dependencies = {self.data_view_id: DependencyType.HARD}
+        object.__setattr__(self, 'dependencies', dependencies)
 
 
 @dc.dataclass(frozen=True)
@@ -211,11 +224,8 @@ class LoadDataNode(Node):
     explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
 
     def __post_init__(self, explicit_deps):
-
-        object.__setattr__(self, 'dependencies', {})
-
-        if explicit_deps:
-            self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
+        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
+        object.__setattr__(self, 'dependencies', dependencies)
 
 
 @dc.dataclass(frozen=True)
@@ -230,40 +240,37 @@ class SaveDataNode(Node):
     storage_def: meta.StorageDefinition
 
     def __post_init__(self):
-        object.__setattr__(self, 'dependencies', {self.data_item: DependencyType.HARD})
+        dependencies = {self.data_item: DependencyType.HARD}
+        object.__setattr__(self, 'dependencies', dependencies)
 
 
 @dc.dataclass(frozen=True)
 class ImportModelNode(Node):
 
     model_scope: str
-    import_details: meta.ImportModelJobDetails
+    import_details: meta.ImportModelJob
 
     explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
 
     def __post_init__(self, explicit_deps):
-
-        object.__setattr__(self, 'dependencies', {})
-
-        if explicit_deps:
-            self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
+        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
+        object.__setattr__(self, 'dependencies', dependencies)
 
 
 @dc.dataclass(frozen=True)
 class RunModelNode(Node):
 
     model_def: meta.ModelDefinition
+    parameter_ids: tp.FrozenSet[NodeId]
     input_ids: tp.FrozenSet[NodeId]
 
     explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
 
     def __post_init__(self, explicit_deps):
-
-        input_dependencies = {input_id: DependencyType.HARD for input_id in self.input_ids}
-        object.__setattr__(self, 'dependencies', input_dependencies)
-
-        if explicit_deps:
-            self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
+        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
+        dependencies.update({param_id: DependencyType.HARD for param_id in self.parameter_ids})
+        dependencies.update({input_id: DependencyType.HARD for input_id in self.input_ids})
+        object.__setattr__(self, 'dependencies', dependencies)
 
 
 @dc.dataclass(frozen=True)
@@ -273,11 +280,9 @@ class JobOutputMetadataNode(Node):
     physical_items: tp.Dict[NodeId, str]
 
     def __post_init__(self):
-
-        output_meta_deps = {physical_node_id: DependencyType.HARD for physical_node_id in self.physical_items}
-        output_meta_deps[self.data_view_id] = DependencyType.HARD
-
-        object.__setattr__(self, 'dependencies', output_meta_deps)
+        dependencies = {physical_node_id: DependencyType.HARD for physical_node_id in self.physical_items}
+        dependencies[self.data_view_id] = DependencyType.HARD
+        object.__setattr__(self, 'dependencies', dependencies)
 
 
 @dc.dataclass(frozen=True)
@@ -287,10 +292,12 @@ class JobResultMetadataNode(Node):
     outputs: tp.FrozenSet[NodeId]
     result_spec: JobResultSpec
 
-    def __post_init__(self):
+    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
 
-        output_deps = {output_meta_id: DependencyType.HARD for output_meta_id in self.outputs}
-        object.__setattr__(self, 'dependencies', output_deps)
+    def __post_init__(self, explicit_deps):
+        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
+        dependencies.update({output_meta_id: DependencyType.HARD for output_meta_id in self.outputs})
+        object.__setattr__(self, 'dependencies', dependencies)
 
 
 @dc.dataclass(frozen=True)
@@ -314,9 +321,6 @@ class JobNode(Node):
     explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
 
     def __post_init__(self, explicit_deps):
-        object.__setattr__(self, 'dependencies', {self.root_exec_node: DependencyType.HARD})
-
-        if explicit_deps:
-            self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
-
-
+        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
+        dependencies[self.root_exec_node] = DependencyType.HARD
+        object.__setattr__(self, 'dependencies', dependencies)

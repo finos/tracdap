@@ -75,12 +75,14 @@ class GraphBuilder:
         return cls.build_calculation_job(
             job_config, result_spec,
             job_config.job.runModel.model,
+            job_config.job.runModel.parameters,
             job_config.job.runModel.inputs,
             job_config.job.runModel.outputs)
 
     @classmethod
     def build_calculation_job(
-            cls, job_config: config.JobConfig, result_spec: JobResultSpec, target: meta.TagSelector,
+            cls, job_config: config.JobConfig, result_spec: JobResultSpec,
+            target: meta.TagSelector, parameters: tp.Dict[str, meta.Value],
             inputs: tp.Dict[str, meta.TagSelector], outputs: tp.Dict[str, meta.TagSelector]) -> Graph:
 
         job_namespace = NodeNamespace(_util.object_key(job_config.jobId))
@@ -90,8 +92,10 @@ class GraphBuilder:
         ctx_push_graph = GraphBuilder.build_context_push(
             job_namespace, null_graph, input_mapping=dict())
 
+        params_graph = cls.build_job_parameters(parameters, job_namespace, ctx_push_graph)
+
         # Input graph will prepare data views job inputs
-        input_graph = cls.build_job_inputs(job_config, inputs, job_namespace, ctx_push_graph)
+        input_graph = cls.build_job_inputs(job_config, inputs, job_namespace, params_graph)
 
         # Now create the root execution node, which will be either a single model or a flow
         # The root exec node can run directly in the job context, no need to do a context push
@@ -113,7 +117,10 @@ class GraphBuilder:
             if isinstance(n, JobOutputMetadataNode))
 
         job_metadata_id = NodeId("trac_job_metadata", job_namespace)
-        job_metadata_node = JobResultMetadataNode(job_metadata_id, job_config.jobId, output_metadata_nodes, result_spec)
+        job_metadata_node = JobResultMetadataNode(
+            job_metadata_id, job_config.jobId,
+            output_metadata_nodes, result_spec,
+            explicit_deps=[target_graph.root_id])
 
         job_logs_node = None
         job_metrics_node = None
@@ -140,6 +147,27 @@ class GraphBuilder:
             job_namespace, job_graph, dict())
 
         return job_ctx_pop
+
+    @classmethod
+    def build_job_parameters(
+            cls, parameters: tp.Dict[str, meta.Value],
+            namespace: NodeNamespace, graph: Graph) -> Graph:
+
+        nodes = {**graph.nodes}
+
+        job_params_node_id = NodeId("trac_job_params", namespace)
+        job_params_node = SetParametersNode(job_params_node_id, parameters, explicit_deps=[graph.root_id])
+
+        nodes[job_params_node_id] = job_params_node
+
+        for param_name in parameters:
+
+            param_node_id = NodeId(param_name, namespace)
+            param_node = KeyedItemNode(param_node_id, job_params_node_id, param_name)
+
+            nodes[param_node_id] = param_node
+
+        return Graph(nodes, graph.root_id)
 
     @classmethod
     def build_job_inputs(
@@ -266,6 +294,7 @@ class GraphBuilder:
             return NodeId(node_name, namespace)
 
         # Input data should already be mapped to named inputs in the model context
+        parameter_ids = frozenset(map(node_id_for, model_def.parameters.keys()))
         input_ids = frozenset(map(node_id_for, model_def.inputs.keys()))
 
         # Create the model node
@@ -274,7 +303,7 @@ class GraphBuilder:
 
         model_name = model_def.entryPoint.split(".")[-1]  # TODO: Check unique model name
         model_id = node_id_for(model_name)
-        model_node = RunModelNode(model_id, model_def, input_ids, explicit_deps=[graph.root_id])
+        model_node = RunModelNode(model_id, model_def, parameter_ids, input_ids, explicit_deps=[graph.root_id])
 
         # Create nodes for each model output
         # The model node itself outputs a bundle (dictionary of named outputs)
