@@ -30,7 +30,7 @@ import java.util.*;
 
 public class RunModelJob implements IJobLogic {
 
-    private static final String TRAC_MODEL_RESOURCE_KEY = "trac_model";
+    private static final String TRAC_MODEL_RESOURCE_NAME = "trac_model";
 
     @Override
     public Map<String, TagSelector> requiredMetadata(JobDefinition job) {
@@ -42,7 +42,7 @@ public class RunModelJob implements IJobLogic {
 
         var resources = new HashMap<String, TagSelector>(runModel.getInputsCount() + 1);
         resources.putAll(runModel.getInputsMap());
-        resources.put(TRAC_MODEL_RESOURCE_KEY, runModel.getModel());
+        resources.put(TRAC_MODEL_RESOURCE_NAME, runModel.getModel());
 
         return resources;
     }
@@ -52,7 +52,7 @@ public class RunModelJob implements IJobLogic {
 
         var runModelJob = job.getRunModel().toBuilder();
 
-        var modelId = resources.get(TRAC_MODEL_RESOURCE_KEY);
+        var modelId = resources.get(TRAC_MODEL_RESOURCE_NAME);
         var modelSelector = MetadataUtil.selectorFor(modelId);
 
         runModelJob.setModel(modelSelector);

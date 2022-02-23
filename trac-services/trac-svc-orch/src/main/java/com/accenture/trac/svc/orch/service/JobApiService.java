@@ -214,11 +214,11 @@ public class JobApiService {
 
         log.info("Loading additional required metadata...");
 
-        var orderedKeys = new ArrayList<String>(resources.size());
+        var orderedNames = new ArrayList<String>(resources.size());
         var orderedSelectors = new ArrayList<TagSelector>(resources.size());
 
         for (var resource : resources.entrySet()) {
-            orderedKeys.add(resource.getKey());
+            orderedNames.add(resource.getKey());
             orderedSelectors.add(resource.getValue());
         }
 
@@ -229,29 +229,34 @@ public class JobApiService {
 
         return grpcWrap
                 .unaryCall(READ_BATCH_METHOD, batchRequest, metaClient::readBatch)
-                .thenApply(batchResponse -> loadResourcesResponse(batchResponse, orderedKeys, jobState));
+                .thenApply(batchResponse -> loadResourcesResponse(batchResponse, orderedNames, jobState));
     }
 
     private JobState loadResourcesResponse(
             MetadataBatchResponse batchResponse,
-            List<String> orderedKeys,
+            List<String> orderedNames,
             JobState jobState) {
 
-        if (batchResponse.getTagCount() != orderedKeys.size())
+        if (batchResponse.getTagCount() != orderedNames.size())
             throw new EUnexpected();
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
 
-        var resourceMapping = new HashMap<String, TagHeader>(orderedKeys.size());
-        var resourceDefinitions = new HashMap<String, ObjectDefinition>(orderedKeys.size());
+        var resourceMapping = new HashMap<String, TagHeader>(orderedNames.size());
+        var resourceDefinitions = new HashMap<String, ObjectDefinition>(orderedNames.size());
 
-        for (var resourceIndex = 0; resourceIndex < orderedKeys.size(); resourceIndex++) {
+        for (var resourceIndex = 0; resourceIndex < orderedNames.size(); resourceIndex++) {
 
-            var resourceKey = orderedKeys.get(resourceIndex);
-            var resource = batchResponse.getTag(resourceIndex);
+            var resourceName = orderedNames.get(resourceIndex);
+            var resourceTag = batchResponse.getTag(resourceIndex);
 
-            resourceMapping.put(resourceKey, resource.getHeader());
-            resourceDefinitions.put(resourceKey, resource.getDefinition());
+            var resourceKey = String.format("%s-%s-v%d",
+                    resourceTag.getHeader().getObjectType(),
+                    resourceTag.getHeader().getObjectId(),
+                    resourceTag.getHeader().getObjectVersion());
+
+            resourceMapping.put(resourceName, resourceTag.getHeader());
+            resourceDefinitions.put(resourceKey, resourceTag.getDefinition());
         }
 
         jobState.resources = resourceDefinitions;
