@@ -26,7 +26,7 @@ class UsingDataExample(unittest.TestCase):
         job_config = 'using_data.yaml'
         sys_config = '../sys_config.yaml'
 
-        spec = importlib.util.spec_from_file_location("hello_pandas", "examples/models/python/using_data/using_data.py")
+        spec = importlib.util.spec_from_file_location("using_data", "examples/models/python/using_data/using_data.py")
         module = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = module
         spec.loader.exec_module(module)

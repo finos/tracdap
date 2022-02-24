@@ -18,7 +18,6 @@ import re
 import typing as tp
 import copy
 import pathlib
-import uuid
 
 import trac.rt.api as api
 import trac.rt.metadata as meta
@@ -236,7 +235,10 @@ class DevModeTranslator:
         translated_sys_config = copy.copy(sys_config)
         translated_sys_config.repositories = repos
 
-        cls._log.info(f"Generating model definition for [{model_class.__name__}]")
+        model_id = util.new_object_id(meta.ObjectType.MODEL)
+        model_key = util.object_key(model_id)
+
+        cls._log.info(f"Generating model definition for [{model_class.__name__}] with ID = [{model_key}]")
 
         skeleton_modeL_def = meta.ModelDefinition(  # noqa
             language="python",
@@ -274,11 +276,6 @@ class DevModeTranslator:
             objectType=meta.ObjectType.MODEL,
             model=model_def)
 
-        model_id = util.new_object_id(meta.ObjectType.MODEL)
-        model_key = util.object_key(model_id)
-
-        cls._log.info(f"Assigning model ID = [{model_key}]")
-
         translated_job_config = copy.copy(job_config)
         translated_job_config.job.runModel.model = model_id
         translated_job_config.resources = copy.copy(job_config.resources)
@@ -296,23 +293,23 @@ class DevModeTranslator:
             storage_path = data_value
             storage_key = sys_config.storageSettings.defaultStorage
             storage_format = sys_config.storageSettings.defaultFormat
-            snap = 1
+            snap_version = 1
 
         elif isinstance(data_value, dict):
 
             storage_path = data_value.get("path")
 
             if not storage_path:
-                raise _ex.EConfigParse(f"Invalid configuration for input '{data_key}' (missing required value 'path'")
+                raise _ex.EConfigParse(f"Invalid configuration for input [{data_key}] (missing required value 'path'")
 
             storage_key = data_value.get("storageKey") or sys_config.storageSettings.defaultStorage
             storage_format = data_value.get("format") or sys_config.storageSettings.defaultFormat
-            snap = 1
+            snap_version = 1
 
         else:
             raise _ex.EConfigParse(f"Invalid configuration for input '{data_key}'")
 
-        cls._log.info(f"Generating data definition for '{data_key}' (assigned ID {data_id})")
+        cls._log.info(f"Generating data definition for [{data_key}] with ID = [{util.object_key(data_id)}]")
 
         # For unique outputs, increment the snap number to find a new unique snap
         # These are not incarnations, bc likely in dev mode model code and inputs are changing
@@ -326,21 +323,21 @@ class DevModeTranslator:
 
             while x_storage.exists(storage_path):
 
-                snap += 1
-                x_stem = f"{x_orig_path.stem}-{snap}"
+                snap_version += 1
+                x_stem = f"{x_orig_path.stem}-{snap_version}"
                 storage_path = str(x_orig_path.parent.joinpath(x_stem))
 
-            cls._log.info(f"Output for {data_key} will be snap version {snap}")
+            cls._log.info(f"Output for [{data_key}] will be snap version {snap_version}")
 
         data_obj, storage_obj = cls._generate_input_definition(
             data_id, storage_id, storage_key, storage_path, storage_format,
-            snap_index=snap, delta_index=1, incarnation_index=1)
+            snap_index=snap_version, delta_index=1, incarnation_index=1)
 
         return data_obj, storage_obj
 
     @classmethod
     def _generate_input_definition(
-            cls, data_id: uuid.UUID, storage_id: uuid.UUID,
+            cls, data_id: meta.TagHeader, storage_id: meta.TagHeader,
             storage_key: str, storage_path: str, storage_format: str,
             snap_index: int, delta_index: int, incarnation_index: int) \
             -> (meta.ObjectDefinition, meta.ObjectDefinition):
@@ -349,7 +346,7 @@ class DevModeTranslator:
             opaqueKey="part-root",
             partType=meta.PartType.PART_ROOT)
 
-        data_item = f"DATA:{data_id}:{part_key.opaqueKey}:{snap_index}:{delta_index}"
+        data_item = f"DATA:{data_id.objectId}:{part_key.opaqueKey}:{snap_index}:{delta_index}"
 
         delta = meta.DataDefinition.Delta(
             deltaIndex=delta_index,
@@ -366,8 +363,8 @@ class DevModeTranslator:
         data_def = meta.DataDefinition(parts={})
 
         data_def.storageId = meta.TagSelector(
-            meta.ObjectType.STORAGE, str(storage_id),
-            latestObject=True, latestTag=True)
+            meta.ObjectType.STORAGE, storage_id.objectId,
+            objectVersion=storage_id.objectVersion, latestTag=True)
 
         data_def.schema = meta.SchemaDefinition(schemaType=meta.SchemaType.TABLE, table=meta.TableSchema())
         data_def.parts[part_key.opaqueKey] = part
@@ -380,7 +377,7 @@ class DevModeTranslator:
 
         storage_incarnation = meta.StorageIncarnation(
             incarnationIndex=incarnation_index,
-            incarnationTimestamp=meta.DatetimeValue(isoDatetime=""),  # TODO: Timestamp
+            incarnationTimestamp=storage_id.objectTimestamp,
             incarnationStatus=meta.IncarnationStatus.INCARNATION_AVAILABLE,
             copies=[storage_copy])
 

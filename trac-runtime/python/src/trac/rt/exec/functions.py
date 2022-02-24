@@ -388,7 +388,7 @@ class RunModelFunc(NodeFunction):
         def filter_ctx(node_id: NodeId):
             if node_id.namespace != self.node.id.namespace:
                 return False
-            if node_id.name in model_def.parameters or node_id in model_def.inputs:
+            if node_id.name in model_def.parameters or node_id.name in model_def.inputs:
                 return True
             return False
 
