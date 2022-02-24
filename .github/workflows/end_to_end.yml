@@ -72,3 +72,12 @@ jobs:
 
       - name: Run end to end tests
         run: ./gradlew integration -DintegrationTags="int-e2e"
+
+      # If the tests fail, make the output available for download
+      - name: Store failed test results
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: junit-test-results
+          path: build/modules/*/reports/**
+          retention-days: 7
