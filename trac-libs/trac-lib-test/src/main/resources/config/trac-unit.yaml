@@ -18,6 +18,24 @@ config:
   keystore.url: trac-unit.pfx
 
 
+instances:
+
+  meta:
+    - scheme: http
+      host: localhost
+      port: 8081
+
+  data:
+    - scheme: http
+      host: localhost
+      port: 8082
+
+  orch:
+    - scheme: http
+      host: localhost
+      port: 8083
+
+
 services:
 
   meta:
@@ -46,3 +64,11 @@ services:
           - storageType: LOCAL
             storageProps:
               rootDir: ${TRAC_RUN_DIR}/unit_test_storage
+
+  orch:
+    port: 8083
+
+    executor:
+      executorType: LOCAL
+      executorProps:
+        venvPath: ${TRAC_RUN_DIR}/venv
