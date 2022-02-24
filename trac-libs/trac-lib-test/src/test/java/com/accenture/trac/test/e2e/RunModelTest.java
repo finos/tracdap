@@ -18,164 +18,59 @@ package com.accenture.trac.test.e2e;
 
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.startup.StandardArgs;
-import com.accenture.trac.deploy.metadb.DeployMetaDB;
-import com.accenture.trac.gateway.TracPlatformGateway;
+import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.metadata.*;
-import com.accenture.trac.svc.data.TracDataService;
-import com.accenture.trac.svc.meta.TracMetadataService;
-import com.accenture.trac.svc.orch.TracOrchestratorService;
-import com.accenture.trac.test.config.ConfigHelpers;
-import com.accenture.trac.test.helpers.ServiceHelpers;
 import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.net.URL;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 
 @Tag("integration")
 @Tag("int-e2e")
-public class RunModelTest {
-
-    static final String TRAC_UNIT_CONFIG = "config/trac-unit.yaml";
-    static final String TEST_TENANT = "ACME_CORP";
-
-    private static final boolean IS_WINDOWS = System.getProperty("os.name").toLowerCase().contains("windows");
-    private static final String PYTHON_EXE = IS_WINDOWS ? "python.exe" : "python";
-    private static final String VENV_BIN_SUBDIR = IS_WINDOWS ? "Scripts" : "bin";
-    private static final String VENV_ENV_VAR = "VIRTUAL_ENV";
-
-    final Logger log = LoggerFactory.getLogger(getClass());
-
-    @TempDir
-    static Path tracDir;
-    static URL platformConfig;
-    static URL gatewayConfig;
-    static String keystoreKey;
-
-    static TracMetadataService metaSvc;
-    static TracDataService dataSvc;
-    static TracOrchestratorService orchSvc;
-    static TracPlatformGateway gateway;
-
-    TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClient;
-    TracDataApiGrpc.TracDataApiBlockingStub dataClient;
-    TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClient;
-
-    @BeforeAll
-    static void setupClass() throws Exception {
-
-        var substitutions = Map.of(
-                "${TRAC_RUN_DIR}", tracDir.toString().replace("\\", "\\\\"));
-
-        platformConfig = ConfigHelpers.prepareConfig(
-                TRAC_UNIT_CONFIG, tracDir,
-                substitutions);
-
-        keystoreKey = "";  // not yet used
-
-        var databaseTasks = List.of(
-                StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK_NAME, "", ""),
-                StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, TEST_TENANT, ""));
-
-        ServiceHelpers.runDbDeploy(tracDir, platformConfig, keystoreKey, databaseTasks);
-
-        preparePlugins();
-
-        startServices();
-    }
-
-    static void preparePlugins() throws Exception {
-
-        // TODO: Replace this with extensions, to run E2E tests over different backend configurations
-
-        Files.createDirectory(tracDir.resolve("unit_test_storage"));
-
-        System.out.println("Setting up Python venv for local executor...");
-
-        var venvPath = tracDir.resolve("venv");
-        var venvPb = new ProcessBuilder();
-        venvPb.command("python", "-m", "venv", venvPath.toString());
-
-        var venvP = venvPb.start();
-        venvP.waitFor(60, TimeUnit.SECONDS);
-
-        System.out.println("Installing the TRAC runtime for Python...");
-
-        // This assumes the runtime has already been built externally (requires full the Python build chain)
-
-        var pythonExe = venvPath
-                .resolve(VENV_BIN_SUBDIR)
-                .resolve(PYTHON_EXE)
-                .toString();
-
-        var tracRtDistDir = Paths.get(".")
-                .toAbsolutePath()
-                .normalize()
-                .resolve("../../trac-runtime/python/build/dist");
-
-        var tracRtWhl = Files.find(tracRtDistDir, 1, (file, attrs) -> file.getFileName().toString().endsWith(".whl"))
-                .findFirst();
-
-        if (tracRtWhl.isEmpty())
-            throw new RuntimeException("Could not find TRAC runtime wheel");
-
-        var pipPB = new ProcessBuilder();
-        pipPB.command(pythonExe, "-m", "pip", "install", tracRtWhl.get().toString());
-        pipPB.environment().put(VENV_ENV_VAR, venvPath.toString());
-
-        var pipP = pipPB.start();
-        pipP.waitFor(2, TimeUnit.MINUTES);
-    }
-
-    static void startServices() {
-
-        metaSvc = ServiceHelpers.startService(TracMetadataService.class, tracDir, platformConfig, keystoreKey);
-        dataSvc = ServiceHelpers.startService(TracDataService.class, tracDir, platformConfig, keystoreKey);
-        orchSvc = ServiceHelpers.startService(TracOrchestratorService.class, tracDir, platformConfig, keystoreKey);
-    }
-
-    @AfterAll
-    static void stopServices() {
-
-        if (orchSvc != null)
-            orchSvc.stop();
-
-        if (dataSvc != null)
-            dataSvc.stop();
-
-        if (metaSvc != null)
-            metaSvc.stop();
-    }
+public class RunModelTest extends PlatformTestBase {
 
     static TagHeader inputDataId;
     static TagHeader modelId;
 
     @Test @Order(1)
-    void loadInputData() {
+    void loadInputData() throws Exception {
 
         log.info("Loading input data...");
 
         var inputSchema = SchemaDefinition.newBuilder()
+                .setSchemaType(SchemaType.TABLE)
+                .setTable(TableSchema.newBuilder()
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("id")
+                        .setFieldType(BasicType.STRING)
+                        .setBusinessKey(true))
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("loan_amount")
+                        .setFieldType(BasicType.DECIMAL))
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("loan_condition_cat")
+                        .setFieldType(BasicType.INTEGER)
+                        .setCategorical(true))
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("total_pymnt")
+                        .setFieldType(BasicType.DECIMAL))
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("region")
+                        .setFieldType(BasicType.STRING)
+                        .setCategorical(true)))
                 .build();
 
-        var inputBytes = ByteString.copyFrom(new byte[0]);
+        var inputPath = Paths.get("../../examples/models/python/data/inputs/loan_final313_100_shortform.csv");
+        var inputBytes = Files.readAllBytes(inputPath);
 
         var writeRequest = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSchema(inputSchema)
                 .setFormat("text/csv")
-                .setContent(inputBytes)
+                .setContent(ByteString.copyFrom(inputBytes))
                 .addTagUpdates(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_dataset")
                         .setValue(MetadataCodec.encodeValue("run_model:customer_loans")))
@@ -183,7 +78,22 @@ public class RunModelTest {
 
         inputDataId = dataClient.createSmallDataset(writeRequest);
 
-        log.info("Input data loaded, data ID = [{}]", inputDataId.getObjectId());
+        var dataSelector = MetadataUtil.selectorFor(inputDataId);
+        var dataRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(dataSelector)
+                .build();
+
+        var dataTag = metaClient.readObject(dataRequest);
+
+        var datasetAttr = dataTag.getAttrsOrThrow("e2e_test_dataset");
+        var datasetSchema = dataTag.getDefinition().getData().getSchema();
+
+        Assertions.assertEquals("run_model:customer_loans", MetadataCodec.decodeStringValue(datasetAttr));
+        Assertions.assertEquals(SchemaType.TABLE, datasetSchema.getSchemaType());
+        Assertions.assertEquals(5, datasetSchema.getTable().getFieldsCount());
+
+        log.info("Input data loaded, data ID = [{}]", dataTag.getHeader().getObjectId());
     }
 
     @Test @Order(2)

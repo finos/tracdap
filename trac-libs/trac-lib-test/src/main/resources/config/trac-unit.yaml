@@ -44,7 +44,7 @@ services:
     dalType: JDBC
     dalProps:
       dialect: H2
-      jdbcUrl: ${TRAC_RUN_DIR}/trac.meta
+      jdbcUrl: ${TRAC_DIR}/trac.meta
       h2.user: trac
       h2.pass: trac
       h2.schema: public
@@ -63,7 +63,7 @@ services:
         instances:
           - storageType: LOCAL
             storageProps:
-              rootDir: ${TRAC_RUN_DIR}/unit_test_storage
+              rootDir: ${TRAC_DIR}/unit_test_storage
 
   orch:
     port: 8083
@@ -71,4 +71,4 @@ services:
     executor:
       executorType: LOCAL
       executorProps:
-        venvPath: ${TRAC_RUN_DIR}/venv
+        venvPath: ${TRAC_EXEC_DIR}/venv

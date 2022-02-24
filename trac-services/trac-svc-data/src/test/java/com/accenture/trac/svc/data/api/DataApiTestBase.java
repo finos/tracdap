@@ -85,7 +85,9 @@ abstract  class DataApiTestBase {
     @BeforeAll
     static void setupClass() throws Exception {
 
-        var substitutions = Map.of("${TRAC_RUN_DIR}", staticTempDir.toString().replace("\\", "\\\\"));
+        var substitutions = Map.of(
+                "${TRAC_DIR}", staticTempDir.toString().replace("\\", "\\\\"),
+                "${TRAC_EXEC_DIR}", staticTempDir.toString().replace("\\", "\\\\"));
 
         var configPath = ConfigHelpers.prepareConfig(
                 TRAC_UNIT_CONFIG, staticTempDir,
@@ -162,7 +164,7 @@ abstract  class DataApiTestBase {
         // Create storage root dir referenced in config
         Files.createDirectory(tempDir.resolve(STORAGE_ROOT_DIR));
 
-        var substitutions = Map.of("${TRAC_RUN_DIR}", tempDir.toString().replace("\\", "\\\\"));
+        var substitutions = Map.of("${TRAC_DIR}", tempDir.toString().replace("\\", "\\\\"));
 
         var configPath = ConfigHelpers.prepareConfig(TRAC_UNIT_CONFIG, tempDir, substitutions);
 

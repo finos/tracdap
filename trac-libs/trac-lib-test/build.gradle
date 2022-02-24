@@ -46,9 +46,10 @@ dependencies {
 
     api project(':deploy-metadb')
 
-    // Config loading for tests requires dataformat classes to be explicit on the project classpath
+    // Some runtime classes need to be explicit on the test project classpath
     testImplementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
     testImplementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: "$jackson_version"
+    testImplementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
 }
 
 
