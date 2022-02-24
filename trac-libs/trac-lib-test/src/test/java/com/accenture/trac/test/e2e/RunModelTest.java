@@ -32,12 +32,16 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 
 @Tag("integration")
@@ -45,6 +49,13 @@ public class RunModelTest {
 
     static final String TRAC_UNIT_CONFIG = "config/trac-unit.yaml";
     static final String TEST_TENANT = "ACME_CORP";
+
+    private static final boolean IS_WINDOWS = System.getProperty("os.name").toLowerCase().contains("windows");
+    private static final String PYTHON_EXE = IS_WINDOWS ? "python.exe" : "python";
+    private static final String VENV_BIN_SUBDIR = IS_WINDOWS ? "Scripts" : "bin";
+    private static final String VENV_ENV_VAR = "VIRTUAL_ENV";
+
+    final Logger log = LoggerFactory.getLogger(getClass());
 
     @TempDir
     static Path tracDir;
@@ -89,6 +100,42 @@ public class RunModelTest {
         // TODO: Replace this with extensions, to run E2E tests over different backend configurations
 
         Files.createDirectory(tracDir.resolve("unit_test_storage"));
+
+        System.out.println("Setting up Python venv for local executor...");
+
+        var venvPath = tracDir.resolve("venv");
+        var venvPb = new ProcessBuilder();
+        venvPb.command("python", "-m", "venv", venvPath.toString());
+
+        var venvP = venvPb.start();
+        venvP.waitFor(60, TimeUnit.SECONDS);
+
+        System.out.println("Installing the TRAC runtime for Python...");
+
+        // This assumes the runtime has already been built externally (requires full the Python build chain)
+
+        var pythonExe = venvPath
+                .resolve(VENV_BIN_SUBDIR)
+                .resolve(PYTHON_EXE)
+                .toString();
+
+        var tracRtDistDir = Paths.get(".")
+                .toAbsolutePath()
+                .normalize()
+                .resolve("../../trac-runtime/python/build/dist");
+
+        var tracRtWhl = Files.find(tracRtDistDir, 1, (file, attrs) -> file.getFileName().toString().endsWith(".whl"))
+                .findFirst();
+
+        if (tracRtWhl.isEmpty())
+            throw new RuntimeException("Could not find TRAC runtime wheel");
+
+        var pipPB = new ProcessBuilder();
+        pipPB.command(pythonExe, "-m", "pip", "install", tracRtWhl.get().toString());
+        pipPB.environment().put(VENV_ENV_VAR, venvPath.toString());
+
+        var pipP = pipPB.start();
+        pipP.waitFor(2, TimeUnit.MINUTES);
     }
 
     static void startServices() {
@@ -114,5 +161,6 @@ public class RunModelTest {
     @Test
     void test1() {
 
+        log.info("Test is running...");
     }
 }
