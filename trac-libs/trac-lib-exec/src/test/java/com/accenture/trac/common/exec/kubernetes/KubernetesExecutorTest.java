@@ -23,7 +23,7 @@ import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.RepositoryConfig;
 import com.accenture.trac.config.RuntimeConfig;
-import com.accenture.trac.metadata.ImportModelJobDetails;
+import com.accenture.trac.metadata.ImportModelJob;
 import com.accenture.trac.metadata.JobDefinition;
 import com.accenture.trac.metadata.JobType;
 import com.accenture.trac.metadata.TagHeader;
@@ -83,7 +83,7 @@ public class KubernetesExecutorTest {
                 .setJobId(jobId)
                 .setJob(JobDefinition.newBuilder()
                 .setJobType(JobType.IMPORT_MODEL)
-                .setImportModel(ImportModelJobDetails.newBuilder()
+                .setImportModel(ImportModelJob.newBuilder()
                 .setLanguage("python")
                 .setRepository("trac_git_repo")
                 .setPath("examples/models/python/hello_world")
