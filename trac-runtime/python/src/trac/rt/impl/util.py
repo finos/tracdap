@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import logging
 import sys
+import uuid
+import datetime as dt
 
 import trac.rt.metadata as meta
 import typing as tp
@@ -126,6 +128,19 @@ def logger_for_class(clazz: type) -> logging.Logger:
 
 def logger_for_namespace(namespace: str) -> logging.Logger:
     return logging.getLogger(namespace)
+
+
+def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
+
+    timestamp = dt.datetime.utcnow()
+
+    return meta.TagHeader(
+        objectType=object_type,
+        objectId=str(uuid.uuid4()),
+        objectVersion=1,
+        objectTimestamp=meta.DatetimeValue(timestamp.isoformat()),
+        tagVersion=1,
+        tagTimestamp=meta.DatetimeValue(timestamp.isoformat()))
 
 
 def object_key(object_id: tp.Union[meta.TagHeader, meta.TagSelector]):

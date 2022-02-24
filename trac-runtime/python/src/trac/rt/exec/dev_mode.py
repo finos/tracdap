@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import datetime as dt
 import re
 import typing as tp
 import copy
@@ -79,8 +78,8 @@ class DevModeTranslator:
 
         def process_input_or_output(data_key, data_value, is_input: bool):
 
-            data_id = cls._create_object_header(meta.ObjectType.DATA)
-            storage_id = cls._create_object_header(meta.ObjectType.STORAGE)
+            data_id = util.new_object_id(meta.ObjectType.DATA)
+            storage_id = util.new_object_id(meta.ObjectType.STORAGE)
 
             data_obj, storage_obj = cls._process_job_io(
                 sys_config, sys_config_dir,
@@ -111,19 +110,6 @@ class DevModeTranslator:
         return job_config, sys_config
 
     @staticmethod
-    def _create_object_header(object_type: meta.ObjectType):
-
-        timestamp = dt.datetime.now()
-
-        return meta.TagHeader(
-            objectType=object_type,
-            objectId=str(uuid.uuid4()),
-            objectVersion=1,
-            objectTimestamp=meta.DatetimeValue(timestamp.isoformat()),
-            tagVersion=1,
-            tagTimestamp=meta.DatetimeValue(timestamp.isoformat()))
-
-    @staticmethod
     def _selector_for(object_id: meta.TagHeader):
 
         return meta.TagSelector(
@@ -135,14 +121,7 @@ class DevModeTranslator:
     @classmethod
     def _process_job_id(cls, job_config: cfg.JobConfig):
 
-        job_timestamp = dt.datetime.now()
-        job_id = meta.TagHeader(
-            objectType=meta.ObjectType.JOB,
-            objectId=str(uuid.uuid4()),
-            objectVersion=1,
-            objectTimestamp=meta.DatetimeValue(job_timestamp.isoformat()),
-            tagVersion=1,
-            tagTimestamp=meta.DatetimeValue(job_timestamp.isoformat()))
+        job_id = util.new_object_id(meta.ObjectType.JOB)
 
         cls._log.info(f"Assigning job ID = [{util.object_key(job_id)}]")
 
@@ -295,21 +274,15 @@ class DevModeTranslator:
             objectType=meta.ObjectType.MODEL,
             model=model_def)
 
-        model_timestamp = dt.datetime.now()
-        model_id = meta.TagHeader(
-            meta.ObjectType.MODEL,
-            str(uuid.uuid4()),
-            objectVersion=1, objectTimestamp=meta.DatetimeValue(model_timestamp.isoformat()),
-            tagVersion=1, tagTimestamp=meta.DatetimeValue(model_timestamp.isoformat()))
+        model_id = util.new_object_id(meta.ObjectType.MODEL)
+        model_key = util.object_key(model_id)
 
-        model_object_key = util.object_key(model_id)
-
-        cls._log.info(f"Assigning model ID = [{model_object_key}]")
+        cls._log.info(f"Assigning model ID = [{model_key}]")
 
         translated_job_config = copy.copy(job_config)
         translated_job_config.job.runModel.model = model_id
         translated_job_config.resources = copy.copy(job_config.resources)
-        translated_job_config.resources[model_object_key] = model_object
+        translated_job_config.resources[model_key] = model_object
 
         return translated_job_config, translated_sys_config
 
