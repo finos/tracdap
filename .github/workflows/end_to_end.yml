@@ -1,0 +1,74 @@
+name: End to end
+
+# Run the main build and test for all branch pushes and pull requests, do not repeat the build for tags
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+
+
+env:
+  JAVA_VERSION: 17
+  JAVA_DISTRIBUTION: zulu
+  PYTHON_VERSION: 3.10
+  NODE_VERSION: 14.x
+
+
+jobs:
+
+  end_to_end:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Java - Setup
+        uses: actions/setup-java@v2
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+
+          # Turn on Gradle dependency caching
+          cache: gradle
+
+      - name: Java - Build platform
+        run: ./gradlew build -x test
+
+      - name: Python - setup
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Python - PIP
+        run: python -m pip install --upgrade pip
+
+      - name: Python - Install build dependencies
+        run: |
+          pip install -r trac-runtime/python/requirements.txt
+
+      - name: Pythonn - Protoc code generation
+        run: |
+          python dev/codegen/protoc-ctrl.py python_runtime \
+            --proto_path trac-api/trac-metadata/src/main/proto \
+            --proto_path trac-api/trac-config/src/main/proto \
+            --out trac-runtime/python/generated/trac/rt_gen/domain
+          python dev/codegen/protoc-ctrl.py python_proto \
+            --proto_path trac-api/trac-metadata/src/main/proto \
+            --proto_path trac-api/trac-config/src/main/proto \
+            --out trac-runtime/python/generated/trac/rt_gen/proto
+
+      - name: Python - Build runtime package
+        run: |
+          cd trac-runtime/python
+          python package-ctrl.py
+
+      - name: Run end to end tests
+        run: ./gradlew integration -DintegrationTags="int-e2e"
