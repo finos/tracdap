@@ -45,6 +45,10 @@ dependencies {
     // Give tests access to the deploy tools to set up services for integration
 
     api project(':deploy-metadb')
+
+    // Config loading for tests requires dataformat classes to be explicit on the project classpath
+    testImplementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
+    testImplementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: "$jackson_version"
 }
 
 
