@@ -16,21 +16,20 @@
 
 package com.accenture.trac.test.e2e;
 
-import com.accenture.trac.api.TracDataApiGrpc;
-import com.accenture.trac.api.TracMetadataApiGrpc;
-import com.accenture.trac.api.TracOrchestratorApiGrpc;
+import com.accenture.trac.api.*;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.startup.StandardArgs;
 import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.gateway.TracPlatformGateway;
+import com.accenture.trac.metadata.*;
 import com.accenture.trac.svc.data.TracDataService;
 import com.accenture.trac.svc.meta.TracMetadataService;
 import com.accenture.trac.svc.orch.TracOrchestratorService;
 import com.accenture.trac.test.config.ConfigHelpers;
 import com.accenture.trac.test.helpers.ServiceHelpers;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import com.google.protobuf.ByteString;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +44,7 @@ import java.util.concurrent.TimeUnit;
 
 
 @Tag("integration")
+@Tag("int-e2e")
 public class RunModelTest {
 
     static final String TRAC_UNIT_CONFIG = "config/trac-unit.yaml";
@@ -158,9 +158,64 @@ public class RunModelTest {
             metaSvc.stop();
     }
 
-    @Test
-    void test1() {
+    static TagHeader inputDataId;
+    static TagHeader modelId;
 
-        log.info("Test is running...");
+    @Test @Order(1)
+    void loadInputData() {
+
+        log.info("Loading input data...");
+
+        var inputSchema = SchemaDefinition.newBuilder()
+                .build();
+
+        var inputBytes = ByteString.copyFrom(new byte[0]);
+
+        var writeRequest = DataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSchema(inputSchema)
+                .setFormat("text/csv")
+                .setContent(inputBytes)
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_dataset")
+                        .setValue(MetadataCodec.encodeValue("run_model:customer_loans")))
+                .build();
+
+        inputDataId = dataClient.createSmallDataset(writeRequest);
+
+        log.info("Input data loaded, data ID = [{}]", inputDataId.getObjectId());
+    }
+
+    @Test @Order(2)
+    void importModel() {
+
+        log.info("Running IMPORT_MODEL job...");
+
+        var importModel = ImportModelJob.newBuilder()
+                .setLanguage("python")
+                .setRepository("trac_git_repo")   // TODO
+                .setPath("examples/models/python/using_data")
+                .setEntryPoint("using_data.UsingDataModel")
+                .setVersion("main")
+                .addModelAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_model")
+                        .setValue(MetadataCodec.encodeValue("run_model:using_data")))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_MODEL)
+                .setImportModel(importModel))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_model:import_model")))
+                .build();
+
+        var jobStatus = orchClient.submitJob(jobRequest);
+
+        log.info("Job status: {}", jobStatus.toString());
+
+        var jobId = jobStatus.getJobId();
     }
 }
