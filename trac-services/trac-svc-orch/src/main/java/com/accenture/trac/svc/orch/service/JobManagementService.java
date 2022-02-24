@@ -229,8 +229,7 @@ public class JobManagementService {
                     LaunchArg.string("--sys-config"), LaunchArg.path("config", "sys_config.json"),
                     LaunchArg.string("--job-config"), LaunchArg.path("config", "job_config.json"),
                     LaunchArg.string("--job-result-dir"), LaunchArg.path("result", "."),
-                    LaunchArg.string("--job-result-format"), LaunchArg.string("json"),
-                    LaunchArg.string("--dev-mode"));
+                    LaunchArg.string("--job-result-format"), LaunchArg.string("json"));
 
             execState = jobExecutor.startBatch(execState, launchCmd, launchArgs);
 
