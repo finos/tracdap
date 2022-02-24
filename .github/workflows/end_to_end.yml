@@ -11,7 +11,7 @@ on:
 env:
   JAVA_VERSION: 17
   JAVA_DISTRIBUTION: zulu
-  PYTHON_VERSION: 3.10
+  PYTHON_VERSION: "3.10"
   NODE_VERSION: 14.x
 
 
@@ -54,7 +54,7 @@ jobs:
         run: |
           pip install -r trac-runtime/python/requirements.txt
 
-      - name: Pythonn - Protoc code generation
+      - name: Python - Protoc code generation
         run: |
           python dev/codegen/protoc-ctrl.py python_runtime \
             --proto_path trac-api/trac-metadata/src/main/proto \
