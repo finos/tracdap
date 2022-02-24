@@ -32,6 +32,8 @@ import java.nio.file.Paths;
 @Tag("int-e2e")
 public class RunModelTest extends PlatformTestBase {
 
+    static final String INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
+
     static TagHeader inputDataId;
     static TagHeader modelId;
 
@@ -63,7 +65,7 @@ public class RunModelTest extends PlatformTestBase {
                         .setCategorical(true)))
                 .build();
 
-        var inputPath = Paths.get("../../examples/models/python/data/inputs/loan_final313_100_shortform.csv");
+        var inputPath = tracRepoDir.resolve(INPUT_PATH);
         var inputBytes = Files.readAllBytes(inputPath);
 
         var writeRequest = DataWriteRequest.newBuilder()

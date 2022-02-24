@@ -58,8 +58,11 @@ public class PlatformTestBase {
     private static final String PYTHON_EXE = IS_WINDOWS ? "python.exe" : "python";
     private static final String VENV_BIN_SUBDIR = IS_WINDOWS ? "Scripts" : "bin";
     private static final String VENV_ENV_VAR = "VIRTUAL_ENV";
+    private static final String TRAC_RUNTIME_DIST_DIR = "trac-runtime/python/build/dist";
 
     protected static final Logger log = LoggerFactory.getLogger(PlatformTestBase.class);
+
+    static Path tracRepoDir;
 
     @TempDir
     static Path tracDir;
@@ -82,6 +85,11 @@ public class PlatformTestBase {
 
     @BeforeAll
     static void setupClass() throws Exception {
+
+        tracRepoDir = Paths.get(".").toAbsolutePath();
+
+        while (!Files.exists(tracRepoDir.resolve("trac-api")))
+            tracRepoDir = tracRepoDir.getParent();
 
         prepareConfig();
         prepareDatabase();
@@ -176,12 +184,8 @@ public class PlatformTestBase {
                     .resolve(PYTHON_EXE)
                     .toString();
 
-            var tracRtDistDir = Paths.get(".")
-                    .toAbsolutePath()
-                    .normalize()
-                    .resolve("../../trac-runtime/python/build/dist");
-
-            var tracRtWhl = Files.find(tracRtDistDir, 1, (file, attrs) -> file.getFileName().toString().endsWith(".whl"))
+            var tracRtDistDir = tracRepoDir.resolve(TRAC_RUNTIME_DIST_DIR);
+            var tracRtWhl = Files.find(tracRtDistDir, 1, (file, attrs) -> file.toString().endsWith(".whl"))
                     .findFirst();
 
             if (tracRtWhl.isEmpty())
