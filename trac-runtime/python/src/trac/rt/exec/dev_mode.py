@@ -252,25 +252,20 @@ class DevModeTranslator:
         loader = _models.ModelLoader(translated_sys_config)
 
         try:
-            loader.create_scope("DEV_MODE")
-            model_class = loader.load_model_class("DEV_MODE", skeleton_modeL_def)
+            loader.create_scope("DEV_MODE_TRANSLATION")
+            model_class = loader.load_model_class("DEV_MODE_TRANSLATION", skeleton_modeL_def)
+            model_scan = loader.scan_model(model_class)
         finally:
-            loader.destroy_scope("DEV_MODE")
-
-        model: api.TracModel = model_class()
-
-        model_params = model.define_parameters()
-        model_inputs = model.define_inputs()
-        model_outputs = model.define_outputs()
+            loader.destroy_scope("DEV_MODE_TRANSLATION")
 
         model_def = meta.ModelDefinition(  # noqa
             language="python",
             repository="trac_integrated",
             entryPoint=f"{model_class.__module__}.{model_class.__name__}",
 
-            parameters=model_params,
-            inputs=model_inputs,
-            outputs=model_outputs)
+            parameters=model_scan.parameters,
+            inputs=model_scan.inputs,
+            outputs=model_scan.outputs)
 
         model_object = meta.ObjectDefinition(
             objectType=meta.ObjectType.MODEL,

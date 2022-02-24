@@ -26,13 +26,20 @@ import org.junit.jupiter.api.Tag;
 
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 
 
 @Tag("integration")
 @Tag("int-e2e")
 public class RunModelTest extends PlatformTestBase {
 
-    static final String INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
+    private static final String INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
+
+    private static final List<JobStatusCode> COMPLETED_JOB_STATES = List.of(
+            JobStatusCode.COMPLETE,
+            JobStatusCode.FAILED,
+            JobStatusCode.CANCELLED);
+
 
     static TagHeader inputDataId;
     static TagHeader modelId;
@@ -99,7 +106,7 @@ public class RunModelTest extends PlatformTestBase {
     }
 
     @Test @Order(2)
-    void importModel() {
+    void importModel() throws Exception {
 
         log.info("Running IMPORT_MODEL job...");
 
@@ -125,9 +132,54 @@ public class RunModelTest extends PlatformTestBase {
                 .build();
 
         var jobStatus = orchClient.submitJob(jobRequest);
+        log.info("Job ID: [{}]", MetadataUtil.objectKey(jobStatus.getJobId()));
+        log.info("Job status: {}", jobStatus.getStatus());
 
-        log.info("Job status: {}", jobStatus.toString());
+        var statusRequest = JobStatusRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(jobStatus.getJobId()))
+                .build();
 
-        var jobId = jobStatus.getJobId();
+        while (!COMPLETED_JOB_STATES.contains(jobStatus.getStatus())) {
+            Thread.sleep(1000);
+            jobStatus = orchClient.checkJob(statusRequest);
+            log.info("Job status: {}", jobStatus.getStatus());
+        }
+
+        Assertions.assertEquals(JobStatusCode.COMPLETE, jobStatus.getStatus());
+
+        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
+
+        var modelSearch = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                .setObjectType(ObjectType.MODEL)
+                .setSearch(SearchExpression.newBuilder()
+                    .setTerm(SearchTerm.newBuilder()
+                    .setAttrName("trac_create_job")
+                    .setAttrType(BasicType.STRING)
+                    .setOperator(SearchOperator.EQ)
+                    .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
+                .build();
+
+        var modelSearchResult = metaClient.search(modelSearch);
+
+        Assertions.assertEquals(1, modelSearchResult.getSearchResultCount());
+
+        var modelId = modelSearchResult.getSearchResult(0).getHeader();
+        var modelReq = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(modelId))
+                .build();
+
+        var modelTag = metaClient.readObject(modelReq);
+        var modelDef = modelTag.getDefinition().getModel();
+        var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
+
+        Assertions.assertEquals("run_model:using_data", MetadataCodec.decodeStringValue(modelAttr));
+        Assertions.assertEquals("using_data.UsingDataModel", modelDef.getEntryPoint());
+        Assertions.assertTrue(modelDef.getParametersMap().containsKey("eur_usd_rate"));
+        Assertions.assertTrue(modelDef.getInputsMap().containsKey("customer_loans"));
+        Assertions.assertTrue(modelDef.getOutputsMap().containsKey("profit_by_region"));
     }
 }

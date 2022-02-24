@@ -17,9 +17,11 @@
 package com.accenture.trac.svc.orch.service;
 
 import com.accenture.trac.api.*;
+import com.accenture.trac.common.exception.EMetadataNotFound;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.grpc.GrpcClientWrap;
 import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.metadata.*;
 
 import com.accenture.trac.svc.orch.cache.IJobCache;
@@ -92,8 +94,30 @@ public class JobApiService {
                 .thenApply(this::reportStatus);
     }
 
-    void checkJob() {
+    public CompletionStage<JobStatus> checkJob(JobStatusRequest request) {
 
+        // TODO: Keys for selectors
+        var jobKey = String.format("%s-%s-v%d",
+                request.getSelector().getObjectType(),
+                request.getSelector().getObjectId(),
+                request.getSelector().getObjectVersion());
+
+        var cachedState = jobCache.readJob(jobKey);
+
+        // TODO: Should there be a different error for jobs not found in the cache? EJobNotLive?
+        if (cachedState == null) {
+            var message = String.format("Job not found (it may have completed): [%s]", jobKey);
+            log.error(message);
+            throw new EMetadataNotFound(message);
+        }
+
+        var jobStatus = JobStatus.newBuilder()
+                .setJobId(cachedState.jobId)
+                .setStatus(cachedState.statusCode)
+                .setMessage(cachedState.statusCode.toString())
+                .build();
+
+        return CompletableFuture.completedFuture(jobStatus);
     }
 
     void getJobResult() {
@@ -179,8 +203,7 @@ public class JobApiService {
 
     private CompletionStage<JobState> submitForExecution(JobState jobState) {
 
-        // TODO: Centralize this
-        var jobKey = String.format("%s-v%d", jobState.jobId.getObjectId(), jobState.jobId.getObjectVersion());
+        var jobKey = MetadataUtil.objectKey(jobState.jobId);
 
         jobState.jobKey = jobKey;
         jobState.statusCode = JobStatusCode.QUEUED;
@@ -249,11 +272,7 @@ public class JobApiService {
 
             var resourceName = orderedNames.get(resourceIndex);
             var resourceTag = batchResponse.getTag(resourceIndex);
-
-            var resourceKey = String.format("%s-%s-v%d",
-                    resourceTag.getHeader().getObjectType(),
-                    resourceTag.getHeader().getObjectId(),
-                    resourceTag.getHeader().getObjectVersion());
+            var resourceKey = MetadataUtil.objectKey(resourceTag.getHeader());
 
             resourceMapping.put(resourceName, resourceTag.getHeader());
             resourceDefinitions.put(resourceKey, resourceTag.getDefinition());

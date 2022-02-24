@@ -18,6 +18,7 @@ package com.accenture.trac.svc.orch.service;
 
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exec.*;
+import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.JobResult;
 import com.accenture.trac.metadata.ObjectType;
@@ -56,13 +57,14 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.accenture.trac.common.metadata.MetadataCodec.encodeValue;
-import static com.accenture.trac.common.metadata.MetadataConstants.TRAC_JOB_STATUS_ATTR;
+import static com.accenture.trac.common.metadata.MetadataConstants.*;
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
 
 
 public class JobManagementService {
 
-    private static final Duration POLL_INTERVAL = Duration.ofSeconds(10);
+    private static final Duration POLL_INTERVAL = Duration.ofSeconds(2);
+    private static final Duration RETAIN_COMPLETE_DELAY = Duration.ofSeconds(60);
 
     private static final RuntimeConfig rtc = RuntimeConfig.newBuilder()
             .putRepositories("trac_git_repo", RepositoryConfig.newBuilder()
@@ -280,6 +282,8 @@ public class JobManagementService {
 
             for (var update : Streams.concat(metaUpdates.stream(), Stream.of(jobUpdate)).collect(Collectors.toList())) {
 
+                update = applyJobAttrs(jobState, update);
+
                 TagHeader updateResult;
 
                 if (!update.hasDefinition())
@@ -300,7 +304,7 @@ public class JobManagementService {
 
             jobExecutor.destroyBatch(jobKey, execState);
 
-            jobCache.deleteJob(jobKey, ctx.ticket());
+            executorService.schedule(() -> deleteJob(jobKey), RETAIN_COMPLETE_DELAY.getSeconds(), TimeUnit.SECONDS);
         }
         catch (InvalidProtocolBufferException e) {
 
@@ -311,6 +315,42 @@ public class JobManagementService {
 
             log.error("Record job result failed: [{}] {}", jobKey, e.getMessage(), e);
             throw e;
+        }
+    }
+
+    private MetadataWriteRequest applyJobAttrs(JobState jobState, MetadataWriteRequest request) {
+
+        if (!request.hasDefinition())
+            return request;
+
+        var builder = request.toBuilder();
+
+        builder.addTagUpdates(TagUpdate.newBuilder()
+                .setAttrName(TRAC_UPDATE_JOB)
+                .setValue(MetadataCodec.encodeValue(jobState.jobKey)));
+
+        if (!request.hasPriorVersion() || request.getPriorVersion().getObjectVersion() == 0) {
+
+            builder.addTagUpdates(TagUpdate.newBuilder()
+                    .setAttrName(TRAC_CREATE_JOB)
+                    .setValue(MetadataCodec.encodeValue(jobState.jobKey)));
+        }
+
+        return builder.build();
+    }
+
+    private void deleteJob(String jobKey) {
+
+        try (var ctx = jobCache.useTicket(TicketRequest.forJob())) {
+
+            if (ctx.superseded())
+                return;
+
+            var jobState = jobCache.readJob(jobKey);
+
+            log.info("Removing job from cache: [{}] (status = {}", jobKey, jobState.statusCode.name());
+
+            jobCache.deleteJob(jobKey, ctx.ticket());
         }
     }
 

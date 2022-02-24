@@ -55,7 +55,8 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
     @Override
     public void checkJob(JobStatusRequest request, StreamObserver<JobStatus> responseObserver) {
-        super.followJob(request, responseObserver);
+
+        grpcWrap.unaryCall(CHECK_JOB_METHOD, request, responseObserver, orchestrator::checkJob);
     }
 
     @Override

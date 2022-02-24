@@ -22,7 +22,7 @@ import com.accenture.trac.metadata.TagSelector;
 
 public class MetadataUtil {
 
-    private static final String OBJECT_KEY_TEMPLATE = "%s:%s:%d";
+    private static final String OBJECT_KEY_TEMPLATE = "%s-%s-v%d";
 
     public static TagSelector selectorFor(TagHeader header) {
         return selectorFor(header, false, false);

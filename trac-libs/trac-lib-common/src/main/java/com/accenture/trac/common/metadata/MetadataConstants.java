@@ -32,6 +32,14 @@ public class MetadataConstants {
     // Identifiers starting trac_ or _ are reserved for use by the TRAC platform
     public static final Pattern TRAC_RESERVED_IDENTIFIER = Pattern.compile("\\A(trac_|_).*", Pattern.CASE_INSENSITIVE);
 
+    public static final String TRAC_CREATE_TIME = "trac_create_time";
+    public static final String TRAC_CREATE_USER = "trac_create_user";
+    public static final String TRAC_CREATE_JOB = "trac_create_job";
+
+    public static final String TRAC_UPDATE_TIME = "trac_update_time";
+    public static final String TRAC_UPDATE_USER = "trac_update_user";
+    public static final String TRAC_UPDATE_JOB = "trac_update_job";
+
     public static final String TRAC_JOB_TYPE_ATTR = "trac_job_type";
     public static final String TRAC_JOB_STATUS_ATTR = "trac_job_status";
 

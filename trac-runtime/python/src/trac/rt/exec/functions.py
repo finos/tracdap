@@ -158,12 +158,7 @@ class JobResultMetadataFunc(NodeFunction):
         else:
             raise _ex.EUnexpected(f"Unsupported result format [{self.node.result_spec.result_format}]")
 
-        # TODO: Single standard job key
-        if isinstance(self.node.job_id, meta.TagHeader):
-            job_key = f"{self.node.job_id.objectId}-v{self.node.job_id.objectVersion}"
-        else:
-            job_key = str(self.node.job_id)
-
+        job_key = _util.object_key(self.node.job_id)
         job_result_file = f"job_result_{job_key}.{self.node.result_spec.result_format}"
         job_result_path = pathlib \
             .Path(self.node.result_spec.result_dir) \
@@ -352,17 +347,12 @@ class ImportModelFunc(NodeFunction):
             version=self.node.import_details.version)
 
         model_class = self._models.load_model_class(self.node.model_scope, stub_model_def)
-        self._models.scan_model(model_class)
-
-        model: _api.TracModel = model_class()
-
-        params = model.define_parameters()
+        model_scan = self._models.scan_model(model_class)
 
         model_def = copy.copy(stub_model_def)
-        model_def.parameters = params
-
-        for param in model_def.parameters:
-            print(param, model_def.parameters.get(param).paramType)
+        model_def.parameters = model_scan.parameters
+        model_def.inputs = model_scan.inputs
+        model_def.outputs = model_scan.outputs
 
         object_def = meta.ObjectDefinition(
             objectType=meta.ObjectType.MODEL,
