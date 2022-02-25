@@ -50,7 +50,7 @@ import java.util.concurrent.TimeUnit;
 
 public class PlatformTestBase {
 
-    public static final String TRAC_UNIT_CONFIG = "config/trac-unit.yaml";
+    public static final String TRAC_UNIT_CONFIG = "config/trac-e2e.yaml";
     public static final String TRAC_EXEC_DIR = "TRAC_EXEC_DIR";
     public static final String TEST_TENANT = "ACME_CORP";
 
