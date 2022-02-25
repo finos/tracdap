@@ -55,7 +55,7 @@ import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
 public class DataService {
 
-    private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/part-%s/snap-%d/delta-%d-%s";
+    private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d-%s";
     private static final String DATA_ITEM_SUFFIX_TEMPLATE = "x%06x";
 
     private static final MethodDescriptor<MetadataReadRequest, Tag> READ_OBJECT_METHOD = TrustedMetadataApiGrpc.getReadObjectMethod();

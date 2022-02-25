@@ -24,6 +24,7 @@ import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.JobResult;
 import com.accenture.trac.metadata.*;
+import org.checkerframework.checker.units.qual.A;
 
 import java.util.*;
 
@@ -33,41 +34,38 @@ public class RunModelJob implements IJobLogic {
     private static final String TRAC_MODEL_RESOURCE_NAME = "trac_model";
 
     @Override
-    public Map<String, TagSelector> requiredMetadata(JobDefinition job) {
+    public List<TagSelector> requiredMetadata(JobDefinition job) {
 
         if (job.getJobType() != JobType.RUN_MODEL)
             throw new EUnexpected();
 
         var runModel = job.getRunModel();
 
-        var resources = new HashMap<String, TagSelector>(runModel.getInputsCount() + 1);
-        resources.putAll(runModel.getInputsMap());
-        resources.put(TRAC_MODEL_RESOURCE_NAME, runModel.getModel());
+        var resources = new ArrayList<TagSelector>(runModel.getInputsCount() + 1);
+        resources.add(runModel.getModel());
+        resources.addAll(runModel.getInputsMap().values());
 
         return resources;
     }
 
     @Override
-    public JobDefinition freezeResources(JobDefinition job, Map<String, TagHeader> resources) {
+    public List<TagSelector> requiredMetadata(Map<String, ObjectDefinition> newResources) {
 
-        var runModelJob = job.getRunModel().toBuilder();
+        var resources = new ArrayList<TagSelector>();
 
-        var modelId = resources.get(TRAC_MODEL_RESOURCE_NAME);
-        var modelSelector = MetadataUtil.selectorFor(modelId);
+        for (var obj : newResources.values()) {
 
-        runModelJob.setModel(modelSelector);
+            if (obj.getObjectType() != ObjectType.DATA)
+                continue;
 
-        for (var input : runModelJob.getInputsMap().entrySet()) {
+            var dataDef = obj.getData();
+            resources.add(dataDef.getStorageId());
 
-            var resourceId = resources.get(input.getKey());
-            var resourceSelector = MetadataUtil.selectorFor(resourceId);
-
-            input.setValue(resourceSelector);
+            if (dataDef.hasSchemaId())
+                resources.add(dataDef.getSchemaId());
         }
 
-        return job.toBuilder()
-                .setRunModel(runModelJob)
-                .build();
+        return resources;
     }
 
     @Override

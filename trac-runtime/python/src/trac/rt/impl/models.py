@@ -78,7 +78,7 @@ class ModelLoader:
         # TODO: Prevent duplicate checkout per scope
 
         repo = self.__repos.get_repository(model_def.repository)
-        checkout_dir = pathlib.Path(state.scratch_dir).joinpath(model_def.repository)
+        checkout_dir = pathlib.Path(state.scratch_dir)
         checkout = repo.checkout_model(model_def, checkout_dir)
 
         with ModelShim.use_checkout(checkout):

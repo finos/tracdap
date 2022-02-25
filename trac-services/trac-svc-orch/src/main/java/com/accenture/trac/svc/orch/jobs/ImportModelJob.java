@@ -16,11 +16,9 @@
 
 package com.accenture.trac.svc.orch.jobs;
 
-
 import com.accenture.trac.api.JobRequest;
 import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.JobResult;
 import com.accenture.trac.metadata.*;
 
@@ -34,19 +32,20 @@ import static com.accenture.trac.common.metadata.MetadataConstants.*;
 public class ImportModelJob implements IJobLogic {
 
     @Override
-    public Map<String, TagSelector> requiredMetadata(JobDefinition job) {
+    public List<TagSelector> requiredMetadata(JobDefinition job) {
 
         // No extra metadata needed for an import_model job
 
-        return Map.of();
+        return List.of();
     }
 
     @Override
-    public JobDefinition freezeResources(JobDefinition job, Map<String, TagHeader> resources) {
+    public List<TagSelector> requiredMetadata(
+            Map<String, ObjectDefinition> newResources) {
 
-        // NO-OP, IMPORT_MODEL does not use any resources
+        // No extra metadata needed for an import_model job
 
-        return job;
+        return List.of();
     }
 
     @Override

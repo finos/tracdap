@@ -28,9 +28,9 @@ import java.util.Map;
 
 public interface IJobLogic {
 
-    Map<String, TagSelector> requiredMetadata(JobDefinition job);
+    List<TagSelector> requiredMetadata(JobDefinition job);
 
-    JobDefinition freezeResources(JobDefinition job, Map<String, TagHeader> resources);
+    List<TagSelector> requiredMetadata(Map<String, ObjectDefinition> newResources);
 
     List<MetadataWriteRequest> buildResultMetadata(String tenant, JobRequest request, JobResult result);
 }

@@ -68,7 +68,7 @@ enum JobStatusCode {
   QUEUED = 4;
   SUBMITTED = 5;
   RUNNING = 6;
-  COMPLETE = 7;
+  SUCCEEDED = 7;
   FAILED = 8;
   CANCELLED = 9;
 }

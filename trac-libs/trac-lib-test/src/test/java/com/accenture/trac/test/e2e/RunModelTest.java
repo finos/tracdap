@@ -25,18 +25,18 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
 
 import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.List;
 
 
 @Tag("integration")
 @Tag("int-e2e")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class RunModelTest extends PlatformTestBase {
 
     private static final String INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
 
     private static final List<JobStatusCode> COMPLETED_JOB_STATES = List.of(
-            JobStatusCode.COMPLETE,
+            JobStatusCode.SUCCEEDED,
             JobStatusCode.FAILED,
             JobStatusCode.CANCELLED);
 
@@ -112,7 +112,7 @@ public class RunModelTest extends PlatformTestBase {
 
         var importModel = ImportModelJob.newBuilder()
                 .setLanguage("python")
-                .setRepository("trac_git_repo")   // TODO
+                .setRepository("UNIT_TEST_REPO")
                 .setPath("examples/models/python/using_data")
                 .setEntryPoint("using_data.UsingDataModel")
                 .setVersion("main")
@@ -146,7 +146,7 @@ public class RunModelTest extends PlatformTestBase {
             log.info("Job status: {}", jobStatus.getStatus());
         }
 
-        Assertions.assertEquals(JobStatusCode.COMPLETE, jobStatus.getStatus());
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatus());
 
         var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
 
@@ -166,10 +166,10 @@ public class RunModelTest extends PlatformTestBase {
 
         Assertions.assertEquals(1, modelSearchResult.getSearchResultCount());
 
-        var modelId = modelSearchResult.getSearchResult(0).getHeader();
+        var searchResult = modelSearchResult.getSearchResult(0);
         var modelReq = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(modelId))
+                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
                 .build();
 
         var modelTag = metaClient.readObject(modelReq);
@@ -181,5 +181,49 @@ public class RunModelTest extends PlatformTestBase {
         Assertions.assertTrue(modelDef.getParametersMap().containsKey("eur_usd_rate"));
         Assertions.assertTrue(modelDef.getInputsMap().containsKey("customer_loans"));
         Assertions.assertTrue(modelDef.getOutputsMap().containsKey("profit_by_region"));
+
+        modelId = modelTag.getHeader();
+    }
+
+    @Test @Order(3)
+    void runModel() throws Exception {
+
+        var runModel = RunModelJob.newBuilder()
+                .setModel(MetadataUtil.selectorFor(modelId))
+                .putParameters("eur_usd_rate", MetadataCodec.encodeValue(1.3785))
+                .putParameters("default_weighting", MetadataCodec.encodeValue(1.5))
+                .putParameters("filter_defaults", MetadataCodec.encodeValue(true))
+                .putInputs("customer_loans", MetadataUtil.selectorFor(inputDataId))
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_model")
+                        .setValue(MetadataCodec.encodeValue("run_model:using_data")))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_MODEL)
+                .setRunModel(runModel))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_model:run_model")))
+                .build();
+
+        var jobStatus = orchClient.submitJob(jobRequest);
+        log.info("Job ID: [{}]", MetadataUtil.objectKey(jobStatus.getJobId()));
+        log.info("Job status: {}", jobStatus.getStatus());
+
+        var statusRequest = JobStatusRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(jobStatus.getJobId()))
+                .build();
+
+        while (!COMPLETED_JOB_STATES.contains(jobStatus.getStatus())) {
+            Thread.sleep(1000);
+            jobStatus = orchClient.checkJob(statusRequest);
+            log.info("Job status: {}", jobStatus.getStatus());
+        }
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatus());
     }
 }

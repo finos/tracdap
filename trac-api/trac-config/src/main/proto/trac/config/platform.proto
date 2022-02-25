@@ -77,6 +77,8 @@ message OrchServiceConfig {
   uint32 port = 1;
 
   ExecutorConfig executor = 2;
+
+  map<string, RepositoryConfig> repositories = 3;
 }
 
 message StorageConfig {
@@ -88,6 +90,13 @@ message StorageInstance {
 
   string storageType = 1;
   map<string, string> storageProps = 2;
+}
+
+message RepositoryConfig {
+
+  string repoType = 1;
+  string repoUrl = 2;
+  map<string, string> repoProps = 3;
 }
 
 message ExecutorConfig {

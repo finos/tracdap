@@ -246,7 +246,8 @@ class _CsvStorageFormat(_StorageFormat):
 class CommonDataStorage(IDataStorage):
 
     __formats = {
-        'csv': _CsvStorageFormat()
+        'csv': _CsvStorageFormat(),
+        'text/csv': _CsvStorageFormat()
     }
 
     def __init__(
@@ -270,6 +271,17 @@ class CommonDataStorage(IDataStorage):
 
         if format_impl is None:
             raise _ex.EStorageConfig(f"Requested storage format [{storage_format}] is not available")
+
+        stat = self.__file_storage.stat(storage_path)
+
+        if stat.file_type == FileType.DIRECTORY:
+
+            dir_content = self.__file_storage.ls(storage_path)
+
+            if len(dir_content) == 1:
+                storage_path = dir_content[0]
+            else:
+                raise NotImplementedError("Directory storage format not available yet")
 
         if self.__pushdown_pandas:
             full_path = self.__root_path / storage_path
@@ -464,4 +476,4 @@ class LocalDataStorage(CommonDataStorage):
         super().__init__(storage_config, file_storage, pushdown_pandas=True, pushdown_spark=True)
 
 
-StorageManager.register_storage_type("LOCAL_STORAGE", LocalFileStorage, LocalDataStorage)
+StorageManager.register_storage_type("LOCAL", LocalFileStorage, LocalDataStorage)

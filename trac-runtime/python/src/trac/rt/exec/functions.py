@@ -274,22 +274,12 @@ class LoadDataFunc(_LoadSaveDataFunc):
         file_storage = self.storage.get_file_storage(data_copy.storageKey)
         data_storage = self.storage.get_data_storage(data_copy.storageKey)
 
-        stat = file_storage.stat(data_copy.storagePath)
+        df = data_storage.read_pandas_table(
+            self.node.data_def.schema.table,
+            data_copy.storagePath, data_copy.storageFormat,
+            storage_options={})
 
-        if stat.file_type == _storage.FileType.FILE:
-
-            # Assumption that dataset is a table, and not some other schema type
-
-            df = data_storage.read_pandas_table(
-                self.node.data_def.schema.table,
-                data_copy.storagePath, data_copy.storageFormat,
-                storage_options={})
-
-            return _data.DataItem(pandas=df)
-
-        else:
-
-            raise NotImplementedError("Directory storage format not available yet")
+        return _data.DataItem(pandas=df)
 
 
 class SaveDataFunc(_LoadSaveDataFunc):

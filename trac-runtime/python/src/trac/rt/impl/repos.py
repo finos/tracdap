@@ -18,6 +18,7 @@ import abc
 import typing as tp
 import pathlib
 import subprocess as sp
+import time
 
 import trac.rt.metadata as _meta
 import trac.rt.config as _cfg
@@ -71,6 +72,8 @@ class LocalRepository(IModelRepository):
 
 class GitRepository(IModelRepository):
 
+    GIT_TIMEOUT_SECONDS = 30
+
     def __init__(self, repo_config: _cfg.RepositoryConfig):
         self._repo_config = repo_config
         self._log = _util.logger_for_object(self)
@@ -99,10 +102,16 @@ class GitRepository(IModelRepository):
 
         for git_cmd in git_cmds:
 
-            self._log.debug(f"git {' '.join(git_cmd)}")
+            self._log.info(f"git {' '.join(git_cmd)}")
 
             cmd = [*git_cli, *git_cmd]
-            cmd_result = sp.run(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
+            cmd_result = sp.run(cmd, cwd=repo_dir, stdout=sp.PIPE, stderr=sp.PIPE, timeout=self.GIT_TIMEOUT_SECONDS)
+
+            if cmd_result.returncode != 0:
+                time.sleep(1)
+                self._log.warning(f"git {' '.join(git_cmd)} (retrying)")
+                cmd_result = sp.run(cmd, cwd=repo_dir, stdout=sp.PIPE, stderr=sp.PIPE, timeout=self.GIT_TIMEOUT_SECONDS)
+
             cmd_out = str(cmd_result.stdout, 'utf-8').splitlines()
             cmd_err = str(cmd_result.stderr, 'utf-8').splitlines()
 

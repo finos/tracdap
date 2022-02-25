@@ -34,13 +34,6 @@ message RuntimeConfig {
   SparkSettings sparkSettings = 5;
 }
 
-message RepositoryConfig {
-
-  string repoType = 1;
-  string repoUrl = 2;
-  map<string, string> repoProps = 3;
-}
-
 message StorageSettings {
 
   string defaultStorage = 1;

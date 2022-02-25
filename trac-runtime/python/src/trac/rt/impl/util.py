@@ -19,7 +19,9 @@ import sys
 import uuid
 import datetime as dt
 
+import trac.rt.exceptions as ex
 import trac.rt.metadata as meta
+import trac.rt.config as cfg
 import typing as tp
 
 
@@ -145,4 +147,27 @@ def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
 
 def object_key(object_id: tp.Union[meta.TagHeader, meta.TagSelector]):
 
-    return f"{object_id.objectType.name}-{object_id.objectId}-v{object_id.objectVersion}"
+    if isinstance(object_id, meta.TagHeader):
+        return f"{object_id.objectType.name}-{object_id.objectId}-v{object_id.objectVersion}"
+
+    if object_id.objectVersion:
+        return f"{object_id.objectType.name}-{object_id.objectId}-v{object_id.objectVersion}"
+
+    if object_id.objectAsOf:
+        return f"{object_id.objectType.name}-{object_id.objectId}-asof-{object_id.objectAsOf.isoDatetime}"
+
+    if object_id.latestObject:
+        return f"{object_id.objectType.name}-{object_id.objectId}-latest"
+
+    raise ex.EUnexpected()
+
+
+def get_job_resource(object_id: tp.Union[meta.TagHeader, meta.TagSelector], job_config: cfg.JobConfig):
+
+    resource_key = object_key(object_id)
+    mapped_key = job_config.resourceMapping.get(resource_key)
+
+    if mapped_key is not None:
+        return job_config.resources[mapped_key]
+    else:
+        return job_config.resources[resource_key]

@@ -34,8 +34,10 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.stream.Collectors;
 
 import static com.accenture.trac.common.metadata.MetadataConstants.TRAC_JOB_STATUS_ATTR;
 import static com.accenture.trac.common.metadata.MetadataConstants.TRAC_JOB_TYPE_ATTR;
@@ -235,14 +237,19 @@ public class JobApiService {
             return CompletableFuture.completedFuture(jobState);
         }
 
+        return loadResources(jobState, resources);
+    }
+
+    private CompletionStage<JobState> loadResources(JobState jobState, List<TagSelector> resources) {
+
         log.info("Loading additional required metadata...");
 
-        var orderedNames = new ArrayList<String>(resources.size());
+        var orderedKeys = new ArrayList<String>(resources.size());
         var orderedSelectors = new ArrayList<TagSelector>(resources.size());
 
-        for (var resource : resources.entrySet()) {
-            orderedNames.add(resource.getKey());
-            orderedSelectors.add(resource.getValue());
+        for (var selector : resources) {
+            orderedKeys.add(MetadataUtil.objectKey(selector));
+            orderedSelectors.add(selector);
         }
 
         var batchRequest = MetadataBatchRequest.newBuilder()
@@ -252,35 +259,49 @@ public class JobApiService {
 
         return grpcWrap
                 .unaryCall(READ_BATCH_METHOD, batchRequest, metaClient::readBatch)
-                .thenApply(batchResponse -> loadResourcesResponse(batchResponse, orderedNames, jobState));
+                .thenCompose(batchResponse -> loadResourcesResponse(batchResponse, orderedKeys, jobState));
     }
 
-    private JobState loadResourcesResponse(
+    private CompletionStage<JobState> loadResourcesResponse(
             MetadataBatchResponse batchResponse,
-            List<String> orderedNames,
+            List<String> mappingKeys,
             JobState jobState) {
 
-        if (batchResponse.getTagCount() != orderedNames.size())
+        if (batchResponse.getTagCount() != mappingKeys.size())
             throw new EUnexpected();
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
 
-        var resourceMapping = new HashMap<String, TagHeader>(orderedNames.size());
-        var resourceDefinitions = new HashMap<String, ObjectDefinition>(orderedNames.size());
+        var resources = new HashMap<String, ObjectDefinition>(mappingKeys.size());
+        var mappings = new HashMap<String, String>(mappingKeys.size());
 
-        for (var resourceIndex = 0; resourceIndex < orderedNames.size(); resourceIndex++) {
+        for (var resourceIndex = 0; resourceIndex < mappingKeys.size(); resourceIndex++) {
 
-            var resourceName = orderedNames.get(resourceIndex);
             var resourceTag = batchResponse.getTag(resourceIndex);
             var resourceKey = MetadataUtil.objectKey(resourceTag.getHeader());
+            var mappingKey = mappingKeys.get(resourceIndex);
 
-            resourceMapping.put(resourceName, resourceTag.getHeader());
-            resourceDefinitions.put(resourceKey, resourceTag.getDefinition());
+            resources.put(resourceKey, resourceTag.getDefinition());
+
+            if (!resourceKey.equals(mappingKey))
+                mappings.put(mappingKey, resourceKey);
         }
 
-        jobState.resources = resourceDefinitions;
-        jobState.definition = jobLogic.freezeResources(jobState.definition, resourceMapping);
+        jobState.resources.putAll(resources);
+        jobState.resourceMappings.putAll(mappings);
 
-        return jobState;
+        var extraResources = jobLogic.requiredMetadata(resources);
+
+        extraResources = extraResources.stream()
+                .filter(selector -> {
+                    var key = MetadataUtil.objectKey(selector);
+                    return !jobState.resources.containsKey(key) && !jobState.resourceMappings.containsKey(key);
+                })
+                .collect(Collectors.toList());
+
+        if (!extraResources.isEmpty())
+            return loadResources(jobState, extraResources);
+        else
+            return CompletableFuture.completedFuture(jobState);
     }
 }

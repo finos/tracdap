@@ -63,10 +63,17 @@ services:
         instances:
           - storageType: LOCAL
             storageProps:
-              rootDir: ./build/run
+              rootPath: ./build/run
 
   orch:
     port: 8083
+
+    repositories:
+
+      # Add your own repositories in here to load models into TRAC
+      example_repo:
+        repoType: git
+        repoUrl: https://github.com/accenture/trac
 
     executor:
       executorType: LOCAL

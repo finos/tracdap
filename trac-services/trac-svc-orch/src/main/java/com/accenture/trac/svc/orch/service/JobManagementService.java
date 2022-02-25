@@ -19,14 +19,11 @@ package com.accenture.trac.svc.orch.service;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exec.*;
 import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.config.JobConfig;
-import com.accenture.trac.config.JobResult;
+import com.accenture.trac.config.*;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.metadata.TagUpdate;
 import com.accenture.trac.api.JobStatusCode;
-import com.accenture.trac.config.RepositoryConfig;
-import com.accenture.trac.config.RuntimeConfig;
 import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.api.TrustedMetadataApiGrpc;
 
@@ -64,7 +61,7 @@ import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
 public class JobManagementService {
 
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(2);
-    private static final Duration RETAIN_COMPLETE_DELAY = Duration.ofSeconds(60);
+    private static final Duration RETAIN_COMPLETE_DELAY = Duration.ofSeconds(2);
 
     private static final RuntimeConfig rtc = RuntimeConfig.newBuilder()
             .putRepositories("trac_git_repo", RepositoryConfig.newBuilder()
@@ -74,6 +71,7 @@ public class JobManagementService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final PlatformConfig platformConfig;
     private final IJobCache jobCache;
     private final IBatchExecutor jobExecutor;
     private final ScheduledExecutorService executorService;
@@ -82,11 +80,13 @@ public class JobManagementService {
     private ScheduledFuture<?> pollingTask;
 
     public JobManagementService(
+            PlatformConfig platformConfig,
             IJobCache jobCache,
             IBatchExecutor jobExecutor,
             ScheduledExecutorService executorService,
             TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient) {
 
+        this.platformConfig = platformConfig;
         this.jobCache = jobCache;
         this.jobExecutor = jobExecutor;
         this.executorService = executorService;
@@ -134,11 +134,12 @@ public class JobManagementService {
 
             log.info("Polling job cache...");
 
-            var completeStates = List.of(JobStatusCode.COMPLETE, JobStatusCode.FAILED, JobStatusCode.CANCELLED);
+            var completeStates = List.of(JobStatusCode.SUCCEEDED, JobStatusCode.FAILED, JobStatusCode.CANCELLED);
             var completeJobs = jobCache.pollJobs(job -> completeStates.contains(job.statusCode));
 
             for (var job : completeJobs)
-                executorService.schedule(() -> recordJobResult(job.jobKey), 0L, TimeUnit.SECONDS);
+                if (!job.recorded)
+                    executorService.schedule(() -> recordJobResult(job.jobKey), 0L, TimeUnit.SECONDS);
 
             var queuedJobs = jobCache.pollJobs(job -> job.statusCode == JobStatusCode.QUEUED);
 
@@ -215,9 +216,13 @@ public class JobManagementService {
                     .setJobId(jobState.jobId)
                     .setJob(jobState.definition)
                     .putAllResources(jobState.resources)
+                    .putAllResourceMapping(jobState.resourceMappings)
                     .build();
 
-            var sysConfig = rtc;  // TODO: Real sys config for model runtime
+            var sysConfig = RuntimeConfig.newBuilder()
+                    .putAllStorage(platformConfig.getServices().getData().getStorageMap())
+                    .putAllRepositories(platformConfig.getServices().getOrch().getRepositoriesMap())
+                    .build();
 
             // TODO: Config format and file names
             var jobConfigJson = JsonFormat.printer().print(jobConfig).getBytes(StandardCharsets.UTF_8);
@@ -263,7 +268,8 @@ public class JobManagementService {
                 return;
 
             var jobState = jobCache.readJob(jobKey);
-            var jobLogic = JobLogic.forJobType(jobState.jobType);
+            jobState.recorded = true;
+            jobCache.updateJob(jobKey, jobState, ctx.ticket());
 
             var execState = JobState.deserialize(jobState.executorState, ExecutorState.class);
             var jobResultFile = String.format("job_result_%s.json", jobKey);
@@ -277,6 +283,7 @@ public class JobManagementService {
 
             log.info("Record job result [{}]: {}", jobKey, jobState.statusCode);
 
+            var jobLogic = JobLogic.forJobType(jobState.jobType);
             var metaUpdates = jobLogic.buildResultMetadata(jobState.tenant, jobState.jobRequest, jobResult);
             var jobUpdate = buildJobSucceededUpdate(jobState);
 
@@ -316,6 +323,9 @@ public class JobManagementService {
             log.error("Record job result failed: [{}] {}", jobKey, e.getMessage(), e);
             throw e;
         }
+        finally {
+
+        }
     }
 
     private MetadataWriteRequest applyJobAttrs(JobState jobState, MetadataWriteRequest request) {
@@ -348,7 +358,7 @@ public class JobManagementService {
 
             var jobState = jobCache.readJob(jobKey);
 
-            log.info("Removing job from cache: [{}] (status = {}", jobKey, jobState.statusCode.name());
+            log.info("Removing job from cache: [{}] (status = {})", jobKey, jobState.statusCode.name());
 
             jobCache.deleteJob(jobKey, ctx.ticket());
         }

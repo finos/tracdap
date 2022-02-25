@@ -39,7 +39,7 @@ import static com.accenture.trac.common.storage.local.LocalFileErrors.ExplicitEr
 
 public class LocalFileStorage implements IFileStorage {
 
-    public static final String CONFIG_ROOT_DIR = "rootDir";
+    public static final String CONFIG_ROOT_PATH = "rootPath";
 
     private static final String BACKSLASH = "/";
 
@@ -66,7 +66,7 @@ public class LocalFileStorage implements IFileStorage {
 
         // TODO: Robust config handling
 
-        var rootDirProp = config.getProperty(CONFIG_ROOT_DIR);
+        var rootDirProp = config.getProperty(CONFIG_ROOT_PATH);
         this.rootPath = Paths.get(rootDirProp)
                 .toAbsolutePath()
                 .normalize();

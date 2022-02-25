@@ -41,10 +41,13 @@ public class JobState implements Serializable {
 
     public JobDefinition definition;
     public Map<String, ObjectDefinition> resources = new HashMap<>();
+    public Map<String, String> resourceMappings = new HashMap<>();
 
     public JobStatusCode statusCode;
 
     public byte[] executorState;
+
+    public boolean recorded = false;
 
     public static <T extends Serializable> byte[] serialize(T obj){
 

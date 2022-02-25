@@ -16,13 +16,16 @@
 
 package com.accenture.trac.common.metadata;
 
+import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.metadata.TagSelector;
 
 
 public class MetadataUtil {
 
-    private static final String OBJECT_KEY_TEMPLATE = "%s-%s-v%d";
+    private static final String OBJECT_KEY_FOR_VERSION = "%s-%s-v%d";
+    private static final String OBJECT_KEY_FOR_ASOF = "%s-%s-asof-%s";
+    private static final String OBJECT_KEY_FOR_LATEST = "%s-%s-latest";
 
     public static TagSelector selectorFor(TagHeader header) {
         return selectorFor(header, false, false);
@@ -53,9 +56,34 @@ public class MetadataUtil {
 
     public static String objectKey(TagHeader header) {
 
-        return String.format(OBJECT_KEY_TEMPLATE,
+        return String.format(OBJECT_KEY_FOR_VERSION,
                 header.getObjectType(),
                 header.getObjectId(),
                 header.getObjectVersion());
+    }
+
+    public static String objectKey(TagSelector selector) {
+
+        if (selector.hasObjectVersion())
+
+            return String.format(OBJECT_KEY_FOR_VERSION,
+                    selector.getObjectType(),
+                    selector.getObjectId(),
+                    selector.getObjectVersion());
+
+        if (selector.hasObjectAsOf())
+
+            return String.format(OBJECT_KEY_FOR_ASOF,
+                    selector.getObjectType(),
+                    selector.getObjectId(),
+                    selector.getObjectAsOf().getIsoDatetime());
+
+        if (selector.hasLatestObject())
+
+            return String.format(OBJECT_KEY_FOR_LATEST,
+                    selector.getObjectType(),
+                    selector.getObjectId());
+
+        throw new EUnexpected();
     }
 }

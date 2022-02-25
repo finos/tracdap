@@ -127,7 +127,11 @@ public class TracOrchestratorService extends CommonServiceBase {
             executors.initExecutor(orchestratorConfig.getExecutor());
             jobExecCtrl = executors.getExecutor();
 
-            jobMonitor = new JobManagementService(jobCache, jobExecCtrl, serviceGroup, metaClientBlocking);
+            jobMonitor = new JobManagementService(
+                    platformConfig,
+                    jobCache, jobExecCtrl,
+                    serviceGroup, metaClientBlocking);
+
             jobMonitor.start();
 
             var orchestrator = new JobApiService(jobCache, metaClient);

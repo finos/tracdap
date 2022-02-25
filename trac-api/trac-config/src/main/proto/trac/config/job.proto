@@ -30,5 +30,6 @@ message JobConfig {
     metadata.TagHeader jobId = 1;
     metadata.JobDefinition job = 2;
 
-    map<string, metadata.ObjectDefinition> resources = 3;
+    map<string, string> resourceMapping = 3;
+    map<string, metadata.ObjectDefinition> resources = 4;
 }

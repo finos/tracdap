@@ -410,11 +410,11 @@ public class LocalBatchExecutor implements IBatchExecutor {
             var currentStatus = process.isAlive()
                     ? JobStatusCode.RUNNING :
                     process.exitValue() == 0
-                            ? JobStatusCode.COMPLETE
+                            ? JobStatusCode.SUCCEEDED
                             : JobStatusCode.FAILED;
 
 
-            if (currentStatus == JobStatusCode.COMPLETE || currentStatus == JobStatusCode.FAILED) {
+            if (currentStatus == JobStatusCode.SUCCEEDED || currentStatus == JobStatusCode.FAILED) {
 
                 var result = new ExecutorPollResult();
                 result.jobKey = job.getKey();

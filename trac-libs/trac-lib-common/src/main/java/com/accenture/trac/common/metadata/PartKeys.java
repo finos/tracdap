@@ -22,7 +22,7 @@ import com.accenture.trac.metadata.PartType;
 
 public class PartKeys {
 
-    private static final String ROOT_OPAQUE_KEY = "root";
+    private static final String ROOT_OPAQUE_KEY = "part-root";
 
     public static final PartKey ROOT = PartKey.newBuilder()
             .setPartType(PartType.PART_ROOT)

@@ -55,7 +55,7 @@ services:
     port: 8082
 
     defaultStorageKey: UNIT_TEST_STORAGE
-    defaultStorageFormat: ARROW_FILE
+    defaultStorageFormat: CSV
 
     storage:
 
@@ -63,10 +63,15 @@ services:
         instances:
           - storageType: LOCAL
             storageProps:
-              rootDir: ${TRAC_DIR}/unit_test_storage
+              rootPath: ${TRAC_DIR}/unit_test_storage
 
   orch:
     port: 8083
+
+    repositories:
+      UNIT_TEST_REPO:
+        repoType: git
+        repoUrl: https://github.com/accenture/trac
 
     executor:
       executorType: LOCAL

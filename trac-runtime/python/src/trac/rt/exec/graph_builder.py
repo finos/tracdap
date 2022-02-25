@@ -101,8 +101,7 @@ class GraphBuilder:
         # The root exec node can run directly in the job context, no need to do a context push
         # All input views are already mapped and there is only a single execution target
 
-        target_key = _util.object_key(target)
-        target_obj = job_config.resources.get(target_key)
+        target_obj = _util.get_job_resource(target, job_config)
         target_graph = GraphBuilder.build_model_or_flow(
             job_config, job_namespace, input_graph, target_obj)
 
@@ -178,11 +177,8 @@ class GraphBuilder:
 
         for input_name, data_selector in inputs.items():
 
-            data_key = _util.object_key(data_selector)
-            data_def = job_config.resources[data_key].data
-
-            storage_key = _util.object_key(data_def.storageId)
-            storage_def = job_config.resources[storage_key].storage
+            data_def = _util.get_job_resource(data_selector, job_config).data
+            storage_def = _util.get_job_resource(data_def.storageId, job_config).storage
 
             # TODO: Get this from somewhere
             root_part_opaque_key = 'part-root'
@@ -216,11 +212,8 @@ class GraphBuilder:
 
         for output_name, data_selector in outputs.items():
 
-            data_key = _util.object_key(data_selector)
-            data_def = job_config.resources[data_key].data
-
-            storage_key = _util.object_key(data_def.storageId)
-            storage_def = job_config.resources[storage_key].storage
+            data_def = _util.get_job_resource(data_selector, job_config).data
+            storage_def = _util.get_job_resource(data_def.storageId, job_config).storage
 
             # TODO: Get this from somewhere
             root_part_opaque_key = 'part-root'
