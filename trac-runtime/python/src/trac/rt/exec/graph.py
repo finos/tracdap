@@ -15,10 +15,13 @@
 from __future__ import annotations
 
 import pathlib
+import types
 import typing as tp
 import dataclasses as dc
 
+import trac.rt.impl.data as _data
 import trac.rt.metadata as meta
+import trac.rt.config as cfg
 
 
 @dc.dataclass(frozen=True)
@@ -40,11 +43,19 @@ class NodeNamespace:
             level = level.parent
 
 
+_T = tp.TypeVar('_T')
+
+
 @dc.dataclass(frozen=True)
-class NodeId:
+class NodeId(tp.Generic[_T]):
+
+    @staticmethod
+    def of(name: str, namespace: NodeNamespace, result_type: tp.Type[_T]) -> NodeId[_T]:
+        return NodeId(name, namespace, result_type)
 
     name: str
     namespace: NodeNamespace
+    result_type: tp.Type[_T] = type(None)
 
     def __str__(self):
         return f"{self.name} / {self.namespace}"
@@ -61,15 +72,17 @@ class DependencyType:
 
 
 DependencyType.HARD = DependencyType(immediate=True, tolerant=False)
+DependencyType.SOFT = DependencyType(immediate=False, tolerant=True)
 DependencyType.TOLERANT = DependencyType(immediate=True, tolerant=True)
+DependencyType.DELAYED = DependencyType(immediate=False, tolerant=False)
 
 
 @dc.dataclass(frozen=True)
-class Node:
+class Node(tp.Generic[_T]):
 
     """A node in the TRAC execution graph"""
 
-    id: NodeId
+    id: NodeId[_T]
     """ID of this node"""
 
     dependencies: tp.Dict[NodeId, DependencyType] = dc.field(init=False)
@@ -77,6 +90,7 @@ class Node:
 
 
 NodeMap = tp.Dict[NodeId, Node]
+MetadataBundle = tp.Dict[meta.ObjectType, meta.ObjectDefinition]
 
 
 @dc.dataclass(frozen=True)
@@ -186,7 +200,25 @@ class SetParametersNode(Node):
 
 
 @dc.dataclass(frozen=True)
-class DataViewNode(MappingNode):
+class StaticDataSpecNode(Node[_data.DataItemSpec]):
+
+    data_spec: _data.DataItemSpec
+
+    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
+
+    def __post_init__(self, explicit_deps):
+        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
+        object.__setattr__(self, 'dependencies', dependencies)
+
+
+@dc.dataclass(frozen=True)
+class DynamicDataSpecNode(Node[_data.DataItemSpec]):
+
+    pass
+
+
+@dc.dataclass(frozen=True)
+class DataViewNode(MappingNode[_data.DataView]):
 
     schema: meta.SchemaDefinition
     root_item: NodeId
@@ -201,7 +233,7 @@ class DataItemNode(MappingNode):
 
     """Map a data item out of an assembled data view"""
 
-    data_view_id: NodeId
+    data_view_id: NodeId[_data.DataView]
     data_item: str
 
     def __post_init__(self):
@@ -210,21 +242,20 @@ class DataItemNode(MappingNode):
 
 
 @dc.dataclass(frozen=True)
-class LoadDataNode(Node):
+class LoadDataNode(Node[_data.DataItem]):
 
     """
     Load an individual data item from storage
     The latest incarnation of the item will be loaded from any available copy
     """
 
-    data_item: str
-    data_def: meta.DataDefinition
-    storage_def: meta.StorageDefinition
+    spec_id: NodeId[_data.DataItemSpec]
 
     explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
 
     def __post_init__(self, explicit_deps):
         dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
+        dependencies[self.spec_id] = DependencyType.HARD
         object.__setattr__(self, 'dependencies', dependencies)
 
 
@@ -235,12 +266,11 @@ class SaveDataNode(Node):
     Save an individual data item to storage
     """
 
-    data_item: NodeId
-    data_def: meta.DataDefinition
-    storage_def: meta.StorageDefinition
+    spec_id: NodeId[_data.DataItemSpec]
+    data_item_id: NodeId[_data.DataItem]
 
     def __post_init__(self):
-        dependencies = {self.data_item: DependencyType.HARD}
+        dependencies = {self.spec_id: DependencyType.HARD, self.data_item_id: DependencyType.HARD}
         object.__setattr__(self, 'dependencies', dependencies)
 
 
@@ -274,7 +304,7 @@ class RunModelNode(Node):
 
 
 @dc.dataclass(frozen=True)
-class JobOutputMetadataNode(Node):
+class SaveJobResultNode(Node):
 
     data_view_id: NodeId
     physical_items: tp.Dict[NodeId, str]
@@ -286,10 +316,10 @@ class JobOutputMetadataNode(Node):
 
 
 @dc.dataclass(frozen=True)
-class JobResultMetadataNode(Node):
+class BuildJobResultNode(Node[cfg.JobResult]):
 
     job_id: meta.TagHeader
-    outputs: tp.FrozenSet[NodeId]
+    outputs: tp.FrozenSet[NodeId[MetadataBundle]]
     result_spec: JobResultSpec
 
     explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None

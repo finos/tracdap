@@ -37,11 +37,19 @@ from trac.rt.exec.graph import *
 NodeContext = tp.Dict[NodeId, object]  # Available prior node results when a node function is called
 NodeResult = tp.Any  # Result of a node function (will be recorded against the node ID)
 
+_T = tp.TypeVar('_T')
+_N = tp.TypeVar("_N", bound=Node)
 
-class NodeFunction(tp.Callable[[NodeContext], NodeResult], abc.ABC):
+
+def _ctx_lookup(node_id: NodeId[_T], ctx: NodeContext) -> _T:
+    # TODO: Error handling and type checking
+    return ctx.get(node_id).result  # noqa
+
+
+class NodeFunction(tp.Callable[[NodeContext], _T], abc.ABC):
 
     @abc.abstractmethod
-    def __call__(self, ctx: NodeContext) -> NodeResult:
+    def __call__(self, ctx: NodeContext) -> _T:
         pass
 
 
@@ -119,16 +127,12 @@ class KeyedItemFunc(NodeFunction):
         return src_item
 
 
-class JobResultMetadataFunc(NodeFunction):
+class BuildJobResultFunc(NodeFunction):
 
-    def __init__(self, node: JobResultMetadataNode):
-        super().__init__()
-        self.node = node
+    def __init__(self, node: BuildJobResultNode):
+        super().__init__(node)
 
-    def __call__(self, ctx: NodeContext) -> NodeResult:
-
-        if not self.node.result_spec.save_result:
-            return None
+    def __call__(self, ctx: NodeContext) -> _config.JobResult:
 
         job_result = _config.JobResult()
         job_result.jobId = self.node.job_id
@@ -137,6 +141,23 @@ class JobResultMetadataFunc(NodeFunction):
         for output_id in self.node.outputs:
             output_result = ctx.get(output_id).result
             job_result.objects[output_id.name] = output_result
+
+        return job_result
+
+
+class SaveJobResultFunc(NodeFunction):
+
+    def __init__(self, node: SaveJobResultNode):
+        super().__init__(node)
+
+    def __call__(self, ctx: NodeContext) -> NodeResult:
+
+        node.jo
+
+        job_result = _config.JobResult()  # todo
+
+        if not self.node.result_spec.save_result:
+            return None
 
         # TODO: Full implementation
         class Dumper(json.JSONEncoder):
@@ -195,7 +216,6 @@ class SetParametersFunc(NodeFunction):
 class DataViewFunc(NodeFunction):
 
     def __init__(self, node: DataViewNode):
-        super().__init__()
         self.node = node
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
@@ -210,12 +230,11 @@ class DataViewFunc(NodeFunction):
 class DataItemFunc(NodeFunction):
 
     def __init__(self, node: DataItemNode):
-        super().__init__()
         self.node = node
 
-    def __call__(self, ctx: NodeContext) -> NodeResult:
+    def __call__(self, ctx: NodeContext) -> DataItemNode.id.result_type:
 
-        data_view: _data.DataView = ctx[self.node.data_view_id].result
+        data_view = _ctx_lookup(self.node.data_view_id, ctx)
 
         # TODO: Support selecting data item described by self.node
 
@@ -227,7 +246,82 @@ class DataItemFunc(NodeFunction):
         return delta
 
 
-class _LoadSaveDataFunc(NodeFunction, abc.ABC):
+class StaticDataSpecFunc(NodeFunction[_data.DataItemSpec]):
+
+    def __init__(self, node: StaticDataSpecNode):
+        self.node = node
+
+    def __call__(self, ctx: NodeContext) -> _data.DataItemSpec:
+        return self.node.data_spec
+
+
+class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
+
+    def __init__(self, node: DynamicDataSpecNode):
+        self.node = node
+        self.part_key = ""
+        self.is_delta = False
+
+    def __call__(self, ctx: NodeContext) -> _data.DataItemSpec:
+
+        prior_data_def: meta.DataDefinition = None
+        prior_storage_def: meta.StorageDefinition = None
+        prior_schema_def: meta.SchemaDefinition = None
+
+        if prior_data_def is None:
+            data_def = meta.DataDefinition()
+            data_def.storageId = meta.TagSelector()  # TODO
+            data_def.schema = # TODO
+            data_def.schemaId = # TODO
+        else:
+            data_def = copy.copy(prior_data_def)
+
+        if prior_storage_def is None:
+            storage_def = meta.StorageDefinition()
+        else:
+            storage_def = copy.copy(prior_storage_def)
+
+        delta = meta.DataDefinition.Delta()
+
+        if self.part_key in data_def.parts:
+            part = data_def.parts[self.part_key]
+            if self.is_delta:
+                snap_index = part.snap.snapIndex
+                delta_index = len(part.snap.deltas)
+            else:
+                snap_index = part.snap.snapIndex + 1
+                delta_index = 0
+
+        data_item = f""
+
+        storage_key = "TODO"  # TODO
+        storage_path = ""  # from data item
+        storage_format = "CSV"  # TODO
+
+        storage_copy = meta.StorageCopy(
+            storage_key, storage_path, storage_format,
+            meta.CopyStatus.COPY_AVAILABLE)
+
+        storage_incarnation = meta.StorageIncarnation(
+            [storage_copy],
+            incarnationIndex=0,
+            incarnationTimestamp=meta.DatetimeValue(isoDatetime=""),  # TODO
+            incarnationStatus=meta.IncarnationStatus.INCARNATION_AVAILABLE)
+
+        storage_item = meta.StorageItem([storage_incarnation])
+        storage_def.dataItems = {**storage_def.dataItems, data_item: storage_item}
+
+        bundle = {
+            meta.ObjectType.DATA: meta.ObjectDefinition(meta.ObjectType.DATA, data=data_def),
+            meta.ObjectType.STORAGE: meta.ObjectDefinition(meta.ObjectType.STORAGE, storage=storage_def)
+        }
+
+        return bundle
+
+
+
+
+class _LoadSaveDataFunc(abc.ABC):
 
     def __init__(self, storage: _storage.StorageManager):
         self.storage = storage
@@ -260,29 +354,28 @@ class _LoadSaveDataFunc(NodeFunction, abc.ABC):
         return copy
 
 
-class LoadDataFunc(_LoadSaveDataFunc):
+class LoadDataFunc(NodeFunction[_data.DataItem], _LoadSaveDataFunc):
 
     def __init__(self, node: LoadDataNode, storage: _storage.StorageManager):
         super().__init__(storage)
         self.node = node
 
-    def __call__(self, ctx: NodeContext) -> NodeResult:
+    def __call__(self, ctx: NodeContext) -> _data.DataItem:
 
-        data_item = self.node.data_item
-        data_copy = self._choose_copy(data_item, self.node.storage_def)
-
-        file_storage = self.storage.get_file_storage(data_copy.storageKey)
+        data_spec = _ctx_lookup(self.node.spec_id, ctx)
+        data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
         data_storage = self.storage.get_data_storage(data_copy.storageKey)
 
         df = data_storage.read_pandas_table(
-            self.node.data_def.schema.table,
-            data_copy.storagePath, data_copy.storageFormat,
+            data_spec.data_def.schema.table,
+            data_copy.storagePath,
+            data_copy.storageFormat,
             storage_options={})
 
         return _data.DataItem(pandas=df)
 
 
-class SaveDataFunc(_LoadSaveDataFunc):
+class SaveDataFunc(NodeFunction, _LoadSaveDataFunc):
 
     def __init__(self, node: SaveDataNode, storage: _storage.StorageManager):
         super().__init__(storage)
@@ -290,13 +383,12 @@ class SaveDataFunc(_LoadSaveDataFunc):
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
 
-        # This function assumes that metadata for item to be saved has already been generated
+        # This function assumes that metadata has already been generated as the data_spec
         # i.e. it is already known which incarnation / copy of the data will be created
-        # For dev mode, these decisions will happen during dev mode config translation
 
-        data_item_name = self.node.data_item.name
-        data_copy = self._choose_copy(data_item_name, self.node.storage_def)
+        data_spec = _ctx_lookup(self.node.spec_id, ctx)
 
+        data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
         file_storage = self.storage.get_file_storage(data_copy.storageKey)
         data_storage = self.storage.get_data_storage(data_copy.storageKey)
 
@@ -305,13 +397,13 @@ class SaveDataFunc(_LoadSaveDataFunc):
         file_storage.mkdir(parent_dir, recursive=True, exists_ok=True)
 
         # Item to be saved should exist in the current context, for now assume it is always Pandas
-        data_item: _data.DataItem = ctx[self.node.data_item].result
+        data_item = _ctx_lookup(self.node.data_item_id, ctx)
         df = data_item.pandas
 
         # Assumption that dataset is a table, and not some other schema type
 
         data_storage.write_pandas_table(
-            self.node.data_def.schema.table, df,
+            data_spec.data_def.schema.table, df,
             data_copy.storagePath, data_copy.storageFormat,
             storage_options={}, overwrite=False)
 
@@ -398,13 +490,13 @@ class RunModelFunc(NodeFunction):
 
 class FunctionResolver:
 
-    __ResolveFunc = tp.Callable[['FunctionResolver', _config.JobConfig, Node], NodeFunction]
+    __ResolveFunc = tp.Callable[['FunctionResolver', _config.JobConfig, Node[_T]], NodeFunction[_T]]
 
     def __init__(self, models: _models.ModelLoader, storage: _storage.StorageManager):
         self._models = models
         self._storage = storage
 
-    def resolve_node(self, job_config, node: Node) -> NodeFunction:
+    def resolve_node(self, job_config, node: Node[_T]) -> NodeFunction[_T]:
 
         basic_node_class = self.__basic_node_mapping.get(node.__class__)
 
@@ -444,7 +536,7 @@ class FunctionResolver:
         SetParametersNode: SetParametersFunc,
         DataViewNode: DataViewFunc,
         DataItemNode: DataItemFunc,
-        JobResultMetadataNode: JobResultMetadataFunc}
+        BuildJobResultNode: BuildJobResultFunc}
 
     __node_mapping: tp.Dict[Node.__class__, __ResolveFunc] = {
 
@@ -453,7 +545,7 @@ class FunctionResolver:
         RunModelNode: resolve_run_model_node,
         ImportModelNode: resolve_import_model_node,
 
-        JobOutputMetadataNode: lambda s, j, n: NoopFunc(),
-        JobResultMetadataNode: lambda s, j, n: NoopFunc(),
+        SaveJobResultNode: lambda s, j, n: NoopFunc(),
+        BuildJobResultNode: lambda s, j, n: NoopFunc(),
         JobNode: lambda s, j, n: NoopFunc()
     }

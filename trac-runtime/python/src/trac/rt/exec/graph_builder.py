@@ -14,6 +14,7 @@
 
 import trac.rt.config as config
 import trac.rt.exceptions as _ex
+import trac.rt.impl.data as _data
 import trac.rt.impl.util as _util
 
 from .graph import *
@@ -51,7 +52,7 @@ class GraphBuilder:
         output_metadata_nodes = frozenset([import_id])
 
         job_metadata_id = NodeId("trac_job_metadata", job_namespace)
-        job_metadata_node = JobResultMetadataNode(job_metadata_id, job_config.jobId, output_metadata_nodes, result_spec)
+        job_metadata_node = BuildJobResultNode(job_metadata_id, job_config.jobId, output_metadata_nodes, result_spec)
 
         job_node_id = NodeId("trac_job_completion", job_namespace)
         job_node = JobNode(job_node_id, job_metadata_id, explicit_deps=[import_id])
@@ -113,10 +114,10 @@ class GraphBuilder:
 
         output_metadata_nodes = frozenset(
             nid for nid, n in output_graph.nodes.items()
-            if isinstance(n, JobOutputMetadataNode))
+            if isinstance(n, SaveJobResultNode))
 
         job_metadata_id = NodeId("trac_job_metadata", job_namespace)
-        job_metadata_node = JobResultMetadataNode(
+        job_metadata_node = BuildJobResultNode(
             job_metadata_id, job_config.jobId,
             output_metadata_nodes, result_spec,
             explicit_deps=[target_graph.root_id])
@@ -183,11 +184,19 @@ class GraphBuilder:
             # TODO: Get this from somewhere
             root_part_opaque_key = 'part-root'
             data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
+            data_spec = _data.DataItemSpec(data_item, data_def, storage_def, schema_def=None)
+
+            data_spec_id = NodeId.of(f"{data_item}:SPEC", namespace, _data.DataItemSpec)
+            data_spec_node = StaticDataSpecNode(data_spec_id, data_spec, explicit_deps=[graph.root_id])
 
             # Physical load of data items from disk
             # Currently one item per input, since inputs are single part/delta
-            data_load_id = NodeId(f"{data_item}:LOAD", namespace)
-            data_load_node = LoadDataNode(data_load_id, data_item, data_def, storage_def, explicit_deps=[graph.root_id])
+            data_load_id = NodeId.of(f"{data_item}:LOAD", namespace, _data.DataItem)
+            data_load_node = LoadDataNode(data_load_id, data_spec_id, explicit_deps=[graph.root_id])
+
+            # TODO: >>>>>>>>>>>>>>>>>>
+            # TODO: Continue from here
+            # TODO: >>>>>>>>>>>>>>>>>>
 
             # Input items mapped directly from their load operations
             data_item_id = NodeId(data_item, namespace)
@@ -220,7 +229,10 @@ class GraphBuilder:
             data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
 
             # Output data view must already exist in the namespace
-            data_view_id = NodeId(output_name, namespace)
+            data_view_id = NodeId.of(output_name, namespace, _data.DataView)
+
+            data_spec_id = NodeId.of(f"{output_name}:SPEC", namespace, _data.DataItemSpec)
+            data_spec_node =
 
             # Map one data item from each view, since outputs are single part/delta
             data_item_id = NodeId(data_item, namespace)
@@ -234,7 +246,7 @@ class GraphBuilder:
             # Output metadata is associate with the job-level output (i.e. the data view)
             # It references all the connected physical save operations, currently there is just one for part-root
             output_meta_id = NodeId(f"{output_name}:METADATA", namespace)
-            output_meta_node = JobOutputMetadataNode(output_meta_id, data_view_id, {data_save_id: data_item})
+            output_meta_node = SaveJobResultNode(output_meta_id, data_view_id, {data_save_id: data_item})
 
             nodes[data_item_id] = data_item_node
             nodes[data_save_id] = data_save_node
