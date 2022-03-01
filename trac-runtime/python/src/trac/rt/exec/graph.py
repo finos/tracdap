@@ -160,7 +160,7 @@ class ContextPopNode(Node):
 
 
 @dc.dataclass(frozen=True)
-class MappingNode(Node):
+class MappingNode(Node[_T]):
     pass
 
 
@@ -218,10 +218,10 @@ class DynamicDataSpecNode(Node[_data.DataItemSpec]):
 
 
 @dc.dataclass(frozen=True)
-class DataViewNode(MappingNode[_data.DataView]):
+class DataViewNode(Node[_data.DataView]):
 
     schema: meta.SchemaDefinition
-    root_item: NodeId
+    root_item: NodeId[_data.DataItem]
 
     def __post_init__(self):
         dependencies = {self.root_item: DependencyType.HARD}

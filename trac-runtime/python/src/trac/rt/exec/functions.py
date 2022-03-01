@@ -311,12 +311,11 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
         storage_item = meta.StorageItem([storage_incarnation])
         storage_def.dataItems = {**storage_def.dataItems, data_item: storage_item}
 
-        bundle = {
-            meta.ObjectType.DATA: meta.ObjectDefinition(meta.ObjectType.DATA, data=data_def),
-            meta.ObjectType.STORAGE: meta.ObjectDefinition(meta.ObjectType.STORAGE, storage=storage_def)
-        }
-
-        return bundle
+        return _data.DataItemSpec(
+            data_item,
+            data_def,
+            storage_def,
+            schema_def=None)
 
 
 

@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import copy
+
 import trac.rt.config as config
 import trac.rt.exceptions as _ex
 import trac.rt.impl.data as _data
@@ -174,40 +176,34 @@ class GraphBuilder:
             cls, job_config: config.JobConfig, inputs: tp.Dict[str, meta.TagSelector],
             namespace: NodeNamespace, graph: Graph) -> Graph:
 
-        nodes = {**graph.nodes}
+        nodes = copy.copy(graph.nodes)
 
         for input_name, data_selector in inputs.items():
 
+            # Build a data spec using metadata from the job config
+            # For now we are always loading the root part, snap 0, delta 0
             data_def = _util.get_job_resource(data_selector, job_config).data
             storage_def = _util.get_job_resource(data_def.storageId, job_config).storage
 
-            # TODO: Get this from somewhere
-            root_part_opaque_key = 'part-root'
+            root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
             data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
             data_spec = _data.DataItemSpec(data_item, data_def, storage_def, schema_def=None)
 
-            data_spec_id = NodeId.of(f"{data_item}:SPEC", namespace, _data.DataItemSpec)
+            # Data spec node is static, using the assembled data spec
+            data_spec_id = NodeId.of(f"{input_name}:SPEC", namespace, _data.DataItemSpec)
             data_spec_node = StaticDataSpecNode(data_spec_id, data_spec, explicit_deps=[graph.root_id])
 
             # Physical load of data items from disk
             # Currently one item per input, since inputs are single part/delta
-            data_load_id = NodeId.of(f"{data_item}:LOAD", namespace, _data.DataItem)
+            data_load_id = NodeId.of(f"{input_name}:LOAD", namespace, _data.DataItem)
             data_load_node = LoadDataNode(data_load_id, data_spec_id, explicit_deps=[graph.root_id])
 
-            # TODO: >>>>>>>>>>>>>>>>>>
-            # TODO: Continue from here
-            # TODO: >>>>>>>>>>>>>>>>>>
-
-            # Input items mapped directly from their load operations
-            data_item_id = NodeId(data_item, namespace)
-            data_item_node = IdentityNode(data_item_id, data_load_id)
-
             # Input views assembled by mapping one root part to each view
-            data_view_id = NodeId(input_name, namespace)
-            data_view_node = DataViewNode(data_view_id, data_def.schema, data_item_id)
+            data_view_id = NodeId.of(input_name, namespace, _data.DataView)
+            data_view_node = DataViewNode(data_view_id, data_def.schema, data_load_id)
 
+            nodes[data_spec_id] = data_spec_node
             nodes[data_load_id] = data_load_node
-            nodes[data_item_id] = data_item_node
             nodes[data_view_id] = data_view_node
 
         return Graph(nodes, graph.root_id)
@@ -217,40 +213,34 @@ class GraphBuilder:
             cls, job_config: config.JobConfig, outputs: tp.Dict[str, meta.TagSelector],
             namespace: NodeNamespace, graph: Graph) -> Graph:
 
-        nodes = {**graph.nodes}
+        nodes = copy.copy(graph.nodes)
 
         for output_name, data_selector in outputs.items():
 
-            data_def = _util.get_job_resource(data_selector, job_config).data
-            storage_def = _util.get_job_resource(data_def.storageId, job_config).storage
-
-            # TODO: Get this from somewhere
-            root_part_opaque_key = 'part-root'
-            data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
+            # data_def = _util.get_job_resource(data_selector, job_config).data
+            # storage_def = _util.get_job_resource(data_def.storageId, job_config).storage
+            #
+            # # TODO: Get this from somewhere
+            # root_part_opaque_key = 'part-root'
+            # data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
 
             # Output data view must already exist in the namespace
             data_view_id = NodeId.of(output_name, namespace, _data.DataView)
 
             data_spec_id = NodeId.of(f"{output_name}:SPEC", namespace, _data.DataItemSpec)
-            data_spec_node =
+            data_spec_node = DynamicDataSpecNode(data_spec_id)
 
             # Map one data item from each view, since outputs are single part/delta
             data_item_id = NodeId(data_item, namespace)
             data_item_node = DataItemNode(data_item_id, data_view_id, data_item)
 
             # Create a physical save operation for the data item
-            data_save_id = NodeId(f"{data_item}:SAVE", namespace)
-            data_save_node = SaveDataNode(data_save_id, data_item_id, data_def, storage_def)  # TODO: deps for save node
+            data_save_id = NodeId.of(f"{output_name}:SAVE", namespace, None)
+            data_save_node = SaveDataNode(data_save_id, data_spec_id, data_item_id)
 
-            # Create an output metadata node
-            # Output metadata is associate with the job-level output (i.e. the data view)
-            # It references all the connected physical save operations, currently there is just one for part-root
-            output_meta_id = NodeId(f"{output_name}:METADATA", namespace)
-            output_meta_node = SaveJobResultNode(output_meta_id, data_view_id, {data_save_id: data_item})
-
+            nodes[data_spec_id] = data_spec_node
             nodes[data_item_id] = data_item_node
             nodes[data_save_id] = data_save_node
-            nodes[output_meta_id] = output_meta_node
 
         return Graph(nodes, graph.root_id)
 
