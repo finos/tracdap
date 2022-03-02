@@ -36,6 +36,21 @@ message JobResult {
   map<string, metadata.ObjectDefinition> objects = 5;
 }
 
+
+message importModelResult {
+
+  metadata.TagHeader modelId = 1;
+  metadata.TagHeader priorModelId = 2;
+}
+
+message RunModelResult {
+
+}
+
+
+
+
+
 enum JobStatus {
 
   JOB_STATUS_NOT_SET = 0;

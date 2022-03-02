@@ -18,6 +18,7 @@ package com.accenture.trac.svc.data.service;
 
 import com.accenture.trac.api.*;
 import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
+import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.config.DataServiceConfig;
 import com.accenture.trac.metadata.*;
 
@@ -521,7 +522,7 @@ public class FileService {
 
         // TODO: Special metadata Value type for handling tag selectors
         var selector = selectorForLatest(objectId);
-        var storageObjectAttr = String.format("%s:%s", selector.getObjectType(), selector.getObjectId());
+        var storageObjectAttr = MetadataUtil.objectKey(selector);
 
         var storageForAttr = TagUpdate.newBuilder()
                 .setAttrName(TRAC_STORAGE_OBJECT_ATTR)

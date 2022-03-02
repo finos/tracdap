@@ -51,8 +51,9 @@ message RunModelJob {
   map<string, Value> parameters = 2;
   map<string, TagSelector> inputs = 3;
   map<string, TagSelector> outputs = 4;
+  map<string, TagSelector> priorOutputs = 5;
 
-  repeated TagUpdate outputAttrs = 5;
+  repeated TagUpdate outputAttrs = 6;
 }
 
 message RunFlowJob {
@@ -62,9 +63,10 @@ message RunFlowJob {
   map<string, Value> parameters = 2;
   map<string, TagSelector> inputs = 3;
   map<string, TagSelector> outputs = 4;
-  map<string, TagSelector> models = 5;
+  map<string, TagSelector> priorOutputs = 5;
+  map<string, TagSelector> models = 6;
 
-  repeated TagUpdate outputAttrs = 6;
+  repeated TagUpdate outputAttrs = 7;
 }
 
 message ImportModelJob {

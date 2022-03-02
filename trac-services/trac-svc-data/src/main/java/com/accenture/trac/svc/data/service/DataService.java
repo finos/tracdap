@@ -575,7 +575,7 @@ public class DataService {
 
         // TODO: Special metadata Value type for handling tag selectors
         var selector = MetadataUtil.selectorForLatest(dataId);
-        var storageObjectAttr = String.format("%s:%s", selector.getObjectType(), selector.getObjectId());
+        var storageObjectAttr = MetadataUtil.objectKey(selector);
 
         var storageForAttr = TagUpdate.newBuilder()
                 .setAttrName(TRAC_STORAGE_OBJECT_ATTR)

@@ -130,7 +130,7 @@ class KeyedItemFunc(NodeFunction):
 class BuildJobResultFunc(NodeFunction):
 
     def __init__(self, node: BuildJobResultNode):
-        super().__init__(node)
+        self.node = node
 
     def __call__(self, ctx: NodeContext) -> _config.JobResult:
 
@@ -138,8 +138,25 @@ class BuildJobResultFunc(NodeFunction):
         job_result.jobId = self.node.job_id
         job_result.status = _config.JobStatus.SUCCEEDED
 
-        for output_id in self.node.outputs:
-            output_result = ctx.get(output_id).result
+        for output_name, output_id in self.node.outputs.items():
+
+            save_output_node = _ctx_lookup(output_id, ctx)
+
+            output_save_result: object = None
+            output_spec: _data.DataItemSpec = _ctx_lookup(output_spec_id, ctx)
+
+            output_mapping = object()  # self.node.job_config.outputs[output_name]
+
+            output_data_id = None
+            output_storage_id = None
+
+            job_result.objects[output_data_id] = meta.ObjectDefinition(
+                meta.ObjectType.DATA, data=output_spec.data_def)
+
+            job_result.objects[output_storage_id] = meta.ObjectDefinition(
+                meta.ObjectType.STORAGE, storage=output_spec.storage_def)
+
+
             job_result.objects[output_id.name] = output_result
 
         return job_result

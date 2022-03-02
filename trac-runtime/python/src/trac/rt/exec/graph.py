@@ -319,7 +319,7 @@ class SaveJobResultNode(Node):
 class BuildJobResultNode(Node[cfg.JobResult]):
 
     job_id: meta.TagHeader
-    outputs: tp.FrozenSet[NodeId[MetadataBundle]]
+    outputs: tp.Dict[str, NodeId]
     result_spec: JobResultSpec
 
     explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
