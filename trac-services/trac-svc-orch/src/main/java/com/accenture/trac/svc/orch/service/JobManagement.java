@@ -1,0 +1,284 @@
+/*
+ * Copyright 2022 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.accenture.trac.svc.orch.service;
+
+import com.accenture.trac.api.MetadataBatchRequest;
+import com.accenture.trac.api.MetadataBatchResponse;
+import com.accenture.trac.api.MetadataWriteRequest;
+import com.accenture.trac.api.TrustedMetadataApiGrpc;
+import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.common.grpc.GrpcClientWrap;
+import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.MetadataConstants;
+import com.accenture.trac.common.metadata.MetadataUtil;
+import com.accenture.trac.config.JobConfig;
+import com.accenture.trac.config.PlatformConfig;
+import com.accenture.trac.config.RuntimeConfig;
+import com.accenture.trac.metadata.*;
+import com.accenture.trac.svc.orch.cache.JobState;
+import com.accenture.trac.svc.orch.jobs.JobLogic;
+import io.grpc.MethodDescriptor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.stream.Collectors;
+
+import static com.accenture.trac.common.metadata.MetadataCodec.encodeValue;
+import static com.accenture.trac.common.metadata.MetadataConstants.*;
+import static com.accenture.trac.common.metadata.MetadataConstants.TRAC_CREATE_JOB;
+import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
+
+public class JobManagement {
+
+    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreateObjectMethod();
+    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getUpdateObjectMethod();
+    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_TAG_METHOD = TrustedMetadataApiGrpc.getUpdateTagMethod();
+    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_PREALLOCATED_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectMethod();
+    private static final MethodDescriptor<MetadataBatchRequest, MetadataBatchResponse> READ_BATCH_METHOD = TrustedMetadataApiGrpc.getReadBatchMethod();
+
+    private final Logger log = LoggerFactory.getLogger(JobManagement.class);
+
+    private final PlatformConfig platformConfig;
+    private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient;
+    private final GrpcClientWrap grpcWrap;
+
+    public JobManagement(
+            PlatformConfig platformConfig,
+            TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient) {
+
+        this.platformConfig = platformConfig;
+        this.metaClient = metaClient;
+        this.grpcWrap = new GrpcClientWrap(getClass());
+    }
+
+    CompletionStage<JobState> assembleAndValidate(JobState jobState) {
+
+        return CompletableFuture.completedFuture(jobState)
+
+                .thenCompose(this::loadResources);
+
+        // static validate
+        // load related metadata
+        // semantic validate
+    }
+
+    CompletionStage<JobState> loadResources(JobState jobState) {
+
+        var jobLogic = JobLogic.forJobType(jobState.jobType);
+        var resources = jobLogic.requiredMetadata(jobState.definition);
+
+        if (resources.isEmpty()) {
+            log.info("No additional metadata required");
+            return CompletableFuture.completedFuture(jobState);
+        }
+
+        return loadResources(jobState, resources);
+    }
+
+    CompletionStage<JobState> loadResources(JobState jobState, List<TagSelector> resources) {
+
+        log.info("Loading additional required metadata...");
+
+        var orderedKeys = new ArrayList<String>(resources.size());
+        var orderedSelectors = new ArrayList<TagSelector>(resources.size());
+
+        for (var selector : resources) {
+            orderedKeys.add(MetadataUtil.objectKey(selector));
+            orderedSelectors.add(selector);
+        }
+
+        var batchRequest = MetadataBatchRequest.newBuilder()
+                .setTenant(jobState.tenant)
+                .addAllSelector(orderedSelectors)
+                .build();
+
+        return grpcWrap
+                .unaryCall(READ_BATCH_METHOD, batchRequest, metaClient::readBatch)
+                .thenCompose(batchResponse -> loadResourcesResponse(batchResponse, orderedKeys, jobState));
+    }
+
+    CompletionStage<JobState> loadResourcesResponse(
+            MetadataBatchResponse batchResponse,
+            List<String> mappingKeys,
+            JobState jobState) {
+
+        if (batchResponse.getTagCount() != mappingKeys.size())
+            throw new EUnexpected();
+
+        var jobLogic = JobLogic.forJobType(jobState.jobType);
+
+        var resources = new HashMap<String, ObjectDefinition>(mappingKeys.size());
+        var mappings = new HashMap<String, TagHeader>(mappingKeys.size());
+
+        for (var resourceIndex = 0; resourceIndex < mappingKeys.size(); resourceIndex++) {
+
+            var resourceTag = batchResponse.getTag(resourceIndex);
+            var resourceKey = MetadataUtil.objectKey(resourceTag.getHeader());
+            var mappingKey = mappingKeys.get(resourceIndex);
+
+            resources.put(resourceKey, resourceTag.getDefinition());
+            mappings.put(mappingKey, resourceTag.getHeader());
+        }
+
+        jobState.resources.putAll(resources);
+        jobState.resourceMappings.putAll(mappings);
+
+        var extraResources = jobLogic.requiredMetadata(resources);
+
+        extraResources = extraResources.stream()
+                .filter(selector -> {
+                    var key = MetadataUtil.objectKey(selector);
+                    return !jobState.resources.containsKey(key) && !jobState.resourceMappings.containsKey(key);
+                })
+                .collect(Collectors.toList());
+
+        if (!extraResources.isEmpty())
+            return loadResources(jobState, extraResources);
+
+        jobState.jobConfig = JobConfig.newBuilder()
+                .setJobId(jobState.jobId)
+                .setJob(jobState.definition)
+                .putAllResources(jobState.resources)
+                .putAllResourceMapping(jobState.resourceMappings)
+                .build();
+
+        // TODO: Build result mapping
+
+        // TODO: Separate this
+        jobState.sysConfig = RuntimeConfig.newBuilder()
+                .putAllStorage(platformConfig.getServices().getData().getStorageMap())
+                .putAllRepositories(platformConfig.getServices().getOrch().getRepositoriesMap())
+                .build();
+
+        return CompletableFuture.completedFuture(jobState);
+    }
+
+    CompletionStage<JobState> saveInitialMetadata(JobState jobState) {
+
+        var jobObj = ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.JOB)
+                .setJob(jobState.definition)
+                .build();
+
+        var ctrlJobAttrs = List.of(
+                TagUpdate.newBuilder()
+                        .setAttrName(TRAC_JOB_TYPE_ATTR)
+                        .setValue(MetadataCodec.encodeValue(jobState.jobType.toString()))
+                        .build(),
+                TagUpdate.newBuilder()
+                        .setAttrName(TRAC_JOB_STATUS_ATTR)
+                        .setValue(MetadataCodec.encodeValue(jobState.statusCode.toString()))
+                        .build());
+
+        var freeJobAttrs = jobState.jobRequest.getJobAttrsList();
+
+        var jobWriteReq = MetadataWriteRequest.newBuilder()
+                .setTenant(jobState.tenant)
+                .setObjectType(ObjectType.JOB)
+                .setDefinition(jobObj)
+                .addAllTagUpdates(ctrlJobAttrs)
+                .addAllTagUpdates(freeJobAttrs)
+                .build();
+
+        var grpcCall = grpcWrap.unaryCall(
+                CREATE_OBJECT_METHOD, jobWriteReq,
+                metaClient::createObject);
+
+        return grpcCall.thenApply(header -> {
+
+            jobState.jobId = header;
+            return jobState;
+        });
+    }
+
+    CompletionStage<Void> processJobResult(JobState jobState) {
+
+        log.info("Record job result [{}]: {}", jobState.jobKey, jobState.statusCode);
+
+        var jobLogic = JobLogic.forJobType(jobState.jobType);
+        var metaUpdates = jobLogic.buildResultMetadata(jobState.tenant, jobState.jobConfig, jobState.jobResult);
+        var jobUpdate = buildJobSucceededUpdate(jobState);
+
+        CompletionStage<?> updateResult = CompletableFuture.completedFuture(0);
+
+        for (var update : metaUpdates) {
+
+            var update_ = applyJobAttrs(jobState, update);
+            updateResult = updateResult.thenCompose(x -> saveResultMetadata(update_));
+        }
+
+        updateResult = updateResult.thenCompose(x -> saveResultMetadata(jobUpdate));
+
+        return updateResult.thenApply(x -> null);
+    }
+
+    private CompletionStage<TagHeader> saveResultMetadata(MetadataWriteRequest update) {
+
+        if (!update.hasDefinition())
+            return grpcWrap.unaryCall(UPDATE_TAG_METHOD, update, metaClient::updateTag);
+
+        if (!update.hasPriorVersion())
+            return grpcWrap.unaryCall(CREATE_OBJECT_METHOD, update, metaClient::createObject);
+
+        if (update.getPriorVersion().getObjectVersion() < MetadataConstants.OBJECT_FIRST_VERSION)
+            return grpcWrap.unaryCall(CREATE_PREALLOCATED_OBJECT_METHOD, update, metaClient::createPreallocatedObject);
+        else
+            return grpcWrap.unaryCall(UPDATE_OBJECT_METHOD, update, metaClient::updateObject);
+    }
+
+    private MetadataWriteRequest buildJobSucceededUpdate(JobState jobState) {
+
+        var attrUpdates = List.of(
+                TagUpdate.newBuilder()
+                        .setAttrName(TRAC_JOB_STATUS_ATTR)
+                        .setValue(encodeValue(jobState.statusCode.toString()))
+                        .build());
+
+        return MetadataWriteRequest.newBuilder()
+                .setTenant(jobState.tenant)
+                .setObjectType(ObjectType.JOB)
+                .setPriorVersion(selectorFor(jobState.jobId))
+                .addAllTagUpdates(attrUpdates)
+                .build();
+    }
+
+    private MetadataWriteRequest applyJobAttrs(JobState jobState, MetadataWriteRequest request) {
+
+        if (!request.hasDefinition())
+            return request;
+
+        var builder = request.toBuilder();
+
+        builder.addTagUpdates(TagUpdate.newBuilder()
+                .setAttrName(TRAC_UPDATE_JOB)
+                .setValue(MetadataCodec.encodeValue(jobState.jobKey)));
+
+        if (!request.hasPriorVersion() || request.getPriorVersion().getObjectVersion() == 0) {
+
+            builder.addTagUpdates(TagUpdate.newBuilder()
+                    .setAttrName(TRAC_CREATE_JOB)
+                    .setValue(MetadataCodec.encodeValue(jobState.jobKey)));
+        }
+
+        return builder.build();
+    }
+}

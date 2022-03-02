@@ -16,9 +16,9 @@
 
 package com.accenture.trac.svc.orch.jobs;
 
-import com.accenture.trac.api.JobRequest;
 import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.JobResult;
 import com.accenture.trac.metadata.*;
 
@@ -49,9 +49,9 @@ public class ImportModelJob implements IJobLogic {
     }
 
     @Override
-    public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobRequest request, JobResult result) {
+    public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, JobResult jobResult) {
 
-        var modelObjMaybe = result.getObjectsMap().values().stream().findFirst();
+        var modelObjMaybe = jobResult.getResultsMap().values().stream().findFirst();
 
         if (modelObjMaybe.isEmpty())
             throw new EUnexpected();
@@ -86,7 +86,7 @@ public class ImportModelJob implements IJobLogic {
                         .setValue(encodeValue(modelDef.getVersion()))
                         .build());
 
-        var suppliedAttrs = request.getJob()
+        var suppliedAttrs = jobConfig.getJob()
                 .getImportModel()
                 .getModelAttrsList();
 

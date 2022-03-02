@@ -54,6 +54,26 @@ public class MetadataUtil {
         return selector.build();
     }
 
+    public static TagSelector priorVersion(TagHeader header) {
+
+        return TagSelector.newBuilder()
+                .setObjectType(header.getObjectType())
+                .setObjectId(header.getObjectId())
+                .setObjectVersion(header.getObjectVersion() - 1)
+                .setLatestTag(true)
+                .build();
+    }
+
+    public static TagSelector preallocated(TagSelector selector) {
+
+        return TagSelector.newBuilder()
+                .setObjectType(selector.getObjectType())
+                .setObjectId(selector.getObjectId())
+                .setObjectVersion(0)
+                .setTagVersion(0)
+                .build();
+    }
+
     public static String objectKey(TagHeader header) {
 
         return String.format(OBJECT_KEY_FOR_VERSION,

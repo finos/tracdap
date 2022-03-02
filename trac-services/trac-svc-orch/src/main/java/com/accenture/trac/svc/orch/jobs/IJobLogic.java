@@ -32,5 +32,5 @@ public interface IJobLogic {
 
     List<TagSelector> requiredMetadata(Map<String, ObjectDefinition> newResources);
 
-    List<MetadataWriteRequest> buildResultMetadata(String tenant, JobRequest request, JobResult result);
+    List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, JobResult jobResult);
 }

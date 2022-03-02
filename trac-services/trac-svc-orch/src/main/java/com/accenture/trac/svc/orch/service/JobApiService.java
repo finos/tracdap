@@ -19,46 +19,30 @@ package com.accenture.trac.svc.orch.service;
 import com.accenture.trac.api.*;
 import com.accenture.trac.common.exception.EMetadataNotFound;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.common.grpc.GrpcClientWrap;
-import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
-import com.accenture.trac.metadata.*;
 
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
-import com.accenture.trac.svc.orch.jobs.JobLogic;
-import io.grpc.MethodDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.stream.Collectors;
-
-import static com.accenture.trac.common.metadata.MetadataConstants.TRAC_JOB_STATUS_ATTR;
-import static com.accenture.trac.common.metadata.MetadataConstants.TRAC_JOB_TYPE_ATTR;
 
 
 public class JobApiService {
 
-    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreateObjectMethod();
-    private static final MethodDescriptor<MetadataBatchRequest, MetadataBatchResponse> READ_BATCH_METHOD = TrustedMetadataApiGrpc.getReadBatchMethod();
-
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final IJobCache jobCache;
-    private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient;
-    private final GrpcClientWrap grpcWrap;
+    private final JobManagement jobManager;
 
-    public JobApiService(IJobCache jobCache, TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient) {
+    public JobApiService(
+            IJobCache jobCache,
+            JobManagement jobManager) {
 
         this.jobCache = jobCache;
-        this.metaClient = metaClient;
-        this.grpcWrap = new GrpcClientWrap(getClass());
+        this.jobManager = jobManager;
     }
 
     public CompletableFuture<JobStatus> validateJob(JobRequest request) {
@@ -69,7 +53,7 @@ public class JobApiService {
 
                 .thenApply(s -> jobStatus(s, JobStatusCode.PREPARING))
 
-                .thenCompose(this::assembleAndValidate)
+                .thenCompose(jobManager::assembleAndValidate)
 
                 .thenApply(s -> jobStatus(s, JobStatusCode.VALIDATED))
 
@@ -84,12 +68,12 @@ public class JobApiService {
 
                 .thenApply(s -> jobStatus(s, JobStatusCode.PREPARING))
 
-                .thenCompose(this::assembleAndValidate)
+                .thenCompose(jobManager::assembleAndValidate)
 
                 .thenApply(s -> jobStatus(s, JobStatusCode.VALIDATED))
                 .thenApply(s -> jobStatus(s, JobStatusCode.PENDING))
 
-                .thenCompose(this::saveMetadata)
+                .thenCompose(jobManager::saveInitialMetadata)
 
                 .thenCompose(this::submitForExecution)
 
@@ -98,25 +82,24 @@ public class JobApiService {
 
     public CompletionStage<JobStatus> checkJob(JobStatusRequest request) {
 
-        // TODO: Keys for selectors
-        var jobKey = String.format("%s-%s-v%d",
-                request.getSelector().getObjectType(),
-                request.getSelector().getObjectId(),
-                request.getSelector().getObjectVersion());
+        // TODO: Keys for other selector types
+        if (!request.getSelector().hasObjectVersion())
+            throw new EUnexpected();
 
-        var cachedState = jobCache.readJob(jobKey);
+        var jobKey = MetadataUtil.objectKey(request.getSelector());
+        var jobState = jobCache.readJob(jobKey);
 
         // TODO: Should there be a different error for jobs not found in the cache? EJobNotLive?
-        if (cachedState == null) {
+        if (jobState == null) {
             var message = String.format("Job not found (it may have completed): [%s]", jobKey);
             log.error(message);
             throw new EMetadataNotFound(message);
         }
 
         var jobStatus = JobStatus.newBuilder()
-                .setJobId(cachedState.jobId)
-                .setStatus(cachedState.statusCode)
-                .setMessage(cachedState.statusCode.toString())
+                .setJobId(jobState.jobId)
+                .setStatus(jobState.statusCode)
+                .setMessage(jobState.statusCode.toString())
                 .build();
 
         return CompletableFuture.completedFuture(jobStatus);
@@ -125,7 +108,6 @@ public class JobApiService {
     void getJobResult() {
 
     }
-
 
     private JobState newJob(JobRequest request) {
 
@@ -142,65 +124,6 @@ public class JobApiService {
 
         jobState.statusCode = statusCode;
         return jobState;
-    }
-
-
-    private CompletionStage<JobState> assembleAndValidate(JobState jobState) {
-
-        return CompletableFuture.completedFuture(jobState)
-
-                .thenCompose(this::loadResources);
-
-        // static validate
-        // load related metadata
-        // semantic validate
-    }
-
-    private JobState buildMetadata(JobState jobState) {
-
-        var jobLogic = JobLogic.forJobType(jobState.jobType);
-
-
-
-        return jobState;
-    }
-
-    private CompletionStage<JobState> saveMetadata(JobState jobState) {
-
-        var jobObj = ObjectDefinition.newBuilder()
-                .setObjectType(ObjectType.JOB)
-                .setJob(jobState.definition)
-                .build();
-
-        var ctrlJobAttrs = List.of(
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_JOB_TYPE_ATTR)
-                        .setValue(MetadataCodec.encodeValue(jobState.jobType.toString()))
-                        .build(),
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_JOB_STATUS_ATTR)
-                        .setValue(MetadataCodec.encodeValue(jobState.statusCode.toString()))
-                        .build());
-
-        var freeJobAttrs = jobState.jobRequest.getJobAttrsList();
-
-        var jobWriteReq = MetadataWriteRequest.newBuilder()
-                .setTenant(jobState.tenant)
-                .setObjectType(ObjectType.JOB)
-                .setDefinition(jobObj)
-                .addAllTagUpdates(ctrlJobAttrs)
-                .addAllTagUpdates(freeJobAttrs)
-                .build();
-
-        var grpcCall = grpcWrap.unaryCall(
-                CREATE_OBJECT_METHOD, jobWriteReq,
-                metaClient::createObject);
-
-        return grpcCall.thenApply(header -> {
-
-            jobState.jobId = header;
-            return jobState;
-        });
     }
 
     private CompletionStage<JobState> submitForExecution(JobState jobState) {
@@ -225,83 +148,5 @@ public class JobApiService {
         status.setStatus(jobState.statusCode);
 
         return status.build();
-    }
-
-    private CompletionStage<JobState> loadResources(JobState jobState) {
-
-        var jobLogic = JobLogic.forJobType(jobState.jobType);
-        var resources = jobLogic.requiredMetadata(jobState.definition);
-
-        if (resources.isEmpty()) {
-            log.info("No additional metadata required");
-            return CompletableFuture.completedFuture(jobState);
-        }
-
-        return loadResources(jobState, resources);
-    }
-
-    private CompletionStage<JobState> loadResources(JobState jobState, List<TagSelector> resources) {
-
-        log.info("Loading additional required metadata...");
-
-        var orderedKeys = new ArrayList<String>(resources.size());
-        var orderedSelectors = new ArrayList<TagSelector>(resources.size());
-
-        for (var selector : resources) {
-            orderedKeys.add(MetadataUtil.objectKey(selector));
-            orderedSelectors.add(selector);
-        }
-
-        var batchRequest = MetadataBatchRequest.newBuilder()
-                .setTenant(jobState.tenant)
-                .addAllSelector(orderedSelectors)
-                .build();
-
-        return grpcWrap
-                .unaryCall(READ_BATCH_METHOD, batchRequest, metaClient::readBatch)
-                .thenCompose(batchResponse -> loadResourcesResponse(batchResponse, orderedKeys, jobState));
-    }
-
-    private CompletionStage<JobState> loadResourcesResponse(
-            MetadataBatchResponse batchResponse,
-            List<String> mappingKeys,
-            JobState jobState) {
-
-        if (batchResponse.getTagCount() != mappingKeys.size())
-            throw new EUnexpected();
-
-        var jobLogic = JobLogic.forJobType(jobState.jobType);
-
-        var resources = new HashMap<String, ObjectDefinition>(mappingKeys.size());
-        var mappings = new HashMap<String, String>(mappingKeys.size());
-
-        for (var resourceIndex = 0; resourceIndex < mappingKeys.size(); resourceIndex++) {
-
-            var resourceTag = batchResponse.getTag(resourceIndex);
-            var resourceKey = MetadataUtil.objectKey(resourceTag.getHeader());
-            var mappingKey = mappingKeys.get(resourceIndex);
-
-            resources.put(resourceKey, resourceTag.getDefinition());
-
-            if (!resourceKey.equals(mappingKey))
-                mappings.put(mappingKey, resourceKey);
-        }
-
-        jobState.resources.putAll(resources);
-        jobState.resourceMappings.putAll(mappings);
-
-        var extraResources = jobLogic.requiredMetadata(resources);
-
-        extraResources = extraResources.stream()
-                .filter(selector -> {
-                    var key = MetadataUtil.objectKey(selector);
-                    return !jobState.resources.containsKey(key) && !jobState.resourceMappings.containsKey(key);
-                })
-                .collect(Collectors.toList());
-
-        if (!extraResources.isEmpty())
-            return loadResources(jobState, extraResources);
-        else
-            return CompletableFuture.completedFuture(jobState);
     }
 }

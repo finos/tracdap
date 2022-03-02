@@ -30,16 +30,8 @@ message JobConfig {
     metadata.TagHeader jobId = 1;
     metadata.JobDefinition job = 2;
 
-    map<string, string> resourceMapping = 3;
-    map<string, metadata.ObjectDefinition> resources = 4;
+    map<string, metadata.ObjectDefinition> resources = 3;
 
-    map<string, metadata.TagSelector> resultMapping = 5;
-}
-
-message JobResultConfig {
-
-    metadata.TagHeader resultId = 1;
-    metadata.TagHeader priorId = 2;
-
-    string priorKey = 3;
+    map<string, metadata.TagHeader> resourceMapping = 4;
+    map<string, metadata.TagHeader> resultMapping = 5;
 }

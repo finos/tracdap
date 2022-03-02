@@ -131,8 +131,7 @@ public class RunModelJob implements IJobLogic {
                 .build();
     }
 
-
-
+    @Override
     public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, JobResult jobResult) {
 
         var updates = new ArrayList<MetadataWriteRequest>();
@@ -143,15 +142,25 @@ public class RunModelJob implements IJobLogic {
 
             var outputName = output.getKey();
 
-            var priorDataSelector = TagSelector.newBuilder().build();  // TODO: Where is this?
-            var priorStorageSelector = TagSelector.newBuilder().build();  // TODO: Where is this?
+            // TODO: String constants
 
-            var dataSelector = output.getValue();
-            var dataKey = MetadataUtil.objectKey(dataSelector);
-            var dataObj = jobResult.getObjectsOrThrow(dataKey);
+            var dataIdLookup = outputName + ":DATA";
+            var dataId = jobConfig.getResultMappingOrThrow(dataIdLookup);
+            var dataKey = MetadataUtil.objectKey(dataId);
+            var dataObj = jobResult.getResultsOrThrow(dataKey);
 
-            if (!dataSelector.hasObjectVersion())
-                throw new EUnexpected();  // TODO: Validation gap?
+            var storageIdLookup = outputName + ":STORAGE";
+            var storageId = jobConfig.getResultMappingOrThrow(storageIdLookup);
+            var storageKey = MetadataUtil.objectKey(storageId);
+            var storageObj = jobResult.getResultsOrThrow(storageKey);
+
+            var priorDataSelector = runModel.containsPriorOutputs(outputName)
+                    ? runModel.getPriorOutputsOrThrow(outputName)
+                    : MetadataUtil.preallocated(runModel.getOutputsOrThrow(outputName));
+
+            var priorStorageSelector = runModel.containsPriorOutputs(outputName)
+                    ? priorStorageSelector(priorDataSelector, jobConfig)
+                    : MetadataUtil.preallocated(dataObj.getData().getStorageId());
 
             var controlledAttrs = List.of(
                     TagUpdate.newBuilder()
@@ -174,15 +183,11 @@ public class RunModelJob implements IJobLogic {
 
             updates.add(dataUpdate);
 
-            var storageSelector = dataObj.getData().getStorageId();
-            var storageKey = "";  // TODO
-            var storageObj = jobResult.getObjectsOrThrow(storageKey);
-
             var storageAttrs = List.of(
                     TagUpdate.newBuilder()
-                            .setAttrName(MetadataConstants.TRAC_STORAGE_OBJECT_ATTR)
-                            .setValue(MetadataCodec.encodeValue(dataKey))
-                            .build());
+                    .setAttrName(MetadataConstants.TRAC_STORAGE_OBJECT_ATTR)
+                    .setValue(MetadataCodec.encodeValue(dataKey))
+                    .build());
 
             var storageUpdate = MetadataWriteRequest.newBuilder()
                     .setTenant(tenant)
@@ -196,5 +201,29 @@ public class RunModelJob implements IJobLogic {
         }
 
         return updates;
+    }
+
+    private TagSelector priorStorageSelector(TagSelector priorDataSelector, JobConfig jobConfig) {
+
+        var dataKey = MetadataUtil.objectKey(priorDataSelector);
+
+        if (jobConfig.containsResourceMapping(dataKey)) {
+            var dataId = jobConfig.getResourceMappingOrDefault(dataKey, null);
+            var dataSelector = MetadataUtil.selectorFor(dataId);
+            dataKey = MetadataUtil.objectKey(dataSelector);
+        }
+
+        var dataObj = jobConfig.getResourcesOrThrow(dataKey);
+
+        var storageSelector = dataObj.getData().getStorageId();
+        var storageKey = MetadataUtil.objectKey(storageSelector);
+
+        if (jobConfig.containsResourceMapping(storageKey)) {
+
+            var storageId = jobConfig.getResourceMappingOrDefault(storageKey, null);
+            storageSelector = MetadataUtil.selectorFor(storageId);
+        }
+
+        return storageSelector;
     }
 }

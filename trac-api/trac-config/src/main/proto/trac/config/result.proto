@@ -33,23 +33,8 @@ message JobResult {
   string errorMessage = 3;
   repeated string stackTrace = 4;
 
-  map<string, metadata.ObjectDefinition> objects = 5;
+  map<string, metadata.ObjectDefinition> results = 5;
 }
-
-
-message importModelResult {
-
-  metadata.TagHeader modelId = 1;
-  metadata.TagHeader priorModelId = 2;
-}
-
-message RunModelResult {
-
-}
-
-
-
-
 
 enum JobStatus {
 

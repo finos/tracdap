@@ -19,6 +19,9 @@ package com.accenture.trac.svc.orch.cache;
 import com.accenture.trac.api.JobRequest;
 import com.accenture.trac.api.JobStatusCode;
 import com.accenture.trac.common.exception.EUnexpected;
+import com.accenture.trac.config.JobConfig;
+import com.accenture.trac.config.JobResult;
+import com.accenture.trac.config.RuntimeConfig;
 import com.accenture.trac.metadata.JobDefinition;
 import com.accenture.trac.metadata.JobType;
 import com.accenture.trac.metadata.ObjectDefinition;
@@ -41,7 +44,12 @@ public class JobState implements Serializable {
 
     public JobDefinition definition;
     public Map<String, ObjectDefinition> resources = new HashMap<>();
-    public Map<String, String> resourceMappings = new HashMap<>();
+    public Map<String, TagHeader> resourceMappings = new HashMap<>();
+    public Map<String, TagHeader> resultMappings = new HashMap<>();
+
+    public RuntimeConfig sysConfig;
+    public JobConfig jobConfig;
+    public JobResult jobResult;
 
     public JobStatusCode statusCode;
 
