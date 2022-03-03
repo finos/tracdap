@@ -150,10 +150,10 @@ def object_key(object_id: tp.Union[meta.TagHeader, meta.TagSelector]):
     if isinstance(object_id, meta.TagHeader):
         return f"{object_id.objectType.name}-{object_id.objectId}-v{object_id.objectVersion}"
 
-    if object_id.objectVersion:
+    if object_id.objectVersion is not None:
         return f"{object_id.objectType.name}-{object_id.objectId}-v{object_id.objectVersion}"
 
-    if object_id.objectAsOf:
+    if object_id.objectAsOf is not None:
         return f"{object_id.objectType.name}-{object_id.objectId}-asof-{object_id.objectAsOf.isoDatetime}"
 
     if object_id.latestObject:
@@ -181,15 +181,15 @@ def selector_for_latest(object_id: meta.TagHeader) -> meta.TagSelector:
 
 
 def get_job_resource(
-        object_id: tp.Union[meta.TagHeader, meta.TagSelector],
+        selector: tp.Union[meta.TagHeader, meta.TagSelector],
         job_config: cfg.JobConfig,
         optional: bool = False):
 
-    resource_key = object_key(object_id)
-    mapped_key = job_config.resourceMapping.get(resource_key)
+    resource_key = object_key(selector)
+    resource_id = job_config.resourceMapping.get(resource_key)
 
-    if mapped_key is not None:
-        resource_key = mapped_key
+    if resource_id is not None:
+        resource_key = object_key(resource_id)
 
     if optional:
         return job_config.resources.get(resource_key)

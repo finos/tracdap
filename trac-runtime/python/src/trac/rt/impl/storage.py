@@ -155,11 +155,18 @@ class StorageManager:
         self.__log = _util.logger_for_object(self)
         self.__file_storage: tp.Dict[str, IFileStorage] = dict()
         self.__data_storage: tp.Dict[str, IDataStorage] = dict()
+        self.__settings = sys_config.storageSettings
 
         storage_options = {"sys_config_dir": sys_config_dir}
 
         for storage_key, storage_config in sys_config.storage.items():
             self.create_storage(storage_key, storage_config, storage_options)
+
+    def default_storage_key(self):
+        return self.__settings.defaultStorage
+
+    def default_storage_format(self):
+        return self.__settings.defaultFormat
 
     def create_storage(self, storage_key: str, storage_config: _cfg.StorageConfig, storage_options: dict = None):
 

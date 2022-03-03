@@ -27,14 +27,13 @@ class GraphBuilder:
     @staticmethod
     def build_job(
             job_config: config.JobConfig,
-            sys_config: config.RuntimeConfig,
             result_spec: JobResultSpec) -> Graph:
 
         if job_config.job.jobType == meta.JobType.IMPORT_MODEL:
             return GraphBuilder.build_import_model_job(job_config, result_spec)
 
         if job_config.job.jobType == meta.JobType.RUN_MODEL:
-            return GraphBuilder.build_run_model_job(job_config, sys_config, result_spec)
+            return GraphBuilder.build_run_model_job(job_config, result_spec)
 
         raise _ex.EConfigParse(f"Job type [{job_config.job.jobType}] is not supported yet")
 
@@ -92,11 +91,10 @@ class GraphBuilder:
     @classmethod
     def build_run_model_job(
             cls, job_config: config.JobConfig,
-            sys_config: config.RuntimeConfig,
             result_spec: JobResultSpec) -> Graph:
 
         return cls.build_calculation_job(
-            job_config, sys_config, result_spec,
+            job_config, result_spec,
             job_config.job.runModel.model,
             job_config.job.runModel.parameters,
             job_config.job.runModel.inputs,
@@ -105,7 +103,6 @@ class GraphBuilder:
     @classmethod
     def build_calculation_job(
             cls, job_config: config.JobConfig,
-            sys_config: config.RuntimeConfig,
             result_spec: JobResultSpec,
             target: meta.TagSelector, parameters: tp.Dict[str, meta.Value],
             inputs: tp.Dict[str, meta.TagSelector], outputs: tp.Dict[str, meta.TagSelector]) -> Graph:
@@ -132,7 +129,7 @@ class GraphBuilder:
 
         # Output graph will extract and save data items from job-level output data views
 
-        output_graph = cls.build_job_outputs(job_config, sys_config, outputs, job_namespace, target_graph)
+        output_graph = cls.build_job_outputs(job_config, outputs, job_namespace, target_graph)
 
         # Build job-level metadata outputs
 
@@ -232,7 +229,6 @@ class GraphBuilder:
     @classmethod
     def build_job_outputs(
             cls, job_config: config.JobConfig,
-            sys_config: config.RuntimeConfig,
             outputs: tp.Dict[str, meta.TagSelector],
             namespace: NodeNamespace, graph: Graph) -> Graph:
 
@@ -266,7 +262,7 @@ class GraphBuilder:
                 output_storage_id = job_config.resultMapping[output_storage_key]
 
                 data_spec_node = DynamicDataSpecNode(
-                        data_spec_id, data_view_id, sys_config,
+                        data_spec_id, data_view_id,
                         output_data_id, output_storage_id,
                         prior_data_spec=None)
 

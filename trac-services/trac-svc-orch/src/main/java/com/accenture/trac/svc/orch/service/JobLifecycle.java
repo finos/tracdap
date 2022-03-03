@@ -28,6 +28,7 @@ import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.PlatformConfig;
 import com.accenture.trac.config.RuntimeConfig;
+import com.accenture.trac.config.StorageSettings;
 import com.accenture.trac.metadata.*;
 import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.jobs.JobLogic;
@@ -216,6 +217,9 @@ public class JobLifecycle {
                 .build();
 
         jobState.sysConfig = RuntimeConfig.newBuilder()
+                .setStorageSettings(StorageSettings.newBuilder()
+                .setDefaultStorage(platformConfig.getServices().getData().getDefaultStorageKey())
+                .setDefaultFormat(platformConfig.getServices().getData().getDefaultStorageFormat()))
                 .putAllStorage(platformConfig.getServices().getData().getStorageMap())
                 .putAllRepositories(platformConfig.getServices().getOrch().getRepositoriesMap())
                 .build();

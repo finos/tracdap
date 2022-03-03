@@ -286,8 +286,9 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
     RANDOM = random.Random()
     RANDOM.seed()
 
-    def __init__(self, node: DynamicDataSpecNode):
+    def __init__(self, node: DynamicDataSpecNode, storage: _storage.StorageManager):
         self.node = node
+        self.storage = storage
 
     def __call__(self, ctx: NodeContext) -> _data.DataItemSpec:
 
@@ -323,8 +324,8 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
         data_def.schema = data_view.schema
         data_def.parts[part_key.opaqueKey] = part
 
-        storage_key = self.node.sys_config.storageSettings.defaultStorage
-        storage_format = self.node.sys_config.storageSettings.defaultFormat
+        storage_key = self.storage.default_storage_key()
+        storage_format = self.storage.default_storage_format()
         storage_path = data_item
 
         storage_copy = meta.StorageCopy(
@@ -556,6 +557,9 @@ class FunctionResolver:
     def resolve_save_data(self, job_config: _config.JobConfig, node: SaveDataNode):
         return SaveDataFunc(node, self._storage)
 
+    def resolve_dynamic_data_spec(self, job_config: _config.JobConfig, node: DynamicDataSpecNode):
+        return DynamicDataSpecFunc(node, self._storage)
+
     def resolve_import_model_node(self, job_config: _config.JobConfig, node: ImportModelNode):
         return ImportModelFunc(node, self._models)
 
@@ -580,13 +584,13 @@ class FunctionResolver:
         BuildJobResultNode: BuildJobResultFunc,
         SaveJobResultNode: SaveJobResultFunc,
         StaticDataSpecNode: StaticDataSpecFunc,
-        DynamicDataSpecNode: DynamicDataSpecFunc,
         DataResultNode: DataResultFunc}
 
     __node_mapping: tp.Dict[Node.__class__, __ResolveFunc] = {
 
         LoadDataNode: resolve_load_data,
         SaveDataNode: resolve_save_data,
+        DynamicDataSpecNode: resolve_dynamic_data_spec,
         RunModelNode: resolve_run_model_node,
         ImportModelNode: resolve_import_model_node,
 

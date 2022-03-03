@@ -216,11 +216,14 @@ class DynamicDataSpecNode(Node[_data.DataItemSpec]):
 
     data_view_id: NodeId[_data.DataView]
 
-    sys_config: cfg.RuntimeConfig
     data_obj_id: meta.TagHeader
     storage_obj_id: meta.TagHeader
 
     prior_data_spec: tp.Optional[_data.DataItemSpec]
+
+    def __post_init__(self):
+        dependencies = {self.data_view_id: DependencyType.HARD}
+        object.__setattr__(self, 'dependencies', dependencies)
 
 
 @dc.dataclass(frozen=True)
