@@ -208,7 +208,7 @@ public class JobLifecycle {
     JobState buildJobConfig(JobState jobState) {
 
         jobState.jobConfig = JobConfig.newBuilder()
-                .setJobId(jobState.jobId)
+                //.setJobId(jobState.jobId)
                 .setJob(jobState.definition)
                 .putAllResources(jobState.resources)
                 .putAllResourceMapping(jobState.resourceMapping)
@@ -257,6 +257,11 @@ public class JobLifecycle {
         return grpcCall.thenApply(header -> {
 
             jobState.jobId = header;
+
+            jobState.jobConfig = jobState.jobConfig.toBuilder()
+                    .setJobId(header)
+                    .build();
+
             return jobState;
         });
     }

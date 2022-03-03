@@ -105,10 +105,6 @@ public class JobApiService {
         return CompletableFuture.completedFuture(jobStatus);
     }
 
-    void getJobResult() {
-
-    }
-
     private JobState newJob(JobRequest request) {
 
         var jobState = new JobState();
