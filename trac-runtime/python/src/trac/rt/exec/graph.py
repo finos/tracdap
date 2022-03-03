@@ -54,7 +54,8 @@ class NodeId(tp.Generic[_T]):
 
     name: str
     namespace: NodeNamespace
-    result_type: tp.Type[_T] = type(None)
+
+    result_type: tp.Type[_T] = dc.field(default=type(None), init=True, compare=False, hash=False)
 
     def __str__(self):
         return f"{self.name} / {self.namespace}"

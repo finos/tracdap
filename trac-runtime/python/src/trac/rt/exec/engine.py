@@ -244,8 +244,9 @@ class GraphProcessor(actors.Actor):
         if not any(self.graph.active_nodes):
 
             if any(self.graph.pending_nodes):
-                self._log.error("Processor has become deadlocked (cyclic dependency error)")
-                self.actors().send_parent("job_failed")
+                err_msg = "Processor has become deadlocked (cyclic dependency error)"
+                self._log.error(err_msg)
+                self.actors().send_parent("job_failed", RuntimeError(err_msg))
 
             elif any(self.graph.failed_nodes):
 

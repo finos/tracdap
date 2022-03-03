@@ -248,7 +248,7 @@ class DataItemFunc(NodeFunction[_data.DataItem]):
         return delta
 
 
-class DataResultNode(NodeFunction[ObjectMap]):
+class DataResultFunc(NodeFunction[ObjectMap]):
 
     def __init__(self, node: DataResultNode):
         self.node = node
@@ -577,7 +577,10 @@ class FunctionResolver:
         DataViewNode: DataViewFunc,
         DataItemNode: DataItemFunc,
         ImportModelResultNode: ImportModelResultFunc,
-        BuildJobResultNode: BuildJobResultFunc}
+        BuildJobResultNode: BuildJobResultFunc,
+        StaticDataSpecNode: StaticDataSpecFunc,
+        DynamicDataSpecNode: DynamicDataSpecFunc,
+        DataResultNode: DataResultFunc}
 
     __node_mapping: tp.Dict[Node.__class__, __ResolveFunc] = {
 

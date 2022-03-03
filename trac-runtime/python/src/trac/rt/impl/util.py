@@ -180,12 +180,18 @@ def selector_for_latest(object_id: meta.TagHeader) -> meta.TagSelector:
         latestTag=True)
 
 
-def get_job_resource(object_id: tp.Union[meta.TagHeader, meta.TagSelector], job_config: cfg.JobConfig):
+def get_job_resource(
+        object_id: tp.Union[meta.TagHeader, meta.TagSelector],
+        job_config: cfg.JobConfig,
+        optional: bool = False):
 
     resource_key = object_key(object_id)
     mapped_key = job_config.resourceMapping.get(resource_key)
 
     if mapped_key is not None:
-        return job_config.resources[mapped_key]
+        resource_key = mapped_key
+
+    if optional:
+        return job_config.resources.get(resource_key)
     else:
         return job_config.resources[resource_key]
