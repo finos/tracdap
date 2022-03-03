@@ -23,6 +23,7 @@ import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.JobResult;
 import com.accenture.trac.metadata.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +32,21 @@ public interface IJobLogic {
     List<TagSelector> requiredMetadata(JobDefinition job);
 
     List<TagSelector> requiredMetadata(Map<String, ObjectDefinition> newResources);
+
+    Map<String, MetadataWriteRequest> createResultIds(
+            String tenant, JobDefinition job,
+            Map<String, ObjectDefinition> resources,
+            Map<String, TagHeader> resourceMapping);
+
+    Map<String, TagHeader> updateResultIds(
+            JobDefinition job, Instant jobTimestamp,
+            Map<String, ObjectDefinition> resources,
+            Map<String, TagHeader> resourceMapping);
+
+    JobDefinition setResultIds(
+            JobDefinition job, Map<String, TagHeader> resultMapping,
+            Map<String, ObjectDefinition> resources,
+            Map<String, TagHeader> resourceMapping);
 
     List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, JobResult jobResult);
 }

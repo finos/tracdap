@@ -45,17 +45,11 @@ import java.util.concurrent.TimeUnit;
 public class JobManagementService {
 
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(2);
-    private static final Duration RETAIN_COMPLETE_DELAY = Duration.ofSeconds(2);
-
-    private static final RuntimeConfig rtc = RuntimeConfig.newBuilder()
-            .putRepositories("trac_git_repo", RepositoryConfig.newBuilder()
-            .setRepoType("git")
-            .setRepoUrl("https://github.com/accenture/trac")
-            .build()).build();
+    private static final Duration RETAIN_COMPLETE_DELAY = Duration.ofSeconds(60);
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final JobManagement jobManager;
+    private final JobLifecycle jobLifecycle;
     private final IJobCache jobCache;
     private final IBatchExecutor jobExecutor;
     private final ScheduledExecutorService executorService;
@@ -63,12 +57,12 @@ public class JobManagementService {
     private ScheduledFuture<?> pollingTask;
 
     public JobManagementService(
-            JobManagement jobManager,
+            JobLifecycle jobLifecycle,
             IJobCache jobCache,
             IBatchExecutor jobExecutor,
             ScheduledExecutorService executorService) {
 
-        this.jobManager = jobManager;
+        this.jobLifecycle = jobLifecycle;
         this.jobCache = jobCache;
         this.jobExecutor = jobExecutor;
         this.executorService = executorService;
@@ -248,7 +242,7 @@ public class JobManagementService {
             JsonFormat.parser().merge(jobResultString, jobResultBuilder);
             jobState.jobResult = jobResultBuilder.build();
 
-            jobManager.processJobResult(jobState).toCompletableFuture().get();  // TODO: Sync / async
+            jobLifecycle.processJobResult(jobState).toCompletableFuture().get();  // TODO: Sync / async
 
             jobExecutor.destroyBatch(jobKey, execState);
 

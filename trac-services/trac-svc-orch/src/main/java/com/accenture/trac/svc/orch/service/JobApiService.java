@@ -34,15 +34,15 @@ public class JobApiService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final JobLifecycle jobLifecycle;
     private final IJobCache jobCache;
-    private final JobManagement jobManager;
 
     public JobApiService(
-            IJobCache jobCache,
-            JobManagement jobManager) {
+            JobLifecycle jobLifecycle,
+            IJobCache jobCache) {
 
+        this.jobLifecycle = jobLifecycle;
         this.jobCache = jobCache;
-        this.jobManager = jobManager;
     }
 
     public CompletableFuture<JobStatus> validateJob(JobRequest request) {
@@ -53,7 +53,7 @@ public class JobApiService {
 
                 .thenApply(s -> jobStatus(s, JobStatusCode.PREPARING))
 
-                .thenCompose(jobManager::assembleAndValidate)
+                .thenCompose(jobLifecycle::assembleAndValidate)
 
                 .thenApply(s -> jobStatus(s, JobStatusCode.VALIDATED))
 
@@ -68,12 +68,12 @@ public class JobApiService {
 
                 .thenApply(s -> jobStatus(s, JobStatusCode.PREPARING))
 
-                .thenCompose(jobManager::assembleAndValidate)
+                .thenCompose(jobLifecycle::assembleAndValidate)
 
                 .thenApply(s -> jobStatus(s, JobStatusCode.VALIDATED))
                 .thenApply(s -> jobStatus(s, JobStatusCode.PENDING))
 
-                .thenCompose(jobManager::saveInitialMetadata)
+                .thenCompose(jobLifecycle::saveInitialMetadata)
 
                 .thenCompose(this::submitForExecution)
 

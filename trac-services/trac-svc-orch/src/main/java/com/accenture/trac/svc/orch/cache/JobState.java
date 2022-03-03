@@ -44,8 +44,8 @@ public class JobState implements Serializable {
 
     public JobDefinition definition;
     public Map<String, ObjectDefinition> resources = new HashMap<>();
-    public Map<String, TagHeader> resourceMappings = new HashMap<>();
-    public Map<String, TagHeader> resultMappings = new HashMap<>();
+    public Map<String, TagHeader> resourceMapping = new HashMap<>();
+    public Map<String, TagHeader> resultMapping = new HashMap<>();
 
     public RuntimeConfig sysConfig;
     public JobConfig jobConfig;

@@ -22,6 +22,7 @@ import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.JobResult;
 import com.accenture.trac.metadata.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -46,6 +47,36 @@ public class ImportModelJob implements IJobLogic {
         // No extra metadata needed for an import_model job
 
         return List.of();
+    }
+
+    @Override
+    public Map<String, MetadataWriteRequest> createResultIds(
+            String tenant, JobDefinition job,
+            Map<String, ObjectDefinition> resources,
+            Map<String, TagHeader> resourceMapping) {
+
+        return Map.of();  // not currently used
+    }
+
+    @Override
+    public Map<String, TagHeader> updateResultIds(
+            JobDefinition job, Instant jobTimestamp,
+            Map<String, ObjectDefinition> resources,
+            Map<String, TagHeader> resourceMapping) {
+
+        // Model updates not supported yet
+
+        return Map.of();
+    }
+
+    @Override
+    public JobDefinition setResultIds(
+            JobDefinition job,
+            Map<String, TagHeader> resultMapping,
+            Map<String, ObjectDefinition> resources,
+            Map<String, TagHeader> resourceMapping) {
+
+        return job;
     }
 
     @Override

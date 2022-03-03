@@ -17,23 +17,20 @@
 package com.accenture.trac.svc.orch.jobs;
 
 
-import com.accenture.trac.api.JobRequest;
 import com.accenture.trac.api.MetadataWriteRequest;
+import com.accenture.trac.config.JobConfig;
+import com.accenture.trac.config.JobResult;
+import com.accenture.trac.metadata.*;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataConstants;
 import com.accenture.trac.common.metadata.MetadataUtil;
-import com.accenture.trac.config.JobConfig;
-import com.accenture.trac.config.JobResult;
-import com.accenture.trac.metadata.*;
-import org.checkerframework.checker.units.qual.A;
 
+import java.time.Instant;
 import java.util.*;
 
 
 public class RunModelJob implements IJobLogic {
-
-    private static final String TRAC_MODEL_RESOURCE_NAME = "trac_model";
 
     @Override
     public List<TagSelector> requiredMetadata(JobDefinition job) {
@@ -70,58 +67,100 @@ public class RunModelJob implements IJobLogic {
         return resources;
     }
 
-
-
-    public Map<String, MetadataWriteRequest> preRunMetadata(
-            String tenant, JobRequest request,
+    @Override
+    public Map<String, MetadataWriteRequest> createResultIds(
+            String tenant, JobDefinition job,
             Map<String, ObjectDefinition> resources,
-            Map<String, String> resourceMapping) {
+            Map<String, TagHeader> resourceMapping) {
 
-        var outputMap = new HashMap<String, MetadataWriteRequest>();
+        var runModel = job.getRunModel();
+        var resultMapping = new HashMap<String, MetadataWriteRequest>();
 
-        var modelId = request.getJob().getRunModel().getModel();
-        var selectorKey = MetadataUtil.objectKey(modelId);
-        var mappedKey = resourceMapping.get(selectorKey);
-        var modelKey = mappedKey != null ? mappedKey : selectorKey;
-        var modelDef = resources.get(modelKey).getModel();
+        var modelKey = MetadataUtil.objectKey(runModel.getModel());
+        var modelId = resourceMapping.get(modelKey);
+        var modelDef = resources.get(MetadataUtil.objectKey(modelId)).getModel();
 
         for (var output : modelDef.getOutputsMap().entrySet()) {
 
+            if (runModel.containsPriorOutputs(output.getKey()))
+                continue;
+
             var dataKey = String.format("%s:%s", output.getKey(), ObjectType.DATA);
+            var storageKey = String.format("%s:%s", output.getKey(), ObjectType.STORAGE);
+
             var dataReq = MetadataWriteRequest.newBuilder()
                     .setTenant(tenant)
                     .setObjectType(ObjectType.DATA)
                     .build();
 
-            var storageKey = String.format("%s:%s", output.getKey(), ObjectType.STORAGE);
             var storageReq = MetadataWriteRequest.newBuilder()
                     .setTenant(tenant)
                     .setObjectType(ObjectType.STORAGE)
                     .build();
 
-            outputMap.put(dataKey, dataReq);
-            outputMap.put(storageKey, storageReq);
+            resultMapping.put(dataKey, dataReq);
+            resultMapping.put(storageKey, storageReq);
         }
 
-        return outputMap;
+        return resultMapping;
     }
 
-    public JobDefinition setOutputIds(JobDefinition job, Map<String, TagHeader> outputIds,
-                                      Map<String, ObjectDefinition> resources,
-                                      Map<String, String> resourceMapping) {
+    @Override
+    public Map<String, TagHeader> updateResultIds(
+            JobDefinition job, Instant jobTimestamp,
+            Map<String, ObjectDefinition> resources,
+            Map<String, TagHeader> resourceMapping) {
+
+        var runModel = job.getRunModel();
+        var resultMapping = new HashMap<String, TagHeader>();
+
+        var modelKey = MetadataUtil.objectKey(runModel.getModel());
+        var modelId = resourceMapping.get(modelKey);
+        var modelDef = resources.get(MetadataUtil.objectKey(modelId)).getModel();
+
+        for (var output : modelDef.getOutputsMap().entrySet()) {
+
+            var priorOutput = runModel.getPriorOutputsOrDefault(output.getKey(), null);
+
+            if (priorOutput == null)
+                continue;
+
+            var priorDataKey = MetadataUtil.objectKey(priorOutput);
+            var priorDataId = resourceMapping.get(priorDataKey);
+            var priorDataDef = resources.get(MetadataUtil.objectKey(priorDataId)).getData();
+
+            var priorStorageKey = MetadataUtil.objectKey(priorDataDef.getStorageId());
+            var priorStorageId = resourceMapping.get(priorStorageKey);
+
+            var dataKey = String.format("%s:%s", output.getKey(), ObjectType.DATA);
+            var storageKey = String.format("%s:%s", output.getKey(), ObjectType.STORAGE);
+            var dataId = MetadataUtil.nextObjectVersion(priorDataId, jobTimestamp);
+            var storageId = MetadataUtil.nextObjectVersion(priorStorageId, jobTimestamp);
+
+            resultMapping.put(dataKey, dataId);
+            resultMapping.put(storageKey, storageId);
+        }
+
+        return resultMapping;
+    }
+
+    @Override
+    public JobDefinition setResultIds(
+            JobDefinition job, Map<String, TagHeader> resultMapping,
+            Map<String, ObjectDefinition> resources,
+            Map<String, TagHeader> resourceMapping) {
 
         var runModel = job.getRunModel().toBuilder();
+        runModel.clearOutputs();
 
-        var modelId = job.getRunModel().getModel();
-        var selectorKey = MetadataUtil.objectKey(modelId);
-        var mappedKey = resourceMapping.get(selectorKey);
-        var modelKey = mappedKey != null ? mappedKey : selectorKey;
-        var modelDef = resources.get(modelKey).getModel();
+        var modelKey = MetadataUtil.objectKey(runModel.getModel());
+        var modelId = resourceMapping.get(modelKey);
+        var modelDef = resources.get(MetadataUtil.objectKey(modelId)).getModel();
 
         for (var output : modelDef.getOutputsMap().keySet()) {
 
             var dataKey = String.format("%s:%s", output, ObjectType.DATA);
-            var dataId = outputIds.get(dataKey);
+            var dataId = resultMapping.get(dataKey);
             var dataSelector = MetadataUtil.selectorFor(dataId);
             runModel.putOutputs(output, dataSelector);
         }

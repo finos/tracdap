@@ -20,6 +20,8 @@ import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.metadata.TagHeader;
 import com.accenture.trac.metadata.TagSelector;
 
+import java.time.Instant;
+
 
 public class MetadataUtil {
 
@@ -61,6 +63,24 @@ public class MetadataUtil {
                 .setObjectId(header.getObjectId())
                 .setObjectVersion(header.getObjectVersion() - 1)
                 .setLatestTag(true)
+                .build();
+    }
+
+    public static TagHeader nextObjectVersion(TagHeader header, Instant timestamp) {
+
+        return header.toBuilder()
+                .setObjectVersion(header.getObjectVersion() + 1)
+                .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
+                .build();
+    }
+
+    public static TagHeader nextTagVersion(TagHeader header, Instant timestamp) {
+
+        return header.toBuilder()
+                .setTagVersion(header.getTagVersion() + 1)
+                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .build();
     }
 

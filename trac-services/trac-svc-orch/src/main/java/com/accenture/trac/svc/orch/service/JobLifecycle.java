@@ -35,6 +35,7 @@ import io.grpc.MethodDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,21 +48,22 @@ import static com.accenture.trac.common.metadata.MetadataConstants.*;
 import static com.accenture.trac.common.metadata.MetadataConstants.TRAC_CREATE_JOB;
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
 
-public class JobManagement {
+public class JobLifecycle {
 
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreateObjectMethod();
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getUpdateObjectMethod();
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_TAG_METHOD = TrustedMetadataApiGrpc.getUpdateTagMethod();
+    private static final MethodDescriptor<MetadataWriteRequest, TagHeader> PREALLOCATE_ID_METHOD = TrustedMetadataApiGrpc.getPreallocateIdMethod();
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_PREALLOCATED_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectMethod();
     private static final MethodDescriptor<MetadataBatchRequest, MetadataBatchResponse> READ_BATCH_METHOD = TrustedMetadataApiGrpc.getReadBatchMethod();
 
-    private final Logger log = LoggerFactory.getLogger(JobManagement.class);
+    private final Logger log = LoggerFactory.getLogger(JobLifecycle.class);
 
     private final PlatformConfig platformConfig;
     private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient;
     private final GrpcClientWrap grpcWrap;
 
-    public JobManagement(
+    public JobLifecycle(
             PlatformConfig platformConfig,
             TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient) {
 
@@ -74,10 +76,11 @@ public class JobManagement {
 
         return CompletableFuture.completedFuture(jobState)
 
-                .thenCompose(this::loadResources);
+                .thenCompose(this::loadResources)
+                .thenCompose(this::allocateResultIds)
+                .thenApply(this::buildJobConfig);
 
         // static validate
-        // load related metadata
         // semantic validate
     }
 
@@ -113,13 +116,12 @@ public class JobManagement {
 
         return grpcWrap
                 .unaryCall(READ_BATCH_METHOD, batchRequest, metaClient::readBatch)
-                .thenCompose(batchResponse -> loadResourcesResponse(batchResponse, orderedKeys, jobState));
+                .thenCompose(batchResponse -> loadResourcesResponse(jobState, orderedKeys, batchResponse));
     }
 
     CompletionStage<JobState> loadResourcesResponse(
-            MetadataBatchResponse batchResponse,
-            List<String> mappingKeys,
-            JobState jobState) {
+            JobState jobState, List<String> mappingKeys,
+            MetadataBatchResponse batchResponse) {
 
         if (batchResponse.getTagCount() != mappingKeys.size())
             throw new EUnexpected();
@@ -140,36 +142,85 @@ public class JobManagement {
         }
 
         jobState.resources.putAll(resources);
-        jobState.resourceMappings.putAll(mappings);
+        jobState.resourceMapping.putAll(mappings);
 
-        var extraResources = jobLogic.requiredMetadata(resources);
-
-        extraResources = extraResources.stream()
-                .filter(selector -> {
-                    var key = MetadataUtil.objectKey(selector);
-                    return !jobState.resources.containsKey(key) && !jobState.resourceMappings.containsKey(key);
-                })
+        var extraResources = jobLogic.requiredMetadata(resources).stream()
+                .filter(selector -> !jobState.resources.containsKey(MetadataUtil.objectKey(selector)))
+                .filter(selector -> !jobState.resourceMapping.containsKey(MetadataUtil.objectKey(selector)))
                 .collect(Collectors.toList());
 
         if (!extraResources.isEmpty())
             return loadResources(jobState, extraResources);
 
+        return CompletableFuture.completedFuture(jobState);
+    }
+
+    CompletionStage<JobState> allocateResultIds(JobState jobState) {
+
+        // TODO: Single job timestamp - requires changes in meta svc for this to actually be used
+        // meta svc must accept object timestamps as out-of-band gRPC metadata for trusted API calls
+        var jobTimestamp = Instant.now();
+
+        var jobLogic = JobLogic.forJobType(jobState.jobType);
+
+        var existingResultIds = jobLogic.updateResultIds(
+                jobState.definition, jobTimestamp,
+                jobState.resources, jobState.resourceMapping);
+
+        jobState.resultMapping.putAll(existingResultIds);
+
+        var newResultIds = jobLogic.createResultIds(
+                jobState.tenant, jobState.definition,
+                jobState.resources, jobState.resourceMapping);
+
+        CompletionStage<JobState> state_ = CompletableFuture.completedFuture(jobState);
+
+        for (var idRequest : newResultIds.entrySet()) {
+
+            state_ = state_.thenCompose(s -> allocateResultId(s, idRequest.getKey(), idRequest.getValue()));
+        }
+
+        return state_.thenApply(this::setResultIds);
+    }
+
+    CompletionStage<JobState> allocateResultId(JobState jobState, String resultKey, MetadataWriteRequest idRequest) {
+
+        var idResult = grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, idRequest, metaClient::preallocateId);
+
+        return idResult.thenApply(newId -> {
+
+            jobState.resultMapping.put(resultKey, newId);
+            return jobState;
+        });
+    }
+
+    JobState setResultIds(JobState jobState) {
+
+        var jobLogic = JobLogic.forJobType(jobState.jobType);
+
+        jobState.definition = jobLogic.setResultIds(
+                jobState.definition, jobState.resultMapping,
+                jobState.resources, jobState.resourceMapping);
+
+        return jobState;
+    }
+
+    JobState buildJobConfig(JobState jobState) {
+
         jobState.jobConfig = JobConfig.newBuilder()
                 .setJobId(jobState.jobId)
                 .setJob(jobState.definition)
                 .putAllResources(jobState.resources)
-                .putAllResourceMapping(jobState.resourceMappings)
+                .putAllResourceMapping(jobState.resourceMapping)
+                .putAllResultMapping(jobState.resultMapping)
                 .build();
 
-        // TODO: Build result mapping
-
-        // TODO: Separate this
         jobState.sysConfig = RuntimeConfig.newBuilder()
                 .putAllStorage(platformConfig.getServices().getData().getStorageMap())
                 .putAllRepositories(platformConfig.getServices().getOrch().getRepositoriesMap())
                 .build();
 
-        return CompletableFuture.completedFuture(jobState);
+        return jobState;
     }
 
     CompletionStage<JobState> saveInitialMetadata(JobState jobState) {

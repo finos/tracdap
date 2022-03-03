@@ -30,6 +30,7 @@ import com.accenture.trac.common.exec.ExecutionManager;
 import com.accenture.trac.common.exec.IBatchExecutor;
 import com.accenture.trac.svc.orch.service.JobApiService;
 
+import com.accenture.trac.svc.orch.service.JobLifecycle;
 import com.accenture.trac.svc.orch.service.JobManagementService;
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
@@ -118,7 +119,8 @@ public class TracOrchestratorService extends CommonServiceBase {
 
             prepareMetadataClientChannel(platformConfig, clientChannelType);
             var metaClient = TrustedMetadataApiGrpc.newFutureStub(clientChannel);
-            var metaClientBlocking = TrustedMetadataApiGrpc.newBlockingStub(clientChannel);
+
+            var jobLifecycle = new JobLifecycle(platformConfig, metaClient);
 
             jobCache = new LocalJobCache();
             // jobCache = InterfaceLogging.wrap(jobCache, IJobCache.class);
@@ -128,13 +130,12 @@ public class TracOrchestratorService extends CommonServiceBase {
             jobExecCtrl = executors.getExecutor();
 
             jobMonitor = new JobManagementService(
-                    platformConfig,
-                    jobCache, jobExecCtrl,
-                    serviceGroup, metaClientBlocking);
+                    jobLifecycle, jobCache,
+                    jobExecCtrl, serviceGroup);
 
             jobMonitor.start();
 
-            var orchestrator = new JobApiService(jobCache, metaClient);
+            var orchestrator = new JobApiService(jobLifecycle, jobCache);
             var orchestratorApi = new TracOrchestratorApi(orchestrator);
 
             this.server = NettyServerBuilder.forPort(orchestratorConfig.getPort())
