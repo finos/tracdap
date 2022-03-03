@@ -578,6 +578,7 @@ class FunctionResolver:
         DataItemNode: DataItemFunc,
         ImportModelResultNode: ImportModelResultFunc,
         BuildJobResultNode: BuildJobResultFunc,
+        SaveJobResultNode: SaveJobResultFunc,
         StaticDataSpecNode: StaticDataSpecFunc,
         DynamicDataSpecNode: DynamicDataSpecFunc,
         DataResultNode: DataResultFunc}

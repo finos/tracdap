@@ -48,7 +48,8 @@ class GraphBuilder:
         ctx_push_graph = GraphBuilder.build_context_push(
             job_namespace, null_graph, input_mapping=dict())
 
-        new_model_id = _util.new_object_id(meta.ObjectType.MODEL)  # TODO
+        # TODO: Import model job should pre-allocate an ID, then model ID comes from job_config.resultMapping
+        new_model_id = _util.new_object_id(meta.ObjectType.MODEL)
 
         model_scope = _util.object_key(job_config.jobId)
         import_details = job_config.job.importModel
