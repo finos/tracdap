@@ -162,6 +162,24 @@ def object_key(object_id: tp.Union[meta.TagHeader, meta.TagSelector]):
     raise ex.EUnexpected()
 
 
+def selector_for(object_id: meta.TagHeader) -> meta.TagSelector:
+
+    return meta.TagSelector(
+        objectType=object_id.objectType,
+        objectId=object_id.objectId,
+        objectVersion=object_id.objectVersion,
+        tagVersion=object_id.tagVersion)
+
+
+def selector_for_latest(object_id: meta.TagHeader) -> meta.TagSelector:
+
+    return meta.TagSelector(
+        objectType=object_id.objectType,
+        objectId=object_id.objectId,
+        latestObject=True,
+        latestTag=True)
+
+
 def get_job_resource(object_id: tp.Union[meta.TagHeader, meta.TagSelector], job_config: cfg.JobConfig):
 
     resource_key = object_key(object_id)

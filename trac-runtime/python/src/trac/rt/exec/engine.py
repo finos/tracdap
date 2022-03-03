@@ -86,7 +86,8 @@ class GraphBuilder(actors.Actor):
 
         self._log.info("Building execution graph")
 
-        graph_data = _graph.GraphBuilder.build_job(self.job_config, self.result_spec)
+        # TODO: Get sys config, or find a way to pass storage settings
+        graph_data = _graph.GraphBuilder.build_job(self.job_config, None, self.result_spec)
         graph_nodes = {node_id: GraphContextNode(node, {}) for node_id, node in graph_data.nodes.items()}
         graph = GraphContext(graph_nodes, pending_nodes=set(graph_nodes.keys()))
 

@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 import pathlib
-import types
 import typing as tp
 import dataclasses as dc
 
@@ -90,7 +89,7 @@ class Node(tp.Generic[_T]):
 
 
 NodeMap = tp.Dict[NodeId, Node]
-MetadataBundle = tp.Dict[meta.ObjectType, meta.ObjectDefinition]
+ObjectMap = tp.Dict[str, meta.ObjectDefinition]
 
 
 @dc.dataclass(frozen=True)
@@ -214,7 +213,13 @@ class StaticDataSpecNode(Node[_data.DataItemSpec]):
 @dc.dataclass(frozen=True)
 class DynamicDataSpecNode(Node[_data.DataItemSpec]):
 
-    pass
+    data_view_id: NodeId[_data.DataView]
+
+    sys_config: cfg.RuntimeConfig
+    data_obj_id: meta.TagHeader
+    storage_obj_id: meta.TagHeader
+
+    prior_data_spec: tp.Optional[_data.DataItemSpec]
 
 
 @dc.dataclass(frozen=True)
@@ -234,10 +239,21 @@ class DataItemNode(MappingNode):
     """Map a data item out of an assembled data view"""
 
     data_view_id: NodeId[_data.DataView]
-    data_item: str
 
     def __post_init__(self):
         dependencies = {self.data_view_id: DependencyType.HARD}
+        object.__setattr__(self, 'dependencies', dependencies)
+
+
+@dc.dataclass(frozen=True)
+class DataResultNode(Node[ObjectMap]):
+
+    output_name: str
+    data_spec_id: NodeId[_data.DataItemSpec]
+    data_save_id: NodeId[type(None)]
+
+    def __post_init__(self):
+        dependencies = {self.data_spec_id: DependencyType.HARD, self.data_save_id: DependencyType.HARD}
         object.__setattr__(self, 'dependencies', dependencies)
 
 
@@ -275,7 +291,7 @@ class SaveDataNode(Node):
 
 
 @dc.dataclass(frozen=True)
-class ImportModelNode(Node):
+class ImportModelNode(Node[meta.ModelDefinition]):
 
     model_scope: str
     import_details: meta.ImportModelJob
@@ -284,6 +300,17 @@ class ImportModelNode(Node):
 
     def __post_init__(self, explicit_deps):
         dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
+        object.__setattr__(self, 'dependencies', dependencies)
+
+
+@dc.dataclass(frozen=True)
+class ImportModelResultNode(Node[ObjectMap]):
+
+    import_id: NodeId[meta.ModelDefinition]
+    object_id: meta.TagHeader
+
+    def __post_init__(self):
+        dependencies = {self.import_id: DependencyType.HARD}
         object.__setattr__(self, 'dependencies', dependencies)
 
 
@@ -304,29 +331,27 @@ class RunModelNode(Node):
 
 
 @dc.dataclass(frozen=True)
-class SaveJobResultNode(Node):
-
-    data_view_id: NodeId
-    physical_items: tp.Dict[NodeId, str]
-
-    def __post_init__(self):
-        dependencies = {physical_node_id: DependencyType.HARD for physical_node_id in self.physical_items}
-        dependencies[self.data_view_id] = DependencyType.HARD
-        object.__setattr__(self, 'dependencies', dependencies)
-
-
-@dc.dataclass(frozen=True)
 class BuildJobResultNode(Node[cfg.JobResult]):
 
     job_id: meta.TagHeader
-    outputs: tp.Dict[str, NodeId]
-    result_spec: JobResultSpec
+    result_ids: tp.List[NodeId[ObjectMap]]
 
     explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
 
     def __post_init__(self, explicit_deps):
         dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
-        dependencies.update({output_meta_id: DependencyType.HARD for output_meta_id in self.outputs})
+        dependencies.update({result_id: DependencyType.HARD for result_id in self.result_ids})
+        object.__setattr__(self, 'dependencies', dependencies)
+
+
+@dc.dataclass(frozen=True)
+class SaveJobResultNode(Node[type(None)]):
+
+    job_result_id: NodeId[cfg.JobResult]
+    result_spec: JobResultSpec
+
+    def __post_init__(self):
+        dependencies = {self.job_result_id: DependencyType.HARD}
         object.__setattr__(self, 'dependencies', dependencies)
 
 
@@ -346,11 +371,13 @@ class JobLogsNode(Node):
 class JobNode(Node):
 
     # job_def: meta.JobDefinition
-    root_exec_node: NodeId
+    target_node_id: NodeId
+    result_node_id: NodeId
 
     explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
 
     def __post_init__(self, explicit_deps):
         dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
-        dependencies[self.root_exec_node] = DependencyType.HARD
+        dependencies[self.target_node_id] = DependencyType.HARD
+        dependencies[self.result_node_id] = DependencyType.HARD
         object.__setattr__(self, 'dependencies', dependencies)
