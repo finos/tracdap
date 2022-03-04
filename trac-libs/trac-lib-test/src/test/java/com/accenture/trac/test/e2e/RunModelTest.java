@@ -195,8 +195,8 @@ public class RunModelTest extends PlatformTestBase {
                 .putParameters("filter_defaults", MetadataCodec.encodeValue(true))
                 .putInputs("customer_loans", MetadataUtil.selectorFor(inputDataId))
                 .addOutputAttrs(TagUpdate.newBuilder()
-                        .setAttrName("e2e_test_model")
-                        .setValue(MetadataCodec.encodeValue("run_model:using_data")))
+                        .setAttrName("e2e_test_data")
+                        .setValue(MetadataCodec.encodeValue("run_model:data_output")))
                 .build();
 
         var jobRequest = JobRequest.newBuilder()
@@ -225,5 +225,36 @@ public class RunModelTest extends PlatformTestBase {
         }
 
         Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatus());
+
+        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
+
+        var dataSearch = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("trac_create_job")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
+                .build();
+
+        var dataSearchResult = metaClient.search(dataSearch);
+
+        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
+
+        var searchResult = dataSearchResult.getSearchResult(0);
+        var dataReq = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
+                .build();
+
+        var dataTag = metaClient.readObject(dataReq);
+        var dataDef = dataTag.getDefinition().getData();
+        var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
+
+        Assertions.assertEquals("run_model:data_output", MetadataCodec.decodeStringValue(outputAttr));
+        Assertions.assertEquals(1, dataDef.getPartsCount());
     }
 }
