@@ -16,14 +16,30 @@
 
 package com.accenture.trac.svc.orch.cache;
 
+import com.accenture.trac.common.metadata.MetadataUtil;
+import com.accenture.trac.metadata.TagHeader;
+
 public class TicketRequest {
 
+    private final String jobKey;
 
-    public static TicketRequest forResources() {
-        return new TicketRequest();
+    private TicketRequest(String jobKey) {
+        this.jobKey = jobKey;
     }
 
-    public static TicketRequest forJob() {
-        return new TicketRequest();
+    private TicketRequest(TagHeader jobId) {
+        this.jobKey = MetadataUtil.objectKey(jobId);
+    }
+
+    public static TicketRequest forJob(String jobKey) {
+        return new TicketRequest(jobKey);
+    }
+
+    public static TicketRequest forJob(TagHeader jobId) {
+        return new TicketRequest(jobId);
+    }
+
+    public String jobKey() {
+        return jobKey;
     }
 }

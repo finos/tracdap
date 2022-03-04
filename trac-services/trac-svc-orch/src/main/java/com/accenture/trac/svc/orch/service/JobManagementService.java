@@ -104,16 +104,15 @@ public class JobManagementService {
 
     public void pollJobCache() {
 
-        try (var ctx = jobCache.useTicket(TicketRequest.forJob())) {
+        try {
 
             log.info("Polling job cache...");
 
-            var completeStates = List.of(JobStatusCode.SUCCEEDED, JobStatusCode.FAILED, JobStatusCode.CANCELLED);
-            var completeJobs = jobCache.pollJobs(job -> completeStates.contains(job.statusCode));
+            var finishedStates = List.of(JobStatusCode.FINISHING, JobStatusCode.CANCELLED);
+            var finishedJobs = jobCache.pollJobs(job -> finishedStates.contains(job.statusCode));
 
-            for (var job : completeJobs)
-                if (!job.recorded)
-                    executorService.schedule(() -> recordJobResult(job.jobKey), 0L, TimeUnit.SECONDS);
+            for (var job : finishedJobs)
+                executorService.schedule(() -> recordJobResult(job.jobKey), 0L, TimeUnit.SECONDS);
 
             var queuedJobs = jobCache.pollJobs(job -> job.statusCode == JobStatusCode.QUEUED);
 
@@ -128,7 +127,7 @@ public class JobManagementService {
 
     public void pollExecutor() {
 
-        try (var ctx = jobCache.useTicket(TicketRequest.forJob())) {
+        try  {
 
             log.info("Polling executor...");
 
@@ -149,11 +148,19 @@ public class JobManagementService {
 
             for (var result : pollResults) {
 
-                var job = jobCache.readJob(result.jobKey);
-                job.statusCode = result.statusCode;
-                job.executorState = JobState.serialize(result.executorState);
+                log.info("Got state update for job: {}", result.jobKey);
 
-                jobCache.updateJob(job.jobKey, job, ctx.ticket());
+                try (var ctx = jobCache.useTicket(TicketRequest.forJob(result.jobKey))) {
+
+                    if (ctx.superseded())
+                        continue;
+
+                    var job = jobCache.readJob(result.jobKey);
+                    job.executorState = JobState.serialize(result.executorState);
+                    job.statusCode = JobStatusCode.FINISHING;
+
+                    jobCache.updateJob(job.jobKey, job, ctx.ticket());
+                }
             }
         }
         catch (Exception e) {
@@ -164,15 +171,12 @@ public class JobManagementService {
 
     public void submitJob(String jobKey) {
 
-        log.info("Submit job for execution: [{}]", jobKey);
-
-        var resourceTicket = TicketRequest.forResources();
-        var jobTicket = TicketRequest.forJob();
-
-        try (var ctx = jobCache.useTicket(resourceTicket, jobTicket)) {
+        try (var ctx = jobCache.useTicket(TicketRequest.forJob(jobKey))) {
 
             if (ctx.superseded())
                 return;
+
+            log.info("Submit job for execution: [{}]", jobKey);
 
             var jobState = jobCache.readJob(jobKey);
 
@@ -223,27 +227,39 @@ public class JobManagementService {
 
     public void recordJobResult(String jobKey) {
 
-        try (var ctx = jobCache.useTicket(TicketRequest.forJob())) {
+        log.info("Trying to record job result.... [{}]", jobKey);
+
+        try (var ctx = jobCache.useTicket(TicketRequest.forJob(jobKey))) {
 
             if (ctx.superseded())
                 return;
 
-            var jobState = jobCache.readJob(jobKey);
-            jobState.recorded = true;
-            jobCache.updateJob(jobKey, jobState, ctx.ticket());
+            log.info("Record job result: [{}]", jobKey);
 
+            var jobState = jobCache.readJob(jobKey);
             var execState = JobState.deserialize(jobState.executorState, ExecutorState.class);
 
-            // Retrieve job result from executor
-            var jobResultFile = String.format("job_result_%s.json", jobKey);
-            var jobResultBytes = jobExecutor.readFile(execState, "result", jobResultFile);
-            var jobResultString = new String(jobResultBytes, StandardCharsets.UTF_8);
-            var jobResultBuilder = JobResult.newBuilder();
-            JsonFormat.parser().merge(jobResultString, jobResultBuilder);
-            jobState.jobResult = jobResultBuilder.build();
+            var pollResult = jobExecutor.pollBatch(execState);
+            jobState.statusCode = pollResult.statusCode;
 
-            jobLifecycle.processJobResult(jobState).toCompletableFuture().get();  // TODO: Sync / async
+            if (pollResult.statusCode == JobStatusCode.SUCCEEDED) {
 
+                // Retrieve job result from executor
+                var jobResultFile = String.format("job_result_%s.json", jobKey);
+                var jobResultBytes = jobExecutor.readFile(execState, "result", jobResultFile);
+                var jobResultString = new String(jobResultBytes, StandardCharsets.UTF_8);
+                var jobResultBuilder = JobResult.newBuilder();
+                JsonFormat.parser().merge(jobResultString, jobResultBuilder);
+                jobState.jobResult = jobResultBuilder.build();
+
+                jobLifecycle.processJobResult(jobState).toCompletableFuture().get();  // TODO: Sync / async
+            }
+            else {
+
+                // TODO: Record error info
+            }
+
+            jobCache.updateJob(jobKey, jobState, ctx.ticket());
             jobExecutor.destroyBatch(jobKey, execState);
 
             executorService.schedule(() -> deleteJob(jobKey), RETAIN_COMPLETE_DELAY.getSeconds(), TimeUnit.SECONDS);
@@ -258,14 +274,11 @@ public class JobManagementService {
             log.error("Record job result failed: [{}] {}", jobKey, e.getMessage(), e);
             throw new ETracInternal("Record job result failed", e);
         }
-        finally {
-
-        }
     }
 
     private void deleteJob(String jobKey) {
 
-        try (var ctx = jobCache.useTicket(TicketRequest.forJob())) {
+        try (var ctx = jobCache.useTicket(TicketRequest.forJob(jobKey))) {
 
             if (ctx.superseded())
                 return;

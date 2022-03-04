@@ -16,21 +16,25 @@
 
 package com.accenture.trac.svc.orch.cache.local;
 
+import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.cache.Ticket;
 import com.accenture.trac.svc.orch.cache.TicketRequest;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 
 public class LocalJobCache implements IJobCache {
 
-    private final Map<String, JobState> cache;
+    private final ConcurrentMap<String, LocalJobCacheEntry> cache;
 
     public LocalJobCache() {
 
@@ -38,45 +42,164 @@ public class LocalJobCache implements IJobCache {
     }
 
     @Override
-    public void createJob(String jobId, JobState state) {
-
-        var existing = cache.putIfAbsent(jobId, state);
-    }
-
-    @Override
-    public JobState readJob(String jobId) {
-
-        return cache.get(jobId);
-    }
-
-    @Override
-    public void updateJob(String jobId, JobState state, Ticket ticket) {
-
-        var newState = cache.computeIfPresent(jobId, (pk_, pv_) -> state);
-    }
-
-    @Override
-    public void deleteJob(String jobId, Ticket ticket) {
-
-        var existing = cache.remove(jobId);
-    }
-
-    @Override
-    public List<JobState> pollJobs(Function<JobState, Boolean> filter) {
-
-        return cache.values()
-                .stream()
-                .filter(filter::apply)
-                .collect(Collectors.toList());
-    }
-
-    @Override
     public Ticket openTicket(TicketRequest request) {
-        return null;
+
+        var operationTime = Instant.now();
+        var duration = Duration.of(1, ChronoUnit.MINUTES);
+        var ticket = Ticket.forDuration(request.jobKey(), operationTime, duration);
+
+        var cacheEntry = cache.compute(request.jobKey(), (key, priorEntry) -> {
+
+            var priorTicket = priorEntry != null ? priorEntry.ticket : null;
+
+            if (priorTicket != null && operationTime.isBefore(priorTicket.expiry()))
+                return priorEntry;
+
+            var newEntry = priorEntry != null ? priorEntry.clone() : new LocalJobCacheEntry();
+            newEntry.ticket = ticket;
+
+            return newEntry;
+        });
+
+        if (cacheEntry.ticket != ticket)
+            return Ticket.superseded(request.jobKey(), operationTime);
+
+        return ticket;
     }
 
     @Override
     public void closeTicket(Ticket ticket) {
 
+        cache.computeIfPresent(ticket.key(), (key, priorEntry) -> {
+
+            if (priorEntry.ticket != ticket)
+                return priorEntry;
+
+            // If there is no job state associated with this cache entry, then remove it from the cache
+            // This happens when an entry is deleted, or if a create operation fails
+            if (priorEntry.jobState == null)
+                return null;
+
+            var newEntry = priorEntry.clone();
+            newEntry.ticket = null;
+
+            return newEntry;
+        });
+    }
+
+    @Override
+    public void createJob(String jobKey, JobState jobState, Ticket ticket) {
+
+        var operationTime = Instant.now();
+
+        var cacheEntry = cache.computeIfPresent(jobKey, (key, priorEntry) -> {
+
+            if (priorEntry.ticket != ticket)
+                return priorEntry;
+
+            if (priorEntry.jobState != null)
+                throw new EUnexpected();
+
+            var newEntry = priorEntry.clone();
+            newEntry.jobState = jobState;
+            newEntry.lastActivity = operationTime;
+            newEntry.revision = priorEntry.revision + 1;
+
+            return newEntry;
+        });
+
+        if (cacheEntry == null || cacheEntry.ticket != ticket)
+            throw new EUnexpected();  // todo: error handling?
+
+    }
+
+    @Override
+    public JobState readJob(String jobKey) {
+
+        return cache.get(jobKey).jobState.clone();
+    }
+
+    @Override
+    public void updateJob(String jobKey, JobState jobState, Ticket ticket) {
+
+        var operationTime = Instant.now();
+
+        var cacheEntry = cache.compute(jobKey, (key, priorEntry) -> {
+
+            if (priorEntry == null)
+                throw new EUnexpected();
+
+            if (priorEntry.ticket != ticket)
+                return priorEntry;
+
+            if (priorEntry.jobState == null)
+                throw new EUnexpected();
+
+            var newEntry = priorEntry.clone();
+            newEntry.jobState = jobState;
+            newEntry.lastActivity = operationTime;
+            newEntry.revision = priorEntry.revision + 1;
+
+            return newEntry;
+        });
+
+        if (cacheEntry.ticket != ticket)
+            throw new EUnexpected();  // todo: error handling?
+    }
+
+    @Override
+    public void deleteJob(String jobKey, Ticket ticket) {
+
+        var operationTime = Instant.now();
+
+        var cacheEntry = cache.computeIfPresent(jobKey, (key, priorEntry) -> {
+
+            if (priorEntry.ticket != ticket)
+                return priorEntry;
+
+            if (priorEntry.jobState == null)
+                throw new EUnexpected();
+
+            var newEntry = priorEntry.clone();
+            newEntry.jobState = null;
+            newEntry.lastActivity = operationTime;
+            newEntry.revision = priorEntry.revision + 1;
+
+            return newEntry;
+        });
+
+        if (cacheEntry != null && cacheEntry.ticket != ticket)
+            throw new EUnexpected();  // todo: error handling?
+    }
+
+    @Override
+    public List<JobState> pollJobs(Function<JobState, Boolean> filter) {
+
+        var pollWindow = Duration.of(2, ChronoUnit.SECONDS);
+
+        var operationTime = Instant.now();
+        var pollResult = new ArrayList<JobState>();
+
+        cache.forEach((key, entry) -> {
+
+            if (entry.ticket != null && operationTime.isBefore(entry.ticket.expiry()))
+                return;
+
+            if (entry.jobState == null || entry.lastActivity == null)
+                return;
+
+            if (entry.lastPoll != null && entry.lastPoll.isAfter(entry.lastActivity)) {
+
+                var pollExpiry = entry.lastPoll.plus(pollWindow);
+
+                if (operationTime.isBefore(pollExpiry))
+                    return;
+            }
+
+            if (filter.apply(entry.jobState))
+                pollResult.add(entry.jobState);
+        });
+
+        return pollResult;
     }
 }

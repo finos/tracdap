@@ -370,7 +370,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
 
     @Override
-    public void pollBatch(ExecutorState jobState) {
+    public ExecutorPollResult pollBatch(ExecutorState jobState) {
 
         try {
 
@@ -382,9 +382,15 @@ public class LocalBatchExecutor implements IBatchExecutor {
             if (process == null)
                 throw new EUnexpected();  // TODO
 
-            if (process.isAlive())
-                return;  // tODO: running
+            var pollResult = new ExecutorPollResult();
+            pollResult.jobKey = jobState.getJobKey();
+            pollResult.statusCode = process.isAlive()
+                ? JobStatusCode.RUNNING :
+                process.exitValue() == 0
+                    ? JobStatusCode.SUCCEEDED
+                    : JobStatusCode.FAILED;
 
+            return pollResult;
         }
         catch (RuntimeException e) {
             e.printStackTrace();

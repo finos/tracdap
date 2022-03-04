@@ -14,32 +14,29 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.cache;
+package com.accenture.trac.svc.orch.cache.local;
 
+import com.accenture.trac.svc.orch.cache.JobState;
+import com.accenture.trac.svc.orch.cache.Ticket;
 
-public class TicketContext implements AutoCloseable {
+import java.time.Instant;
 
-    private final IJobCache cache;
-    private final Ticket[] tickets;
+class LocalJobCacheEntry implements Cloneable {
 
-    TicketContext(IJobCache cache, Ticket... tickets) {
-        this.cache = cache;
-        this.tickets = tickets;
-    }
-
-    public Ticket ticket() {
-        return this.tickets[0];
-    }
-
-    public boolean superseded() {
-
-        return false;
-    }
+    int revision;
+    Instant lastActivity;
+    Instant lastPoll;
+    Ticket ticket;
+    JobState jobState;
 
     @Override
-    public void close() {
+    public LocalJobCacheEntry clone() {
 
-        for (var ticket : tickets)
-            cache.closeTicket(ticket);
+        try {
+            return (LocalJobCacheEntry) super.clone();
+        }
+        catch (CloneNotSupportedException e) {
+            throw new AssertionError();
+        }
     }
 }

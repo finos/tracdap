@@ -330,7 +330,9 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
     }
 
     @Override
-    public void pollBatch(ExecutorState jobState) {
+    public ExecutorPollResult pollBatch(ExecutorState jobState) {
+
+        return null;
     }
 
 

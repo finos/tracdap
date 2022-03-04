@@ -41,7 +41,7 @@ public interface IBatchExecutor {
 
     ExecutorState cancelBatch(ExecutorState jobState);
 
-    void pollBatch(ExecutorState jobState);
+    ExecutorPollResult pollBatch(ExecutorState jobState);
 
     List<ExecutorPollResult> pollAllBatches(Map<String, ExecutorState> priorStates);
 }

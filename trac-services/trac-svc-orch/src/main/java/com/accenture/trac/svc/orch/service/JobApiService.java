@@ -23,6 +23,7 @@ import com.accenture.trac.common.metadata.MetadataUtil;
 
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
+import com.accenture.trac.svc.orch.cache.TicketRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,12 +127,20 @@ public class JobApiService {
 
         var jobKey = MetadataUtil.objectKey(jobState.jobId);
 
-        jobState.jobKey = jobKey;
-        jobState.statusCode = JobStatusCode.QUEUED;
+        try (var ctx = jobCache.useTicket(TicketRequest.forJob(jobKey))) {
 
-        jobCache.createJob(jobKey, jobState);
+            // Should not happen for a new job ID
+            // However if it does, we definitely want to report an error!
+            if (ctx.superseded())
+                throw new EUnexpected();
 
-        return CompletableFuture.completedFuture(jobState);
+            jobState.jobKey = jobKey;
+            jobState.statusCode = JobStatusCode.QUEUED;
+
+            jobCache.createJob(jobKey, jobState, ctx.ticket());
+
+            return CompletableFuture.completedFuture(jobState);
+        }
     }
 
     private JobStatus reportStatus(JobState jobState) {

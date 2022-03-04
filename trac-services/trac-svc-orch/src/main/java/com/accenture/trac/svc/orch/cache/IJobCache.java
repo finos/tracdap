@@ -22,7 +22,18 @@ import java.util.function.Function;
 
 public interface IJobCache {
 
-    void createJob(String jobKey, JobState state);
+    default TicketContext useTicket(TicketRequest... request) {
+
+        var tickets = Arrays.stream(request).map(this::openTicket).toArray(Ticket[]::new);
+
+        return new TicketContext(this, tickets);
+    }
+
+    Ticket openTicket(TicketRequest request);
+
+    void closeTicket(Ticket ticket);
+
+    void createJob(String jobKey, JobState state, Ticket ticket);
 
     JobState readJob(String jobKey);
 
@@ -32,14 +43,5 @@ public interface IJobCache {
 
     List<JobState> pollJobs(Function<JobState, Boolean> filter);
 
-    Ticket openTicket(TicketRequest request);
 
-    void closeTicket(Ticket ticket);
-
-    default TicketContext useTicket(TicketRequest... request) {
-
-        var tickets = Arrays.stream(request).map(this::openTicket).toArray(Ticket[]::new);
-
-        return new TicketContext(this, tickets);
-    }
 }

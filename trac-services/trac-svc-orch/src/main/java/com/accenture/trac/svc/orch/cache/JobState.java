@@ -32,7 +32,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 
-public class JobState implements Serializable {
+public class JobState implements Serializable, Cloneable {
 
     public String tenant;
 
@@ -55,7 +55,7 @@ public class JobState implements Serializable {
 
     public byte[] executorState;
 
-    public boolean recorded = false;
+
 
     public static <T extends Serializable> byte[] serialize(T obj){
 
@@ -87,6 +87,22 @@ public class JobState implements Serializable {
         }
         catch (IOException | ClassNotFoundException e) {
             throw new EUnexpected();  // TODO
+        }
+    }
+
+    @Override
+    public JobState clone() {
+        try {
+            JobState clone = (JobState) super.clone();
+
+            clone.resources = new HashMap<>(this.resources);
+            clone.resourceMapping = new HashMap<>(this.resourceMapping);
+            clone.resultMapping = new HashMap<>(this.resultMapping);
+
+            return clone;
+        }
+        catch (CloneNotSupportedException e) {
+            throw new AssertionError();
         }
     }
 }
