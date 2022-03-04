@@ -277,8 +277,7 @@ class StaticDataSpecFunc(NodeFunction[_data.DataItemSpec]):
 
 class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
 
-    DATA_ITEM_TEMPLATE = "data/{}/{}/{}/snap-{}/delta-{}-{}"
-    DATA_ITEM_SUFFIX_TEMPLATE = "x%06x"
+    DATA_ITEM_TEMPLATE = "data/{}/{}/{}/snap-{:d}/delta-{:d}-x{:0>6x}"
 
     RANDOM = random.Random()
     RANDOM.seed()
@@ -303,14 +302,13 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
         snap_index = 0
         delta_index = 0
 
-        suffix_bytes = random.randint(0, 1 << 24)
-        suffix = self.DATA_ITEM_SUFFIX_TEMPLATE.format(suffix_bytes)
-
         data_type = data_view.schema.schemaType.name.lower()
+        suffix_bytes = random.randint(0, 1 << 24)
+
         data_item = self.DATA_ITEM_TEMPLATE.format(
             data_type, data_id.objectId,
             part_key.opaqueKey, snap_index, delta_index,
-            suffix)
+            suffix_bytes)
 
         delta = meta.DataDefinition.Delta(delta_index, data_item)
         snap = meta.DataDefinition.Snap(snap_index, [delta])
