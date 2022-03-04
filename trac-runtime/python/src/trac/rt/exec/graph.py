@@ -324,6 +324,7 @@ class ImportModelResultNode(Node[ObjectMap]):
 @dc.dataclass(frozen=True)
 class RunModelNode(Node):
 
+    model_scope: str
     model_def: meta.ModelDefinition
     parameter_ids: tp.FrozenSet[NodeId]
     input_ids: tp.FrozenSet[NodeId]

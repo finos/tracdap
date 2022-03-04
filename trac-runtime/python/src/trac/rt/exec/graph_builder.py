@@ -344,9 +344,14 @@ class GraphBuilder:
         # Always add the prior graph root ID as a dependency
         # This is to ensure dependencies are still pulled in for models with no inputs!
 
+        model_scope = _util.object_key(job_config.jobId)
         model_name = model_def.entryPoint.split(".")[-1]  # TODO: Check unique model name
         model_id = node_id_for(model_name)
-        model_node = RunModelNode(model_id, model_def, parameter_ids, input_ids, explicit_deps=[graph.root_id])
+
+        model_node = RunModelNode(
+            model_id, model_scope, model_def,
+            parameter_ids, input_ids,
+            explicit_deps=[graph.root_id])
 
         # Create nodes for each model output
         # The model node itself outputs a bundle (dictionary of named outputs)

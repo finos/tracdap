@@ -171,7 +171,7 @@ class SaveJobResultFunc(NodeFunction[None]):
                 if isinstance(o, uuid.UUID):
                     return str(o)
                 elif type(o).__module__.startswith("trac."):
-                    return {**o.__dict__}
+                    return {**o.__dict__}  # noqa
                 else:
                     return super().default(o)
 
@@ -368,15 +368,15 @@ class _LoadSaveDataFunc(abc.ABC):
         if incarnation is None:
             raise _ex.EValidationGap()
 
-        copy = next(filter(
+        copy_ = next(filter(
             lambda c: c.copyStatus == meta.CopyStatus.COPY_AVAILABLE
             and self.storage.has_data_storage(c.storageKey),
             incarnation.copies), None)
 
-        if copy is None:
+        if copy_ is None:
             raise _ex.EValidationGap()
 
-        return copy
+        return copy_
 
 
 class LoadDataFunc(NodeFunction[_data.DataItem], _LoadSaveDataFunc):
@@ -481,10 +481,9 @@ class ImportModelResultFunc(NodeFunction[ObjectMap]):
 
 class RunModelFunc(NodeFunction):
 
-    def __init__(self, node: RunModelNode, job_config: _config.JobConfig, model_class: _api.TracModel.__class__):
+    def __init__(self, node: RunModelNode, model_class: _api.TracModel.__class__):
         super().__init__()
         self.node = node
-        self.job_config = job_config
         self.model_class = model_class
 
     def __call__(self, ctx: NodeContext) -> NodeResult:
@@ -526,13 +525,13 @@ class RunModelFunc(NodeFunction):
 
 class FunctionResolver:
 
-    __ResolveFunc = tp.Callable[['FunctionResolver', _config.JobConfig, Node[_T]], NodeFunction[_T]]
+    __ResolveFunc = tp.Callable[['FunctionResolver', Node[_T]], NodeFunction[_T]]
 
     def __init__(self, models: _models.ModelLoader, storage: _storage.StorageManager):
         self._models = models
         self._storage = storage
 
-    def resolve_node(self, job_config, node: Node[_T]) -> NodeFunction[_T]:
+    def resolve_node(self, node: Node[_T]) -> NodeFunction[_T]:
 
         basic_node_class = self.__basic_node_mapping.get(node.__class__)
 
@@ -544,28 +543,27 @@ class FunctionResolver:
         if resolve_func is None:
             raise _ex.EUnexpected()
 
-        return resolve_func(self, job_config, node)
+        return resolve_func(self, node)
 
-    def resolve_load_data(self, job_config: _config.JobConfig, node: LoadDataNode):
+    def resolve_load_data(self, node: LoadDataNode):
         return LoadDataFunc(node, self._storage)
 
-    def resolve_save_data(self, job_config: _config.JobConfig, node: SaveDataNode):
+    def resolve_save_data(self, node: SaveDataNode):
         return SaveDataFunc(node, self._storage)
 
-    def resolve_dynamic_data_spec(self, job_config: _config.JobConfig, node: DynamicDataSpecNode):
+    def resolve_dynamic_data_spec(self, node: DynamicDataSpecNode):
         return DynamicDataSpecFunc(node, self._storage)
 
-    def resolve_import_model_node(self, job_config: _config.JobConfig, node: ImportModelNode):
+    def resolve_import_model_node(self, node: ImportModelNode):
         return ImportModelFunc(node, self._models)
 
-    def resolve_run_model_node(self, job_config: _config.JobConfig, node: RunModelNode) -> NodeFunction:
+    def resolve_run_model_node(self, node: RunModelNode) -> NodeFunction:
 
-        model_scope = _util.object_key(job_config.jobId)
-        model_class = self._models.load_model_class(model_scope, node.model_def)
+        model_class = self._models.load_model_class(node.model_scope, node.model_def)
 
         # TODO: Verify model_class against model_def
 
-        return RunModelFunc(node, job_config, model_class)
+        return RunModelFunc(node, model_class)
 
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
         ContextPushNode: ContextPushFunc,
@@ -589,7 +587,7 @@ class FunctionResolver:
         RunModelNode: resolve_run_model_node,
         ImportModelNode: resolve_import_model_node,
 
-        SaveJobResultNode: lambda s, j, n: NoopFunc(),
-        BuildJobResultNode: lambda s, j, n: NoopFunc(),
-        JobNode: lambda s, j, n: NoopFunc()
+        SaveJobResultNode: lambda s, n: NoopFunc(),
+        BuildJobResultNode: lambda s, n: NoopFunc(),
+        JobNode: lambda s, n: NoopFunc()
     }
