@@ -17,7 +17,6 @@
 package com.accenture.trac.svc.orch.jobs;
 
 
-import com.accenture.trac.api.JobRequest;
 import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.JobResult;
@@ -33,13 +32,13 @@ public interface IJobLogic {
 
     List<TagSelector> requiredMetadata(Map<String, ObjectDefinition> newResources);
 
-    Map<String, MetadataWriteRequest> createResultIds(
-            String tenant, JobDefinition job,
+    Map<String, TagHeader> priorResultIds(
+            JobDefinition job,
             Map<String, ObjectDefinition> resources,
             Map<String, TagHeader> resourceMapping);
 
-    Map<String, TagHeader> updateResultIds(
-            JobDefinition job, Instant jobTimestamp,
+    Map<String, MetadataWriteRequest> newResultIds(
+            String tenant, JobDefinition job,
             Map<String, ObjectDefinition> resources,
             Map<String, TagHeader> resourceMapping);
 

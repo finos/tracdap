@@ -260,13 +260,10 @@ class DataResultFunc(NodeFunction[ObjectMap]):
         # TODO: Check result of save operation
         # save_result = _ctx_lookup(self.node.data_save_id, ctx)
 
-        data_result_key = f"{self.node.output_name}:DATA"
-        storage_result_key = f"{self.node.output_name}:STORAGE"
-
         data_result = meta.ObjectDefinition(objectType=meta.ObjectType.DATA, data=data_spec.data_def)
         storage_result = meta.ObjectDefinition(objectType=meta.ObjectType.STORAGE, storage=data_spec.storage_def)
 
-        return {data_result_key: data_result, storage_result_key: storage_result}
+        return {self.node.data_key: data_result, self.node.storage_key: storage_result}
 
 
 class StaticDataSpecFunc(NodeFunction[_data.DataItemSpec]):

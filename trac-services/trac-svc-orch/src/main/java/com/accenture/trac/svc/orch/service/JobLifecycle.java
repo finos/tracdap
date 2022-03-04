@@ -164,33 +164,41 @@ public class JobLifecycle {
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
 
-        var existingResultIds = jobLogic.updateResultIds(
-                jobState.definition, jobTimestamp,
+        var priorResultIds = jobLogic.priorResultIds(
+                jobState.definition,
                 jobState.resources, jobState.resourceMapping);
 
-        jobState.resultMapping.putAll(existingResultIds);
-
-        var newResultIds = jobLogic.createResultIds(
+        var newResultIds = jobLogic.newResultIds(
                 jobState.tenant, jobState.definition,
                 jobState.resources, jobState.resourceMapping);
+
+        for (var priorId : priorResultIds.entrySet()) {
+
+            var resultId = MetadataUtil.nextObjectVersion(priorId.getValue(), jobTimestamp);
+            jobState.resultMapping.put(priorId.getKey(), resultId);
+        }
 
         CompletionStage<JobState> state_ = CompletableFuture.completedFuture(jobState);
 
         for (var idRequest : newResultIds.entrySet()) {
 
-            state_ = state_.thenCompose(s -> allocateResultId(s, idRequest.getKey(), idRequest.getValue()));
+            state_ = state_.thenCompose(s -> allocateResultId(s, jobTimestamp, idRequest.getKey(), idRequest.getValue()));
         }
 
         return state_.thenApply(this::setResultIds);
     }
 
-    CompletionStage<JobState> allocateResultId(JobState jobState, String resultKey, MetadataWriteRequest idRequest) {
+    CompletionStage<JobState> allocateResultId(
+            JobState jobState, Instant jobTimestamp,
+            String resultKey, MetadataWriteRequest idRequest) {
 
-        var idResult = grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, idRequest, metaClient::preallocateId);
+        var preallocateResult = grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, idRequest, metaClient::preallocateId);
 
-        return idResult.thenApply(newId -> {
+        return preallocateResult.thenApply(preallocatedId -> {
 
-            jobState.resultMapping.put(resultKey, newId);
+            var resultId = MetadataUtil.nextObjectVersion(preallocatedId, jobTimestamp);
+            jobState.resultMapping.put(resultKey, resultId);
+
             return jobState;
         });
     }

@@ -341,7 +341,7 @@ class DevModeTranslator:
             opaqueKey="part-root",
             partType=meta.PartType.PART_ROOT)
 
-        data_item = f"DATA:{data_id.objectId}:{part_key.opaqueKey}:{snap_index}:{delta_index}"
+        data_item = f"data/table/{data_id.objectId}/{part_key.opaqueKey}/snap-{snap_index}/delta-{delta_index}-x000000"
 
         delta = meta.DataDefinition.Delta(
             deltaIndex=delta_index,

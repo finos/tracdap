@@ -254,17 +254,23 @@ class GraphBuilder:
 
                 data_spec_node = StaticDataSpecNode(data_spec_id, data_spec, explicit_deps=[data_view_id])
 
+                output_data_key = output_name + ":DATA"
+                output_storage_key = output_name + ":STORAGE"
+
             else:
 
-                output_data_key = output_name + ":DATA"
-                output_data_id = job_config.resultMapping[output_data_key]
-                output_storage_key = output_name + ":STORAGE"
-                output_storage_id = job_config.resultMapping[output_storage_key]
+                data_key = output_name + ":DATA"
+                data_id = job_config.resultMapping[data_key]
+                storage_key = output_name + ":STORAGE"
+                storage_id = job_config.resultMapping[storage_key]
 
                 data_spec_node = DynamicDataSpecNode(
                         data_spec_id, data_view_id,
-                        output_data_id, output_storage_id,
+                        data_id, storage_id,
                         prior_data_spec=None)
+
+                output_data_key = _util.object_key(data_id)
+                output_storage_key = _util.object_key(storage_id)
 
             # Map one data item from each view, since outputs are single part/delta
             data_item_id = NodeId(f"{output_name}:ITEM", namespace)
@@ -275,7 +281,9 @@ class GraphBuilder:
             data_save_node = SaveDataNode(data_save_id, data_spec_id, data_item_id)
 
             data_result_id = NodeId.of(f"{output_name}:RESULT", namespace, ObjectMap)
-            data_result_node = DataResultNode(data_result_id, output_name, data_spec_id, data_save_id)
+            data_result_node = DataResultNode(
+                data_result_id, output_name, data_spec_id, data_save_id,
+                output_data_key, output_storage_key)
 
             nodes[data_spec_id] = data_spec_node
             nodes[data_item_id] = data_item_node

@@ -256,6 +256,9 @@ class DataResultNode(Node[ObjectMap]):
     data_spec_id: NodeId[_data.DataItemSpec]
     data_save_id: NodeId[type(None)]
 
+    data_key: str
+    storage_key: str
+
     def __post_init__(self):
         dependencies = {self.data_spec_id: DependencyType.HARD, self.data_save_id: DependencyType.HARD}
         object.__setattr__(self, 'dependencies', dependencies)

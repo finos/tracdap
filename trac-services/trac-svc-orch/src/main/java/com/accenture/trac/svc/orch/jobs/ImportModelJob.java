@@ -50,7 +50,7 @@ public class ImportModelJob implements IJobLogic {
     }
 
     @Override
-    public Map<String, MetadataWriteRequest> createResultIds(
+    public Map<String, MetadataWriteRequest> newResultIds(
             String tenant, JobDefinition job,
             Map<String, ObjectDefinition> resources,
             Map<String, TagHeader> resourceMapping) {
@@ -59,8 +59,8 @@ public class ImportModelJob implements IJobLogic {
     }
 
     @Override
-    public Map<String, TagHeader> updateResultIds(
-            JobDefinition job, Instant jobTimestamp,
+    public Map<String, TagHeader> priorResultIds(
+            JobDefinition job,
             Map<String, ObjectDefinition> resources,
             Map<String, TagHeader> resourceMapping) {
 

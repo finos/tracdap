@@ -26,7 +26,6 @@ import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataConstants;
 import com.accenture.trac.common.metadata.MetadataUtil;
 
-import java.time.Instant;
 import java.util.*;
 
 
@@ -68,7 +67,7 @@ public class RunModelJob implements IJobLogic {
     }
 
     @Override
-    public Map<String, MetadataWriteRequest> createResultIds(
+    public Map<String, MetadataWriteRequest> newResultIds(
             String tenant, JobDefinition job,
             Map<String, ObjectDefinition> resources,
             Map<String, TagHeader> resourceMapping) {
@@ -106,8 +105,8 @@ public class RunModelJob implements IJobLogic {
     }
 
     @Override
-    public Map<String, TagHeader> updateResultIds(
-            JobDefinition job, Instant jobTimestamp,
+    public Map<String, TagHeader> priorResultIds(
+            JobDefinition job,
             Map<String, ObjectDefinition> resources,
             Map<String, TagHeader> resourceMapping) {
 
@@ -134,11 +133,9 @@ public class RunModelJob implements IJobLogic {
 
             var dataKey = String.format("%s:%s", output.getKey(), ObjectType.DATA);
             var storageKey = String.format("%s:%s", output.getKey(), ObjectType.STORAGE);
-            var dataId = MetadataUtil.nextObjectVersion(priorDataId, jobTimestamp);
-            var storageId = MetadataUtil.nextObjectVersion(priorStorageId, jobTimestamp);
 
-            resultMapping.put(dataKey, dataId);
-            resultMapping.put(storageKey, storageId);
+            resultMapping.put(dataKey, priorDataId);
+            resultMapping.put(storageKey, priorStorageId);
         }
 
         return resultMapping;
