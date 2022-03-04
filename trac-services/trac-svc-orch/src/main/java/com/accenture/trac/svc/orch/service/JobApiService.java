@@ -23,7 +23,6 @@ import com.accenture.trac.common.metadata.MetadataUtil;
 
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
-import com.accenture.trac.svc.orch.cache.TicketRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,7 +126,7 @@ public class JobApiService {
 
         var jobKey = MetadataUtil.objectKey(jobState.jobId);
 
-        try (var ctx = jobCache.useTicket(TicketRequest.forJob(jobKey))) {
+        try (var ctx = jobCache.useTicket(jobKey)) {
 
             // Should not happen for a new job ID
             // However if it does, we definitely want to report an error!

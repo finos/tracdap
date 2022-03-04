@@ -16,20 +16,18 @@
 
 package com.accenture.trac.svc.orch.cache;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 
+
 public interface IJobCache {
 
-    default TicketContext useTicket(TicketRequest... request) {
-
-        var tickets = Arrays.stream(request).map(this::openTicket).toArray(Ticket[]::new);
-
-        return new TicketContext(this, tickets);
+    default TicketContext useTicket(String jobKey) {
+        var ticket = openTicket(jobKey);
+        return new TicketContext(this, ticket);
     }
 
-    Ticket openTicket(TicketRequest request);
+    Ticket openTicket(String jobKey);
 
     void closeTicket(Ticket ticket);
 
@@ -42,6 +40,4 @@ public interface IJobCache {
     void deleteJob(String jobKey, Ticket ticket);
 
     List<JobState> pollJobs(Function<JobState, Boolean> filter);
-
-
 }

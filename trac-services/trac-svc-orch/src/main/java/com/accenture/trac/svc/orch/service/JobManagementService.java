@@ -25,7 +25,6 @@ import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
-import com.accenture.trac.svc.orch.cache.TicketRequest;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
@@ -150,7 +149,7 @@ public class JobManagementService {
 
                 log.info("Got state update for job: {}", result.jobKey);
 
-                try (var ctx = jobCache.useTicket(TicketRequest.forJob(result.jobKey))) {
+                try (var ctx = jobCache.useTicket(result.jobKey)) {
 
                     if (ctx.superseded())
                         continue;
@@ -171,7 +170,7 @@ public class JobManagementService {
 
     public void submitJob(String jobKey) {
 
-        try (var ctx = jobCache.useTicket(TicketRequest.forJob(jobKey))) {
+        try (var ctx = jobCache.useTicket(jobKey)) {
 
             if (ctx.superseded())
                 return;
@@ -229,7 +228,7 @@ public class JobManagementService {
 
         log.info("Trying to record job result.... [{}]", jobKey);
 
-        try (var ctx = jobCache.useTicket(TicketRequest.forJob(jobKey))) {
+        try (var ctx = jobCache.useTicket(jobKey)) {
 
             if (ctx.superseded())
                 return;
@@ -278,7 +277,7 @@ public class JobManagementService {
 
     private void deleteJob(String jobKey) {
 
-        try (var ctx = jobCache.useTicket(TicketRequest.forJob(jobKey))) {
+        try (var ctx = jobCache.useTicket(jobKey)) {
 
             if (ctx.superseded())
                 return;

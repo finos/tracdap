@@ -20,7 +20,6 @@ import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.cache.Ticket;
-import com.accenture.trac.svc.orch.cache.TicketRequest;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -42,13 +41,13 @@ public class LocalJobCache implements IJobCache {
     }
 
     @Override
-    public Ticket openTicket(TicketRequest request) {
+    public Ticket openTicket(String jobKey) {
 
         var operationTime = Instant.now();
         var duration = Duration.of(1, ChronoUnit.MINUTES);
-        var ticket = Ticket.forDuration(request.jobKey(), operationTime, duration);
+        var ticket = Ticket.forDuration(jobKey, operationTime, duration);
 
-        var cacheEntry = cache.compute(request.jobKey(), (key, priorEntry) -> {
+        var cacheEntry = cache.compute(jobKey, (key, priorEntry) -> {
 
             var priorTicket = priorEntry != null ? priorEntry.ticket : null;
 
@@ -62,13 +61,16 @@ public class LocalJobCache implements IJobCache {
         });
 
         if (cacheEntry.ticket != ticket)
-            return Ticket.superseded(request.jobKey(), operationTime);
+            return Ticket.superseded(jobKey, operationTime);
 
         return ticket;
     }
 
     @Override
     public void closeTicket(Ticket ticket) {
+
+        if (ticket.superseded())
+            return;
 
         cache.computeIfPresent(ticket.key(), (key, priorEntry) -> {
 
