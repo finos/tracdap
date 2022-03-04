@@ -17,6 +17,7 @@
 package com.accenture.trac.svc.orch.service;
 
 import com.accenture.trac.api.*;
+import com.accenture.trac.metadata.JobStatusCode;
 import com.accenture.trac.common.exception.EMetadataNotFound;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataUtil;
@@ -96,11 +97,7 @@ public class JobApiService {
             throw new EMetadataNotFound(message);
         }
 
-        var jobStatus = JobStatus.newBuilder()
-                .setJobId(jobState.jobId)
-                .setStatus(jobState.statusCode)
-                .setMessage(jobState.statusCode.toString())
-                .build();
+        var jobStatus = reportStatus(jobState);
 
         return CompletableFuture.completedFuture(jobStatus);
     }
@@ -149,7 +146,10 @@ public class JobApiService {
         if (jobState.jobId != null)
             status.setJobId(jobState.jobId);
 
-        status.setStatus(jobState.statusCode);
+        status.setStatusCode(jobState.statusCode);
+
+        if (jobState.statusMessage != null)
+            status.setStatusMessage(jobState.statusMessage);
 
         return status.build();
     }

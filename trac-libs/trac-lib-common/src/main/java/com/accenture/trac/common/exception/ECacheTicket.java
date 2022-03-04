@@ -16,16 +16,17 @@
 
 package com.accenture.trac.common.exception;
 
-/**
- * The executor failed to respond, or the response was gabled
- */
-public class EExecutorCommunication extends EExecutor {
 
-    public EExecutorCommunication(String message, Throwable cause) {
+/**
+ * The cache ticket is invalid or expired
+ */
+public class ECacheTicket extends ECache {
+
+    public ECacheTicket(String message, Throwable cause) {
         super(message, cause);
     }
 
-    public EExecutorCommunication(String message) {
+    public ECacheTicket(String message) {
         super(message);
     }
 }

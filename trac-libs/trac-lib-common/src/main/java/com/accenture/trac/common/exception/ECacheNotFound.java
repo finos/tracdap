@@ -14,23 +14,19 @@
  * limitations under the License.
  */
 
-syntax = 'proto3';
-package trac.config;
-
-option java_package = "com.accenture.trac.config";
-option java_multiple_files = true;
-
-import "trac/metadata/object_id.proto";
-import "trac/metadata/object.proto";;
-import "trac/metadata/job.proto";
+package com.accenture.trac.common.exception;
 
 
-message JobResult {
+/**
+ * Job not found in the orchestrator job cache
+ */
+public class ECacheNotFound extends ECache {
 
-  metadata.TagHeader jobId = 1;
+    public ECacheNotFound(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-  metadata.JobStatusCode statusCode = 2;
-  string statusMessage = 3;
-
-  map<string, metadata.ObjectDefinition> results = 4;
+    public ECacheNotFound(String message) {
+        super(message);
+    }
 }

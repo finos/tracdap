@@ -16,17 +16,18 @@
 
 package com.accenture.trac.svc.orch.service;
 
-import com.accenture.trac.common.exception.ETracInternal;
+import com.accenture.trac.common.config.ConfigFormat;
+import com.accenture.trac.common.exception.*;
 import com.accenture.trac.common.exec.*;
 import com.accenture.trac.config.*;
-import com.accenture.trac.api.JobStatusCode;
+import com.accenture.trac.metadata.JobStatusCode;
 
-import com.accenture.trac.common.exception.EStartup;
-import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
 
+import com.accenture.trac.svc.orch.cache.Ticket;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,10 +36,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 
 public class JobManagementService {
@@ -109,14 +107,19 @@ public class JobManagementService {
 
             var finishedStates = List.of(JobStatusCode.FINISHING, JobStatusCode.CANCELLED);
             var finishedJobs = jobCache.pollJobs(job -> finishedStates.contains(job.statusCode));
-
-            for (var job : finishedJobs)
-                executorService.schedule(() -> recordJobResult(job.jobKey), 0L, TimeUnit.SECONDS);
-
             var queuedJobs = jobCache.pollJobs(job -> job.statusCode == JobStatusCode.QUEUED);
 
+            for (var job : finishedJobs)
+
+                executorService.schedule(
+                        () -> jobOperation(job.jobKey, this::recordJobResult),
+                        0L, TimeUnit.SECONDS);
+
             for (var job : queuedJobs)
-                executorService.schedule(() -> submitJob(job.jobKey), 0L, TimeUnit.SECONDS);
+
+                executorService.schedule(
+                        () -> jobOperation(job.jobKey, this::submitJob),
+                        0L, TimeUnit.SECONDS);
         }
         catch (Exception e) {
 
@@ -149,17 +152,13 @@ public class JobManagementService {
 
                 log.info("Got state update for job: {}", result.jobKey);
 
-                try (var ctx = jobCache.useTicket(result.jobKey)) {
+                jobOperation(result.jobKey, (key, state, ticket) -> {
 
-                    if (ctx.superseded())
-                        continue;
+                    state.executorState = JobState.serialize(result.executorState);
+                    state.statusCode = JobStatusCode.FINISHING;
 
-                    var job = jobCache.readJob(result.jobKey);
-                    job.executorState = JobState.serialize(result.executorState);
-                    job.statusCode = JobStatusCode.FINISHING;
-
-                    jobCache.updateJob(job.jobKey, job, ctx.ticket());
-                }
+                    jobCache.updateJob(key, state, ticket);
+                });
             }
         }
         catch (Exception e) {
@@ -168,65 +167,75 @@ public class JobManagementService {
         }
     }
 
-    public void submitJob(String jobKey) {
+    private void submitJob(String jobKey, JobState jobState, Ticket ticket) {
 
-        try (var ctx = jobCache.useTicket(jobKey)) {
+        var execState = jobExecutor.createBatch(jobKey);
+        execState = jobExecutor.createVolume(execState, "config", ExecutorVolumeType.CONFIG_DIR);
+        execState = jobExecutor.createVolume(execState, "result", ExecutorVolumeType.RESULT_DIR);
+        execState = jobExecutor.createVolume(execState, "log", ExecutorVolumeType.RESULT_DIR);
+        execState = jobExecutor.createVolume(execState, "scratch", ExecutorVolumeType.SCRATCH_DIR);
 
-            if (ctx.superseded())
-                return;
+        // No specialisation is needed to build the job config
+        // This may change in the future, in which case add IJobLogic.buildJobConfig()
 
-            log.info("Submit job for execution: [{}]", jobKey);
+        var jobConfigJson = encodeProto(jobState.jobConfig, ConfigFormat.JSON);
+        var sysConfigJson = encodeProto(jobState.sysConfig, ConfigFormat.JSON);
+        execState = jobExecutor.writeFile(execState, "config", "job_config.json", jobConfigJson);
+        execState = jobExecutor.writeFile(execState, "config", "sys_config.json", sysConfigJson);
 
-            var jobState = jobCache.readJob(jobKey);
+        var launchCmd = LaunchCmd.trac();
 
-            var execState = jobExecutor.createBatch(jobKey);
-            execState = jobExecutor.createVolume(execState, "config", ExecutorVolumeType.CONFIG_DIR);
-            execState = jobExecutor.createVolume(execState, "result", ExecutorVolumeType.RESULT_DIR);
-            execState = jobExecutor.createVolume(execState, "log", ExecutorVolumeType.RESULT_DIR);
-            execState = jobExecutor.createVolume(execState, "scratch", ExecutorVolumeType.SCRATCH_DIR);
+        var launchArgs = List.of(
+                LaunchArg.string("--sys-config"), LaunchArg.path("config", "sys_config.json"),
+                LaunchArg.string("--job-config"), LaunchArg.path("config", "job_config.json"),
+                LaunchArg.string("--job-result-dir"), LaunchArg.path("result", "."),
+                LaunchArg.string("--job-result-format"), LaunchArg.string("json"));
 
-            // No specialisation is needed to build the job config
-            // This may change in the future, in which case add IJobLogic.buildJobConfig()
+        execState = jobExecutor.startBatch(execState, launchCmd, launchArgs);
 
-            // TODO: Config format and file names
-            var jobConfigJson = JsonFormat.printer().print(jobState.jobConfig).getBytes(StandardCharsets.UTF_8);
-            var sysConfigJson = JsonFormat.printer().print(jobState.sysConfig).getBytes(StandardCharsets.UTF_8);
-            execState = jobExecutor.writeFile(execState, "config", "job_config.json", jobConfigJson);
-            execState = jobExecutor.writeFile(execState, "config", "sys_config.json", sysConfigJson);
+        jobState.statusCode = JobStatusCode.SUBMITTED;
+        jobState.executorState = JobState.serialize(execState);
+        jobCache.updateJob(jobKey, jobState, ticket);
 
-            var launchCmd = LaunchCmd.trac();
-
-            var launchArgs = List.of(
-                    LaunchArg.string("--sys-config"), LaunchArg.path("config", "sys_config.json"),
-                    LaunchArg.string("--job-config"), LaunchArg.path("config", "job_config.json"),
-                    LaunchArg.string("--job-result-dir"), LaunchArg.path("result", "."),
-                    LaunchArg.string("--job-result-format"), LaunchArg.string("json"));
-
-            execState = jobExecutor.startBatch(execState, launchCmd, launchArgs);
-
-            jobState.statusCode = JobStatusCode.SUBMITTED;
-            jobState.executorState = JobState.serialize(execState);
-            jobCache.updateJob(jobKey, jobState, ctx.ticket());
-
-            log.info("Job submitted: [{}]", jobKey);
-        }
-        catch (InvalidProtocolBufferException e) {
-
-            log.error("Submit job to executor failed: [{}] {}", jobKey, e.getMessage(), e);
-
-            // TODO: Error
-            throw new EUnexpected(e);
-        }
-        catch (Exception e) {
-
-            log.error("Submit job to executor failed: [{}] {}", jobKey, e.getMessage(), e);
-            throw e;
-        }
+        log.info("Job submitted: [{}]", jobKey);
     }
 
-    public void recordJobResult(String jobKey) {
+    public void recordJobResult(String jobKey, JobState jobState, Ticket ticket)  {
 
-        log.info("Trying to record job result.... [{}]", jobKey);
+        log.info("Record job result: [{}]", jobKey);
+
+        var execState = JobState.deserialize(jobState.executorState, ExecutorState.class);
+        var execResult = jobExecutor.pollBatch(execState);
+
+        jobState.statusCode = execResult.statusCode;
+
+        if (execResult.statusCode == JobStatusCode.SUCCEEDED) {
+
+            var jobResultFile = String.format("job_result_%s.json", jobKey);
+            var jobResultBytes = jobExecutor.readFile(execState, "result", jobResultFile);
+
+            jobState.jobResult = decodeProto(jobResultBytes, ConfigFormat.JSON, JobResult.class, JobResult.newBuilder());
+
+            jobLifecycle.processJobResult(jobState).toCompletableFuture().join();  // TODO: Sync / async
+        }
+        else {
+
+            jobState.jobResult = JobResult.newBuilder()
+                    .setJobId(jobState.jobId)
+                    .setStatusCode(JobStatusCode.FAILED)
+                    .setStatusMessage(execResult.statusMessage)
+                    .build();
+        }
+
+        jobCache.updateJob(jobKey, jobState, ticket);
+        jobExecutor.destroyBatch(jobKey, execState);
+
+        executorService.schedule(
+                () -> jobOperation(jobKey, this::deleteJob),
+                RETAIN_COMPLETE_DELAY.getSeconds(), TimeUnit.SECONDS);
+    }
+
+    private void recordJobError(String jobKey) {
 
         try (var ctx = jobCache.useTicket(jobKey)) {
 
@@ -234,48 +243,24 @@ public class JobManagementService {
                 return;
 
             log.info("Record job result: [{}]", jobKey);
-
-            var jobState = jobCache.readJob(jobKey);
-            var execState = JobState.deserialize(jobState.executorState, ExecutorState.class);
-
-            var pollResult = jobExecutor.pollBatch(execState);
-            jobState.statusCode = pollResult.statusCode;
-
-            if (pollResult.statusCode == JobStatusCode.SUCCEEDED) {
-
-                // Retrieve job result from executor
-                var jobResultFile = String.format("job_result_%s.json", jobKey);
-                var jobResultBytes = jobExecutor.readFile(execState, "result", jobResultFile);
-                var jobResultString = new String(jobResultBytes, StandardCharsets.UTF_8);
-                var jobResultBuilder = JobResult.newBuilder();
-                JsonFormat.parser().merge(jobResultString, jobResultBuilder);
-                jobState.jobResult = jobResultBuilder.build();
-
-                jobLifecycle.processJobResult(jobState).toCompletableFuture().get();  // TODO: Sync / async
-            }
-            else {
-
-                // TODO: Record error info
-            }
-
-            jobCache.updateJob(jobKey, jobState, ctx.ticket());
-            jobExecutor.destroyBatch(jobKey, execState);
-
-            executorService.schedule(() -> deleteJob(jobKey), RETAIN_COMPLETE_DELAY.getSeconds(), TimeUnit.SECONDS);
-        }
-        catch (InvalidProtocolBufferException e) {
-
-            log.error("Garbled result from job execution: {}", e.getMessage(), e);
-            throw new ETracInternal("Garbled result from job execution", e);  // TODO: err
-        }
-        catch (Exception e) {
-
-            log.error("Record job result failed: [{}] {}", jobKey, e.getMessage(), e);
-            throw new ETracInternal("Record job result failed", e);
         }
     }
 
-    private void deleteJob(String jobKey) {
+    private void deleteJob(String jobKey, JobState jobState, Ticket ticket) {
+
+        log.info("Removing job from cache: [{}] (status = {})", jobKey, jobState.statusCode.name());
+
+        jobCache.deleteJob(jobKey, ticket);
+    }
+
+    @FunctionalInterface
+    private interface JobOperationFunc {
+
+        void apply(String jobKey, JobState jobState, Ticket ticket);
+    }
+
+
+    private void jobOperation(String jobKey, JobOperationFunc func) {
 
         try (var ctx = jobCache.useTicket(jobKey)) {
 
@@ -284,9 +269,101 @@ public class JobManagementService {
 
             var jobState = jobCache.readJob(jobKey);
 
-            log.info("Removing job from cache: [{}] (status = {})", jobKey, jobState.statusCode.name());
+            func.apply(jobKey, jobState, ctx.ticket());
+        }
+        catch (ECacheNotFound e) {
+            log.warn("Job [{}] is no longer in the cache", jobKey);
+        }
+        catch (ECache e) {
+            log.warn("Cache error while processing job: [{}] {}", jobKey, e.getMessage(), e);
+        }
+        catch (EExecutorUnavailable e) {
+            log.warn("Executor is not responding or unavailable: [{}] {}", jobKey, e.getMessage(), e);
+        }
+        catch (Exception e) {
 
-            jobCache.deleteJob(jobKey, ctx.ticket());
+            try (var ctx = jobCache.useTicket(jobKey)) {
+
+                if (ctx.superseded())
+                    return;
+
+                var jobState = jobCache.readJob(jobKey);
+
+                jobState.statusCode = JobStatusCode.FAILED;
+                jobState.statusMessage = e.getMessage();
+
+                jobCache.updateJob(jobKey, jobState, ctx.ticket());
+
+                executorService.schedule(
+                        () -> jobOperation(jobKey, this::deleteJob),
+                        RETAIN_COMPLETE_DELAY.getSeconds(), TimeUnit.SECONDS);
+            }
+        }
+    }
+
+
+    private <T extends Message> byte[] encodeProto(T message, ConfigFormat format) {
+
+        try {
+
+            switch (format) {
+
+                case JSON:
+
+                    return JsonFormat.printer().print(message).getBytes(StandardCharsets.UTF_8);
+
+                case PROTO:
+
+                    return message.toByteArray();
+
+                default:
+
+                    var message_ = String.format(
+                            "Failed sending job request to executor (request format [%s] is not supported)",
+                            format.name());
+
+                    throw new EExecutorFailure(message_);
+            }
+        }
+        catch (InvalidProtocolBufferException error) {
+
+            var message_ = "Failed sending job request to executor (request message is garbled)";
+            throw new EExecutorFailure(message_, error);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T extends Message> T decodeProto(
+            byte [] bytes, ConfigFormat format,
+            Class<T> clazz, Message.Builder builder) {
+
+        try {
+
+            switch (format) {
+
+                case JSON:
+                    var json = new String(bytes, StandardCharsets.UTF_8);
+                    JsonFormat.parser().merge(json, builder);
+                    return (T) builder.build();
+
+                case PROTO:
+
+                    builder.mergeFrom(bytes);
+                    return (T) builder.build();
+
+                default:
+
+                    var message = String.format(
+                            "Bad response from job executor (response format [%s] is not supported)",
+                            format.name());
+
+                    throw new EExecutorFailure(message);
+            }
+        }
+        catch (InvalidProtocolBufferException error) {
+
+            var message = "Bad response from job executor (response message is garbled)";
+            throw new EExecutorFailure(message, error);
         }
     }
 }

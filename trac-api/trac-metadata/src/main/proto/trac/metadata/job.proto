@@ -25,6 +25,30 @@ import "trac/metadata/object_id.proto";
 import "trac/metadata/tag_update.proto";
 
 
+enum JobType {
+  JOB_TYPE_NOT_SET = 0;
+  RUN_MODEL = 1;
+  RUN_FLOW = 2;
+  IMPORT_MODEL = 3;
+  IMPORT_DATA = 4;
+}
+
+enum JobStatusCode {
+
+  JOB_STATUS_CODE_NOT_SET = 0;
+  PREPARING = 1;
+  VALIDATED = 2;
+  PENDING = 3;
+  QUEUED = 4;
+  SUBMITTED = 5;
+  RUNNING = 6;
+  FINISHING = 7;
+  SUCCEEDED = 8;
+  FAILED = 9;
+  CANCELLED = 10;
+}
+
+
 message JobDefinition {
 
   JobType jobType = 1;
@@ -34,14 +58,6 @@ message JobDefinition {
     RunFlowJob runFlow = 3;
     ImportModelJob importModel = 4;
   }
-}
-
-enum JobType {
-  JOB_TYPE_NOT_SET = 0;
-  RUN_MODEL = 1;
-  RUN_FLOW = 2;
-  IMPORT_MODEL = 3;
-  IMPORT_DATA = 4;
 }
 
 message RunModelJob {

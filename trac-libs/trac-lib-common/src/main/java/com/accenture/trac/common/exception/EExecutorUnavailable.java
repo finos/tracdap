@@ -14,23 +14,18 @@
  * limitations under the License.
  */
 
-syntax = 'proto3';
-package trac.config;
+package com.accenture.trac.common.exception;
 
-option java_package = "com.accenture.trac.config";
-option java_multiple_files = true;
+/**
+ * The executor failed to respond, or is temporarily unavailable
+ */
+public class EExecutorUnavailable extends EExecutor {
 
-import "trac/metadata/object_id.proto";
-import "trac/metadata/object.proto";;
-import "trac/metadata/job.proto";
+    public EExecutorUnavailable(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-
-message JobResult {
-
-  metadata.TagHeader jobId = 1;
-
-  metadata.JobStatusCode statusCode = 2;
-  string statusMessage = 3;
-
-  map<string, metadata.ObjectDefinition> results = 4;
+    public EExecutorUnavailable(String message) {
+        super(message);
+    }
 }

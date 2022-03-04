@@ -16,6 +16,8 @@
 
 package com.accenture.trac.svc.orch.cache.local;
 
+import com.accenture.trac.common.exception.ECacheNotFound;
+import com.accenture.trac.common.exception.ECacheTicket;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
@@ -99,6 +101,7 @@ public class LocalJobCache implements IJobCache {
             if (priorEntry.ticket != ticket)
                 return priorEntry;
 
+            // Same job created twice, this is an unexpected logic error
             if (priorEntry.jobState != null)
                 throw new EUnexpected();
 
@@ -111,14 +114,18 @@ public class LocalJobCache implements IJobCache {
         });
 
         if (cacheEntry == null || cacheEntry.ticket != ticket)
-            throw new EUnexpected();  // todo: error handling?
-
+            throw new ECacheTicket("");  // TODO: Error
     }
 
     @Override
     public JobState readJob(String jobKey) {
 
-        return cache.get(jobKey).jobState.clone();
+        var cacheEntry = cache.get(jobKey);
+
+        if (cacheEntry == null || cacheEntry.jobState == null)
+            throw new ECacheNotFound("");  // TODO: Error
+
+        return cacheEntry.jobState.clone();
     }
 
     @Override
@@ -126,16 +133,13 @@ public class LocalJobCache implements IJobCache {
 
         var operationTime = Instant.now();
 
-        var cacheEntry = cache.compute(jobKey, (key, priorEntry) -> {
-
-            if (priorEntry == null)
-                throw new EUnexpected();
+        var cacheEntry = cache.computeIfPresent(jobKey, (key, priorEntry) -> {
 
             if (priorEntry.ticket != ticket)
                 return priorEntry;
 
             if (priorEntry.jobState == null)
-                throw new EUnexpected();
+                throw new ECacheNotFound("");  // TODO: error
 
             var newEntry = priorEntry.clone();
             newEntry.jobState = jobState;
@@ -145,8 +149,8 @@ public class LocalJobCache implements IJobCache {
             return newEntry;
         });
 
-        if (cacheEntry.ticket != ticket)
-            throw new EUnexpected();  // todo: error handling?
+        if (cacheEntry == null || cacheEntry.ticket != ticket)
+            throw new ECacheTicket("");  // TODO: Error
     }
 
     @Override
@@ -171,7 +175,7 @@ public class LocalJobCache implements IJobCache {
         });
 
         if (cacheEntry != null && cacheEntry.ticket != ticket)
-            throw new EUnexpected();  // todo: error handling?
+            throw new ECacheTicket("");  // TODO: Error
     }
 
     @Override

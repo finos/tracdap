@@ -59,28 +59,13 @@ service TracOrchestratorApi {
 }
 
 
-enum JobStatusCode {
-
-  JOB_STATUS_CODE_NOT_SET = 0;
-  PREPARING = 1;
-  VALIDATED = 2;
-  PENDING = 3;
-  QUEUED = 4;
-  SUBMITTED = 5;
-  RUNNING = 6;
-  FINISHING = 7;
-  SUCCEEDED = 8;
-  FAILED = 9;
-  CANCELLED = 10;
-}
-
 message JobRequest {
 
   string tenant = 1;
 
-  repeated metadata.TagUpdate jobAttrs = 2;
+  metadata.JobDefinition job = 2;
 
-  metadata.JobDefinition job = 3;
+  repeated metadata.TagUpdate jobAttrs = 3;
 }
 
 
@@ -96,6 +81,6 @@ message JobStatus {
 
   metadata.TagHeader jobId = 1;
 
-  JobStatusCode status = 2;
-  string message = 3;
+  metadata.JobStatusCode statusCode = 2;
+  string statusMessage = 3;
 }

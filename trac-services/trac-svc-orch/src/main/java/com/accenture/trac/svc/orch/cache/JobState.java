@@ -17,13 +17,13 @@
 package com.accenture.trac.svc.orch.cache;
 
 import com.accenture.trac.api.JobRequest;
-import com.accenture.trac.api.JobStatusCode;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.config.JobConfig;
 import com.accenture.trac.config.JobResult;
 import com.accenture.trac.config.RuntimeConfig;
 import com.accenture.trac.metadata.JobDefinition;
 import com.accenture.trac.metadata.JobType;
+import com.accenture.trac.metadata.JobStatusCode;
 import com.accenture.trac.metadata.ObjectDefinition;
 import com.accenture.trac.metadata.TagHeader;
 
@@ -36,11 +36,15 @@ public class JobState implements Serializable, Cloneable {
 
     public String tenant;
 
+    public JobRequest jobRequest;
     public String jobKey;
     public TagHeader jobId;
     public JobType jobType;
 
-    public JobRequest jobRequest;
+    public JobStatusCode statusCode;
+    public String statusMessage;
+
+    public Exception exception;
 
     public JobDefinition definition;
     public Map<String, ObjectDefinition> resources = new HashMap<>();
@@ -50,8 +54,6 @@ public class JobState implements Serializable, Cloneable {
     public RuntimeConfig sysConfig;
     public JobConfig jobConfig;
     public JobResult jobResult;
-
-    public JobStatusCode statusCode;
 
     public byte[] executorState;
 

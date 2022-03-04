@@ -20,17 +20,11 @@ package trac.config;
 option java_package = "com.accenture.trac.config";
 option java_multiple_files = true;
 
-import "trac/metadata/object_id.proto";
-import "trac/metadata/object.proto";;
-import "trac/metadata/job.proto";
 
+enum ConfigFormat {
 
-message JobResult {
-
-  metadata.TagHeader jobId = 1;
-
-  metadata.JobStatusCode statusCode = 2;
-  string statusMessage = 3;
-
-  map<string, metadata.ObjectDefinition> results = 4;
+  CONFIG_FORMAT_NOT_SET = 0;
+  YAML = 1;
+  JSON = 2;
+  PROTO = 3;
 }

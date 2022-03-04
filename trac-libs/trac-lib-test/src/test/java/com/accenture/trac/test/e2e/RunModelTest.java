@@ -133,20 +133,20 @@ public class RunModelTest extends PlatformTestBase {
 
         var jobStatus = orchClient.submitJob(jobRequest);
         log.info("Job ID: [{}]", MetadataUtil.objectKey(jobStatus.getJobId()));
-        log.info("Job status: {}", jobStatus.getStatus());
+        log.info("Job status: [{}] {}", jobStatus.getStatusCode(), jobStatus.getStatusMessage());
 
         var statusRequest = JobStatusRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(MetadataUtil.selectorFor(jobStatus.getJobId()))
                 .build();
 
-        while (!COMPLETED_JOB_STATES.contains(jobStatus.getStatus())) {
+        while (!COMPLETED_JOB_STATES.contains(jobStatus.getStatusCode())) {
             Thread.sleep(1000);
             jobStatus = orchClient.checkJob(statusRequest);
-            log.info("Job status: {}", jobStatus.getStatus());
+            log.info("Job status: [{}] {}", jobStatus.getStatusCode(), jobStatus.getStatusMessage());
         }
 
-        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatus());
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
 
         var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
 
@@ -211,20 +211,20 @@ public class RunModelTest extends PlatformTestBase {
 
         var jobStatus = orchClient.submitJob(jobRequest);
         log.info("Job ID: [{}]", MetadataUtil.objectKey(jobStatus.getJobId()));
-        log.info("Job status: {}", jobStatus.getStatus());
+        log.info("Job status: [{}] {}", jobStatus.getStatusCode(), jobStatus.getStatusMessage());
 
         var statusRequest = JobStatusRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(MetadataUtil.selectorFor(jobStatus.getJobId()))
                 .build();
 
-        while (!COMPLETED_JOB_STATES.contains(jobStatus.getStatus())) {
+        while (!COMPLETED_JOB_STATES.contains(jobStatus.getStatusCode())) {
             Thread.sleep(1000);
             jobStatus = orchClient.checkJob(statusRequest);
-            log.info("Job status: {}", jobStatus.getStatus());
+            log.info("Job status: [{}] {}", jobStatus.getStatusCode(), jobStatus.getStatusMessage());
         }
 
-        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatus());
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
 
         var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
 
