@@ -20,6 +20,7 @@ import com.accenture.trac.api.MetadataBatchRequest;
 import com.accenture.trac.api.MetadataBatchResponse;
 import com.accenture.trac.api.MetadataWriteRequest;
 import com.accenture.trac.api.TrustedMetadataApiGrpc;
+import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.grpc.GrpcClientWrap;
 import com.accenture.trac.common.metadata.MetadataCodec;
@@ -77,12 +78,49 @@ public class JobLifecycle {
 
         return CompletableFuture.completedFuture(jobState)
 
+                .thenApply(this::convertFlowToModel)
+
                 .thenCompose(this::loadResources)
                 .thenCompose(this::allocateResultIds)
                 .thenApply(this::buildJobConfig);
 
         // static validate
         // semantic validate
+    }
+
+   JobState convertFlowToModel(JobState jobState) {
+
+        if (jobState.definition.getJobType() != JobType.RUN_FLOW)
+            return jobState;
+
+        var runFlow = jobState.definition.getRunFlow();
+
+        if (runFlow.getModelsCount() != 1)
+            throw new EInputValidation("Run flow must be supplied with a single model for the preview implementation");
+
+        var modelSelector = runFlow.getModelsMap().values().stream().findFirst();
+
+        if (modelSelector.isEmpty())
+            throw new EInputValidation("Run flow must be supplied with a single model for the preview implementation");
+
+        var runModel = RunModelJob.newBuilder()
+                .setModel(modelSelector.get())
+                .putAllParameters(runFlow.getParametersMap())
+                .putAllInputs(runFlow.getInputsMap())
+                .putAllOutputs(runFlow.getOutputsMap())
+                .putAllPriorOutputs(runFlow.getPriorOutputsMap())
+                .addAllOutputAttrs(runFlow.getOutputAttrsList())
+                .build();
+
+        var jobDef = jobState.definition.toBuilder()
+                .setJobType(JobType.IMPORT_MODEL)
+                .setRunModel(runModel)
+                .build();
+
+        var newState = jobState.clone();
+        newState.definition = jobDef;
+
+        return newState;
     }
 
     CompletionStage<JobState> loadResources(JobState jobState) {
