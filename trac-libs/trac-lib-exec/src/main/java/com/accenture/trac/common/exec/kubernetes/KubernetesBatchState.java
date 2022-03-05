@@ -18,9 +18,12 @@ package com.accenture.trac.common.exec.kubernetes;
 
 import com.accenture.trac.common.exec.ExecutorState;
 
+/*
 public class KubernetesBatchState extends ExecutorState {
 
     public KubernetesBatchState(String jobKey) {
         super(jobKey);
     }
 }
+
+*/

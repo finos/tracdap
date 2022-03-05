@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+/*
 package com.accenture.trac.common.exec.kubernetes;
 
 import com.accenture.trac.common.exception.EStartup;
@@ -271,7 +272,7 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
             var namespace = "default";
 
             var jobList = kubeBatchApi.listNamespacedJob(
-                    namespace, null, null, null, null /*"status.conditions[?(@.type==\"Complete\")]"*/, null, null, null, null, null, false);
+                    namespace, null, null, null, null / *"status.conditions[?(@.type==\"Complete\")]"* /, null, null, null, null, null, false);
 
             for (var kubeJob : jobList.getItems()) {
 
@@ -385,5 +386,7 @@ public class KubernetesBatchExecutor implements IBatchExecutor {
             throw new ETracInternal("Kubernetes error", e);  // TODO: Error
         }
     }
-    */
+    * /
 }
+
+*/
