@@ -772,7 +772,8 @@ class TracGenerator:
         # Enum fields are always set to a value (the enum' zero value)
         elif field.type == field.Type.TYPE_ENUM:
             enum_type = type_info.enum
-            return f"{enum_type.name}.{enum_type.value[0].name}"
+            enum_type_name = self.python_base_type(package, field, make_relative=True, alias=True)
+            return f"{enum_type_name}.{enum_type.value[0].name}"
 
         # Assume everything else is a primitive
         else:
