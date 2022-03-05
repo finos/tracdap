@@ -70,11 +70,13 @@ class GraphBuilder(actors.Actor):
 
     def __init__(
             self, job_config: config.JobConfig,
+            result_spec: _graph.JobResultSpec,
             models: _models.ModelLoader,
             storage: _storage.StorageManager):
 
         super().__init__()
         self.job_config = job_config
+        self.result_spec = result_spec
         self.graph: tp.Optional[GraphContext] = None
 
         self._resolver = _func.FunctionResolver(models, storage)
@@ -84,14 +86,15 @@ class GraphBuilder(actors.Actor):
 
         self._log.info("Building execution graph")
 
-        graph_data = _graph.GraphBuilder.build_job(self.job_config)
+        # TODO: Get sys config, or find a way to pass storage settings
+        graph_data = _graph.GraphBuilder.build_job(self.job_config, self.result_spec)
         graph_nodes = {node_id: GraphContextNode(node, {}) for node_id, node in graph_data.nodes.items()}
         graph = GraphContext(graph_nodes, pending_nodes=set(graph_nodes.keys()))
 
         self._log.info("Resolving graph nodes to executable code")
 
         for node_id, node in graph.nodes.items():
-            node.function = self._resolver.resolve_node(self.job_config, node.node)
+            node.function = self._resolver.resolve_node(node.node)
 
         self.graph = graph
         self.actors().send_parent("job_graph", self.graph)
@@ -241,8 +244,9 @@ class GraphProcessor(actors.Actor):
         if not any(self.graph.active_nodes):
 
             if any(self.graph.pending_nodes):
-                self._log.error("Processor has become deadlocked (cyclic dependency error)")
-                self.actors().send_parent("job_failed")
+                err_msg = "Processor has become deadlocked (cyclic dependency error)"
+                self._log.error(err_msg)
+                self.actors().send_parent("job_failed", RuntimeError(err_msg))
 
             elif any(self.graph.failed_nodes):
 
@@ -341,25 +345,27 @@ class JobProcessor(actors.Actor):
     """
 
     def __init__(
-            self, job_id, job_config: config.JobConfig,
+            self, job_key, job_config: config.JobConfig,
+            result_spec: _graph.JobResultSpec,
             models: _models.ModelLoader,
             storage: _storage.StorageManager):
 
         super().__init__()
-        self.job_id = job_id
+        self.job_key = job_key
         self.job_config = job_config
+        self.result_spec = result_spec
         self._models = models
         self._storage = storage
         self._log = util.logger_for_object(self)
 
     def on_start(self):
-        self._log.info(f"Starting job [{self.job_id}]")
-        self._models.create_scope(f"JOB_SCOPE:{self.job_id}")
-        self.actors().spawn(GraphBuilder, self.job_config, self._models, self._storage)
+        self._log.info(f"Starting job [{self.job_key}]")
+        self._models.create_scope(self.job_key)
+        self.actors().spawn(GraphBuilder, self.job_config, self.result_spec, self._models, self._storage)
 
     def on_stop(self):
-        self._log.info(f"Cleaning up job [{self.job_id}]")
-        self._models.destroy_scope(f"JOB_SCOPE:{self.job_id}")
+        self._log.info(f"Cleaning up job [{self.job_key}]")
+        self._models.destroy_scope(self.job_key)
 
     @actors.Message
     def job_graph(self, graph: GraphContext):
@@ -368,13 +374,13 @@ class JobProcessor(actors.Actor):
 
     @actors.Message
     def job_succeeded(self):
-        self._log.info(f"Job succeeded {self.job_id}")
-        self.actors().send_parent("job_succeeded", self.job_id)
+        self._log.info(f"Job succeeded {self.job_key}")
+        self.actors().send_parent("job_succeeded", self.job_key)
 
     @actors.Message
     def job_failed(self, error: Exception):
-        self._log.error(f"Job failed {self.job_id}")
-        self.actors().send_parent("job_failed", self.job_id, error)
+        self._log.error(f"Job failed {self.job_key}")
+        self.actors().send_parent("job_failed", self.job_key, error)
 
 
 @dataclass
@@ -416,15 +422,24 @@ class TracEngine(actors.Actor):
         self._log.info("Engine shutdown complete")
 
     @actors.Message
-    def submit_job(self, job_config: config.JobConfig):
+    def submit_job(
+            self, job_config: config.JobConfig,
+            job_result_dir: str,
+            job_result_format: str):
 
-        job_id = str(job_config.jobId)
+        job_key = util.object_key(job_config.jobId)
 
-        self._log.info(f"Job submitted: [{job_id}]")
+        result_needed = bool(job_result_dir)
+        result_spec = _graph.JobResultSpec(result_needed, job_result_dir, job_result_format)
 
-        job_actor_id = self.actors().spawn(JobProcessor, job_id, job_config, self._models, self._storage)
+        self._log.info(f"Job submitted: [{job_key}]")
 
-        jobs = {**self.engine_ctx.jobs, job_id: job_actor_id}
+        job_actor_id = self.actors().spawn(
+            JobProcessor, job_key,
+            job_config, result_spec,
+            self._models, self._storage)
+
+        jobs = {**self.engine_ctx.jobs, job_key: job_actor_id}
         self.engine_ctx = EngineContext(jobs, self.engine_ctx.data)
 
     @actors.Message

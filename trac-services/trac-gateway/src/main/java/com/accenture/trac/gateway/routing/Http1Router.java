@@ -379,7 +379,7 @@ public class Http1Router extends ChannelDuplexHandler {
         target.channelActiveFuture = channelActiveFuture;
 
         var channelInit = proxyInitializerForRoute(
-                route.getConfig(), route.getIndex(),
+                route, route.getIndex(),
                 ctx, channelActiveFuture);
 
         if (route.getConfig().getRouteType() == GwProtocol.REST) {
@@ -407,19 +407,19 @@ public class Http1Router extends ChannelDuplexHandler {
     }
 
     private ChannelInitializer<Channel> proxyInitializerForRoute(
-            GwRoute routeConfig, int routeIndex,
+            Route routeConfig, int routeIndex,
             ChannelHandlerContext routerCtx,
             ChannelPromise routeActivePromise) {
 
         var routerLink = new Http1RouterLink(routerCtx, routeActivePromise, this, routeIndex);
 
-        switch (routeConfig.getRouteType()) {
+        switch (routeConfig.getConfig().getRouteType()) {
 
             case HTTP:
-                return new Http1ProxyBuilder(routeConfig, routerLink);
+                return new Http1ProxyBuilder(routeConfig.getConfig(), routerLink);
 
             case GRPC:
-                return new GrpcProxyBuilder(routeConfig, SOURCE_IS_HTTP_1, routerLink);
+                return new GrpcProxyBuilder(routeConfig.getConfig(), SOURCE_IS_HTTP_1, routerLink);
 
             case REST:
                 return new RestApiProxyBuilder(routeConfig, SOURCE_IS_HTTP_1, routerLink, routerCtx.executor());

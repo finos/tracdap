@@ -155,11 +155,18 @@ class StorageManager:
         self.__log = _util.logger_for_object(self)
         self.__file_storage: tp.Dict[str, IFileStorage] = dict()
         self.__data_storage: tp.Dict[str, IDataStorage] = dict()
+        self.__settings = sys_config.storageSettings
 
         storage_options = {"sys_config_dir": sys_config_dir}
 
         for storage_key, storage_config in sys_config.storage.items():
             self.create_storage(storage_key, storage_config, storage_options)
+
+    def default_storage_key(self):
+        return self.__settings.defaultStorage
+
+    def default_storage_format(self):
+        return self.__settings.defaultFormat
 
     def create_storage(self, storage_key: str, storage_config: _cfg.StorageConfig, storage_options: dict = None):
 
@@ -246,7 +253,8 @@ class _CsvStorageFormat(_StorageFormat):
 class CommonDataStorage(IDataStorage):
 
     __formats = {
-        'csv': _CsvStorageFormat()
+        'csv': _CsvStorageFormat(),
+        'text/csv': _CsvStorageFormat()
     }
 
     def __init__(
@@ -270,6 +278,17 @@ class CommonDataStorage(IDataStorage):
 
         if format_impl is None:
             raise _ex.EStorageConfig(f"Requested storage format [{storage_format}] is not available")
+
+        stat = self.__file_storage.stat(storage_path)
+
+        if stat.file_type == FileType.DIRECTORY:
+
+            dir_content = self.__file_storage.ls(storage_path)
+
+            if len(dir_content) == 1:
+                storage_path = dir_content[0]
+            else:
+                raise NotImplementedError("Directory storage format not available yet")
 
         if self.__pushdown_pandas:
             full_path = self.__root_path / storage_path
@@ -464,4 +483,4 @@ class LocalDataStorage(CommonDataStorage):
         super().__init__(storage_config, file_storage, pushdown_pandas=True, pushdown_spark=True)
 
 
-StorageManager.register_storage_type("LOCAL_STORAGE", LocalFileStorage, LocalDataStorage)
+StorageManager.register_storage_type("LOCAL", LocalFileStorage, LocalDataStorage)

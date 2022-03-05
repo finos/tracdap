@@ -28,17 +28,9 @@ import "trac/metadata/job.proto";
 message JobResult {
 
   metadata.TagHeader jobId = 1;
-  JobStatus status = 2;
 
-  string errorMessage = 3;
-  repeated string stackTrace = 4;
+  metadata.JobStatusCode statusCode = 2;
+  string statusMessage = 3;
 
-  map<string, metadata.ObjectDefinition> objects = 5;
-}
-
-enum JobStatus {
-
-  JOB_STATUS_NOT_SET = 0;
-  SUCCEEDED = 1;
-  FAILED = 2;
+  map<string, metadata.ObjectDefinition> results = 4;
 }

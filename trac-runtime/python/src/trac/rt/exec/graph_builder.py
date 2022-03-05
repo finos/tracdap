@@ -12,8 +12,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import copy
+
 import trac.rt.config as config
 import trac.rt.exceptions as _ex
+import trac.rt.impl.data as _data
+import trac.rt.impl.util as _util
 
 from .graph import *
 
@@ -21,48 +25,61 @@ from .graph import *
 class GraphBuilder:
 
     @staticmethod
-    def build_job(job_config: config.JobConfig) -> Graph:
+    def build_job(
+            job_config: config.JobConfig,
+            result_spec: JobResultSpec) -> Graph:
 
         if job_config.job.jobType == meta.JobType.IMPORT_MODEL:
-            return GraphBuilder.build_import_model_job(job_config)
+            return GraphBuilder.build_import_model_job(job_config, result_spec)
 
-        target_def = job_config.objects.get(job_config.job.target)
+        if job_config.job.jobType == meta.JobType.RUN_MODEL:
+            return GraphBuilder.build_run_model_job(job_config, result_spec)
 
-        if target_def is None:
-            raise _ex.EConfigParse(f"No definition available for job target '{job_config.job.target}'")
-
-        # Only calculation jobs are supported at present
-        return GraphBuilder.build_calculation_job(job_config)
+        raise _ex.EConfigParse(f"Job type [{job_config.job.jobType}] is not supported yet")
 
     @classmethod
-    def build_import_model_job(cls, job_config: config.JobConfig) -> Graph:
+    def build_import_model_job(cls, job_config: config.JobConfig, result_spec: JobResultSpec) -> Graph:
 
-        job_namespace = NodeNamespace(f"job={job_config.jobId}")
+        job_namespace = NodeNamespace(_util.object_key(job_config.jobId))
         null_graph = Graph({}, NodeId('', job_namespace))
 
         # Create a job context with no dependencies and no external data mappings
         ctx_push_graph = GraphBuilder.build_context_push(
             job_namespace, null_graph, input_mapping=dict())
 
-        import_id = NodeId("trac_import_model", job_namespace)
-        import_details = job_config.job.importModel
-        model_scope = f"JOB_SCOPE:{job_config.jobId}"
+        # TODO: Import model job should pre-allocate an ID, then model ID comes from job_config.resultMapping
+        new_model_id = _util.new_object_id(meta.ObjectType.MODEL)
 
+        model_scope = _util.object_key(job_config.jobId)
+        import_details = job_config.job.importModel
+
+        import_id = NodeId.of("trac_import_model", job_namespace, meta.ModelDefinition)
         import_node = ImportModelNode(import_id, model_scope, import_details, explicit_deps=[ctx_push_graph.root_id])
 
-        output_metadata_nodes = frozenset([import_id])
+        import_result_id = NodeId.of("trac_import_result", job_namespace, ObjectMap)
+        import_result_node = ImportModelResultNode(import_result_id, import_id, new_model_id)
 
-        job_metadata_id = NodeId("trac_job_metadata", job_namespace)
-        job_metadata_node = JobResultMetadataNode(job_metadata_id, output_metadata_nodes)
+        build_result_id = NodeId.of("trac_build_result", job_namespace, cfg.JobResult)
+        build_result_node = BuildJobResultNode(
+            build_result_id, job_config.jobId,
+            [import_result_id], explicit_deps=[import_id])
 
-        job_node_id = NodeId("trac_job_completion", job_namespace)
-        job_node = JobNode(job_node_id, job_metadata_id, explicit_deps=[import_id])
+        save_result_id = NodeId("trac_save_result", job_namespace)
+        save_result_node = SaveJobResultNode(save_result_id, build_result_id, result_spec)
+
+        job_node_id = NodeId("trac_job", job_namespace)
+        job_result_id = save_result_id if result_spec.save_result else build_result_id
+        job_node = JobNode(job_node_id, import_id, job_result_id)
 
         job_graph_nodes = {
             **ctx_push_graph.nodes,
             import_id: import_node,
-            job_metadata_id: job_metadata_node,
+            import_result_id: import_result_node,
+            build_result_id: build_result_node,
             job_node_id: job_node}
+
+        if result_spec.save_result:
+            job_graph_nodes[save_result_id] = save_result_node
 
         job_graph = Graph(job_graph_nodes, job_node_id)
 
@@ -72,55 +89,75 @@ class GraphBuilder:
         return job_ctx_pop
 
     @classmethod
-    def build_calculation_job(cls, job_config: config.JobConfig) -> Graph:
+    def build_run_model_job(
+            cls, job_config: config.JobConfig,
+            result_spec: JobResultSpec) -> Graph:
 
-        job_namespace = NodeNamespace(f"job={job_config.jobId}")
+        return cls.build_calculation_job(
+            job_config, result_spec,
+            job_config.job.runModel.model,
+            job_config.job.runModel.parameters,
+            job_config.job.runModel.inputs,
+            job_config.job.runModel.outputs)
+
+    @classmethod
+    def build_calculation_job(
+            cls, job_config: config.JobConfig,
+            result_spec: JobResultSpec,
+            target: meta.TagSelector, parameters: tp.Dict[str, meta.Value],
+            inputs: tp.Dict[str, meta.TagSelector], outputs: tp.Dict[str, meta.TagSelector]) -> Graph:
+
+        job_namespace = NodeNamespace(_util.object_key(job_config.jobId))
         null_graph = Graph({}, NodeId('', job_namespace))
 
         # Create a job context with no dependencies and no external data mappings
         ctx_push_graph = GraphBuilder.build_context_push(
             job_namespace, null_graph, input_mapping=dict())
 
+        params_graph = cls.build_job_parameters(parameters, job_namespace, ctx_push_graph)
+
         # Input graph will prepare data views job inputs
-        input_graph = cls.build_job_inputs(job_config, job_namespace, ctx_push_graph)
+        input_graph = cls.build_job_inputs(job_config, inputs, job_namespace, params_graph)
 
         # Now create the root execution node, which will be either a single model or a flow
         # The root exec node can run directly in the job context, no need to do a context push
         # All input views are already mapped and there is only a single execution target
 
-        job_target_obj = job_config.objects.get(job_config.job.target)
-        job_target_graph = GraphBuilder.build_model_or_flow(
-            job_config, job_namespace, input_graph, job_target_obj)
+        target_obj = _util.get_job_resource(target, job_config)
+        target_graph = GraphBuilder.build_model_or_flow(
+            job_config, job_namespace, input_graph, target_obj)
 
         # Output graph will extract and save data items from job-level output data views
 
-        output_graph = cls.build_job_outputs(job_config, job_namespace, job_target_graph)
+        output_graph = cls.build_job_outputs(job_config, outputs, job_namespace, target_graph)
 
         # Build job-level metadata outputs
 
-        output_metadata_nodes = frozenset(
+        data_result_ids = list(
             nid for nid, n in output_graph.nodes.items()
-            if isinstance(n, JobOutputMetadataNode))
+            if isinstance(n, DataResultNode))
 
-        job_metadata_id = NodeId("trac_job_metadata", job_namespace)
-        job_metadata_node = JobResultMetadataNode(job_metadata_id, output_metadata_nodes)
+        build_result_id = NodeId.of("trac_build_result", job_namespace, cfg.JobResult)
+        build_result_node = BuildJobResultNode(
+            build_result_id, job_config.jobId,
+            data_result_ids, explicit_deps=[target_graph.root_id])
 
-        job_logs_node = None
-        job_metrics_node = None
-
-        job_models = [job_target_graph.root_id]
-        # job_outputs = [view_id for view_id in output_views]
-        # job_save_ops = [save_id for save_id in save_physical_outputs]
+        save_result_id = NodeId("trac_save_result", job_namespace)
+        save_result_node = SaveJobResultNode(save_result_id, build_result_id, result_spec)
 
         # Build the top level job node
 
-        job_node_id = NodeId("trac_job_completion", job_namespace)
-        job_node = JobNode(job_node_id, job_metadata_id, explicit_deps=job_models)
+        job_node_id = NodeId("trac_job", job_namespace)
+        job_result_id = save_result_id if result_spec.save_result else build_result_id
+        job_node = JobNode(job_node_id, target_graph.root_id, job_result_id)
 
         job_graph_nodes = {
             **output_graph.nodes,
-            job_metadata_id: job_metadata_node,
+            build_result_id: build_result_node,
             job_node_id: job_node}
+
+        if result_spec.save_result:
+            job_graph_nodes[save_result_id] = save_result_node
 
         job_graph = Graph(job_graph_nodes, job_node_id)
 
@@ -132,80 +169,126 @@ class GraphBuilder:
         return job_ctx_pop
 
     @classmethod
-    def build_job_inputs(
-            cls, job_config: config.JobConfig, namespace: NodeNamespace,
-            graph: Graph) -> Graph:
+    def build_job_parameters(
+            cls, parameters: tp.Dict[str, meta.Value],
+            namespace: NodeNamespace, graph: Graph) -> Graph:
 
         nodes = {**graph.nodes}
 
-        for input_name, data_id in job_config.job.inputs.items():
+        job_params_node_id = NodeId("trac_job_params", namespace)
+        job_params_node = SetParametersNode(job_params_node_id, parameters, explicit_deps=[graph.root_id])
 
-            data_def = job_config.objects[data_id].data
+        nodes[job_params_node_id] = job_params_node
 
-            # TODO: Real lookup for selectors
-            storage_def = job_config.objects[data_def.storageId.objectId].storage
+        for param_name in parameters:
 
-            # TODO: Get this from somewhere
-            root_part_opaque_key = 'part-root'
+            param_node_id = NodeId(param_name, namespace)
+            param_node = KeyedItemNode(param_node_id, job_params_node_id, param_name)
+
+            nodes[param_node_id] = param_node
+
+        return Graph(nodes, graph.root_id)
+
+    @classmethod
+    def build_job_inputs(
+            cls, job_config: config.JobConfig, inputs: tp.Dict[str, meta.TagSelector],
+            namespace: NodeNamespace, graph: Graph) -> Graph:
+
+        nodes = copy.copy(graph.nodes)
+
+        for input_name, data_selector in inputs.items():
+
+            # Build a data spec using metadata from the job config
+            # For now we are always loading the root part, snap 0, delta 0
+            data_def = _util.get_job_resource(data_selector, job_config).data
+            storage_def = _util.get_job_resource(data_def.storageId, job_config).storage
+
+            root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
             data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
+            data_spec = _data.DataItemSpec(data_item, data_def, storage_def, schema_def=None)
+
+            # Data spec node is static, using the assembled data spec
+            data_spec_id = NodeId.of(f"{input_name}:SPEC", namespace, _data.DataItemSpec)
+            data_spec_node = StaticDataSpecNode(data_spec_id, data_spec, explicit_deps=[graph.root_id])
 
             # Physical load of data items from disk
             # Currently one item per input, since inputs are single part/delta
-            data_load_id = NodeId(f"{data_item}:LOAD", namespace)
-            data_load_node = LoadDataNode(data_load_id, data_item, data_def, storage_def, explicit_deps=[graph.root_id])
+            data_load_id = NodeId.of(f"{input_name}:LOAD", namespace, _data.DataItem)
+            data_load_node = LoadDataNode(data_load_id, data_spec_id, explicit_deps=[graph.root_id])
 
-            # Input items mapped directly from their load operations
-            data_item_id = NodeId(data_item, namespace)
-            data_item_node = IdentityNode(data_item_id, data_load_id)
+            # Input views assembled by mapping one root part to each view
+            data_view_id = NodeId.of(input_name, namespace, _data.DataView)
+            data_view_node = DataViewNode(data_view_id, data_def.schema, data_load_id)
 
-            # Inputs views assembled by mapping one root part to each view
-            data_view_id = NodeId(input_name, namespace)
-            data_view_node = DataViewNode(data_view_id, data_def.schema, data_item_id)
-
+            nodes[data_spec_id] = data_spec_node
             nodes[data_load_id] = data_load_node
-            nodes[data_item_id] = data_item_node
             nodes[data_view_id] = data_view_node
 
         return Graph(nodes, graph.root_id)
 
     @classmethod
     def build_job_outputs(
-            cls, job_config: config.JobConfig, namespace: NodeNamespace,
-            graph: Graph) -> Graph:
+            cls, job_config: config.JobConfig,
+            outputs: tp.Dict[str, meta.TagSelector],
+            namespace: NodeNamespace, graph: Graph) -> Graph:
 
-        nodes = {**graph.nodes}
+        nodes = copy.copy(graph.nodes)
 
-        for output_name, data_id in job_config.job.outputs.items():
-
-            data_def = job_config.objects[data_id].data
-
-            # TODO: Real lookup for selectors
-            storage_def = job_config.objects[data_def.storageId.objectId].storage
-
-            # TODO: Get this from somewhere
-            root_part_opaque_key = 'part-root'
-            data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
+        for output_name, data_selector in outputs.items():
 
             # Output data view must already exist in the namespace
-            data_view_id = NodeId(output_name, namespace)
+            data_view_id = NodeId.of(output_name, namespace, _data.DataView)
+            data_spec_id = NodeId.of(f"{output_name}:SPEC", namespace, _data.DataItemSpec)
+
+            data_obj = _util.get_job_resource(data_selector, job_config, optional=True)
+
+            if data_obj is not None:
+
+                data_def = data_obj.data
+                storage_obj = _util.get_job_resource(data_def.storageId, job_config)
+                storage_def = storage_obj.storage
+
+                root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
+                data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
+                data_spec = _data.DataItemSpec(data_item, data_def, storage_def, schema_def=None)
+
+                data_spec_node = StaticDataSpecNode(data_spec_id, data_spec, explicit_deps=[data_view_id])
+
+                output_data_key = output_name + ":DATA"
+                output_storage_key = output_name + ":STORAGE"
+
+            else:
+
+                data_key = output_name + ":DATA"
+                data_id = job_config.resultMapping[data_key]
+                storage_key = output_name + ":STORAGE"
+                storage_id = job_config.resultMapping[storage_key]
+
+                data_spec_node = DynamicDataSpecNode(
+                        data_spec_id, data_view_id,
+                        data_id, storage_id,
+                        prior_data_spec=None)
+
+                output_data_key = _util.object_key(data_id)
+                output_storage_key = _util.object_key(storage_id)
 
             # Map one data item from each view, since outputs are single part/delta
-            data_item_id = NodeId(data_item, namespace)
-            data_item_node = DataItemNode(data_item_id, data_view_id, data_item)
+            data_item_id = NodeId(f"{output_name}:ITEM", namespace)
+            data_item_node = DataItemNode(data_item_id, data_view_id)
 
             # Create a physical save operation for the data item
-            data_save_id = NodeId(f"{data_item}:SAVE", namespace)
-            data_save_node = SaveDataNode(data_save_id, data_item_id, data_def, storage_def)  # TODO: deps for save node
+            data_save_id = NodeId.of(f"{output_name}:SAVE", namespace, None)
+            data_save_node = SaveDataNode(data_save_id, data_spec_id, data_item_id)
 
-            # Create an output metadata node
-            # Output metadata is associate with the job-level output (i.e. the data view)
-            # It references all the connected physical save operations, currently there is just one for part-root
-            output_meta_id = NodeId(f"{output_name}:METADATA", namespace)
-            output_meta_node = JobOutputMetadataNode(output_meta_id, data_view_id, {data_save_id: data_item})
+            data_result_id = NodeId.of(f"{output_name}:RESULT", namespace, ObjectMap)
+            data_result_node = DataResultNode(
+                data_result_id, output_name, data_spec_id, data_save_id,
+                output_data_key, output_storage_key)
 
+            nodes[data_spec_id] = data_spec_node
             nodes[data_item_id] = data_item_node
             nodes[data_save_id] = data_save_node
-            nodes[output_meta_id] = output_meta_node
+            nodes[data_result_id] = data_result_node
 
         return Graph(nodes, graph.root_id)
 
@@ -254,15 +337,21 @@ class GraphBuilder:
             return NodeId(node_name, namespace)
 
         # Input data should already be mapped to named inputs in the model context
+        parameter_ids = frozenset(map(node_id_for, model_def.parameters.keys()))
         input_ids = frozenset(map(node_id_for, model_def.inputs.keys()))
 
         # Create the model node
         # Always add the prior graph root ID as a dependency
         # This is to ensure dependencies are still pulled in for models with no inputs!
 
+        model_scope = _util.object_key(job_config.jobId)
         model_name = model_def.entryPoint.split(".")[-1]  # TODO: Check unique model name
         model_id = node_id_for(model_name)
-        model_node = RunModelNode(model_id, model_def, input_ids, explicit_deps=[graph.root_id])
+
+        model_node = RunModelNode(
+            model_id, model_scope, model_def,
+            parameter_ids, input_ids,
+            explicit_deps=[graph.root_id])
 
         # Create nodes for each model output
         # The model node itself outputs a bundle (dictionary of named outputs)

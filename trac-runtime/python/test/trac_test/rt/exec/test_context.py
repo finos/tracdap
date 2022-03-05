@@ -145,12 +145,14 @@ class TracContextTest(unittest.TestCase):
         profit_by_region_schema = _test_model_def.outputs.get("profit_by_region").schema
         profit_by_region_view = _data.DataView(profit_by_region_schema, {})
 
-        data_ctx = {
+        data = {
             "customer_loans": customer_loans_view,
             "profit_by_region": profit_by_region_view
         }
 
-        self.ctx = TracContextImpl(_test_model_def, _TestModel, params, data_ctx)
+        local_ctx = {**params, **data}
+
+        self.ctx = TracContextImpl(_test_model_def, _TestModel, local_ctx)
 
     # Getting params
 

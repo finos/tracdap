@@ -1,0 +1,21 @@
+
+
+tenant: ACME_CORP
+
+jobType: IMPORT_MODEL
+
+importModel:
+  models:
+
+    - language: python
+      repository: test_repo
+      path: src/python
+      package: com.accenture.trac.examples
+      entryPoint: HelloWorld
+      version: v1.0.0
+
+      tagUpdates:
+        - attrName: model_type
+          value: { stringValue: "hello_world" }
+
+        - attrName:

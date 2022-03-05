@@ -31,6 +31,7 @@ import trac.rt.api as _api
 import trac.rt.metadata as _meta
 import trac.rt.config as _cfg
 import trac.rt.impl.repos as _repos
+import trac.rt.impl.type_system as _types
 import trac.rt.impl.util as _util
 import trac.rt.exceptions as _ex
 
@@ -77,7 +78,7 @@ class ModelLoader:
         # TODO: Prevent duplicate checkout per scope
 
         repo = self.__repos.get_repository(model_def.repository)
-        checkout_dir = pathlib.Path(state.scratch_dir).joinpath(model_def.repository)
+        checkout_dir = pathlib.Path(state.scratch_dir)
         checkout = repo.checkout_model(model_def, checkout_dir)
 
         with ModelShim.use_checkout(checkout):
@@ -98,12 +99,25 @@ class ModelLoader:
             inputs = model.define_inputs()
             outputs = model.define_outputs()
 
+            for parameter in parameters.values():
+                if parameter.defaultValue is not None:
+                    parameter.defaultValue = _types.encode_value(parameter.defaultValue)
+
             # TODO: Model validation
 
             model_def = _meta.ModelDefinition()
             model_def.parameters.update(parameters)
             model_def.inputs.update(inputs)
             model_def.outputs.update(outputs)
+
+            for name, param in model_def.parameters.items():
+                self.__log.info(f"Parameter [{name}] - {param.paramType.basicType.name}")
+
+            for name, schema in model_def.inputs.items():
+                self.__log.info(f"Input [{name}] - {schema.schema.schemaType.name}")
+
+            for name, schema in model_def.outputs.items():
+                self.__log.info(f"Output [{name}] - {schema.schema.schemaType.name}")
 
             return model_def
 

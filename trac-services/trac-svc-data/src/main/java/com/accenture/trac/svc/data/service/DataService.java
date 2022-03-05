@@ -47,6 +47,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
+import static com.accenture.trac.common.metadata.MetadataConstants.*;
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
 import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
 import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
@@ -54,9 +55,7 @@ import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
 public class DataService {
 
-    private static final String TRAC_STORAGE_OBJECT_ATTR = "trac_storage_object";
-
-    private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/part-%s/snap-%d/delta-%d-%s";
+    private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d-%s";
     private static final String DATA_ITEM_SUFFIX_TEMPLATE = "x%06x";
 
     private static final MethodDescriptor<MetadataReadRequest, Tag> READ_OBJECT_METHOD = TrustedMetadataApiGrpc.getReadObjectMethod();
@@ -576,7 +575,7 @@ public class DataService {
 
         // TODO: Special metadata Value type for handling tag selectors
         var selector = MetadataUtil.selectorForLatest(dataId);
-        var storageObjectAttr = String.format("%s:%s", selector.getObjectType(), selector.getObjectId());
+        var storageObjectAttr = MetadataUtil.objectKey(selector);
 
         var storageForAttr = TagUpdate.newBuilder()
                 .setAttrName(TRAC_STORAGE_OBJECT_ATTR)

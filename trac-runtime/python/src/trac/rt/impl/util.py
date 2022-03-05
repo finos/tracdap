@@ -16,6 +16,13 @@ from __future__ import annotations
 
 import logging
 import sys
+import uuid
+import datetime as dt
+
+import trac.rt.exceptions as ex
+import trac.rt.metadata as meta
+import trac.rt.config as cfg
+import typing as tp
 
 
 class ColorFormatter(logging.Formatter):
@@ -123,3 +130,68 @@ def logger_for_class(clazz: type) -> logging.Logger:
 
 def logger_for_namespace(namespace: str) -> logging.Logger:
     return logging.getLogger(namespace)
+
+
+def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
+
+    timestamp = dt.datetime.utcnow()
+
+    return meta.TagHeader(
+        objectType=object_type,
+        objectId=str(uuid.uuid4()),
+        objectVersion=1,
+        objectTimestamp=meta.DatetimeValue(timestamp.isoformat()),
+        tagVersion=1,
+        tagTimestamp=meta.DatetimeValue(timestamp.isoformat()))
+
+
+def object_key(object_id: tp.Union[meta.TagHeader, meta.TagSelector]):
+
+    if isinstance(object_id, meta.TagHeader):
+        return f"{object_id.objectType.name}-{object_id.objectId}-v{object_id.objectVersion}"
+
+    if object_id.objectVersion is not None:
+        return f"{object_id.objectType.name}-{object_id.objectId}-v{object_id.objectVersion}"
+
+    if object_id.objectAsOf is not None:
+        return f"{object_id.objectType.name}-{object_id.objectId}-asof-{object_id.objectAsOf.isoDatetime}"
+
+    if object_id.latestObject:
+        return f"{object_id.objectType.name}-{object_id.objectId}-latest"
+
+    raise ex.EUnexpected()
+
+
+def selector_for(object_id: meta.TagHeader) -> meta.TagSelector:
+
+    return meta.TagSelector(
+        objectType=object_id.objectType,
+        objectId=object_id.objectId,
+        objectVersion=object_id.objectVersion,
+        tagVersion=object_id.tagVersion)
+
+
+def selector_for_latest(object_id: meta.TagHeader) -> meta.TagSelector:
+
+    return meta.TagSelector(
+        objectType=object_id.objectType,
+        objectId=object_id.objectId,
+        latestObject=True,
+        latestTag=True)
+
+
+def get_job_resource(
+        selector: tp.Union[meta.TagHeader, meta.TagSelector],
+        job_config: cfg.JobConfig,
+        optional: bool = False):
+
+    resource_key = object_key(selector)
+    resource_id = job_config.resourceMapping.get(resource_key)
+
+    if resource_id is not None:
+        resource_key = object_key(resource_id)
+
+    if optional:
+        return job_config.resources.get(resource_key)
+    else:
+        return job_config.resources[resource_key]

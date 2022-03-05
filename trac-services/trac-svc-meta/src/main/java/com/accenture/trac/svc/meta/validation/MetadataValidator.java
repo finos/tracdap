@@ -24,7 +24,7 @@ import com.accenture.trac.common.exception.*;
 
 import java.util.*;
 
-import static com.accenture.trac.svc.meta.services.MetadataConstants.*;
+import static com.accenture.trac.common.metadata.MetadataConstants.*;
 
 
 public class MetadataValidator {

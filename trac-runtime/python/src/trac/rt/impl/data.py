@@ -21,6 +21,15 @@ import trac.rt.metadata as _meta
 
 
 @dc.dataclass(frozen=True)
+class DataItemSpec:
+
+    data_item: str
+    data_def: _meta.DataDefinition
+    storage_def: _meta.StorageDefinition
+    schema_def: tp.Optional[_meta.SchemaDefinition]
+
+
+@dc.dataclass(frozen=True)
 class DataItem:
 
     pandas: tp.Optional[pd.DataFrame] = None

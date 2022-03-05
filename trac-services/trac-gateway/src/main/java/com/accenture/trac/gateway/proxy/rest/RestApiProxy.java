@@ -166,9 +166,11 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
         }
         finally {
 
-            // RestApiProxy runs on an embedded pipeline, we're taking the message off the pipe here
-            // So, it will not be released automatically by Netty when it reaches the end of the pipe
-            // ReferenceCountUtil.release(msg);
+            // RestApiProxy uses the HTTP/2 codec and runs on an embedded channel
+            // We are intercepting messages and then making calls to gRPC using the gRPC client
+            // However, in order for the HTTP/2 codec to work, messages need to propagate down to the codec handler
+            // So, instead of releasing the message, pass it on to the next handler
+            // And the let the HTTP/2 codec at the end of the pipeline release it
 
             ctx.write(msg);
         }
@@ -339,7 +341,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             headers.setInt(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
 
             var headersFrame = new DefaultHttp2HeadersFrame(headers, false).stream(stream);
-            var dataFrame = new DefaultHttp2DataFrame(content).stream(stream);
+            var dataFrame = new DefaultHttp2DataFrame(content, true).stream(stream);
 
             ctx.fireChannelRead(headersFrame);
             ctx.fireChannelRead(dataFrame);

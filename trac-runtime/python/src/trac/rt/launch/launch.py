@@ -123,6 +123,8 @@ def launch_cli():
 
     runtime_instance = runtime.TracRuntime(
         _sys_config, _job_config,
+        job_result_dir=launch_args.job_result_dir,
+        job_result_format=launch_args.job_result_format,
         dev_mode=launch_args.dev_mode)
 
     runtime_instance.pre_start()

@@ -19,6 +19,7 @@ package com.accenture.trac.gateway.proxy.rest;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.config.GwRoute;
 import com.accenture.trac.gateway.config.rest.MetaApiRestMapping;
+import com.accenture.trac.gateway.exec.Route;
 import com.accenture.trac.gateway.proxy.http.Http1to2Framing;
 
 import io.netty.channel.*;
@@ -36,13 +37,13 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final GwRoute routeConfig;
+    private final Route routeConfig;
     private final int sourceHttpVersion;
     private final ChannelDuplexHandler routerLink;
     private final EventExecutor executor;
 
     public RestApiProxyBuilder(
-            GwRoute routeConfig,
+            Route routeConfig,
             int sourceHttpVersion,
             ChannelDuplexHandler routerLink,
             EventExecutor executor) {
@@ -77,10 +78,10 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
         // REST proxy
 
         // TODO: Build this after reading service config and pass it in
-        var restApiConfig = MetaApiRestMapping.metaApiRoutes();
+        var restApiConfig = routeConfig.getRestMethods();
 
-        var grpcHost = routeConfig.getTarget().getHost();
-        var grpcPort = (short) routeConfig.getTarget().getPort();
+        var grpcHost = routeConfig.getConfig().getTarget().getHost();
+        var grpcPort = (short) routeConfig.getConfig().getTarget().getPort();
         var restApiProxy = new RestApiProxy(grpcHost, grpcPort, restApiConfig, executor);
         pipeline.addLast(restApiProxy);
 
@@ -88,7 +89,7 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
 
         if (sourceHttpVersion == 1) {
 
-            pipeline.addLast(new Http1to2Framing(routeConfig));
+            pipeline.addLast(new Http1to2Framing(routeConfig.getConfig()));
             pipeline.addLast(routerLink);
         }
         else if (sourceHttpVersion == 2) {

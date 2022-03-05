@@ -80,8 +80,8 @@ message ModelDefinition {
     string repository = 2;
     string path = 3;
     string package = 4;
-    string version = 5;
-    string entryPoint = 6;
+    string entryPoint = 5;
+    string version = 6;
 
     map<string, ModelParameter> parameters = 7;
     map<string, ModelInputSchema> inputs = 8;

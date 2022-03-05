@@ -1,0 +1,139 @@
+/*
+ * Copyright 2020 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+package trac.metadata;
+
+option java_package = "com.accenture.trac.metadata";
+option java_multiple_files = true;
+
+import "trac/metadata/type.proto";
+import "trac/metadata/object_id.proto";
+
+
+/**
+ * Enumeration of available TagUpdate operations.
+ *
+ * @see TagUpdate
+ */
+enum TagOperation {
+
+  /**
+   * Add an attribute to a tag or replace it if it already exists.
+   *
+   * This is the default operation if no operation is specified. If the
+   * attribute does not exist it will be created using CREATE_ATTR, otherwise
+   * it will replaced using REPLACE_ATTR.
+   *
+   * @see TagOperation.CREATE_ATTR
+   * @see TagOperation.REPLACE_ATTR
+   */
+  CREATE_OR_REPLACE_ATTR = 0;
+
+  /**
+   * Add an attribute to a tag or append to it if it already exists.
+   *
+   * If the attribute does not exist it will be created using CREATE_ATTR,
+   * otherwise it will appended to using APPEND_ATTR.
+   *
+   * @see TagOperation.CREATE_ATTR
+   * @see TagOperation.APPEND_ATTR
+   */
+  CREATE_OR_APPEND_ATTR = 1;
+
+  /**
+   * Add an attribute to a tag, fail if the attribute already exists.
+   */
+  CREATE_ATTR = 2;
+
+  /**
+   * Replace an attribute on a tag, fail if the attribute does not exist.
+   *
+   * When replacing an attribute, the new attribute must be of the same basic
+   * type as the old one. It is allowed to replace a single-valued attribute
+   * with a multi-valued one and vice-versa (this is not considered to be
+   * changing the basic type).
+   *
+   * Changing the type of attributes is not recommended because it is likely
+   * to confuse applications that refer to those attributes. If you really
+   * need to change the type of an attribute (e.g. to correct an error), use
+   * DELETE_ATTR followed by CREATE_ATTR.
+   */
+  REPLACE_ATTR = 3;
+
+  /**
+   * Append one or more values to an existing attribute, fail if the attribute
+   * does not exist.
+   *
+   * The existing attribute may be single- or multi-valued and the append
+   * operation may add one value or multiple values (i.e. all combinations are
+   * permitted). The appended value(s) must be of the same basic type as the
+   * existing value(s).
+   */
+  APPEND_ATTR = 4;
+
+  /**
+   * Remove an attribute from a tag, fail if the attribute does not exist.
+   */
+  DELETE_ATTR = 5;
+
+  /**
+   * Remove all the attributes from a tag.
+   *
+   * This operation does not affect controlled attributes, which are still
+   * managed by TRAC according to its normal rules.
+   */
+  CLEAR_ALL_ATTR = 6;
+}
+
+
+/**
+ * A tag update is a request for a single update operation on a tag.
+ *
+ * Tag updates can be supplied to TRAC via an API call to request updates to a
+ * tag. They may also be included in TRAC policy objects or client application
+ * logic, to describe a set of operations that is performed in response to a
+ * particular action.
+ *
+ * @see MetadataWriteRequest
+ */
+message TagUpdate {
+
+  /**
+   * The operation requested in this update
+   *
+   * @see TagOperation
+   */
+  TagOperation operation = 1;
+
+  /**
+   * Name of the attribute this update refers to.
+   *
+   * This field must be supplied for operations that refer to a single
+   * attribute, otherwise it should be left blank.
+   */
+  string attrName = 2;
+
+  /**
+   * Attribute value to use for this update.
+   *
+   * This field must be supplied for operations that use a value, otherwise it
+   * should be omitted.
+   *
+   * @see metadata.Value
+   */
+  optional metadata.Value value = 3;
+}

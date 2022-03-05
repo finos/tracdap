@@ -59,8 +59,7 @@ class TracContextImpl(_api.TracContext):
     def __init__(self,
                  model_def: _meta.ModelDefinition,
                  model_class: _api.TracModel.__class__,
-                 parameters: tp.Dict[str, tp.Any],
-                 data: tp.Dict[str, _data.DataView]):
+                 local_ctx: tp.Dict[str, _data.DataView]):
 
         self.__ctx_log = _util.logger_for_object(self)
 
@@ -68,8 +67,8 @@ class TracContextImpl(_api.TracContext):
         self.__model_class = model_class
         self.__model_log = _util.logger_for_class(self.__model_class)
 
-        self.__parameters = parameters or {}
-        self.__data = data or {}
+        self.__parameters = local_ctx or {}
+        self.__data = local_ctx or {}
 
         self.__val = TracContextValidator(
             self.__ctx_log,

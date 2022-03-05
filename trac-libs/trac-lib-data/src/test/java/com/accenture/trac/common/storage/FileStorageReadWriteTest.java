@@ -79,7 +79,7 @@ public class FileStorageReadWriteTest {
 
         var storageProps = new Properties();
         storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
-        storageProps.put(LocalFileStorage.CONFIG_ROOT_DIR, storageDir.toString());
+        storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
         storage = new LocalFileStorage(storageProps);
 
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));

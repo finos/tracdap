@@ -39,6 +39,8 @@ class TracRuntime:
             self,
             sys_config: tp.Union[str, pathlib.Path, _cfg.RuntimeConfig],
             job_config: tp.Union[str, pathlib.Path, _cfg.JobConfig, None] = None,
+            job_result_dir: tp.Union[str, pathlib.Path, None] = None,
+            job_result_format: tp.Optional[str] = None,
             dev_mode: bool = False,
             model_class: tp.Optional[_api.TracModel.__class__] = None):
 
@@ -63,9 +65,11 @@ class TracRuntime:
         self._log = util.logger_for_object(self)
         self._log.info(f"TRAC Python Runtime {trac_version}")
 
-        self._job_config_path = job_config_path
+        self._sys_config_dir = pathlib.Path(sys_config_path).parent
         self._sys_config_path = sys_config_path
-        self._sys_config_dir = pathlib.Path(self._sys_config_path).parent
+        self._job_config_path = job_config_path
+        self._job_result_dir = job_result_dir
+        self._job_result_format = job_result_format
         self._batch_mode = bool(job_config is not None)
         self._dev_mode = dev_mode
         self._model_class = model_class
@@ -195,7 +199,10 @@ class TracRuntime:
             self._log.error(msg)
             raise _ex.EJobValidation(msg)
 
-        self._system.send("submit_job", self._job_config)
+        self._system.send(
+            "submit_job", self._job_config,
+            str(self._job_result_dir) if self._job_result_dir else "",
+            self._job_result_format if self._job_result_format else "")
 
     # ------------------------------------------------------------------------------------------------------------------
     # Error handling

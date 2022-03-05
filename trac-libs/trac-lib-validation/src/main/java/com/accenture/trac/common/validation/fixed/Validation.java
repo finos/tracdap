@@ -18,6 +18,7 @@ package com.accenture.trac.common.validation.fixed;
 
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataCodec;
+import com.accenture.trac.common.metadata.MetadataConstants;
 import com.accenture.trac.metadata.DecimalValue;
 import com.accenture.trac.metadata.ObjectType;
 import com.accenture.trac.metadata.TagSelector;
@@ -168,14 +169,14 @@ public class Validation {
     static ValidationContext identifier(String value, ValidationContext ctx) {
 
         return regexMatch(
-                ValidationConstants.VALID_IDENTIFIER, true,
+                MetadataConstants.VALID_IDENTIFIER, true,
                 "is not a valid identifier", value, ctx);
     }
 
     static ValidationContext notTracReserved(String value, ValidationContext ctx) {
 
         return regexMatch(
-                ValidationConstants.TRAC_RESERVED_IDENTIFIER, false,
+                MetadataConstants.TRAC_RESERVED_IDENTIFIER, false,
                 "is a TRAC reserved identifier", value, ctx);
     }
 
@@ -228,7 +229,7 @@ public class Validation {
         ctx = regexMatch(ValidationConstants.FILENAME_RESERVED, false,
                 "is a reserved filename", value, ctx);
 
-        ctx = regexMatch(ValidationConstants.TRAC_RESERVED_IDENTIFIER, false,
+        ctx = regexMatch(MetadataConstants.TRAC_RESERVED_IDENTIFIER, false,
                 "is a TRAC reserved identifier", value, ctx);
 
         return ctx;

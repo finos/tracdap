@@ -18,6 +18,24 @@ config:
   keystore.url: trac-unit.pfx
 
 
+instances:
+
+  meta:
+    - scheme: http
+      host: localhost
+      port: 8081
+
+  data:
+    - scheme: http
+      host: localhost
+      port: 8082
+
+  orch:
+    - scheme: http
+      host: localhost
+      port: 8083
+
+
 services:
 
   meta:
@@ -26,7 +44,7 @@ services:
     dalType: JDBC
     dalProps:
       dialect: H2
-      jdbcUrl: ${TRAC_RUN_DIR}/trac.meta
+      jdbcUrl: ${TRAC_DIR}/trac.meta
       h2.user: trac
       h2.pass: trac
       h2.schema: public
@@ -45,4 +63,17 @@ services:
         instances:
           - storageType: LOCAL
             storageProps:
-              rootDir: ${TRAC_RUN_DIR}/unit_test_storage
+              rootPath: ${TRAC_DIR}/unit_test_storage
+
+  orch:
+    port: 8083
+
+    repositories:
+      UNIT_TEST_REPO:
+        repoType: git
+        repoUrl: https://github.com/accenture/trac
+
+    executor:
+      executorType: LOCAL
+      executorProps:
+        venvPath: ${TRAC_EXEC_DIR}/venv

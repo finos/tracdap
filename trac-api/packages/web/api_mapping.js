@@ -26,6 +26,7 @@ const methodTypes = {
     "createFilet": "grpc.MethodType.CLIENT_STREAMING",
     "updateFile": "grpc.MethodType.CLIENT_STREAMING",
     "readFile": "grpc.MethodType.SERVER_STREAMING",
+    "followJob": "grpc.MethodType.SERVER_STREAMING",
 };
 
 
@@ -40,7 +41,8 @@ const enumMapping = {
     "IncarnationStatus": "trac.metadata.IncarnationStatus",
     "SearchOperator": "trac.metadata.SearchOperator",
     "LogicalOperator": "trac.metadata.LogicalOperator",
-    "TagOperation": "trac.metadata.TagOperation"
+    "TagOperation": "trac.metadata.TagOperation",
+    "JobStatusCode": "trac.metadata.JobStatusCode"
 }
 
 const basicTypeMapping = {

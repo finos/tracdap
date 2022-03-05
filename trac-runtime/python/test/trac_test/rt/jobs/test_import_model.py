@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import unittest
+import tempfile
 
 import trac.rt.config as cfg
 import trac.rt.metadata as meta
@@ -39,20 +40,28 @@ class ImportModelTest(unittest.TestCase):
 
     def test_import_from_git_ok(self):
 
+        job_id = util.new_object_id(meta.ObjectType.JOB)
+
         job_def = meta.JobDefinition(
             jobType=meta.JobType.IMPORT_MODEL,
-            importModel=meta.ImportModelJobDetails(
+            importModel=meta.ImportModelJob(
                 language="python",
                 repository="trac_git_repo",
                 path="examples/models/python/hello_world",
                 entryPoint="hello_world.HelloWorldModel",
                 version="main"))
 
-        job_config = cfg.JobConfig(job=job_def)
+        job_config = cfg.JobConfig(job_id, job_def)
 
-        trac_runtime = runtime.TracRuntime(self.sys_config, job_config, dev_mode=True)
-        trac_runtime.pre_start()
+        with tempfile.TemporaryDirectory() as tmpdir:
 
-        with trac_runtime as rt:
-            rt.submit_batch()
-            rt.wait_for_shutdown()
+            trac_runtime = runtime.TracRuntime(
+                self.sys_config, job_config,
+                job_result_dir=tmpdir,
+                job_result_format="json")
+
+            trac_runtime.pre_start()
+
+            with trac_runtime as rt:
+                rt.submit_batch()
+                rt.wait_for_shutdown()

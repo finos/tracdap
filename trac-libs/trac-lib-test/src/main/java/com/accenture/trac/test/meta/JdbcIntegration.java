@@ -61,7 +61,7 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
         var metaConfig = platformConfig.getServices().getMeta();
 
         var dalProps = new Properties();
-        dalProps.putAll(metaConfig.getDalProps());
+        dalProps.putAll(metaConfig.getDalPropsMap());
 
         dialect = JdbcSetup.getSqlDialect(dalProps, "");
         source = JdbcSetup.createDatasource(dalProps, "");

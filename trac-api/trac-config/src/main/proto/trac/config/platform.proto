@@ -34,6 +34,7 @@ message InstantMap {
 
   repeated InstanceConfig meta = 1;
   repeated InstanceConfig data = 2;
+  repeated InstanceConfig orch = 3;
 }
 
 message InstanceConfig {
@@ -48,6 +49,7 @@ message ServiceMap {
 
   MetaServiceConfig meta = 1;
   DataServiceConfig data = 2;
+  OrchServiceConfig orch = 3;
 }
 
 
@@ -70,6 +72,15 @@ message DataServiceConfig  {
   map<string, StorageConfig> storage = 4;
 }
 
+message OrchServiceConfig {
+
+  uint32 port = 1;
+
+  ExecutorConfig executor = 2;
+
+  map<string, RepositoryConfig> repositories = 3;
+}
+
 message StorageConfig {
 
   repeated StorageInstance instances = 1;
@@ -79,4 +90,17 @@ message StorageInstance {
 
   string storageType = 1;
   map<string, string> storageProps = 2;
+}
+
+message RepositoryConfig {
+
+  string repoType = 1;
+  string repoUrl = 2;
+  map<string, string> repoProps = 3;
+}
+
+message ExecutorConfig {
+
+  string executorType = 1;
+  map<string, string> executorProps = 2;
 }

@@ -24,6 +24,10 @@ apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
 dependencies {
 
+    api project(":trac-api-metadata")
+    api project(":trac-api-config")
+    api project(":trac-api-services")
+
     api project(':trac-lib-common')
     api project(':trac-lib-db')
     api project(':trac-lib-data')
@@ -35,11 +39,17 @@ dependencies {
 
     api project(':trac-svc-meta')
     api project(':trac-svc-data')
+    api project(':trac-svc-orch')
     api project(':trac-gateway')
 
     // Give tests access to the deploy tools to set up services for integration
 
     api project(':deploy-metadb')
+
+    // Some runtime classes need to be explicit on the test project classpath
+    testImplementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
+    testImplementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: "$jackson_version"
+    testImplementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
 }
 
 

@@ -22,22 +22,8 @@ option java_multiple_files = true;
 
 import "trac/metadata/type.proto";
 import "trac/metadata/object_id.proto";
+import "trac/metadata/tag_update.proto";
 
-
-message JobDefinition {
-
-  JobType jobType = 1;
-  TagSelector target = 2;
-
-  map<string, Value> parameters = 3;
-  map<string, TagSelector> inputs = 4;
-  map<string, TagSelector> outputs = 5;
-  map<string, TagSelector> models = 6;
-
-  oneof jobDetails {
-    ImportModelJobDetails importModel = 7;
-  }
-}
 
 enum JobType {
   JOB_TYPE_NOT_SET = 0;
@@ -47,7 +33,59 @@ enum JobType {
   IMPORT_DATA = 4;
 }
 
-message ImportModelJobDetails {
+enum JobStatusCode {
+
+  JOB_STATUS_CODE_NOT_SET = 0;
+  PREPARING = 1;
+  VALIDATED = 2;
+  PENDING = 3;
+  QUEUED = 4;
+  SUBMITTED = 5;
+  RUNNING = 6;
+  FINISHING = 7;
+  SUCCEEDED = 8;
+  FAILED = 9;
+  CANCELLED = 10;
+}
+
+
+message JobDefinition {
+
+  JobType jobType = 1;
+
+  oneof jobDetails {
+    RunModelJob runModel = 2;
+    RunFlowJob runFlow = 3;
+    ImportModelJob importModel = 4;
+  }
+}
+
+message RunModelJob {
+
+  TagSelector model = 1;
+
+  map<string, Value> parameters = 2;
+  map<string, TagSelector> inputs = 3;
+  map<string, TagSelector> outputs = 4;
+  map<string, TagSelector> priorOutputs = 5;
+
+  repeated TagUpdate outputAttrs = 6;
+}
+
+message RunFlowJob {
+
+  TagSelector flow = 1;
+
+  map<string, Value> parameters = 2;
+  map<string, TagSelector> inputs = 3;
+  map<string, TagSelector> outputs = 4;
+  map<string, TagSelector> priorOutputs = 5;
+  map<string, TagSelector> models = 6;
+
+  repeated TagUpdate outputAttrs = 7;
+}
+
+message ImportModelJob {
 
   string language = 1;
   string repository = 2;
@@ -55,4 +93,6 @@ message ImportModelJobDetails {
   string package = 4;
   string entryPoint = 5;
   string version = 6;
+
+  repeated TagUpdate modelAttrs = 7;
 }

@@ -34,4 +34,12 @@ def cli_args():
         "--dev-mode", dest="dev_mode", default=False, action="store_true",
         help="Enable development mode config translation")
 
+    parser.add_argument(
+        "--job-result-dir", dest="job_result_dir", type=pathlib.Path, required=False,
+        help="Output the result metadata for a batch job to the given directory")
+
+    parser.add_argument(
+        "--job-result-format", dest="job_result_format", choices=["json", "yaml", "proto"], default="json",
+        help="Output format for the result metadata (only meaningful if --job-result-dir is set)")
+
     return parser.parse_args()
