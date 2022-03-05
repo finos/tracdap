@@ -138,7 +138,7 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
 
         job_result = _config.JobResult()
         job_result.jobId = self.node.job_id
-        job_result.status = _config.JobStatus.SUCCEEDED
+        job_result.statusCodeC = meta.JobStatusCode.SUCCEEDED
 
         for result_id in self.node.result_ids:
 
