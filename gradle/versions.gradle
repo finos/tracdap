@@ -57,8 +57,6 @@ ext {
     aws_sdk_version = '1.12.128'
     gcp_sdk_version = '1.118.1'
 
-    // kube_client_version = '14.0.1'
-
 
     // Test dependencies
 

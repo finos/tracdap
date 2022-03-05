@@ -28,8 +28,6 @@ dependencies {
     api project(':trac-api-services')
     api project(':trac-lib-common')
 
-    // implementation group: 'io.kubernetes', name: 'client-java', version: "$kube_client_version"
-
     testImplementation project(':trac-lib-test')
 }
 
