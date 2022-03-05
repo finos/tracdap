@@ -1,11 +1,17 @@
 name: End to end
 
-# Run the main build and test for all branch pushes and pull requests, do not repeat the build for tags
 on:
+
+  # End-to-end tests always run on pull requests
+  pull_request:
+
+  # Re-run E2E tests in main, to make sure there are no issues from the merge
   push:
     branches:
-      - '**'
-  pull_request:
+      - main
+
+  # Allow manual triggering of E2E tests
+  workflow_dispatch:
 
 
 env:
