@@ -24,7 +24,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -323,6 +325,12 @@ public class LocalBatchExecutor implements IBatchExecutor {
             batchState.setPid(process.pid());
             processMap.put(process.pid(), process);
 
+            logBatchStart(jobState.getJobKey(), process, batchDir);
+
+            // If used, this should go on the main service executor
+//            process.onExit().whenComplete((proc, err) ->
+//                    logBatchComplete(jobState.getJobKey(), process, batchState));
+
             return batchState;
         }
         catch (IOException e) {
@@ -361,6 +369,39 @@ public class LocalBatchExecutor implements IBatchExecutor {
         }
     }
 
+    private void logBatchStart(String jobKey, Process batchProcess, Path batchDir) {
+
+        var procInfo = batchProcess.info();
+
+        log.info("Starting batch process [{}]", jobKey);
+        log.info("Command: {}", procInfo.commandLine().orElse("unknown"));
+        log.info("Working dir: {}", batchDir);
+        log.info("User: [{}]", procInfo.user().orElse("unknown"));
+        log.info("PID: [{}]", batchProcess.pid());
+    }
+
+    private void logBatchComplete(String jobKey, Process batchProcess, LocalBatchState batchState) {
+
+        var procInfo = batchProcess.info();
+
+        if (batchProcess.exitValue() == 0) {
+
+            log.info("Batch process succeeded: [{}]", jobKey);
+            log.info("Exit code: [{}]", batchProcess.exitValue());
+            log.info("CPU time: [{}]", procInfo.totalCpuDuration().orElse(Duration.ZERO));
+        }
+        else {
+
+            var errorBytes = readFile(batchState, JOB_LOG_SUBDIR, "trac_rt_stderr.txt");
+            var errorDetail = new String(errorBytes, StandardCharsets.UTF_8);
+
+            log.error("Batch process failed: [{}]", jobKey);
+            log.error("Exit code: [{}]", batchProcess.exitValue());
+            log.error("CPU time: [{}]", procInfo.totalCpuDuration().orElse(Duration.ZERO));
+            log.error(errorDetail);
+        }
+    }
+
 
     @Override
     public ExecutorState cancelBatch(ExecutorState jobState) {
@@ -375,8 +416,6 @@ public class LocalBatchExecutor implements IBatchExecutor {
         try {
 
             var batchState = validState(jobState);
-            var batchDir = Paths.get(batchState.getBatchDir());
-
             var process = processMap.get(batchState.getPid());
 
             if (process == null)
@@ -384,11 +423,23 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
             var pollResult = new ExecutorPollResult();
             pollResult.jobKey = jobState.getJobKey();
+            pollResult.executorState = batchState;
+
             pollResult.statusCode = process.isAlive()
                 ? JobStatusCode.RUNNING :
                 process.exitValue() == 0
                     ? JobStatusCode.SUCCEEDED
                     : JobStatusCode.FAILED;
+
+            if (pollResult.statusCode == JobStatusCode.FAILED) {
+
+                var statusMessage = String.format("Local batch terminated with non-zero exit code [%d]", process.exitValue());
+                var errorBytes = readFile(batchState, JOB_LOG_SUBDIR, "trac_rt_stderr.txt");
+                var errorDetail = new String(errorBytes, StandardCharsets.UTF_8);
+
+                pollResult.statusMessage = statusMessage;
+                pollResult.errorDetail = errorDetail;
+            }
 
             return pollResult;
         }
@@ -406,28 +457,17 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
         for (var job : priorStates.entrySet()) {
 
-            var priorState = validState(job.getValue());
-            var pid = priorState.getPid();
-            var process = processMap.get(pid);
+            try {
 
-            if (process == null)
-                throw new EUnexpected();  // TODO
+                var priorState = validState(job.getValue());
+                var pollResult = pollBatch(priorState);
 
-            var currentStatus = process.isAlive()
-                    ? JobStatusCode.RUNNING :
-                    process.exitValue() == 0
-                            ? JobStatusCode.SUCCEEDED
-                            : JobStatusCode.FAILED;
+                if (pollResult.statusCode == JobStatusCode.SUCCEEDED || pollResult.statusCode == JobStatusCode.FAILED)
+                    updates.add(pollResult);
+            }
+            catch (Exception e) {
 
-
-            if (currentStatus == JobStatusCode.SUCCEEDED || currentStatus == JobStatusCode.FAILED) {
-
-                var result = new ExecutorPollResult();
-                result.jobKey = job.getKey();
-                result.statusCode = currentStatus;
-                result.executorState = job.getValue();
-
-                updates.add(result);
+                log.warn("Failed to poll job: [{}] {}", job.getKey(), e.getMessage(), e);
             }
         }
 

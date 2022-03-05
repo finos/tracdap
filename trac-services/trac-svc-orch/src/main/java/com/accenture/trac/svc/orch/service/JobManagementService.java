@@ -200,7 +200,7 @@ public class JobManagementService {
         log.info("Job submitted: [{}]", jobKey);
     }
 
-    public void recordJobResult(String jobKey, JobState jobState, Ticket ticket)  {
+    public void recordJobResult(String jobKey, JobState jobState, Ticket ticket) {
 
         log.info("Record job result: [{}]", jobKey);
 
@@ -208,6 +208,7 @@ public class JobManagementService {
         var execResult = jobExecutor.pollBatch(execState);
 
         jobState.statusCode = execResult.statusCode;
+        jobState.statusMessage = execResult.statusMessage;
 
         if (execResult.statusCode == JobStatusCode.SUCCEEDED) {
 
@@ -216,15 +217,7 @@ public class JobManagementService {
 
             jobState.jobResult = decodeProto(jobResultBytes, ConfigFormat.JSON, JobResult.class, JobResult.newBuilder());
 
-            jobLifecycle.processJobResult(jobState).toCompletableFuture().join();  // TODO: Sync / async
-        }
-        else {
-
-            jobState.jobResult = JobResult.newBuilder()
-                    .setJobId(jobState.jobId)
-                    .setStatusCode(JobStatusCode.FAILED)
-                    .setStatusMessage(execResult.statusMessage)
-                    .build();
+            jobLifecycle.processJobResult(jobState).toCompletableFuture().join();
         }
 
         jobCache.updateJob(jobKey, jobState, ticket);
@@ -233,6 +226,14 @@ public class JobManagementService {
         executorService.schedule(
                 () -> jobOperation(jobKey, this::deleteJob),
                 RETAIN_COMPLETE_DELAY.getSeconds(), TimeUnit.SECONDS);
+
+        if (jobState.statusCode == JobStatusCode.SUCCEEDED) {
+            log.info("Job [{}] {} {}", jobKey, jobState.statusCode, jobState.statusMessage);
+        } else {
+            log.error("Job [{}] {} {}", jobKey, jobState.statusCode, jobState.statusMessage);
+            if (execResult.errorDetail != null)
+                log.error(execResult.errorDetail);
+        }
     }
 
     private void recordJobError(String jobKey) {
@@ -287,6 +288,8 @@ public class JobManagementService {
                 if (ctx.superseded())
                     return;
 
+                log.error("Job will be deleted due to an unexpected error: [{}] {}", jobKey, e.getMessage(), e);
+
                 var jobState = jobCache.readJob(jobKey);
 
                 jobState.statusCode = JobStatusCode.FAILED;
@@ -297,6 +300,10 @@ public class JobManagementService {
                 executorService.schedule(
                         () -> jobOperation(jobKey, this::deleteJob),
                         RETAIN_COMPLETE_DELAY.getSeconds(), TimeUnit.SECONDS);
+            }
+            catch (Exception e2) {
+
+                log.error("Error handling failed: [{}] {}", jobKey, e.getMessage(), e);
             }
         }
     }

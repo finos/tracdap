@@ -17,13 +17,12 @@
 package com.accenture.trac.common.exec;
 
 import com.accenture.trac.metadata.JobStatusCode;
-import com.accenture.trac.config.JobResult;
 
 public class ExecutorPollResult {
 
     public String jobKey;
     public JobStatusCode statusCode;
     public String statusMessage;
-    public JobResult jobResult;
+    public String errorDetail;
     public ExecutorState executorState;
 }
