@@ -60,13 +60,13 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
     // Include this test case as a unit test
     @ExtendWith(JdbcUnit.class)
-    static class Unit extends MetadataWriteApiTest {}
+    static class UnitTest extends MetadataWriteApiTest {}
 
     // Include this test case for integration against different database backends
     @org.junit.jupiter.api.Tag("integration")
     @org.junit.jupiter.api.Tag("int-metadb")
     @ExtendWith(JdbcIntegration.class)
-    static class Integration extends MetadataWriteApiTest {}
+    static class IntegrationTest extends MetadataWriteApiTest {}
 
     @Rule
     final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
@@ -229,8 +229,8 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var brokenEdges = validFlow.getFlow().toBuilder()
                 .addEdges(FlowEdge.newBuilder()
-                    .setHead(FlowSocket.newBuilder().setNode("another_absent_node").setSocket("missing_socket"))
-                    .setTail(FlowSocket.newBuilder().setNode("node_totally_not_present")))
+                    .setTo(FlowSocket.newBuilder().setNode("another_absent_node").setSocket("missing_socket"))
+                    .setFrom(FlowSocket.newBuilder().setNode("node_totally_not_present")))
                 .build();
 
         var invalidFlow = validFlow.toBuilder()
