@@ -16,6 +16,8 @@
 
 ext {
 
+    java_min_version = JavaVersion.VERSION_11
+
     guava_version = '31.0.1-jre'
 
     netty_version = '4.1.72.Final'
