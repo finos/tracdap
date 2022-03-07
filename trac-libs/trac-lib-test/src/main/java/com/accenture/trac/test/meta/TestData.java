@@ -299,11 +299,11 @@ public class TestData {
                 .putNodes("main_model", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE).build())
                 .putNodes("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
                 .addEdges(FlowEdge.newBuilder()
-                        .setHead(FlowSocket.newBuilder().setNode("main_model").setSocket("input_1"))
-                        .setTail(FlowSocket.newBuilder().setNode("input_1")))
+                        .setTarget(FlowSocket.newBuilder().setNode("main_model").setSocket("input_1"))
+                        .setSource(FlowSocket.newBuilder().setNode("input_1")))
                 .addEdges(FlowEdge.newBuilder()
-                        .setHead(FlowSocket.newBuilder().setNode("output_1"))
-                        .setTail(FlowSocket.newBuilder().setNode("main_model").setSocket("output_1"))))
+                        .setTarget(FlowSocket.newBuilder().setNode("output_1"))
+                        .setSource(FlowSocket.newBuilder().setNode("main_model").setSocket("output_1"))))
                 .build();
     }
 
