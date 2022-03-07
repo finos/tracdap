@@ -65,23 +65,23 @@
         "edges": [
 
             {
-                "head": { "node": "simulate_customer_transactions", "socket": "initial_accounts" },
-                "tail": { "node": "customer_accounts" }
+                "to": { "node": "simulate_customer_transactions", "socket": "initial_accounts" },
+                "from": { "node": "customer_accounts" }
             },
 
             {
-                "head": { "node": "simulate_customer_transactions", "socket": "economic_scenario" },
-                "tail": { "node": "economic_scenario" }
+                "to": { "node": "simulate_customer_transactions", "socket": "economic_scenario" },
+                "from": { "node": "economic_scenario" }
             },
 
             {
-                "head": { "node": "simulate_joiners_and_leavers", "socket": "initial_accounts" },
-                "tail": { "node": "simulate_customer_transactions", "socket": "simulated_accounts" }
+                "to": { "node": "simulate_joiners_and_leavers", "socket": "initial_accounts" },
+                "from": { "node": "simulate_customer_transactions", "socket": "simulated_accounts" }
             },
 
              {
-                 "head": { "node": "simulated_accounts" },
-                 "tail": { "node": "simulate_joiners_and_leavers", "socket": "simulated_accounts" }
+                 "to": { "node": "simulated_accounts" },
+                 "from": { "node": "simulate_joiners_and_leavers", "socket": "simulated_accounts" }
              }
         ]
 
