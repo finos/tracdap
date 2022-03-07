@@ -53,8 +53,8 @@ message FlowSocket {
 
 message FlowEdge {
 
-  FlowSocket head = 1;
-  FlowSocket tail = 2;
+  FlowSocket from = 1;
+  FlowSocket to = 2;
 }
 
 
