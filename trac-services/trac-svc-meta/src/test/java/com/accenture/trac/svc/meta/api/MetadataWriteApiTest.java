@@ -229,8 +229,8 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var brokenEdges = validFlow.getFlow().toBuilder()
                 .addEdges(FlowEdge.newBuilder()
-                    .setTo(FlowSocket.newBuilder().setNode("another_absent_node").setSocket("missing_socket"))
-                    .setFrom(FlowSocket.newBuilder().setNode("node_totally_not_present")))
+                    .setTarget(FlowSocket.newBuilder().setNode("another_absent_node").setSocket("missing_socket"))
+                    .setSource(FlowSocket.newBuilder().setNode("node_totally_not_present")))
                 .build();
 
         var invalidFlow = validFlow.toBuilder()
