@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 import typing as tp
-import trac.rt.api as trac
+import tracdap.rt.api as trac
 
 
 class HelloWorldModel(trac.TracModel):
