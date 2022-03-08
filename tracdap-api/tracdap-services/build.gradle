@@ -36,7 +36,7 @@ sourceSets {
 
 dependencies {
 
-    api project(':trac-api-metadata')
+    api project(':tracdap-api-metadata')
 
     // JavaX "Generated" annotation is still required by gRPC generated code
     implementation project(':trac-lib-annotations')
