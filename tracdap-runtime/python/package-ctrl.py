@@ -72,8 +72,8 @@ def copy_license():
 
 def move_generated_into_src():
 
-    move_generated_package_into_src("src/trac/rt/metadata", "generated/trac/rt_gen/domain/trac/metadata")
-    move_generated_package_into_src("src/trac/rt/config", "generated/trac/rt_gen/domain/trac/config")
+    move_generated_package_into_src("src/tracdap/rt/metadata", "generated/tracdap/rt_gen/domain/tracdap/metadata")
+    move_generated_package_into_src("src/tracdap/rt/config", "generated/tracdap/rt_gen/domain/tracdap/config")
 
 
 def move_generated_package_into_src(src_relative_path, generate_rel_path):
@@ -107,7 +107,7 @@ def set_trac_version():
     exit_code = process.wait()
 
     if exit_code != 0:
-        raise subprocess.SubprocessError('Failed to get TRAC version')
+        raise subprocess.SubprocessError('Failed to get TRAC d.a.p. version')
 
     raw_version = output.decode('utf-8').strip()
 
@@ -129,7 +129,7 @@ def set_trac_version():
 
     # Set the version number embedded into the package
 
-    embedded_version_file = BUILD_PATH.joinpath("src/trac/rt/_version.py")
+    embedded_version_file = BUILD_PATH.joinpath("src/tracdap/rt/_version.py")
     embedded_header_copied = False
 
     for line in fileinput.input(embedded_version_file, inplace=True):
