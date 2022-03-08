@@ -1,4 +1,4 @@
-# TRAC <span style="font-size:0.8em;">*D.A.P.*<span>
+# TRAC *d.a.p.*
 
 *A next-generation data and analytics platform for use in highly regulated environments*
 
