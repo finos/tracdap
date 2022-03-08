@@ -13,7 +13,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="$PROJECT_DIR$/dev/codegen/protoc-ctrl.py" />
-    <option name="PARAMETERS" value="python_runtime --proto_path trac-api/trac-metadata/src/main/proto --proto_path trac-api/trac-config/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/domain" />
+    <option name="PARAMETERS" value="python_runtime --proto_path tracdap-api/tracdap-metadata/src/main/proto --proto_path tracdap-api/tracdap-config/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/domain" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />
