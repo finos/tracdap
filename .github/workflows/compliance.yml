@@ -101,7 +101,7 @@ jobs:
       - name: Safety check
         run: |
           mkdir -p build/compliance/python-runtime-safety
-          cd trac-runtime/python
+          cd tracdap-runtime/python
           safety check --full-report --not-bare --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
           safety check --full-report --not-bare --json --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
 
@@ -112,7 +112,7 @@ jobs:
           . dev/compliance/license-exceptions-python.sh
 
           mkdir -p build/compliance/python-runtime-licenses
-          cd trac-runtime/python
+          cd tracdap-runtime/python
           pip-licenses --format=json --ignore-packages $IGNORE_LICENSE > ../../build/compliance/python-runtime-licenses/python-runtime-licenses.json
           pip-licenses --format=html --ignore-packages $IGNORE_LICENSE > ../../build/compliance/python-runtime-licenses/python-runtime-licenses.html
           pip-licenses --allow-only="Apache Software License;MIT License;BSD License;3-Clause BSD License" --ignore-packages $IGNORE_LICENSE
@@ -143,7 +143,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: trac-api/packages/web/package-lock.json
+          cache-dependency-path: tracdap-api/packages/web/package-lock.json
 
       # Use a cache to save downloading global compliance data on every build (e.g. NVD)
       # Compliance tasks will automatically look for updates and download deltas
