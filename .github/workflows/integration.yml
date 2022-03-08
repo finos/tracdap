@@ -84,22 +84,22 @@ jobs:
 
       - name: Python - Install build dependencies
         run: |
-          pip install -r trac-runtime/python/requirements.txt
+          pip install -r tracdap-runtime/python/requirements.txt
 
       - name: Python - Protoc code generation
         run: |
           python dev/codegen/protoc-ctrl.py python_runtime \
             --proto_path tracdap-api/tracdap-metadata/src/main/proto \
             --proto_path tracdap-api/tracdap-config/src/main/proto \
-            --out trac-runtime/python/generated/trac/rt_gen/domain
+            --out tracdap-runtime/python/generated/tracdap/rt_gen/domain
           python dev/codegen/protoc-ctrl.py python_proto \
             --proto_path tracdap-api/tracdap-metadata/src/main/proto \
             --proto_path tracdap-api/tracdap-config/src/main/proto \
-            --out trac-runtime/python/generated/trac/rt_gen/proto
+            --out tracdap-runtime/python/generated/tracdap/rt_gen/proto
 
       - name: Python - Build runtime package
         run: |
-          cd trac-runtime/python
+          cd tracdap-runtime/python
           python package-ctrl.py
 
       - name: Run end to end tests
