@@ -148,7 +148,7 @@ def build_protoc_args(generator, proto_paths, output_location, packages):
 
     elif generator == "python_runtime":
 
-        options = "--trac_opt=target_package=trac.rt"
+        options = "--trac_opt=target_package=tracdap.rt"
 
         if packages_option:
             options += f";{packages_option}"
