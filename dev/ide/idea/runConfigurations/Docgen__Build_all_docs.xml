@@ -6,7 +6,6 @@
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
     </envs>
-    <option name="SDK_HOME" value="$PROJECT_DIR$/dev/venv/Scripts/python.exe" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/dev/docgen" />
     <option name="IS_MODULE_SDK" value="true" />
     <option name="ADD_CONTENT_ROOTS" value="false" />
