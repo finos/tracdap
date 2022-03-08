@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-import {trac} from 'trac-web-api';
+import {tracdap} from 'tracdap-web-api';
 
 import {searchForSchema} from './metadata_mojo';
 import {loadFromDisk} from './util';
 
 // Create the Data API
-const dataApiRpcImpl = trac.setup.rpcImplForTarget(trac.api.TracDataApi, "http", "localhost", 8080);
-const dataApi = new trac.api.TracDataApi(dataApiRpcImpl);
+const dataApiRpcImpl = tracdap.setup.rpcImplForTarget(tracdap.api.TracDataApi, "http", "localhost", 8080);
+const dataApi = new tracdap.api.TracDataApi(dataApiRpcImpl);
 
 
 export function saveDataToTrac(schemaId, csvData) {
 
-    const request = trac.api.DataWriteRequest.create({
+    const request = tracdap.api.DataWriteRequest.create({
 
         tenant: "ACME_CORP",
 
@@ -53,7 +53,7 @@ export function saveDataToTrac(schemaId, csvData) {
 export function loadDataFromTrac(dataId) {
 
     // Ask for the dataset in JSON format
-    const request = trac.api.DataReadRequest.create({
+    const request = tracdap.api.DataReadRequest.create({
 
         tenant: "ACME_CORP",
 
@@ -138,7 +138,7 @@ function saveDataFromMemory(schemaId, originalDataId, newData) {
     const json = JSON.stringify(newData);
     const bytes = new TextEncoder().encode(json);
 
-    const request = trac.api.DataWriteRequest.create({
+    const request = tracdap.api.DataWriteRequest.create({
 
         tenant: "ACME_CORP",
 

@@ -14,7 +14,7 @@ Installing the API
 The easiest way to build web client applications for TRAC is using the web API package,
 It is available to install with NPM::
 
-    npm install --save trac-web-api
+    npm install --save tracdap-web-api
 
 Web apps built with this package can run in a browser using gRPC-Web to connect directly
 to the TRAC platform. There is no need to install anything else, or to deploy intermediate
@@ -25,7 +25,7 @@ Setting up a dev environment
 ----------------------------
 
 The easiest way to get a local development instance of TRAC is to clone the
-`TRAC GitHub Repository <https://github.com/finos/tracdap>`_
+`TRAC d.a.p. GitHub Repository <https://github.com/finos/tracdap>`_
 and follow the instructions in the main
 `README <https://github.com/finos/tracdap#readme>`_
 file.
