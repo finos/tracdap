@@ -31,9 +31,9 @@
 
         // Allow recent NPM versions to auto-detect ES6-style exports
         module.exports = $root;
-        module.exports.trac = $root.trac;
-        module.exports.trac.api = $root.trac.api;
-        module.exports.trac.metadata = $root.trac.metadata;
+        module.exports.tracdap = $root.trac;
+        module.exports.tracdap.api = $root.trac.api;
+        module.exports.tracdap.metadata = $root.trac.metadata;
         module.exports.google = $root.google;
     }
 
@@ -51,16 +51,16 @@
 
         function WebRpcImpl(service, namespace, protocol, host, port) {
 
-            const trac = $root.trac;
+            const tracdap = $root.tracdap;
 
             // If the namespace is not specified, the service must be part of trac.api
-            if (!namespace && !(service.name in trac.api))
-                throw new Error('Service ' + service.name + ' is not part of trac.api, you must specify a namespace');
+            if (!namespace && !(service.name in tracdap.api))
+                throw new Error('Service ' + service.name + ' is not part of tracdap.api, you must specify a namespace');
 
             // If a namespace is supplied, always use it even if the service exists in trac.api
             this.serviceName = namespace
                 ? namespace + '.' + service.name
-                : 'trac.api.' + service.name;
+                : 'tracdap.api.' + service.name;
 
             this.hostAddress = protocol
                 ? protocol + "://" + host + ":" + port
@@ -123,11 +123,11 @@
 
     })();
 
-    $root.trac.setup = (function() {
+    $root.tracdap.setup = (function() {
 
         /**
          * Namespace setup.
-         * @memberof trac
+         * @memberof tracdap
          * @namespace
          */
         const setup = {};
@@ -135,7 +135,7 @@
         /**
          * Create an rpcImpl for use in a web browser, requests will be sent to the page origin server
          * @function rpcImplForBrowser
-         * @memberof trac.setup
+         * @memberof tracdap.setup
          * @param {$protobuf.rpc.Service} serviceClass The service class to create an rpcImpl for
          * @returns {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
          */
@@ -148,7 +148,7 @@
         /**
          * Create an rpcImpl that connects to a specific target
          * @function rpcImplForTarget
-         * @memberof trac.setup
+         * @memberof tracdap.setup
          * @param {$protobuf.rpc.Service} serviceClass The service class to create an rpcImpl for
          * @param {string} protocol The protocol to use for connection (either "http" or "https")
          * @param {string} host The host to connect to
@@ -167,8 +167,8 @@
 
     const api_mapping = $API_MAPPING;
 
-    $root.trac = {
-        ...$root.trac,
+    $root.tracdap = {
+        ...$root.tracdap,
         ...api_mapping
     };
 

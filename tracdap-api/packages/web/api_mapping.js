@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Accenture Global Solutions Limited
+ * Copyright 2022 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,28 +31,28 @@ const methodTypes = {
 
 
 const enumMapping = {
-    "BasicType": "trac.metadata.BasicType",
-    "ObjectType": "trac.metadata.ObjectType",
-    "SchemaType": "trac.metadata.SchemaType",
-    "PartType": "trac.metadata.PartType",
-    "FlowNodeType": "trac.metadata.FlowNodeType",
-    "JobType": "trac.metadata.JobType",
-    "CopyStatus": "trac.metadata.CopyStatus",
-    "IncarnationStatus": "trac.metadata.IncarnationStatus",
-    "SearchOperator": "trac.metadata.SearchOperator",
-    "LogicalOperator": "trac.metadata.LogicalOperator",
-    "TagOperation": "trac.metadata.TagOperation",
-    "JobStatusCode": "trac.metadata.JobStatusCode"
+    "BasicType": "tracdap.metadata.BasicType",
+    "ObjectType": "tracdap.metadata.ObjectType",
+    "SchemaType": "tracdap.metadata.SchemaType",
+    "PartType": "tracdap.metadata.PartType",
+    "FlowNodeType": "tracdap.metadata.FlowNodeType",
+    "JobType": "tracdap.metadata.JobType",
+    "CopyStatus": "tracdap.metadata.CopyStatus",
+    "IncarnationStatus": "tracdap.metadata.IncarnationStatus",
+    "SearchOperator": "tracdap.metadata.SearchOperator",
+    "LogicalOperator": "tracdap.metadata.LogicalOperator",
+    "TagOperation": "tracdap.metadata.TagOperation",
+    "JobStatusCode": "tracdap.metadata.JobStatusCode"
 }
 
 const basicTypeMapping = {
-    "BOOLEAN": "trac.metadata.BasicType.BOOLEAN",
-    "INTEGER": "trac.metadata.BasicType.INTEGER",
-    "FLOAT": "trac.metadata.BasicType.FLOAT",
-    "DECIMAL": "trac.metadata.BasicType.DECIMAL",
-    "STRING": "trac.metadata.BasicType.STRING",
-    "DATE": "trac.metadata.BasicType.DATE",
-    "DATETIME": "trac.metadata.BasicType.DATETIME"
+    "BOOLEAN": "tracdap.metadata.BasicType.BOOLEAN",
+    "INTEGER": "tracdap.metadata.BasicType.INTEGER",
+    "FLOAT": "tracdap.metadata.BasicType.FLOAT",
+    "DECIMAL": "tracdap.metadata.BasicType.DECIMAL",
+    "STRING": "tracdap.metadata.BasicType.STRING",
+    "DATE": "tracdap.metadata.BasicType.DATE",
+    "DATETIME": "tracdap.metadata.BasicType.DATETIME"
 }
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Accenture Global Solutions Limited
+ * Copyright 2022 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,19 +21,19 @@ const pbts = require('protobufjs/cli/pbts');
 
 
 const packages = {
-    'trac/metadata': '../../trac-metadata/src/main/proto',
-    'trac/api': '../../trac-services/src/main/proto'
+    'tracdap/metadata': '../../tracdap-metadata/src/main/proto',
+    'tracdap/api': '../../tracdap-services/src/main/proto'
 };
 
 const mapping = require('./api_mapping.js');
 
-const jsOutFile = "trac.js";
-const tsOutFile = "trac.d.ts"
+const jsOutFile = "tracdap.js";
+const tsOutFile = "tracdap.d.ts"
 
 const pbjsArgs = [
     "--target", "static-module",
     "--wrap", "./wrapper.js",
-    "--root", "trac",
+    "--root", "tracdap",
     "--force-number",
     "--path", './build',
     "--out", jsOutFile
