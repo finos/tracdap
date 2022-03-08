@@ -179,13 +179,13 @@ message SearchTerm {
   string attrName = 1;
 
   /// The primitive type of the attribute being searched for
-  trac.metadata.BasicType attrType = 2;
+  BasicType attrType = 2;
 
   /// The search operator to apply
   SearchOperator operator = 3;
 
   /// The search value to look for
-  trac.metadata.Value searchValue = 4;
+  Value searchValue = 4;
 }
 
 /**

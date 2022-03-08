@@ -281,7 +281,7 @@ service TracMetadataApi {
      * ID, object type does not match ID, unknown object version, unknown tag
      * version.
      */
-    rpc getObject(MetadataGetRequest) returns (trac.metadata.Tag) {
+    rpc getObject(MetadataGetRequest) returns (metadata.Tag) {
         option (google.api.http) = {
             get: "/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/{tagVersion}"
         };
@@ -303,7 +303,7 @@ service TracMetadataApi {
      * Error conditions include: Invalid request, unknown tenant, unknown object
      * ID, object type does not match ID.
      */
-    rpc getLatestObject(MetadataGetRequest) returns (trac.metadata.Tag) {
+    rpc getLatestObject(MetadataGetRequest) returns (metadata.Tag) {
         option (google.api.http) = {
             get: "/{tenant}/{objectType}/{objectId}/versions/latest/tags/latest"
         };
@@ -325,7 +325,7 @@ service TracMetadataApi {
      * Error conditions include: Invalid request, unknown tenant, unknown object
      * ID, object type does not match ID, unknown object version.
      */
-    rpc getLatestTag(MetadataGetRequest) returns (trac.metadata.Tag) {
+    rpc getLatestTag(MetadataGetRequest) returns (metadata.Tag) {
         option (google.api.http) = {
             get: "/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/latest"
         };
@@ -448,7 +448,7 @@ message MetadataGetRequest {
 
     string tenant = 1;
 
-    trac.metadata.ObjectType objectType = 2;
+    metadata.ObjectType objectType = 2;
     string objectId = 3;
     optional int32 objectVersion = 4;
     optional int32 tagVersion = 5;
