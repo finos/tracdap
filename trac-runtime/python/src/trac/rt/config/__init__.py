@@ -12,4 +12,4 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from trac.rt_gen.domain.trac.config import *  # noqa
+from trac.rt_gen.domain.tracdap.config import *  # noqa
