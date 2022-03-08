@@ -1,6 +1,8 @@
-# TRAC
+# TRAC <span style="font-size:0.8em;">*D.A.P.*<span>
 
 *A next-generation data and analytics platform for use in highly regulated environments*
+
+[![FINOS - Incubating](https://cdn.jsdelivr.net/gh/finos/contrib-toolbox@master/images/badge-incubating.svg)](https://finosfoundation.atlassian.net/wiki/display/FINOS/Incubating)
 
 TRAC brings a step change in performance, insight, flexibility and control 
 compared to conventional analytics platforms. By redrawing the boundary
@@ -32,12 +34,15 @@ The following packages are available:
 
 ## Development Status
 
-[![Build and Test](https://github.com/Accenture/trac/actions/workflows/build.yml/badge.svg)](
-https://github.com/Accenture/trac/actions/workflows/build.yml)
-[![Integration Tests](https://github.com/Accenture/trac/actions/workflows/integration.yml/badge.svg)](
-https://github.com/Accenture/trac/actions/workflows/integration.yml)
-[![Packaging](https://github.com/Accenture/trac/actions/workflows/packaging.yml/badge.svg)](
-https://github.com/Accenture/trac/actions/workflows/packaging.yml)
+[![Build and Test](https://github.com/finos/tracdap/actions/workflows/build.yml/badge.svg)](
+https://github.com/finos/tracdap/actions/workflows/build.yml)
+[![Integration](https://github.com/finos/tracdap/actions/workflows/integration.yml/badge.svg)](
+https://github.com/finos/tracdap/actions/workflows/integration.yml)
+[![Compliance](https://github.com/finos/tracdap/actions/workflows/compliance.yml/badge.svg)](
+https://github.com/finos/tracdap/actions/workflows/compliance.yml)
+[![Packaging](https://github.com/finos/tracdap/actions/workflows/packaging.yml/badge.svg)](
+https://github.com/finos/tracdap/actions/workflows/packaging.yml)
+
 
 The current release series (0.3.x) is intended for reference and experimentation.
 It includes the metadata service, data service and core data engine, runtime engine
@@ -51,7 +56,7 @@ stabilise before eventually being frozen for TRAC version 1.0, after which they 
 be added to but not removed or changed.
 
 For more information see the
-[development roadmap](https://github.com/Accenture/trac/wiki/Development-Roadmap).
+[development roadmap](https://github.com/finos/tracdap/wiki/Development-Roadmap).
 
 ## Building TRAC
 
@@ -105,9 +110,9 @@ in the online documentation.
 
 ## Contributing
 
-1. Fork it (<https://github.com/finos/{project slug}/fork>)
+1. Fork it (<https://github.com/finos/tracdap/fork>)
 2. Create your feature branch (`git checkout -b feature/fooBar`)
-3. Read our [contribution guidelines](.github/CONTRIBUTING.md) and [Community Code of Conduct](https://www.finos.org/code-of-conduct)
+3. Read our [contribution guidelines](./CONTRIBUTING.md) and [Community Code of Conduct](https://www.finos.org/code-of-conduct)
 4. Commit your changes (`git commit -am 'Add some fooBar'`)
 5. Push to the branch (`git push origin feature/fooBar`)
 6. Create a new Pull Request
