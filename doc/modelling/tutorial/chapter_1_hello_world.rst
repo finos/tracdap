@@ -11,7 +11,7 @@ under *examples/models/python*.
 Requirements
 ------------
 
-.. include:: ../../../trac-runtime/python/README.md
+.. include:: ../../../tracdap-runtime/python/README.md
     :start-after: ## Requirements
     :end-before: ## Installing the runtime
 
