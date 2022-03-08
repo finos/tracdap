@@ -15,12 +15,12 @@
  */
 
 syntax = 'proto3';
-package trac.metadata;
+package tracdap.metadata;
 
 option java_package = "com.accenture.trac.metadata";
 option java_multiple_files = true;
 
-import "trac/metadata/object_id.proto";
+import "tracdap/metadata/object_id.proto";
 
 
 message FileDefinition {

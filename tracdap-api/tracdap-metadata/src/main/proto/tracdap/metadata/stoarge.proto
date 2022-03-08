@@ -15,12 +15,12 @@
  */
 
 syntax = 'proto3';
-package trac.metadata;
+package tracdap.metadata;
 
 option java_package = "com.accenture.trac.metadata";
 option java_multiple_files = true;
 
-import "trac/metadata/type.proto";
+import "tracdap/metadata/type.proto";
 
 
 enum CopyStatus {

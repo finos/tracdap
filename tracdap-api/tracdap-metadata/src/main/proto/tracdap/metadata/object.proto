@@ -15,20 +15,20 @@
  */
 
 syntax = 'proto3';
-package trac.metadata;
+package tracdap.metadata;
 
 option java_package = "com.accenture.trac.metadata";
 option java_multiple_files = true;
 option java_outer_classname = "ObjectProtoWrapper";  // Do not create a Java class called "Object"!
 
-import "trac/metadata/object_id.proto";
-import "trac/metadata/data.proto";
-import "trac/metadata/model.proto";
-import "trac/metadata/flow.proto";
-import "trac/metadata/job.proto";
-import "trac/metadata/file.proto";
-import "trac/metadata/custom.proto";
-import "trac/metadata/stoarge.proto";
+import "tracdap/metadata/object_id.proto";
+import "tracdap/metadata/data.proto";
+import "tracdap/metadata/model.proto";
+import "tracdap/metadata/flow.proto";
+import "tracdap/metadata/job.proto";
+import "tracdap/metadata/file.proto";
+import "tracdap/metadata/custom.proto";
+import "tracdap/metadata/stoarge.proto";
 
 
 /**

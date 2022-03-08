@@ -15,14 +15,14 @@
  */
 
 syntax = 'proto3';
-package trac.config;
+package tracdap.config;
 
 option java_package = "com.accenture.trac.config";
 option java_multiple_files = true;
 
-import "trac/metadata/object_id.proto";
-import "trac/metadata/object.proto";;
-import "trac/metadata/job.proto";
+import "tracdap/metadata/object_id.proto";
+import "tracdap/metadata/object.proto";;
+import "tracdap/metadata/job.proto";
 
 
 message JobConfig {

@@ -15,17 +15,17 @@
  */
 
 syntax = "proto3";
-package trac.api;
+package tracdap.api;
 
 option java_package = "com.accenture.trac.api";
 option java_multiple_files = true;
 
-import "trac/metadata/type.proto";
-import "trac/metadata/object_id.proto";
-import "trac/metadata/object.proto";
-import "trac/metadata/tag.proto";
-import "trac/metadata/tag_update.proto";
-import "trac/metadata/job.proto";
+import "tracdap/metadata/type.proto";
+import "tracdap/metadata/object_id.proto";
+import "tracdap/metadata/object.proto";
+import "tracdap/metadata/tag.proto";
+import "tracdap/metadata/tag_update.proto";
+import "tracdap/metadata/job.proto";
 
 import "google/api/annotations.proto";
 

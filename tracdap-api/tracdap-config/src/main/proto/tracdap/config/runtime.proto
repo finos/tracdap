@@ -15,12 +15,12 @@
  */
 
 syntax = 'proto3';
-package trac.config;
+package tracdap.config;
 
 option java_package = "com.accenture.trac.config";
 option java_multiple_files = true;
 
-import "trac/config/platform.proto";
+import "tracdap/config/platform.proto";
 
 
 message RuntimeConfig {
