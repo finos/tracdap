@@ -4,7 +4,7 @@ Chapter 2 - Using Data
 ######################
 
 This tutorial is based on the *using_data.py* example, which can be found in the
-`TRAC GitHub Repository <https://github.com/Accenture/trac>`_
+`TRAC GitHub Repository <https://github.com/finos/tracdap>`_
 under *examples/models/python*.
 
 .. literalinclude:: ../../../examples/models/python/using_data/using_data.py

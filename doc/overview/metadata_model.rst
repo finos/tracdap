@@ -36,7 +36,7 @@ data can often be discarded and recreated later if needed.
 
 .. seealso::
     For a comprehensive reference of data structures in the metadata model, see the
-    :doc:`metadata listing <../autoapi/trac/metadata/index>`.
+    :doc:`metadata listing <../autoapi/tracdap/metadata/index>`.
 
 
 Objects

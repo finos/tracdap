@@ -4,7 +4,7 @@ Chapter 1 - Hello World
 #######################
 
 This tutorial is based on the *hello_world.py* example, which can be found in the
-`TRAC GitHub Repository <https://github.com/Accenture/trac>`_
+`TRAC GitHub Repository <https://github.com/finos/tracdap>`_
 under *examples/models/python*.
 
 
@@ -154,5 +154,5 @@ Now you should be able to run your model script and see the model output in the 
 
 
 .. seealso::
-    The full source code for this example is available in the
-    `TRAC GitHub repository <https://github.com/Accenture/trac/tree/main/examples/models/python/hello_world>`_
+    The full source code for this example is
+    `available on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/hello_world>`_
