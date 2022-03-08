@@ -15,8 +15,8 @@
 
 # Code gen creates outputs under artificial locations:
 #
-#   trac.rt_gen.domain.tracdap.metadata - TRAC domain objects for the runtime API
-#   trac.rt_gen.proto.tracdap.metadata - Output of Google's native protoc for Python
+#   tracdap.rt_gen.domain.tracdap.metadata - TRAC domain objects for the runtime API
+#   tracdap.rt_gen.proto.tracdap.metadata - Output of Google's native protoc for Python
 #
 # The generator respects the package layout of the source .proto files, however
 # having the top level trac namespace defined in two source roots means only one
@@ -24,10 +24,10 @@
 # around this by copying the output of the generator under the correct locations
 # in the package, which will be as follows:
 #
-#   trac.rt_gen.domain.tracdap.metadata -> trac.rt.metadata
-#   trac.rt_gen.proto.tracdap.metadata -> trac.rt.proto
+#   tracdap.rt_gen.domain.tracdap.metadata -> tracdap.rt.metadata
+#   tracdap.rt_gen.proto.tracdap.metadata -> tracdap.rt.proto
 #
 # This proxy import means the API will work as expected during development
 # without needing to run packaging jobs.
 
-from trac.rt_gen.domain.tracdap.metadata import *  # noqa
+from tracdap.rt_gen.domain.tracdap.metadata import *  # noqa

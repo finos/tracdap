@@ -1,4 +1,16 @@
-#  Copyright 2021 Accenture Global Solutions Limited
+#  Copyright 2022 Accenture Global Solutions Limited
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -19,18 +31,18 @@ import sys
 import pathlib
 import typing as tp
 
-import trac.rt.api as _api
-import trac.rt.config as _cfg
-import trac.rt._version as _version
-import trac.rt.exceptions as _ex
-import trac.rt.impl.config_parser as _cparse
-import trac.rt.impl.util as util
-import trac.rt.impl.models as _models
-import trac.rt.impl.storage as _storage
+import tracdap.rt.api as _api
+import tracdap.rt.config as _cfg
+import tracdap.rt._version as _version
+import tracdap.rt.exceptions as _ex
+import tracdap.rt.impl.config_parser as _cparse
+import tracdap.rt.impl.util as util
+import tracdap.rt.impl.models as _models
+import tracdap.rt.impl.storage as _storage
 
-import trac.rt.exec.actors as _actors
-import trac.rt.exec.engine as _engine
-import trac.rt.exec.dev_mode as _dev_mode
+import tracdap.rt.exec.actors as _actors
+import tracdap.rt.exec.engine as _engine
+import tracdap.rt.exec.dev_mode as _dev_mode
 
 
 class TracRuntime:

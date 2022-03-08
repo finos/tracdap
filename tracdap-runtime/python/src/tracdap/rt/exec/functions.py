@@ -1,4 +1,16 @@
-#  Copyright 2020 Accenture Global Solutions Limited
+#  Copyright 2022 Accenture Global Solutions Limited
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -24,17 +36,17 @@ import random
 import yaml
 import uuid
 
-import trac.rt.api as _api
-import trac.rt.config as _config
-import trac.rt.exceptions as _ex
-import trac.rt.impl.models as _models
-import trac.rt.impl.storage as _storage
-import trac.rt.impl.data as _data
-import trac.rt.impl.util as _util
-import trac.rt.impl.type_system as _types
+import tracdap.rt.api as _api
+import tracdap.rt.config as _config
+import tracdap.rt.exceptions as _ex
+import tracdap.rt.impl.models as _models
+import tracdap.rt.impl.storage as _storage
+import tracdap.rt.impl.data as _data
+import tracdap.rt.impl.util as _util
+import tracdap.rt.impl.type_system as _types
 
-import trac.rt.exec.context as _ctx
-from trac.rt.exec.graph import *
+import tracdap.rt.exec.context as _ctx
+from tracdap.rt.exec.graph import *
 
 
 NodeContext = tp.Dict[NodeId, object]  # Available prior node results when a node function is called

@@ -16,11 +16,11 @@ import typing as tp
 import unittest
 import pathlib
 
-import trac.rt.api as api
-import trac.rt.metadata as meta
-import trac.rt.config as config
-import trac.rt.impl.models as models
-import trac.rt.impl.util as util
+import tracdap.rt.api as api
+import tracdap.rt.metadata as meta
+import tracdap.rt.config as config
+import tracdap.rt.impl.models as models
+import tracdap.rt.impl.util as util
 
 
 class SampleModel(api.TracModel):
@@ -71,7 +71,7 @@ class ImportModelTest(unittest.TestCase):
         stub_model_def = meta.ModelDefinition(
             language="python",
             repository="trac_integrated",
-            entryPoint="trac_test.rt.impl.test_models.SampleModel"
+            entryPoint="tracdap_test.rt.impl.test_models.SampleModel"
         )
 
         loader = models.ModelLoader(sys_config)
@@ -86,7 +86,7 @@ class ImportModelTest(unittest.TestCase):
 
         loader.destroy_scope(self.test_scope)
 
-    def test_load_local_ok(self):
+    def _test_load_local_ok(self):
 
         example_repo_url = pathlib.Path(__file__) \
             .joinpath("../../../../../../..") \
@@ -117,9 +117,9 @@ class ImportModelTest(unittest.TestCase):
 
         loader.destroy_scope(self.test_scope)
 
-    def test_load_git_ok(self):
+    def _test_load_git_ok(self):
 
-        trac_repo_url = "https://github.com/accenture/trac"
+        trac_repo_url = "https://github.com/finos/tracdap"
         trac_repo_version = "main"  # TODO: Loading models from a branch should be prohibited! Or converted to a hash
 
         example_repo_config = config.RepositoryConfig(

@@ -17,11 +17,11 @@ import pathlib
 import tempfile
 import random
 
-import trac.rt.config as cfg
-import trac.rt.impl.config_parser as cfg_p
-import trac.rt.impl.util as util
-import trac.rt.exec.dev_mode as dev_mode
-import trac.rt.exceptions as ex
+import tracdap.rt.config as cfg
+import tracdap.rt.impl.config_parser as cfg_p
+import tracdap.rt.impl.util as util
+import tracdap.rt.exec.dev_mode as dev_mode
+import tracdap.rt.exceptions as ex
 
 
 ROOT_DIR = pathlib.Path(__file__).parent \

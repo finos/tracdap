@@ -15,10 +15,10 @@
 import unittest
 import tempfile
 
-import trac.rt.config as cfg
-import trac.rt.metadata as meta
-import trac.rt.exec.runtime as runtime
-import trac.rt.impl.util as util
+import tracdap.rt.config as cfg
+import tracdap.rt.metadata as meta
+import tracdap.rt.exec.runtime as runtime
+import tracdap.rt.impl.util as util
 
 
 class ImportModelTest(unittest.TestCase):
@@ -32,13 +32,13 @@ class ImportModelTest(unittest.TestCase):
         repos = {
             "trac_git_repo": cfg.RepositoryConfig(
                 repoType="git",
-                repoUrl="https://github.com/accenture/trac")
+                repoUrl="https://github.com/finos/tracdap")
         }
 
         self.sys_config = cfg.RuntimeConfig(repositories=repos)
         # self.trac_runtime = runtime.TracRuntime(self.sys_config)
 
-    def test_import_from_git_ok(self):
+    def _test_import_from_git_ok(self):
 
         job_id = util.new_object_id(meta.ObjectType.JOB)
 

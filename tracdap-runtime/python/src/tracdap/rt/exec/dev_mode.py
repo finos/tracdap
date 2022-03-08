@@ -1,4 +1,16 @@
-#  Copyright 2021 Accenture Global Solutions Limited
+#  Copyright 2022 Accenture Global Solutions Limited
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -19,14 +31,14 @@ import typing as tp
 import copy
 import pathlib
 
-import trac.rt.api as api
-import trac.rt.metadata as meta
-import trac.rt.config as cfg
-import trac.rt.exceptions as _ex
-import trac.rt.impl.models as _models
-import trac.rt.impl.storage as _storage
-import trac.rt.impl.type_system as _types
-import trac.rt.impl.util as util
+import tracdap.rt.api as api
+import tracdap.rt.metadata as meta
+import tracdap.rt.config as cfg
+import tracdap.rt.exceptions as _ex
+import tracdap.rt.impl.models as _models
+import tracdap.rt.impl.storage as _storage
+import tracdap.rt.impl.type_system as _types
+import tracdap.rt.impl.util as util
 
 
 DEV_MODE_JOB_CONFIG = [

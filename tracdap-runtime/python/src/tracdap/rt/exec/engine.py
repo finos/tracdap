@@ -1,4 +1,16 @@
-#  Copyright 2021 Accenture Global Solutions Limited
+#  Copyright 2022 Accenture Global Solutions Limited
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -18,15 +30,15 @@ import typing as tp
 from copy import copy
 from dataclasses import dataclass, field
 
-import trac.rt.config as config
-import trac.rt.impl.util as util
-import trac.rt.impl.models as _models
-import trac.rt.impl.storage as _storage
+import tracdap.rt.config as config
+import tracdap.rt.impl.util as util
+import tracdap.rt.impl.models as _models
+import tracdap.rt.impl.storage as _storage
 
-import trac.rt.exec.actors as actors
-import trac.rt.exec.graph_builder as _graph
-import trac.rt.exec.functions as _func
-from trac.rt.exec.graph import NodeId
+import tracdap.rt.exec.actors as actors
+import tracdap.rt.exec.graph_builder as _graph
+import tracdap.rt.exec.functions as _func
+from tracdap.rt.exec.graph import NodeId
 
 
 @dataclass

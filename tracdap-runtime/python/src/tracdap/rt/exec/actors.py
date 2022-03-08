@@ -21,8 +21,8 @@ import enum
 import dataclasses as dc
 import inspect
 
-import trac.rt.impl.util as util
-import trac.rt.exceptions as _ex
+import tracdap.rt.impl.util as util
+import tracdap.rt.exceptions as _ex
 
 
 ActorId = str

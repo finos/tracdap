@@ -16,7 +16,7 @@ import unittest
 import importlib.util
 import sys
 
-import trac.rt.launch as launch
+import tracdap.rt.launch as launch
 
 
 class HelloWorldExample(unittest.TestCase):

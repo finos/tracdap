@@ -18,7 +18,7 @@ from .define_func import *
 
 # Make metadata classes available to client code when importing the API package
 # Remove this import when generating docs, so metadata classes are only documented once
-from trac.rt.metadata import *  # noqa DOCGEN_REMOVE
+from tracdap.rt.metadata import *  # noqa DOCGEN_REMOVE
 
 # Map basic types into the root of the API package
 BOOLEAN = BasicType.BOOLEAN

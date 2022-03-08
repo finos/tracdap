@@ -12,8 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import trac.rt.impl.util as util
-import trac.rt.exec.actors as actors
+import tracdap.rt.impl.util as util
+import tracdap.rt.exec.actors as actors
 import unittest
 
 

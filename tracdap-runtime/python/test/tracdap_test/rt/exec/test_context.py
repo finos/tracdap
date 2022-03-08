@@ -18,11 +18,11 @@ import decimal
 import datetime
 import pandas as pd
 
-import trac.rt.api as _api
-import trac.rt.exceptions as _ex
-import trac.rt.impl.data as _data
+import tracdap.rt.api as _api
+import tracdap.rt.exceptions as _ex
+import tracdap.rt.impl.data as _data
 
-from trac.rt.exec.context import TracContextImpl
+from tracdap.rt.exec.context import TracContextImpl
 
 
 class _TestModel(_api.TracModel):
