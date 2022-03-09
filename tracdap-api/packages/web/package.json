@@ -18,9 +18,9 @@
     "url": "https://github.com/finos/tracdap/issues"
   },
   "files": [
-    "trac.*"
+    "tracdap.*"
   ],
-  "main": "trac.js",
+  "main": "tracdap.js",
   "dependencies": {
     "grpc-web": "~1.2.1",
     "protobufjs": "~6.11.2"
