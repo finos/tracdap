@@ -17,7 +17,7 @@
 syntax = 'proto3';
 package tracdap.metadata;
 
-option java_package = "com.accenture.trac.metadata";
+option java_package = "org.finos.tracdap.metadata";
 option java_multiple_files = true;
 
 import "tracdap/metadata/object_id.proto";
