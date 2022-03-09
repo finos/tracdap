@@ -14,28 +14,28 @@
  * limitations under the License.
  */
 
-import {trac} from 'trac-web-api';
+import {tracdap} from 'tracdap-web-api';
 
 import {loadTag} from "./hello_world";
 
-const metaApiRpcImpl = trac.setup.rpcImplForTarget(trac.api.TracMetadataApi, "http", "localhost", 8080);
-const metaApi = new trac.api.TracMetadataApi(metaApiRpcImpl);
+const metaApiRpcImpl = tracdap.setup.rpcImplForTarget(tracdap.api.TracMetadataApi, "http", "localhost", 8080);
+const metaApi = new tracdap.api.TracMetadataApi(metaApiRpcImpl);
 
 
 export function searchForSchema() {
 
-    const searchRequest = trac.api.MetadataSearchRequest.create({
+    const searchRequest = tracdap.api.MetadataSearchRequest.create({
 
         tenant: "ACME_CORP",
         searchParams: {
 
-            objectType: trac.ObjectType.SCHEMA,
+            objectType: tracdap.ObjectType.SCHEMA,
 
             search: {  term: {
 
                 attrName: "schema_type",
-                attrType: trac.STRING,
-                operator: trac.SearchOperator.EQ,
+                attrType: tracdap.STRING,
+                operator: tracdap.SearchOperator.EQ,
                 searchValue: { stringValue: "customer_records" }
             }}
         }
@@ -61,20 +61,20 @@ export function findFirst(searchRequest) {
 
 export function logicalSearch() {
 
-    const schemaTypeCriteria = trac.metadata.SearchExpression.create({
+    const schemaTypeCriteria = tracdap.metadata.SearchExpression.create({
         term: {
             attrName: "schema_type",
-            attrType: trac.STRING,
-            operator: trac.SearchOperator.EQ,
+            attrType: tracdap.STRING,
+            operator: tracdap.SearchOperator.EQ,
             searchValue: { stringValue: "customer_records" }
         }
     });
 
-    const businessDivisionCriteria = trac.metadata.SearchExpression.create({
+    const businessDivisionCriteria = tracdap.metadata.SearchExpression.create({
         term: {
             attrName: "business_division",
-            attrType: trac.STRING,
-            operator: trac.SearchOperator.IN,
+            attrType: tracdap.STRING,
+            operator: tracdap.SearchOperator.IN,
             searchValue: { arrayValue: {
                 items: [
                     { stringValue: "WIDGET_SALES" },
@@ -85,9 +85,9 @@ export function logicalSearch() {
         }
     });
 
-    const logicalSearch = trac.metadata.SearchExpression.create({
+    const logicalSearch = tracdap.metadata.SearchExpression.create({
         logical: {
-            operator: trac.LogicalOperator.AND,
+            operator: tracdap.LogicalOperator.AND,
             expr: [
                 schemaTypeCriteria,
                 businessDivisionCriteria
@@ -95,11 +95,11 @@ export function logicalSearch() {
         }
     });
 
-    const searchRequest = trac.api.MetadataSearchRequest.create({
+    const searchRequest = tracdap.api.MetadataSearchRequest.create({
 
         tenant: "ACME_CORP",
         searchParams: {
-            objectType: trac.ObjectType.SCHEMA,
+            objectType: tracdap.ObjectType.SCHEMA,
             search: logicalSearch
         }
     });

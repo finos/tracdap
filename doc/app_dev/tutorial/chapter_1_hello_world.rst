@@ -4,7 +4,7 @@ Chapter 1 - Hello World
 #######################
 
 This tutorial is based on the *hello_world.js* example, which can be found in the
-`TRAC GitHub Repository <https://github.com/Accenture/trac>`_
+`TRAC GitHub Repository <https://github.com/finos/tracdap>`_
 under *examples/apps/javascript*.
 
 
@@ -14,7 +14,7 @@ Installing the API
 The easiest way to build web client applications for TRAC is using the web API package,
 It is available to install with NPM::
 
-    npm install --save trac-web-api
+    npm install --save tracdap-web-api
 
 Web apps built with this package can run in a browser using gRPC-Web to connect directly
 to the TRAC platform. There is no need to install anything else, or to deploy intermediate
@@ -25,9 +25,9 @@ Setting up a dev environment
 ----------------------------
 
 The easiest way to get a local development instance of TRAC is to clone the
-`TRAC GitHub Repository <https://github.com/Accenture/trac>`_
+`TRAC d.a.p. GitHub Repository <https://github.com/finos/tracdap>`_
 and follow the instructions in the main
-`README <https://github.com/Accenture/trac#readme>`_
+`README <https://github.com/finos/tracdap#readme>`_
 file.
 
 To make a browser-based app that talks to TRAC, the platform and the app should be served under the same origin.
@@ -71,15 +71,15 @@ Start by importing the TRAC API package:
     :lineno-start: 17
 
 We need two things to create the TRAC connection, an RPC connector and an instance of the
-TRAC API class. You can use trac.setup to create an RPC connector that works in the browser.
+TRAC API class. You can use tracdap.setup to create an RPC connector that works in the browser.
 
 .. code-block:: javascript
     :linenos:
     :lineno-start: 19
 
-    // Use trac.setup to create an RPC connector pointed at your TRAC server
+    // Use tracdap.setup to create an RPC connector pointed at your TRAC server
     // The browser RPC connector will send all requests to the page origin server
-    const metaApiRpcImpl = trac.setup.rpcImplForBrowser(trac.api.TracMetadataApi);
+    const metaApiRpcImpl = tracdap.setup.rpcImplForBrowser(tracdap.api.TracMetadataApi);
 
 This assumes you have set up routing through the TRAC gateway as described in the previous section.
 
@@ -119,7 +119,7 @@ Creating and saving objects
 Suppose we want to create a schema, that we can use to describe some customer account data.
 (It is not always necessary to create schemas in this way, but we'll do it for an example).
 
-First we need to build the :class:`SchemaDefinition<trac.metadata.SchemaDefinition>` object.
+First we need to build the :class:`SchemaDefinition<tracdap.metadata.SchemaDefinition>` object.
 In real-world applications schemas would be created by automated tools (for example TRAC
 generates schemas during data import jobs), but for this example we can define a simple one
 in code.
@@ -130,17 +130,17 @@ in code.
     :linenos:
     :lineno-start: 27
 
-The web API package provides structured classes for every type and enum in the ``trac.metadata``
+The web API package provides structured classes for every type and enum in the ``tracdap.metadata``
 package. A ``.create()`` method is available for every type, which provides auto-complete and
 type hints in IDEs that support it. Enums are set using the constants defined in the API package.
-All enum types are available in the trac namespace, so ``trac.SchemaType`` is shorthand for
-``trac.metadata.SchemaType`` and so on. The basic types in the TRAC type system are also
-available, so ``trac.STRING`` is a shorthand for ``trac.metadata.BasicType.STRING``.
+All enum types are available in the trac namespace, so ``tracdap.SchemaType`` is shorthand for
+``tracdap.metadata.SchemaType`` and so on. The basic types in the TRAC type system are also
+available, so ``tracdap.STRING`` is a shorthand for ``tracdap.metadata.BasicType.STRING``.
 
 Now we want to save the schema into the TRAC metadata store.
-To do that, we use a :class:`MetadataWriteRequest<trac.api.MetadataWriteRequest>`.
-Request objects from the ``trac.api`` package can be created the same way metadata objects from
-``trac.metadata``.
+To do that, we use a :class:`MetadataWriteRequest<tracdap.api.MetadataWriteRequest>`.
+Request objects from the ``tracdap.api`` package can be created the same way metadata objects from
+``tracdap.metadata``.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
@@ -154,17 +154,17 @@ tenant A cannot access a resource created in tenant B. For this example we have 
 tenant called "ACME_CORP".
 
 Objects are the basic resources held in the platform, each object is described by an
-:class:`ObjectDefinition<trac.metadata.ObjectDefinition>` which can hold one of a number
+:class:`ObjectDefinition<tracdap.metadata.ObjectDefinition>` which can hold one of a number
 of types of object. Here we are creating a SCHEMA object, we build the object definition
 using the schema created earlier.
 
 We also want to tag our new schema with some informational attributes. These attributes
 describe the schema object and will allow us to find it later using metadata searches.
-Tags can be applied using :class:`TagUpdate<trac.metadata.TagUpdate>` instructions when
+Tags can be applied using :class:`TagUpdate<tracdap.metadata.TagUpdate>` instructions when
 objects are created. Here we are applying three tags to the new object, two are categorical
 tags and one is descriptive.
 
-The last step is to call :meth:`createObject()<trac.api.TracMetadataApi.createObject>`,
+The last step is to call :meth:`createObject()<tracdap.api.TracMetadataApi.createObject>`,
 to send our request to the TRAC metadata service.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
@@ -173,8 +173,8 @@ to send our request to the TRAC metadata service.
     :linenos:
     :lineno-start: 77
 
-The :meth:`createObject()<trac.api.TracMetadataApi.createObject>` method returns the ID of
-the newly created schema as a :class:`TagHeader<trac.metadata.TagHeader>`, which includes the
+The :meth:`createObject()<tracdap.api.TracMetadataApi.createObject>` method returns the ID of
+the newly created schema as a :class:`TagHeader<tracdap.metadata.TagHeader>`, which includes the
 object type, ID, version and timestamps.
 
 All the API methods in the web API package are available in both future and callback form.
@@ -195,7 +195,7 @@ Loading objects
 ---------------
 
 Now the schema has been saved into TRAC, at some point we will want to retrieve it.
-We can do this using a :class:`MetadataReadRequest<trac.api.MetadataReadRequest>`.
+We can do this using a :class:`MetadataReadRequest<tracdap.api.MetadataReadRequest>`.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
@@ -203,13 +203,13 @@ We can do this using a :class:`MetadataReadRequest<trac.api.MetadataReadRequest>
     :linenos:
     :lineno-start: 86
 
-All that is needed is the tenant code and a :class:`TagSelector<trac.metadata.TagSelector>`.
+All that is needed is the tenant code and a :class:`TagSelector<tracdap.metadata.TagSelector>`.
 Tag selectors allow different versions of an object or tag to be selected according to various
 criteria. In this example we already have the tag header, which tells us the exact version that
 should be loaded. The web API package allows headers to be used as selectors, doing this will
 create a selector for the version identified in the header.
 
-Finally we use :meth:`readObject()<trac.api.TracMetadataApi.readObject>` to send the read request.
+Finally we use :meth:`readObject()<tracdap.api.TracMetadataApi.readObject>` to send the read request.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/hello_world.js
     :language: JavaScript
@@ -217,11 +217,11 @@ Finally we use :meth:`readObject()<trac.api.TracMetadataApi.readObject>` to send
     :linenos:
     :lineno-start: 94
 
-The :meth:`readObject()<trac.api.TracMetadataApi.readObject>`
-method returns a :class:`Tag<trac.metadata.Tag>`,
-which includes the :class:`TagHeader<trac.metadata.TagHeader>`
+The :meth:`readObject()<tracdap.api.TracMetadataApi.readObject>`
+method returns a :class:`Tag<tracdap.metadata.Tag>`,
+which includes the :class:`TagHeader<tracdap.metadata.TagHeader>`
 and all the tag attributes, as well as the
-:class:`ObjectDefinition<trac.metadata.ObjectDefinition>`.
+:class:`ObjectDefinition<tracdap.metadata.ObjectDefinition>`.
 Since we used the future form of the call, it will return a promise for the tag.
 
 

@@ -41,6 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -58,7 +59,7 @@ public class PlatformTestBase {
     private static final String PYTHON_EXE = IS_WINDOWS ? "python.exe" : "python";
     private static final String VENV_BIN_SUBDIR = IS_WINDOWS ? "Scripts" : "bin";
     private static final String VENV_ENV_VAR = "VIRTUAL_ENV";
-    private static final String TRAC_RUNTIME_DIST_DIR = "trac-runtime/python/build/dist";
+    private static final String TRAC_RUNTIME_DIST_DIR = "tracdap-runtime/python/build/dist";
 
     protected static final Logger log = LoggerFactory.getLogger(PlatformTestBase.class);
 
@@ -67,6 +68,7 @@ public class PlatformTestBase {
     @TempDir
     static Path tracDir;
     static Path tracExecDir;
+    static String currentOrigin;
     static URL platformConfigUrl;
     static String keystoreKey;
     static PlatformConfig platformConfig;
@@ -88,7 +90,7 @@ public class PlatformTestBase {
 
         tracRepoDir = Paths.get(".").toAbsolutePath();
 
-        while (!Files.exists(tracRepoDir.resolve("trac-api")))
+        while (!Files.exists(tracRepoDir.resolve("tracdap-api")))
             tracRepoDir = tracRepoDir.getParent();
 
         prepareConfig();
@@ -124,9 +126,12 @@ public class PlatformTestBase {
                 ? Paths.get(System.getenv(TRAC_EXEC_DIR))
                 : tracDir;
 
+        currentOrigin = getCurrentOrigin();
+
         var substitutions = Map.of(
                 "${TRAC_DIR}", tracDir.toString().replace("\\", "\\\\"),
-                "${TRAC_EXEC_DIR}", tracExecDir.toString().replace("\\", "\\\\"));
+                "${TRAC_EXEC_DIR}", tracExecDir.toString().replace("\\", "\\\\"),
+                "${CURRENT_ORIGIN}", currentOrigin);
 
         platformConfigUrl = ConfigHelpers.prepareConfig(
                 TRAC_UNIT_CONFIG, tracDir,
@@ -140,6 +145,24 @@ public class PlatformTestBase {
 
         var config = new ConfigManager(platformConfigUrl.toString(), tracDir, plugins);
         platformConfig = config.loadRootConfigObject(PlatformConfig.class);
+    }
+
+    private static String getCurrentOrigin() throws Exception {
+
+        var pb = new ProcessBuilder();
+        pb.command("git", "config", "--get", "remote.origin.url");
+
+        var proc = pb.start();
+
+        try {
+            proc.waitFor(10, TimeUnit.SECONDS);
+
+            var procResult = proc.getInputStream().readAllBytes();
+            return new String(procResult, StandardCharsets.UTF_8).strip();
+        }
+        finally {
+            proc.destroy();
+        }
     }
 
     static void prepareDatabase() {

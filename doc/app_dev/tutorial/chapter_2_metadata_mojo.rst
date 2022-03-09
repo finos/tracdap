@@ -4,7 +4,7 @@ Chapter 2 - Metadata Mojo
 #########################
 
 This tutorial is based on the *metadata_mojo.js* example, which can be found in the
-`TRAC GitHub Repository <https://github.com/Accenture/trac>`_
+`TRAC GitHub Repository <https://github.com/finos/tracdap>`_
 under *examples/apps/javascript*.
 
 It may be helpful to read the :doc:`metadata model overview </overview/metadata_model>`
@@ -34,11 +34,11 @@ Let's create a request for this search:
     :linenos:
     :lineno-start: 27
 
-In the :class:`SearchParameters<trac.metadata.SearchParameters>` we set the type of object to search
+In the :class:`SearchParameters<tracdap.metadata.SearchParameters>` we set the type of object to search
 for, and provide a search expression containing a single search term.
 
-To execute the search we use the :meth:`search()<trac.api.TracMetadataApi.search>` method of the
-:class:`TracMetadataApi<trac.api.TracMetadataApi>`.
+To execute the search we use the :meth:`search()<tracdap.api.TracMetadataApi.search>` method of the
+:class:`TracMetadataApi<tracdap.api.TracMetadataApi>`.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
@@ -51,7 +51,7 @@ In a real-world scenario, the list might be displayed in a search grid with the 
 columns, so the user can look through the results and select the one they want. For this example
 we just select the first result.
 
-We return the ``header`` field of the selected objet, which is a :class:`TagHeader<trac.metadata.TagHeader>`
+We return the ``header`` field of the selected objet, which is a :class:`TagHeader<tracdap.metadata.TagHeader>`
 object that can be used as an object ID. For example, this ID could be used in the
 :ref:`app_hello_loading_objects` example in the previous tutorial, to load tag with its full definition.
 
@@ -78,7 +78,7 @@ is one of the business divisions we are interested in:
     :linenos:
     :lineno-start: 71
 
-See the documentation for :class:`SearchOperator<trac.metadata.SearchOperator>` for the
+See the documentation for :class:`SearchOperator<tracdap.metadata.SearchOperator>` for the
 list of all available search operators.
 
 Now let's create a logical expression, which combines the two previous expressions:
@@ -97,8 +97,8 @@ must contain exactly one expression (again, most search operators have negative 
 remove the need to use ``NOT``).
 
 Once the top level search expression is built, it can be included in a search request and used
-to call the :meth:`search()<trac.api.TracMetadataApi.search>` method of the
-:class:`TracMetadataApi<trac.api.TracMetadataApi>`.
+to call the :meth:`search()<tracdap.api.TracMetadataApi.search>` method of the
+:class:`TracMetadataApi<tracdap.api.TracMetadataApi>`.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/metadata_mojo.js
     :language: JavaScript
@@ -119,4 +119,4 @@ Several other metadata features are available in the current release of TRAC, in
 * Multi-valued tag attributes
 
 These features can be explored by looking at the documentation for the
-:class:`TracMetadataApi<trac.api.TracMetadataApi>` and the :mod:`Metadata Listing <trac.metadata>`.
+:class:`TracMetadataApi<tracdap.api.TracMetadataApi>` and the :mod:`Metadata Listing <tracdap.metadata>`.

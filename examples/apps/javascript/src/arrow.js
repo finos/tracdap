@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {trac} from 'trac-web-api';
+import {tracdap} from 'tracdap-web-api';
 
 import {searchForSchema} from './metadata_mojo';
 import {saveDataToTrac, renderTable} from './using_data';
@@ -23,14 +23,14 @@ import {loadFromDisk} from './util';
 import * as arrow from 'apache-arrow';
 
 // Create the Data API
-const dataApiRpcImpl = trac.setup.rpcImplForTarget(trac.api.TracDataApi, "http", "localhost", 8080);
-const dataApi = new trac.api.TracDataApi(dataApiRpcImpl);
+const dataApiRpcImpl = tracdap.setup.rpcImplForTarget(tracdap.api.TracDataApi, "http", "localhost", 8080);
+const dataApi = new tracdap.api.TracDataApi(dataApiRpcImpl);
 
 
 function loadArrowData(dataId) {
 
     // Ask for the dataset in Arrow IPC stream format
-    const request = trac.api.DataReadRequest.create({
+    const request = tracdap.api.DataReadRequest.create({
 
         tenant: "ACME_CORP",
 

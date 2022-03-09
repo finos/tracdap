@@ -4,8 +4,8 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/build-scripts.iml" filepath="$PROJECT_DIR$/.idea/modules/build-scripts.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/documentation.iml" filepath="$PROJECT_DIR$/.idea/modules/documentation.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/trac-web-api.iml" filepath="$PROJECT_DIR$/.idea/modules/trac-web-api.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/trac-runtime-py.iml" filepath="$PROJECT_DIR$/.idea/modules/trac-runtime-py.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/tracdap-web-api.iml" filepath="$PROJECT_DIR$/.idea/modules/tracdap-web-api.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/tracdap-runtime-py.iml" filepath="$PROJECT_DIR$/.idea/modules/tracdap-runtime-py.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/example-models-py.iml" filepath="$PROJECT_DIR$/.idea/modules/example-models-py.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/example-apps-js.iml" filepath="$PROJECT_DIR$/.idea/modules/example-apps-js.iml" />
     </modules>

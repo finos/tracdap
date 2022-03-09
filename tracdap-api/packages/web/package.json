@@ -1,0 +1,41 @@
+{
+  "name": "tracdap-web-api",
+  "version": "0.0.0-DEVELOPMENT",
+  "description": "API package for building web applications on the TRAC Data & Analytics Platform",
+  "license": "Apache-2.0",
+  "licenses": [
+    {
+      "type": "Apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    }
+  ],
+  "homepage": "https://github.com/finos/tracdap",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/finos/tracdap"
+  },
+  "bugs": {
+    "url": "https://github.com/finos/tracdap/issues"
+  },
+  "files": [
+    "trac.*"
+  ],
+  "main": "trac.js",
+  "dependencies": {
+    "grpc-web": "~1.2.1",
+    "protobufjs": "~6.11.2"
+  },
+  "devDependencies": {
+    "license-checker-rseidelsohn": "^2.2.0",
+    "owasp-dependency-check": "0.0.18",
+    "node-fetch": "^3.2.0"
+  },
+  "scripts": {
+    "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
+    "tracVersion:posix": "npm version `../../../dev/version.sh`",
+    "buildApi": "node api_builder.js",
+    "compliance-owasp": "owasp-dependency-check --project \"tracdap-web-api\" --failOnCVSS 4 --data ../../../build/compliance-cache/nvd_web_api --out ../../../build/compliance/web-api-owasp/",
+    "compliance-licenses": "license-checker-rseidelsohn --onlyAllow \"MIT; Apache-2.0; BSD; BSD-3-Clause; ISC; BSD-2-Clause; Unlicense\" --excludePackages \"spdx-exceptions;spdx-license-ids\" --json --out ../../../build/compliance/web-api-licenses/license-report.json",
+    "compliance-audit": "npm audit > ../../../build/compliance/web-api-npm-audit/npm-audit.txt"
+  }
+}

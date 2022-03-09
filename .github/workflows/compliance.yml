@@ -95,13 +95,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd trac-runtime/python
+          cd tracdap-runtime/python
           pip install -r requirements.txt
 
       - name: Safety check
         run: |
           mkdir -p build/compliance/python-runtime-safety
-          cd trac-runtime/python
+          cd tracdap-runtime/python
           safety check --full-report --not-bare --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
           safety check --full-report --not-bare --json --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
 
@@ -112,7 +112,7 @@ jobs:
           . dev/compliance/license-exceptions-python.sh
 
           mkdir -p build/compliance/python-runtime-licenses
-          cd trac-runtime/python
+          cd tracdap-runtime/python
           pip-licenses --format=json --ignore-packages $IGNORE_LICENSE > ../../build/compliance/python-runtime-licenses/python-runtime-licenses.json
           pip-licenses --format=html --ignore-packages $IGNORE_LICENSE > ../../build/compliance/python-runtime-licenses/python-runtime-licenses.html
           pip-licenses --allow-only="Apache Software License;MIT License;BSD License;3-Clause BSD License" --ignore-packages $IGNORE_LICENSE
@@ -143,7 +143,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: trac-api/packages/web/package-lock.json
+          cache-dependency-path: tracdap-api/packages/web/package-lock.json
 
       # Use a cache to save downloading global compliance data on every build (e.g. NVD)
       # Compliance tasks will automatically look for updates and download deltas
@@ -155,24 +155,24 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd trac-api/packages/web
+          cd tracdap-api/packages/web
           npm install
 
       - name: OWASP dependency check
         run: |
           mkdir -p build/compliance
-          cd trac-api/packages/web
+          cd tracdap-api/packages/web
           npm run compliance-owasp
 
       - name: License check
         run: |
-          cd trac-api/packages/web
+          cd tracdap-api/packages/web
           npm run compliance-licenses
 
       - name: NPM audit
         run: |
           mkdir -p build/compliance/web-api-npm-audit
-          cd trac-api/packages/web
+          cd tracdap-api/packages/web
           npm run compliance-audit
 
       # Always save the reports - they are especially needed when the checks have failed!
@@ -202,21 +202,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get TRAC version
-        id: trac-version
+      - name: Get TRAC d.a.p. version
+        id: tracdap-version
         run: |
-          trac_version=`dev/version.sh`
-          echo "trac_version = ${trac_version}"
-          echo "::set-output name=trac_version::${trac_version}"
+          tracdap_version=`dev/version.sh`
+          echo "tracdap_version = ${tracdap_version}"
+          echo "::set-output name=tracdap_version::${tracdap_version}"
 
       - name: Fetch copmliance report artifacts
         uses: actions/download-artifact@v2
         with:
           name: compliance-reports
-          path: trac-compliance-reports-${{ steps.trac-version.outputs.trac_version }}
+          path: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}
 
       - name: Build compliance reports tarball
-        run: tar -cvzf trac-compliance-reports-${{ steps.trac-version.outputs.trac_version }}.tgz trac-compliance-reports-${{ steps.trac-version.outputs.trac_version }}/
+        run: tar -cvzf tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}/
 
       - name: Publish compliance reports
         uses: actions/upload-release-asset@v1.0.1
@@ -224,6 +224,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: trac-compliance-reports-${{ steps.trac-version.outputs.trac_version }}.tgz
-          asset_name: trac-compliance-reports-${{ steps.trac-version.outputs.trac_version }}.tgz
+          asset_path: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
+          asset_name: tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
           asset_content_type: application/gzip

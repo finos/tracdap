@@ -122,33 +122,33 @@ jobs:
         run: |
           pip install "pyspark ${{ matrix.enviroment.PYSPARK_VERSION }}"
           pip install "pandas ${{ matrix.enviroment.PANDAS_VERSION }}"
-          cd trac-runtime/python
+          cd tracdap-runtime/python
           pip install -r requirements.txt
 
       - name: Protoc code generation
         run: |
           python dev/codegen/protoc-ctrl.py python_runtime \
-            --proto_path trac-api/trac-metadata/src/main/proto \
-            --proto_path trac-api/trac-config/src/main/proto \
-            --out trac-runtime/python/generated/trac/rt_gen/domain
+            --proto_path tracdap-api/tracdap-metadata/src/main/proto \
+            --proto_path tracdap-api/tracdap-config/src/main/proto \
+            --out tracdap-runtime/python/generated/tracdap/rt_gen/domain
           python dev/codegen/protoc-ctrl.py python_proto \
-            --proto_path trac-api/trac-metadata/src/main/proto \
-            --proto_path trac-api/trac-config/src/main/proto \
-            --out trac-runtime/python/generated/trac/rt_gen/proto
+            --proto_path tracdap-api/tracdap-metadata/src/main/proto \
+            --proto_path tracdap-api/tracdap-config/src/main/proto \
+            --out tracdap-runtime/python/generated/tracdap/rt_gen/proto
 
       - name: Unit tests
         run: |
-          export PYTHONPATH=trac-runtime/python/generated
-          export PYTHONPATH=trac-runtime/python/src:$PYTHONPATH
-          export PYTHONPATH=trac-runtime/python/test:$PYTHONPATH
-          python -m unittest discover -s trac-runtime/python/test/trac_test -t trac-runtime/python/test
+          export PYTHONPATH=tracdap-runtime/python/generated
+          export PYTHONPATH=tracdap-runtime/python/src:$PYTHONPATH
+          export PYTHONPATH=tracdap-runtime/python/test:$PYTHONPATH
+          python -m unittest discover -s tracdap-runtime/python/test/tracdap_test -t tracdap-runtime/python/test
 
       - name: Python example models
         run: |
-          export PYTHONPATH=trac-runtime/python/generated
-          export PYTHONPATH=trac-runtime/python/src:$PYTHONPATH
-          export PYTHONPATH=trac-runtime/python/test:$PYTHONPATH
-          python -m unittest discover -s trac-runtime/python/test/trac_examples -t trac-runtime/python/test
+          export PYTHONPATH=tracdap-runtime/python/generated
+          export PYTHONPATH=tracdap-runtime/python/src:$PYTHONPATH
+          export PYTHONPATH=tracdap-runtime/python/test:$PYTHONPATH
+          python -m unittest discover -s tracdap-runtime/python/test/tracdap_examples -t tracdap-runtime/python/test
 
 
   web_api:
@@ -168,16 +168,16 @@ jobs:
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: npm
-        cache-dependency-path: trac-api/packages/web/package-lock.json
+        cache-dependency-path: tracdap-api/packages/web/package-lock.json
 
     - name: Install dependencies
       run: |
-        cd trac-api/packages/web
+        cd tracdap-api/packages/web
         npm install
 
     - name: Build API
       run: |
-        cd trac-api/packages/web
+        cd tracdap-api/packages/web
         npm run buildApi
 
 

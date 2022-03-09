@@ -22,13 +22,13 @@ rootProject.name = 'trac-platform'
 
 // API components
 
-include 'trac-api-metadata'
-include 'trac-api-config'
-include 'trac-api-services'
+include 'tracdap-api-metadata'
+include 'tracdap-api-config'
+include 'tracdap-api-services'
 
-project(":trac-api-metadata").projectDir = file("trac-api/trac-metadata")
-project(":trac-api-config").projectDir = file("trac-api/trac-config")
-project(":trac-api-services").projectDir = file("trac-api/trac-services")
+project(":tracdap-api-metadata").projectDir = file("tracdap-api/tracdap-metadata")
+project(":tracdap-api-config").projectDir = file("tracdap-api/tracdap-config")
+project(":tracdap-api-services").projectDir = file("tracdap-api/tracdap-services")
 
 
 // Java libraries

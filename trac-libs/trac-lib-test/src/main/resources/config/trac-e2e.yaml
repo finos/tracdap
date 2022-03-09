@@ -71,7 +71,7 @@ services:
     repositories:
       UNIT_TEST_REPO:
         repoType: git
-        repoUrl: https://github.com/accenture/trac
+        repoUrl: ${CURRENT_ORIGIN}
 
     executor:
       executorType: LOCAL

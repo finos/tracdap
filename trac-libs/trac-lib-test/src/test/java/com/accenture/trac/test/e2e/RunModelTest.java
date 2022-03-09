@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 
@@ -114,12 +115,14 @@ public class RunModelTest extends PlatformTestBase {
 
         log.info("Running IMPORT_MODEL job...");
 
+        var modelVersion = getCurrentCommit();
+
         var importModel = ImportModelJob.newBuilder()
                 .setLanguage("python")
                 .setRepository("UNIT_TEST_REPO")
                 .setPath("examples/models/python/using_data")
                 .setEntryPoint("using_data.UsingDataModel")
-                .setVersion("main")
+                .setVersion(modelVersion)
                 .addModelAttrs(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_model")
                         .setValue(MetadataCodec.encodeValue("run_model:using_data")))
@@ -188,6 +191,25 @@ public class RunModelTest extends PlatformTestBase {
 
         modelId = modelTag.getHeader();
     }
+
+    private String getCurrentCommit() throws Exception {
+
+        var pb = new ProcessBuilder();
+        pb.command("git", "rev-parse", "HEAD");
+
+        var proc = pb.start();
+
+        try {
+            proc.waitFor(10, TimeUnit.SECONDS);
+
+            var procResult = proc.getInputStream().readAllBytes();
+            return new String(procResult, StandardCharsets.UTF_8).strip();
+        }
+        finally {
+            proc.destroy();
+        }
+    }
+
 
     @Test @Order(3)
     void runModel() throws Exception {

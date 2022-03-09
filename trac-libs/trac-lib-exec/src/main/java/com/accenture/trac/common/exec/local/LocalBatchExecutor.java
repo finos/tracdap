@@ -42,7 +42,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
     private static final String PYTHON_EXE = IS_WINDOWS ? "python.exe" : "python";
     private static final String VENV_BIN_SUBDIR = IS_WINDOWS ? "Scripts" : "bin";
     private static final String VENV_ENV_VAR = "VIRTUAL_ENV";
-    private static final List<String> TRAC_CMD_ARGS = List.of("-m", "trac.rt.launch");
+    private static final List<String> TRAC_CMD_ARGS = List.of("-m", "tracdap.rt.launch");
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 

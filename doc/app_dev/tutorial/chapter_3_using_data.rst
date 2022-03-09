@@ -4,7 +4,7 @@ Chapter 3 - Using Data
 ######################
 
 This tutorial is based on the *using_data.js* example, which can be found in the
-`TRAC GitHub Repository <https://github.com/Accenture/trac>`_
+`TRAC GitHub Repository <https://github.com/finos/tracdap>`_
 under *examples/apps/javascript*.
 
 
@@ -19,8 +19,8 @@ Here is how to set them up for a browser-based app:
     :lineno-start: 22
 
     // Create the Data API
-    const dataApiRpcImpl = trac.setup.rpcImplForBrowser(trac.api.TracDataApi);
-    const dataApi = new trac.api.TracDataApi(dataApiRpcImpl);
+    const dataApiRpcImpl = tracdap.setup.rpcImplForBrowser(tracdap.api.TracDataApi);
+    const dataApi = new tracdap.api.TracDataApi(dataApiRpcImpl);
 
 For a Node.js or standalone environment, create a connector pointing at your TRAC instance:
 
@@ -40,13 +40,13 @@ small we can load it into memory as a blob, using either the ``FileReader`` API 
 browser or the ``fs`` API for Node.js environments.
 
 In order to save data to TRAC we will need to supply a schema. This can either be done
-by providing a full :class:`SchemaDefinition<trac.metadata.SchemaDefinition>` to be embedded
+by providing a full :class:`SchemaDefinition<tracdap.metadata.SchemaDefinition>` to be embedded
 with the dataset, or by providing the ID of an existing schema in the TRAC metadata store.
 In this example we use the latter approach, see lessons 1 & 2 for examples of how to create
 a schema and search for its ID.
 
 Once both schema and data are available, we can create a
-:class:`DataWriteRequest<trac.api.DataWriteRequest>`.
+:class:`DataWriteRequest<tracdap.api.DataWriteRequest>`.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
@@ -54,15 +54,15 @@ Once both schema and data are available, we can create a
     :linenos:
     :lineno-start: 27
 
-Here, ``schemaId`` is the :class:`TagHeader<trac.metadata.TagHeader>`
-(or :class:`TagSelector<trac.metadata.TagSelector>`) for a schema created earlier.
+Here, ``schemaId`` is the :class:`TagHeader<tracdap.metadata.TagHeader>`
+(or :class:`TagSelector<tracdap.metadata.TagSelector>`) for a schema created earlier.
 The ``format`` field must be a MIME type for a supported data format and the ``content``
 field contains binary data encoded in that format. Since our ``csvData`` blob contains
 data loaded from a CSV file, we know it is already in the right format.
 
 When data is saved the platform will create a DATA object in the metadata store to describe
 the dataset. This DATA object can be indexed and searched for, so we use
-:class:`TagUpdate<trac.metadata.TagUpdate>` instructions to apply tag attributes just
+:class:`TagUpdate<tracdap.metadata.TagUpdate>` instructions to apply tag attributes just
 like any other type of object.
 
 Now the data API can be used to send the new dataset to the platform:
@@ -73,15 +73,15 @@ Now the data API can be used to send the new dataset to the platform:
     :linenos:
     :lineno-start: 45
 
-Here we used :meth:`createSmallDataset()<trac.api.TracDataApi.createSmallDataset>`, which
+Here we used :meth:`createSmallDataset()<tracdap.api.TracDataApi.createSmallDataset>`, which
 assumes the content of the dataset is small enough to be sent as a single blob in the ``content``
 field. Since the data has already been loaded into memory, this approach avoids the complexity
 of using streaming calls. (An equivalent client-streaming method,
-:meth:`createDataset()<trac.api.TracDataApi.createDataset>`, is available in the platform API
+:meth:`createDataset()<tracdap.api.TracDataApi.createDataset>`, is available in the platform API
 but not currently supported over gRPC-Web).
 
-The :meth:`createSmallDataset()<trac.api.TracDataApi.createSmallDataset>` method returns the ID of
-the newly created dataset as a :class:`TagHeader<trac.metadata.TagHeader>`, which includes the
+The :meth:`createSmallDataset()<tracdap.api.TracDataApi.createSmallDataset>` method returns the ID of
+the newly created dataset as a :class:`TagHeader<tracdap.metadata.TagHeader>`, which includes the
 object type, ID, version and timestamps. In this example we used the promise form of the method,
 the equivalent call using a callback would be:
 
@@ -97,7 +97,7 @@ Loading data from TRAC
 ======================
 
 Now suppose we want to get the dataset back out of TRAC, for example to display it in a web page.
-To do this we use a :class:`DataReadRequest<trac.api.DataReadRequest>`.
+To do this we use a :class:`DataReadRequest<tracdap.api.DataReadRequest>`.
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
@@ -117,10 +117,10 @@ Now let's send the request to the data API:
     :linenos:
     :lineno-start: 64
 
-Again, by using :meth:`readSmallDataset()<trac.api.TracDataApi.readSmallDataset>` we are assuming
+Again, by using :meth:`readSmallDataset()<tracdap.api.TracDataApi.readSmallDataset>` we are assuming
 that the content of the dataset can fit as single blob in one response message. For relatively small
 datasets that will be displayed in a web page, this approach avoids the complexity of streaming calls.
-An equivalent server-streaming call, :meth:`readDataset()<trac.api.TracDataApi.readDataset>`, is
+An equivalent server-streaming call, :meth:`readDataset()<tracdap.api.TracDataApi.readDataset>`, is
 available and supported in the web API package.
 
 In order to use the data that comes back, it needs to be decoded. Since the data is in JSON format
@@ -156,7 +156,7 @@ back. To encode the data using JSON:
     :linenos:
     :lineno-start: 135
 
-Now we need to create a :class:`DataWriteRequest<trac.api.DataWriteRequest>` for the update:
+Now we need to create a :class:`DataWriteRequest<tracdap.api.DataWriteRequest>` for the update:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
@@ -177,7 +177,7 @@ Since this is an update operation, the existing tags will be carried forward ont
 We only need to specify tags we want to change in the ``tagUpdates`` field. In this example we add one new
 tag to describe the change.
 
-To send the update to the platform, we use :meth:`updateSmallDataset()<trac.api.TracDataApi.readSmallDataset>`:
+To send the update to the platform, we use :meth:`updateSmallDataset()<tracdap.api.TracDataApi.readSmallDataset>`:
 
 .. literalinclude:: ../../../examples/apps/javascript/src/using_data.js
     :language: JavaScript
@@ -187,7 +187,7 @@ To send the update to the platform, we use :meth:`updateSmallDataset()<trac.api.
 
 
 Again we are assuming that the content of the dataset can be sent as single blob in one message.
-(An equivalent client-streaming method, :meth:`updateDataset()<trac.api.TracDataApi.createDataset>`,
+(An equivalent client-streaming method, :meth:`updateDataset()<tracdap.api.TracDataApi.createDataset>`,
 is available in the platform API but not currently supported over gRPC-Web).
 
-The method returns the ID for the updated version of the dataset as a :class:`TagHeader<trac.metadata.TagHeader>`.
+The method returns the ID for the updated version of the dataset as a :class:`TagHeader<tracdap.metadata.TagHeader>`.

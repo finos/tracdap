@@ -20,17 +20,17 @@ build/
 # Tracked IDEA config files are in dev/ide/idea
 .idea/*
 
-/trac-api/packages/web/node_modules/**
-/trac-api/packages/web/build/**
-/trac-api/packages/web/dist/**
-/trac-api/packages/web/trac.*
+/tracdap-api/packages/web/node_modules/**
+/tracdap-api/packages/web/build/**
+/tracdap-api/packages/web/dist/**
+/tracdap-api/packages/web/trac.*
 
-/trac-runtime/python/.idea/**
-/trac-runtime/python/venv/**
-/trac-runtime/python/generated/**
-/trac-runtime/python/build/**
-/trac-runtime/python/dist/**
-/trac-runtime/python/*.egg-info
+/tracdap-runtime/python/.idea/**
+/tracdap-runtime/python/venv/**
+/tracdap-runtime/python/generated/**
+/tracdap-runtime/python/build/**
+/tracdap-runtime/python/dist/**
+/tracdap-runtime/python/*.egg-info
 
 /examples/models/python/data/outputs/**
 /examples/apps/javascript/node_modules/**
