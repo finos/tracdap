@@ -24,8 +24,11 @@ import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 @Tag("integration")
@@ -43,6 +46,7 @@ public class RunModelTest extends PlatformTestBase {
 
     static TagHeader inputDataId;
     static TagHeader modelId;
+    static TagHeader outputDataId;
 
     @Test @Order(1)
     void loadInputData() throws Exception {
@@ -256,5 +260,33 @@ public class RunModelTest extends PlatformTestBase {
 
         Assertions.assertEquals("run_model:data_output", MetadataCodec.decodeStringValue(outputAttr));
         Assertions.assertEquals(1, dataDef.getPartsCount());
+
+        outputDataId = dataTag.getHeader();
     }
+
+    @Test @Order(4)
+    void checkOutputData() {
+
+        log.info("Checking output data...");
+
+        var readRequest = DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(outputDataId))
+                .setFormat("text/csv")
+                .build();
+
+
+        var readResponse = dataClient.readSmallDataset(readRequest);
+
+        var csvText = readResponse.getContent().toString(StandardCharsets.UTF_8);
+        var csvLines = csvText.split("\n");
+
+        var csvHeaders = Arrays.stream(csvLines[0].split(","))
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        Assertions.assertEquals(List.of("region", "gross_profit"), csvHeaders);
+        Assertions.assertEquals(101, csvLines.length);
+    }
+
 }
