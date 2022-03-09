@@ -46,8 +46,8 @@ public class ConfigTranslator {
             var metaApiRoutes = createRoutesForService(
                     "TRAC Metadata Service",
                     services.getMeta(),
-                    "/trac.api.TracMetadataApi/",
-                    "/trac-meta/",
+                    "/tracdap.api.TracMetadataApi/",
+                    "/tracdap-meta/",
                     GwRestMapping.TRAC_META);
 
             serviceRoutes.addAll(metaApiRoutes);
@@ -58,8 +58,8 @@ public class ConfigTranslator {
             var dataApiRoutes = createRoutesForService(
                     "TRAC Data Service",
                     services.getData(),
-                    "/trac.api.TracDataApi/",
-                    "/trac-data/",
+                    "/tracdap.api.TracDataApi/",
+                    "/tracdap-data/",
                     null);
 
             serviceRoutes.addAll(dataApiRoutes);
@@ -70,8 +70,8 @@ public class ConfigTranslator {
             var orchApiRoutes = createRoutesForService(
                     "TRAC Orchestrator Service",
                     services.getOrch(),
-                    "/trac.api.TracOrchestratorApi/",
-                    "/trac-orch/",
+                    "/tracdap.api.TracOrchestratorApi/",
+                    "/tracdap-orch/",
                     GwRestMapping.TRAC_ORCH);
 
             serviceRoutes.addAll(orchApiRoutes);

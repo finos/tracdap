@@ -40,50 +40,50 @@ public class MetaApiRestMapping {
         var apiMethods = new ArrayList<RestApiMethod<?, ?, ?>>();
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/create-object",
+                "/tracdap-meta/api/v1/{tenant}/create-object",
                 TracMetadataApiGrpc.getCreateObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/update-object",
+                "/tracdap-meta/api/v1/{tenant}/update-object",
                 TracMetadataApiGrpc.getUpdateObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/update-tag",
+                "/tracdap-meta/api/v1/{tenant}/update-tag",
                 TracMetadataApiGrpc.getUpdateTagMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/read-object",
+                "/tracdap-meta/api/v1/{tenant}/read-object",
                 TracMetadataApiGrpc.getReadObjectMethod(),
                 MetadataReadRequest.getDefaultInstance(),
                 "selector", TagSelector.getDefaultInstance()));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/read-batch",
+                "/tracdap-meta/api/v1/{tenant}/read-batch",
                 TracMetadataApiGrpc.getReadBatchMethod(),
                 MetadataBatchRequest.getDefaultInstance(),
                 "selector", TagSelector.getDefaultInstance()));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta/api/v1/{tenant}/search",
+                "/tracdap-meta/api/v1/{tenant}/search",
                 TracMetadataApiGrpc.getSearchMethod(),
                 MetadataSearchRequest.getDefaultInstance(),
                 "searchParams", SearchParameters.getDefaultInstance()));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.GET,
-                "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/{tagVersion}",
+                "/tracdap-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/{tagVersion}",
                 TracMetadataApiGrpc.getGetObjectMethod(),
                 MetadataGetRequest.getDefaultInstance()));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.GET,
-                "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/latest/tags/latest",
+                "/tracdap-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/latest/tags/latest",
                 TracMetadataApiGrpc.getGetLatestObjectMethod(),
                 MetadataGetRequest.getDefaultInstance()));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.GET,
-                "/trac-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/latest",
+                "/tracdap-meta/api/v1/{tenant}/{objectType}/{objectId}/versions/{objectVersion}/tags/latest",
                 TracMetadataApiGrpc.getGetLatestTagMethod(),
                 MetadataGetRequest.getDefaultInstance()));
 
@@ -95,42 +95,42 @@ public class MetaApiRestMapping {
         var apiMethods = new ArrayList<RestApiMethod<?, ?, ?>>();
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/create-object",
+                "/tracdap-meta-trusted/api/v1/{tenant}/trusted/create-object",
                 TrustedMetadataApiGrpc.getCreateObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/update-object",
+                "/tracdap-meta-trusted/api/v1/{tenant}/trusted/update-object",
                 TrustedMetadataApiGrpc.getUpdateObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/update-tag",
+                "/tracdap-meta-trusted/api/v1/{tenant}/trusted/update-tag",
                 TrustedMetadataApiGrpc.getUpdateTagMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/preallocate",
+                "/tracdap-meta-trusted/api/v1/{tenant}/trusted/preallocate",
                 TrustedMetadataApiGrpc.getPreallocateIdMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/create-preallocated",
+                "/tracdap-meta-trusted/api/v1/{tenant}/trusted/create-preallocated",
                 TrustedMetadataApiGrpc.getCreatePreallocatedObjectMethod(),
                 MetadataWriteRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/read-object",
+                "/tracdap-meta-trusted/api/v1/{tenant}/trusted/read-object",
                 TracMetadataApiGrpc.getReadObjectMethod(),
                 MetadataReadRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/read-batch",
+                "/tracdap-meta-trusted/api/v1/{tenant}/trusted/read-batch",
                 TracMetadataApiGrpc.getReadBatchMethod(),
                 MetadataBatchRequest.getDefaultInstance(), true));
 
         apiMethods.add(RestApiMethod.create(HttpMethod.POST,
-                "/trac-meta-trusted/api/v1/{tenant}/trusted/search",
+                "/tracdap-meta-trusted/api/v1/{tenant}/trusted/search",
                 TracMetadataApiGrpc.getSearchMethod(),
                 MetadataSearchRequest.getDefaultInstance(),
                 "searchParams", SearchParameters.getDefaultInstance()));
