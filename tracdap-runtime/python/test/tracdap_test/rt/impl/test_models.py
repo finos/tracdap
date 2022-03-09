@@ -15,6 +15,7 @@
 import typing as tp
 import unittest
 import pathlib
+import subprocess as sp
 
 import tracdap.rt.api as api
 import tracdap.rt.metadata as meta
@@ -63,6 +64,15 @@ class ImportModelTest(unittest.TestCase):
     def setUp(self) -> None:
         self.test_scope = f"{self.__class__.__name__}.{self._testMethodName}"
 
+        repo_url_proc = sp.run(["git", "config", "--get", "remote.origin.url"], stdout=sp.PIPE)
+        commit_hash_proc = sp.run(["git", "rev-parse", "HEAD"], stdout=sp.PIPE)
+
+        if repo_url_proc.returncode != 0 or commit_hash_proc.returncode != 0:
+            raise RuntimeError("Could not discover details of the current git repo")
+
+        self.repo_url = repo_url_proc.stdout.decode('utf-8').strip()
+        self.commit_hash = commit_hash_proc.stdout.decode('utf-8').strip()
+
     def test_load_integrated_ok(self):
 
         sys_config = config.RuntimeConfig()
@@ -86,7 +96,7 @@ class ImportModelTest(unittest.TestCase):
 
         loader.destroy_scope(self.test_scope)
 
-    def _test_load_local_ok(self):
+    def test_load_local_ok(self):
 
         example_repo_url = pathlib.Path(__file__) \
             .joinpath("../../../../../../..") \
@@ -117,14 +127,11 @@ class ImportModelTest(unittest.TestCase):
 
         loader.destroy_scope(self.test_scope)
 
-    def _test_load_git_ok(self):
-
-        trac_repo_url = "https://github.com/finos/tracdap"
-        trac_repo_version = "main"  # TODO: Loading models from a branch should be prohibited! Or converted to a hash
+    def test_load_git_ok(self):
 
         example_repo_config = config.RepositoryConfig(
             repoType="git",
-            repoUrl=trac_repo_url)
+            repoUrl=self.repo_url)
 
         sys_config = config.RuntimeConfig()
         sys_config.repositories["example_repo"] = example_repo_config
@@ -134,7 +141,7 @@ class ImportModelTest(unittest.TestCase):
             repository="example_repo",
             path="examples/models/python/hello_world",
             entryPoint="hello_world.HelloWorldModel",
-            version=trac_repo_version
+            version=self.commit_hash
         )
 
         loader = models.ModelLoader(sys_config)

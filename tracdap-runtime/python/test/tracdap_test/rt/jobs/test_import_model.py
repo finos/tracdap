@@ -14,6 +14,7 @@
 
 import unittest
 import tempfile
+import subprocess as sp
 
 import tracdap.rt.config as cfg
 import tracdap.rt.metadata as meta
@@ -29,16 +30,24 @@ class ImportModelTest(unittest.TestCase):
 
     def setUp(self) -> None:
 
+        repo_url_proc = sp.run(["git", "config", "--get", "remote.origin.url"], stdout=sp.PIPE)
+        commit_hash_proc = sp.run(["git", "rev-parse", "HEAD"], stdout=sp.PIPE)
+
+        if repo_url_proc.returncode != 0 or commit_hash_proc.returncode != 0:
+            raise RuntimeError("Could not discover details of the current git repo")
+
+        self.repo_url = repo_url_proc.stdout.decode('utf-8').strip()
+        self.commit_hash = commit_hash_proc.stdout.decode('utf-8').strip()
+
         repos = {
-            "trac_git_repo": cfg.RepositoryConfig(
+            "unit_test_repo": cfg.RepositoryConfig(
                 repoType="git",
-                repoUrl="https://github.com/finos/tracdap")
+                repoUrl=self.repo_url)
         }
 
         self.sys_config = cfg.RuntimeConfig(repositories=repos)
-        # self.trac_runtime = runtime.TracRuntime(self.sys_config)
 
-    def _test_import_from_git_ok(self):
+    def test_import_from_git_ok(self):
 
         job_id = util.new_object_id(meta.ObjectType.JOB)
 
@@ -46,10 +55,10 @@ class ImportModelTest(unittest.TestCase):
             jobType=meta.JobType.IMPORT_MODEL,
             importModel=meta.ImportModelJob(
                 language="python",
-                repository="trac_git_repo",
+                repository="unit_test_repo",
                 path="examples/models/python/hello_world",
                 entryPoint="hello_world.HelloWorldModel",
-                version="main"))
+                version=self.commit_hash))
 
         job_config = cfg.JobConfig(job_id, job_def)
 
