@@ -16,7 +16,7 @@
 
 package com.accenture.trac.svc.data.service;
 
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.metadata.*;
 
 import java.time.Instant;
 import java.util.List;

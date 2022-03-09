@@ -16,7 +16,7 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
-import com.accenture.trac.metadata.TagSelector;
+import org.finos.tracdap.metadata.TagSelector;
 import com.accenture.trac.common.exception.*;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
 import com.accenture.trac.common.exception.EMetadataDuplicate;

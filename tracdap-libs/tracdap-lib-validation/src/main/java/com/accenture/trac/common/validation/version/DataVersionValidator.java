@@ -17,9 +17,9 @@
 package com.accenture.trac.common.validation.version;
 
 import com.accenture.trac.common.validation.core.ValidationContext;
-import com.accenture.trac.metadata.DataDefinition;
-import com.accenture.trac.metadata.SchemaDefinition;
-import com.accenture.trac.metadata.TagSelector;
+import org.finos.tracdap.metadata.DataDefinition;
+import org.finos.tracdap.metadata.SchemaDefinition;
+import org.finos.tracdap.metadata.TagSelector;
 import com.google.protobuf.Descriptors;
 
 

@@ -17,7 +17,7 @@
 package com.accenture.trac.gateway.routing;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.config.GatewayConfig;
+import org.finos.tracdap.config.GatewayConfig;
 import com.accenture.trac.gateway.exec.Route;
 
 import io.netty.channel.*;

@@ -16,14 +16,14 @@
 
 package com.accenture.trac.common.validation.fixed;
 
-import com.accenture.trac.api.DataReadRequest;
-import com.accenture.trac.api.DataWriteRequest;
-import com.accenture.trac.api.FileReadRequest;
-import com.accenture.trac.api.FileWriteRequest;
-import com.accenture.trac.metadata.ObjectType;
-import com.accenture.trac.metadata.SchemaDefinition;
-import com.accenture.trac.metadata.TagSelector;
-import com.accenture.trac.metadata.TagUpdate;
+import org.finos.tracdap.api.DataReadRequest;
+import org.finos.tracdap.api.DataWriteRequest;
+import org.finos.tracdap.api.FileReadRequest;
+import org.finos.tracdap.api.FileWriteRequest;
+import org.finos.tracdap.metadata.ObjectType;
+import org.finos.tracdap.metadata.SchemaDefinition;
+import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.metadata.TagUpdate;
 import com.accenture.trac.common.validation.core.ValidationContext;
 import com.google.protobuf.Descriptors;
 

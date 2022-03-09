@@ -20,10 +20,10 @@ package com.accenture.trac.common.storage;
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.data.IDataContext;
-import com.accenture.trac.metadata.DataDefinition;
-import com.accenture.trac.metadata.SchemaDefinition;
-import com.accenture.trac.metadata.StorageCopy;
-import com.accenture.trac.metadata.StorageDefinition;
+import org.finos.tracdap.metadata.DataDefinition;
+import org.finos.tracdap.metadata.SchemaDefinition;
+import org.finos.tracdap.metadata.StorageCopy;
+import org.finos.tracdap.metadata.StorageDefinition;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 
 import java.util.concurrent.CompletableFuture;

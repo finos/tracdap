@@ -16,15 +16,15 @@
 
 package com.accenture.trac.svc.data.api;
 
-import com.accenture.trac.api.*;
+import org.finos.tracdap.api.*;
 import com.accenture.trac.common.concurrent.ExecutionContext;
 import com.accenture.trac.common.grpc.GrpcServerWrap;
 import com.accenture.trac.common.util.Bytes;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.validation.Validator;
-import com.accenture.trac.metadata.FileDefinition;
-import com.accenture.trac.metadata.SchemaDefinition;
-import com.accenture.trac.metadata.TagHeader;
+import org.finos.tracdap.metadata.FileDefinition;
+import org.finos.tracdap.metadata.SchemaDefinition;
+import org.finos.tracdap.metadata.TagHeader;
 import com.accenture.trac.svc.data.service.DataService;
 import com.accenture.trac.svc.data.service.FileService;
 

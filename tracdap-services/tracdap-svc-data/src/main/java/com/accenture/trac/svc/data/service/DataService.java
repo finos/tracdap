@@ -16,9 +16,9 @@
 
 package com.accenture.trac.svc.data.service;
 
-import com.accenture.trac.api.*;
-import com.accenture.trac.config.DataServiceConfig;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.api.*;
+import org.finos.tracdap.config.DataServiceConfig;
+import org.finos.tracdap.metadata.*;
 
 import com.accenture.trac.common.codec.ICodec;
 import com.accenture.trac.common.codec.ICodecManager;

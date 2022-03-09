@@ -16,7 +16,7 @@
 
 package com.accenture.trac.gateway.proxy.http;
 
-import com.accenture.trac.config.GwRoute;
+import org.finos.tracdap.config.GwRoute;
 
 import io.netty.channel.*;
 import io.netty.handler.codec.http.HttpClientCodec;

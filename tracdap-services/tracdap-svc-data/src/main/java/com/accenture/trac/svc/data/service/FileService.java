@@ -16,11 +16,11 @@
 
 package com.accenture.trac.svc.data.service;
 
-import com.accenture.trac.api.*;
-import com.accenture.trac.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
+import org.finos.tracdap.api.*;
+import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import com.accenture.trac.common.metadata.MetadataUtil;
-import com.accenture.trac.config.DataServiceConfig;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.config.DataServiceConfig;
+import org.finos.tracdap.metadata.*;
 
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.exception.EDataSize;

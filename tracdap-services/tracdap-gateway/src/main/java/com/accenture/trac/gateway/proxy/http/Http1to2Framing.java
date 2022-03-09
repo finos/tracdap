@@ -17,7 +17,7 @@
 package com.accenture.trac.gateway.proxy.http;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.config.GwRoute;
+import org.finos.tracdap.config.GwRoute;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;

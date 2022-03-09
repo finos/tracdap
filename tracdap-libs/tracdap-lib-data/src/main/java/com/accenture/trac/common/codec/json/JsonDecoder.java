@@ -21,7 +21,7 @@ import com.accenture.trac.common.codec.arrow.ArrowSchema;
 import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.exception.EDataCorruption;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.metadata.SchemaDefinition;
+import org.finos.tracdap.metadata.SchemaDefinition;
 
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonFactory;

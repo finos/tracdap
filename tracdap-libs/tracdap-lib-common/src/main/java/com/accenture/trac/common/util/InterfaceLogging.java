@@ -16,8 +16,8 @@
 
 package com.accenture.trac.common.util;
 
-import com.accenture.trac.metadata.TagHeader;
-import com.accenture.trac.metadata.TagSelector;
+import org.finos.tracdap.metadata.TagHeader;
+import org.finos.tracdap.metadata.TagSelector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

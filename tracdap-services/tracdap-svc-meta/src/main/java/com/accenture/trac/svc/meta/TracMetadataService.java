@@ -22,7 +22,7 @@ import com.accenture.trac.common.exception.*;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.service.CommonServiceBase;
 import com.accenture.trac.common.util.InterfaceLogging;
-import com.accenture.trac.config.PlatformConfig;
+import org.finos.tracdap.config.PlatformConfig;
 import com.accenture.trac.svc.meta.api.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;

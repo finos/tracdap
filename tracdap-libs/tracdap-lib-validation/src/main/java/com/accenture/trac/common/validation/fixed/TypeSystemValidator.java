@@ -18,7 +18,7 @@ package com.accenture.trac.common.validation.fixed;
 
 import com.accenture.trac.common.metadata.TypeSystem;
 import com.accenture.trac.common.validation.core.ValidationContext;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Descriptors;
 
 

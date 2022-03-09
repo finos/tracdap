@@ -16,7 +16,7 @@
 
 package com.accenture.trac.common.validation.version;
 
-import com.accenture.trac.metadata.FileDefinition;
+import org.finos.tracdap.metadata.FileDefinition;
 import com.accenture.trac.common.validation.core.ValidationContext;
 import com.google.protobuf.*;
 

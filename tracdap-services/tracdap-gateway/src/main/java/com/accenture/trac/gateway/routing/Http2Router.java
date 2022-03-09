@@ -18,7 +18,7 @@ package com.accenture.trac.gateway.routing;
 
 import com.accenture.trac.common.exception.EUnexpected;
 
-import com.accenture.trac.config.GwRoute;
+import org.finos.tracdap.config.GwRoute;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http2.Http2ChannelDuplexHandler;
 import io.netty.handler.codec.http2.Http2Frame;

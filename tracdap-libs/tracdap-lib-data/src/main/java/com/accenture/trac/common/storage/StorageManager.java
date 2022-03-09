@@ -16,7 +16,7 @@
 
 package com.accenture.trac.common.storage;
 
-import com.accenture.trac.config.StorageConfig;
+import org.finos.tracdap.config.StorageConfig;
 import com.accenture.trac.common.codec.ICodecManager;
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.exception.EStorageConfig;

@@ -19,8 +19,8 @@ package com.accenture.trac.common.validation.version;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.validation.core.ValidationContext;
-import com.accenture.trac.metadata.DatetimeValue;
-import com.accenture.trac.metadata.TagSelector;
+import org.finos.tracdap.metadata.DatetimeValue;
+import org.finos.tracdap.metadata.TagSelector;
 import com.google.protobuf.Descriptors;
 
 import java.util.Objects;

@@ -21,7 +21,7 @@ import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.startup.Startup;
 import com.accenture.trac.common.util.InterfaceLogging;
 import com.accenture.trac.common.db.JdbcDialect;
-import com.accenture.trac.config.PlatformConfig;
+import org.finos.tracdap.config.PlatformConfig;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
 

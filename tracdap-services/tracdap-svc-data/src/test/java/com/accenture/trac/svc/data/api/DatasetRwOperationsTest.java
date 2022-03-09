@@ -16,11 +16,11 @@
 
 package com.accenture.trac.svc.data.api;
 
-import com.accenture.trac.api.*;
+import org.finos.tracdap.api.*;
 import com.accenture.trac.common.concurrent.Futures;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.PartKeys;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.metadata.*;
 import com.accenture.trac.test.data.SampleDataFormats;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;

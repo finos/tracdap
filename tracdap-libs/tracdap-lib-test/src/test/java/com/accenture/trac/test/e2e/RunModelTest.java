@@ -16,10 +16,10 @@
 
 package com.accenture.trac.test.e2e;
 
-import com.accenture.trac.api.*;
+import org.finos.tracdap.api.*;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.metadata.*;
 import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;

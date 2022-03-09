@@ -17,10 +17,10 @@
 package com.accenture.trac.svc.orch.jobs;
 
 
-import com.accenture.trac.api.MetadataWriteRequest;
-import com.accenture.trac.config.JobConfig;
-import com.accenture.trac.config.JobResult;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.api.MetadataWriteRequest;
+import org.finos.tracdap.config.JobConfig;
+import org.finos.tracdap.config.JobResult;
+import org.finos.tracdap.metadata.*;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataConstants;

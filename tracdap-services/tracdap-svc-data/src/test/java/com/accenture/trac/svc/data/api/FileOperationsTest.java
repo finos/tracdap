@@ -16,15 +16,15 @@
 
 package com.accenture.trac.svc.data.api;
 
-import com.accenture.trac.api.FileReadRequest;
-import com.accenture.trac.api.FileReadResponse;
-import com.accenture.trac.api.FileWriteRequest;
-import com.accenture.trac.api.MetadataReadRequest;
+import org.finos.tracdap.api.FileReadRequest;
+import org.finos.tracdap.api.FileReadResponse;
+import org.finos.tracdap.api.FileWriteRequest;
+import org.finos.tracdap.api.MetadataReadRequest;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataUtil;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.concurrent.Futures;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.metadata.*;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;

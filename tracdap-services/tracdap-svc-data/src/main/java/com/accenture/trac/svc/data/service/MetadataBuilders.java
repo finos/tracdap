@@ -16,11 +16,11 @@
 
 package com.accenture.trac.svc.data.service;
 
-import com.accenture.trac.api.MetadataBatchRequest;
-import com.accenture.trac.api.MetadataReadRequest;
-import com.accenture.trac.api.MetadataWriteRequest;
+import org.finos.tracdap.api.MetadataBatchRequest;
+import org.finos.tracdap.api.MetadataReadRequest;
+import org.finos.tracdap.api.MetadataWriteRequest;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Message;
 
 import java.util.List;

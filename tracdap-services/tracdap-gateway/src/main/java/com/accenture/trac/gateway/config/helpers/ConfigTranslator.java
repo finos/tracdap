@@ -16,7 +16,7 @@
 
 package com.accenture.trac.gateway.config.helpers;
 
-import com.accenture.trac.config.*;
+import org.finos.tracdap.config.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 
 public class ConfigTranslator {
 
-    public static GatewayConfig translateServiceRoutes(com.accenture.trac.config.GatewayConfig originalConfig) {
+    public static GatewayConfig translateServiceRoutes(org.finos.tracdap.config.GatewayConfig originalConfig) {
 
         var serviceRoutes = createRoutesForServices(originalConfig.getServices());
 

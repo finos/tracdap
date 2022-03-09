@@ -16,8 +16,8 @@
 
 package com.accenture.trac.gateway;
 
-import com.accenture.trac.api.MetadataSearchRequest;
-import com.accenture.trac.api.TracMetadataApiGrpc;
+import org.finos.tracdap.api.MetadataSearchRequest;
+import org.finos.tracdap.api.TracMetadataApiGrpc;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.startup.StandardArgs;
 

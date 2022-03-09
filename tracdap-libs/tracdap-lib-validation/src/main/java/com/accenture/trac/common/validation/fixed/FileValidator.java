@@ -17,9 +17,9 @@
 package com.accenture.trac.common.validation.fixed;
 
 import com.accenture.trac.common.validation.core.ValidationContext;
-import com.accenture.trac.metadata.FileDefinition;
-import com.accenture.trac.metadata.ObjectType;
-import com.accenture.trac.metadata.TagSelector;
+import org.finos.tracdap.metadata.FileDefinition;
+import org.finos.tracdap.metadata.ObjectType;
+import org.finos.tracdap.metadata.TagSelector;
 import com.google.protobuf.Descriptors;
 
 import java.util.regex.Pattern;

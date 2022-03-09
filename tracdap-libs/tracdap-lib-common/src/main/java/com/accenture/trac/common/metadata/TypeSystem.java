@@ -16,7 +16,7 @@
 
 package com.accenture.trac.common.metadata;
 
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.metadata.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

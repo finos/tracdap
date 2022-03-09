@@ -24,7 +24,7 @@ import com.accenture.trac.common.exception.EStartup;
 
 import com.accenture.trac.common.startup.Startup;
 import com.accenture.trac.common.util.VersionInfo;
-import com.accenture.trac.config.PlatformConfig;
+import org.finos.tracdap.config.PlatformConfig;
 import org.flywaydb.core.Flyway;
 
 import org.slf4j.Logger;

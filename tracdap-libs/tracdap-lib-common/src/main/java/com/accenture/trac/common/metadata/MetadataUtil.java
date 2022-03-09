@@ -17,8 +17,8 @@
 package com.accenture.trac.common.metadata;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.metadata.TagHeader;
-import com.accenture.trac.metadata.TagSelector;
+import org.finos.tracdap.metadata.TagHeader;
+import org.finos.tracdap.metadata.TagSelector;
 
 import java.time.Instant;
 

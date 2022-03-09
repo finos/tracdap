@@ -16,7 +16,7 @@
 
 package com.accenture.trac.svc.meta.dal;
 
-import com.accenture.trac.metadata.ObjectType;
+import org.finos.tracdap.metadata.ObjectType;
 import com.accenture.trac.common.exception.EMetadataDuplicate;
 import com.accenture.trac.common.exception.EMetadataNotFound;
 import com.accenture.trac.common.exception.EMetadataWrongType;

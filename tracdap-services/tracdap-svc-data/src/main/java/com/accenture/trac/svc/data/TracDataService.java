@@ -16,9 +16,9 @@
 
 package com.accenture.trac.svc.data;
 
-import com.accenture.trac.api.TrustedMetadataApiGrpc;
-import com.accenture.trac.config.DataServiceConfig;
-import com.accenture.trac.config.PlatformConfig;
+import org.finos.tracdap.api.TrustedMetadataApiGrpc;
+import org.finos.tracdap.config.DataServiceConfig;
+import org.finos.tracdap.config.PlatformConfig;
 
 import com.accenture.trac.common.codec.CodecManager;
 import com.accenture.trac.common.codec.ICodecManager;

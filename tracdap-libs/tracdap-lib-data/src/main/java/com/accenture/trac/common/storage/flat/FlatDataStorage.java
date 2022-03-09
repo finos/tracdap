@@ -22,8 +22,8 @@ import com.accenture.trac.common.data.DataBlock;
 import com.accenture.trac.common.data.IDataContext;
 import com.accenture.trac.common.storage.IDataStorage;
 import com.accenture.trac.common.storage.IFileStorage;
-import com.accenture.trac.metadata.SchemaDefinition;
-import com.accenture.trac.metadata.StorageCopy;
+import org.finos.tracdap.metadata.SchemaDefinition;
+import org.finos.tracdap.metadata.StorageCopy;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;

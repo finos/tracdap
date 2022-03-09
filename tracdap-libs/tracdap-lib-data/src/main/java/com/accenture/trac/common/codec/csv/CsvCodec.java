@@ -17,7 +17,7 @@
 package com.accenture.trac.common.codec.csv;
 
 import com.accenture.trac.common.codec.ICodec;
-import com.accenture.trac.metadata.SchemaDefinition;
+import org.finos.tracdap.metadata.SchemaDefinition;
 import org.apache.arrow.memory.BufferAllocator;
 
 import java.util.List;

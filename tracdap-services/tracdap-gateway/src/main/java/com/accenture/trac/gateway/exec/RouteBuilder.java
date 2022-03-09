@@ -16,7 +16,7 @@
 
 package com.accenture.trac.gateway.exec;
 
-import com.accenture.trac.config.GwRoute;
+import org.finos.tracdap.config.GwRoute;
 import com.accenture.trac.gateway.config.rest.OrchApiRestMapping;
 import com.accenture.trac.gateway.config.rest.MetaApiRestMapping;
 import com.accenture.trac.gateway.proxy.rest.RestApiMethod;

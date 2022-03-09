@@ -16,7 +16,7 @@
 
 package com.accenture.trac.test.data;
 
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.metadata.*;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.*;
 import org.apache.arrow.vector.types.pojo.ArrowType;

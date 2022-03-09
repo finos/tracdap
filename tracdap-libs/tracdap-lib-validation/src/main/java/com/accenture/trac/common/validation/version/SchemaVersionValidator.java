@@ -18,7 +18,7 @@ package com.accenture.trac.common.validation.version;
 
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.validation.core.ValidationContext;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Descriptors;
 
 import java.util.function.Function;

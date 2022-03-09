@@ -17,7 +17,7 @@
 package com.accenture.trac.gateway.proxy.grpc;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.config.GwRoute;
+import org.finos.tracdap.config.GwRoute;
 import com.accenture.trac.gateway.proxy.http.Http1to2Framing;
 
 import io.netty.channel.*;

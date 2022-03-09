@@ -16,10 +16,10 @@
 
 package com.accenture.trac.svc.meta.validation;
 
-import com.accenture.trac.metadata.ObjectDefinition;
-import com.accenture.trac.metadata.ObjectType;
-import com.accenture.trac.metadata.TagSelector;
-import com.accenture.trac.metadata.TagUpdate;
+import org.finos.tracdap.metadata.ObjectDefinition;
+import org.finos.tracdap.metadata.ObjectType;
+import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.metadata.TagUpdate;
 import com.accenture.trac.common.exception.*;
 
 import java.util.*;

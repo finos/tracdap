@@ -16,14 +16,14 @@
 
 package com.accenture.trac.test.e2e;
 
-import com.accenture.trac.api.TracDataApiGrpc;
-import com.accenture.trac.api.TracMetadataApiGrpc;
-import com.accenture.trac.api.TracOrchestratorApiGrpc;
+import org.finos.tracdap.api.TracDataApiGrpc;
+import org.finos.tracdap.api.TracMetadataApiGrpc;
+import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import com.accenture.trac.common.config.ConfigManager;
 import com.accenture.trac.common.plugin.PluginManager;
 import com.accenture.trac.common.startup.StandardArgs;
-import com.accenture.trac.config.InstanceConfig;
-import com.accenture.trac.config.PlatformConfig;
+import org.finos.tracdap.config.InstanceConfig;
+import org.finos.tracdap.config.PlatformConfig;
 import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.svc.data.TracDataService;
 import com.accenture.trac.svc.meta.TracMetadataService;

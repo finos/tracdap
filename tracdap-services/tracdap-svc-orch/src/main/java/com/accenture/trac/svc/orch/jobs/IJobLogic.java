@@ -17,10 +17,10 @@
 package com.accenture.trac.svc.orch.jobs;
 
 
-import com.accenture.trac.api.MetadataWriteRequest;
-import com.accenture.trac.config.JobConfig;
-import com.accenture.trac.config.JobResult;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.api.MetadataWriteRequest;
+import org.finos.tracdap.config.JobConfig;
+import org.finos.tracdap.config.JobResult;
+import org.finos.tracdap.metadata.*;
 
 import java.time.Instant;
 import java.util.List;

@@ -22,7 +22,7 @@ import com.accenture.trac.common.codec.json.JacksonValues;
 import com.accenture.trac.common.exception.ETracInternal;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.util.ByteOutputStream;
-import com.accenture.trac.metadata.SchemaDefinition;
+import org.finos.tracdap.metadata.SchemaDefinition;
 
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.dataformat.csv.CsvFactory;

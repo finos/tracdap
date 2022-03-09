@@ -16,7 +16,7 @@
 
 package com.accenture.trac.common.exec;
 
-import com.accenture.trac.metadata.JobStatusCode;
+import org.finos.tracdap.metadata.JobStatusCode;
 
 public class ExecutorPollResult {
 

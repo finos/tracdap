@@ -18,7 +18,7 @@ package com.accenture.trac.common.metadata;
 
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.exception.EValidationGap;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.metadata.*;
 
 import java.math.BigDecimal;
 import java.time.*;

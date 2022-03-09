@@ -17,9 +17,9 @@
 package com.accenture.trac.common.codec.arrow;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.metadata.BasicType;
-import com.accenture.trac.metadata.SchemaDefinition;
-import com.accenture.trac.metadata.SchemaType;
+import org.finos.tracdap.metadata.BasicType;
+import org.finos.tracdap.metadata.SchemaDefinition;
+import org.finos.tracdap.metadata.SchemaType;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorSchemaRoot;

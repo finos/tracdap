@@ -16,10 +16,10 @@
 
 package com.accenture.trac.svc.meta.api;
 
-import com.accenture.trac.api.*;
+import org.finos.tracdap.api.*;
 import com.accenture.trac.common.grpc.GrpcServerWrap;
-import com.accenture.trac.metadata.Tag;
-import com.accenture.trac.metadata.TagHeader;
+import org.finos.tracdap.metadata.Tag;
+import org.finos.tracdap.metadata.TagHeader;
 import com.accenture.trac.svc.meta.services.MetadataReadService;
 import com.accenture.trac.svc.meta.services.MetadataSearchService;
 import com.accenture.trac.svc.meta.services.MetadataWriteService;

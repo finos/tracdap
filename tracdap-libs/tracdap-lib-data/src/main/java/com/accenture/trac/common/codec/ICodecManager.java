@@ -17,7 +17,7 @@
 package com.accenture.trac.common.codec;
 
 import com.accenture.trac.common.data.DataBlock;
-import com.accenture.trac.metadata.SchemaDefinition;
+import org.finos.tracdap.metadata.SchemaDefinition;
 import io.netty.buffer.ByteBuf;
 
 

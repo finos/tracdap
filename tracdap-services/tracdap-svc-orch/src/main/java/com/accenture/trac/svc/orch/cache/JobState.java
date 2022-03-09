@@ -16,16 +16,16 @@
 
 package com.accenture.trac.svc.orch.cache;
 
-import com.accenture.trac.api.JobRequest;
+import org.finos.tracdap.api.JobRequest;
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.config.JobConfig;
-import com.accenture.trac.config.JobResult;
-import com.accenture.trac.config.RuntimeConfig;
-import com.accenture.trac.metadata.JobDefinition;
-import com.accenture.trac.metadata.JobType;
-import com.accenture.trac.metadata.JobStatusCode;
-import com.accenture.trac.metadata.ObjectDefinition;
-import com.accenture.trac.metadata.TagHeader;
+import org.finos.tracdap.config.JobConfig;
+import org.finos.tracdap.config.JobResult;
+import org.finos.tracdap.config.RuntimeConfig;
+import org.finos.tracdap.metadata.JobDefinition;
+import org.finos.tracdap.metadata.JobType;
+import org.finos.tracdap.metadata.JobStatusCode;
+import org.finos.tracdap.metadata.ObjectDefinition;
+import org.finos.tracdap.metadata.TagHeader;
 
 import java.io.*;
 import java.util.HashMap;

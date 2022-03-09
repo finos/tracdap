@@ -19,8 +19,8 @@ package com.accenture.trac.svc.orch.service;
 import com.accenture.trac.common.config.ConfigFormat;
 import com.accenture.trac.common.exception.*;
 import com.accenture.trac.common.exec.*;
-import com.accenture.trac.config.*;
-import com.accenture.trac.metadata.JobStatusCode;
+import org.finos.tracdap.config.*;
+import org.finos.tracdap.metadata.JobStatusCode;
 
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;

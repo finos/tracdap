@@ -16,8 +16,8 @@
 
 package com.accenture.trac.svc.meta.services;
 
-import com.accenture.trac.metadata.Tag;
-import com.accenture.trac.metadata.SearchParameters;
+import org.finos.tracdap.metadata.Tag;
+import org.finos.tracdap.metadata.SearchParameters;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 
 import java.util.List;

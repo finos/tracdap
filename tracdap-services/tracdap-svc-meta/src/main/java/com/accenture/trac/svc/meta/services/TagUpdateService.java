@@ -16,7 +16,7 @@
 
 package com.accenture.trac.svc.meta.services;
 
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.metadata.*;
 import com.accenture.trac.common.metadata.TypeSystem;
 import com.accenture.trac.common.exception.*;
 

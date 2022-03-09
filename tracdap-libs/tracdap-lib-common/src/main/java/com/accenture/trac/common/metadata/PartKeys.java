@@ -17,8 +17,8 @@
 package com.accenture.trac.common.metadata;
 
 import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.metadata.PartKey;
-import com.accenture.trac.metadata.PartType;
+import org.finos.tracdap.metadata.PartKey;
+import org.finos.tracdap.metadata.PartType;
 
 public class PartKeys {
 

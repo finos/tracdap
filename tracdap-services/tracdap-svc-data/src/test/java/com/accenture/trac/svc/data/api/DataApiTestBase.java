@@ -16,8 +16,8 @@
 
 package com.accenture.trac.svc.data.api;
 
-import com.accenture.trac.api.TracDataApiGrpc;
-import com.accenture.trac.api.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.TracDataApiGrpc;
+import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 
 import com.accenture.trac.common.codec.CodecManager;
 import com.accenture.trac.common.startup.Startup;
@@ -26,7 +26,7 @@ import com.accenture.trac.common.concurrent.ExecutionContext;
 import com.accenture.trac.common.concurrent.ExecutionRegister;
 import com.accenture.trac.common.concurrent.IExecutionContext;
 import com.accenture.trac.common.storage.StorageManager;
-import com.accenture.trac.config.PlatformConfig;
+import org.finos.tracdap.config.PlatformConfig;
 import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.svc.data.EventLoopChannel;
 import com.accenture.trac.svc.data.TracDataService;

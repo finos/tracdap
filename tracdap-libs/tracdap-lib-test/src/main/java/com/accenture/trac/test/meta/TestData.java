@@ -16,7 +16,7 @@
 
 package com.accenture.trac.test.meta;
 
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.metadata.*;
 import com.accenture.trac.common.metadata.TypeSystem;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.google.protobuf.ByteString;

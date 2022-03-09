@@ -16,12 +16,12 @@
 
 package com.accenture.trac.svc.data.api;
 
-import com.accenture.trac.api.*;
+import org.finos.tracdap.api.*;
 import com.accenture.trac.common.concurrent.Flows;
 import com.accenture.trac.common.concurrent.Futures;
-import com.accenture.trac.metadata.ObjectDefinition;
-import com.accenture.trac.metadata.ObjectType;
-import com.accenture.trac.metadata.TagSelector;
+import org.finos.tracdap.metadata.ObjectDefinition;
+import org.finos.tracdap.metadata.ObjectType;
+import org.finos.tracdap.metadata.TagSelector;
 
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;

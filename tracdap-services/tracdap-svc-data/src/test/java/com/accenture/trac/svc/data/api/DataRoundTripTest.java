@@ -16,9 +16,9 @@
 
 package com.accenture.trac.svc.data.api;
 
-import com.accenture.trac.api.*;
+import org.finos.tracdap.api.*;
 import com.accenture.trac.common.concurrent.Flows;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.metadata.*;
 
 import com.accenture.trac.test.data.SampleDataFormats;
 import com.accenture.trac.test.helpers.TestResourceHelpers;

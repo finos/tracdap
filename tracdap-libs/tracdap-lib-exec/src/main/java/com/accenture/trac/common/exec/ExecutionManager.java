@@ -18,7 +18,7 @@ package com.accenture.trac.common.exec;
 
 import com.accenture.trac.common.exception.EStartup;
 import com.accenture.trac.common.plugin.PluginManager;
-import com.accenture.trac.config.ExecutorConfig;
+import org.finos.tracdap.config.ExecutorConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

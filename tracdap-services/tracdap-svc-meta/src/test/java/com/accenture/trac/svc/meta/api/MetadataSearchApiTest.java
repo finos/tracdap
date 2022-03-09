@@ -16,8 +16,8 @@
 
 package com.accenture.trac.svc.meta.api;
 
-import com.accenture.trac.api.*;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.api.*;
+import org.finos.tracdap.metadata.*;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.services.MetadataReadService;

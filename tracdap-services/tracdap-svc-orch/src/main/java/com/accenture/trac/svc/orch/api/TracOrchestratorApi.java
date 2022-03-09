@@ -16,9 +16,9 @@
 
 package com.accenture.trac.svc.orch.api;
 
-import com.accenture.trac.api.*;
+import org.finos.tracdap.api.*;
 import com.accenture.trac.common.grpc.GrpcServerWrap;
-import com.accenture.trac.metadata.TagSelector;
+import org.finos.tracdap.metadata.TagSelector;
 import com.accenture.trac.svc.orch.service.JobApiService;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;

@@ -16,21 +16,21 @@
 
 package com.accenture.trac.svc.orch.service;
 
-import com.accenture.trac.api.MetadataBatchRequest;
-import com.accenture.trac.api.MetadataBatchResponse;
-import com.accenture.trac.api.MetadataWriteRequest;
-import com.accenture.trac.api.TrustedMetadataApiGrpc;
+import org.finos.tracdap.api.MetadataBatchRequest;
+import org.finos.tracdap.api.MetadataBatchResponse;
+import org.finos.tracdap.api.MetadataWriteRequest;
+import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import com.accenture.trac.common.exception.EInputValidation;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.grpc.GrpcClientWrap;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import com.accenture.trac.common.metadata.MetadataConstants;
 import com.accenture.trac.common.metadata.MetadataUtil;
-import com.accenture.trac.config.JobConfig;
-import com.accenture.trac.config.PlatformConfig;
-import com.accenture.trac.config.RuntimeConfig;
-import com.accenture.trac.config.StorageSettings;
-import com.accenture.trac.metadata.*;
+import org.finos.tracdap.config.JobConfig;
+import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.RuntimeConfig;
+import org.finos.tracdap.config.StorageSettings;
+import org.finos.tracdap.metadata.*;
 import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.jobs.JobLogic;
 import io.grpc.MethodDescriptor;

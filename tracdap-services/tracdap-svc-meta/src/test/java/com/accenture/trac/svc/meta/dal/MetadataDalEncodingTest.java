@@ -16,8 +16,8 @@
 
 package com.accenture.trac.svc.meta.dal;
 
-import com.accenture.trac.metadata.BasicType;
-import com.accenture.trac.metadata.ObjectType;
+import org.finos.tracdap.metadata.BasicType;
+import org.finos.tracdap.metadata.ObjectType;
 import com.accenture.trac.common.metadata.MetadataCodec;
 import static com.accenture.trac.test.meta.TestData.*;
 

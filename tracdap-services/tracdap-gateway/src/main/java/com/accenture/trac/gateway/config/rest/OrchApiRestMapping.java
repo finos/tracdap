@@ -16,11 +16,11 @@
 
 package com.accenture.trac.gateway.config.rest;
 
-import com.accenture.trac.api.JobRequest;
-import com.accenture.trac.api.JobStatusRequest;
-import com.accenture.trac.api.TracOrchestratorApiGrpc;
+import org.finos.tracdap.api.JobRequest;
+import org.finos.tracdap.api.JobStatusRequest;
+import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import com.accenture.trac.gateway.proxy.rest.RestApiMethod;
-import com.accenture.trac.metadata.TagSelector;
+import org.finos.tracdap.metadata.TagSelector;
 import io.netty.handler.codec.http.HttpMethod;
 
 import java.util.ArrayList;

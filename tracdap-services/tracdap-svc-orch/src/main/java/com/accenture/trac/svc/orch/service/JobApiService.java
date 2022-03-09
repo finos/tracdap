@@ -16,8 +16,8 @@
 
 package com.accenture.trac.svc.orch.service;
 
-import com.accenture.trac.api.*;
-import com.accenture.trac.metadata.JobStatusCode;
+import org.finos.tracdap.api.*;
+import org.finos.tracdap.metadata.JobStatusCode;
 import com.accenture.trac.common.exception.EMetadataNotFound;
 import com.accenture.trac.common.exception.EUnexpected;
 import com.accenture.trac.common.metadata.MetadataUtil;
