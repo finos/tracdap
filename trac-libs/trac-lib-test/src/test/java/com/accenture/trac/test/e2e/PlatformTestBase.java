@@ -59,7 +59,7 @@ public class PlatformTestBase {
     private static final String PYTHON_EXE = IS_WINDOWS ? "python.exe" : "python";
     private static final String VENV_BIN_SUBDIR = IS_WINDOWS ? "Scripts" : "bin";
     private static final String VENV_ENV_VAR = "VIRTUAL_ENV";
-    private static final String TRAC_RUNTIME_DIST_DIR = "trac-runtime/python/build/dist";
+    private static final String TRAC_RUNTIME_DIST_DIR = "tracdap-runtime/python/build/dist";
 
     protected static final Logger log = LoggerFactory.getLogger(PlatformTestBase.class);
 
@@ -158,7 +158,7 @@ public class PlatformTestBase {
             proc.waitFor(10, TimeUnit.SECONDS);
 
             var procResult = proc.getInputStream().readAllBytes();
-            return new String(procResult, StandardCharsets.UTF_8);
+            return new String(procResult, StandardCharsets.UTF_8).strip();
         }
         finally {
             proc.destroy();
