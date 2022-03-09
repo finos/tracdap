@@ -24,7 +24,7 @@ apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
 dependencies {
 
-    implementation project(':trac-lib-common')
+    implementation project(':tracdap-lib-common')
 
     // Hikari DBCP2 connection pool
     implementation (group: 'com.zaxxer', name: 'HikariCP', version: "$hikari_cp_version") {

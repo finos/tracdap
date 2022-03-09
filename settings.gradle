@@ -34,47 +34,47 @@ project(":tracdap-api-services").projectDir = file("tracdap-api/tracdap-services
 // Java libraries
 
 
-include 'trac-lib-annotations'
-include 'trac-lib-common'
-include 'trac-lib-validation'
-include 'trac-lib-db'
-include 'trac-lib-data'
-include 'trac-lib-exec'
-include 'trac-lib-test'
+include 'tracdap-lib-annotations'
+include 'tracdap-lib-common'
+include 'tracdap-lib-validation'
+include 'tracdap-lib-db'
+include 'tracdap-lib-data'
+include 'tracdap-lib-exec'
+include 'tracdap-lib-test'
 include 'sql-drivers'
 
-project(":trac-lib-annotations").projectDir = file("trac-libs/trac-lib-annotations")
-project(":trac-lib-common").projectDir = file("trac-libs/trac-lib-common")
-project(":trac-lib-validation").projectDir = file("trac-libs/trac-lib-validation")
-project(":trac-lib-db").projectDir = file("trac-libs/trac-lib-db")
-project(":trac-lib-data").projectDir = file("trac-libs/trac-lib-data")
-project(":trac-lib-exec").projectDir = file("trac-libs/trac-lib-exec")
-project(":trac-lib-test").projectDir = file("trac-libs/trac-lib-test")
-project(":sql-drivers").projectDir = file("trac-libs/sql-drivers")
+project(":tracdap-lib-annotations").projectDir = file("tracdap-libs/tracdap-lib-annotations")
+project(":tracdap-lib-common").projectDir = file("tracdap-libs/tracdap-lib-common")
+project(":tracdap-lib-validation").projectDir = file("tracdap-libs/tracdap-lib-validation")
+project(":tracdap-lib-db").projectDir = file("tracdap-libs/tracdap-lib-db")
+project(":tracdap-lib-data").projectDir = file("tracdap-libs/tracdap-lib-data")
+project(":tracdap-lib-exec").projectDir = file("tracdap-libs/tracdap-lib-exec")
+project(":tracdap-lib-test").projectDir = file("tracdap-libs/tracdap-lib-test")
+project(":sql-drivers").projectDir = file("tracdap-libs/sql-drivers")
 
 
 // Java services
 
-include 'trac-svc-meta'
-include 'trac-svc-data'
-include 'trac-svc-orch'
-include 'trac-gateway'
+include 'tracdap-svc-meta'
+include 'tracdap-svc-data'
+include 'tracdap-svc-orch'
+include 'tracdap-gateway'
 
-project(":trac-svc-meta").projectDir = file("trac-services/trac-svc-meta")
-project(":trac-svc-data").projectDir = file("trac-services/trac-svc-data")
-project(":trac-svc-orch").projectDir = file("trac-services/trac-svc-orch")
-project(":trac-gateway").projectDir = file("trac-services/trac-gateway")
+project(":tracdap-svc-meta").projectDir = file("tracdap-services/tracdap-svc-meta")
+project(":tracdap-svc-data").projectDir = file("tracdap-services/tracdap-svc-data")
+project(":tracdap-svc-orch").projectDir = file("tracdap-services/tracdap-svc-orch")
+project(":tracdap-gateway").projectDir = file("tracdap-services/tracdap-gateway")
 
 
 // Tools and utilities
 
 include 'deploy-metadb'
-project(":deploy-metadb").projectDir = file("trac-tools/deploy-metadb")
+project(":deploy-metadb").projectDir = file("tracdap-tools/deploy-metadb")
 
 // Plugins
 
 include 'aws-config'
-project(":aws-config").projectDir = file("trac-plugins/aws-config")
+project(":aws-config").projectDir = file(" tracdap-plugins/aws-config")
 
 include 'gcp-config'
-project(":gcp-config").projectDir = file("trac-plugins/gcp-config")
+project(":gcp-config").projectDir = file("tracdap-plugins/gcp-config")

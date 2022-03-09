@@ -26,7 +26,7 @@ dependencies {
 
     api project(':tracdap-api-metadata')
     api project(':tracdap-api-services')
-    api project(':trac-lib-common')
+    api project(':tracdap-lib-common')
 
-    testImplementation project(':trac-lib-test')
+    testImplementation project(':tracdap-lib-test')
 }

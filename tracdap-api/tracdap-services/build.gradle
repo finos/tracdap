@@ -39,7 +39,7 @@ dependencies {
     api project(':tracdap-api-metadata')
 
     // JavaX "Generated" annotation is still required by gRPC generated code
-    implementation project(':trac-lib-annotations')
+    implementation project(':tracdap-lib-annotations')
 
     // Core services API uses gRPC / Protobuf stubs
     api group: 'io.grpc', name: 'grpc-stub', version: "$grpc_version"

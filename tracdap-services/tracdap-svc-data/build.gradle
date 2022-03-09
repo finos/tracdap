@@ -40,9 +40,9 @@ dependencies {
     implementation project(':tracdap-api-metadata')
     implementation project(':tracdap-api-config')
     implementation project(':tracdap-api-services')
-    implementation project(':trac-lib-common')
-    implementation project(':trac-lib-validation')
-    implementation project(':trac-lib-data')
+    implementation project(':tracdap-lib-common')
+    implementation project(':tracdap-lib-validation')
+    implementation project(':tracdap-lib-data')
 
     // Core framework - gRPC on Netty
     implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
@@ -59,7 +59,7 @@ dependencies {
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
     implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-csv', version: "$jackson_version"
 
-    testImplementation project(':trac-lib-test')
+    testImplementation project(':tracdap-lib-test')
 
     // Migration support for JUnit 4 Rules, provided by gRPC for managing test service instances
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-migrationsupport', version: "$junit_version"
