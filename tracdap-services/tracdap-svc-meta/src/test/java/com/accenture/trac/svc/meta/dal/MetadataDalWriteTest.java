@@ -17,18 +17,17 @@
 package com.accenture.trac.svc.meta.dal;
 
 import org.finos.tracdap.metadata.ObjectType;
-import com.accenture.trac.common.exception.EMetadataDuplicate;
-import com.accenture.trac.common.exception.EMetadataNotFound;
-import com.accenture.trac.common.exception.EMetadataWrongType;
-import static com.accenture.trac.test.meta.TestData.*;
+import org.finos.tracdap.common.exception.EMetadataDuplicate;
+import org.finos.tracdap.common.exception.EMetadataNotFound;
+import org.finos.tracdap.common.exception.EMetadataWrongType;
 
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import com.accenture.trac.test.meta.IDalTestable;
-import com.accenture.trac.test.meta.JdbcUnit;
-import com.accenture.trac.test.meta.JdbcIntegration;
+import org.finos.tracdap.test.meta.IDalTestable;
+import org.finos.tracdap.test.meta.JdbcUnit;
+import org.finos.tracdap.test.meta.JdbcIntegration;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

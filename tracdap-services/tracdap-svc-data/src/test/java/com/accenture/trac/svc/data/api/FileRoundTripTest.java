@@ -17,8 +17,8 @@
 package com.accenture.trac.svc.data.api;
 
 import org.finos.tracdap.api.*;
-import com.accenture.trac.common.concurrent.Flows;
-import com.accenture.trac.common.concurrent.Futures;
+import org.finos.tracdap.common.concurrent.Flows;
+import org.finos.tracdap.common.concurrent.Futures;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagSelector;
@@ -36,9 +36,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
-import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.*;
-import static com.accenture.trac.test.storage.StorageTestHelpers.readFile;
+import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
+import static org.finos.tracdap.test.storage.StorageTestHelpers.readFile;
 
 
 public class FileRoundTripTest extends DataApiTestBase {

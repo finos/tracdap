@@ -16,9 +16,9 @@
 
 package com.accenture.trac.svc.orch.cache.local;
 
-import com.accenture.trac.common.exception.ECacheNotFound;
-import com.accenture.trac.common.exception.ECacheTicket;
-import com.accenture.trac.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.ECacheNotFound;
+import org.finos.tracdap.common.exception.ECacheTicket;
+import org.finos.tracdap.common.exception.EUnexpected;
 import com.accenture.trac.svc.orch.cache.IJobCache;
 import com.accenture.trac.svc.orch.cache.JobState;
 import com.accenture.trac.svc.orch.cache.Ticket;

@@ -16,12 +16,12 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.metadata.TagSelector;
-import com.accenture.trac.common.exception.*;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
-import com.accenture.trac.common.exception.EMetadataDuplicate;
-import com.accenture.trac.common.exception.EMetadataNotFound;
-import com.accenture.trac.common.exception.EMetadataWrongType;
+import org.finos.tracdap.common.exception.EMetadataDuplicate;
+import org.finos.tracdap.common.exception.EMetadataNotFound;
+import org.finos.tracdap.common.exception.EMetadataWrongType;
 
 import java.sql.SQLException;
 import java.text.MessageFormat;

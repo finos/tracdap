@@ -16,9 +16,9 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc;
 
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.metadata.*;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.exception.*;
+import org.finos.tracdap.common.metadata.MetadataCodec;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

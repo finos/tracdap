@@ -16,7 +16,7 @@
 
 package com.accenture.trac.gateway;
 
-import com.accenture.trac.common.startup.Startup;
+import org.finos.tracdap.common.startup.Startup;
 
 import io.netty.handler.codec.http.*;
 import org.junit.jupiter.api.*;

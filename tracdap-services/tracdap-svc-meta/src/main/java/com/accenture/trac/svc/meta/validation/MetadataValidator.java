@@ -16,15 +16,14 @@
 
 package com.accenture.trac.svc.meta.validation;
 
+import org.finos.tracdap.common.exception.EAuthorization;
+import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.metadata.TagUpdate;
-import com.accenture.trac.common.exception.*;
 
 import java.util.*;
-
-import static com.accenture.trac.common.metadata.MetadataConstants.*;
 
 
 public class MetadataValidator {

@@ -16,8 +16,8 @@
 
 package com.accenture.trac.svc.orch.jobs;
 
-import com.accenture.trac.common.exception.ETracInternal;
-import com.accenture.trac.common.exception.EValidationGap;
+import org.finos.tracdap.common.exception.ETracInternal;
+import org.finos.tracdap.common.exception.EValidationGap;
 import org.finos.tracdap.metadata.JobType;
 
 import java.lang.reflect.Constructor;

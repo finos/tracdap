@@ -1,0 +1,36 @@
+/*
+ * Copyright 2022 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.finos.tracdap.common.exception;
+
+
+/**
+ * Type not supported for an individual value in a dataset
+ *
+ * For example, a data codec that encounters a blob field and does not have support for blob types
+ * could raise this error, or it could occur trying to map a type that doesn't have a mapping
+ * in the TRAC type system.
+ */
+public class EDataTypeNotSupported extends EData {
+
+    public EDataTypeNotSupported(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public EDataTypeNotSupported(String message) {
+        super(message);
+    }
+}

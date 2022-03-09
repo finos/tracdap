@@ -16,8 +16,8 @@
 
 package com.accenture.trac.plugins.config.aws;
 
-import com.accenture.trac.common.config.IConfigLoader;
-import com.accenture.trac.common.exception.EStartup;
+import org.finos.tracdap.common.config.IConfigLoader;
+import org.finos.tracdap.common.exception.EStartup;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.AmazonS3Exception;

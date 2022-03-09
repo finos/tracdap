@@ -18,17 +18,17 @@ package com.accenture.trac.svc.meta.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.metadata.*;
-import com.accenture.trac.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataCodec;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.services.MetadataReadService;
 import com.accenture.trac.svc.meta.services.MetadataSearchService;
 import com.accenture.trac.svc.meta.services.MetadataWriteService;
 
-import com.accenture.trac.test.meta.IDalTestable;
-import com.accenture.trac.test.meta.JdbcIntegration;
-import com.accenture.trac.test.meta.JdbcUnit;
+import org.finos.tracdap.test.meta.IDalTestable;
+import org.finos.tracdap.test.meta.JdbcIntegration;
+import org.finos.tracdap.test.meta.JdbcUnit;
 
-import com.accenture.trac.test.meta.TestData;
+import org.finos.tracdap.test.meta.TestData;
 
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -47,7 +47,6 @@ import org.junit.jupiter.params.provider.EnumSource;
 import java.util.HashMap;
 import java.util.UUID;
 
-import static com.accenture.trac.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 

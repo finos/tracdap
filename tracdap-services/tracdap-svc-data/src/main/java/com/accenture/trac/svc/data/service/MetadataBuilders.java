@@ -19,7 +19,7 @@ package com.accenture.trac.svc.data.service;
 import org.finos.tracdap.api.MetadataBatchRequest;
 import org.finos.tracdap.api.MetadataReadRequest;
 import org.finos.tracdap.api.MetadataWriteRequest;
-import com.accenture.trac.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Message;
 

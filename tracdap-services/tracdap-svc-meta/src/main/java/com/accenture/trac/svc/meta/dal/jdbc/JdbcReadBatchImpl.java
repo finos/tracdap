@@ -17,12 +17,11 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
 import org.finos.tracdap.metadata.*;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.exception.EValidationGap;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.exception.EValidationGap;
 import com.accenture.trac.svc.meta.dal.jdbc.dialects.IDialect;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;

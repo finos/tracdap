@@ -16,9 +16,7 @@
 
 package com.accenture.trac.gateway.proxy.rest;
 
-import com.accenture.trac.common.exception.EUnexpected;
-import org.finos.tracdap.config.GwRoute;
-import com.accenture.trac.gateway.config.rest.MetaApiRestMapping;
+import org.finos.tracdap.common.exception.EUnexpected;
 import com.accenture.trac.gateway.exec.Route;
 import com.accenture.trac.gateway.proxy.http.Http1to2Framing;
 

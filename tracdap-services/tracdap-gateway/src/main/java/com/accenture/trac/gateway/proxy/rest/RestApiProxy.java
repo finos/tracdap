@@ -16,8 +16,8 @@
 
 package com.accenture.trac.gateway.proxy.rest;
 
-import com.accenture.trac.common.exception.EInputValidation;
-import com.accenture.trac.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.EInputValidation;
+import org.finos.tracdap.common.exception.EUnexpected;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -35,7 +35,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http2.*;
-import io.netty.util.ReferenceCountUtil;
 
 import io.netty.util.concurrent.EventExecutor;
 import org.slf4j.Logger;

@@ -16,7 +16,7 @@
 
 package com.accenture.trac.gateway.proxy.grpc;
 
-import com.accenture.trac.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.EUnexpected;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;

@@ -16,7 +16,7 @@
 
 package com.accenture.trac.svc.data.api;
 
-import com.accenture.trac.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.metadata.MetadataUtil;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.junit.jupiter.api.Test;
@@ -24,8 +24,8 @@ import org.junit.jupiter.api.Test;
 import static com.accenture.trac.svc.data.api.FileOperationsTest.BASIC_CREATE_FILE_REQUEST;
 import static com.accenture.trac.svc.data.api.FileOperationsTest.BASIC_UPDATE_FILE_REQUEST;
 import static com.accenture.trac.svc.data.api.DataApiTestHelpers.readRequest;
-import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
-import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 

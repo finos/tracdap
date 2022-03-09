@@ -16,8 +16,8 @@
 
 package com.accenture.trac.plugins.config.gcp;
 
-import com.accenture.trac.common.config.IConfigLoader;
-import com.accenture.trac.common.exception.EStartup;
+import org.finos.tracdap.common.config.IConfigLoader;
+import org.finos.tracdap.common.exception.EStartup;
 
 import com.google.cloud.ReadChannel;
 import com.google.cloud.storage.Blob;

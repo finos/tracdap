@@ -20,10 +20,10 @@ import org.finos.tracdap.api.FileReadRequest;
 import org.finos.tracdap.api.FileReadResponse;
 import org.finos.tracdap.api.FileWriteRequest;
 import org.finos.tracdap.api.MetadataReadRequest;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.MetadataUtil;
-import com.accenture.trac.common.concurrent.Flows;
-import com.accenture.trac.common.concurrent.Futures;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.concurrent.Flows;
+import org.finos.tracdap.common.concurrent.Futures;
 import org.finos.tracdap.metadata.*;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
@@ -39,8 +39,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.accenture.trac.svc.data.api.DataApiTestHelpers.readRequest;
-import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
-import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.junit.jupiter.api.Assertions.*;
 
 

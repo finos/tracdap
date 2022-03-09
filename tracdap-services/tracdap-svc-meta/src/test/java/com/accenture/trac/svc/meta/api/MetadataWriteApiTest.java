@@ -18,13 +18,13 @@ package com.accenture.trac.svc.meta.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.metadata.*;
-import com.accenture.trac.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataCodec;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.services.MetadataReadService;
 import com.accenture.trac.svc.meta.services.MetadataSearchService;
 import com.accenture.trac.svc.meta.services.MetadataWriteService;
 
-import com.accenture.trac.test.meta.JdbcIntegration;
+import org.finos.tracdap.test.meta.JdbcIntegration;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
@@ -34,9 +34,9 @@ import io.grpc.testing.GrpcCleanupRule;
 import java.util.UUID;
 import java.util.function.Function;
 
-import com.accenture.trac.test.meta.IDalTestable;
-import com.accenture.trac.test.meta.JdbcUnit;
-import com.accenture.trac.test.meta.TestData;
+import org.finos.tracdap.test.meta.IDalTestable;
+import org.finos.tracdap.test.meta.JdbcUnit;
+import org.finos.tracdap.test.meta.TestData;
 
 import org.junit.Rule;
 import org.junit.jupiter.api.Disabled;
@@ -46,7 +46,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
-import static com.accenture.trac.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 

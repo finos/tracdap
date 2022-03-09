@@ -18,17 +18,16 @@ package com.accenture.trac.svc.meta.dal;
 
 import org.finos.tracdap.metadata.BasicType;
 import org.finos.tracdap.metadata.ObjectType;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import static com.accenture.trac.test.meta.TestData.*;
+import org.finos.tracdap.common.metadata.MetadataCodec;
 
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.UUID;
 
-import com.accenture.trac.test.meta.IDalTestable;
-import com.accenture.trac.test.meta.JdbcUnit;
-import com.accenture.trac.test.meta.JdbcIntegration;
+import org.finos.tracdap.test.meta.IDalTestable;
+import org.finos.tracdap.test.meta.JdbcUnit;
+import org.finos.tracdap.test.meta.JdbcIntegration;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;

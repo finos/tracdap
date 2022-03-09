@@ -17,8 +17,8 @@
 package com.accenture.trac.svc.meta.dal.jdbc;
 
 import org.finos.tracdap.metadata.*;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.exception.EValidationGap;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.exception.EValidationGap;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcBaseDal.KeyedItem;
 import com.google.protobuf.InvalidProtocolBufferException;
 

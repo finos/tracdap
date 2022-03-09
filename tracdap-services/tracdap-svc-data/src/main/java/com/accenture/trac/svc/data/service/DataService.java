@@ -20,18 +20,18 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.config.DataServiceConfig;
 import org.finos.tracdap.metadata.*;
 
-import com.accenture.trac.common.codec.ICodec;
-import com.accenture.trac.common.codec.ICodecManager;
-import com.accenture.trac.common.concurrent.IExecutionContext;
-import com.accenture.trac.common.data.DataContext;
-import com.accenture.trac.common.data.IDataContext;
-import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.common.grpc.GrpcClientWrap;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.MetadataUtil;
-import com.accenture.trac.common.metadata.PartKeys;
-import com.accenture.trac.common.storage.IStorageManager;
-import com.accenture.trac.common.validation.Validator;
+import org.finos.tracdap.common.codec.ICodec;
+import org.finos.tracdap.common.codec.ICodecManager;
+import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.data.IDataContext;
+import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.grpc.GrpcClientWrap;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.metadata.PartKeys;
+import org.finos.tracdap.common.storage.IStorageManager;
+import org.finos.tracdap.common.validation.Validator;
 
 import io.grpc.MethodDescriptor;
 import io.netty.buffer.ByteBuf;
@@ -47,9 +47,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
-import static com.accenture.trac.common.metadata.MetadataConstants.*;
-import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
-import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
+import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
+import static org.finos.tracdap.common.metadata.MetadataUtil.selectorForLatest;
 import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
 

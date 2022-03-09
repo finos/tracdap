@@ -17,11 +17,11 @@
 package com.accenture.trac.svc.data.api;
 
 import org.finos.tracdap.api.*;
-import com.accenture.trac.common.concurrent.Flows;
+import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.metadata.*;
 
-import com.accenture.trac.test.data.SampleDataFormats;
-import com.accenture.trac.test.helpers.TestResourceHelpers;
+import org.finos.tracdap.test.data.SampleDataFormats;
+import org.finos.tracdap.test.helpers.TestResourceHelpers;
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import org.apache.arrow.memory.RootAllocator;
@@ -39,9 +39,9 @@ import java.util.concurrent.Flow;
 import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
-import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
-import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
-import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
+import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 
 class DataRoundTripTest extends DataApiTestBase {

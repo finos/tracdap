@@ -17,11 +17,11 @@
 package com.accenture.trac.svc.data.api;
 
 import org.finos.tracdap.api.*;
-import com.accenture.trac.common.concurrent.Futures;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.PartKeys;
+import org.finos.tracdap.common.concurrent.Futures;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.PartKeys;
 import org.finos.tracdap.metadata.*;
-import com.accenture.trac.test.data.SampleDataFormats;
+import org.finos.tracdap.test.data.SampleDataFormats;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -38,11 +38,11 @@ import java.util.UUID;
 import java.util.Vector;
 import java.util.stream.Collectors;
 
-import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
-import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
-import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.resultOf;
-import static com.accenture.trac.test.concurrent.ConcurrentTestHelpers.waitFor;
-import static com.accenture.trac.test.helpers.TestResourceHelpers.loadResourceAsByteString;
+import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
+import static org.finos.tracdap.common.metadata.MetadataUtil.selectorForLatest;
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
+import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
+import static org.finos.tracdap.test.helpers.TestResourceHelpers.loadResourceAsByteString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 

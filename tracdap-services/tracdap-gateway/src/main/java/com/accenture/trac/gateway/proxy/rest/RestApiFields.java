@@ -16,7 +16,7 @@
 
 package com.accenture.trac.gateway.proxy.rest;
 
-import com.accenture.trac.common.exception.EStartup;
+import org.finos.tracdap.common.exception.EStartup;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 

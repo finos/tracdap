@@ -17,9 +17,9 @@
 package com.accenture.trac.svc.meta.services;
 
 import org.finos.tracdap.metadata.*;
-import com.accenture.trac.common.metadata.TypeSystem;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.exception.EMetadataBadUpdate;
+import org.finos.tracdap.common.metadata.TypeSystem;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.exception.EMetadataBadUpdate;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

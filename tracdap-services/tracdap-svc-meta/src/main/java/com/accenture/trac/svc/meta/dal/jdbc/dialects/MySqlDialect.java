@@ -16,7 +16,7 @@
 
 package com.accenture.trac.svc.meta.dal.jdbc.dialects;
 
-import com.accenture.trac.common.db.JdbcDialect;
+import org.finos.tracdap.common.db.JdbcDialect;
 import com.accenture.trac.svc.meta.dal.jdbc.JdbcErrorCode;
 
 import java.sql.Connection;

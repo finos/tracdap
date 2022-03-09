@@ -16,9 +16,11 @@
 
 package com.accenture.trac.svc.meta.services;
 
+import org.finos.tracdap.common.exception.EMetadataBadUpdate;
+import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.EValidationGap;
 import org.finos.tracdap.metadata.*;
-import com.accenture.trac.common.metadata.TypeSystem;
-import com.accenture.trac.common.exception.*;
+import org.finos.tracdap.common.metadata.TypeSystem;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +32,7 @@ import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 
-import static com.accenture.trac.common.metadata.MetadataConstants.TRAC_RESERVED_IDENTIFIER;
+import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_RESERVED_IDENTIFIER;
 
 
 public class TagUpdateService {

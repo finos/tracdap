@@ -16,7 +16,7 @@
 
 package com.accenture.trac.plugins.config.aws;
 
-import com.accenture.trac.common.exception.EStartup;
+import org.finos.tracdap.common.exception.EStartup;
 import com.accenture.trac.plugins.config.gcp.GcpConfigLoader;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.Storage;

@@ -20,12 +20,12 @@ import org.finos.tracdap.api.MetadataBatchRequest;
 import org.finos.tracdap.api.MetadataBatchResponse;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
-import com.accenture.trac.common.exception.EInputValidation;
-import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.common.grpc.GrpcClientWrap;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.metadata.MetadataConstants;
-import com.accenture.trac.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.exception.EInputValidation;
+import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.grpc.GrpcClientWrap;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataConstants;
+import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.RuntimeConfig;
@@ -45,10 +45,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
-import static com.accenture.trac.common.metadata.MetadataCodec.encodeValue;
-import static com.accenture.trac.common.metadata.MetadataConstants.*;
-import static com.accenture.trac.common.metadata.MetadataConstants.TRAC_CREATE_JOB;
-import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
+import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
+import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_CREATE_JOB;
+import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
 
 public class JobLifecycle {
 

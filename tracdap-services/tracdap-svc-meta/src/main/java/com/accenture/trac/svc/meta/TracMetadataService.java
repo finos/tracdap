@@ -16,12 +16,12 @@
 
 package com.accenture.trac.svc.meta;
 
-import com.accenture.trac.common.config.ConfigManager;
-import com.accenture.trac.common.db.JdbcSetup;
-import com.accenture.trac.common.exception.*;
-import com.accenture.trac.common.plugin.PluginManager;
-import com.accenture.trac.common.service.CommonServiceBase;
-import com.accenture.trac.common.util.InterfaceLogging;
+import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.db.JdbcSetup;
+import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.common.service.CommonServiceBase;
+import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.config.PlatformConfig;
 import com.accenture.trac.svc.meta.api.*;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;

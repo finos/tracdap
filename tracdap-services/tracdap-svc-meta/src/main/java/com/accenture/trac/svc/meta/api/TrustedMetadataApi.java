@@ -17,7 +17,7 @@
 package com.accenture.trac.svc.meta.api;
 
 import org.finos.tracdap.api.*;
-import com.accenture.trac.common.grpc.GrpcServerWrap;
+import org.finos.tracdap.common.grpc.GrpcServerWrap;
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.TagHeader;
 import com.accenture.trac.svc.meta.services.MetadataReadService;

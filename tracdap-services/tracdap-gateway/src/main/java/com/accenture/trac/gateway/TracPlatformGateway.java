@@ -16,10 +16,10 @@
 
 package com.accenture.trac.gateway;
 
-import com.accenture.trac.common.config.ConfigManager;
-import com.accenture.trac.common.exception.EStartup;
-import com.accenture.trac.common.plugin.PluginManager;
-import com.accenture.trac.common.service.CommonServiceBase;
+import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.config.GatewayConfig;
 
 import com.accenture.trac.gateway.config.helpers.ConfigTranslator;

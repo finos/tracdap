@@ -16,7 +16,7 @@
 
 package com.accenture.trac.gateway.routing;
 
-import com.accenture.trac.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.EUnexpected;
 
 import org.finos.tracdap.config.GwRoute;
 import io.netty.channel.ChannelHandlerContext;

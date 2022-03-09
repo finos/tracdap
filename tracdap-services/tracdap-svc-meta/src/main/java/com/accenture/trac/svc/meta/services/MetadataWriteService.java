@@ -17,8 +17,8 @@
 package com.accenture.trac.svc.meta.services;
 
 import org.finos.tracdap.metadata.*;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.validation.Validator;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.validation.Validator;
 import com.accenture.trac.svc.meta.dal.IMetadataDal;
 import com.accenture.trac.svc.meta.validation.MetadataValidator;
 import com.google.protobuf.Descriptors;
@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import static com.accenture.trac.common.metadata.MetadataConstants.*;
 import static com.accenture.trac.svc.meta.services.MetadataConstants.*;
 
 

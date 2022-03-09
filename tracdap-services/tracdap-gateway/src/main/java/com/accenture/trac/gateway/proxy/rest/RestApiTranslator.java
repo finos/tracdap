@@ -16,8 +16,8 @@
 
 package com.accenture.trac.gateway.proxy.rest;
 
-import com.accenture.trac.common.exception.EInputValidation;
-import com.accenture.trac.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.EInputValidation;
+import org.finos.tracdap.common.exception.EUnexpected;
 
 import com.google.gson.stream.MalformedJsonException;
 import com.google.protobuf.Descriptors;

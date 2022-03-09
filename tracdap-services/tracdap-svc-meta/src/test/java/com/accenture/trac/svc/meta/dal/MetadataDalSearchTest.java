@@ -17,13 +17,13 @@
 package com.accenture.trac.svc.meta.dal;
 
 import org.finos.tracdap.metadata.*;
-import com.accenture.trac.common.metadata.TypeSystem;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.test.meta.IDalTestable;
-import com.accenture.trac.test.meta.JdbcUnit;
-import com.accenture.trac.test.meta.JdbcIntegration;
+import org.finos.tracdap.common.metadata.TypeSystem;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.test.meta.IDalTestable;
+import org.finos.tracdap.test.meta.JdbcUnit;
+import org.finos.tracdap.test.meta.JdbcIntegration;
 
-import com.accenture.trac.test.meta.TestData;
+import org.finos.tracdap.test.meta.TestData;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,9 +39,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-import static com.accenture.trac.common.metadata.MetadataCodec.encodeArrayValue;
-import static com.accenture.trac.common.metadata.MetadataCodec.encodeValue;
-import static com.accenture.trac.test.meta.TestData.*;
+import static org.finos.tracdap.common.metadata.MetadataCodec.encodeArrayValue;
+import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
 import static org.junit.jupiter.api.Assertions.*;
 
 

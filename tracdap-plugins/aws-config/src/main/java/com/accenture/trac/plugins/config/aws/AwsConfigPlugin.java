@@ -16,10 +16,10 @@
 
 package com.accenture.trac.plugins.config.aws;
 
-import com.accenture.trac.common.config.IConfigLoader;
-import com.accenture.trac.common.exception.EUnexpected;
-import com.accenture.trac.common.plugin.PluginServiceInfo;
-import com.accenture.trac.common.plugin.TracPlugin;
+import org.finos.tracdap.common.config.IConfigLoader;
+import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.plugin.PluginServiceInfo;
+import org.finos.tracdap.common.plugin.TracPlugin;
 
 import java.util.List;
 import java.util.Properties;

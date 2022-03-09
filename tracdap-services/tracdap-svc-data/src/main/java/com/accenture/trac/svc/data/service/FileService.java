@@ -18,17 +18,17 @@ package com.accenture.trac.svc.data.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
-import com.accenture.trac.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.DataServiceConfig;
 import org.finos.tracdap.metadata.*;
 
-import com.accenture.trac.common.concurrent.IExecutionContext;
-import com.accenture.trac.common.exception.EDataSize;
-import com.accenture.trac.common.grpc.GrpcClientWrap;
-import com.accenture.trac.common.metadata.MetadataCodec;
-import com.accenture.trac.common.storage.IFileStorage;
-import com.accenture.trac.common.storage.IStorageManager;
-import com.accenture.trac.common.validation.Validator;
+import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.exception.EDataSize;
+import org.finos.tracdap.common.grpc.GrpcClientWrap;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.storage.IFileStorage;
+import org.finos.tracdap.common.storage.IStorageManager;
+import org.finos.tracdap.common.validation.Validator;
 
 import io.grpc.MethodDescriptor;
 import io.netty.buffer.ByteBuf;
@@ -45,9 +45,8 @@ import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.accenture.trac.common.metadata.MetadataConstants.*;
-import static com.accenture.trac.common.metadata.MetadataUtil.selectorFor;
-import static com.accenture.trac.common.metadata.MetadataUtil.selectorForLatest;
+import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
+import static org.finos.tracdap.common.metadata.MetadataUtil.selectorForLatest;
 import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
 

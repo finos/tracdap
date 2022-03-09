@@ -16,9 +16,8 @@
 
 package com.accenture.trac.gateway.routing;
 
-import com.accenture.trac.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.GwProtocol;
-import org.finos.tracdap.config.GwRoute;
 import com.accenture.trac.gateway.exec.Route;
 import com.accenture.trac.gateway.proxy.http.Http1ProxyBuilder;
 import com.accenture.trac.gateway.proxy.grpc.GrpcProxyBuilder;

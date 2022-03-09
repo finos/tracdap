@@ -16,7 +16,7 @@
 
 package com.accenture.trac.plugins.config.aws;
 
-import com.accenture.trac.common.exception.EStartup;
+import org.finos.tracdap.common.exception.EStartup;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import org.junit.jupiter.api.AfterAll;

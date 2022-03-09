@@ -18,12 +18,8 @@ package com.accenture.trac.gateway;
 
 import org.finos.tracdap.api.MetadataSearchRequest;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
-import com.accenture.trac.common.config.ConfigManager;
-import com.accenture.trac.common.startup.StandardArgs;
 
-import java.nio.file.Paths;
-
-import com.accenture.trac.common.startup.Startup;
+import org.finos.tracdap.common.startup.Startup;
 import io.grpc.ManagedChannelBuilder;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;

@@ -16,14 +16,14 @@
 
 package com.accenture.trac.deploy.metadb;
 
-import com.accenture.trac.common.config.ConfigManager;
-import com.accenture.trac.common.exception.ETracPublic;
-import com.accenture.trac.common.startup.StandardArgs;
-import com.accenture.trac.common.db.JdbcSetup;
-import com.accenture.trac.common.exception.EStartup;
+import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.exception.ETracPublic;
+import org.finos.tracdap.common.startup.StandardArgs;
+import org.finos.tracdap.common.db.JdbcSetup;
+import org.finos.tracdap.common.exception.EStartup;
 
-import com.accenture.trac.common.startup.Startup;
-import com.accenture.trac.common.util.VersionInfo;
+import org.finos.tracdap.common.startup.Startup;
+import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.config.PlatformConfig;
 import org.flywaydb.core.Flyway;
 
