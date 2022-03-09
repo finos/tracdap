@@ -56,7 +56,7 @@ public class Http1ProxyTest {
         // Find the top level root dir, we need it as a base for content, config files etc.
 
         var cwd = Paths.get(".").toAbsolutePath().normalize();
-        rootDir = cwd.endsWith("trac-gateway")
+        rootDir = cwd.endsWith("tracdap-gateway")
                 ? Paths.get("../..").toAbsolutePath().normalize()
                 : cwd;
 
