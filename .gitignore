@@ -23,7 +23,7 @@ build/
 /tracdap-api/packages/web/node_modules/**
 /tracdap-api/packages/web/build/**
 /tracdap-api/packages/web/dist/**
-/tracdap-api/packages/web/trac.*
+/tracdap-api/packages/web/tracdap.*
 
 /tracdap-runtime/python/.idea/**
 /tracdap-runtime/python/venv/**
