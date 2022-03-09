@@ -247,7 +247,7 @@ class _CsvStorageFormat(_StorageFormat):
 
         columns = list(map(lambda f: f.fieldName, schema.fields)) if schema.fields else None
 
-        data.to_csv(tgt, columns=columns, **options)
+        data.to_csv(tgt, columns=columns, index=False, **options)
 
 
 class CommonDataStorage(IDataStorage):
@@ -311,9 +311,18 @@ class CommonDataStorage(IDataStorage):
 
         # TODO: Switch between binary and text mode depending on format, also set encoding (default is utf-8)
 
+        # TODO: Full handling of directory storage formats
+        format_extension = f".{storage_format.lower()}"
+
+        if not storage_path.endswith(format_extension):
+            storage_path_ = storage_path.rstrip("/\\") + f"/chunk-0.{storage_format.lower()}"
+            self.__file_storage.mkdir(storage_path, True, False)
+        else:
+            storage_path_ = storage_path
+
         if self.__pushdown_pandas:
 
-            full_path = self.__root_path / storage_path
+            full_path = self.__root_path / storage_path_
             file_mode = 'wt' if overwrite else 'xt'
             pushdown_options = {**storage_options, 'mode': file_mode}
 
@@ -321,7 +330,7 @@ class CommonDataStorage(IDataStorage):
 
         else:
 
-            with self.__file_storage.write_text_stream(storage_path, overwrite=overwrite) as text_stream:
+            with self.__file_storage.write_text_stream(storage_path_, overwrite=overwrite) as text_stream:
                 format_impl.write_pandas(text_stream, schema, df, storage_options)
 
     def read_spark_table(
