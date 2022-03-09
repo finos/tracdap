@@ -202,7 +202,8 @@ public class RunModelTest extends PlatformTestBase {
         try {
             proc.waitFor(10, TimeUnit.SECONDS);
 
-            return proc.inputReader().readLine();
+            var procResult = proc.getInputStream().readAllBytes();
+            return new String(procResult, StandardCharsets.UTF_8);
         }
         finally {
             proc.destroy();

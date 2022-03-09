@@ -41,6 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -156,7 +157,8 @@ public class PlatformTestBase {
         try {
             proc.waitFor(10, TimeUnit.SECONDS);
 
-            return proc.inputReader().readLine();
+            var procResult = proc.getInputStream().readAllBytes();
+            return new String(procResult, StandardCharsets.UTF_8);
         }
         finally {
             proc.destroy();
