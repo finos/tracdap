@@ -182,7 +182,7 @@ class SaveJobResultFunc(NodeFunction[None]):
                     return o.name
                 if isinstance(o, uuid.UUID):
                     return str(o)
-                elif type(o).__module__.startswith("trac."):
+                elif type(o).__module__.startswith("tracdap."):
                     return {**o.__dict__}  # noqa
                 else:
                     return super().default(o)
