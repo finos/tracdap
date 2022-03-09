@@ -74,7 +74,7 @@ project(":deploy-metadb").projectDir = file("tracdap-tools/deploy-metadb")
 // Plugins
 
 include 'aws-config'
-project(":aws-config").projectDir = file(" tracdap-plugins/aws-config")
+project(":aws-config").projectDir = file("tracdap-plugins/aws-config")
 
 include 'gcp-config'
 project(":gcp-config").projectDir = file("tracdap-plugins/gcp-config")
