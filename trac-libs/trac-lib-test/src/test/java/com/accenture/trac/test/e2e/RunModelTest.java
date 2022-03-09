@@ -269,6 +269,8 @@ public class RunModelTest extends PlatformTestBase {
 
         log.info("Checking output data...");
 
+        var EXPECTED_REGIONS = 5;  // based on the sample dataset
+
         var readRequest = DataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(MetadataUtil.selectorFor(outputDataId))
@@ -286,7 +288,7 @@ public class RunModelTest extends PlatformTestBase {
                 .collect(Collectors.toList());
 
         Assertions.assertEquals(List.of("region", "gross_profit"), csvHeaders);
-        Assertions.assertEquals(101, csvLines.length);
+        Assertions.assertEquals(EXPECTED_REGIONS + 1, csvLines.length);
     }
 
 }
