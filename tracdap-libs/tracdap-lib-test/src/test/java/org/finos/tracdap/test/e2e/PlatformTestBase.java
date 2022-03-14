@@ -26,7 +26,7 @@ import org.finos.tracdap.config.InstanceConfig;
 import org.finos.tracdap.config.PlatformConfig;
 import com.accenture.trac.deploy.metadb.DeployMetaDB;
 import com.accenture.trac.svc.data.TracDataService;
-import com.accenture.trac.svc.meta.TracMetadataService;
+import org.finos.tracdap.svc.meta.TracMetadataService;
 import com.accenture.trac.svc.orch.TracOrchestratorService;
 import org.finos.tracdap.test.config.ConfigHelpers;
 import org.finos.tracdap.test.helpers.ServiceHelpers;

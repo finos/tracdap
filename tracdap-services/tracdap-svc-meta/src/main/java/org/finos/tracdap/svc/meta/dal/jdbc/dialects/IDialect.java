@@ -14,12 +14,26 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.test.meta;
+package org.finos.tracdap.svc.meta.dal.jdbc.dialects;
 
-import org.finos.tracdap.svc.meta.dal.IMetadataDal;
+import org.finos.tracdap.common.db.JdbcDialect;
+import org.finos.tracdap.svc.meta.dal.jdbc.JdbcErrorCode;
+
+import java.sql.Connection;
+import java.sql.SQLException;
 
 
-public interface IDalTestable {
+public interface IDialect {
 
-    void setDal(IMetadataDal dal);
+    JdbcDialect dialectCode();
+
+    JdbcErrorCode mapErrorCode(SQLException e);
+
+    void prepareMappingTable(Connection conn) throws SQLException;
+
+    String mappingTableName();
+
+    boolean supportsGeneratedKeys();
+
+    int booleanType();
 }

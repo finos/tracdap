@@ -23,7 +23,7 @@ import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
 import com.accenture.trac.deploy.metadb.DeployMetaDB;
-import com.accenture.trac.svc.meta.TracMetadataService;
+import org.finos.tracdap.svc.meta.TracMetadataService;
 
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;

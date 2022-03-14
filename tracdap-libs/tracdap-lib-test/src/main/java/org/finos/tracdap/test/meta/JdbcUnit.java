@@ -19,8 +19,8 @@ package org.finos.tracdap.test.meta;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.common.db.JdbcDialect;
-import com.accenture.trac.svc.meta.dal.IMetadataDal;
-import com.accenture.trac.svc.meta.dal.jdbc.JdbcMetadataDal;
+import org.finos.tracdap.svc.meta.dal.IMetadataDal;
+import org.finos.tracdap.svc.meta.dal.jdbc.JdbcMetadataDal;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.*;

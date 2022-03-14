@@ -14,12 +14,16 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.test.meta;
+package org.finos.tracdap.svc.meta.dal.jdbc;
 
-import org.finos.tracdap.svc.meta.dal.IMetadataDal;
+import java.sql.SQLException;
 
 
-public interface IDalTestable {
+public class JdbcException extends SQLException {
 
-    void setDal(IMetadataDal dal);
+    public static final String SYNTHETIC_ERROR = "SYNTHETIC_ERROR";
+
+    JdbcException(JdbcErrorCode errorCode) {
+        super(errorCode.name(), SYNTHETIC_ERROR, errorCode.ordinal());
+    }
 }

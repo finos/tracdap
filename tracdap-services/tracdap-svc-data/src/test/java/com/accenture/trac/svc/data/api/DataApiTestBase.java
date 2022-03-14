@@ -32,7 +32,7 @@ import com.accenture.trac.svc.data.EventLoopChannel;
 import com.accenture.trac.svc.data.TracDataService;
 import com.accenture.trac.svc.data.service.DataService;
 import com.accenture.trac.svc.data.service.FileService;
-import com.accenture.trac.svc.meta.TracMetadataService;
+import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.config.ConfigHelpers;
 
 import io.grpc.ManagedChannel;

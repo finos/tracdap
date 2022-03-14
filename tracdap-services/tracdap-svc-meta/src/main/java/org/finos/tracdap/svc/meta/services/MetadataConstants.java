@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.test.meta;
-
-import org.finos.tracdap.svc.meta.dal.IMetadataDal;
+package org.finos.tracdap.svc.meta.services;
 
 
-public interface IDalTestable {
+public class MetadataConstants {
 
-    void setDal(IMetadataDal dal);
+    public static final boolean TRUSTED_API = true;
+    public static final boolean PUBLIC_API = false;
 }
