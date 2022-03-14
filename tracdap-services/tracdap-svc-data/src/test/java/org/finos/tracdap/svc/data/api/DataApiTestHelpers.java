@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Accenture Global Solutions Limited
+ * Copyright 2022 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.api;
+package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.FileReadRequest;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
@@ -57,7 +57,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-import static com.accenture.trac.svc.data.api.DataApiTestBase.TEST_TENANT;
+import static org.finos.tracdap.svc.data.api.DataApiTestBase.TEST_TENANT;
 
 
 class DataApiTestHelpers {

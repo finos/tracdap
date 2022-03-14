@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Accenture Global Solutions Limited
+ * Copyright 2022 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.api;
+package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.FileReadRequest;
 import org.finos.tracdap.api.FileReadResponse;
@@ -38,7 +38,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static com.accenture.trac.svc.data.api.DataApiTestHelpers.readRequest;
+import static org.finos.tracdap.svc.data.api.DataApiTestHelpers.readRequest;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.junit.jupiter.api.Assertions.*;
@@ -141,8 +141,8 @@ public class FileOperationsTest extends DataApiTestBase {
 
         // Explicitly set attrs
 
-        Assertions.assertTrue(tag.containsAttrs("app_template"));
-        Assertions.assertTrue(tag.containsAttrs("description"));
+        assertTrue(tag.containsAttrs("app_template"));
+        assertTrue(tag.containsAttrs("description"));
         var appTemplateAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("app_template"));
         var descriptionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("description"));
         Assertions.assertEquals("template_name", appTemplateAttr);
@@ -150,10 +150,10 @@ public class FileOperationsTest extends DataApiTestBase {
 
         // Controlled attrs should always be set for files
 
-        Assertions.assertTrue(tag.containsAttrs("trac_file_name"));
-        Assertions.assertTrue(tag.containsAttrs("trac_file_extension"));
-        Assertions.assertTrue(tag.containsAttrs("trac_file_mime_type"));
-        Assertions.assertTrue(tag.containsAttrs("trac_file_size"));
+        assertTrue(tag.containsAttrs("trac_file_name"));
+        assertTrue(tag.containsAttrs("trac_file_extension"));
+        assertTrue(tag.containsAttrs("trac_file_mime_type"));
+        assertTrue(tag.containsAttrs("trac_file_size"));
         var nameAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_name"));
         var extensionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_extension"));
         var mimeTypeAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_mime_type"));
@@ -166,22 +166,22 @@ public class FileOperationsTest extends DataApiTestBase {
         // Check core attributes of the file definition
 
         var def = tag.getDefinition();
-        Assertions.assertEquals(ObjectType.FILE, def.getObjectType());
+        assertEquals(ObjectType.FILE, def.getObjectType());
 
         var fileDef = def.getFile();
-        Assertions.assertEquals("some_file.txt", fileDef.getName());
-        Assertions.assertEquals("txt", fileDef.getExtension());
-        Assertions.assertEquals("text/plain", fileDef.getMimeType());
-        Assertions.assertEquals(BASIC_FILE_CONTENT.size(), fileDef.getSize());
+        assertEquals("some_file.txt", fileDef.getName());
+        assertEquals("txt", fileDef.getExtension());
+        assertEquals("text/plain", fileDef.getMimeType());
+        assertEquals(BASIC_FILE_CONTENT.size(), fileDef.getSize());
 
         // Storage ID should always point to a storage object and refer to the latest object/tag version
         // This is because storage can evolve independently of logical files/data (e.g. due to retention policy)
         // Data item should always be set
 
-        Assertions.assertEquals(ObjectType.STORAGE, fileDef.getStorageId().getObjectType());
-        Assertions.assertTrue(fileDef.getStorageId().getLatestObject());
-        Assertions.assertTrue(fileDef.getStorageId().getLatestTag());
-        Assertions.assertFalse(fileDef.getDataItem().isBlank());
+        assertEquals(ObjectType.STORAGE, fileDef.getStorageId().getObjectType());
+        assertTrue(fileDef.getStorageId().getLatestObject());
+        assertTrue(fileDef.getStorageId().getLatestTag());
+        assertFalse(fileDef.getDataItem().isBlank());
     }
 
     @Test
@@ -358,7 +358,7 @@ public class FileOperationsTest extends DataApiTestBase {
         var tag = resultOf(metaResponse);
         var def = tag.getDefinition();
         var fileDef = def.getFile();
-        Assertions.assertEquals(BASIC_FILE_CONTENT.size(), fileDef.getSize());
+        assertEquals(BASIC_FILE_CONTENT.size(), fileDef.getSize());
 
         // Read back content and check
 
@@ -481,8 +481,8 @@ public class FileOperationsTest extends DataApiTestBase {
 
         // Explicitly set attrs
 
-        Assertions.assertTrue(tag.containsAttrs("app_template"));
-        Assertions.assertTrue(tag.containsAttrs("description"));
+        assertTrue(tag.containsAttrs("app_template"));
+        assertTrue(tag.containsAttrs("description"));
         var appTemplateAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("app_template"));
         var descriptionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("description"));
         Assertions.assertEquals("template_name", appTemplateAttr);
@@ -490,10 +490,10 @@ public class FileOperationsTest extends DataApiTestBase {
 
         // Controlled attrs should always be set for files
 
-        Assertions.assertTrue(tag.containsAttrs("trac_file_name"));
-        Assertions.assertTrue(tag.containsAttrs("trac_file_extension"));
-        Assertions.assertTrue(tag.containsAttrs("trac_file_mime_type"));
-        Assertions.assertTrue(tag.containsAttrs("trac_file_size"));
+        assertTrue(tag.containsAttrs("trac_file_name"));
+        assertTrue(tag.containsAttrs("trac_file_extension"));
+        assertTrue(tag.containsAttrs("trac_file_mime_type"));
+        assertTrue(tag.containsAttrs("trac_file_size"));
         var nameAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_name"));
         var extensionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_extension"));
         var mimeTypeAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_mime_type"));
@@ -506,20 +506,20 @@ public class FileOperationsTest extends DataApiTestBase {
         // Check core attributes of the file definition
 
         var def = tag.getDefinition();
-        Assertions.assertEquals(ObjectType.FILE, def.getObjectType());
+        assertEquals(ObjectType.FILE, def.getObjectType());
 
         var fileDef = def.getFile();
-        Assertions.assertEquals("some_file.txt", fileDef.getName());
-        Assertions.assertEquals("txt", fileDef.getExtension());
-        Assertions.assertEquals("text/plain", fileDef.getMimeType());
-        Assertions.assertEquals(BASIC_FILE_CONTENT_V2.size(), fileDef.getSize());
+        assertEquals("some_file.txt", fileDef.getName());
+        assertEquals("txt", fileDef.getExtension());
+        assertEquals("text/plain", fileDef.getMimeType());
+        assertEquals(BASIC_FILE_CONTENT_V2.size(), fileDef.getSize());
 
         // Storage checks
 
-        Assertions.assertEquals(ObjectType.STORAGE, fileDef.getStorageId().getObjectType());
-        Assertions.assertTrue(fileDef.getStorageId().getLatestObject());
-        Assertions.assertTrue(fileDef.getStorageId().getLatestTag());
-        Assertions.assertFalse(fileDef.getDataItem().isBlank());
+        assertEquals(ObjectType.STORAGE, fileDef.getStorageId().getObjectType());
+        assertTrue(fileDef.getStorageId().getLatestObject());
+        assertTrue(fileDef.getStorageId().getLatestTag());
+        assertFalse(fileDef.getDataItem().isBlank());
 
         // Make sure V2 file is referring to the same storage object
         // Also, V1 and V2 file blobs should have different data item IDs
@@ -534,8 +534,8 @@ public class FileOperationsTest extends DataApiTestBase {
         var tagV1 = resultOf(metaV1Response);
         var fileDefV1 = tagV1.getDefinition().getFile();
 
-        Assertions.assertEquals(fileDefV1.getStorageId(), fileDef.getStorageId());
-        Assertions.assertNotEquals(fileDefV1.getDataItem(), fileDef.getDataItem());
+        assertEquals(fileDefV1.getStorageId(), fileDef.getStorageId());
+        assertNotEquals(fileDefV1.getDataItem(), fileDef.getDataItem());
     }
 
     @Test
@@ -848,10 +848,10 @@ public class FileOperationsTest extends DataApiTestBase {
 
         // Check controlled tag attrs
 
-        Assertions.assertTrue(tag.containsAttrs("trac_file_name"));
-        Assertions.assertTrue(tag.containsAttrs("trac_file_extension"));
-        Assertions.assertTrue(tag.containsAttrs("trac_file_mime_type"));
-        Assertions.assertTrue(tag.containsAttrs("trac_file_size"));
+        assertTrue(tag.containsAttrs("trac_file_name"));
+        assertTrue(tag.containsAttrs("trac_file_extension"));
+        assertTrue(tag.containsAttrs("trac_file_mime_type"));
+        assertTrue(tag.containsAttrs("trac_file_size"));
         var nameAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_name"));
         var extensionAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_extension"));
         var mimeTypeAttr = MetadataCodec.decodeStringValue(tag.getAttrsOrThrow("trac_file_mime_type"));
@@ -864,13 +864,13 @@ public class FileOperationsTest extends DataApiTestBase {
         // Check file definition
 
         var def = tag.getDefinition();
-        Assertions.assertEquals(ObjectType.FILE, def.getObjectType());
+        assertEquals(ObjectType.FILE, def.getObjectType());
 
         var fileDef = def.getFile();
-        Assertions.assertEquals("alternate_file_name_v2.txt", fileDef.getName());
-        Assertions.assertEquals("txt", fileDef.getExtension());
-        Assertions.assertEquals("text/plain", fileDef.getMimeType());
-        Assertions.assertEquals(BASIC_FILE_CONTENT_V2.size(), fileDef.getSize());
+        assertEquals("alternate_file_name_v2.txt", fileDef.getName());
+        assertEquals("txt", fileDef.getExtension());
+        assertEquals("text/plain", fileDef.getMimeType());
+        assertEquals(BASIC_FILE_CONTENT_V2.size(), fileDef.getSize());
     }
 
     @Test
@@ -995,7 +995,7 @@ public class FileOperationsTest extends DataApiTestBase {
         var tag = resultOf(metaResponse);
         var def = tag.getDefinition();
         var fileDef = def.getFile();
-        Assertions.assertEquals(BASIC_FILE_CONTENT_V2.size(), fileDef.getSize());
+        assertEquals(BASIC_FILE_CONTENT_V2.size(), fileDef.getSize());
 
         // Read back content and check
 

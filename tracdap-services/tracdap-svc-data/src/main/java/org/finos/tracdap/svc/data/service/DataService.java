@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Accenture Global Solutions Limited
+ * Copyright 2022 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.service;
+package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.config.DataServiceConfig;
@@ -49,7 +49,6 @@ import java.util.concurrent.Flow;
 
 import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
 import static org.finos.tracdap.common.metadata.MetadataUtil.selectorForLatest;
-import static com.accenture.trac.svc.data.service.MetadataBuilders.*;
 
 
 public class DataService {
@@ -227,7 +226,7 @@ public class DataService {
 
     private CompletionStage<Void> loadMetadata(String tenant, TagSelector dataSelector, RequestState state) {
 
-        var request = requestForSelector(tenant, dataSelector);
+        var request = MetadataBuilders.requestForSelector(tenant, dataSelector);
 
         return grpcWrap
                 .unaryCall(READ_OBJECT_METHOD, request, metaClient::readObject)
@@ -242,7 +241,7 @@ public class DataService {
 
     private CompletionStage<Void> loadStorageAndExternalSchema(String tenant, RequestState state) {
 
-        var request = requestForBatch(tenant, state.data.getStorageId(), state.data.getSchemaId());
+        var request = MetadataBuilders.requestForBatch(tenant, state.data.getStorageId(), state.data.getSchemaId());
 
         return grpcWrap
                 .unaryCall(READ_BATCH_METHOD, request, metaClient::readBatch)
@@ -261,7 +260,7 @@ public class DataService {
 
     private CompletionStage<Void> loadStorageAndEmbeddedSchema(String tenant, RequestState state) {
 
-        var request = requestForSelector(tenant, state.data.getStorageId());
+        var request = MetadataBuilders.requestForSelector(tenant, state.data.getStorageId());
 
         return grpcWrap
                 .unaryCall(READ_OBJECT_METHOD, request, metaClient::readObject)
@@ -321,8 +320,8 @@ public class DataService {
 
     private CompletionStage<Void> preallocateIds(DataWriteRequest request, RequestState state) {
 
-        var preAllocDataReq = preallocateRequest(request.getTenant(), ObjectType.DATA);
-        var preAllocStorageReq = preallocateRequest(request.getTenant(), ObjectType.STORAGE);
+        var preAllocDataReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.DATA);
+        var preAllocStorageReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.STORAGE);
 
         return CompletableFuture.completedFuture(0)
 
@@ -336,10 +335,10 @@ public class DataService {
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state) {
 
         var priorStorageId = selectorFor(state.preAllocStorageId);
-        var storageReq = buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
+        var storageReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
 
         var priorDataId = selectorFor(state.preAllocDataId);
-        var dataReq = buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
+        var dataReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
 
         return grpcWrap
                 .unaryCall(CREATE_PREALLOCATED_METHOD, storageReq, metaClient::createPreallocatedObject)
@@ -350,10 +349,10 @@ public class DataService {
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state, RequestState prior) {
 
         var priorStorageId = selectorFor(prior.storageId);
-        var storageReq = buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
+        var storageReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
 
         var priorDataId = selectorFor(prior.dataId);
-        var dataReq = buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
+        var dataReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
 
         return grpcWrap
                 .unaryCall(UPDATE_OBJECT_METHOD, storageReq, metaClient::updateObject)
@@ -366,8 +365,8 @@ public class DataService {
         state.dataTags = request.getTagUpdatesList();  // File tags requested by the client
         state.storageTags = List.of();                 // Storage tags is empty to start with
 
-        state.dataId = bumpVersion(state.preAllocDataId);
-        state.storageId = bumpVersion(state.preAllocStorageId);
+        state.dataId = MetadataBuilders.bumpVersion(state.preAllocDataId);
+        state.storageId = MetadataBuilders.bumpVersion(state.preAllocStorageId);
 
         state.part = PartKeys.ROOT;
         state.snap = 0;
@@ -395,8 +394,8 @@ public class DataService {
         state.dataTags = request.getTagUpdatesList();  // File tags requested by the client
         state.storageTags = List.of();                 // Storage tags is empty to start with
 
-        state.dataId = bumpVersion(prior.dataId);
-        state.storageId = bumpVersion(prior.storageId);
+        state.dataId = MetadataBuilders.bumpVersion(prior.dataId);
+        state.storageId = MetadataBuilders.bumpVersion(prior.storageId);
 
         state.part = PartKeys.ROOT;
         state.delta = 0;

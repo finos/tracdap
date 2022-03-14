@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Accenture Global Solutions Limited
+ * Copyright 2022 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.data.api;
+package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
@@ -25,8 +25,8 @@ import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.FileDefinition;
 import org.finos.tracdap.metadata.SchemaDefinition;
 import org.finos.tracdap.metadata.TagHeader;
-import com.accenture.trac.svc.data.service.DataService;
-import com.accenture.trac.svc.data.service.FileService;
+import org.finos.tracdap.svc.data.service.DataService;
+import org.finos.tracdap.svc.data.service.FileService;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
