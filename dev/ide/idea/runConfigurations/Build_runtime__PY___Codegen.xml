@@ -1,18 +1,18 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Codegen: Python proto" type="PythonConfigurationType" factoryName="Python">
-    <module name="build-scripts" />
+  <configuration default="false" name="Build runtime (PY): Codegen" type="PythonConfigurationType" factoryName="Python">
+    <module name="tracdap-runtime-py" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
     </envs>
-    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/dev/codegen" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tracdap-runtime/python" />
     <option name="IS_MODULE_SDK" value="true" />
-    <option name="ADD_CONTENT_ROOTS" value="false" />
+    <option name="ADD_CONTENT_ROOTS" value="true" />
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/dev/codegen/protoc-ctrl.py" />
-    <option name="PARAMETERS" value="python_proto --proto_path tracdap-api/tracdap-metadata/src/main/proto --proto_path tracdap-api/tracdap-config/src/main/proto --out tracdap-runtime/python/generated/tracdap/rt_gen/proto" />
+    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/tracdap-runtime/python/build_runtime.py" />
+    <option name="PARAMETERS" value="--target codegen" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

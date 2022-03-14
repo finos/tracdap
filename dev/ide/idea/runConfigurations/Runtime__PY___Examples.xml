@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Python Runtime: Unit Tests" type="tests" factoryName="Unittests">
+  <configuration default="false" name="Runtime (PY): Examples" type="tests" factoryName="Unittests">
     <module name="tracdap-runtime-py" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
@@ -9,7 +9,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="_new_pattern" value="&quot;&quot;" />
-    <option name="_new_additionalArguments" value="&quot;discover -s tracdap-runtime/python/test/tracdap_test -t tracdap-runtime/python/test&quot;" />
+    <option name="_new_additionalArguments" value="&quot;discover -s tracdap-runtime/python/test/tracdap_examples -t tracdap-runtime/python/test&quot;" />
     <option name="_new_target" value="&quot;&quot;" />
     <option name="_new_targetType" value="&quot;CUSTOM&quot;" />
     <method v="2" />
