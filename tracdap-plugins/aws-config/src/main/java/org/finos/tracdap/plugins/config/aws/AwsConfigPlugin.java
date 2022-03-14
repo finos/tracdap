@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Accenture Global Solutions Limited
+ * Copyright 2022 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.plugins.config.aws;
+package org.finos.tracdap.plugins.config.aws;
 
 import org.finos.tracdap.common.config.IConfigLoader;
 import org.finos.tracdap.common.exception.EUnexpected;
