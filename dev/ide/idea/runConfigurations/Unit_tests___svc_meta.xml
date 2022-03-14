@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Unit tests: -svc-meta" type="JUnit" factoryName="JUnit">
-    <module name="trac-platform.trac-svc-meta.test" />
+    <module name="trac-platform.tracdap-svc-meta.test" />
     <option name="MAIN_CLASS_NAME" value="" />
     <option name="METHOD_NAME" value="" />
     <option name="TEST_OBJECT" value="tags" />
