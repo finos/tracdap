@@ -37,6 +37,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import static org.finos.tracdap.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
@@ -49,12 +50,12 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
     }
 
     @ExtendWith(JdbcUnit.class)
-    static class Unit extends MetadataDalEncodingTest {}
+    static class UnitTest extends MetadataDalEncodingTest {}
 
     @Tag("integration")
     @Tag("int-metadb")
     @ExtendWith(JdbcIntegration.class)
-    static class Integration extends MetadataDalEncodingTest {}
+    static class IntegrationTest extends MetadataDalEncodingTest {}
 
     @Test
     void roundTrip_ok() throws Exception {

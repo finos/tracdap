@@ -46,6 +46,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import static org.finos.tracdap.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -341,7 +342,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     void updateObject_publicTypesNotAllowed(ObjectType objectType) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
 
         var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
@@ -363,7 +364,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     void updateObject_versionsNotSupported(ObjectType objectType) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
 
         var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
@@ -390,7 +391,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     void updateObject_ok(ObjectType objectType, Function<MetadataWriteRequest, TagHeader> saveApiCall) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
         var v1ObjectId = UUID.fromString(v1SavedTag.getHeader().getObjectId());
 
         var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
@@ -477,7 +478,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         // Test both trusted and public APIs
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
         var v1ObjectId = v1SavedTag.getHeader().getObjectId();
 
         var readRequest = MetadataReadRequest.newBuilder()
@@ -532,7 +533,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         // Make sure both types are allowed on the public API, so we don't get permission denied
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
 
         var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
@@ -567,7 +568,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         // First attempt - use a prior version selector that does not match the new object
         // This should be an invalid request (it is always invalid, regardless of what is in the DB)
 
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
 
         var v2WriteRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -604,7 +605,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         // V1 object is not saved
         var v1Tag = TestData.dummyTagForObjectType(ObjectType.CUSTOM);
-        var v1Selector = TestData.selectorForTag(v1Tag);
+        var v1Selector = selectorForTag(v1Tag);
 
         var v2Obj = TestData.dummyVersionForType(v1Tag.getDefinition());
 
@@ -629,7 +630,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         // V1 object created and saved
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
 
         // V2 object is not saved
         var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
@@ -658,7 +659,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         // V1 object created and saved
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
 
         var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
@@ -690,7 +691,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         // V1 object created and saved
         var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
         var v1Schema = v1SavedTag.getDefinition().getData().getSchema();
 
         // Create a V2 data definition that is invalid, use an explicit fieldOrder = -1
@@ -728,7 +729,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     void updateObject_invalidAttrs() {
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
 
         var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
@@ -758,7 +759,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     void updateObject_reservedAttrs() {
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
 
         var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
 
@@ -795,7 +796,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     void updateTag_AllTypesOk(ObjectType objectType) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
         var v1ObjectId = UUID.fromString(v1SavedTag.getHeader().getObjectId());
 
         // Write tag update via the trusted API
@@ -835,7 +836,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .build();
 
         var t2SavedTag = readApi.readObject(t2MetadataReadRequest);
-        var t2Selector = TestData.selectorForTag(t2SavedTag);
+        var t2Selector = selectorForTag(t2SavedTag);
 
         assertEquals(t2ExpectedTag, t2SavedTag);
 
@@ -884,7 +885,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     void updateTag_latestUpdated() {
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
         var v1Header = v1SavedTag.getHeader();
 
         var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
@@ -955,7 +956,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         // Make sure both types are allowed on the public API, so we don't get permission denied
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
 
         var t2Update = TagUpdate.newBuilder()
                 .setAttrName("extra_attr_v2")
@@ -991,7 +992,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
 
-        var v1Selector = TestData.selectorForTag(v1SavedTag).toBuilder()
+        var v1Selector = selectorForTag(v1SavedTag).toBuilder()
                 .setObjectType(ObjectType.DATA)
                 .build();
 
@@ -1021,7 +1022,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var v1Obj = TestData.dummyDataDef();
         var v1Tag = TestData.dummyTag(v1Obj, INCLUDE_HEADER);
-        var v1Selector = TestData.selectorForTag(v1Tag);
+        var v1Selector = selectorForTag(v1Tag);
 
         var t2Update = TagUpdate.newBuilder()
                 .setAttrName("extra_attr_v2")
@@ -1049,7 +1050,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
 
-        var v2Selector = TestData.selectorForTag(v1SavedTag).toBuilder()
+        var v2Selector = selectorForTag(v1SavedTag).toBuilder()
                 .setObjectVersion(2)
                 .build();
 
@@ -1079,7 +1080,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
 
-        var t2Selector = TestData.selectorForTag(v1SavedTag).toBuilder()
+        var t2Selector = selectorForTag(v1SavedTag).toBuilder()
                 .setTagVersion(2)
                 .build();
 
@@ -1108,7 +1109,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     void updateTag_superseded() {
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.DATA);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
 
         var t2Update = TagUpdate.newBuilder()
                 .setAttrName("extra_attr_v2")
@@ -1141,7 +1142,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     void updateTag_invalidAttrs() {
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
 
         var t2Update = TagUpdate.newBuilder()
                 .setAttrName("no-hyphens")
@@ -1168,7 +1169,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     void updateTag_reservedAttrs() {
 
         var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
-        var v1Selector = TestData.selectorForTag(v1SavedTag);
+        var v1Selector = selectorForTag(v1SavedTag);
 
         var t2Update = TagUpdate.newBuilder()
                 .setAttrName("trac_anything_reserved")
@@ -1208,7 +1209,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .build();
 
         var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
-        var preallocateSelector = TestData.selectorForTag(preallocateHeader);
+        var preallocateSelector = selectorForTag(preallocateHeader);
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
         var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
@@ -1285,7 +1286,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .build();
 
         var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
-        var preallocateSelector = TestData.selectorForTag(preallocateHeader);
+        var preallocateSelector = selectorForTag(preallocateHeader);
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
         var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
@@ -1358,7 +1359,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
                 .build();
 
         var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
-        var preallocateSelector = TestData.selectorForTag(preallocateHeader);
+        var preallocateSelector = selectorForTag(preallocateHeader);
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.MODEL);
         var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
@@ -1432,7 +1433,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
 
         // Preallocate header does not set object/tag version (they will be zero)
-        var v1Selector = TestData.selectorForTag(preallocateHeader).toBuilder()
+        var v1Selector = selectorForTag(preallocateHeader).toBuilder()
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -1469,7 +1470,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
 
         // Preallocate header does not set object/tag version (they will be zero)
-        var v1Selector = TestData.selectorForTag(preallocateHeader).toBuilder()
+        var v1Selector = selectorForTag(preallocateHeader).toBuilder()
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();

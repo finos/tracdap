@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import static org.finos.tracdap.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -46,12 +47,12 @@ abstract class MetadataDalReadTest implements IDalTestable {
     }
 
     @ExtendWith(JdbcUnit.class)
-    static class Unit extends MetadataDalReadTest {}
+    static class UnitTest extends MetadataDalReadTest {}
 
     @Tag("integration")
     @Tag("int-metadb")
     @ExtendWith(JdbcIntegration.class)
-    static class Integration extends MetadataDalReadTest {}
+    static class IntegrationTest extends MetadataDalReadTest {}
 
     @Test
     void loadByVersion_single() throws Exception {

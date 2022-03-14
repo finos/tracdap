@@ -38,9 +38,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeArrayValue;
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
+import static org.finos.tracdap.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -53,12 +55,12 @@ abstract class MetadataDalSearchTest implements IDalTestable {
     }
 
     @ExtendWith(JdbcUnit.class)
-    static class Unit extends MetadataDalSearchTest {}
+    static class UnitTest extends MetadataDalSearchTest {}
 
     @org.junit.jupiter.api.Tag("integration")
     @org.junit.jupiter.api.Tag("int-metadb")
     @ExtendWith(JdbcIntegration.class)
-    static class Integration extends MetadataDalSearchTest {}
+    static class IntegrationTest extends MetadataDalSearchTest {}
 
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -735,17 +737,17 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                     LocalDate.now(),
                     LocalDate.now().plusWeeks(1));
 
-            case DATETIME: return List.of(
+            case DATETIME: return Stream.of(
                     OffsetDateTime.now(ZoneOffset.UTC).minusWeeks(1),
                     OffsetDateTime.now(ZoneOffset.UTC),
                     OffsetDateTime.now(ZoneOffset.UTC).plusWeeks(1))
 
                     // Metadata datetime attrs are at microsecond precision
-                    .stream().map(TestData::truncateMicrosecondPrecision)
+                    .map(TestData::truncateMicrosecondPrecision)
                     .collect(Collectors.toList());
 
             default:
-                throw new RuntimeException("Cannot create ordered values for unordered type " + basicType.toString());
+                throw new RuntimeException("Cannot create ordered values for unordered type " + basicType);
         }
     }
 

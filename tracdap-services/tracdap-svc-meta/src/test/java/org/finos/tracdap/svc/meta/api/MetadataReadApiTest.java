@@ -47,6 +47,8 @@ import org.junit.jupiter.params.provider.EnumSource;
 import java.util.HashMap;
 import java.util.UUID;
 
+import static org.finos.tracdap.test.meta.TestData.TEST_TENANT;
+import static org.finos.tracdap.test.meta.TestData.selectorForTag;
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -60,13 +62,13 @@ abstract class MetadataReadApiTest implements IDalTestable {
 
     // Include this test case as a unit test
     @ExtendWith(JdbcUnit.class)
-    static class Unit extends MetadataReadApiTest {}
+    static class UnitTest extends MetadataReadApiTest {}
 
     // Include this test case for integration against different database backends
     @org.junit.jupiter.api.Tag("integration")
     @Tag("int-metadb")
     @ExtendWith(JdbcIntegration.class)
-    static class Integration extends MetadataReadApiTest {}
+    static class IntegrationTest extends MetadataReadApiTest {}
 
     @Rule
     final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();

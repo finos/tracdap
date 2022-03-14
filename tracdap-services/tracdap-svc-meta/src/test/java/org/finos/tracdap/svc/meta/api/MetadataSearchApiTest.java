@@ -46,6 +46,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeNativeObject;
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
+import static org.finos.tracdap.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -68,13 +69,13 @@ abstract class MetadataSearchApiTest implements IDalTestable {
 
     // Include this test case as a unit test
     @ExtendWith(JdbcUnit.class)
-    static class Unit extends MetadataSearchApiTest {}
+    static class UnitTest extends MetadataSearchApiTest {}
 
     // Include this test case for integration against different database backends
     @org.junit.jupiter.api.Tag("integration")
     @org.junit.jupiter.api.Tag("int-metadb")
     @ExtendWith(JdbcIntegration.class)
-    static class Integration extends MetadataSearchApiTest {}
+    static class IntegrationTest extends MetadataSearchApiTest {}
 
     @Rule
     final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
