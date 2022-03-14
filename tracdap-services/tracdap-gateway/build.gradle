@@ -28,7 +28,7 @@ ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Platform Gateway")
 
 application {
 
-    mainClass.set("com.accenture.trac.gateway.TracPlatformGateway")
+    mainClass.set("org.finos.tracdap.gateway.TracPlatformGateway")
     tasks.run.workingDir = rootProject.projectDir
 
     // JVM flags needed for Arrow / Netty / gRPC to access native memory
