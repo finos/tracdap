@@ -25,6 +25,9 @@ import org.finos.tracdap.metadata.TagUpdate;
 
 import java.util.*;
 
+import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_RESERVED_IDENTIFIER;
+import static org.finos.tracdap.common.metadata.MetadataConstants.VALID_IDENTIFIER;
+
 
 public class MetadataValidator {
 

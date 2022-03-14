@@ -26,11 +26,11 @@ import java.util.Map;
 public class PluginServiceInfo {
 
     static final Map<String, String> SERVICE_NAMES = Map.ofEntries(
-            Map.entry("com.accenture.trac.common.config.IConfigLoader", "CONFIG"),
-            Map.entry("com.accenture.trac.common.codec.ICodec", "FORMAT"),
-            Map.entry("com.accenture.trac.common.storage.IFileStorage", "FILE_STORAGE"),
-            Map.entry("com.accenture.trac.common.storage.IDataStorage", "DATA_STORAGE"),
-            Map.entry("com.accenture.trac.common.exec.IBatchExecutor", "BATCH_EXECUTOR"));
+            Map.entry("org.finos.tracdap.common.config.IConfigLoader", "CONFIG"),
+            Map.entry("org.finos.tracdap.common.codec.ICodec", "FORMAT"),
+            Map.entry("org.finos.tracdap.common.storage.IFileStorage", "FILE_STORAGE"),
+            Map.entry("org.finos.tracdap.common.storage.IDataStorage", "DATA_STORAGE"),
+            Map.entry("org.finos.tracdap.common.exec.IBatchExecutor", "BATCH_EXECUTOR"));
 
     private final String pluginName;
     private final Class<?> serviceClass;

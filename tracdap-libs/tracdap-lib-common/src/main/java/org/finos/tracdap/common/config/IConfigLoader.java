@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.config;
 
-import com.accenture.trac.common.exception.*;
 import org.finos.tracdap.common.config.local.LocalConfigLoader;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.TracPlugin;

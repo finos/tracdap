@@ -19,7 +19,6 @@ package org.finos.tracdap.svc.data.service;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.config.DataServiceConfig;
 import org.finos.tracdap.metadata.*;
-
 import org.finos.tracdap.common.codec.ICodec;
 import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
@@ -47,6 +46,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
+import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_STORAGE_OBJECT_ATTR;
 import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
 import static org.finos.tracdap.common.metadata.MetadataUtil.selectorForLatest;
 

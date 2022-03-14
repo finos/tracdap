@@ -23,7 +23,6 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.config.PlatformConfig;
-import com.accenture.trac.svc.meta.api.*;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 import org.finos.tracdap.svc.meta.dal.jdbc.JdbcMetadataDal;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;

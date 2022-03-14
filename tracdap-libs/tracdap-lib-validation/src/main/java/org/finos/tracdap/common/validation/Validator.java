@@ -25,7 +25,7 @@ import org.finos.tracdap.common.validation.core.ValidationKey;
 import org.finos.tracdap.common.validation.core.ValidationResult;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.TagHeader;
-import com.accenture.trac.common.validation.core.*;
+
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import org.slf4j.Logger;

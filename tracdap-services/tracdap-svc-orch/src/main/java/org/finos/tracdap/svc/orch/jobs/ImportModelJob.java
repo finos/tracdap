@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
+import static org.finos.tracdap.common.metadata.MetadataConstants.*;
 
 
 public class ImportModelJob implements IJobLogic {

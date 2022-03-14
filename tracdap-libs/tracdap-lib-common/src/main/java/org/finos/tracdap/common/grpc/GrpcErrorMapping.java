@@ -16,12 +16,11 @@
 
 package org.finos.tracdap.common.grpc;
 
-import com.accenture.trac.common.exception.*;
+import org.finos.tracdap.common.exception.*;
 
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
-import org.finos.tracdap.common.exception.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
