@@ -17,7 +17,7 @@
 package org.finos.tracdap.plugins.config.aws;
 
 import org.finos.tracdap.common.exception.EStartup;
-import com.accenture.trac.plugins.config.gcp.GcpConfigLoader;
+import org.finos.tracdap.plugins.config.gcp.GcpConfigLoader;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
