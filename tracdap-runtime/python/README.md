@@ -80,6 +80,6 @@ This is not normally necessary for model development, but if you want to do it h
 
     # Build the Python package files
 
-    python ./build_runtime.py
+    python ./build_runtime.py --target dist
     
 The package files will appear under build/dist
