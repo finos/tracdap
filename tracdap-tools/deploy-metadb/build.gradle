@@ -26,7 +26,7 @@ ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Deploy Meta DB")
 
 
 application {
-    mainClass.set("com.accenture.trac.deploy.metadb.DeployMetaDB")
+    mainClass.set("org.finos.tracdap.deploy.metadb.DeployMetaDB")
     tasks.run.workingDir = rootProject.projectDir
 }
 

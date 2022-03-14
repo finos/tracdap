@@ -27,7 +27,7 @@ import org.finos.tracdap.common.concurrent.ExecutionRegister;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.storage.StorageManager;
 import org.finos.tracdap.config.PlatformConfig;
-import com.accenture.trac.deploy.metadb.DeployMetaDB;
+import org.finos.tracdap.deploy.metadb.DeployMetaDB;
 import org.finos.tracdap.svc.data.EventLoopChannel;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.data.service.DataService;
