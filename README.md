@@ -98,9 +98,9 @@ the TRAC metadata schema into an H2 database file.
 
 Once you have a database prepared you can start the TRAC services.
 
-    gradlew :trac-svc-meta:run --args="--config etc/trac-devlocal.yaml"
-    gradlew :trac-svc-data:run --args="--config etc/trac-devlocal.yaml"
-    gradlew :trac-gateway:run --args="--config etc/trac-devlocal-gateway.yaml"
+    gradlew :tracdap-svc-meta:run --args="--config etc/trac-devlocal.yaml"
+    gradlew :tracdap-svc-data:run --args="--config etc/trac-devlocal.yaml"
+    gradlew :tracdap-gateway:run --args="--config etc/trac-devlocal-gateway.yaml"
 
 To confirm the platform is working you can use the [example API calls](./examples/rest_calls)
 with a REST client such as [Postman](https://www.postman.com/). For more information on the

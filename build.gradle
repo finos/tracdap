@@ -29,7 +29,7 @@ def versionNumber = ext.getVersionFromGit()
 
 allprojects {
 
-    group 'com.accenture.trac'
+    group 'org.finos.tracdap'
     version versionNumber
 }
 
