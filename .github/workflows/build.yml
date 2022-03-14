@@ -127,14 +127,7 @@ jobs:
 
       - name: Protoc code generation
         run: |
-          python dev/codegen/protoc-ctrl.py python_runtime \
-            --proto_path tracdap-api/tracdap-metadata/src/main/proto \
-            --proto_path tracdap-api/tracdap-config/src/main/proto \
-            --out tracdap-runtime/python/generated/tracdap/rt_gen/domain
-          python dev/codegen/protoc-ctrl.py python_proto \
-            --proto_path tracdap-api/tracdap-metadata/src/main/proto \
-            --proto_path tracdap-api/tracdap-config/src/main/proto \
-            --out tracdap-runtime/python/generated/tracdap/rt_gen/proto
+          python tracdap-runtime/python/build_runtime.py --target codegen
 
       - name: Unit tests
         run: |
