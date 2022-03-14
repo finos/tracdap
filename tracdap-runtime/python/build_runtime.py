@@ -217,7 +217,7 @@ def main():
     # Codegen step is always required
     generate_from_proto()
 
-    if args.target == "all":
+    if args.target == "dist":
 
         reset_build_dir()
         copy_source_files()

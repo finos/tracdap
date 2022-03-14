@@ -87,9 +87,7 @@ jobs:
           pip install -r tracdap-runtime/python/requirements.txt
 
       - name: Python - Build runtime package
-        run: |
-          cd tracdap-runtime/python
-          python build_runtime.py
+        run: python tracdap-runtime/python/build_runtime.py --target dist
 
       - name: Run end to end tests
         run: ./gradlew integration -DintegrationTags="int-e2e"
