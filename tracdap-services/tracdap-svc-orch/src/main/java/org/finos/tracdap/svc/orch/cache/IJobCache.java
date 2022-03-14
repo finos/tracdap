@@ -14,32 +14,30 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.cache;
+package org.finos.tracdap.svc.orch.cache;
+
+import java.util.List;
+import java.util.function.Function;
 
 
-public class TicketContext implements AutoCloseable {
+public interface IJobCache {
 
-    private final IJobCache cache;
-    private final Ticket[] tickets;
-
-    TicketContext(IJobCache cache, Ticket... tickets) {
-        this.cache = cache;
-        this.tickets = tickets;
+    default TicketContext useTicket(String jobKey) {
+        var ticket = openTicket(jobKey);
+        return new TicketContext(this, ticket);
     }
 
-    public Ticket ticket() {
-        return this.tickets[0];
-    }
+    Ticket openTicket(String jobKey);
 
-    public boolean superseded() {
+    void closeTicket(Ticket ticket);
 
-        return false;
-    }
+    void createJob(String jobKey, JobState state, Ticket ticket);
 
-    @Override
-    public void close() {
+    JobState readJob(String jobKey);
 
-        for (var ticket : tickets)
-            cache.closeTicket(ticket);
-    }
+    void updateJob(String jobKey, JobState state, Ticket ticket);
+
+    void deleteJob(String jobKey, Ticket ticket);
+
+    List<JobState> pollJobs(Function<JobState, Boolean> filter);
 }

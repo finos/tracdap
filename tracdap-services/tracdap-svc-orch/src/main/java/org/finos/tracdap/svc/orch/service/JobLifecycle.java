@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.service;
+package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.MetadataBatchRequest;
 import org.finos.tracdap.api.MetadataBatchResponse;
@@ -31,8 +31,8 @@ import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.RuntimeConfig;
 import org.finos.tracdap.config.StorageSettings;
 import org.finos.tracdap.metadata.*;
-import com.accenture.trac.svc.orch.cache.JobState;
-import com.accenture.trac.svc.orch.jobs.JobLogic;
+import org.finos.tracdap.svc.orch.cache.JobState;
+import org.finos.tracdap.svc.orch.jobs.JobLogic;
 import io.grpc.MethodDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

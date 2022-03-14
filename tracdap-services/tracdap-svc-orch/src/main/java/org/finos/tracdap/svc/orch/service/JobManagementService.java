@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.service;
+package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.common.config.ConfigFormat;
 import org.finos.tracdap.common.exception.*;
@@ -22,10 +22,10 @@ import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.config.*;
 import org.finos.tracdap.metadata.JobStatusCode;
 
-import com.accenture.trac.svc.orch.cache.IJobCache;
-import com.accenture.trac.svc.orch.cache.JobState;
+import org.finos.tracdap.svc.orch.cache.IJobCache;
+import org.finos.tracdap.svc.orch.cache.JobState;
 
-import com.accenture.trac.svc.orch.cache.Ticket;
+import org.finos.tracdap.svc.orch.cache.Ticket;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;

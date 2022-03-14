@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.service;
+package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.metadata.JobStatusCode;
@@ -22,8 +22,8 @@ import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 
-import com.accenture.trac.svc.orch.cache.IJobCache;
-import com.accenture.trac.svc.orch.cache.JobState;
+import org.finos.tracdap.svc.orch.cache.IJobCache;
+import org.finos.tracdap.svc.orch.cache.JobState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

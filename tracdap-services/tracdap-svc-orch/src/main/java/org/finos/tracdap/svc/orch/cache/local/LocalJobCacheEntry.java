@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch.cache.local;
+package org.finos.tracdap.svc.orch.cache.local;
 
-import com.accenture.trac.svc.orch.cache.JobState;
-import com.accenture.trac.svc.orch.cache.Ticket;
+import org.finos.tracdap.svc.orch.cache.JobState;
+import org.finos.tracdap.svc.orch.cache.Ticket;
 
 import java.time.Instant;
 

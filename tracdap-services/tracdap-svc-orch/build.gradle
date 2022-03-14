@@ -26,7 +26,7 @@ ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Orchestrator Service")
 
 
 application {
-    mainClass.set("com.accenture.trac.svc.orch.TracOrchestratorService")
+    mainClass.set("org.finos.tracdap.svc.orch.TracOrchestratorService")
     tasks.run.workingDir = rootProject.projectDir
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Accenture Global Solutions Limited
+ * Copyright 2022 Accenture Global Solutions Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.accenture.trac.svc.orch;
+package org.finos.tracdap.svc.orch;
 
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigManager;
@@ -23,15 +23,15 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.config.OrchServiceConfig;
 import org.finos.tracdap.config.PlatformConfig;
-import com.accenture.trac.svc.orch.api.TracOrchestratorApi;
-import com.accenture.trac.svc.orch.cache.IJobCache;
-import com.accenture.trac.svc.orch.cache.local.LocalJobCache;
+import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
+import org.finos.tracdap.svc.orch.cache.IJobCache;
+import org.finos.tracdap.svc.orch.cache.local.LocalJobCache;
 import org.finos.tracdap.common.exec.ExecutionManager;
 import org.finos.tracdap.common.exec.IBatchExecutor;
-import com.accenture.trac.svc.orch.service.JobApiService;
+import org.finos.tracdap.svc.orch.service.JobApiService;
 
-import com.accenture.trac.svc.orch.service.JobLifecycle;
-import com.accenture.trac.svc.orch.service.JobManagementService;
+import org.finos.tracdap.svc.orch.service.JobLifecycle;
+import org.finos.tracdap.svc.orch.service.JobManagementService;
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.netty.NettyChannelBuilder;
