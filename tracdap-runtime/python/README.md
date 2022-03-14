@@ -78,14 +78,8 @@ This is not normally necessary for model development, but if you want to do it h
     . venv/bin/activate                # For macOS or Linux
     pip install -r requirements.txt
 
-    # Run the code generator
-
-    python ../../dev/codegen/protoc-ctrl.py python_runtime \
-        --proto_path trac-api/trac-metadata/src/main/proto \
-        --out trac-runtime/python/generated/trac/rt_gen/domain
-
     # Build the Python package files
 
-    python ./package-ctrl.py
+    python ./build_runtime.py --target dist
     
 The package files will appear under build/dist

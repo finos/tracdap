@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import os
 import pathlib
 import shutil
 import subprocess
@@ -19,6 +20,7 @@ import fileinput
 import platform
 import sys
 import packaging.version
+import argparse
 
 
 SCRIPT_DIR = pathlib.Path(__file__) \
@@ -45,7 +47,7 @@ def reset_build_dir():
     if BUILD_PATH.exists():
         shutil.rmtree(BUILD_PATH)
 
-    BUILD_PATH.mkdir(parents=True, exist_ok=False)
+    BUILD_PATH.mkdir(parents=False, exist_ok=False)
 
 
 def copy_source_files():
@@ -68,6 +70,48 @@ def copy_license():
     shutil.copy(
         SCRIPT_DIR.joinpath("../../LICENSE"),
         BUILD_PATH.joinpath("LICENSE"))
+
+
+def generate_from_proto():
+
+    generated_dir = SCRIPT_DIR.joinpath("generated")
+
+    if generated_dir.exists():
+        shutil.rmtree(generated_dir)
+
+    generated_dir.mkdir(parents=False, exist_ok=False)
+
+    protoc_ctrl = ROOT_PATH.joinpath("dev/codegen/protoc-ctrl.py")
+
+    domain_cmd = [
+        str(sys.executable), str(protoc_ctrl), "python_runtime",
+        "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
+        "--proto_path", "tracdap-api/tracdap-config/src/main/proto",
+        "--out", "tracdap-runtime/python/generated/tracdap/rt_gen/domain"]
+
+    proto_cmd = [
+        str(sys.executable), str(protoc_ctrl), "python_proto",
+        "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
+        "--proto_path", "tracdap-api/tracdap-config/src/main/proto",
+        "--out", "tracdap-runtime/python/generated/tracdap/rt_gen/domain"]
+
+    domain_proc = subprocess.Popen(domain_cmd, stdout=subprocess.PIPE, cwd=ROOT_PATH, env=os.environ)
+    domain_out, domain_err = domain_proc.communicate()
+    domain_result = domain_proc.wait()
+
+    print(domain_out.decode("utf-8"))
+
+    if domain_result != 0:
+        raise subprocess.SubprocessError("Failed to generate domain classes from definitions")
+
+    proto_proc = subprocess.Popen(proto_cmd, stdout=subprocess.PIPE, cwd=ROOT_PATH, env=os.environ)
+    proto_out, proto_err = proto_proc.communicate()
+    proto_result = proto_proc.wait()
+
+    print(proto_out.decode("utf-8"))
+
+    if proto_result != 0:
+        raise subprocess.SubprocessError("Failed to generate proto classes from definitions")
 
 
 def move_generated_into_src():
@@ -116,7 +160,7 @@ def set_trac_version():
 
     # Set the version number used in the package metadata
 
-    # setup.cfg has file: and attr: for reading the version in from external sources
+    # setup.cfg uses file: and attr: for reading the version in from external sources
     # attr: doesn't work with namespace packages, __version__ has to be in the root package
     # file: works for the sdist build but is throwing an error for bdist_wheel, this could be a bug
     # Writing the version directly into setup.cfg avoids both of these issues
@@ -154,16 +198,35 @@ def run_pypa_build():
         raise subprocess.SubprocessError(f"PyPA Build failed with exit code {build_result.returncode}")
 
 
+def cli_args():
+
+    parser = argparse.ArgumentParser(description='TRAC/Python Runtime Builder')
+
+    parser.add_argument(
+        "--target", type=str, metavar="target", choices=["codegen", "dist"],
+        required=False, default="dist",
+        help="The target to build")
+
+    return parser.parse_args()
+
+
 def main():
 
-    reset_build_dir()
-    copy_source_files()
-    copy_license()
+    args = cli_args()
 
-    move_generated_into_src()
-    set_trac_version()
+    # Codegen step is always required
+    generate_from_proto()
 
-    run_pypa_build()
+    if args.target == "dist":
+
+        reset_build_dir()
+        copy_source_files()
+        copy_license()
+
+        move_generated_into_src()
+        set_trac_version()
+
+        run_pypa_build()
 
 
 main()
