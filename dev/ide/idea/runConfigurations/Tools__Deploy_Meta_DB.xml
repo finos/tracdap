@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Tools: Deploy Meta DB" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="org.finos.tracdap.deploy.metadb.DeployMetaDB" />
-    <module name="trac-platform.deploy-metadb.main" />
+    <module name="tracdap.deploy-metadb.main" />
     <option name="PROGRAM_PARAMETERS" value="--config etc/trac-devlocal.yaml --task deploy_schema --task add_tenant:ACME_CORP" />
     <method v="2">
       <option name="Make" enabled="true" />

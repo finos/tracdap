@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Unit tests: -lib-data" type="JUnit" factoryName="JUnit">
-    <module name="trac-platform.tracdap-lib-data.test" />
+    <module name="tracdap.tracdap-lib-data.test" />
     <option name="MAIN_CLASS_NAME" value="" />
     <option name="METHOD_NAME" value="" />
     <option name="TEST_OBJECT" value="tags" />
