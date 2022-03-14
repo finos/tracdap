@@ -20,8 +20,10 @@ googleapis-common-protos >= 1.53, < 2.0
 
 
 # Tools for building and packaging the Python runtime
+
 wheel >= 0.35
 build >= 0.6
+packaging >= 21.3
 
 
 # Compliance dependencies
