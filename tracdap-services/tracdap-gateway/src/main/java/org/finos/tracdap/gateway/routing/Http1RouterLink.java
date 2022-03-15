@@ -48,16 +48,18 @@ public class Http1RouterLink extends ChannelDuplexHandler {
 
     private final Http1Router router;
     private final int routeIndex;
+    private final int connId;
 
     public Http1RouterLink(
             ChannelHandlerContext routerCtx, ChannelPromise routeActivePromise,
-            Http1Router router, int routeIndex) {
+            Http1Router router, int routeIndex, int connId) {
 
         this.routerCtx = routerCtx;
         this.routeActivePromise = routeActivePromise;
 
         this.router = router;
         this.routeIndex = routeIndex;
+        this.connId = connId;
     }
 
     @Override
@@ -67,7 +69,9 @@ public class Http1RouterLink extends ChannelDuplexHandler {
         // Once this handler is active, the route is active
         // This signal tells the router it can start sending messages on the route
 
-        log.info("Route link handler now active");
+        if (log.isDebugEnabled())
+            log.debug("conn = {}, Route link handler now active", connId);
+
         routeActivePromise.setSuccess();
 
         super.channelActive(ctx);
@@ -77,7 +81,7 @@ public class Http1RouterLink extends ChannelDuplexHandler {
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
 
         if (log.isDebugEnabled())
-            log.debug("Router link outbound message of type {}", msg.getClass().getSimpleName());
+            log.debug("conn = {}, Router link outbound message of type {}", connId, msg.getClass().getSimpleName());
 
         // For outbound messages, the router is already running on the target channel
         // So simply pass the message along the pipeline as-is
@@ -97,7 +101,7 @@ public class Http1RouterLink extends ChannelDuplexHandler {
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
 
         if (log.isDebugEnabled())
-            log.debug("Router link inbound message of type {}", msg.getClass().getSimpleName());
+            log.debug("conn = {}, Router link inbound message of type {}", connId, msg.getClass().getSimpleName());
 
         router.associateRoute(msg, routeIndex);
 
@@ -160,9 +164,9 @@ public class Http1RouterLink extends ChannelDuplexHandler {
         // TODO: Implement more robust error forwarding in the router link handler
 
         if (direction == WRITE_DIRECTION)
-            log.error("Failed writing messages to proxy backend", cause);
+            log.error("conn = {}, Failed writing messages to proxy backend", connId, cause);
         else
-            log.error("Failed reading messages from proxy backend", cause);
+            log.error("conn = {}, Failed reading messages from proxy backend", connId, cause);
 
         var response = new DefaultHttpResponse(PROTOCOL_VERSION, HttpResponseStatus.BAD_GATEWAY);
         routerCtx.channel().writeAndFlush(response);

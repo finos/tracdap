@@ -30,19 +30,22 @@ public class Http1ProxyBuilder extends ChannelInitializer<Channel> {
 
     private final GwRoute routeConfig;
     ChannelDuplexHandler routerLink;
+    private final int connId;
 
     public Http1ProxyBuilder(
             GwRoute routeConfig,
-            ChannelDuplexHandler routerLink) {
+            ChannelDuplexHandler routerLink,
+            int connId) {
 
         this.routeConfig = routeConfig;
         this.routerLink = routerLink;
+        this.connId = connId;
     }
 
     @Override
     protected void initChannel(Channel channel) {
 
-        log.info("Init HTTP/1.1 proxy channel");
+        log.info("conn = {}, Init HTTP/1.1 proxy channel", connId);
 
         var pipeline = channel.pipeline();
         pipeline.addLast(new HttpClientCodec());

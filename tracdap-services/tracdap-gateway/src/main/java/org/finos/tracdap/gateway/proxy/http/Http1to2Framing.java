@@ -25,6 +25,7 @@ import io.netty.handler.codec.http2.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,12 +41,14 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
 
     private final Map<Integer, Http2FrameStream> streams;
     private final AtomicInteger nextSeqId;
-    private int inboundSeqId;
-    private int outboundSeqId;
+    private final int connId;
 
-    public Http1to2Framing(GwRoute routeConfig) {
+    private int inboundSeqId;
+
+    public Http1to2Framing(GwRoute routeConfig, int connId) {
 
         this.routeConfig = routeConfig;
+        this.connId = connId;
 
         this.streams = new HashMap<>();
         this.nextSeqId = new AtomicInteger(0);
@@ -55,10 +58,8 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
 
-        log.info("Translating HTTP/1 message of type {}", msg.getClass().getSimpleName());
-
         if (msg instanceof HttpRequest)
-            newSeqStream();
+            newSeqStream(promise);
 
         var frames = translateRequestFrames(msg);
         var notLastFrame = frames.subList(0, frames.size() - 1);
@@ -67,17 +68,11 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
         for (var frame : notLastFrame)
             ctx.write(frame);
 
-        promise.addListener(fut -> {
-
-            var stream = streams.get(inboundSeqId);
-            log.info("on stream  {}, {}", stream.id(), stream.state());
-        });
-
         ctx.write(lastFrame, promise);
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+    public void channelRead(@Nonnull ChannelHandlerContext ctx, @Nonnull Object msg) throws Exception {
 
         if (!(msg instanceof Http2Frame))
             throw new EUnexpected();
@@ -89,18 +84,14 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
             ctx.fireChannelRead(httpObj);
     }
 
-    private void newSeqStream() {
+    private void newSeqStream(ChannelPromise promise) {
 
         inboundSeqId = nextSeqId.getAndIncrement();
 
         var stream = this.newStream();
         streams.put(inboundSeqId, stream);
 
-        log.info("SEQ ID {} -> STREAM {}", inboundSeqId, stream.id());
-    }
-
-    private void deleteSeqStream() {
-
+        promise.addListener(f -> log.info("conn = {}, seq {} -> stream {}", connId, inboundSeqId, stream.id()));
     }
 
     private List<Http2Frame> translateRequestFrames(Object http1) {
@@ -129,10 +120,12 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
                 h2Headers.authority(routeConfig.getTarget().getHost());
 
             // Copy across all other HTTP/1 headers that we are not explicitly changing or removing
+            @SuppressWarnings("deprecation")                   // KEEP_ALIVE is deprecated, but still filter it out
             var filterHeaders = List.of(
-                    HttpHeaderNames.HOST.toString(),
-                    HttpHeaderNames.CONNECTION.toString(),
-                    HttpHeaderNames.CONTENT_LENGTH.toString());
+                    HttpHeaderNames.HOST.toString(),           // Using HTTP/2 :authority
+                    HttpHeaderNames.CONNECTION.toString(),     // Not allowed in HTTP/2
+                    HttpHeaderNames.KEEP_ALIVE.toString(),     // Not allowed in HTTP/2
+                    HttpHeaderNames.TE.toString());            // Make sure we never send te: trailers
 
             for (var header : h1Headers)
                 if (!filterHeaders.contains(header.getKey().toLowerCase()))
@@ -151,8 +144,6 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
 
             contentBuf.retain();
 
-            log.info("Size of content: {}", contentBuf.readableBytes());
-
             while (contentBuf.readableBytes() > MAX_DATA_SIZE) {
 
                 var slice = contentBuf.readSlice(MAX_DATA_SIZE);
@@ -162,9 +153,6 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
 
             var endStreamFlag = (http1 instanceof LastHttpContent);
             var slice = contentBuf.readSlice(contentBuf.readableBytes());
-
-            log.info("Size of slice: {}", slice.readableBytes());
-            log.info("end of stream: {}", endStreamFlag);
 
             var padding = 256 - (slice.readableBytes() % 256) % 256;
 
@@ -198,19 +186,30 @@ public class Http1to2Framing extends Http2ChannelDuplexHandler {
             if (!header.getKey().toString().startsWith(":"))
                 h1Headers.add(header.getKey(), header.getValue());
 
-        if (!h1Headers.contains(HttpHeaderNames.CONTENT_LENGTH) &&
-            !h1Headers.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
-
+        if (!h1Headers.contains(HttpHeaderNames.CONTENT_LENGTH))
             h1Headers.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+
+        if (h2Headers.contains(":status")) {  // regular HTTP/2 headers frame
+
+            var statusCode = HttpResponseStatus.parseLine(h2Headers.get(":status"));
+            var headerObj = new DefaultHttpResponse(HttpVersion.HTTP_1_1, statusCode, h1Headers);
+
+            if (headersFrame.isEndStream())
+                return List.of(headerObj, new DefaultLastHttpContent());
+            else
+                return List.of(headerObj);
         }
 
-        var statusCode = HttpResponseStatus.parseLine(h2Headers.get(":status"));
-        var headerObj = new DefaultHttpResponse(HttpVersion.HTTP_1_1, statusCode, h1Headers);
+        // HTTP/2 trailers frame
+        else {
 
-        if (headersFrame.isEndStream())
-            return List.of(headerObj, new DefaultLastHttpContent());
-        else
-            return List.of(headerObj);
+            // Trailers cannot be converted back to HTTP/1, neither is it safe to discard them
+            // Since the TE header was removed from the request headers,
+            // The server should not send a response including trailers
+
+            log.error("conn = {}, Unexpected trailers frame in HTTP/2 response", connId);
+            throw new EUnexpected();
+        }
     }
 
     private List<HttpObject> translateResponseData(Http2DataFrame dataFrame) {

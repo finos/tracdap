@@ -410,18 +410,18 @@ public class Http1Router extends ChannelDuplexHandler {
             ChannelHandlerContext routerCtx,
             ChannelPromise routeActivePromise) {
 
-        var routerLink = new Http1RouterLink(routerCtx, routeActivePromise, this, routeIndex);
+        var routerLink = new Http1RouterLink(routerCtx, routeActivePromise, this, routeIndex, connId);
 
         switch (routeConfig.getConfig().getRouteType()) {
 
             case HTTP:
-                return new Http1ProxyBuilder(routeConfig.getConfig(), routerLink);
+                return new Http1ProxyBuilder(routeConfig.getConfig(), routerLink, connId);
 
             case GRPC:
-                return new GrpcProxyBuilder(routeConfig.getConfig(), SOURCE_IS_HTTP_1, routerLink);
+                return new GrpcProxyBuilder(routeConfig.getConfig(), SOURCE_IS_HTTP_1, routerLink, connId);
 
             case REST:
-                return new RestApiProxyBuilder(routeConfig, SOURCE_IS_HTTP_1, routerLink, routerCtx.executor());
+                return new RestApiProxyBuilder(routeConfig, SOURCE_IS_HTTP_1, routerLink, routerCtx.executor(), connId);
 
             default:
                 throw new EUnexpected();

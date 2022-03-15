@@ -37,9 +37,11 @@ public class GrpcWebProxy extends Http2ChannelDuplexHandler {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final int connId;
     private final boolean isWebTextProtocol;
 
-    public GrpcWebProxy() {
+    public GrpcWebProxy(int connId) {
+        this.connId = connId;
         this.isWebTextProtocol = false;
     }
 
@@ -57,9 +59,11 @@ public class GrpcWebProxy extends Http2ChannelDuplexHandler {
             var grpcWebFrame = (Http2HeadersFrame) frame;
             var grpcFrame = translateRequestHeaders(grpcWebFrame);
 
-            log.info("Translating gRPC request for stream {}", grpcWebFrame.stream().id());
-
             ctx.write(grpcFrame, promise);
+
+            // Stream ID is not available until the first frame is written to the HTTP/2 codec
+            promise.addListener(f -> log.info("conn = {}, stream = {}, TRANSLATE gRPC-Web {}",
+                    connId, grpcWebFrame.stream().id(), grpcFrame.headers().get(":path")));
         }
         else if (frame instanceof Http2DataFrame) {
 
@@ -78,7 +82,7 @@ public class GrpcWebProxy extends Http2ChannelDuplexHandler {
             // gRPC proxy layer does not interact with control frames (settings/ping/goaway/etc)
             // Most likely there shouldn't be any of these at this layer anyway
 
-            log.warn("Unexpected HTTP/2 request frame ({}) in gRPC-web proxy layer", frame.name());
+            log.warn("conn = {}, Unexpected HTTP/2 request frame ({}) in gRPC-web proxy layer", connId, frame.name());
             ctx.write(msg, promise);
         }
     }
@@ -154,8 +158,6 @@ public class GrpcWebProxy extends Http2ChannelDuplexHandler {
 
     private Http2DataFrame translateResponseTrailers(Http2HeadersFrame trailersFrame, ByteBufAllocator allocator) {
 
-        log.info("Translating trailers frame");
-
         var h2Trailers = trailersFrame.headers();
         var h1Trailers = new DefaultHttpHeaders();
 
@@ -166,7 +168,9 @@ public class GrpcWebProxy extends Http2ChannelDuplexHandler {
 
         var bufSize = trailerBuf.readableBytes();
         var msgSize = bufSize - 5;
-        log.info("Trailer frame: size = {}, grpc size = {}", bufSize, msgSize);
+
+        if (log.isDebugEnabled())
+            log.debug("conn = {}, Trailer frame: size = {}, grpc size = {}", connId, bufSize, msgSize);
 
         return new DefaultHttp2DataFrame(trailerBuf, true);
     }

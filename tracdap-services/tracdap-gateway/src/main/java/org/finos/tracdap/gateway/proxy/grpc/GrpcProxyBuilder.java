@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.gateway.proxy.grpc;
 
+import io.netty.buffer.ByteBuf;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.GwRoute;
 import org.finos.tracdap.gateway.proxy.http.Http1to2Framing;
@@ -23,14 +24,18 @@ import org.finos.tracdap.gateway.proxy.http.Http1to2Framing;
 import io.netty.channel.*;
 import io.netty.handler.codec.http2.*;
 import io.netty.handler.logging.LogLevel;
+import org.finos.tracdap.gateway.proxy.http.Http2FlowControl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nonnull;
 
 
 public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
 
     private static final String HTTP2_PREFACE_HANDLER = "HTTP2_PREFACE";
     private static final String HTTP2_FRAME_CODEC = "HTTP2_FRAME_CODEC";
+    private static final String HTTP2_FLOW_CTRL = "HTTP2_FLOW_CTRL";
     private static final String GRPC_PROXY_HANDLER = "GRPC_PROXY_HANDLER";
     private static final String GRPC_WEB_PROXY_HANDLER = "GRPC_WEB_PROXY_HANDLER";
     private static final String HTTP_1_TO_2_FRAMING = "HTTP_1_TO_2_FRAMING";
@@ -41,44 +46,46 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
     private final GwRoute routeConfig;
     private final int sourceHttpVersion;
     private final ChannelDuplexHandler routerLink;
+    private final int connId;
 
     public GrpcProxyBuilder(
             GwRoute routeConfig,
             int sourceHttpVersion,
-            ChannelDuplexHandler routerLink) {
+            ChannelDuplexHandler routerLink,
+            int connId) {
 
         this.routeConfig = routeConfig;
         this.sourceHttpVersion = sourceHttpVersion;
         this.routerLink = routerLink;
+        this.connId = connId;
     }
 
     @Override
-    protected void initChannel(Channel channel) {
+    protected void initChannel(@Nonnull Channel channel) {
 
-        log.info("Init gRPC proxy channel");
+        if (log.isDebugEnabled())
+            log.debug("conn = {}, Init gRPC proxy channel", connId);
 
         var pipeline = channel.pipeline();
-        pipeline.addLast("OBJECT_LOGGER", new ObjectLogger());
 
         var initialSettings = new Http2Settings()
                 .maxFrameSize(16 * 1024);
 
-        log.info(initialSettings.toString());
-
         var http2Codec = Http2FrameCodecBuilder.forClient()
-                .frameLogger(new Http2FrameLogger(LogLevel.INFO))
                 .initialSettings(initialSettings)
                 .autoAckSettingsFrame(true)
                 .autoAckPingFrame(true)
+                .validateHeaders(true)
                 .build();
 
         pipeline.addLast(HTTP2_FRAME_CODEC, http2Codec);
-        pipeline.addLast(GRPC_PROXY_HANDLER, new GrpcProxy());
-        pipeline.addLast(GRPC_WEB_PROXY_HANDLER, new GrpcWebProxy());
+        pipeline.addLast(HTTP2_FLOW_CTRL, new Http2FlowControl());
+        pipeline.addLast(GRPC_PROXY_HANDLER, new GrpcProxy(connId));
+        pipeline.addLast(GRPC_WEB_PROXY_HANDLER, new GrpcWebProxy(connId));
 
         if (sourceHttpVersion == 1) {
 
-            pipeline.addLast(HTTP_1_TO_2_FRAMING, new Http1to2Framing(routeConfig));
+            pipeline.addLast(HTTP_1_TO_2_FRAMING, new Http1to2Framing(routeConfig, connId));
             pipeline.addLast(HTTP_1_ROUTER_LINK, routerLink);
         }
         else if (sourceHttpVersion == 2) {
@@ -87,42 +94,5 @@ public class GrpcProxyBuilder extends ChannelInitializer<Channel> {
         }
         else
             throw new EUnexpected();
-    }
-
-    private static class ObjectLogger extends ChannelDuplexHandler {
-
-        private final Logger log = LoggerFactory.getLogger(getClass());
-
-        @Override
-        public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-            log.info("LOGGER: handlerAdded");
-            super.handlerAdded(ctx);
-        }
-
-        @Override
-        public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-            log.info("LOGGER: handlerRemoved");
-            super.handlerRemoved(ctx);
-        }
-
-        @Override
-        public void channelActive(ChannelHandlerContext ctx) throws Exception {
-            log.info("LOGGER: channelActive");
-            super.channelActive(ctx);
-        }
-
-        @Override
-        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-            log.info("LOGGER: channelInactive");
-            super.channelInactive(ctx);
-        }
-
-        @Override
-        public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-
-            log.info("Writing an object of class {}", msg.getClass().getSimpleName());
-
-            super.write(ctx, msg, promise);
-        }
     }
 }
