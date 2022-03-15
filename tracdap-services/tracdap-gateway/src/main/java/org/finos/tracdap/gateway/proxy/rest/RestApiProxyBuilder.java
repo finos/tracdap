@@ -39,23 +39,26 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
     private final int sourceHttpVersion;
     private final ChannelDuplexHandler routerLink;
     private final EventExecutor executor;
+    private final int connId;
 
     public RestApiProxyBuilder(
             Route routeConfig,
             int sourceHttpVersion,
             ChannelDuplexHandler routerLink,
-            EventExecutor executor) {
+            EventExecutor executor,
+            int connId) {
 
         this.routeConfig = routeConfig;
         this.sourceHttpVersion = sourceHttpVersion;
         this.routerLink = routerLink;
         this.executor = executor;
+        this.connId = connId;
     }
 
     @Override
     protected void initChannel(Channel channel) throws Exception {
 
-        log.info("Init REST proxy channel");
+        log.info("conn = {}, Init REST proxy channel", connId);
 
         var pipeline = channel.pipeline();
 
@@ -87,7 +90,7 @@ public class RestApiProxyBuilder extends ChannelInitializer<Channel> {
 
         if (sourceHttpVersion == 1) {
 
-            pipeline.addLast(new Http1to2Framing(routeConfig.getConfig()));
+            pipeline.addLast(new Http1to2Framing(routeConfig.getConfig(), connId));
             pipeline.addLast(routerLink);
         }
         else if (sourceHttpVersion == 2) {

@@ -61,23 +61,23 @@ public class ByteOutputChannel implements WritableByteChannel {
         if (!isOpen)
             throw new IOException("Channel is already closed");
 
-        var chunkBuf = allocator.directBuffer(src.capacity());
+        var chunkBuf = allocator.directBuffer(src.remaining());
         chunkBuf.writeBytes(src);
-
         var chunkRemaining = chunkBuf.readableBytes();
-        var bufferRemaining = buffer == null ?  CHUNK_SIZE : CHUNK_SIZE - buffer.readableBytes();
-        var bytesWritten = 0;
 
         if (!useBuffering) {
             sink.accept(chunkBuf);
             return chunkRemaining;
         }
 
+        var bytesWritten = 0;
+
         while (chunkRemaining > 0) {
 
             if (buffer == null)
                 buffer = allocator.compositeBuffer();
 
+            var bufferRemaining = CHUNK_SIZE - buffer.readableBytes();
             var sliceSize = Math.min(chunkBuf.readableBytes(), bufferRemaining);
             var slice = chunkBuf.readSlice(sliceSize);
             slice.retain();

@@ -183,7 +183,12 @@ public class JacksonValues {
 
                 else {
                     String varcharVal = parser.getValueAsString();
-                    varcharVec.set(row, varcharVal.getBytes(StandardCharsets.UTF_8));
+
+                    // For variable width vectors, the required size of the content buffer is not known up front
+                    // Arrow makes an initial guess, but sometimes it will need to reallocate on write
+                    // So, we need to call setSafe() instead of set(), to avoid a buffer overflow
+
+                    varcharVec.setSafe(row, varcharVal.getBytes(StandardCharsets.UTF_8));
                 }
 
                 break;
