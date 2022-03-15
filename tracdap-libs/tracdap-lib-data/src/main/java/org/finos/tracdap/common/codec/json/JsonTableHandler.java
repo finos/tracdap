@@ -56,6 +56,11 @@ class JsonTableHandler implements JsonStreamParser.Handler {
 
         this.batchEmitter = batchEmitter;
         this.batchSize = batchSize;
+
+        // Allocate memory once, and reuse it for every batch (i.e. do not clear/allocate per batch)
+        // This memory is released in close(), which calls root.close()
+        for (var vector : root.getFieldVectors())
+            vector.allocateNew();
     }
 
     @Override
@@ -85,9 +90,6 @@ class JsonTableHandler implements JsonStreamParser.Handler {
 
             throw new JsonParseException(lexer, msg, lexer.currentLocation());
         }
-
-        if (batchRow == 0)
-            allocateBatch();
     }
 
     @Override
@@ -97,8 +99,10 @@ class JsonTableHandler implements JsonStreamParser.Handler {
 
         batchRow++;
 
-        if (batchRow == batchSize)
+        if (batchRow == batchSize) {
             dispatchBatch();
+            batchRow = 0;
+        }
     }
 
     @Override
@@ -148,12 +152,6 @@ class JsonTableHandler implements JsonStreamParser.Handler {
         }
     }
 
-    private void allocateBatch() {
-
-        for (var vector : root.getFieldVectors())
-            vector.allocateNew();
-    }
-
     private void checkRequiredFields(JsonParser lexer) throws IOException {
 
         for (var vector : root.getFieldVectors()) {
@@ -173,7 +171,5 @@ class JsonTableHandler implements JsonStreamParser.Handler {
 
         var batch = unloader.getRecordBatch();
         batchEmitter.accept(batch);
-
-        root.clear();
     }
 }
