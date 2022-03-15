@@ -31,9 +31,9 @@
 
         // Allow recent NPM versions to auto-detect ES6-style exports
         module.exports = $root;
-        module.exports.tracdap = $root.trac;
-        module.exports.tracdap.api = $root.trac.api;
-        module.exports.tracdap.metadata = $root.trac.metadata;
+        module.exports.tracdap = $root.tracdap;
+        module.exports.tracdap.api = $root.tracdap.api;
+        module.exports.tracdap.metadata = $root.tracdap.metadata;
         module.exports.google = $root.google;
     }
 
