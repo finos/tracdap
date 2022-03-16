@@ -72,21 +72,23 @@ public class JacksonValues {
                 BitVector boolVec = (BitVector) vector;
                 int boolVal;
 
-                    if (token == JsonToken.VALUE_TRUE)
-                        boolVal = 1;
-                    else if (token == JsonToken.VALUE_FALSE)
-                        boolVal = 0;
-                    else if (token == JsonToken.VALUE_STRING) {
-                        String boolStr = parser.getValueAsString();
-                        boolVal = Boolean.parseBoolean(boolStr) ? 1 : 0;
-                    }
-                    else if (token == JsonToken.VALUE_NUMBER_INT) {
-                        boolVal = parser.getIntValue();
-                        if (boolVal != 0 && boolVal != 1)
-                            throw new JsonParseException(parser, "Invalid boolean value", parser.currentLocation());
-                    }
-                    else
+                if (token == JsonToken.VALUE_NULL)
+                    boolVal = 0;
+                else if (token == JsonToken.VALUE_TRUE)
+                    boolVal = 1;
+                else if (token == JsonToken.VALUE_FALSE)
+                    boolVal = 0;
+                else if (token == JsonToken.VALUE_STRING) {
+                    String boolStr = parser.getValueAsString();
+                    boolVal = Boolean.parseBoolean(boolStr) ? 1 : 0;
+                }
+                else if (token == JsonToken.VALUE_NUMBER_INT) {
+                    boolVal = parser.getIntValue();
+                    if (boolVal != 0 && boolVal != 1)
                         throw new JsonParseException(parser, "Invalid boolean value", parser.currentLocation());
+                }
+                else
+                    throw new JsonParseException(parser, "Invalid boolean value", parser.currentLocation());
 
                 boolVec.set(row, isSet, boolVal);
 
