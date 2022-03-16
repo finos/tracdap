@@ -16,7 +16,9 @@
 
 package org.finos.tracdap.common.codec.json;
 
+import org.apache.arrow.vector.types.Types;
 import org.finos.tracdap.common.exception.EDataTypeNotSupported;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -246,6 +248,21 @@ public class JacksonValues {
 
                 log.error(err);
                 throw new EDataTypeNotSupported(err);
+        }
+    }
+
+    public static void setEmptyString(FieldVector vector, int row) {
+
+        var minorType = vector.getMinorType();
+
+        if (minorType == Types.MinorType.VARCHAR) {
+
+            VarCharVector varcharVec = (VarCharVector) vector;
+            varcharVec.setSafe(row, "".getBytes(StandardCharsets.UTF_8));
+        }
+        else {
+
+                throw new EUnexpected();
         }
     }
 

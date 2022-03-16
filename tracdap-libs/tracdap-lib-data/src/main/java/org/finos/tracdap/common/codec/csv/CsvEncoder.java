@@ -73,7 +73,9 @@ public class CsvEncoder extends BaseEncoder {
             // So, there is no need to use a compression codec here
             this.loader = new VectorLoader(root);
 
-            var factory = new CsvFactory();
+            var factory = new CsvFactory()
+                    // Make sure empty strings are quoted, so they can be distinguished from nulls
+                    .enable(CsvGenerator.Feature.ALWAYS_QUOTE_EMPTY_STRINGS);
 
             var csvSchema = CsvSchemaMapping
                     .arrowToCsv(arrowSchema)
