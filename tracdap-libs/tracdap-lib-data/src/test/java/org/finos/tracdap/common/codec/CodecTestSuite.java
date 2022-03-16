@@ -24,6 +24,7 @@ import org.finos.tracdap.common.codec.json.JsonCodec;
 import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.data.DataBlock;
 import org.finos.tracdap.common.exception.EDataCorruption;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.test.data.SampleDataFormats;
 import org.finos.tracdap.test.helpers.TestResourceHelpers;
 import io.netty.buffer.ByteBuf;
@@ -35,17 +36,11 @@ import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.*;
 import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Schema;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIf;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -58,23 +53,22 @@ public abstract class CodecTestSuite {
 
     // Concrete test cases for codecs included in CORE_DATA
 
-    static class ArrowStream extends CodecTestSuite { @BeforeEach void setup() {
+    static class ArrowStreamTest extends CodecTestSuite { @BeforeAll static void setup() {
         codec = new ArrowStreamCodec();
         basicData = null;
     } }
 
-    static class ArrowFile extends CodecTestSuite { @BeforeEach void setup() {
+    static class ArrowFileTest extends CodecTestSuite { @BeforeAll static void setup() {
         codec = new ArrowFileCodec();
         basicData = null;
     } }
 
-    static class CSV extends CodecTestSuite { @BeforeEach void setup() {
+    static class CSVTest extends CodecTestSuite { @BeforeAll static void setup() {
         codec = new CsvCodec();
         basicData = SampleDataFormats.BASIC_CSV_DATA_RESOURCE;
     } }
 
-    static class JSON extends CodecTestSuite { @BeforeAll
-    static void setup() {
+    static class JSONTest extends CodecTestSuite { @BeforeAll static void setup() {
         codec = new JsonCodec();
         basicData = SampleDataFormats.BASIC_JSON_DATA_RESOURCE;
     } }
@@ -89,11 +83,50 @@ public abstract class CodecTestSuite {
     }
 
     @Test
-    void basic_roundTrip() throws Exception {
+    void roundTrip_basic() throws Exception {
 
         var allocator = new RootAllocator();
         var arrowSchema = ArrowSchema.tracToArrow(SampleDataFormats.BASIC_TABLE_SCHEMA);
         var root = generateBasicData(allocator);
+
+        roundTrip_impl(allocator, arrowSchema, root);
+    }
+
+    @Test
+    void roundTrip_nulls() throws Exception {
+
+        var allocator = new RootAllocator();
+        var arrowSchema = ArrowSchema.tracToArrow(SampleDataFormats.BASIC_TABLE_SCHEMA);
+        var root = generateBasicData(allocator);
+
+        var limit = Math.min(root.getRowCount(), root.getFieldVectors().size());
+
+        for (var i = 0; i < limit; i++) {
+
+            var vector = root.getVector(i);
+
+            if (BaseFixedWidthVector.class.isAssignableFrom(vector.getClass())) {
+
+                var fixedVector = (BaseFixedWidthVector) vector;
+                fixedVector.setNull(i);
+            }
+            else if (BaseVariableWidthVector.class.isAssignableFrom(vector.getClass())) {
+
+                var variableVector = (BaseVariableWidthVector) vector;
+                variableVector.setNull(i);
+            }
+            else {
+
+                throw new EUnexpected();
+            }
+
+        }
+
+        roundTrip_impl(allocator, arrowSchema, root);
+    }
+
+
+    void roundTrip_impl(RootAllocator allocator, Schema arrowSchema, VectorSchemaRoot root) throws Exception {
 
         var unloader = new VectorUnloader(root);
         var batch = unloader.getRecordBatch();
