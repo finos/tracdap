@@ -83,6 +83,9 @@ public class CsvEncoder extends BaseEncoder {
             out = new ByteOutputStream(this::emitChunk);
             generator = factory.createGenerator(out, JsonEncoding.UTF8);
             generator.setSchema(csvSchema);
+
+            // Tell Jackson to start the main array of records
+            generator.writeStartArray();
         }
         catch (IOException e) {
 
@@ -137,6 +140,9 @@ public class CsvEncoder extends BaseEncoder {
     protected void encodeEos() {
 
         try {
+
+            // Tell Jackson to end the main array of records
+            generator.writeEndArray();
 
             // Flush and close output
 
