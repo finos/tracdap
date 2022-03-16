@@ -73,7 +73,9 @@ public class CsvEncoder extends BaseEncoder {
             // So, there is no need to use a compression codec here
             this.loader = new VectorLoader(root);
 
-            var factory = new CsvFactory();
+            var factory = new CsvFactory()
+                    // Make sure empty strings are quoted, so they can be distinguished from nulls
+                    .enable(CsvGenerator.Feature.ALWAYS_QUOTE_EMPTY_STRINGS);
 
             var csvSchema = CsvSchemaMapping
                     .arrowToCsv(arrowSchema)
@@ -83,6 +85,9 @@ public class CsvEncoder extends BaseEncoder {
             out = new ByteOutputStream(this::emitChunk);
             generator = factory.createGenerator(out, JsonEncoding.UTF8);
             generator.setSchema(csvSchema);
+
+            // Tell Jackson to start the main array of records
+            generator.writeStartArray();
         }
         catch (IOException e) {
 
@@ -137,6 +142,9 @@ public class CsvEncoder extends BaseEncoder {
     protected void encodeEos() {
 
         try {
+
+            // Tell Jackson to end the main array of records
+            generator.writeEndArray();
 
             // Flush and close output
 
