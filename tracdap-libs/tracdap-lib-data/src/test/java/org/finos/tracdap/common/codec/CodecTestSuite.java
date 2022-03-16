@@ -16,6 +16,9 @@
 
 package org.finos.tracdap.common.codec;
 
+import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.FieldType;
 import org.finos.tracdap.common.codec.arrow.ArrowFileCodec;
 import org.finos.tracdap.common.codec.arrow.ArrowSchema;
 import org.finos.tracdap.common.codec.arrow.ArrowStreamCodec;
@@ -25,6 +28,7 @@ import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.data.DataBlock;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.metadata.SchemaDefinition;
 import org.finos.tracdap.test.data.SampleDataFormats;
 import org.finos.tracdap.test.helpers.TestResourceHelpers;
 import io.netty.buffer.ByteBuf;
@@ -39,6 +43,7 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIf;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -89,7 +94,7 @@ public abstract class CodecTestSuite {
         var arrowSchema = ArrowSchema.tracToArrow(SampleDataFormats.BASIC_TABLE_SCHEMA);
         var root = generateBasicData(allocator);
 
-        roundTrip_impl(allocator, arrowSchema, root);
+        roundTrip_impl(SampleDataFormats.BASIC_TABLE_SCHEMA, arrowSchema, root, allocator);
     }
 
     @Test
@@ -98,6 +103,8 @@ public abstract class CodecTestSuite {
         var allocator = new RootAllocator();
         var arrowSchema = ArrowSchema.tracToArrow(SampleDataFormats.BASIC_TABLE_SCHEMA);
         var root = generateBasicData(allocator);
+
+        // With the basic test data, we'll get one null value for each data type
 
         var limit = Math.min(root.getRowCount(), root.getFieldVectors().size());
 
@@ -122,11 +129,43 @@ public abstract class CodecTestSuite {
 
         }
 
-        roundTrip_impl(allocator, arrowSchema, root);
+        roundTrip_impl(SampleDataFormats.BASIC_TABLE_SCHEMA, arrowSchema, root, allocator);
+    }
+
+    @Test
+    void roundTrip_edgeCaseStrings() throws Exception {
+
+        var allocator = new RootAllocator();
+
+        var fieldType = new FieldType(true, ArrowType.Utf8.INSTANCE, null);
+        var field = new Field("string_field", fieldType, null);
+        var arrowSchema = new Schema(List.of(field));
+        var tracSchema = ArrowSchema.arrowToTrac(arrowSchema);
+
+        var stringVec = new VarCharVector("string_field", allocator);
+        stringVec.allocateNew(10);
+
+        stringVec.set(0, "hello".getBytes(StandardCharsets.UTF_8));
+        stringVec.setNull(1);
+        stringVec.set(2, "".getBytes(StandardCharsets.UTF_8));
+        stringVec.set(3, " ".getBytes(StandardCharsets.UTF_8));
+        stringVec.set(4, "\r\n\t".getBytes(StandardCharsets.UTF_8));
+        stringVec.set(5, "\\\"/\\//\\".getBytes(StandardCharsets.UTF_8));
+        stringVec.set(6, " hello\nworld ".getBytes(StandardCharsets.UTF_8));
+        stringVec.set(7, "你好世界".getBytes(StandardCharsets.UTF_8));
+        stringVec.set(8, "مرحبا بالعالم".getBytes(StandardCharsets.UTF_8));
+        stringVec.set(9, "\0".getBytes(StandardCharsets.UTF_8));
+
+        var root = new VectorSchemaRoot(List.of(field), List.of(stringVec));
+        root.setRowCount(10);
+
+        roundTrip_impl(tracSchema, arrowSchema, root, allocator);
     }
 
 
-    void roundTrip_impl(RootAllocator allocator, Schema arrowSchema, VectorSchemaRoot root) throws Exception {
+    void roundTrip_impl(
+            SchemaDefinition tracSchema, Schema arrowSchema,
+            VectorSchemaRoot root, RootAllocator allocator) throws Exception {
 
         var unloader = new VectorUnloader(root);
         var batch = unloader.getRecordBatch();
@@ -134,8 +173,8 @@ public abstract class CodecTestSuite {
         var dataBlock = DataBlock.forRecords(batch);
         var blockStream = Flows.publish(Stream.of(schemaBlock, dataBlock));
 
-        var encoder = codec.getEncoder(allocator, SampleDataFormats.BASIC_TABLE_SCHEMA, Map.of());
-        var decoder = codec.getDecoder(allocator, SampleDataFormats.BASIC_TABLE_SCHEMA, Map.of());
+        var encoder = codec.getEncoder(allocator, tracSchema, Map.of());
+        var decoder = codec.getDecoder(allocator, tracSchema, Map.of());
 
         blockStream.subscribe(encoder);
         encoder.subscribe(decoder);
@@ -147,7 +186,9 @@ public abstract class CodecTestSuite {
         Assertions.assertEquals(2, rtBlocks.size());
         Assertions.assertEquals(arrowSchema, rtBlocks.get(0).arrowSchema);
 
-        compareBatchToRoot(root, rtBlocks.get(0).arrowSchema, rtBlocks.get(1).arrowRecords, allocator);
+        compareBatchToRoot(
+                arrowSchema, rtBlocks.get(0).arrowSchema,
+                root, rtBlocks.get(1).arrowRecords, allocator);
 
         var rtBatch = rtBlocks.get(1).arrowRecords;
         rtBatch.close();
@@ -177,7 +218,9 @@ public abstract class CodecTestSuite {
         Assertions.assertEquals(2, rtBlocks.size());
         Assertions.assertEquals(arrowSchema, rtBlocks.get(0).arrowSchema);
 
-        compareBatchToRoot(root, rtBlocks.get(0).arrowSchema, rtBlocks.get(1).arrowRecords, allocator);
+        compareBatchToRoot(
+                arrowSchema, rtBlocks.get(0).arrowSchema,
+                root, rtBlocks.get(1).arrowRecords, allocator);
 
         var rtBatch = rtBlocks.get(1).arrowRecords;
         rtBatch.close();
@@ -248,11 +291,11 @@ public abstract class CodecTestSuite {
     }
 
 
-    private void compareBatchToRoot(VectorSchemaRoot root, Schema rtSchema, ArrowRecordBatch rtBatch, BufferAllocator allocator) {
+    private void compareBatchToRoot(
+            Schema expectedSchema, Schema rtSchema,
+            VectorSchemaRoot root, ArrowRecordBatch rtBatch, BufferAllocator allocator) {
 
-
-        var arrowSchema = ArrowSchema.tracToArrow(SampleDataFormats.BASIC_TABLE_SCHEMA);
-        Assertions.assertEquals(arrowSchema, rtSchema);
+        Assertions.assertEquals(expectedSchema, rtSchema);
 
         var rtFields = rtSchema.getFields();
         var rtVectors = rtFields.stream().map(f -> f.createVector(allocator)).collect(Collectors.toList());
@@ -270,7 +313,7 @@ public abstract class CodecTestSuite {
                 var rtVec = rtRoot.getVector(j);
 
                 for (int i = 0; i < 10; i++)
-                    Assertions.assertEquals(vec.getObject(i), rtVec.getObject(i));
+                    Assertions.assertEquals(vec.getObject(i), rtVec.getObject(i), "Mismatch on row " + i);
             }
         }
     }

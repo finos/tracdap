@@ -16,10 +16,9 @@
 
 package org.finos.tracdap.common.codec.arrow;
 
+import org.finos.tracdap.common.exception.EDataTypeNotSupported;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.metadata.BasicType;
-import org.finos.tracdap.metadata.SchemaDefinition;
-import org.finos.tracdap.metadata.SchemaType;
+import org.finos.tracdap.metadata.*;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
@@ -52,6 +51,15 @@ public class ArrowSchema {
             Map.entry(BasicType.DATE, new ArrowType.Date(DateUnit.DAY)),
             Map.entry(BasicType.DATETIME, new ArrowType.Timestamp(TIMESTAMP_PRECISION, NO_ZONE)));  // Using type without timezone
 
+    private static final Map<ArrowType.ArrowTypeID, BasicType> ARROW_TRAC_TYPE_MAPPING = Map.ofEntries(
+            Map.entry(ArrowType.ArrowTypeID.Bool, BasicType.BOOLEAN),
+            Map.entry(ArrowType.ArrowTypeID.Int, BasicType.INTEGER),
+            Map.entry(ArrowType.ArrowTypeID.FloatingPoint, BasicType.FLOAT),
+            Map.entry(ArrowType.ArrowTypeID.Decimal, BasicType.DECIMAL),
+            Map.entry(ArrowType.ArrowTypeID.Utf8, BasicType.STRING),
+            Map.entry(ArrowType.ArrowTypeID.Date, BasicType.DATE),
+            Map.entry(ArrowType.ArrowTypeID.Timestamp, BasicType.DATETIME));
+
 
     public static Schema tracToArrow(SchemaDefinition tracSchema) {
 
@@ -80,6 +88,42 @@ public class ArrowSchema {
         }
 
         return new Schema(arrowFields);
+    }
+
+    public static SchemaDefinition arrowToTrac(Schema arrowSchema) {
+
+        var tracTableSchema = TableSchema.newBuilder();
+
+        for (var arrowField : arrowSchema.getFields()) {
+
+            var fieldName = arrowField.getName();
+            var fieldIndex = tracTableSchema.getFieldsCount();
+
+            var arrowTypeId = arrowField.getType().getTypeID();
+            var tracType = ARROW_TRAC_TYPE_MAPPING.get(arrowTypeId);
+
+            if (tracType == null) {
+                var arrowTypeName = arrowField.getType().getTypeID().name();
+                var error = String.format("TRAC type mapping not available for arrow type [%s]", arrowTypeName);
+                throw new EDataTypeNotSupported(error);
+            }
+
+            tracTableSchema.addFields(FieldSchema.newBuilder()
+                    .setFieldName(fieldName)
+                    .setFieldOrder(fieldIndex)
+                    .setFieldType(tracType));
+
+            // Not attempting to set business key, categorical flag, format code or label
+            // Categorical *could* be inferred for Arrow dictionary vectors
+            // Other flags could be set in Arrow metadata
+            // But since arrow -> trac normally implies an external source,
+            // Thought would be needed on how to interpret any metadata that is present
+        }
+
+        return SchemaDefinition.newBuilder()
+                .setSchemaType(SchemaType.TABLE)
+                .setTable(tracTableSchema)
+                .build();
     }
 
     public static VectorSchemaRoot createRoot(Schema arrowSchema, BufferAllocator arrowAllocator) {
