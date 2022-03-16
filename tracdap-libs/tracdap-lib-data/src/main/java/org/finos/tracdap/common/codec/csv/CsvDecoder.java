@@ -83,8 +83,12 @@ public class CsvDecoder extends BaseDecoder {
     protected void decodeChunk(ByteBuf chunk) {
 
         var csvFactory = new CsvFactory()
-                .enable(CsvParser.Feature.TRIM_SPACES)
-                .enable(CsvParser.Feature.FAIL_ON_MISSING_COLUMNS);
+                // Require strict adherence to the schema
+                .enable(CsvParser.Feature.FAIL_ON_MISSING_COLUMNS)
+                // Always allow nulls during parsing (they will be rejected later for non-nullable fields)
+                .enable(CsvParser.Feature.EMPTY_STRING_AS_NULL)
+                // Permissive handling of extra space (strings with leading/trailing spaces must be quoted anyway)
+                .enable(CsvParser.Feature.TRIM_SPACES);
 
         try (var stream = new ByteBufInputStream(chunk);
              var parser = (CsvParser) csvFactory.createParser((InputStream) stream)) {
