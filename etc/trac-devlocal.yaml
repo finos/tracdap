@@ -73,7 +73,7 @@ services:
       # Add your own repositories in here to load models into TRAC
       example_repo:
         repoType: git
-        repoUrl: https://github.com/accenture/trac
+        repoUrl: https://github.com/finos/tracdap
 
     executor:
       executorType: LOCAL
