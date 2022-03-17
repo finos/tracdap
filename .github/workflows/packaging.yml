@@ -207,14 +207,20 @@ jobs:
 
     steps:
 
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
       - name: Get TRAC version
-        id: tracdap-version
+        id: tracdap-versio
         run: |
           tracdap_version=`dev/version.sh`
           echo "tracdap_version = ${tracdap_version}"
           echo "::set-output name=tracdap_version::${tracdap_version}"
           
-          tracdap_tag=tracdap_version
+          tracdap_tag=`dev/version_tag.sh ${tracdap_version}`
           echo "tracdap_tag = ${tracdap_tag}"
           echo "::set-output name=tracdap_tag::${tracdap_tag}"
 
