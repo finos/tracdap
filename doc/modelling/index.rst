@@ -4,7 +4,7 @@ Modelling
 
 .. note::
 
-    The `TRAC Runtime for Python <https://pypi.org/project/trac-runtime/>`_
+    The `TRAC Runtime for Python <https://pypi.org/project/tracdap-runtime/>`_
     is available to download and install from `pypi.org <https://pypi.org/>`_.
 
 

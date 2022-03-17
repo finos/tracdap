@@ -1,10 +1,10 @@
-# TRAC *d.a.p.*
+# TRAC Data & Analytics Platform
 
 *A next-generation data and analytics platform for use in highly regulated environments*
 
 [![FINOS - Incubating](https://cdn.jsdelivr.net/gh/finos/contrib-toolbox@master/images/badge-incubating.svg)](https://finosfoundation.atlassian.net/wiki/display/FINOS/Incubating)
 
-TRAC brings a step change in performance, insight, flexibility and control 
+TRAC D.A.P. brings a step change in performance, insight, flexibility and control 
 compared to conventional analytics platforms. By redrawing the boundary
 between business and technology, modellers and business users are given easy
 access to modern, open source tools that can execute at scale, while technology
@@ -20,16 +20,15 @@ workflows, guaranteeing total repeatability, audit and control (TRAC).
 
 ## Documentation and Packages
 
-Documentation for the TRAC platform is available on readthedocs.io:
-
-https://trac-platform.readthedocs.io/en/stable
+Documentation for the TRAC platform is available on our website at
+[tracdap.finos.org](https://tracdap.finos.org).
 
 The following packages are available:
 
-| Package                                                            | Description                                                                |
-|--------------------------------------------------------------------|----------------------------------------------------------------------------|
-| [Model runtime for Python](https://pypi.org/project/trac-runtime/) | Build models and test them in a sandbox, ready to deploy to the platform   |
-| [Web API package](https://www.npmjs.com/package/trac-web-api)      | Build client apps in JavaScript or TypeScript using the TRAC platform APIs |
+| Package                                                                  | Description                                                                |
+|--------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| [Model runtime for Python](https://pypi.org/project/tracdap-runtime/)    | Build models and test them in a sandbox, ready to deploy to the platform   |
+| [Web API package](https://www.npmjs.com/package/@finos/tracdap-web-api)  | Build client apps in JavaScript or TypeScript using the TRAC platform APIs |
 
 
 ## Development Status
@@ -42,6 +41,8 @@ https://github.com/finos/tracdap/actions/workflows/integration.yml)
 https://github.com/finos/tracdap/actions/workflows/compliance.yml)
 [![Packaging](https://github.com/finos/tracdap/actions/workflows/packaging.yml/badge.svg)](
 https://github.com/finos/tracdap/actions/workflows/packaging.yml)
+[![Documentation Status](https://readthedocs.org/projects/tracdap/badge/?version=stable)](
+https://tracdap.finos.org/en/stable/?badge=stable)
 
 
 The current release series (0.3.x) is intended for reference and experimentation.
@@ -105,7 +106,7 @@ Once you have a database prepared you can start the TRAC services.
 To confirm the platform is working you can use the [example API calls](./examples/rest_calls)
 with a REST client such as [Postman](https://www.postman.com/). For more information on the
 platform APIs and how to use them to build applications, check out the
-[application development section](https://trac-platform.readthedocs.io/en/stable/app_dev)
+[application development section](https://tracdap.readthedocs.io/en/stable/app_dev)
 in the online documentation.
 
 ## Contributing
