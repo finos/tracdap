@@ -9,7 +9,7 @@
       "url": "https://www.apache.org/licenses/LICENSE-2.0"
     }
   ],
-  "homepage": "https://github.com/finos/tracdap",
+  "homepage": "https://tracdap.finos.org/",
   "repository": {
     "type": "git",
     "url": "https://github.com/finos/tracdap"
