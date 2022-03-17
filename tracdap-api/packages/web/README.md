@@ -1,22 +1,22 @@
 # TRAC Web API
 
-*TRAC is a next-generation data and analytics platform for use in highly regulated environments*
+*TRAC d.a.p. is a next-generation data and analytics platform for use in highly regulated environments*
 
 The TRAC web API provides a structured interface for developing web applications to run on the TRAC platform.
 It is based on the popular [protobuf.js](https://www.npmjs.com/package/protobufjs) framework and uses the
-highly optimised gRPC-Web protocol for transport. The package supports both JavaScript and TypeScript and 
+highly optimised gRPC-Web protocol for transport. The package supports both JavaScript and TypeScript and
 provides everything needed to communicate with the TRAC platform directly from a web browser, no additional
 development tooling, setup or middleware is required. Inline documentation is available for IDEs that support it.
 
-Documentation for the TRAC platform is available at
-[trac-platform.readthedocs.io](https://trac-platform.readthedocs.io).
+Documentation for the TRAC platform is available on our website at
+[tracdap.finos.org](https://tracdap.finos.org).
 
 
 ## Installing the web API package
 
 To install the web API package in your project:
 
-    npm install --save trac-web-api
+    npm install --save @finos/tracdap-web-api
 
 
 ## Using the web API in an application
@@ -24,7 +24,7 @@ To install the web API package in your project:
 Each of the TRAC services has a single public API class, which can be instantiated with just two lines of code.
 
 
-    import {trac} from 'trac-web-api';
+    import {tracdap} from '@finos/tracdap-web-api';
     
     class Example1 {
     
@@ -33,11 +33,11 @@ Each of the TRAC services has a single public API class, which can be instantiat
             // Use trac.setup to create an RPC instance, you need one for each API class
             // This instance is for use in the browser, it will direct calls to the page origin server
 
-            const metaApiRpcImpl = trac.setup.rpcImplForBrowser(trac.api.TracMetadataApi);
+            const metaApiRpcImpl = tracdap.setup.rpcImplForBrowser(trac.api.TracMetadataApi);
 
             // Then create the API
 
-            this.metaApi = new trac.api.TracMetadataApi(metaApiRpcImpl);
+            this.metaApi = new tracdap.api.TracMetadataApi(metaApiRpcImpl);
         }
 
         ...
@@ -92,37 +92,37 @@ The API methods can be called as JavaScript methods on the API classes, both fut
 
             const exampleSearchParams = {
 
-                objectType: trac.ObjectType.MODEL,
+                objectType: tracdap.ObjectType.MODEL,
                 search: { logical: {
         
-                    operator: trac.LogicalOperator.AND,
+                    operator: tracdap.LogicalOperator.AND,
                     expr: [
                         { term: {
                             attrName: "model_type",
-                            attrType: trac.STRING,
-                            operator: trac.SearchOperator.EQ,
+                            attrType: tracdap.STRING,
+                            operator: tracdap.SearchOperator.EQ,
                             searchValue: { stringValue: "acme_widget_model" }
                         }},
                         { term: {
                             attrName: "model_owner",
-                            attrType: trac.STRING,
-                            operator: trac.SearchOperator.EQ,
+                            attrType: tracdap.STRING,
+                            operator: tracdap.SearchOperator.EQ,
                             searchValue: { stringValue: "wile.e.cyote" }
                         }},
                     ]
                 }}
             }
 
-            const err = trac.metadata.SearchParameters.verify(exampleSearchParams);
+            const err = tracdap.metadata.SearchParameters.verify(exampleSearchParams);
 
             if (err)
                 throw err;
     
-            return trac.metadata.SearchParameters.create(exampleSearchParams);
+            return tracdap.metadata.SearchParameters.create(exampleSearchParams);
         }
 
-To learn how to build applications on TRAC, check out the
-[application development section](https://trac-platform.readthedocs.io/en/stable/app_dev)
+To learn how to build applications on TRAC d.a.p., check out the
+[application development section](https://tracdap.readthedocs.io/en/stable/app_dev)
 in our online documentation. It may also be helpful to look at the documentation of
 [protobuf.js](https://www.npmjs.com/package/protobufjs),
 which is used to generate the TRAC API classes for the web API package.
@@ -135,7 +135,7 @@ against a real implementation without needing to run your full build pipeline an
 
 There are no pre-built packages (yet!) for the TRAC platform services. To build and run the platform from source,
 follow the instructions in the main README file in the root of the
-[TRAC source code repository](https://github.com/accenture/trac).
+[TRAC source code repository](https://github.com/finos/tracdap).
 To avoid any compatibility issues, make sure you check out the version tag that matches your version of the web API.
 
 For a local dev setup, you can use the TRAC gateway to route both your app content and API calls. Look in the
@@ -155,7 +155,7 @@ error for methods that are not available in the mock implementation.
 Here is a quick example of one way this could be done.
 
 
-    class LocalImpl extends trac.api.TracMetadataApi {
+    class LocalImpl extends tracdap.api.TracMetadataApi {
 
         // Set an RPC impl to throw an error for methods that have not been mocked
 
@@ -199,9 +199,11 @@ Here is a quick example of one way this could be done.
 
 This is not normally necessary for app development, but if you want to do it here are the commands.
 
-    cd trac-api/packagegs/web
+    cd tracdap-api/packagegs/web
     npm install
 
     npm run tracVersion:windows  # For Windows platforms, requires PowerShell
     npm run tracVersion:posix    # For macOS or Linux
     npm run buildApi
+
+The package will appear in the folder dist/.

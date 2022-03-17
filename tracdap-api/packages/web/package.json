@@ -1,5 +1,5 @@
 {
-  "name": "tracdap-web-api",
+  "name": "@finos/tracdap-web-api",
   "version": "0.0.0-DEVELOPMENT",
   "description": "API package for building web applications on the TRAC Data & Analytics Platform",
   "license": "Apache-2.0",
@@ -9,7 +9,7 @@
       "url": "https://www.apache.org/licenses/LICENSE-2.0"
     }
   ],
-  "homepage": "https://github.com/finos/tracdap",
+  "homepage": "https://tracdap.finos.org/",
   "repository": {
     "type": "git",
     "url": "https://github.com/finos/tracdap"
