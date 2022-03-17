@@ -15,8 +15,6 @@
 # limitations under the License.
 
 pip install --upgrade pip
-pip install -r /mnt/trac/trac-runtime/python/requirements.txt
+pip install -r /mnt/tracdap/tracdap-runtime/python/requirements.txt
 
-python /mnt/trac/dev/codegen/protoc-ctrl.py python_runtime --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/domain
-python /mnt/trac/dev/codegen/protoc-ctrl.py python_proto --proto_path trac-api/trac-metadata/src/main/proto --out trac-runtime/python/generated/trac/rt_gen/proto
-python /mnt/trac/trac-runtime/python/package-ctrl.py
+python /mnt/tracdap/tracdap-runtime/python/build_runtime.py

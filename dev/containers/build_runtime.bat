@@ -1,7 +1,7 @@
 @echo off
 
 set BUILD_IMAGE=python:3.10
-set TRAC_IMAGE="trac/runtime-python"
+set TRAC_IMAGE="tracdap/runtime-python"
 
 REM Get repo root dir
 for %%A IN ("%~dp0..") do set REPO_DIR=%%~dpA
@@ -28,4 +28,4 @@ echo TRAC version = %TRAC_VERSION%
 
 @echo on
 docker run --mount type=bind,source=%REPO_DIR%,target=/mnt/trac %BUILD_IMAGE% /mnt/trac/dev/containers/build_runtime_inner.sh
-docker build -t "%TRAC_IMAGE%:%TRAC_VERSION%" "%REPO_DIR%trac-runtime\python"
+docker build -t "%TRAC_IMAGE%:%TRAC_VERSION%" "%REPO_DIR%tracdap-runtime\python"
