@@ -236,4 +236,4 @@ jobs:
           NPM_TAG: ${{ steps.tracdap-version.outputs.tracdap_tag }}
         run: |
           echo //registry.npmjs.org/:_authToken=\$\{NPM_TOKEN\} > .npmrc
-          echo npm publish --access public --tag ${NPM_TAG} tracdap_dist/*
+          npm publish --access public --tag ${NPM_TAG} tracdap_dist/*
