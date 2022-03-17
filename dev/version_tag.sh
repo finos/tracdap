@@ -16,12 +16,13 @@
 
 # For NPM Publish, we need to specify a release tag
 # This ia a quick way to generate the tag based on the full version string
+# The version number should be as output from version.sh
 
 VERSION=$1
 
-if echo $VERSION | grep -qv "^v[0-9]\+\.[0-9]\+\.[0-9]\+"; then
+if echo $VERSION | grep -qv "^[0-9]\+\.[0-9]\+\.[0-9]\+"; then
   echo "invalid"
-elif echo $VERSION | grep -q "^v[0-9]\+\.[0-9]\+\.[0-9]\+$"; then
+elif echo $VERSION | grep -q "^[0-9]\+\.[0-9]\+\.[0-9]\+$"; then
   echo "latest"
 elif echo $VERSION | grep -q "dev"; then
   echo "dev"
