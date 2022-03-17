@@ -214,7 +214,7 @@ jobs:
           fetch-depth: 0
 
       - name: Get TRAC version
-        id: tracdap-versio
+        id: tracdap-version
         run: |
           tracdap_version=`dev/version.sh`
           echo "tracdap_version = ${tracdap_version}"
