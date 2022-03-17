@@ -22,6 +22,7 @@ VERSION=$1
 
 if echo $VERSION | grep -qv "^[0-9]\+\.[0-9]\+\.[0-9]\+"; then
   echo "invalid"
+  exit -1
 elif echo $VERSION | grep -q "^[0-9]\+\.[0-9]\+\.[0-9]\+$"; then
   echo "latest"
 elif echo $VERSION | grep -q "dev"; then
@@ -34,4 +35,5 @@ elif echo $VERSION | grep -q "rc"; then
   echo "rc"
 else
   echo "invalid"
+  exit -1
 fi
