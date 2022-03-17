@@ -1,6 +1,6 @@
 # TRAC Web API
 
-*TRAC d.a.p. is a next-generation data and analytics platform for use in highly regulated environments*
+*TRAC D.A.P. is a next-generation data and analytics platform for use in highly regulated environments*
 
 The TRAC web API provides a structured interface for developing web applications to run on the TRAC platform.
 It is based on the popular [protobuf.js](https://www.npmjs.com/package/protobufjs) framework and uses the
@@ -121,7 +121,7 @@ The API methods can be called as JavaScript methods on the API classes, both fut
             return tracdap.metadata.SearchParameters.create(exampleSearchParams);
         }
 
-To learn how to build applications on TRAC d.a.p., check out the
+To learn how to build applications on TRAC D.A.P. check out the
 [application development section](https://tracdap.readthedocs.io/en/stable/app_dev)
 in our online documentation. It may also be helpful to look at the documentation of
 [protobuf.js](https://www.npmjs.com/package/protobufjs),
@@ -205,5 +205,9 @@ This is not normally necessary for app development, but if you want to do it her
     npm run tracVersion:windows  # For Windows platforms, requires PowerShell
     npm run tracVersion:posix    # For macOS or Linux
     npm run buildApi
+
+    mkdir dist
+    cd dist
+    npm pack ..
 
 The package will appear in the folder dist/.
