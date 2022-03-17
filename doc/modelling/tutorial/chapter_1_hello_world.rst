@@ -21,7 +21,7 @@ Installing the runtime
 
 The TRAC runtime package can be installed directly from PyPI::
 
-    pip install trac-runtime
+    pip install tracdap-runtime
 
 The TRAC runtime depends on Pandas and PySpark, so these libraries will be pulled in as
 dependencies. If you want to target particular versions, install them explicitly first.
