@@ -235,6 +235,14 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TAG: ${{ steps.tracdap-version.outputs.tracdap_tag }}
         run: |
-          echo registry=https://registry.npmjs.org/ >> .npmrc
+          
+          # NPM publish wants a folder in NPM layout
+          # So, extract the tarball and publish using the NPM package files
+          tar -xzvf tracdap_dist/*
+          cd package
+          ls -la
+          
+          # Set up .npmrc to use an auth token from the environment
           echo //registry.npmjs.org/:_authToken=\$\{NPM_TOKEN\} >> .npmrc
-          echo npm publish --access public --tag ${NPM_TAG} tracdap_dist/*
+          
+          echo npm publish --access public --tag ${NPM_TAG}
