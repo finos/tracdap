@@ -195,8 +195,8 @@ class DocGen:
         version = re.sub(r"[+-].+$", "", version_output)
         release = re.sub(r".*\+.+$", "(latest dev)", version_output)
 
-        self._log.info(f"TRAC d.a.p. version: {version}")
-        self._log.info(f"TRAC d.a.p. release: {release}")
+        self._log.info(f"TRAC D.A.P. version: {version}")
+        self._log.info(f"TRAC D.A.P. release: {release}")
 
         self._version = version  # noqa
         self._release = release  # noqa
