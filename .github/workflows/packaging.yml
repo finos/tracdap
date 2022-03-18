@@ -198,7 +198,7 @@ jobs:
 
   publish_to_npm:
 
-    # if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+    if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
 
     runs-on: ubuntu-latest
 
@@ -230,19 +230,15 @@ jobs:
           name: web_api_package
           path: tracdap_dist/
 
+        # NPM publish wants a folder in NPM layout
+        # So, extract the tarball and publish using the NPM package files
+        # Also, add an entry in .npmrc to tell NPM to use an auth token from the environment
       - name: Publish to NPM
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TAG: ${{ steps.tracdap-version.outputs.tracdap_tag }}
         run: |
-          
-          # NPM publish wants a folder in NPM layout
-          # So, extract the tarball and publish using the NPM package files
           tar -xzvf tracdap_dist/*
           cd package
-          ls -la
-          
-          # Set up .npmrc to use an auth token from the environment
           echo //registry.npmjs.org/:_authToken=\$\{NPM_TOKEN\} >> .npmrc
-          
-          echo npm publish --access public --tag ${NPM_TAG}
+          npm publish --access public --tag ${NPM_TAG}
