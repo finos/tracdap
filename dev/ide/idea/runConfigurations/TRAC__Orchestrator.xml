@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="TRAC: Orchestrator" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="org.finos.tracdap.svc.orch.TracOrchestratorService" />
+    <module name="tracdap.tracdap-svc-orch.main" />
+    <option name="PROGRAM_PARAMETERS" value="--config etc/trac-devlocal.yaml" />
+    <option name="VM_PARAMETERS" value="--add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED -Dio.netty.tryReflectionSetAccessible=true" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

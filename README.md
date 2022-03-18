@@ -45,11 +45,11 @@ https://github.com/finos/tracdap/actions/workflows/packaging.yml)
 https://tracdap.finos.org/en/stable/?badge=stable)
 
 
-The current release series (0.3.x) is intended for reference and experimentation.
+The current release series (0.4.x) is intended for reference and experimentation.
 It includes the metadata service, data service and core data engine, runtime engine
-for Python and a partial implementation of the platform Gateway. This release can
-be used to prototype client applications (e.g. web UIs) and to build and run models
-in a development sandbox.
+for Python and preview versions of the orchestration service and platform Gateway.
+This release can be used to prototype client applications (e.g. web UIs), to build
+and run models and to run small calculation workflows.
 
 At the moment TRAC's API calls and metadata structures are subject to change between 
 versions, including between point versions. As the platform evolves these APIs will
@@ -97,10 +97,20 @@ the TRAC metadata schema into an H2 database file.
     gradlew :deploy-metadb:run --args="--config etc/trac-devlocal.yaml --task deploy_schema"
     gradlew :deploy-metadb:run --args="--config etc/trac-devlocal.yaml --task add_tenant:ACME_CORP"
 
-Once you have a database prepared you can start the TRAC services.
+To run models in TRAC you will need an execution environment. A local execution
+environment for can be configured by creating a Python venv and installing the
+TRAC D.A.P. runtime, then editing trac-devlocal.yaml to set the executor venvPath.
+
+    python -m vemv path/to/venv/
+    . path/to/venv/bin/activate     # For macOS and Linux
+    path\to\venv\Scripts\activate   # For Windows
+    pip install tracdap-runtime
+
+Once you have a database and an executor prepared, you can start the TRAC services.
 
     gradlew :tracdap-svc-meta:run --args="--config etc/trac-devlocal.yaml"
     gradlew :tracdap-svc-data:run --args="--config etc/trac-devlocal.yaml"
+    gradlew :tracdap-svc-orch:run --args="--config etc/trac-devlocal.yaml"
     gradlew :tracdap-gateway:run --args="--config etc/trac-devlocal-gateway.yaml"
 
 To confirm the platform is working you can use the [example API calls](./examples/rest_calls)
