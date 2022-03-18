@@ -194,7 +194,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
         run: |
           ls tracdap_dist/*
-          echo twine upload --username __token__ tracdap_dist/*
+          twine upload --username __token__ tracdap_dist/*
 
   publish_to_npm:
 
@@ -237,4 +237,4 @@ jobs:
         run: |
           echo registry=https://registry.npmjs.org/ >> .npmrc
           echo //registry.npmjs.org/:_authToken=\$\{NPM_TOKEN\} >> .npmrc
-          npm publish --access public --tag ${NPM_TAG} tracdap_dist/*
+          echo npm publish --access public --tag ${NPM_TAG} tracdap_dist/*
