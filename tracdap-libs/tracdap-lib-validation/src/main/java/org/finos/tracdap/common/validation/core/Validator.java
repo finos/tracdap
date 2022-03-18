@@ -16,9 +16,26 @@
 
 package org.finos.tracdap.common.validation.core;
 
-public enum ValidationType {
-    FIXED,
-    VERSION,
-    REFERENTIAL,
-    UNDEFINED
+import com.google.protobuf.Message;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+public @interface Validator {
+
+    ValidationType type() default ValidationType.UNDEFINED;
+
+    Class<? extends Message> object() default Message.class;
+
+    Class<?> serviceFile() default Object.class;
+
+    String serviceName() default "";
+
+    String method() default "";
+
 }

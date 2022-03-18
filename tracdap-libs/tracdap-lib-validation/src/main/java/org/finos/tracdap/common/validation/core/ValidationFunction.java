@@ -17,6 +17,14 @@
 package org.finos.tracdap.common.validation.core;
 
 
+import com.google.protobuf.Message;
+import org.finos.tracdap.common.exception.EUnexpected;
+
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
 public class ValidationFunction<T> {
 
     @FunctionalInterface
@@ -31,6 +39,21 @@ public class ValidationFunction<T> {
     @FunctionalInterface
     public interface Version<T> { ValidationContext apply(T current, T prior, ValidationContext ctx); }
 
+    public static <S> ValidationFunction<S> makeTyped(Typed<S> func, Class<S> targetClass) {
+        return new ValidationFunction<>(func, targetClass);
+    }
+
+    public static <S> ValidationFunction<S> makeTyped(Method method, Class<S> targetClass) {
+        return makeTyped(invokeTyped(method), targetClass);
+    }
+
+    public static <S> ValidationFunction<S> makeVersion(Version<S> func, Class<S> targetClass) {
+        return new ValidationFunction<>(func, targetClass);
+    }
+
+    public static <S> ValidationFunction<S> makeVersion(Method method, Class<S> targetClass) {
+        return makeVersion(invokeVersion(method), targetClass);
+    }
 
     private final Class<T> targetClass;
     private final ValidationFunction.Basic basic;
@@ -84,5 +107,61 @@ public class ValidationFunction<T> {
 
     public ValidationFunction.Version<T> version() {
         return version;
+    }
+
+
+    private static <S> Typed<S> invokeTyped(Method method) {
+
+        var isStatic = Modifier.isStatic(method.getModifiers());
+        var paramTypes = method.getParameterTypes();
+        var returnType = method.getReturnType();
+
+        var signatureMatch =
+                isStatic &&
+                returnType.equals(ValidationContext.class) &&
+                paramTypes.length == 2 &&
+                Message.class.isAssignableFrom(paramTypes[0]) &&
+                paramTypes[1].equals(ValidationContext.class);
+
+        if (!signatureMatch)
+            throw new EUnexpected();
+
+        return (msg, ctx) -> {
+
+            try {
+                return (ValidationContext) method.invoke(null, msg, ctx);
+            }
+            catch (IllegalAccessException | InvocationTargetException e) {
+                throw new EUnexpected();
+            }
+        };
+    }
+
+    private static <S> Version<S> invokeVersion(Method method) {
+
+        var isStatic = Modifier.isStatic(method.getModifiers());
+        var paramTypes = method.getParameterTypes();
+        var returnType = method.getReturnType();
+
+        var signatureMatch =
+                isStatic &&
+                returnType.equals(ValidationContext.class) &&
+                paramTypes.length == 3 &&
+                Message.class.isAssignableFrom(paramTypes[0]) &&
+                paramTypes[1].equals(paramTypes[0]) &&
+                paramTypes[2].equals(ValidationContext.class);
+
+        if (!signatureMatch)
+            throw new EUnexpected();
+
+        return (msg, prior, ctx) -> {
+
+            try {
+                return (ValidationContext) method.invoke(null, msg, prior, ctx);
+            }
+            catch (IllegalAccessException | InvocationTargetException e) {
+                throw new EUnexpected();
+            }
+        };
     }
 }

@@ -20,6 +20,7 @@ import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.exception.EVersionValidation;
 import org.finos.tracdap.common.validation.core.*;
+import org.finos.tracdap.common.validation.core.ValidatorBuilder;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.TagHeader;
 
@@ -33,11 +34,12 @@ import java.util.Map;
 
 public class Validator {
 
+    private static final Map<ValidationKey, ValidationFunction<?>> validators = ValidatorBuilder.buildValidatorMap();
+
     private final Logger log = LoggerFactory.getLogger(getClass());
-    private final Map<ValidationKey, ValidationFunction<?>> validators;
 
     public Validator() {
-        this.validators = ValidationBuilder.buildValidatorMap();
+        //this.validators = ValidatorBuilder.buildValidatorMap();
     }
 
     public <TMsg extends Message>

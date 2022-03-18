@@ -16,9 +16,11 @@
 
 package org.finos.tracdap.common.validation.core;
 
-public enum ValidationType {
-    FIXED,
-    VERSION,
-    REFERENTIAL,
-    UNDEFINED
+import com.google.protobuf.Descriptors;
+
+public class ValidatorUtils {
+
+    public static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
+        return msg.findFieldByNumber(fieldNo);
+    }
 }
