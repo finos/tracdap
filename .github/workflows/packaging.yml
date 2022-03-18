@@ -23,8 +23,8 @@ on:
 
 
 env:
-  PYTHON_VERSION: "3.9"
-  NODE_VERSION: "14.x"
+  PYTHON_VERSION: "3.10"
+  NODE_VERSION: "16.x"
 
 
 jobs:
@@ -130,7 +130,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get TRAC d.a.p. version
+      - name: Get TRAC version
         id: tracdap-version
         run: |
           tracdap_version=`dev/version.sh`
@@ -161,3 +161,84 @@ jobs:
           asset_path: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
           asset_name: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
           asset_content_type: application/gzip
+
+  publish_to_pypi:
+
+    if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+
+    runs-on: ubuntu-latest
+
+    needs:
+      - python_runtime_package
+
+    steps:
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install twine
+
+      - name: Fetch Python runtime package
+        uses: actions/download-artifact@v2
+        with:
+          name: python_runtime_package
+          path: tracdap_dist/
+
+      - name: Publish to PyPI
+        env:
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          ls tracdap_dist/*
+          twine upload --username __token__ tracdap_dist/*
+
+  publish_to_npm:
+
+    if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+
+    runs-on: ubuntu-latest
+
+    needs:
+      - web_api_package
+
+    steps:
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Get TRAC version
+        id: tracdap-version
+        run: |
+          tracdap_version=`dev/version.sh`
+          echo "tracdap_version = ${tracdap_version}"
+          echo "::set-output name=tracdap_version::${tracdap_version}"
+          
+          tracdap_tag=`dev/version_tag.sh ${tracdap_version}`
+          echo "tracdap_tag = ${tracdap_tag}"
+          echo "::set-output name=tracdap_tag::${tracdap_tag}"
+
+      - name: Fetch web API package
+        uses: actions/download-artifact@v2
+        with:
+          name: web_api_package
+          path: tracdap_dist/
+
+        # NPM publish wants a folder in NPM layout
+        # So, extract the tarball and publish using the NPM package files
+        # Also, add an entry in .npmrc to tell NPM to use an auth token from the environment
+      - name: Publish to NPM
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TAG: ${{ steps.tracdap-version.outputs.tracdap_tag }}
+        run: |
+          tar -xzvf tracdap_dist/*
+          cd package
+          echo //registry.npmjs.org/:_authToken=\$\{NPM_TOKEN\} >> .npmrc
+          npm publish --access public --tag ${NPM_TAG}
