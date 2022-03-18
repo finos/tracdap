@@ -37,7 +37,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-public class Validation {
+public class CommonValidators {
 
     static ValidationContext required(ValidationContext ctx) {
 
@@ -369,6 +369,19 @@ public class Validation {
     public static ValidationContext recognizedEnum(ProtocolMessageEnum protoEnum, ValidationContext ctx) {
 
         if (protoEnum.getNumber() < 0) {
+
+            var err = String.format("Unrecognised value specified for [%s]: [%s]",
+                    ctx.fieldName(), protoEnum.getValueDescriptor().getName());
+
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext nonZeroEnum(ProtocolMessageEnum protoEnum, ValidationContext ctx) {
+
+        if (protoEnum.getNumber() <= 0) {
 
             var err = String.format("Unrecognised value specified for [%s]: [%s]",
                     ctx.fieldName(), protoEnum.getValueDescriptor().getName());

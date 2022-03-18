@@ -92,7 +92,7 @@ public class DataApiValidator {
     public static ValidationContext validateCreateDataset(DataWriteRequest msg, ValidationContext ctx) {
 
         ctx = ctx.push(DWR_PRIOR_VERSION)
-                .apply(Validation::omitted)
+                .apply(CommonValidators::omitted)
                 .pop();
 
         return createOrUpdateDataset(msg, ctx);
@@ -101,9 +101,9 @@ public class DataApiValidator {
     public static ValidationContext validateUpdateDataset(DataWriteRequest msg, ValidationContext ctx) {
 
         ctx = ctx.push(DWR_PRIOR_VERSION)
-                .apply(Validation::required)
+                .apply(CommonValidators::required)
                 .apply(MetadataValidator::validateTagSelector, TagSelector.class)
-                .apply(Validation.selectorType(ObjectType.DATA), TagSelector.class)
+                .apply(CommonValidators.selectorType(ObjectType.DATA), TagSelector.class)
                 .pop();
 
         return createOrUpdateDataset(msg, ctx);
@@ -116,8 +116,8 @@ public class DataApiValidator {
         // Easier to loosen later hence leaving the strict restriction for now
 
         ctx = ctx.push(DWR_TENANT)
-                .apply(Validation::required)
-                .apply(Validation::identifier)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
                 .pop();
 
         ctx = ctx.push(DWR_TAG_UPDATES)
@@ -125,16 +125,16 @@ public class DataApiValidator {
                 .pop();
 
         ctx = ctx.pushOneOf(DWR_SCHEMA_SPECIFIER)
-                .apply(Validation::required)
+                .apply(CommonValidators::required)
                 .applyIf(MetadataValidator::validateTagSelector, TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
-                .applyIf(Validation.selectorType(ObjectType.SCHEMA), TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
-                .applyIf(Validation::fixedObjectVersion, TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
+                .applyIf(CommonValidators.selectorType(ObjectType.SCHEMA), TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
+                .applyIf(CommonValidators::fixedObjectVersion, TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
                 .applyIf(SchemaValidator::schema, SchemaDefinition.class, msg.hasField(DWR_SCHEMA))
                 .pop();
 
         ctx = ctx.push(DWR_FORMAT)
-                .apply(Validation::required)
-                .apply(Validation::mimeType)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::mimeType)
                 .pop();
 
         return ctx;
@@ -143,19 +143,19 @@ public class DataApiValidator {
     public static ValidationContext validateReadDataset(DataReadRequest msg, ValidationContext ctx) {
 
         ctx = ctx.push(DRR_TENANT)
-                .apply(Validation::required)
-                .apply(Validation::identifier)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
                 .pop();
 
         ctx = ctx.push(DRR_SELECTOR)
-                .apply(Validation::required)
+                .apply(CommonValidators::required)
                 .apply(MetadataValidator::validateTagSelector, TagSelector.class)
-                .apply(Validation.selectorType(ObjectType.DATA), TagSelector.class)
+                .apply(CommonValidators.selectorType(ObjectType.DATA), TagSelector.class)
                 .pop();
 
         ctx = ctx.push(DRR_FORMAT)
-                .apply(Validation::required)
-                .apply(Validation::mimeType)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::mimeType)
                 .pop();
 
         return ctx;
@@ -164,7 +164,7 @@ public class DataApiValidator {
     public static ValidationContext validateCreateFile(FileWriteRequest msg, ValidationContext ctx) {
 
         ctx = ctx.push(FWR_PRIOR_VERSION)
-                .apply(Validation::omitted)
+                .apply(CommonValidators::omitted)
                 .pop();
 
         return createOrUpdateFile(msg, ctx);
@@ -173,9 +173,9 @@ public class DataApiValidator {
     public static ValidationContext validateUpdateFile(FileWriteRequest msg, ValidationContext ctx) {
 
         ctx = ctx.push(FWR_PRIOR_VERSION)
-                .apply(Validation::required)
+                .apply(CommonValidators::required)
                 .apply(MetadataValidator::validateTagSelector, TagSelector.class)
-                .apply(Validation.selectorType(ObjectType.FILE), TagSelector.class)
+                .apply(CommonValidators.selectorType(ObjectType.FILE), TagSelector.class)
                 .pop();
 
         return createOrUpdateFile(msg, ctx);
@@ -188,8 +188,8 @@ public class DataApiValidator {
         // Easier to loosen later hence leaving the strict restriction for now
 
         ctx = ctx.push(FWR_TENANT)
-                .apply(Validation::required)
-                .apply(Validation::identifier)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
                 .pop();
 
         ctx = ctx.push(FWR_TAG_UPDATES)
@@ -197,18 +197,18 @@ public class DataApiValidator {
                 .pop();
 
         ctx = ctx.push(FWR_NAME)
-                .apply(Validation::required)
-                .apply(Validation::fileName)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::fileName)
                 .pop();
 
         ctx = ctx.push(FWR_MIME_TYPE)
-                .apply(Validation::required)
-                .apply(Validation::mimeType)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::mimeType)
                 .pop();
 
         ctx = ctx.push(FWR_SIZE)
-                .apply(Validation::optional)
-                .apply(Validation::notNegative, Long.class)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::notNegative, Long.class)
                 .pop();
 
         return ctx;
@@ -217,14 +217,14 @@ public class DataApiValidator {
     public static ValidationContext validateReadFile(FileReadRequest msg, ValidationContext ctx) {
 
         ctx = ctx.push(FRR_TENANT)
-                .apply(Validation::required)
-                .apply(Validation::identifier)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
                 .pop();
 
         ctx = ctx.push(FRR_SELECTOR)
-                .apply(Validation::required)
+                .apply(CommonValidators::required)
                 .apply(MetadataValidator::validateTagSelector, TagSelector.class)
-                .apply(Validation.selectorType(ObjectType.FILE), TagSelector.class)
+                .apply(CommonValidators.selectorType(ObjectType.FILE), TagSelector.class)
                 .pop();
 
         return ctx;

@@ -42,21 +42,21 @@ public class ValidationContext {
 
     public static ValidationContext forMethod(Message msg, Descriptors.MethodDescriptor descriptor) {
 
-        var key = ValidationKey.fixedMethod(msg.getDescriptorForType(), descriptor);
+        var key = ValidationKey.forMethod(msg.getDescriptorForType(), descriptor);
         var root = new ValidationLocation(null, key, msg, null, null);
         return new ValidationContext(root);
     }
 
     public static ValidationContext forMessage(Message msg) {
 
-        var key = ValidationKey.fixedMethod(msg.getDescriptorForType(), null);
+        var key = ValidationKey.forMethod(msg.getDescriptorForType(), null);
         var root = new ValidationLocation(null, key, msg, null, null);
         return new ValidationContext(root);
     }
 
     public static ValidationContext forVersion(Message current, Message prior) {
 
-        var key = ValidationKey.version(prior.getDescriptorForType());
+        var key = ValidationKey.forVersion(prior.getDescriptorForType());
         var root = new ValidationLocation(null, key, current, prior, null, null, null);
         return new ValidationContext(root);
     }

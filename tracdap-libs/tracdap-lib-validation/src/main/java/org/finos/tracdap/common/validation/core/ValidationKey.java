@@ -31,19 +31,19 @@ public class ValidationKey implements Comparable<ValidationKey> {
     private static final String DISPLAY_NAME_TEMPLATE = "%s %s%s";
     private final String displayName;
 
-    public static ValidationKey fixedObject(Descriptors.Descriptor messageType) {
+    public static ValidationKey forObject(Descriptors.Descriptor messageType) {
 
         return new ValidationKey(ValidationType.FIXED, messageType, null);
     }
 
-    public static ValidationKey fixedMethod(
+    public static ValidationKey forMethod(
             Descriptors.Descriptor messageType,
             Descriptors.MethodDescriptor method) {
 
         return new ValidationKey(ValidationType.FIXED, messageType, method);
     }
 
-    public static ValidationKey version(Descriptors.Descriptor messageType) {
+    public static ValidationKey forVersion(Descriptors.Descriptor messageType) {
 
         return new ValidationKey(ValidationType.VERSION, messageType, null);
     }

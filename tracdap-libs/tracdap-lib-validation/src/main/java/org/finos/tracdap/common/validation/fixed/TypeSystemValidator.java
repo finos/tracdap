@@ -58,16 +58,16 @@ public class TypeSystemValidator {
     public static ValidationContext dateValue(DatetimeValue msg, ValidationContext ctx) {
 
         return ctx.push(DATEV_ISO_DATE)
-                .apply(Validation::required)
-                .apply(Validation::isoDate)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::isoDate)
                 .pop();
     }
 
     public static ValidationContext datetimeValue(DatetimeValue msg, ValidationContext ctx) {
 
         return ctx.push(DTV_ISO_DATETIME)
-                .apply(Validation::required)
-                .apply(Validation::isoDatetime)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::isoDatetime)
                 .pop();
     }
 

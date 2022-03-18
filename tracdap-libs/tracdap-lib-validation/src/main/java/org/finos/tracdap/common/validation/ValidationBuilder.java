@@ -17,12 +17,12 @@
 package org.finos.tracdap.common.validation;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.validation.core.ValidationFunction;
+import org.finos.tracdap.common.validation.core.ValidationKey;
 import org.finos.tracdap.common.validation.fixed.FileValidator;
 import org.finos.tracdap.common.validation.fixed.SchemaValidator;
 import org.finos.tracdap.common.validation.version.DataVersionValidator;
 import org.finos.tracdap.common.validation.version.SchemaVersionValidator;
-import org.finos.tracdap.common.validation.core.ValidationFunction;
-import org.finos.tracdap.common.validation.core.ValidationKey;
 import org.finos.tracdap.common.validation.fixed.DataApiValidator;
 import org.finos.tracdap.common.validation.version.FileVersionValidator;
 import org.finos.tracdap.metadata.DataDefinition;
@@ -33,7 +33,7 @@ import com.google.protobuf.Descriptors;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ValidatorBuilder {
+public class ValidationBuilder {
 
     public static Map<ValidationKey, ValidationFunction<?>> buildValidatorMap() {
 
@@ -101,7 +101,7 @@ public class ValidatorBuilder {
             Class<T> targetClass, ValidationFunction.Typed<T> validator,
             Descriptors.Descriptor messageType) {
 
-        var key = ValidationKey.fixedObject(messageType);
+        var key = ValidationKey.forObject(messageType);
         var func = new ValidationFunction<>(validator, targetClass);
 
         validatorMap.put(key, func);
@@ -116,7 +116,7 @@ public class ValidatorBuilder {
         var method = file.findServiceByName(serviceName).findMethodByName(methodName);
         var requestType = method.getInputType();
 
-        var key = ValidationKey.fixedMethod(requestType, method);
+        var key = ValidationKey.forMethod(requestType, method);
         var func = new ValidationFunction<>(validator, targetClass);
 
         validatorMap.put(key, func);
@@ -127,7 +127,7 @@ public class ValidatorBuilder {
             Class<T> targetClass, ValidationFunction.Version<T> validator,
             Descriptors.Descriptor messageType) {
 
-        var key = ValidationKey.version(messageType);
+        var key = ValidationKey.forVersion(messageType);
         var func = new ValidationFunction<>(validator, targetClass);
 
         validatorMap.put(key, func);

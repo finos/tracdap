@@ -71,12 +71,12 @@ public class SchemaValidator {
     public static ValidationContext schema(SchemaDefinition schema, ValidationContext ctx) {
 
         ctx = ctx.push(SD_SCHEMA_TYPE)
-                .apply(Validation::required)
-                .apply(Validation::recognizedEnum, SchemaType.class)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::recognizedEnum, SchemaType.class)
                 .pop();
 
         ctx = ctx.pushOneOf(SD_SCHEMA_TYPE_DEFINITION)
-                .apply(Validation::required)
+                .apply(CommonValidators::required)
                 .pop();
 
         if (schema.getSchemaType() == SchemaType.TABLE) {
@@ -95,7 +95,7 @@ public class SchemaValidator {
     public static ValidationContext tableSchema(TableSchema table, ValidationContext ctx) {
 
         ctx = ctx.push(TS_FIELDS)
-                .apply(Validation::listNotEmpty, List.class)
+                .apply(CommonValidators::listNotEmpty, List.class)
                 .applyList(SchemaValidator::fieldSchema, FieldSchema.class)
                 .pop();
 
@@ -143,19 +143,19 @@ public class SchemaValidator {
     public static ValidationContext fieldSchema(FieldSchema field, ValidationContext ctx) {
 
         ctx = ctx.push(FS_FIELD_NAME)
-                .apply(Validation::required)
-                .apply(Validation::identifier)
-                .apply(Validation::notTracReserved)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .apply(CommonValidators::notTracReserved)
                 .pop();
 
         // Do not apply Validation::required, which fails for zero-valued integers
         ctx = ctx.push(FS_FIELD_ORDER)
-                .apply(Validation::notNegative, Integer.class)
+                .apply(CommonValidators::notNegative, Integer.class)
                 .pop();
 
         ctx = ctx.push(FS_FIELD_TYPE)
-                .apply(Validation::required)
-                .apply(Validation::recognizedEnum, BasicType.class)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::recognizedEnum, BasicType.class)
                 .apply(TypeSystemValidator::primitive, BasicType.class)
                 .pop();
 

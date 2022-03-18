@@ -52,8 +52,8 @@ public class FileValidator {
     public static ValidationContext file(FileDefinition msg, ValidationContext ctx) {
 
         ctx = ctx.push(FD_NAME)
-                .apply(Validation::required)
-                .apply(Validation::fileName)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::fileName)
                 .pop();
 
         ctx = ctx.push(FD_EXTENSION)
@@ -61,19 +61,19 @@ public class FileValidator {
                 .pop();
 
         ctx = ctx.push(FD_MIME_TYPE)
-                .apply(Validation::required)
-                .apply(Validation::mimeType)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::mimeType)
                 .pop();
 
         ctx = ctx.push(FD_SIZE)
-                .apply(Validation::optional)
-                .apply(Validation::notNegative, Long.class)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::notNegative, Long.class)
                 .pop();
 
         ctx = ctx.push(FD_STORAGE_ID)
-                .apply(Validation::required)
+                .apply(CommonValidators::required)
                 .apply(MetadataValidator::validateTagSelector, TagSelector.class)
-                .apply(Validation.selectorType(ObjectType.STORAGE), TagSelector.class)
+                .apply(CommonValidators.selectorType(ObjectType.STORAGE), TagSelector.class)
                 .apply(FileValidator::selectorForLatest, TagSelector.class)
                 .pop();
 

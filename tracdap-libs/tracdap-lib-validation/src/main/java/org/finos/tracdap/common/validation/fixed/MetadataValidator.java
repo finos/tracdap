@@ -72,26 +72,26 @@ public class MetadataValidator {
     public static ValidationContext validateTagUpdate(TagUpdate msg, ValidationContext ctx) {
 
         ctx = ctx.push(TU_OPERATION)
-                .apply(Validation::optional)
-                .apply(Validation::recognizedEnum, TagOperation.class)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::recognizedEnum, TagOperation.class)
                 .pop();
 
         if (msg.getOperation() == TagOperation.CLEAR_ALL_ATTR) {
 
             ctx = ctx.push(TU_ATTR_NAME)
-                    .apply(Validation::omitted)
+                    .apply(CommonValidators::omitted)
                     .pop();
 
             ctx = ctx.push(TU_VALUE)
-                    .apply(Validation::omitted)
+                    .apply(CommonValidators::omitted)
                     .pop();
         }
         else {
 
             ctx = ctx.push(TU_ATTR_NAME)
-                    .apply(Validation::required)
-                    .apply(Validation::identifier)
-                    .apply(Validation::notTracReserved)
+                    .apply(CommonValidators::required)
+                    .apply(CommonValidators::identifier)
+                    .apply(CommonValidators::notTracReserved)
                     .pop();
 
             // TODO: Recursive validation of TRAC Values and TypeDescriptors in TypeSystemValidator
@@ -106,26 +106,26 @@ public class MetadataValidator {
         // For object types, this is OBJECT_TYPE_NOT_SET
 
         ctx = ctx.push(TS_OBJECT_TYPE)
-                .apply(Validation::required)
-                .apply(Validation::recognizedEnum, ObjectType.class)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::recognizedEnum, ObjectType.class)
                 .pop();
 
         ctx = ctx.push(TS_OBJECT_ID)
-                .apply(Validation::required)
-                .apply(Validation::uuid)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::uuid)
                 .pop();
 
         ctx = ctx.pushOneOf(TS_OBJECT_CRITERIA)
-                .apply(Validation::required)
-                .applyIf(Validation::optionalTrue, Boolean.class, msg.hasField(TS_LATEST_OBJECT))
-                .applyIf(Validation::positive, Integer.class, msg.hasField(TS_OBJECT_VERSION))
+                .apply(CommonValidators::required)
+                .applyIf(CommonValidators::optionalTrue, Boolean.class, msg.hasField(TS_LATEST_OBJECT))
+                .applyIf(CommonValidators::positive, Integer.class, msg.hasField(TS_OBJECT_VERSION))
                 .applyIf(TypeSystemValidator::datetimeValue, DatetimeValue.class, msg.hasField(TS_OBJECT_ASOF))
                 .pop();
 
         ctx = ctx.pushOneOf(TS_TAG_CRITERIA)
-                .apply(Validation::required)
-                .applyIf(Validation::optionalTrue, Boolean.class, msg.hasField(TS_LATEST_TAG))
-                .applyIf(Validation::positive, Integer.class, msg.hasField(TS_TAG_VERSION))
+                .apply(CommonValidators::required)
+                .applyIf(CommonValidators::optionalTrue, Boolean.class, msg.hasField(TS_LATEST_TAG))
+                .applyIf(CommonValidators::positive, Integer.class, msg.hasField(TS_TAG_VERSION))
                 .applyIf(TypeSystemValidator::datetimeValue, DatetimeValue.class, msg.hasField(TS_TAG_ASOF))
                 .pop();
 
