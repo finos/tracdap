@@ -8,7 +8,7 @@ on:
   # Re-run packaging jobs in main, to make sure there are no issues from the merge
   push:
     branches:
-      - '**'  # main
+      - main
 
   # Build packages when releases are published on GitHub
   # Use the release:publish event rather than looking at all tags
