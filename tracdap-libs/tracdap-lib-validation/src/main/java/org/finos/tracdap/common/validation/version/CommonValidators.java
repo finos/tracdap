@@ -25,6 +25,8 @@ import com.google.protobuf.Descriptors;
 
 import java.util.Objects;
 
+import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
+
 
 public class CommonValidators {
 
@@ -47,9 +49,6 @@ public class CommonValidators {
         TAG_CRITERIA = LATEST_TAG.getContainingOneof();
     }
 
-    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
-        return msg.findFieldByNumber(fieldNo);
-    }
 
     public static ValidationContext exactMatch(Object current, Object prior, ValidationContext ctx) {
 

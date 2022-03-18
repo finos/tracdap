@@ -174,6 +174,10 @@ public class ValidatorBuilder {
 
         try {
 
+            // Allow for qualified service names
+            var serviceNameParts = serviceName.split("\\.");
+            serviceName = serviceNameParts[serviceNameParts.length - 1];
+
             var fileDescriptorFunc = serviceFile.getMethod(GET_DESCRIPTOR_METHOD);
             var fileDescriptor = (Descriptors.FileDescriptor) fileDescriptorFunc.invoke(null);
             var serviceDescriptor = fileDescriptor.findServiceByName(serviceName);

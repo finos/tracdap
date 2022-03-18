@@ -17,12 +17,17 @@
 package org.finos.tracdap.common.validation.version;
 
 import org.finos.tracdap.common.validation.core.ValidationContext;
+import org.finos.tracdap.common.validation.core.ValidationType;
+import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.DataDefinition;
 import org.finos.tracdap.metadata.SchemaDefinition;
 import org.finos.tracdap.metadata.TagSelector;
 import com.google.protobuf.Descriptors;
 
+import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
+
+@Validator(type = ValidationType.VERSION)
 public class DataVersionValidator {
 
     private static final Descriptors.Descriptor DATA_DEFINITION;
@@ -38,10 +43,7 @@ public class DataVersionValidator {
         DD_SCHEMA_DEFINITION = DD_SCHEMA_ID.getContainingOneof();
     }
 
-    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
-        return msg.findFieldByNumber(fieldNo);
-    }
-
+    @Validator
     public static ValidationContext data(DataDefinition current, DataDefinition prior, ValidationContext ctx) {
 
         ctx = ctx.pushOneOf(DD_SCHEMA_DEFINITION)

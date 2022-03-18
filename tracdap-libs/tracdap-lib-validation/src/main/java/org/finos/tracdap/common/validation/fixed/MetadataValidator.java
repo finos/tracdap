@@ -16,11 +16,15 @@
 
 package org.finos.tracdap.common.validation.fixed;
 
+import org.finos.tracdap.common.validation.core.ValidationType;
+import org.finos.tracdap.common.validation.core.Validator;
+import org.finos.tracdap.common.validation.core.ValidatorUtils;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import com.google.protobuf.Descriptors;
 
 
+@Validator(type = ValidationType.FIXED)
 public class MetadataValidator {
 
     // Rough implementation that provides only a few validation points
@@ -47,28 +51,24 @@ public class MetadataValidator {
     static {
 
         TAG_UPDATE = TagUpdate.getDescriptor();
-        TU_OPERATION = field(TAG_UPDATE, TagUpdate.OPERATION_FIELD_NUMBER);
-        TU_ATTR_NAME = field(TAG_UPDATE, TagUpdate.ATTRNAME_FIELD_NUMBER);
-        TU_VALUE = field(TAG_UPDATE, TagUpdate.VALUE_FIELD_NUMBER);
+        TU_OPERATION = ValidatorUtils.field(TAG_UPDATE, TagUpdate.OPERATION_FIELD_NUMBER);
+        TU_ATTR_NAME = ValidatorUtils.field(TAG_UPDATE, TagUpdate.ATTRNAME_FIELD_NUMBER);
+        TU_VALUE = ValidatorUtils.field(TAG_UPDATE, TagUpdate.VALUE_FIELD_NUMBER);
 
         TAG_SELECTOR = TagSelector.getDescriptor();
-        TS_OBJECT_TYPE = field(TAG_SELECTOR, TagSelector.OBJECTTYPE_FIELD_NUMBER);
-        TS_OBJECT_ID = field(TAG_SELECTOR, TagSelector.OBJECTID_FIELD_NUMBER);
-        TS_LATEST_OBJECT = field(TAG_SELECTOR, TagSelector.LATESTOBJECT_FIELD_NUMBER);
-        TS_OBJECT_VERSION = field(TAG_SELECTOR, TagSelector.OBJECTVERSION_FIELD_NUMBER);
-        TS_OBJECT_ASOF = field(TAG_SELECTOR, TagSelector.OBJECTASOF_FIELD_NUMBER);
-        TS_LATEST_TAG = field(TAG_SELECTOR, TagSelector.LATESTTAG_FIELD_NUMBER);
-        TS_TAG_VERSION = field(TAG_SELECTOR, TagSelector.TAGVERSION_FIELD_NUMBER);
-        TS_TAG_ASOF = field(TAG_SELECTOR, TagSelector.TAGASOF_FIELD_NUMBER);
+        TS_OBJECT_TYPE = ValidatorUtils.field(TAG_SELECTOR, TagSelector.OBJECTTYPE_FIELD_NUMBER);
+        TS_OBJECT_ID = ValidatorUtils.field(TAG_SELECTOR, TagSelector.OBJECTID_FIELD_NUMBER);
+        TS_LATEST_OBJECT = ValidatorUtils.field(TAG_SELECTOR, TagSelector.LATESTOBJECT_FIELD_NUMBER);
+        TS_OBJECT_VERSION = ValidatorUtils.field(TAG_SELECTOR, TagSelector.OBJECTVERSION_FIELD_NUMBER);
+        TS_OBJECT_ASOF = ValidatorUtils.field(TAG_SELECTOR, TagSelector.OBJECTASOF_FIELD_NUMBER);
+        TS_LATEST_TAG = ValidatorUtils.field(TAG_SELECTOR, TagSelector.LATESTTAG_FIELD_NUMBER);
+        TS_TAG_VERSION = ValidatorUtils.field(TAG_SELECTOR, TagSelector.TAGVERSION_FIELD_NUMBER);
+        TS_TAG_ASOF = ValidatorUtils.field(TAG_SELECTOR, TagSelector.TAGASOF_FIELD_NUMBER);
         TS_OBJECT_CRITERIA = TS_OBJECT_VERSION.getContainingOneof();
         TS_TAG_CRITERIA = TS_TAG_VERSION.getContainingOneof();
     }
 
-    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
-        return msg.findFieldByNumber(fieldNo);
-    }
-
-
+    @Validator
     public static ValidationContext validateTagUpdate(TagUpdate msg, ValidationContext ctx) {
 
         ctx = ctx.push(TU_OPERATION)
@@ -100,6 +100,7 @@ public class MetadataValidator {
         return ctx;
     }
 
+    @Validator
     public static ValidationContext validateTagSelector(TagSelector msg, ValidationContext ctx) {
 
         // The "required" validation for enums will fail for ordinal = 0

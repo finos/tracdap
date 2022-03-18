@@ -16,11 +16,16 @@
 
 package org.finos.tracdap.common.validation.version;
 
+import org.finos.tracdap.common.validation.core.ValidationType;
+import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.FileDefinition;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import com.google.protobuf.*;
 
+import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
+
+@Validator(type = ValidationType.VERSION)
 public class FileVersionValidator {
 
     private static final Descriptors.Descriptor FILE_DEF;
@@ -37,10 +42,8 @@ public class FileVersionValidator {
         FILE_STORAGE_ID = field(FILE_DEF, FileDefinition.STORAGEID_FIELD_NUMBER);
     }
 
-    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
-        return msg.findFieldByNumber(fieldNo);
-    }
 
+    @Validator
     public static ValidationContext fileVersion(FileDefinition current, FileDefinition prior, ValidationContext ctx) {
 
         ctx = ctx.push(FILE_NAME)

@@ -18,6 +18,9 @@ package org.finos.tracdap.common.validation.fixed;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.core.ValidationContext;
+import org.finos.tracdap.common.validation.core.ValidationType;
+import org.finos.tracdap.common.validation.core.Validator;
+import org.finos.tracdap.common.validation.core.ValidatorUtils;
 import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Descriptors;
 
@@ -25,6 +28,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 
+@Validator(type = ValidationType.FIXED)
 public class SchemaValidator {
 
     private static final List<BasicType> ALLOWED_BUSINESS_KEY_TYPES = List.of(
@@ -46,28 +50,24 @@ public class SchemaValidator {
     private static final Descriptors.FieldDescriptor FS_FIELD_ORDER;
     private static final Descriptors.FieldDescriptor FS_FIELD_TYPE;
 
-
     static {
 
         SCHEMA_DEFINITION = SchemaDefinition.getDescriptor();
-        SD_SCHEMA_TYPE = field(SCHEMA_DEFINITION, SchemaDefinition.SCHEMATYPE_FIELD_NUMBER);
-        SD_TABLE = field(SCHEMA_DEFINITION, SchemaDefinition.TABLE_FIELD_NUMBER);
+        SD_SCHEMA_TYPE = ValidatorUtils.field(SCHEMA_DEFINITION, SchemaDefinition.SCHEMATYPE_FIELD_NUMBER);
+        SD_TABLE = ValidatorUtils.field(SCHEMA_DEFINITION, SchemaDefinition.TABLE_FIELD_NUMBER);
         SD_SCHEMA_TYPE_DEFINITION = SD_TABLE.getContainingOneof();
 
         TABLE_SCHEMA = TableSchema.getDescriptor();
-        TS_FIELDS = field(TABLE_SCHEMA, TableSchema.FIELDS_FIELD_NUMBER);
+        TS_FIELDS = ValidatorUtils.field(TABLE_SCHEMA, TableSchema.FIELDS_FIELD_NUMBER);
 
         FIELD_SCHEMA = FieldSchema.getDescriptor();
-        FS_FIELD_NAME = field(FIELD_SCHEMA, FieldSchema.FIELDNAME_FIELD_NUMBER);
-        FS_FIELD_ORDER = field(FIELD_SCHEMA, FieldSchema.FIELDORDER_FIELD_NUMBER);
-        FS_FIELD_TYPE = field(FIELD_SCHEMA, FieldSchema.FIELDTYPE_FIELD_NUMBER);
-    }
-
-    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
-        return msg.findFieldByNumber(fieldNo);
+        FS_FIELD_NAME = ValidatorUtils.field(FIELD_SCHEMA, FieldSchema.FIELDNAME_FIELD_NUMBER);
+        FS_FIELD_ORDER = ValidatorUtils.field(FIELD_SCHEMA, FieldSchema.FIELDORDER_FIELD_NUMBER);
+        FS_FIELD_TYPE = ValidatorUtils.field(FIELD_SCHEMA, FieldSchema.FIELDTYPE_FIELD_NUMBER);
     }
 
 
+    @Validator
     public static ValidationContext schema(SchemaDefinition schema, ValidationContext ctx) {
 
         ctx = ctx.push(SD_SCHEMA_TYPE)
@@ -92,6 +92,7 @@ public class SchemaValidator {
         }
     }
 
+    @Validator
     public static ValidationContext tableSchema(TableSchema table, ValidationContext ctx) {
 
         ctx = ctx.push(TS_FIELDS)
@@ -140,6 +141,7 @@ public class SchemaValidator {
         return ctx;
     }
 
+    @Validator
     public static ValidationContext fieldSchema(FieldSchema field, ValidationContext ctx) {
 
         ctx = ctx.push(FS_FIELD_NAME)
