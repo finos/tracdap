@@ -16,8 +16,11 @@
 
 package org.finos.tracdap.svc.data.api;
 
+import io.netty.util.concurrent.DefaultEventExecutor;
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.Futures;
+import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.PartKeys;
 import org.finos.tracdap.metadata.*;
@@ -25,12 +28,15 @@ import org.finos.tracdap.test.data.SampleDataFormats;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import org.finos.tracdap.test.helpers.PlatformTest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -47,10 +53,25 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 
-public class DatasetRwOperationsTest extends DataApiTestBase {
+public class DatasetRwOperationsTest {
 
     // Functional test cases for dataset operations in the data API
     // (createDataset, updateDataset, readDataset)
+
+    private static final String TRAC_UNIT_CONFIG = "config/trac-unit.yaml";
+    private static final String TEST_TENANT = "ACME_CORP";
+    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+
+    @RegisterExtension
+    private static final PlatformTest platform = PlatformTest.forConfig(TRAC_UNIT_CONFIG)
+            .addTenant(TEST_TENANT)
+            .startMeta()
+            .startData()
+            .build();
+
+    IExecutionContext execContext = new ExecutionContext(new DefaultEventExecutor());
+    TracMetadataApiGrpc.TracMetadataApiFutureStub metaClient = platform.metaClientFuture();
+    TracDataApiGrpc.TracDataApiStub dataClient = platform.dataClient();
 
     // Reuse sample data from the test lib
 
@@ -127,7 +148,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
         var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
 
-        var storageRoot = tempDir.resolve(STORAGE_ROOT_DIR);
+        var storageRoot = platform.storageRootDir();
         var copyDir = storageRoot.resolve(copy.getStoragePath());
 
         var copyFiles = Files.walk(copyDir)
@@ -238,7 +259,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
         var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
 
-        var storageRoot = tempDir.resolve(STORAGE_ROOT_DIR);
+        var storageRoot = platform.storageRootDir();
         var copyDir = storageRoot.resolve(copy.getStoragePath());
 
         var copyFiles = Files.walk(copyDir)
@@ -693,7 +714,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
         var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
 
-        var storageRoot = tempDir.resolve(STORAGE_ROOT_DIR);
+        var storageRoot = platform.storageRootDir();
         var copyDir = storageRoot.resolve(copy.getStoragePath());
 
         var copyFiles = Files.walk(copyDir)
@@ -847,7 +868,7 @@ public class DatasetRwOperationsTest extends DataApiTestBase {
         var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
         var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
 
-        var storageRoot = tempDir.resolve(STORAGE_ROOT_DIR);
+        var storageRoot = platform.storageRootDir();
         var copyDir = storageRoot.resolve(copy.getStoragePath());
 
         var copyFiles = Files.walk(copyDir)

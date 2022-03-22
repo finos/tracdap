@@ -16,9 +16,13 @@
 
 package org.finos.tracdap.svc.data.api;
 
+import io.netty.util.concurrent.DefaultEventExecutor;
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.Futures;
+import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.metadata.CopyStatus;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagSelector;
@@ -26,9 +30,12 @@ import org.finos.tracdap.metadata.TagSelector;
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 
+import org.finos.tracdap.test.helpers.PlatformTest;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.Flow;
@@ -39,10 +46,24 @@ import java.util.stream.Stream;
 import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
-import static org.finos.tracdap.test.storage.StorageTestHelpers.readFile;
 
 
-public class FileRoundTripTest extends DataApiTestBase {
+public class FileRoundTripTest  {
+
+    private static final String TRAC_UNIT_CONFIG = "config/trac-unit.yaml";
+    private static final String TEST_TENANT = "ACME_CORP";
+    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+
+    @RegisterExtension
+    private static final PlatformTest platform = PlatformTest.forConfig(TRAC_UNIT_CONFIG)
+            .addTenant(TEST_TENANT)
+            .startMeta()
+            .startData()
+            .build();
+
+    IExecutionContext execContext = new ExecutionContext(new DefaultEventExecutor());
+    TracMetadataApiGrpc.TracMetadataApiFutureStub metaClient = platform.metaClientFuture();
+    TracDataApiGrpc.TracDataApiStub dataClient = platform.dataClient();
 
     @Test
     void testRoundTrip_basic() throws Exception {
@@ -150,33 +171,12 @@ public class FileRoundTripTest extends DataApiTestBase {
         Assertions.assertEquals("dat", fileDef.getExtension());
         Assertions.assertEquals("application/octet-stream", fileDef.getMimeType());
         Assertions.assertEquals(expectedSize, fileDef.getSize());
-
-        // Use storage impl directly to check file has arrived in the storage back end
-
-        var storageImpl = storage.getFileStorage(copy.getStorageKey());
-        var exists = storageImpl.exists(copy.getStoragePath(), execContext);
-        var size = storageImpl.size(copy.getStoragePath(), execContext);
-        var storedContent = readFile(copy.getStoragePath(), storageImpl, execContext);
-
-        waitFor(TEST_TIMEOUT, exists, size, storedContent);
-
-        var originalSize = content.stream()
-                .mapToLong(b -> b.length)
-                .sum();
+        Assertions.assertEquals(CopyStatus.COPY_AVAILABLE, copy.getCopyStatus());
 
         var originalBytes = ByteString.copyFrom(
             content.stream()
             .map(ByteString::copyFrom)
             .collect(Collectors.toList()));
-
-        var storedBytes = ByteString.copyFrom(
-            resultOf(storedContent).nioBuffer());
-
-        Assertions.assertTrue(resultOf(exists));
-        Assertions.assertEquals(originalSize, resultOf(size));
-        Assertions.assertEquals(originalBytes, storedBytes);
-
-        resultOf(storedContent).release();
 
         // Set up a server-streaming request to read the file back
 

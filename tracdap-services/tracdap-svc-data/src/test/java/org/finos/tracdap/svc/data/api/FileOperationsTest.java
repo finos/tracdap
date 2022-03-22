@@ -16,10 +16,10 @@
 
 package org.finos.tracdap.svc.data.api;
 
-import org.finos.tracdap.api.FileReadRequest;
-import org.finos.tracdap.api.FileReadResponse;
-import org.finos.tracdap.api.FileWriteRequest;
-import org.finos.tracdap.api.MetadataReadRequest;
+import io.netty.util.concurrent.DefaultEventExecutor;
+import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.concurrent.ExecutionContext;
+import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.concurrent.Flows;
@@ -28,10 +28,13 @@ import org.finos.tracdap.metadata.*;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import org.finos.tracdap.test.helpers.PlatformTest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -44,7 +47,22 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.junit.jupiter.api.Assertions.*;
 
 
-public class FileOperationsTest extends DataApiTestBase {
+public class FileOperationsTest {
+
+    private static final String TRAC_UNIT_CONFIG = "config/trac-unit.yaml";
+    private static final String TEST_TENANT = "ACME_CORP";
+    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+
+    @RegisterExtension
+    private static final PlatformTest platform = PlatformTest.forConfig(TRAC_UNIT_CONFIG)
+            .addTenant(TEST_TENANT)
+            .startMeta()
+            .startData()
+            .build();
+
+    IExecutionContext execContext = new ExecutionContext(new DefaultEventExecutor());
+    TracMetadataApiGrpc.TracMetadataApiFutureStub metaClient = platform.metaClientFuture();
+    TracDataApiGrpc.TracDataApiStub dataClient = platform.dataClient();
 
     // Functional test cases for file operations in the data API
     // (createFile, updateFile, readFile)
@@ -1078,7 +1096,7 @@ public class FileOperationsTest extends DataApiTestBase {
                 (bs, b) -> {bs.add(b); return bs;},
                 new ArrayList<FileReadResponse>());
 
-        var readReq = readRequest(v1Id);
+        var readReq = readRequest(TEST_TENANT, v1Id);
         DataApiTestHelpers.serverStreaming(dataClient::readFile, readReq, responseStream);
 
         waitFor(TEST_TIMEOUT, collectList);
@@ -1115,7 +1133,7 @@ public class FileOperationsTest extends DataApiTestBase {
                 (bs, b) -> {bs.add(b); return bs;},
                 new ArrayList<FileReadResponse>());
 
-        var readReq = readRequest(v1Id);
+        var readReq = readRequest(TEST_TENANT, v1Id);
         DataApiTestHelpers.serverStreaming(dataClient::readFile, readReq, responseStream);
 
         waitFor(TEST_TIMEOUT, collectList);
@@ -1149,7 +1167,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicReq = readRequest(v1Id);
+        var basicReq = readRequest(TEST_TENANT, v1Id);
 
         // Request last file read, should return V1
 
@@ -1205,7 +1223,7 @@ public class FileOperationsTest extends DataApiTestBase {
 
         // Explicit data read for V2
 
-        var v2Request = readRequest(v2Id);
+        var v2Request = readRequest(TEST_TENANT, v2Id);
         var v2ResponseStream = Flows.<FileReadResponse>hub(execContext);
         var v2ByteStream = Flows.map(v2ResponseStream, FileReadResponse::getContent);
         var v2Content = Flows.fold(v2ByteStream,
@@ -1219,7 +1237,7 @@ public class FileOperationsTest extends DataApiTestBase {
 
         // Explicit data read for V1
 
-        var v1Request = readRequest(v1Id);
+        var v1Request = readRequest(TEST_TENANT, v1Id);
         var v1ResponseStream = Flows.<FileReadResponse>hub(execContext);
         var v1ByteStream = Flows.map(v1ResponseStream, FileReadResponse::getContent);
         var v1Content = Flows.fold(v1ByteStream,
@@ -1255,7 +1273,7 @@ public class FileOperationsTest extends DataApiTestBase {
 
         // Explicit data read, as-of the V2 timestamp
 
-        var basicReq = readRequest(v2Id);
+        var basicReq = readRequest(TEST_TENANT, v2Id);
 
         var v2Request = basicReq.toBuilder()
                 .setSelector(basicReq.getSelector().toBuilder()
@@ -1299,7 +1317,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicRequest = readRequest(v1Id);
+        var basicRequest = readRequest(TEST_TENANT, v1Id);
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
@@ -1322,7 +1340,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicRequest = readRequest(v1Id);
+        var basicRequest = readRequest(TEST_TENANT, v1Id);
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
@@ -1343,7 +1361,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicRequest = readRequest(v1Id);
+        var basicRequest = readRequest(TEST_TENANT, v1Id);
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
@@ -1364,7 +1382,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicRequest = readRequest(v1Id);
+        var basicRequest = readRequest(TEST_TENANT, v1Id);
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
@@ -1387,7 +1405,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicRequest = readRequest(v1Id);
+        var basicRequest = readRequest(TEST_TENANT, v1Id);
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
@@ -1408,7 +1426,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicRequest = readRequest(v1Id);
+        var basicRequest = readRequest(TEST_TENANT, v1Id);
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
@@ -1429,7 +1447,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicRequest = readRequest(v1Id);
+        var basicRequest = readRequest(TEST_TENANT, v1Id);
 
         // Try to read obj version 0 - versions should start at 1
 
@@ -1468,7 +1486,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicRequest = readRequest(v1Id);
+        var basicRequest = readRequest(TEST_TENANT, v1Id);
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
@@ -1492,7 +1510,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicRequest = readRequest(v1Id);
+        var basicRequest = readRequest(TEST_TENANT, v1Id);
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
@@ -1513,7 +1531,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicRequest = readRequest(v1Id);
+        var basicRequest = readRequest(TEST_TENANT, v1Id);
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
@@ -1534,7 +1552,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicRequest = readRequest(v1Id);
+        var basicRequest = readRequest(TEST_TENANT, v1Id);
 
         // Try to read tag version 0 - versions should start at 1
 
@@ -1573,7 +1591,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicRequest = readRequest(v1Id);
+        var basicRequest = readRequest(TEST_TENANT, v1Id);
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()
@@ -1597,7 +1615,7 @@ public class FileOperationsTest extends DataApiTestBase {
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
 
-        var basicRequest = readRequest(v1Id);
+        var basicRequest = readRequest(TEST_TENANT, v1Id);
 
         var readRequest = basicRequest.toBuilder()
                 .setSelector(basicRequest.getSelector().toBuilder()

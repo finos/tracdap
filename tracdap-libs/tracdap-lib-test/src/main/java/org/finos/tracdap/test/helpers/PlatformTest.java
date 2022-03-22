@@ -31,11 +31,9 @@ import org.finos.tracdap.svc.orch.TracOrchestratorService;
 import org.finos.tracdap.test.config.ConfigHelpers;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NettyChannelBuilder;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
-import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +54,7 @@ import java.util.concurrent.TimeUnit;
 public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     public static final String TRAC_EXEC_DIR = "TRAC_EXEC_DIR";
+    public static final String STORAGE_ROOT_DIR = "storage_root";
 
     private static final boolean IS_WINDOWS = System.getProperty("os.name").toLowerCase().contains("windows");
     private static final String PYTHON_EXE = IS_WINDOWS ? "python.exe" : "python";
@@ -65,17 +65,17 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String testConfig;
-    private final String testTenant;
+    private final List<String> tenants;
     private final boolean startMeta;
     private final boolean startData;
     private final boolean startOrch;
 
     private PlatformTest(
-            String testConfig, String testTenant,
+            String testConfig, List<String> tenants,
             boolean startMeta, boolean startData, boolean startOrch) {
 
         this.testConfig = testConfig;
-        this.testTenant = testTenant;
+        this.tenants = tenants;
         this.startMeta = startMeta;
         this.startData = startData;
         this.startOrch = startOrch;
@@ -89,24 +89,25 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     public static class Builder {
 
+        private final List<String> tenants = new ArrayList<>();
         private String testConfig;
-        private String testTenant;
         private boolean startMeta;
         private boolean startData;
         private boolean startOrch;
 
-        public Builder testTenant(String testTenant) { this.testTenant = testTenant; return this;}
+        public Builder addTenant(String testTenant) { this.tenants.add(testTenant); return this;}
         public Builder startMeta() { startMeta = true; return this; }
         public Builder startData() { startData = true; return this; }
         public Builder startOrch() { startOrch = true; return this; }
         public Builder startAll() { return startMeta().startData().startOrch(); }
 
         public PlatformTest build() {
-            return new PlatformTest(testConfig, testTenant, startMeta, startData, startOrch);
+            return new PlatformTest(testConfig, tenants, startMeta, startData, startOrch);
         }
     }
 
-    private static Path tracDir;
+    private Path tracDir;
+    private Path tracStorageDir;
     private Path tracExecDir;
     private Path tracRepoDir;
     private URL platformConfigUrl;
@@ -120,6 +121,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private ManagedChannel metaChannel;
     private ManagedChannel dataChannel;
     private ManagedChannel orchChannel;
+
+    public TracMetadataApiGrpc.TracMetadataApiFutureStub metaClientFuture() {
+        return TracMetadataApiGrpc.newFutureStub(metaChannel);
+    }
 
     public TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClientBlocking() {
         return TracMetadataApiGrpc.newBlockingStub(metaChannel);
@@ -137,13 +142,12 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         return TracOrchestratorApiGrpc.newBlockingStub(orchChannel);
     }
 
-    public Path tracRepoDir() {
-        return tracRepoDir;
+    public Path storageRootDir() {
+        return tracStorageDir;
     }
 
-    @BeforeAll
-    static void getTempDir(@TempDir Path tempDir) {
-        tracDir = tempDir;
+    public Path tracRepoDir() {
+        return tracRepoDir;
     }
 
     @Override
@@ -170,6 +174,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     void findDirectories() throws Exception {
 
         tracDir = Files.createTempDirectory("trac_platform_test_");
+
+        tracStorageDir = tracDir.resolve(STORAGE_ROOT_DIR);
+        Files.createDirectory(tracStorageDir);
 
         tracExecDir = System.getenv().containsKey(TRAC_EXEC_DIR)
                 ? Paths.get(System.getenv(TRAC_EXEC_DIR))
@@ -203,6 +210,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         var substitutions = Map.of(
                 "${TRAC_DIR}", tracDir.toString().replace("\\", "\\\\"),
+                "${TRAC_STORAGE_DIR}", tracStorageDir.toString().replace("\\", "\\\\"),
                 "${TRAC_EXEC_DIR}", tracExecDir.toString().replace("\\", "\\\\"),
                 "${CURRENT_ORIGIN}", currentOrigin);
 
@@ -246,9 +254,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         log.info("Deploy database schema...");
 
-        var databaseTasks = List.of(
-                StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK_NAME, "", ""),
-                StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, testTenant, ""));
+        var databaseTasks = new ArrayList<StandardArgs.Task>();
+        databaseTasks.add(StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK_NAME, "", ""));
+
+        for (var tenant : tenants)
+            databaseTasks.add(StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, tenant, ""));
 
         ServiceHelpers.runDbDeploy(tracDir, platformConfigUrl, keystoreKey, databaseTasks);
     }

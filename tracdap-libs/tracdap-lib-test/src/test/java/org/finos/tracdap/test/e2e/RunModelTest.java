@@ -52,9 +52,8 @@ public class RunModelTest {
             JobStatusCode.CANCELLED);
 
     @RegisterExtension
-    private static final PlatformTest platform = PlatformTest
-            .forConfig(E2E_CONFIG)
-            .testTenant(TEST_TENANT)
+    private static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
+            .addTenant(TEST_TENANT)
             .startAll()
             .build();
 

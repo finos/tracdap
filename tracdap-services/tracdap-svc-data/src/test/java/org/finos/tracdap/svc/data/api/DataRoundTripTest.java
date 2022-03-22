@@ -67,12 +67,13 @@ class DataRoundTripTest {
 
     @RegisterExtension
     private static final PlatformTest platform = PlatformTest.forConfig(TRAC_UNIT_CONFIG)
-            .testTenant(TEST_TENANT)
+            .addTenant(TEST_TENANT)
             .startMeta()
             .startData()
             .build();
 
-    private final IExecutionContext execContext = new ExecutionContext(new DefaultEventExecutor());
+    IExecutionContext execContext = new ExecutionContext(new DefaultEventExecutor());
+    TracDataApiGrpc.TracDataApiStub dataClient = platform.dataClient();
 
     @Test
     void roundTrip_arrowStream() throws Exception {
@@ -134,8 +135,6 @@ class DataRoundTripTest {
             List<ByteString> content, String writeFormat, String readFormat,
             BiFunction<SchemaDefinition, List<ByteString>, List<Vector<Object>>> decodeFunc,
             List<Vector<Object>> expectedResult, boolean dataInChunkZero) throws Exception {
-
-        var dataClient = platform.dataClient();
 
         var requestParams = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
