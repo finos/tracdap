@@ -125,6 +125,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         return TracMetadataApiGrpc.newBlockingStub(metaChannel);
     }
 
+    public TracDataApiGrpc.TracDataApiStub dataClient() {
+        return TracDataApiGrpc.newStub(dataChannel);
+    }
+
     public TracDataApiGrpc.TracDataApiBlockingStub dataClientBlocking() {
         return TracDataApiGrpc.newBlockingStub(dataChannel);
     }
@@ -253,47 +257,52 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         // TODO: Allow running whole-platform tests over different backend configurations
 
-        Files.createDirectory(tracDir.resolve("unit_test_storage"));
-
-        var venvDir = tracExecDir.resolve("venv").normalize();
-
-        if (Files.exists(venvDir)) {
-
-            log.info("Using existing venv: [{}]", venvDir);
+        if (startData) {
+            Files.createDirectory(tracDir.resolve("unit_test_storage"));
         }
-        else {
-            log.info("Creating a new venv: [{}]", venvDir);
 
-            var venvPath = tracDir.resolve("venv");
-            var venvPb = new ProcessBuilder();
-            venvPb.command("python", "-m", "venv", venvPath.toString());
+        if (startOrch) {
 
-            var venvP = venvPb.start();
-            venvP.waitFor(60, TimeUnit.SECONDS);
+            var venvDir = tracExecDir.resolve("venv").normalize();
 
-            log.info("Installing TRAC runtime for Python...");
+            if (Files.exists(venvDir)) {
 
-            // This assumes the runtime has already been built externally (requires full the Python build chain)
+                log.info("Using existing venv: [{}]", venvDir);
+            }
+            else {
+                log.info("Creating a new venv: [{}]", venvDir);
 
-            var pythonExe = venvPath
-                    .resolve(VENV_BIN_SUBDIR)
-                    .resolve(PYTHON_EXE)
-                    .toString();
+                var venvPath = tracDir.resolve("venv");
+                var venvPb = new ProcessBuilder();
+                venvPb.command("python", "-m", "venv", venvPath.toString());
 
-            var tracRtDistDir = tracRepoDir.resolve(TRAC_RUNTIME_DIST_DIR);
-            var tracRtWhl = Files.find(tracRtDistDir, 1, (file, attrs) -> file.toString().endsWith(".whl"))
-                    .findFirst();
+                var venvP = venvPb.start();
+                venvP.waitFor(60, TimeUnit.SECONDS);
 
-            if (tracRtWhl.isEmpty())
-                throw new RuntimeException("Could not find TRAC runtime wheel");
+                log.info("Installing TRAC runtime for Python...");
 
-            var pipPB = new ProcessBuilder();
-            pipPB.command(pythonExe, "-m", "pip", "install", tracRtWhl.get().toString());
-            pipPB.environment().put(VENV_ENV_VAR, venvPath.toString());
+                // This assumes the runtime has already been built externally (requires full the Python build chain)
 
-            var pipP = pipPB.start();
-            pipP.waitFor(2, TimeUnit.MINUTES);
+                var pythonExe = venvPath
+                        .resolve(VENV_BIN_SUBDIR)
+                        .resolve(PYTHON_EXE)
+                        .toString();
 
+                var tracRtDistDir = tracRepoDir.resolve(TRAC_RUNTIME_DIST_DIR);
+                var tracRtWhl = Files.find(tracRtDistDir, 1, (file, attrs) -> file.toString().endsWith(".whl"))
+                        .findFirst();
+
+                if (tracRtWhl.isEmpty())
+                    throw new RuntimeException("Could not find TRAC runtime wheel");
+
+                var pipPB = new ProcessBuilder();
+                pipPB.command(pythonExe, "-m", "pip", "install", tracRtWhl.get().toString());
+                pipPB.environment().put(VENV_ENV_VAR, venvPath.toString());
+
+                var pipP = pipPB.start();
+                pipP.waitFor(2, TimeUnit.MINUTES);
+
+            }
         }
     }
 
