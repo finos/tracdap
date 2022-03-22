@@ -35,6 +35,8 @@ dependencies {
     implementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: "$junit_version"
     implementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: "$junit_version"
 
+    implementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
+
     // Tests need the ability to spin up instances of the TRAC services to test against
 
     api project(':tracdap-svc-meta')
@@ -49,7 +51,6 @@ dependencies {
     // Some runtime classes need to be explicit on the test project classpath
     testImplementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
     testImplementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: "$jackson_version"
-    testImplementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
 }
 
 

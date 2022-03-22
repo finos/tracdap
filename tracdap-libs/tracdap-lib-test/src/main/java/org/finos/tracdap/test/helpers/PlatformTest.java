@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.test.e2e;
+package org.finos.tracdap.test.helpers;
 
 import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
@@ -29,7 +29,6 @@ import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
 import org.finos.tracdap.test.config.ConfigHelpers;
-import org.finos.tracdap.test.helpers.ServiceHelpers;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NettyChannelBuilder;
 import org.junit.jupiter.api.BeforeAll;
@@ -228,7 +227,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             proc.waitFor(10, TimeUnit.SECONDS);
 
             var procResult = proc.getInputStream().readAllBytes();
-            return new String(procResult, StandardCharsets.UTF_8).strip();
+            var origin = new String(procResult, StandardCharsets.UTF_8).strip();
+
+            log.info("Using Git origin: {}", origin);
+
+            return origin;
         }
         finally {
             proc.destroy();

@@ -20,6 +20,7 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.test.helpers.PlatformTest;
 
 import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.*;
