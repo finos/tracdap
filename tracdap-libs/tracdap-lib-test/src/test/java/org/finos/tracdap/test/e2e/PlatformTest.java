@@ -32,28 +32,30 @@ import org.finos.tracdap.test.config.ConfigHelpers;
 import org.finos.tracdap.test.helpers.ServiceHelpers;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NettyChannelBuilder;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.extension.AfterAllCallback;
+import org.junit.jupiter.api.extension.BeforeAllCallback;
+import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-public class PlatformTestBase {
 
-    public static final String TRAC_UNIT_CONFIG = "config/trac-e2e.yaml";
+public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
+
     public static final String TRAC_EXEC_DIR = "TRAC_EXEC_DIR";
-    public static final String TEST_TENANT = "ACME_CORP";
 
     private static final boolean IS_WINDOWS = System.getProperty("os.name").toLowerCase().contains("windows");
     private static final String PYTHON_EXE = IS_WINDOWS ? "python.exe" : "python";
@@ -61,72 +63,140 @@ public class PlatformTestBase {
     private static final String VENV_ENV_VAR = "VIRTUAL_ENV";
     private static final String TRAC_RUNTIME_DIST_DIR = "tracdap-runtime/python/build/dist";
 
-    protected static final Logger log = LoggerFactory.getLogger(PlatformTestBase.class);
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
-    static Path tracRepoDir;
+    private final String testConfig;
+    private final String testTenant;
+    private final boolean startMeta;
+    private final boolean startData;
+    private final boolean startOrch;
 
-    @TempDir
-    static Path tracDir;
-    static Path tracExecDir;
-    static String currentOrigin;
-    static URL platformConfigUrl;
-    static String keystoreKey;
-    static PlatformConfig platformConfig;
+    private PlatformTest(
+            String testConfig, String testTenant,
+            boolean startMeta, boolean startData, boolean startOrch) {
 
-    static TracMetadataService metaSvc;
-    static TracDataService dataSvc;
-    static TracOrchestratorService orchSvc;
+        this.testConfig = testConfig;
+        this.testTenant = testTenant;
+        this.startMeta = startMeta;
+        this.startData = startData;
+        this.startOrch = startOrch;
+    }
 
-    ManagedChannel metaChannel;
-    ManagedChannel dataChannel;
-    ManagedChannel orchChannel;
+    public static Builder forConfig(String testConfig) {
+        var builder = new Builder();
+        builder.testConfig = testConfig;
+        return builder;
+    }
 
-    TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClient;
-    TracDataApiGrpc.TracDataApiBlockingStub dataClient;
-    TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClient;
+    public static class Builder {
+
+        private String testConfig;
+        private String testTenant;
+        private boolean startMeta;
+        private boolean startData;
+        private boolean startOrch;
+
+        public Builder testTenant(String testTenant) { this.testTenant = testTenant; return this;}
+        public Builder startMeta() { startMeta = true; return this; }
+        public Builder startData() { startData = true; return this; }
+        public Builder startOrch() { startOrch = true; return this; }
+        public Builder startAll() { return startMeta().startData().startOrch(); }
+
+        public PlatformTest build() {
+            return new PlatformTest(testConfig, testTenant, startMeta, startData, startOrch);
+        }
+    }
+
+    private static Path tracDir;
+    private Path tracExecDir;
+    private Path tracRepoDir;
+    private URL platformConfigUrl;
+    private String keystoreKey;
+    private PlatformConfig platformConfig;
+
+    private TracMetadataService metaSvc;
+    private TracDataService dataSvc;
+    private TracOrchestratorService orchSvc;
+
+    private ManagedChannel metaChannel;
+    private ManagedChannel dataChannel;
+    private ManagedChannel orchChannel;
+
+    public TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClientBlocking() {
+        return TracMetadataApiGrpc.newBlockingStub(metaChannel);
+    }
+
+    public TracDataApiGrpc.TracDataApiBlockingStub dataClientBlocking() {
+        return TracDataApiGrpc.newBlockingStub(dataChannel);
+    }
+
+    public TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClientBlocking() {
+        return TracOrchestratorApiGrpc.newBlockingStub(orchChannel);
+    }
+
+    public Path tracRepoDir() {
+        return tracRepoDir;
+    }
 
     @BeforeAll
-    static void setupClass() throws Exception {
+    static void getTempDir(@TempDir Path tempDir) {
+        tracDir = tempDir;
+    }
 
-        tracRepoDir = Paths.get(".").toAbsolutePath();
+    @Override
+    public void beforeAll(ExtensionContext context) throws Exception {
 
-        while (!Files.exists(tracRepoDir.resolve("tracdap-api")))
-            tracRepoDir = tracRepoDir.getParent();
-
+        findDirectories();
         prepareConfig();
         prepareDatabase();
         preparePlugins();
 
         startServices();
-    }
-
-    @AfterAll
-    static void tearDownClass() {
-
-        stopServices();
-    }
-
-    @BeforeEach
-    void setup() {
-
         startClients();
     }
 
-    @AfterEach
-    void tearDown() throws Exception {
+    @Override
+    public void afterAll(ExtensionContext context) throws Exception {
 
         stopClients();
+        stopServices();
+
+        cleanupDirectories();
     }
 
-    static void prepareConfig() throws Exception {
+    void findDirectories() throws Exception {
 
-        log.info("Prepare config for platform testing...");
+        tracDir = Files.createTempDirectory("trac_platform_test_");
 
         tracExecDir = System.getenv().containsKey(TRAC_EXEC_DIR)
                 ? Paths.get(System.getenv(TRAC_EXEC_DIR))
                 : tracDir;
 
-        currentOrigin = getCurrentOrigin();
+        tracRepoDir = Paths.get(".").toAbsolutePath();
+
+        while (!Files.exists(tracRepoDir.resolve("tracdap-api")))
+            tracRepoDir = tracRepoDir.getParent();
+    }
+
+    void cleanupDirectories() {
+
+        try (var walk = Files.walk(tracDir)) {
+
+            walk.sorted(Comparator.reverseOrder())
+                    .map(Path::toFile)
+                    .forEach(File::delete);
+        }
+        catch (IOException e) {
+
+            log.warn("Failed to clean up test files: " + e.getMessage(), e);
+        }
+    }
+
+    void prepareConfig() throws Exception {
+
+        log.info("Prepare config for platform testing...");
+
+        String currentOrigin = getCurrentOrigin();
 
         var substitutions = Map.of(
                 "${TRAC_DIR}", tracDir.toString().replace("\\", "\\\\"),
@@ -134,7 +204,7 @@ public class PlatformTestBase {
                 "${CURRENT_ORIGIN}", currentOrigin);
 
         platformConfigUrl = ConfigHelpers.prepareConfig(
-                TRAC_UNIT_CONFIG, tracDir,
+                testConfig, tracDir,
                 substitutions);
 
         keystoreKey = "";  // not yet used
@@ -147,7 +217,7 @@ public class PlatformTestBase {
         platformConfig = config.loadRootConfigObject(PlatformConfig.class);
     }
 
-    private static String getCurrentOrigin() throws Exception {
+    String getCurrentOrigin() throws Exception {
 
         var pb = new ProcessBuilder();
         pb.command("git", "config", "--get", "remote.origin.url");
@@ -165,20 +235,20 @@ public class PlatformTestBase {
         }
     }
 
-    static void prepareDatabase() {
+    void prepareDatabase() {
 
         log.info("Deploy database schema...");
 
         var databaseTasks = List.of(
                 StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK_NAME, "", ""),
-                StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, TEST_TENANT, ""));
+                StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, testTenant, ""));
 
         ServiceHelpers.runDbDeploy(tracDir, platformConfigUrl, keystoreKey, databaseTasks);
     }
 
-    static void preparePlugins() throws Exception {
+    void preparePlugins() throws Exception {
 
-        // TODO: Replace this with extensions, to run E2E tests over different backend configurations
+        // TODO: Allow running whole-platform tests over different backend configurations
 
         Files.createDirectory(tracDir.resolve("unit_test_storage"));
 
@@ -224,14 +294,19 @@ public class PlatformTestBase {
         }
     }
 
-    static void startServices() {
+    void startServices() {
 
-        metaSvc = ServiceHelpers.startService(TracMetadataService.class, tracDir, platformConfigUrl, keystoreKey);
-        dataSvc = ServiceHelpers.startService(TracDataService.class, tracDir, platformConfigUrl, keystoreKey);
-        orchSvc = ServiceHelpers.startService(TracOrchestratorService.class, tracDir, platformConfigUrl, keystoreKey);
+        if (startMeta)
+            metaSvc = ServiceHelpers.startService(TracMetadataService.class, tracDir, platformConfigUrl, keystoreKey);
+
+        if (startData)
+            dataSvc = ServiceHelpers.startService(TracDataService.class, tracDir, platformConfigUrl, keystoreKey);
+
+        if (startOrch)
+            orchSvc = ServiceHelpers.startService(TracOrchestratorService.class, tracDir, platformConfigUrl, keystoreKey);
     }
 
-    static void stopServices() {
+    void stopServices() {
 
         if (orchSvc != null)
             orchSvc.stop();
@@ -245,23 +320,29 @@ public class PlatformTestBase {
 
     void startClients() {
 
-        metaChannel = channelForInstance(platformConfig.getInstances().getMeta(0));
-        dataChannel = channelForInstance(platformConfig.getInstances().getData(0));
-        orchChannel = channelForInstance(platformConfig.getInstances().getOrch(0));
+        if (startMeta)
+            metaChannel = channelForInstance(platformConfig.getInstances().getMeta(0));
 
-        metaClient = TracMetadataApiGrpc.newBlockingStub(metaChannel);
-        dataClient = TracDataApiGrpc.newBlockingStub(dataChannel);
-        orchClient = TracOrchestratorApiGrpc.newBlockingStub(orchChannel);
+        if (startData)
+            dataChannel = channelForInstance(platformConfig.getInstances().getData(0));
+
+        if (startOrch)
+            orchChannel = channelForInstance(platformConfig.getInstances().getOrch(0));
     }
 
     void stopClients() throws Exception {
 
-        orchChannel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
-        dataChannel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
-        metaChannel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
+        if (orchChannel != null)
+            orchChannel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
+
+        if (dataChannel != null)
+            dataChannel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
+
+        if (metaChannel != null)
+            metaChannel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
     }
 
-    static ManagedChannel channelForInstance(InstanceConfig instance) {
+    ManagedChannel channelForInstance(InstanceConfig instance) {
 
         var builder = NettyChannelBuilder.forAddress(instance.getHost(), instance.getPort());
 

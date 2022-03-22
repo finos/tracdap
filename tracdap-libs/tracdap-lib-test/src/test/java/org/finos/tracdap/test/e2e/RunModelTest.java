@@ -20,9 +20,13 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
+
 import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -35,8 +39,10 @@ import java.util.stream.Collectors;
 @Tag("integration")
 @Tag("int-e2e")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class RunModelTest extends PlatformTestBase {
+public class RunModelTest {
 
+    private static final String TEST_TENANT = "ACME_CORP";
+    private static final String E2E_CONFIG = "config/trac-e2e.yaml";
     private static final String INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
 
     private static final List<JobStatusCode> COMPLETED_JOB_STATES = List.of(
@@ -44,6 +50,14 @@ public class RunModelTest extends PlatformTestBase {
             JobStatusCode.FAILED,
             JobStatusCode.CANCELLED);
 
+    @RegisterExtension
+    private static final PlatformTest platform = PlatformTest
+            .forConfig(E2E_CONFIG)
+            .testTenant(TEST_TENANT)
+            .startAll()
+            .build();
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     static TagHeader inputDataId;
     static TagHeader modelId;
@@ -53,6 +67,9 @@ public class RunModelTest extends PlatformTestBase {
     void loadInputData() throws Exception {
 
         log.info("Loading input data...");
+
+        var metaClient = platform.metaClientBlocking();
+        var dataClient = platform.dataClientBlocking();
 
         var inputSchema = SchemaDefinition.newBuilder()
                 .setSchemaType(SchemaType.TABLE)
@@ -77,7 +94,7 @@ public class RunModelTest extends PlatformTestBase {
                         .setCategorical(true)))
                 .build();
 
-        var inputPath = tracRepoDir.resolve(INPUT_PATH);
+        var inputPath = platform.tracRepoDir().resolve(INPUT_PATH);
         var inputBytes = Files.readAllBytes(inputPath);
 
         var writeRequest = DataWriteRequest.newBuilder()
@@ -114,6 +131,9 @@ public class RunModelTest extends PlatformTestBase {
     void importModel() throws Exception {
 
         log.info("Running IMPORT_MODEL job...");
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
 
         var modelVersion = getCurrentCommit();
 
@@ -214,6 +234,9 @@ public class RunModelTest extends PlatformTestBase {
     @Test @Order(3)
     void runModel() throws Exception {
 
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
         var runModel = RunModelJob.newBuilder()
                 .setModel(MetadataUtil.selectorFor(modelId))
                 .putParameters("eur_usd_rate", MetadataCodec.encodeValue(1.3785))
@@ -290,6 +313,8 @@ public class RunModelTest extends PlatformTestBase {
     void checkOutputData() {
 
         log.info("Checking output data...");
+
+        var dataClient = platform.dataClientBlocking();
 
         var EXPECTED_REGIONS = 5;  // based on the sample dataset
 
