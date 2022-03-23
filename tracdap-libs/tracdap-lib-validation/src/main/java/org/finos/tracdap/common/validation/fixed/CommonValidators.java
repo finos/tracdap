@@ -44,12 +44,12 @@ public class CommonValidators {
         var parentMsg = ctx.parentMsg();
 
         if (ctx.isOneOf() && !parentMsg.hasOneof(ctx.oneOf())) {
-            var err = String.format("A value is required for field [%s]", ctx.fieldName());
+            var err = String.format("A value is required for [%s]", ctx.fieldName());
             return ctx.error(err);
         }
 
         if (!parentMsg.hasField(ctx.field())) {
-            var err = String.format("A value is required for field [%s]", ctx.fieldName());
+            var err = String.format("A value is required for [%s]", ctx.fieldName());
             return ctx.error(err);
         }
 
@@ -58,7 +58,7 @@ public class CommonValidators {
             var str = (String) ctx.target();
 
             if (str.isEmpty()) {
-                var err = String.format("A value is required for field [%s]", ctx.fieldName());
+                var err = String.format("A value is required for [%s]", ctx.fieldName());
                 return ctx.error(err);
             }
         }
@@ -73,14 +73,14 @@ public class CommonValidators {
         if (ctx.isOneOf()) {
 
             if (parentMsg.hasOneof(ctx.oneOf())) {
-                var err = String.format("A value must not be provided for field [%s]", ctx.fieldName());
+                var err = String.format("A value must not be provided for [%s]", ctx.fieldName());
                 return ctx.error(err);
             }
         }
         else {
 
             if (parentMsg.hasField(ctx.field())) {
-                var err = String.format("A value must not be provided for field [%s]", ctx.fieldName());
+                var err = String.format("A value must not be provided for [%s]", ctx.fieldName());
                 return ctx.error(err);
             }
         }
@@ -113,7 +113,7 @@ public class CommonValidators {
             var uuid = UUID.fromString(value);
         }
         catch (IllegalArgumentException e) {
-            var err = String.format("Value of field [%s] is not a valid object ID: [%s]", ctx.fieldName(), value);
+            var err = String.format("Value of [%s] is not a valid object ID: [%s]", ctx.fieldName(), value);
             return ctx.error(err);
         }
 
@@ -135,7 +135,7 @@ public class CommonValidators {
         }
         catch (DateTimeParseException e) {
 
-            var err = String.format("Value of field [%s] is not a valid date: [%s] %s",
+            var err = String.format("Value of [%s] is not a valid date: [%s] %s",
                     ctx.fieldName(), value, e.getMessage());
 
             return ctx.error(err);
@@ -159,7 +159,7 @@ public class CommonValidators {
         }
         catch (DateTimeParseException e) {
 
-            var err = String.format("Value of field [%s] is not a valid datetime: [%s] %s",
+            var err = String.format("Value of [%s] is not a valid datetime: [%s] %s",
                     ctx.fieldName(), value, e.getMessage());
 
             return ctx.error(err);
@@ -194,7 +194,7 @@ public class CommonValidators {
         var mainType = value.substring(0, value.indexOf("/"));
 
         if (!ValidationConstants.REGISTERED_MIME_TYPES.contains(mainType)) {
-            var err = String.format("Value of field [%s] is not a registered mime type: [%s]", ctx.fieldName(), value);
+            var err = String.format("Value of [%s] is not a registered mime type: [%s]", ctx.fieldName(), value);
             return ctx.error(err);
         }
 
@@ -247,7 +247,7 @@ public class CommonValidators {
         var matcher = regex.matcher(value);
 
         if (matcher.matches() ^ invertMatch) {
-            var err = String.format("Value of field [%s] %s: [%s]", ctx.fieldName(), desc, value);
+            var err = String.format("Value of [%s] %s: [%s]", ctx.fieldName(), desc, value);
             return ctx.error(err);
         }
 
@@ -283,7 +283,7 @@ public class CommonValidators {
         }
 
         if (negative) {
-            var err = String.format("Value of field [%s] cannot be negative: [%s]", ctx.fieldName(), value);
+            var err = String.format("Value of [%s] cannot be negative: [%s]", ctx.fieldName(), value);
             return ctx.error(err);
         }
 
@@ -329,7 +329,7 @@ public class CommonValidators {
         }
 
         if (!positive) {
-            var err = String.format("Value of field [%s] must be positive: [%s]", ctx.fieldName(), value);
+            var err = String.format("Value of [%s] must be positive: [%s]", ctx.fieldName(), value);
             return ctx.error(err);
         }
 
