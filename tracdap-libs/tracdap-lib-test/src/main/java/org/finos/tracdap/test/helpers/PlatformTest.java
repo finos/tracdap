@@ -67,16 +67,18 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     private final String testConfig;
     private final List<String> tenants;
+    private final boolean runDbDeploy;
     private final boolean startMeta;
     private final boolean startData;
     private final boolean startOrch;
 
     private PlatformTest(
-            String testConfig, List<String> tenants,
+            String testConfig, List<String> tenants, boolean runDbDeploy,
             boolean startMeta, boolean startData, boolean startOrch) {
 
         this.testConfig = testConfig;
         this.tenants = tenants;
+        this.runDbDeploy = runDbDeploy;
         this.startMeta = startMeta;
         this.startData = startData;
         this.startOrch = startOrch;
@@ -92,18 +94,23 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         private final List<String> tenants = new ArrayList<>();
         private String testConfig;
+        private boolean runDbDeploy = true;  // Run DB deploy by default
         private boolean startMeta;
         private boolean startData;
         private boolean startOrch;
 
-        public Builder addTenant(String testTenant) { this.tenants.add(testTenant); return this;}
+        public Builder addTenant(String testTenant) { this.tenants.add(testTenant); return this; }
+        public Builder runDbDeploy(boolean runDbDeploy) { this.runDbDeploy = runDbDeploy; return this; }
         public Builder startMeta() { startMeta = true; return this; }
         public Builder startData() { startData = true; return this; }
         public Builder startOrch() { startOrch = true; return this; }
         public Builder startAll() { return startMeta().startData().startOrch(); }
 
         public PlatformTest build() {
-            return new PlatformTest(testConfig, tenants, startMeta, startData, startOrch);
+
+            return new PlatformTest(
+                    testConfig, tenants, runDbDeploy,
+                    startMeta, startData, startOrch);
         }
     }
 
@@ -160,8 +167,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         findDirectories();
         prepareConfig();
-        prepareDatabase();
         preparePlugins();
+
+        if (runDbDeploy)
+            prepareDatabase();
 
         startServices();
         startClients();
