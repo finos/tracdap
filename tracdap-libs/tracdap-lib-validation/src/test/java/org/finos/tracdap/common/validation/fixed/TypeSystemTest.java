@@ -18,6 +18,7 @@ package org.finos.tracdap.common.validation.fixed;
 
 import com.google.protobuf.Message;
 import org.finos.tracdap.common.exception.EInputValidation;
+import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
@@ -27,6 +28,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
 
 class TypeSystemTest {
@@ -170,7 +174,7 @@ class TypeSystemTest {
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
             names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
-    void value_primitive(BasicType basicType) {
+    void primitive_typeExplicit(BasicType basicType) {
 
         // Basic primitive values
 
@@ -181,7 +185,7 @@ class TypeSystemTest {
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
             names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
-    void value_primitiveTypeInferred(BasicType basicType) {
+    void primitive_typeInferred(BasicType basicType) {
 
         // If a primitive value is supplied, type can be omitted and will be inferred
 
@@ -194,7 +198,7 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_primitiveTypeMismatch() {
+    void primitive_typeMismatch() {
 
         // if value and type are both supplied, they must match
 
@@ -209,7 +213,7 @@ class TypeSystemTest {
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
             names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
-    void value_nullPrimitive(BasicType basicType) {
+    void primitive_null(BasicType basicType) {
 
         // All primitive type values can be set to null, so long as a type descriptor is supplied
 
@@ -221,18 +225,85 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_nullWithoutType() {
+    void date_valid() {
 
-        // Values with no type or explicit value are not allowed
-        // Because the type cannot be inferred
+        var value = TestData.randomPrimitive(BasicType.DATE);
 
-        var value = Value.newBuilder().build();
-
-        expectInvalid(value);
+        expectValid(value);
     }
 
     @Test
-    void value_arrayTypeExplicit() {
+    void date_invalid() {
+
+        var value1 = Value.newBuilder()
+                .setType(TypeSystem.descriptor(BasicType.DATE))
+                .setDateValue(DateValue.newBuilder().setIsoDate("not_a_valid_date"))
+                .build();
+
+        expectInvalid(value1);
+
+        var value2 = Value.newBuilder()
+                .setType(TypeSystem.descriptor(BasicType.DATE))
+                .setDateValue(DateValue.newBuilder())   // missing ISO date
+                .build();
+
+        expectInvalid(value2);
+    }
+
+    @Test
+    void datetime_valid() {
+
+        var value = TestData.randomPrimitive(BasicType.DATETIME);
+
+        expectValid(value);
+    }
+
+    @Test
+    void datetime_invalid() {
+
+        var value1 = Value.newBuilder()
+                .setType(TypeSystem.descriptor(BasicType.DATETIME))
+                .setDatetimeValue(DatetimeValue.newBuilder().setIsoDatetime("not_a_valid_datetime"))
+                .build();
+
+        expectInvalid(value1);
+
+        var value2 = Value.newBuilder()
+                .setType(TypeSystem.descriptor(BasicType.DATETIME))
+                .setDatetimeValue(DatetimeValue.newBuilder())  // missing ISO datetime
+                .build();
+
+        expectInvalid(value2);
+    }
+
+    @Test
+    void decimal_valid() {
+
+        var value = TestData.randomPrimitive(BasicType.DECIMAL);
+
+        expectValid(value);
+    }
+
+    @Test
+    void decimal_invalid() {
+
+        var value1 = Value.newBuilder()
+                .setType(TypeSystem.descriptor(BasicType.DECIMAL))
+                .setDecimalValue(DecimalValue.newBuilder().setDecimal("not_a_valid_decimal"))
+                .build();
+
+        expectInvalid(value1);
+
+        var value2 = Value.newBuilder()
+                .setType(TypeSystem.descriptor(BasicType.DECIMAL))
+                .setDecimalValue(DecimalValue.newBuilder())  // missing decimal string
+                .build();
+
+        expectInvalid(value2);
+    }
+
+    @Test
+    void array_TypeExplicit() {
 
         // Array items with explicit types in each item
 
@@ -259,7 +330,7 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_arrayTypeInferred() {
+    void array_TypeInferred() {
 
         // Array with one type descriptor, type is inferred for individual items
 
@@ -282,7 +353,7 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_arrayNested() {
+    void array_nested() {
 
         // Nested array with one type descriptor, type is inferred for individual items
 
@@ -314,33 +385,28 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_arrayCanIncludeNull() {
-
-        // An array can contain null values
+    void array_itemInvalid() {
 
         var type = TypeDescriptor.newBuilder()
                 .setBasicType(BasicType.ARRAY)
-                .setArrayType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING))
+                .setArrayType(TypeDescriptor.newBuilder().setBasicType(BasicType.DECIMAL))
                 .build();
 
         var array = ArrayValue.newBuilder();
-        array.addItems(Value.newBuilder().setStringValue("array_value_1"));
-        // null value with explicit type
-        array.addItems(Value.newBuilder().setType(TypeSystem.descriptor(BasicType.STRING)));
-        // null value with inferred type
-        array.addItems(Value.newBuilder());
-        array.addItems(Value.newBuilder().setStringValue("array_value_4"));
+        array.addItems(MetadataCodec.encodeValue(BigDecimal.ONE));
+        array.addItems(MetadataCodec.encodeValue(BigDecimal.valueOf(3.4567)));
+        array.addItems(Value.newBuilder().setDecimalValue(DecimalValue.newBuilder().setDecimal("invalid_decimal")));
 
         var value = Value.newBuilder()
                 .setType(type)
                 .setArrayValue(array)
                 .build();
 
-        expectValid(value);
+        expectInvalid(value);
     }
 
     @Test
-    void value_arrayItemWrongType() {
+    void array_itemWrongType() {
 
         // An array can contain null values
 
@@ -379,7 +445,33 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_arrayIsNull() {
+    void array_canIncludeNull() {
+
+        // An array can contain null values
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.ARRAY)
+                .setArrayType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING))
+                .build();
+
+        var array = ArrayValue.newBuilder();
+        array.addItems(Value.newBuilder().setStringValue("array_value_1"));
+        // null value with explicit type
+        array.addItems(Value.newBuilder().setType(TypeSystem.descriptor(BasicType.STRING)));
+        // null value with inferred type
+        array.addItems(Value.newBuilder());
+        array.addItems(Value.newBuilder().setStringValue("array_value_4"));
+
+        var value = Value.newBuilder()
+                .setType(type)
+                .setArrayValue(array)
+                .build();
+
+        expectValid(value);
+    }
+
+    @Test
+    void array_isNull() {
 
         // An array cannot itself be null - an ArrayValue must be provided, even if it has zero elements
 
@@ -396,7 +488,7 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_arrayIsEmpty() {
+    void array_isEmpty() {
 
         // Empty arrays are allowed
 
@@ -414,7 +506,7 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_mapTypeExplicit() {
+    void map_typeExplicit() {
 
         // Map entries with explicit types in each item
 
@@ -441,7 +533,7 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_mapTypeInferred() {
+    void map_typeInferred() {
 
         // Map with one type descriptor, type is inferred for individual entries
 
@@ -467,9 +559,8 @@ class TypeSystemTest {
         expectValid(value);
     }
 
-
     @Test
-    void value_mapNested() {
+    void map_nested() {
 
         // Nested map with one type descriptor, type is inferred for individual entries
 
@@ -501,7 +592,28 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_mapEntryWrongType() {
+    void map_entryInvalid() {
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .setMapType(TypeDescriptor.newBuilder().setBasicType(BasicType.DATE))
+                .build();
+
+        var map = MapValue.newBuilder();
+        map.putEntries("key_1", MetadataCodec.encodeValue(LocalDate.now()));
+        map.putEntries("key_2", MetadataCodec.encodeValue(LocalDate.now().plusDays(1)));
+        map.putEntries("key_3", Value.newBuilder().setDateValue(DateValue.newBuilder().setIsoDate("not_a_valid_date")).build());
+
+        var value = Value.newBuilder()
+                .setType(type)
+                .setMapValue(map)
+                .build();
+
+        expectInvalid(value);
+    }
+
+    @Test
+    void map_entryWrongType() {
 
         // An array can contain null values
 
@@ -540,7 +652,7 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_mapCanIncludeNull() {
+    void map_canIncludeNull() {
 
         // A map can contain null values
 
@@ -566,7 +678,7 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_mapIsNull() {
+    void map_isNull() {
 
         // A map cannot itself be null - MapValue must be provided, even if it has zero elements
 
@@ -583,7 +695,7 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_mapIsEmpty() {
+    void map_isEmpty() {
 
         // Empty maps are allowed
 
@@ -598,5 +710,101 @@ class TypeSystemTest {
                 .build();
 
         expectValid(value);
+    }
+
+    @Test
+    void value_nestingValid() {
+
+        var validDate = MetadataCodec.encodeDate(LocalDate.now());
+        var validValue = Value.newBuilder().setDateValue(validDate);
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .setMapType(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.ARRAY)
+                .setArrayType(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.ARRAY)
+                .setArrayType(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.ARRAY)
+                .setArrayType(TypeDescriptor.newBuilder().setBasicType(BasicType.DATE)))))
+                .build();
+
+        var level1 = Value.newBuilder().setArrayValue(ArrayValue.newBuilder().addItems(validValue));
+        var level2 = Value.newBuilder().setArrayValue(ArrayValue.newBuilder().addItems(level1));
+        var level3 = Value.newBuilder().setArrayValue(ArrayValue.newBuilder().addItems(level2));
+        var level4 = Value.newBuilder().setMapValue(MapValue.newBuilder().putEntries("map_key", level3.build()));
+
+        var value = level4.setType(type).build();
+
+        expectValid(value);
+    }
+
+    @Test
+    void value_nestingInvalid1() {
+
+        // Type descriptor does not match value type after four levels of nesting
+
+        var validDate = MetadataCodec.encodeDate(LocalDate.now());
+        var validValue = Value.newBuilder().setDateValue(validDate);
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .setMapType(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.ARRAY)
+                .setArrayType(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.ARRAY)
+                .setArrayType(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.ARRAY)
+                .setArrayType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING)))))
+                .build();
+
+        var level1 = Value.newBuilder().setArrayValue(ArrayValue.newBuilder().addItems(validValue));
+        var level2 = Value.newBuilder().setArrayValue(ArrayValue.newBuilder().addItems(level1));
+        var level3 = Value.newBuilder().setArrayValue(ArrayValue.newBuilder().addItems(level2));
+        var level4 = Value.newBuilder().setMapValue(MapValue.newBuilder().putEntries("map_key", level3.build()));
+
+        var value = level4.setType(type).build();
+
+        expectInvalid(value);
+    }
+
+    @Test
+    void value_nestingInvalid2() {
+
+        // Type matches, but value is invalid after four levels of nesting
+
+        var invalidDate = DateValue.newBuilder().setIsoDate("not_a_valid_date");
+        var invalidValue = Value.newBuilder().setDateValue(invalidDate);
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .setMapType(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.ARRAY)
+                .setArrayType(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.ARRAY)
+                .setArrayType(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.ARRAY)
+                .setArrayType(TypeDescriptor.newBuilder().setBasicType(BasicType.DATE)))))
+                .build();
+
+        var level1 = Value.newBuilder().setArrayValue(ArrayValue.newBuilder().addItems(invalidValue));
+        var level2 = Value.newBuilder().setArrayValue(ArrayValue.newBuilder().addItems(level1));
+        var level3 = Value.newBuilder().setArrayValue(ArrayValue.newBuilder().addItems(level2));
+        var level4 = Value.newBuilder().setMapValue(MapValue.newBuilder().putEntries("map_key", level3.build()));
+
+        var value = level4.setType(type).build();
+
+        expectInvalid(value);
+    }
+
+    @Test
+    void value_nullWithoutType() {
+
+        // Values with no type or explicit value are not allowed
+        // Because the type cannot be inferred
+
+        var value = Value.newBuilder().build();
+
+        expectInvalid(value);
     }
 }
