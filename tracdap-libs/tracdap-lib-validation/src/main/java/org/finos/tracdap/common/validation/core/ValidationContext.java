@@ -351,6 +351,35 @@ public class ValidationContext {
         return resultCtx;
     }
 
+    public <TMsg extends Message, U>
+    ValidationContext applyListWith(ValidationFunction.TypedArg<TMsg, U> validator, Class<TMsg> msgClass, U arg) {
+
+        if (done())
+            return this;
+
+        var loc = location.peek();
+
+        if (!loc.field().isRepeated() || loc.field().isMapField())
+            throw new EUnexpected();
+
+        var list = (List<?>) loc.target();
+
+        if (list == null)
+            throw new EUnexpected();
+
+        var resultCtx = this;
+
+        for (var i = 0; i < list.size(); i++) {
+
+            resultCtx = resultCtx
+                    .pushList(i)
+                    .applyWith(validator, msgClass, arg)
+                    .pop();
+        }
+
+        return resultCtx;
+    }
+
     public ValidationContext skip() {
 
         var loc = location.peek();
