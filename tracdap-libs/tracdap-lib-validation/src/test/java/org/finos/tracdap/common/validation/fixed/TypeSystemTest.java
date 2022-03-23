@@ -471,6 +471,20 @@ class TypeSystemTest {
     }
 
     @Test
+    void array_noTypeInfo() {
+
+        var array = ArrayValue.newBuilder();
+        array.addItems(Value.newBuilder().setStringValue("array_value_1"));
+        array.addItems(Value.newBuilder().setStringValue("array_value_2"));
+
+        var value = Value.newBuilder()
+                .setArrayValue(array)
+                .build();
+
+        expectInvalid(value);
+    }
+
+    @Test
     void array_isNull() {
 
         // An array cannot itself be null - an ArrayValue must be provided, even if it has zero elements
@@ -675,6 +689,20 @@ class TypeSystemTest {
                 .build();
 
         expectValid(value);
+    }
+
+    @Test
+    void map_noTypeInfo() {
+
+        var map = MapValue.newBuilder();
+        map.putEntries("key_1", Value.newBuilder().setStringValue("map_value_1").build());
+        map.putEntries("key_2", Value.newBuilder().setStringValue("map_value_2").build());
+
+        var value = Value.newBuilder()
+                .setMapValue(map)
+                .build();
+
+        expectInvalid(value);
     }
 
     @Test
