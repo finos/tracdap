@@ -19,94 +19,70 @@ package org.finos.tracdap.svc.meta.api;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
-import org.finos.tracdap.svc.meta.dal.IMetadataDal;
-import org.finos.tracdap.svc.meta.services.MetadataReadService;
-import org.finos.tracdap.svc.meta.services.MetadataSearchService;
-import org.finos.tracdap.svc.meta.services.MetadataWriteService;
-
-import org.finos.tracdap.test.meta.JdbcIntegration;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
-import io.grpc.inprocess.InProcessChannelBuilder;
-import io.grpc.inprocess.InProcessServerBuilder;
-import io.grpc.testing.GrpcCleanupRule;
-
-import java.util.UUID;
-import java.util.function.Function;
-
-import org.finos.tracdap.test.meta.IDalTestable;
-import org.finos.tracdap.test.meta.JdbcUnit;
+import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.meta.TestData;
 
-import org.junit.Rule;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+
+import java.util.UUID;
+import java.util.function.Function;
 
 import static org.finos.tracdap.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 
-abstract class MetadataWriteApiTest implements IDalTestable {
+abstract class MetadataWriteApiTest {
 
-    private IMetadataDal dal;
+    public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
+    public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
 
-    public void setDal(IMetadataDal dal) {
-        this.dal = dal;
-    }
+    protected TracMetadataApiGrpc.TracMetadataApiBlockingStub readApi, publicApi;
+    protected TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub trustedApi;
 
     // Include this test case as a unit test
-    @ExtendWith(JdbcUnit.class)
-    static class UnitTest extends MetadataWriteApiTest {}
+    static class UnitTest extends MetadataWriteApiTest {
+
+        @RegisterExtension
+        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+                .addTenant(TEST_TENANT)
+                .startMeta()
+                .build();
+
+        @BeforeEach
+        void setup() {
+            readApi = publicApi = platform.metaClientBlocking();
+            trustedApi = platform.metaClientTrustedBlocking();
+        }
+    }
 
     // Include this test case for integration against different database backends
     @org.junit.jupiter.api.Tag("integration")
     @org.junit.jupiter.api.Tag("int-metadb")
-    @ExtendWith(JdbcIntegration.class)
-    static class IntegrationTest extends MetadataWriteApiTest {}
+    static class IntegrationTest extends MetadataWriteApiTest {
 
-    @Rule
-    final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
+        private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
 
-    private TracMetadataApiGrpc.TracMetadataApiBlockingStub publicApi;
-    private TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub trustedApi;
-    private TracMetadataApiGrpc.TracMetadataApiBlockingStub readApi;
+        @RegisterExtension
+        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+                .addTenant(TEST_TENANT)
+                .runDbDeploy(false)
+                .startMeta()
+                .build();
 
-    @BeforeEach
-    void setup() throws Exception {
-
-        var serverName = InProcessServerBuilder.generateName();
-
-        var readService = new MetadataReadService(dal);
-        var writeService = new MetadataWriteService(dal);
-        var searchService = new MetadataSearchService(dal);
-
-        var publicApiImpl = new TracMetadataApi(readService, writeService, searchService);
-        var trustedApiImpl = new TrustedMetadataApi(readService, writeService, searchService);
-
-        // Create a server, add service, start, and register for automatic graceful shutdown.
-        grpcCleanup.register(InProcessServerBuilder
-                .forName(serverName)
-                .directExecutor()
-                .addService(publicApiImpl)
-                .addService(trustedApiImpl)
-                .build()
-                .start());
-
-        trustedApi = TrustedMetadataApiGrpc.newBlockingStub(
-                // Create a client channel and register for automatic graceful shutdown.
-                grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
-
-        publicApi = TracMetadataApiGrpc.newBlockingStub(
-                // Create a client channel and register for automatic graceful shutdown.
-                grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
-
-        readApi = publicApi;
+        @BeforeEach
+        void setup() {
+            readApi = publicApi = platform.metaClientBlocking();
+            trustedApi = platform.metaClientTrustedBlocking();
+        }
     }
-
 
     // -----------------------------------------------------------------------------------------------------------------
     // CREATE OBJECT
