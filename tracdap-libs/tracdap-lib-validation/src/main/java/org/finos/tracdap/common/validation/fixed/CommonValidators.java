@@ -29,7 +29,9 @@ import com.google.protobuf.Descriptors;
 import com.google.protobuf.ProtocolMessageEnum;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.text.ParseException;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -106,6 +108,17 @@ public class CommonValidators {
         return ctx;
     }
 
+    static <T> ValidationFunction.Typed<T> equalTo(T other, String errorMessage) {
+
+        return (value, ctx) -> {
+
+            if (!value.equals(other))
+                ctx.error(errorMessage);
+
+            return ctx;
+        };
+    }
+
     static ValidationContext uuid(String value, ValidationContext ctx) {
 
         try {
@@ -120,6 +133,26 @@ public class CommonValidators {
         return ctx;
     }
 
+    static ValidationContext decimal(String value, ValidationContext ctx) {
+
+        if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
+            throw new EUnexpected();
+
+        try {
+
+            MetadataCodec.DECIMAL_FORMAT.parse(value);
+
+            return ctx;
+        }
+        catch (ParseException e) {
+
+            var err = String.format("Value of [%s] is not a valid decimal: [%s] %s",
+                    ctx.fieldName(), value, e.getMessage());
+
+            return ctx.error(err);
+        }
+    }
+
     static ValidationContext isoDate(String value, ValidationContext ctx) {
 
         if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
@@ -127,9 +160,7 @@ public class CommonValidators {
 
         try {
 
-            MetadataCodec.ISO_DATE_FORMAT.parseBest(value,
-                    OffsetDateTime::from,
-                    LocalDateTime::from);
+            MetadataCodec.ISO_DATE_FORMAT.parse(value, LocalDate::from);
 
             return ctx;
         }
@@ -153,7 +184,7 @@ public class CommonValidators {
 
             MetadataCodec.ISO_DATETIME_INPUT_FORMAT.parseBest(value,
                     OffsetDateTime::from,
-                    LocalDateTime::from);
+                    Instant::from);
 
             return ctx;
         }
