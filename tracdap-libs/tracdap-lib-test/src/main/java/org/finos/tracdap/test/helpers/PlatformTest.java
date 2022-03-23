@@ -220,7 +220,12 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         log.info("Prepare config for platform testing...");
 
-        String currentOrigin = getCurrentOrigin();
+        // Git is not available in CI for tests run inside containers
+        // So, only look up the current repo if it is needed by the orchestrator
+        // To run orchestrator tests in a container, we'd need to pass the repo URL in, e.g. with an env var from CI
+        String currentOrigin = startOrch
+                ? getCurrentOrigin()
+                : "git_repo_not_configured";
 
         var substitutions = Map.of(
                 "${TRAC_DIR}", tracDir.toString().replace("\\", "\\\\"),
