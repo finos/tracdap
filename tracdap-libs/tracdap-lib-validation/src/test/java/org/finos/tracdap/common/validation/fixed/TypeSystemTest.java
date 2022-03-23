@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.validation.fixed;
 
 import com.google.protobuf.Message;
+import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.BasicType;
 import org.finos.tracdap.metadata.TypeDescriptor;
@@ -39,7 +40,14 @@ class TypeSystemTest {
 
         Assertions.assertDoesNotThrow(
                 () -> validator.validateFixedObject(msg),
-                "Validation failure for expected valid message");
+                "Validation failed for a valid message");
+    }
+
+    static <TMsg extends Message> void expectInvalid(TMsg msg) {
+
+        Assertions.assertThrows(EInputValidation.class,
+                () -> validator.validateFixedObject(msg),
+                "Validation passed for an invalid message");
     }
 
     @Test
@@ -103,6 +111,56 @@ class TypeSystemTest {
                 .setBasicType(BasicType.ARRAY)
                 .setArrayType(TypeDescriptor.newBuilder()
                 .setBasicType(BasicType.STRING)))
+                .build());
+    }
+
+    @Test
+    void typeDescriptor_noBasicType() {
+
+        expectInvalid(TypeDescriptor.newBuilder().build());
+    }
+
+    @Test
+    void typeDescriptor_badArrayType() {
+
+        expectInvalid(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.ARRAY)
+                .build());
+
+        expectInvalid(TypeDescriptor.newBuilder()
+                .setArrayType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING))
+                .build());
+
+        expectInvalid(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.STRING)
+                .setArrayType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING))
+                .build());
+
+        expectInvalid(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .setArrayType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING))
+                .build());
+    }
+
+    @Test
+    void typeDescriptor_badMapType() {
+
+        expectInvalid(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .build());
+
+        expectInvalid(TypeDescriptor.newBuilder()
+                .setMapType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING))
+                .build());
+
+        expectInvalid(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.STRING)
+                .setMapType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING))
+                .build());
+
+        expectInvalid(TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.ARRAY)
+                .setMapType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING))
                 .build());
     }
 }
