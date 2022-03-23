@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.test.meta;
 
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -26,10 +27,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
@@ -44,6 +42,9 @@ public class TestData {
     public static final boolean KEEP_ORIGINAL_TAG_VERSION = false;
 
     public static final String TEST_TENANT = "ACME_CORP";
+
+
+    private static final Random random = new Random(Instant.now().getEpochSecond());
 
 
     public static ObjectDefinition dummyDefinitionForType(ObjectType objectType) {
@@ -539,5 +540,76 @@ public class TestData {
     public static TagSelector selectorForTag(Tag tag) {
 
         return selectorForTag(tag.getHeader());
+    }
+
+    public static Value randomPrimitive(BasicType basicType) {
+
+        var typeDescriptor = TypeSystem.descriptor(basicType);
+
+        switch (basicType) {
+
+            case BOOLEAN:
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setBooleanValue(true)
+                        .build();
+
+            case INTEGER:
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setIntegerValue(random.nextLong())
+                        .build();
+
+            case FLOAT:
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setFloatValue(random.nextDouble())
+                        .build();
+
+            case DECIMAL:
+
+                var decimalValue = BigDecimal.valueOf(random.nextDouble());
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setDecimalValue(DecimalValue.newBuilder()
+                        .setDecimal(decimalValue.toPlainString()))
+                        .build();
+
+            case STRING:
+
+                var stringValue = "random_string_" + random.nextLong();
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setStringValue(stringValue)
+                        .build();
+
+            case DATE:
+
+                var dateValue = MetadataCodec.encodeDate(LocalDate.now());
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setDateValue(dateValue)
+                        .build();
+
+            case DATETIME:
+
+                var datetimeValue = MetadataCodec.encodeDatetime(Instant.now());
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setDatetimeValue(datetimeValue)
+                        .build();
+
+            default:
+
+                throw new EUnexpected();
+        }
+
     }
 }
