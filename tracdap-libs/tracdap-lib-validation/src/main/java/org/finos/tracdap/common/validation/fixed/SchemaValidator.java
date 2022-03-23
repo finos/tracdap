@@ -158,7 +158,7 @@ public class SchemaValidator {
         ctx = ctx.push(FS_FIELD_TYPE)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::recognizedEnum, BasicType.class)
-                .apply(TypeSystemValidator::primitive, BasicType.class)
+                .apply(CommonValidators::primitiveType, BasicType.class)
                 .pop();
 
         if (field.getBusinessKey() && !ALLOWED_BUSINESS_KEY_TYPES.contains(field.getFieldType())) {

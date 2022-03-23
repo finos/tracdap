@@ -19,9 +19,8 @@ package org.finos.tracdap.common.validation.fixed;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
-import org.finos.tracdap.metadata.DecimalValue;
-import org.finos.tracdap.metadata.ObjectType;
-import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.common.metadata.TypeSystem;
+import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.validation.ValidationConstants;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationFunction;
@@ -117,6 +116,36 @@ public class CommonValidators {
 
             return ctx;
         };
+    }
+
+    public static ValidationContext primitiveType(BasicType basicType, ValidationContext ctx) {
+
+        if (!TypeSystem.isPrimitive(basicType)) {
+            var err = String.format("Type specified in [%s] is not a primitive type: [%s]", ctx.fieldName(), basicType);
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext primitiveType(TypeDescriptor typeDescriptor, ValidationContext ctx) {
+
+        if (!TypeSystem.isPrimitive(typeDescriptor)) {
+            var err = String.format("Type specified in [%s] is not a primitive type: [%s]", ctx.fieldName(), typeDescriptor.getBasicType());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext primitiveValue(Value value, ValidationContext ctx) {
+
+        if (!TypeSystem.isPrimitive(value)) {
+            var err = String.format("Value [%s] is not a primitive value: [%s]", ctx.fieldName(), TypeSystem.basicType(value));
+            return ctx.error(err);
+        }
+
+        return ctx;
     }
 
     static ValidationContext uuid(String value, ValidationContext ctx) {
