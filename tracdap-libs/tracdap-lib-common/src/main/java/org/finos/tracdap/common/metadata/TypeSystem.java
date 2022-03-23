@@ -194,4 +194,9 @@ public class TypeSystem {
 
         return PRIMITIVE_TYPES.contains(basicType);
     }
+
+    public static BasicType valueCaseType(Value value) {
+
+        return VALUE_CASE_MAPPING.getOrDefault(value.getValueCase(), BasicType.UNRECOGNIZED);
+    }
 }

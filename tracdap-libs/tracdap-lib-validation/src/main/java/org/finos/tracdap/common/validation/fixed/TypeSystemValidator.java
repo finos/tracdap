@@ -23,6 +23,8 @@ import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Descriptors;
 
+import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
+
 
 @Validator(type = ValidationType.FIXED)
 public class TypeSystemValidator {
@@ -42,12 +44,22 @@ public class TypeSystemValidator {
     private static final Descriptors.FieldDescriptor V_STRING;
     private static final Descriptors.FieldDescriptor V_DATE;
     private static final Descriptors.FieldDescriptor V_DATETIME;
+    private static final Descriptors.FieldDescriptor V_ARRAY;
+    private static final Descriptors.FieldDescriptor V_MAP;
+
+    private static final Descriptors.Descriptor DECIMAL_VALUE;
+    private static final Descriptors.FieldDescriptor DCV_DECIMAL;
 
     private static final Descriptors.Descriptor DATE_VALUE;
     private static final Descriptors.FieldDescriptor DV_ISO_DATE;
 
     private static final Descriptors.Descriptor DATETIME_VALUE;
     private static final Descriptors.FieldDescriptor DTV_ISO_DATETIME;
+
+    private static final Descriptors.Descriptor ARRAY_VALUE;
+    private static final Descriptors.FieldDescriptor AV_ITEMS;
+
+
 
 
     static {
@@ -66,38 +78,21 @@ public class TypeSystemValidator {
         V_STRING = field(VALUE, Value.STRINGVALUE_FIELD_NUMBER);
         V_DATE = field(VALUE, Value.DATEVALUE_FIELD_NUMBER);
         V_DATETIME = field(VALUE, Value.DATETIMEVALUE_FIELD_NUMBER);
+        V_ARRAY = field(VALUE, Value.ARRAYVALUE_FIELD_NUMBER);
+        V_MAP = field(VALUE, Value.MAPVALUE_FIELD_NUMBER);
         V_VALUE = V_BOOLEAN.getContainingOneof();
+
+        DECIMAL_VALUE = DecimalValue.getDescriptor();
+        DCV_DECIMAL = field(DECIMAL_VALUE, DecimalValue.DECIMAL_FIELD_NUMBER);
 
         DATE_VALUE = DateValue.getDescriptor();
         DV_ISO_DATE = field(DATE_VALUE, DateValue.ISODATE_FIELD_NUMBER);
 
         DATETIME_VALUE = DatetimeValue.getDescriptor();
         DTV_ISO_DATETIME = field(DATETIME_VALUE, DatetimeValue.ISODATETIME_FIELD_NUMBER);
-    }
 
-    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
-        return msg.findFieldByNumber(fieldNo);
-    }
-
-
-    public static ValidationContext primitive(BasicType basicType, ValidationContext ctx) {
-
-        if (!TypeSystem.isPrimitive(basicType)) {
-            var err = String.format("Type specified in [%s] is not a primitive type: [%s]", ctx.fieldName(), basicType);
-            return ctx.error(err);
-        }
-
-        return ctx;
-    }
-
-    public static ValidationContext primitive(TypeDescriptor typeDescriptor, ValidationContext ctx) {
-
-        if (!TypeSystem.isPrimitive(typeDescriptor)) {
-            var err = String.format("Type specified in [%s] is not a primitive type: [%s]", ctx.fieldName(), typeDescriptor.getBasicType());
-            return ctx.error(err);
-        }
-
-        return ctx;
+        ARRAY_VALUE = ArrayValue.getDescriptor();
+        AV_ITEMS = field(ARRAY_VALUE, ArrayValue.ITEMS_FIELD_NUMBER);
     }
 
     @Validator
@@ -126,30 +121,74 @@ public class TypeSystemValidator {
         return ctx;
     }
 
+    @Validator
     public static ValidationContext value(Value value, ValidationContext ctx) {
 
-        if (!value.hasOneof(V_VALUE)) {
+        if (value.hasType())
+            return ctx.applyWith(TypeSystemValidator::value, Value.class, value.getType());
 
-            return ctx.push(V_TYPE)
-                    .apply(CommonValidators::required)
-                    .apply(TypeSystemValidator::typeDescriptor, TypeDescriptor.class)
-                    .apply(TypeSystemValidator::primitive, TypeDescriptor.class)
-                    .pop();
-        }
+        if (!value.hasOneof(V_VALUE))
+            return ctx.error(String.format("Type cannot be inferred for null value [%s]", ctx.fieldName()));
+
+        if (!TypeSystem.isPrimitive(value))
+            return ctx.error(String.format("Type cannot be inferred for non-primitive value [%s]", ctx.fieldName()));
+
+        var type = TypeSystem.descriptor(value);
+        return ctx.applyWith(TypeSystemValidator::value, Value.class, type);
+    }
+
+    public static ValidationContext value(Value value, TypeDescriptor expectedType, ValidationContext ctx) {
+
+        var wrongTypeMessage = String.format("Wrong type supplied for [%s]", ctx.fieldName());
 
         ctx = ctx.push(V_TYPE)
                 .apply(CommonValidators::optional)
                 .apply(TypeSystemValidator::typeDescriptor, TypeDescriptor.class)
+                .apply(CommonValidators.equalTo(expectedType, wrongTypeMessage), TypeDescriptor.class)
                 .pop();
 
-        // ctx = ctx.pushOneOf(V_VALUE)
+        if (TypeSystem.isPrimitive(expectedType)) {
+
+            var valueType = TypeSystem.valueCaseType(value);
+
+            ctx = ctx.pushOneOf(V_VALUE)
+                    .apply(CommonValidators::optional)
+                    .applyIf(TypeSystemValidator::decimalValue, DecimalValue.class, valueType == BasicType.DECIMAL)
+                    .applyIf(TypeSystemValidator::dateValue, DateValue.class, valueType == BasicType.DATE)
+                    .applyIf(TypeSystemValidator::datetimeValue, DatetimeValue.class, valueType == BasicType.DATETIME)
+                    .pop();
+
+            // If the value is non-null, make sure the value matches its type descriptor
+            if (value.hasOneof(V_VALUE) && valueType != expectedType.getBasicType())
+                ctx = ctx.error(wrongTypeMessage);
+
+            return ctx;
+        }
+
+        if (expectedType.getBasicType() == BasicType.ARRAY) {
+
+            var arrayType = expectedType.getArrayType();
+
+            return ctx.push(V_ARRAY)
+                    .apply(CommonValidators::required)
+                    .applyWith(TypeSystemValidator::arrayValue, ArrayValue.class, arrayType)
+                    .pop();
+        }
+
+        ctx = ctx.error("Maps not implemented yet");
 
         return ctx;
     }
 
+    public static ValidationContext decimalValue(DecimalValue msg, ValidationContext ctx) {
 
+        return ctx.push(DCV_DECIMAL)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::decimal)
+                .pop();
+    }
 
-    public static ValidationContext dateValue(DatetimeValue msg, ValidationContext ctx) {
+    public static ValidationContext dateValue(DateValue msg, ValidationContext ctx) {
 
         return ctx.push(DV_ISO_DATE)
                 .apply(CommonValidators::required)
@@ -163,6 +202,44 @@ public class TypeSystemValidator {
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::isoDatetime)
                 .pop();
+    }
+
+    public static ValidationContext arrayValue(ArrayValue msg, TypeDescriptor arrayType, ValidationContext ctx) {
+
+        return ctx.push(AV_ITEMS)
+                .applyListWith(TypeSystemValidator::value, Value.class, arrayType)
+                .pop();
+    }
+
+
+    public static ValidationContext primitive(BasicType basicType, ValidationContext ctx) {
+
+        if (!TypeSystem.isPrimitive(basicType)) {
+            var err = String.format("Type specified in [%s] is not a primitive type: [%s]", ctx.fieldName(), basicType);
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext primitive(TypeDescriptor typeDescriptor, ValidationContext ctx) {
+
+        if (!TypeSystem.isPrimitive(typeDescriptor)) {
+            var err = String.format("Type specified in [%s] is not a primitive type: [%s]", ctx.fieldName(), typeDescriptor.getBasicType());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext primitiveValue(Value value, ValidationContext ctx) {
+
+        if (!TypeSystem.isPrimitive(value)) {
+            var err = String.format("Value [%s] is not a primitive value: [%s]", ctx.fieldName(), TypeSystem.basicType(value));
+            return ctx.error(err);
+        }
+
+        return ctx;
     }
 
 
