@@ -19,6 +19,7 @@ package org.finos.tracdap.test.helpers;
 import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
+import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.startup.StandardArgs;
@@ -128,6 +129,10 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     public TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClientBlocking() {
         return TracMetadataApiGrpc.newBlockingStub(metaChannel);
+    }
+
+    public TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClientTrustedBlocking() {
+        return TrustedMetadataApiGrpc.newBlockingStub(metaChannel);
     }
 
     public TracDataApiGrpc.TracDataApiStub dataClient() {
