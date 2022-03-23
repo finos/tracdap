@@ -97,7 +97,7 @@ public class SchemaValidator {
 
         ctx = ctx.push(TS_FIELDS)
                 .apply(CommonValidators::listNotEmpty, List.class)
-                .applyList(SchemaValidator::fieldSchema, FieldSchema.class)
+                .applyRepeated(SchemaValidator::fieldSchema, FieldSchema.class)
                 .pop();
 
         // Check for duplicate field names, including duplicates with different case

@@ -112,7 +112,7 @@ public class ValidationContext {
         return this;
     }
 
-    private ValidationContext pushList(Integer index) {
+    private ValidationContext pushRepeated(Integer index) {
 
         var parentLoc = location.peek();
 
@@ -323,7 +323,7 @@ public class ValidationContext {
     }
 
     public <TMsg extends Message>
-    ValidationContext applyList(ValidationFunction.Typed<TMsg> validator, Class<TMsg> msgClass) {
+    ValidationContext applyRepeated(ValidationFunction.Typed<TMsg> validator, Class<TMsg> msgClass) {
 
         if (done())
             return this;
@@ -343,7 +343,7 @@ public class ValidationContext {
         for (var i = 0; i < list.size(); i++) {
 
             resultCtx = resultCtx
-                    .pushList(i)
+                    .pushRepeated(i)
                     .apply(validator, msgClass)
                     .pop();
         }
@@ -352,7 +352,7 @@ public class ValidationContext {
     }
 
     public <TMsg extends Message, U>
-    ValidationContext applyListWith(ValidationFunction.TypedArg<TMsg, U> validator, Class<TMsg> msgClass, U arg) {
+    ValidationContext applyRepeatedWith(ValidationFunction.TypedArg<TMsg, U> validator, Class<TMsg> msgClass, U arg) {
 
         if (done())
             return this;
@@ -372,7 +372,7 @@ public class ValidationContext {
         for (var i = 0; i < list.size(); i++) {
 
             resultCtx = resultCtx
-                    .pushList(i)
+                    .pushRepeated(i)
                     .applyWith(validator, msgClass, arg)
                     .pop();
         }

@@ -59,7 +59,8 @@ public class TypeSystemValidator {
     private static final Descriptors.Descriptor ARRAY_VALUE;
     private static final Descriptors.FieldDescriptor AV_ITEMS;
 
-
+    private static final Descriptors.Descriptor MAP_VALUE;
+    private static final Descriptors.FieldDescriptor MV_ENTRIES;
 
 
     static {
@@ -93,6 +94,9 @@ public class TypeSystemValidator {
 
         ARRAY_VALUE = ArrayValue.getDescriptor();
         AV_ITEMS = field(ARRAY_VALUE, ArrayValue.ITEMS_FIELD_NUMBER);
+
+        MAP_VALUE = MapValue.getDescriptor();
+        MV_ENTRIES = field(MAP_VALUE, MapValue.ENTRIES_FIELD_NUMBER);
     }
 
     @Validator
@@ -165,7 +169,7 @@ public class TypeSystemValidator {
             return ctx;
         }
 
-        if (expectedType.getBasicType() == BasicType.ARRAY) {
+        else if (expectedType.getBasicType() == BasicType.ARRAY) {
 
             var arrayType = expectedType.getArrayType();
 
@@ -175,7 +179,21 @@ public class TypeSystemValidator {
                     .pop();
         }
 
-        ctx = ctx.error("Maps not implemented yet");
+        else if (expectedType.getBasicType() == BasicType.MAP) {
+
+            var mapType = expectedType.getMapType();
+
+            return ctx.push(V_MAP)
+                    .apply(CommonValidators::required)
+                    .applyWith(TypeSystemValidator::mapValue, MapValue.class, mapType)
+                    .pop();
+        }
+
+        else {
+
+            var unknownTypeError = String.format("Unknown type for [%s]", ctx.fieldName());
+            ctx = ctx.error(unknownTypeError);
+        }
 
         return ctx;
     }
@@ -207,40 +225,14 @@ public class TypeSystemValidator {
     public static ValidationContext arrayValue(ArrayValue msg, TypeDescriptor arrayType, ValidationContext ctx) {
 
         return ctx.push(AV_ITEMS)
-                .applyListWith(TypeSystemValidator::value, Value.class, arrayType)
+                .applyRepeatedWith(TypeSystemValidator::value, Value.class, arrayType)
                 .pop();
     }
 
+    public static ValidationContext mapValue(MapValue msg, TypeDescriptor mapType, ValidationContext ctx) {
 
-    public static ValidationContext primitive(BasicType basicType, ValidationContext ctx) {
-
-        if (!TypeSystem.isPrimitive(basicType)) {
-            var err = String.format("Type specified in [%s] is not a primitive type: [%s]", ctx.fieldName(), basicType);
-            return ctx.error(err);
-        }
-
-        return ctx;
+        return ctx.push(MV_ENTRIES)
+                .applyRepeatedWith(TypeSystemValidator::value, Value.class, mapType)
+                .pop();
     }
-
-    public static ValidationContext primitive(TypeDescriptor typeDescriptor, ValidationContext ctx) {
-
-        if (!TypeSystem.isPrimitive(typeDescriptor)) {
-            var err = String.format("Type specified in [%s] is not a primitive type: [%s]", ctx.fieldName(), typeDescriptor.getBasicType());
-            return ctx.error(err);
-        }
-
-        return ctx;
-    }
-
-    public static ValidationContext primitiveValue(Value value, ValidationContext ctx) {
-
-        if (!TypeSystem.isPrimitive(value)) {
-            var err = String.format("Value [%s] is not a primitive value: [%s]", ctx.fieldName(), TypeSystem.basicType(value));
-            return ctx.error(err);
-        }
-
-        return ctx;
-    }
-
-
 }
