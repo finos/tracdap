@@ -329,7 +329,7 @@ class TypeSystemTest {
         array.addItems(Value.newBuilder().setType(TypeSystem.descriptor(BasicType.STRING)));
         // null value with inferred type
         array.addItems(Value.newBuilder());
-        array.addItems(Value.newBuilder().setStringValue("array_value_3"));
+        array.addItems(Value.newBuilder().setStringValue("array_value_4"));
 
         var value = Value.newBuilder()
                 .setType(type)
@@ -375,22 +375,150 @@ class TypeSystemTest {
     }
 
     @Test
-    void value_okMap() {
+    void value_mapTypeExplicit() {
 
+        // Map entries with explicit types in each item
+
+        var entryType = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.STRING)
+                .build();
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .setMapType(entryType)
+                .build();
+
+        var map = MapValue.newBuilder();
+
+        for (var i = 0; i < 10; i++)
+            map.putEntries("key_" + i, Value.newBuilder().setType(entryType).setStringValue("map_value_" + i).build());
+
+        var value = Value.newBuilder()
+                .setType(type)
+                .setMapValue(map)
+                .build();
+
+        expectValid(value);
     }
 
     @Test
-    void value_okMapNested() {
+    void value_mapTypeInferred() {
 
+        // Map with one type descriptor, type is inferred for individual entries
+
+        var entryType = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.STRING)
+                .build();
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .setMapType(entryType)
+                .build();
+
+        var map = MapValue.newBuilder();
+
+        for (var i = 0; i < 10; i++)
+            map.putEntries("key_" + i, Value.newBuilder().setStringValue("map_value_" + i).build());
+
+        var value = Value.newBuilder()
+                .setType(type)
+                .setMapValue(map)
+                .build();
+
+        expectValid(value);
+    }
+
+
+    @Test
+    void value_mapNested() {
+
+        // Nested map with one type descriptor, type is inferred for individual entries
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .setMapType(TypeDescriptor.newBuilder()
+                        .setBasicType(BasicType.MAP)
+                        .setMapType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING)))
+                .build();
+
+        var map = MapValue.newBuilder();
+
+        for (var i = 0; i < 10; i++) {
+
+            var subMap = MapValue.newBuilder();
+
+            for (var j = 0; j < 10; j++)
+                subMap.putEntries("key_" + j, Value.newBuilder().setStringValue("map_value_" + i + "_" + j).build());
+
+            map.putEntries("key_" + i, Value.newBuilder().setMapValue(subMap).build());
+        }
+
+        var value = Value.newBuilder()
+                .setType(type)
+                .setMapValue(map)
+                .build();
+
+        expectValid(value);
     }
 
     @Test
-    void value_okMapOfArray() {
+    void value_mapCanIncludeNull() {
 
+        // A map can contain null values
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .setMapType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING))
+                .build();
+
+        var map = MapValue.newBuilder();
+        map.putEntries("key_1", Value.newBuilder().setStringValue("map_value_1").build());
+        // null value with explicit type
+        map.putEntries("key_2", Value.newBuilder().setType(TypeSystem.descriptor(BasicType.STRING)).build());
+        // null value with inferred type
+        map.putEntries("key_3", Value.newBuilder().build());
+        map.putEntries("key_4", Value.newBuilder().setStringValue("map_value_4").build());
+
+        var value = Value.newBuilder()
+                .setType(type)
+                .setMapValue(map)
+                .build();
+
+        expectValid(value);
     }
 
     @Test
-    void value_okNull() {
+    void value_mapIsNull() {
 
+        // A map cannot itself be null - MapValue must be provided, even if it has zero elements
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .setMapType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING))
+                .build();
+
+        var value = Value.newBuilder()
+                .setType(type)
+                .build();
+
+        expectInvalid(value);
+    }
+
+    @Test
+    void value_mapIsEmpty() {
+
+        // Empty maps are allowed
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .setMapType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING))
+                .build();
+
+        var value = Value.newBuilder()
+                .setType(type)
+                .setMapValue(MapValue.newBuilder())
+                .build();
+
+        expectValid(value);
     }
 }
