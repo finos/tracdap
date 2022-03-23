@@ -71,7 +71,7 @@ services:
     repositories:
       UNIT_TEST_REPO:
         repoType: git
-        repoUrl: ${CURRENT_ORIGIN}
+        repoUrl: ${CURRENT_GIT_ORIGIN}
 
     executor:
       executorType: LOCAL

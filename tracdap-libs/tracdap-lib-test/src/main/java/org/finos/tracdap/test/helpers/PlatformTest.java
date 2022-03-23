@@ -223,15 +223,17 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         // Git is not available in CI for tests run inside containers
         // So, only look up the current repo if it is needed by the orchestrator
         // To run orchestrator tests in a container, we'd need to pass the repo URL in, e.g. with an env var from CI
-        String currentOrigin = startOrch
-                ? getCurrentOrigin()
+        String currentGitOrigin = startOrch
+                ? getCurrentGitOrigin()
                 : "git_repo_not_configured";
 
+        // Substitutions are used by template config files in test resources
+        // But it is harmless to apply them to fully defined config files as well
         var substitutions = Map.of(
                 "${TRAC_DIR}", tracDir.toString().replace("\\", "\\\\"),
                 "${TRAC_STORAGE_DIR}", tracStorageDir.toString().replace("\\", "\\\\"),
                 "${TRAC_EXEC_DIR}", tracExecDir.toString().replace("\\", "\\\\"),
-                "${CURRENT_ORIGIN}", currentOrigin);
+                "${CURRENT_GIT_ORIGIN}", currentGitOrigin);
 
         platformConfigUrl = ConfigHelpers.prepareConfig(
                 testConfig, tracDir,
@@ -247,7 +249,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         platformConfig = config.loadRootConfigObject(PlatformConfig.class);
     }
 
-    String getCurrentOrigin() throws Exception {
+    String getCurrentGitOrigin() throws Exception {
 
         var pb = new ProcessBuilder();
         pb.command("git", "config", "--get", "remote.origin.url");
