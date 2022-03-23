@@ -340,6 +340,45 @@ class TypeSystemTest {
     }
 
     @Test
+    void value_arrayItemWrongType() {
+
+        // An array can contain null values
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.ARRAY)
+                .setArrayType(TypeDescriptor.newBuilder().setBasicType(BasicType.INTEGER))
+                .build();
+
+        // Array with a float value, no type descriptor
+
+        var array1 = ArrayValue.newBuilder();
+        array1.addItems(Value.newBuilder().setIntegerValue(1));
+        array1.addItems(Value.newBuilder().setIntegerValue(2));
+        array1.addItems(Value.newBuilder().setFloatValue(3.0));
+
+        var value1 = Value.newBuilder()
+                .setType(type)
+                .setArrayValue(array1)
+                .build();
+
+        expectInvalid(value1);
+
+        // Array with a null float value
+
+        var array2 = ArrayValue.newBuilder();
+        array2.addItems(Value.newBuilder().setIntegerValue(1));
+        array2.addItems(Value.newBuilder().setIntegerValue(2));
+        array2.addItems(Value.newBuilder().setType(TypeSystem.descriptor(BasicType.FLOAT)));
+
+        var value2 = Value.newBuilder()
+                .setType(type)
+                .setArrayValue(array2)
+                .build();
+
+        expectInvalid(value2);
+    }
+
+    @Test
     void value_arrayIsNull() {
 
         // An array cannot itself be null - an ArrayValue must be provided, even if it has zero elements
@@ -459,6 +498,45 @@ class TypeSystemTest {
                 .build();
 
         expectValid(value);
+    }
+
+    @Test
+    void value_mapEntryWrongType() {
+
+        // An array can contain null values
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .setMapType(TypeDescriptor.newBuilder().setBasicType(BasicType.INTEGER))
+                .build();
+
+        // Map with a float value, no type descriptor
+
+        var map1 = MapValue.newBuilder();
+        map1.putEntries("key_1", Value.newBuilder().setIntegerValue(1).build());
+        map1.putEntries("key_2", Value.newBuilder().setIntegerValue(2).build());
+        map1.putEntries("key_3", Value.newBuilder().setFloatValue(3.0).build());
+
+        var value1 = Value.newBuilder()
+                .setType(type)
+                .setMapValue(map1)
+                .build();
+
+        expectInvalid(value1);
+
+        // Map with a null float value
+
+        var map2 = MapValue.newBuilder();
+        map2.putEntries("key_1", Value.newBuilder().setIntegerValue(1).build());
+        map2.putEntries("key_2", Value.newBuilder().setIntegerValue(2).build());
+        map2.putEntries("key_3", Value.newBuilder().setType(TypeSystem.descriptor(BasicType.FLOAT)).build());
+
+        var value2 = Value.newBuilder()
+                .setType(type)
+                .setMapValue(map2)
+                .build();
+
+        expectInvalid(value2);
     }
 
     @Test
