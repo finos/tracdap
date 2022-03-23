@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.test.e2e;
+package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.metadata.ImportModelJob;
+import org.finos.tracdap.metadata.RunModelJob;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import com.google.protobuf.ByteString;
