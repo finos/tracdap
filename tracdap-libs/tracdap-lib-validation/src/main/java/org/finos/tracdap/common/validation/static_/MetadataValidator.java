@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.validation.fixed;
+package org.finos.tracdap.common.validation.static_;
 
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
@@ -24,7 +24,7 @@ import org.finos.tracdap.common.validation.core.ValidationContext;
 import com.google.protobuf.Descriptors;
 
 
-@Validator(type = ValidationType.FIXED)
+@Validator(type = ValidationType.STATIC)
 public class MetadataValidator {
 
     // Rough implementation that provides only a few validation points

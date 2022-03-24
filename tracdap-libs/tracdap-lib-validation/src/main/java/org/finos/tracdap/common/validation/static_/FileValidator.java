@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.validation.fixed;
+package org.finos.tracdap.common.validation.static_;
 
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
@@ -28,7 +28,7 @@ import com.google.protobuf.Descriptors;
 import java.util.regex.Pattern;
 
 
-@Validator(type = ValidationType.FIXED)
+@Validator(type = ValidationType.STATIC)
 public class FileValidator {
 
     private static final Pattern EXT_PATTERN = Pattern.compile(".*\\.([^./\\\\]+)");

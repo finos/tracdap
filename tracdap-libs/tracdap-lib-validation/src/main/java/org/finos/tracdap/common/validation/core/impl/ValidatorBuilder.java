@@ -23,7 +23,7 @@ import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
-import org.finos.tracdap.common.validation.fixed.MetadataValidator;
+import org.finos.tracdap.common.validation.static_.MetadataValidator;
 import org.finos.tracdap.common.validation.version.SchemaVersionValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -131,10 +131,10 @@ public class ValidatorBuilder {
 
             Map.Entry<ValidationKey, ValidationFunction<?>> validator;
 
-            if (validationType == ValidationType.FIXED && methodName.isEmpty())
+            if (validationType == ValidationType.STATIC && methodName.isEmpty())
                 validator = buildObjectValidator(objectType, method);
 
-            else if (validationType == ValidationType.FIXED)
+            else if (validationType == ValidationType.STATIC)
                 validator = buildMethodValidator(serviceFile, serviceName, methodName, objectType, method);
 
             else if (validationType == ValidationType.VERSION)

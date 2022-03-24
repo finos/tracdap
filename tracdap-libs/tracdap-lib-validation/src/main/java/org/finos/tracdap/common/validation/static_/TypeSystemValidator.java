@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.validation.fixed;
+package org.finos.tracdap.common.validation.static_;
 
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.validation.core.ValidationType;
@@ -26,7 +26,7 @@ import com.google.protobuf.Descriptors;
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
 
-@Validator(type = ValidationType.FIXED)
+@Validator(type = ValidationType.STATIC)
 public class TypeSystemValidator {
 
     private static final Descriptors.Descriptor TYPE_DESCRIPTOR;

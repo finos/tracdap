@@ -34,14 +34,14 @@ public class ValidationKey implements Comparable<ValidationKey> {
 
     public static ValidationKey forObject(Descriptors.Descriptor messageType) {
 
-        return new ValidationKey(ValidationType.FIXED, messageType, null);
+        return new ValidationKey(ValidationType.STATIC, messageType, null);
     }
 
     public static ValidationKey forMethod(
             Descriptors.Descriptor messageType,
             Descriptors.MethodDescriptor method) {
 
-        return new ValidationKey(ValidationType.FIXED, messageType, method);
+        return new ValidationKey(ValidationType.STATIC, messageType, method);
     }
 
     public static ValidationKey forVersion(Descriptors.Descriptor messageType) {

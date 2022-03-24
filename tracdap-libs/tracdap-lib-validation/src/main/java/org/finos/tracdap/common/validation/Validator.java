@@ -89,7 +89,7 @@ public class Validator {
 
             switch (ctx.validationType()) {
 
-                case FIXED: throw new EInputValidation(result.failureMessage());
+                case STATIC: throw new EInputValidation(result.failureMessage());
                 case VERSION: throw new EVersionValidation(result.failureMessage());
 
                 default:

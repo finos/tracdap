@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.validation.fixed;
+package org.finos.tracdap.common.validation.static_;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.core.ValidationContext;
@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 
-@Validator(type = ValidationType.FIXED)
+@Validator(type = ValidationType.STATIC)
 public class SchemaValidator {
 
     private static final List<BasicType> ALLOWED_BUSINESS_KEY_TYPES = List.of(
