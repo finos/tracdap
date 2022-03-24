@@ -366,8 +366,8 @@ public class ValidationContextImpl implements ValidationContext {
         return apply(validator, targetClass);
     }
 
-    public <TMsg extends Message>
-    ValidationContext applyRepeated(ValidationFunction.Typed<TMsg> validator, Class<TMsg> msgClass) {
+    public <T>
+    ValidationContext applyRepeated(ValidationFunction.Typed<T> validator, Class<T> msgClass) {
 
         if (done())
             return this;
@@ -395,8 +395,8 @@ public class ValidationContextImpl implements ValidationContext {
         return resultCtx;
     }
 
-    public <TMsg extends Message, U>
-    ValidationContext applyRepeated(ValidationFunction.TypedArg<TMsg, U> validator, Class<TMsg> msgClass, U arg) {
+    public <T, U>
+    ValidationContext applyRepeated(ValidationFunction.TypedArg<T, U> validator, Class<T> msgClass, U arg) {
 
         if (done())
             return this;

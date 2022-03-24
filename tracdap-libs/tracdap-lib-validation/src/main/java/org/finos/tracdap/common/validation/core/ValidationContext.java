@@ -111,8 +111,8 @@ public interface ValidationContext {
     <T> ValidationContext applyIf(ValidationFunction.Typed<T> validator, Class<T> targetClass, boolean condition);
     <T> ValidationContext applyIf(ValidationFunction.Version<T> validator, Class<T> targetClass, boolean condition);
 
-    <TMsg extends Message> ValidationContext applyRepeated(ValidationFunction.Typed<TMsg> validator, Class<TMsg> msgClass);
-    <TMsg extends Message, U> ValidationContext applyRepeated(ValidationFunction.TypedArg<TMsg, U> validator, Class<TMsg> msgClass, U arg);
+    <T> ValidationContext applyRepeated(ValidationFunction.Typed<T> validator, Class<T> msgClass);
+    <T, U> ValidationContext applyRepeated(ValidationFunction.TypedArg<T, U> validator, Class<T> msgClass, U arg);
 
     ValidationType validationType();
     ValidationKey key();
