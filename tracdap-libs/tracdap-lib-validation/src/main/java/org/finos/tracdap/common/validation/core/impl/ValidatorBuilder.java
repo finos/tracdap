@@ -23,7 +23,7 @@ import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
-import org.finos.tracdap.common.validation.static_.MetadataValidator;
+import org.finos.tracdap.common.validation.static_.ObjectIdValidator;
 import org.finos.tracdap.common.validation.version.SchemaVersionValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +43,7 @@ public class ValidatorBuilder {
 
     public static Map<ValidationKey, ValidationFunction<?>> buildValidatorMap() {
 
-        var fixedValidatorPackage = MetadataValidator.class.getPackage();
+        var fixedValidatorPackage = ObjectIdValidator.class.getPackage();
         var fixedValidators = scanPackage(fixedValidatorPackage);
 
         var versionValidatorPackage = SchemaVersionValidator.class.getPackage();

@@ -119,7 +119,7 @@ public class DataApiValidator {
 
         ctx = ctx.push(DWR_PRIOR_VERSION)
                 .apply(CommonValidators::required)
-                .apply(MetadataValidator::validateTagSelector, TagSelector.class)
+                .apply(ObjectIdValidator::tagSelector, TagSelector.class)
                 .apply(CommonValidators.selectorType(ObjectType.DATA), TagSelector.class)
                 .pop();
 
@@ -151,12 +151,12 @@ public class DataApiValidator {
                 .pop();
 
         ctx = ctx.pushRepeated(DWR_TAG_UPDATES)
-                .applyRepeated(MetadataValidator::validateTagUpdate, TagUpdate.class)
+                .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
                 .pop();
 
         ctx = ctx.pushOneOf(DWR_SCHEMA_SPECIFIER)
                 .apply(CommonValidators::required)
-                .applyIf(MetadataValidator::validateTagSelector, TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
+                .applyIf(ObjectIdValidator::tagSelector, TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
                 .applyIf(CommonValidators.selectorType(ObjectType.SCHEMA), TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
                 .applyIf(CommonValidators::fixedObjectVersion, TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
                 .applyIf(SchemaValidator::schema, SchemaDefinition.class, msg.hasField(DWR_SCHEMA))
@@ -180,7 +180,7 @@ public class DataApiValidator {
 
         ctx = ctx.push(DRR_SELECTOR)
                 .apply(CommonValidators::required)
-                .apply(MetadataValidator::validateTagSelector, TagSelector.class)
+                .apply(ObjectIdValidator::tagSelector, TagSelector.class)
                 .apply(CommonValidators.selectorType(ObjectType.DATA), TagSelector.class)
                 .pop();
 
@@ -226,7 +226,7 @@ public class DataApiValidator {
 
         ctx = ctx.push(FWR_PRIOR_VERSION)
                 .apply(CommonValidators::required)
-                .apply(MetadataValidator::validateTagSelector, TagSelector.class)
+                .apply(ObjectIdValidator::tagSelector, TagSelector.class)
                 .apply(CommonValidators.selectorType(ObjectType.FILE), TagSelector.class)
                 .pop();
 
@@ -258,7 +258,7 @@ public class DataApiValidator {
                 .pop();
 
         ctx = ctx.pushRepeated(FWR_TAG_UPDATES)
-                .applyRepeated(MetadataValidator::validateTagUpdate, TagUpdate.class)
+                .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
                 .pop();
 
         ctx = ctx.push(FWR_NAME)
@@ -289,7 +289,7 @@ public class DataApiValidator {
 
         ctx = ctx.push(FRR_SELECTOR)
                 .apply(CommonValidators::required)
-                .apply(MetadataValidator::validateTagSelector, TagSelector.class)
+                .apply(ObjectIdValidator::tagSelector, TagSelector.class)
                 .apply(CommonValidators.selectorType(ObjectType.FILE), TagSelector.class)
                 .pop();
 

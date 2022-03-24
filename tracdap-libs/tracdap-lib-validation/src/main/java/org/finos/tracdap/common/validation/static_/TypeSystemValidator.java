@@ -115,7 +115,7 @@ public class TypeSystemValidator {
     public static ValidationContext value(Value value, ValidationContext ctx) {
 
         if (value.hasType())
-            return ctx.apply(TypeSystemValidator::value, Value.class, value.getType());
+            return ctx.apply(TypeSystemValidator::valueWithType, Value.class, value.getType());
 
         if (!value.hasOneof(V_VALUE))
             return ctx.error(String.format("Type cannot be inferred for null value [%s]", ctx.fieldName()));
@@ -124,10 +124,37 @@ public class TypeSystemValidator {
             return ctx.error(String.format("Type cannot be inferred for non-primitive value [%s]", ctx.fieldName()));
 
         var type = TypeSystem.descriptor(value);
-        return ctx.apply(TypeSystemValidator::value, Value.class, type);
+        return ctx.apply(TypeSystemValidator::valueWithType, Value.class, type);
     }
 
-    public static ValidationContext value(Value value, TypeDescriptor expectedType, ValidationContext ctx) {
+    @Validator
+    public static ValidationContext decimalValue(DecimalValue msg, ValidationContext ctx) {
+
+        return ctx.push(DCV_DECIMAL)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::decimal)
+                .pop();
+    }
+
+    @Validator
+    public static ValidationContext dateValue(DateValue msg, ValidationContext ctx) {
+
+        return ctx.push(DV_ISO_DATE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::isoDate)
+                .pop();
+    }
+
+    @Validator
+    public static ValidationContext datetimeValue(DatetimeValue msg, ValidationContext ctx) {
+
+        return ctx.push(DTV_ISO_DATETIME)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::isoDatetime)
+                .pop();
+    }
+
+    private static ValidationContext valueWithType(Value value, TypeDescriptor expectedType, ValidationContext ctx) {
 
         var wrongTypeMessage = String.format("Wrong type supplied for [%s]", ctx.fieldName());
 
@@ -184,42 +211,22 @@ public class TypeSystemValidator {
         return ctx;
     }
 
-    public static ValidationContext decimalValue(DecimalValue msg, ValidationContext ctx) {
-
-        return ctx.push(DCV_DECIMAL)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::decimal)
-                .pop();
-    }
-
-    public static ValidationContext dateValue(DateValue msg, ValidationContext ctx) {
-
-        return ctx.push(DV_ISO_DATE)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::isoDate)
-                .pop();
-    }
-
-    public static ValidationContext datetimeValue(DatetimeValue msg, ValidationContext ctx) {
-
-        return ctx.push(DTV_ISO_DATETIME)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::isoDatetime)
-                .pop();
-    }
+    // Array and map values do not have public validators
+    // This is because the array type needs to be known
+    // So, an array value must always be wrapped in a value
 
     public static ValidationContext arrayValue(ArrayValue msg, TypeDescriptor arrayType, ValidationContext ctx) {
 
         return ctx.pushRepeated(AV_ITEMS)
-                .applyRepeated(TypeSystemValidator::value, Value.class, arrayType)
+                .applyRepeated(TypeSystemValidator::valueWithType, Value.class, arrayType)
                 .pop();
     }
 
-    public static ValidationContext mapValue(MapValue msg, TypeDescriptor mapType, ValidationContext ctx) {
+    private static ValidationContext mapValue(MapValue msg, TypeDescriptor mapType, ValidationContext ctx) {
 
         return ctx.pushMap(MV_ENTRIES)
                 .applyMapKeys(TypeSystemValidator::mapKey)
-                .applyMapValues(TypeSystemValidator::value, Value.class, mapType)
+                .applyMapValues(TypeSystemValidator::valueWithType, Value.class, mapType)
                 .pop();
     }
 

@@ -73,7 +73,7 @@ public class FileValidator {
 
         ctx = ctx.push(FD_STORAGE_ID)
                 .apply(CommonValidators::required)
-                .apply(MetadataValidator::validateTagSelector, TagSelector.class)
+                .apply(ObjectIdValidator::tagSelector, TagSelector.class)
                 .apply(CommonValidators.selectorType(ObjectType.STORAGE), TagSelector.class)
                 .apply(FileValidator::selectorForLatest, TagSelector.class)
                 .pop();
