@@ -37,13 +37,6 @@ public class TypeSystemValidator {
     private static final Descriptors.Descriptor VALUE;
     private static final Descriptors.FieldDescriptor V_TYPE;
     private static final Descriptors.OneofDescriptor V_VALUE;
-    private static final Descriptors.FieldDescriptor V_BOOLEAN;
-    private static final Descriptors.FieldDescriptor V_INTEGER;
-    private static final Descriptors.FieldDescriptor V_FLOAT;
-    private static final Descriptors.FieldDescriptor V_DECIMAL;
-    private static final Descriptors.FieldDescriptor V_STRING;
-    private static final Descriptors.FieldDescriptor V_DATE;
-    private static final Descriptors.FieldDescriptor V_DATETIME;
     private static final Descriptors.FieldDescriptor V_ARRAY;
     private static final Descriptors.FieldDescriptor V_MAP;
 
@@ -72,16 +65,9 @@ public class TypeSystemValidator {
 
         VALUE = Value.getDescriptor();
         V_TYPE = field(VALUE, Value.TYPE_FIELD_NUMBER);
-        V_BOOLEAN = field(VALUE, Value.BOOLEANVALUE_FIELD_NUMBER);
-        V_INTEGER = field(VALUE, Value.INTEGERVALUE_FIELD_NUMBER);
-        V_FLOAT = field(VALUE, Value.FLOATVALUE_FIELD_NUMBER);
-        V_DECIMAL = field(VALUE, Value.DECIMALVALUE_FIELD_NUMBER);
-        V_STRING = field(VALUE, Value.STRINGVALUE_FIELD_NUMBER);
-        V_DATE = field(VALUE, Value.DATEVALUE_FIELD_NUMBER);
-        V_DATETIME = field(VALUE, Value.DATETIMEVALUE_FIELD_NUMBER);
+        V_VALUE = field(VALUE, Value.BOOLEANVALUE_FIELD_NUMBER).getContainingOneof();
         V_ARRAY = field(VALUE, Value.ARRAYVALUE_FIELD_NUMBER);
         V_MAP = field(VALUE, Value.MAPVALUE_FIELD_NUMBER);
-        V_VALUE = V_BOOLEAN.getContainingOneof();
 
         DECIMAL_VALUE = DecimalValue.getDescriptor();
         DCV_DECIMAL = field(DECIMAL_VALUE, DecimalValue.DECIMAL_FIELD_NUMBER);
@@ -232,9 +218,16 @@ public class TypeSystemValidator {
     public static ValidationContext mapValue(MapValue msg, TypeDescriptor mapType, ValidationContext ctx) {
 
         return ctx.pushMap(MV_ENTRIES)
-//                .applyKeys(CommonValidators::required)
-//                .applyKeys(CommonValidators::identifier)
-//                .applyValues(TypeSystemValidator::value, Value.class, mapType)
+                .applyMapKeys(TypeSystemValidator::mapKey)
+                .applyMapValues(TypeSystemValidator::value, Value.class, mapType)
                 .pop();
+    }
+
+    private static ValidationContext mapKey(String key, ValidationContext ctx) {
+
+        if (key == null || key.isEmpty())
+            ctx.error("Map keys cannot be null or empty");
+
+        return ctx;
     }
 }
