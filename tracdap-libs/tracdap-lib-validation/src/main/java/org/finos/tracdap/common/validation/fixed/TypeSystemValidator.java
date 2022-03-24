@@ -129,7 +129,7 @@ public class TypeSystemValidator {
     public static ValidationContext value(Value value, ValidationContext ctx) {
 
         if (value.hasType())
-            return ctx.applyWith(TypeSystemValidator::value, Value.class, value.getType());
+            return ctx.apply(TypeSystemValidator::value, Value.class, value.getType());
 
         if (!value.hasOneof(V_VALUE))
             return ctx.error(String.format("Type cannot be inferred for null value [%s]", ctx.fieldName()));
@@ -138,7 +138,7 @@ public class TypeSystemValidator {
             return ctx.error(String.format("Type cannot be inferred for non-primitive value [%s]", ctx.fieldName()));
 
         var type = TypeSystem.descriptor(value);
-        return ctx.applyWith(TypeSystemValidator::value, Value.class, type);
+        return ctx.apply(TypeSystemValidator::value, Value.class, type);
     }
 
     public static ValidationContext value(Value value, TypeDescriptor expectedType, ValidationContext ctx) {
@@ -175,7 +175,7 @@ public class TypeSystemValidator {
 
             return ctx.push(V_ARRAY)
                     .apply(CommonValidators::required)
-                    .applyWith(TypeSystemValidator::arrayValue, ArrayValue.class, arrayType)
+                    .apply(TypeSystemValidator::arrayValue, ArrayValue.class, arrayType)
                     .pop();
         }
 
@@ -185,7 +185,7 @@ public class TypeSystemValidator {
 
             return ctx.push(V_MAP)
                     .apply(CommonValidators::required)
-                    .applyWith(TypeSystemValidator::mapValue, MapValue.class, mapType)
+                    .apply(TypeSystemValidator::mapValue, MapValue.class, mapType)
                     .pop();
         }
 
@@ -225,7 +225,7 @@ public class TypeSystemValidator {
     public static ValidationContext arrayValue(ArrayValue msg, TypeDescriptor arrayType, ValidationContext ctx) {
 
         return ctx.pushRepeated(AV_ITEMS)
-                .applyRepeatedWith(TypeSystemValidator::value, Value.class, arrayType)
+                .applyRepeated(TypeSystemValidator::value, Value.class, arrayType)
                 .pop();
     }
 

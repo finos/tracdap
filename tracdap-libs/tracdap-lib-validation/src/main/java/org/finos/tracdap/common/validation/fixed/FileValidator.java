@@ -58,7 +58,7 @@ public class FileValidator {
                 .pop();
 
         ctx = ctx.push(FD_EXTENSION)
-                .applyWith(FileValidator::extensionMatchesName, String.class, msg.getName())
+                .apply(FileValidator::extensionMatchesName, String.class, msg.getName())
                 .pop();
 
         ctx = ctx.push(FD_MIME_TYPE)

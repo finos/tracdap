@@ -102,7 +102,7 @@ public interface ValidationContext {
     ValidationContext apply(ValidationFunction.Basic validator);
     ValidationContext apply(ValidationFunction.Typed<String> validator);
     <T> ValidationContext apply(ValidationFunction.Typed<T> validator, Class<T> targetClass);
-    <T, U> ValidationContext applyWith(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg);
+    <T, U> ValidationContext apply(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg);
 
     ValidationContext apply(ValidationFunction.Version<Object> validator);
     <T> ValidationContext apply(ValidationFunction.Version<T> validator, Class<T> targetClass);
@@ -112,7 +112,7 @@ public interface ValidationContext {
     <T> ValidationContext applyIf(ValidationFunction.Version<T> validator, Class<T> targetClass, boolean condition);
 
     <TMsg extends Message> ValidationContext applyRepeated(ValidationFunction.Typed<TMsg> validator, Class<TMsg> msgClass);
-    <TMsg extends Message, U> ValidationContext applyRepeatedWith(ValidationFunction.TypedArg<TMsg, U> validator, Class<TMsg> msgClass, U arg);
+    <TMsg extends Message, U> ValidationContext applyRepeated(ValidationFunction.TypedArg<TMsg, U> validator, Class<TMsg> msgClass, U arg);
 
     ValidationType validationType();
     ValidationKey key();

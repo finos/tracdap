@@ -248,7 +248,7 @@ public class ValidationContextImpl implements ValidationContext {
 
     @SuppressWarnings({"unchecked", "rawTypes"})
     public <T, U>
-    ValidationContext applyWith(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
+    ValidationContext apply(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
 
         if (done())
             return this;
@@ -396,7 +396,7 @@ public class ValidationContextImpl implements ValidationContext {
     }
 
     public <TMsg extends Message, U>
-    ValidationContext applyRepeatedWith(ValidationFunction.TypedArg<TMsg, U> validator, Class<TMsg> msgClass, U arg) {
+    ValidationContext applyRepeated(ValidationFunction.TypedArg<TMsg, U> validator, Class<TMsg> msgClass, U arg) {
 
         if (done())
             return this;
@@ -417,7 +417,7 @@ public class ValidationContextImpl implements ValidationContext {
 
             resultCtx = (ValidationContextImpl) resultCtx
                     .pushRepeatedItem(i)
-                    .applyWith(validator, msgClass, arg)
+                    .apply(validator, msgClass, arg)
                     .pop();
         }
 

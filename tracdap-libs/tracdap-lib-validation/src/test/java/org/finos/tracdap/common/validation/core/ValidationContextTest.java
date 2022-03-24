@@ -192,7 +192,7 @@ public class ValidationContextTest {
         var ctx = ValidationContext.forMessage(value);
 
         ctx.push(V_TYPE)
-            .applyWith(validator, TypeDescriptor.class, arg)
+            .apply(validator, TypeDescriptor.class, arg)
             .pop();
 
         verify(validator).apply(same(type), same(arg), same(ctx));
