@@ -181,6 +181,11 @@ public class ValidationContextImpl implements ValidationContext {
         if (location.empty())
             throw new IllegalStateException();
 
+        // Failures propagate up the stack
+        var loc = location.peek();
+        if (loc.failed() && loc.parent() != null)
+            loc.parent().fail();
+
         location.pop();
 
         if (priorCtx != null)
@@ -503,7 +508,6 @@ public class ValidationContextImpl implements ValidationContext {
     public String priorFieldName() {
         return priorCtx.location.peek().fieldName();
     }
-
 
     public boolean failed() {
         return location.peek().failed();
