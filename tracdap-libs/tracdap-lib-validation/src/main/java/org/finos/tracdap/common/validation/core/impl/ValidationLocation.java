@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.validation.core;
+package org.finos.tracdap.common.validation.core.impl;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 import com.google.protobuf.Descriptors;

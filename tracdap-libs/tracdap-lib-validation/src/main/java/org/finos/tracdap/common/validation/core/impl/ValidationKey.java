@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.validation.core;
+package org.finos.tracdap.common.validation.core.impl;
 
 import com.google.protobuf.Descriptors;
+import org.finos.tracdap.common.validation.core.ValidationType;
 
 
 public class ValidationKey implements Comparable<ValidationKey> {

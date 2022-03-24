@@ -20,7 +20,9 @@ import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.exception.EVersionValidation;
 import org.finos.tracdap.common.validation.core.*;
-import org.finos.tracdap.common.validation.core.ValidatorBuilder;
+import org.finos.tracdap.common.validation.core.impl.ValidationKey;
+import org.finos.tracdap.common.validation.core.impl.ValidatorBuilder;
+import org.finos.tracdap.common.validation.core.impl.ValidationResult;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.TagHeader;
 

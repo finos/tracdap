@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.validation.core;
+package org.finos.tracdap.common.validation.core.impl;
 
 import com.google.common.reflect.ClassPath;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.validation.core.ValidationFunction;
+import org.finos.tracdap.common.validation.core.ValidationType;
+import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.common.validation.fixed.MetadataValidator;
 import org.finos.tracdap.common.validation.version.SchemaVersionValidator;
 import org.slf4j.Logger;
