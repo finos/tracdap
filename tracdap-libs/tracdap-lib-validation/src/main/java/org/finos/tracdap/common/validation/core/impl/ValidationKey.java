@@ -22,14 +22,14 @@ import org.finos.tracdap.common.validation.core.ValidationType;
 
 public class ValidationKey implements Comparable<ValidationKey> {
 
+    private static final String OPAQUE_KEY_TEMPLATE = "%s:%s:%s";
+    private static final String DISPLAY_NAME_TEMPLATE = "%s %s";
+    private static final String METHOD_DISPLAY_NAME_TEMPLATE = "%s, %s %s";
+
     private final ValidationType validationType;
     private final Descriptors.Descriptor messageType;
     private final Descriptors.MethodDescriptor method;
-
-    private static final String OPAQUE_KEY_TEMPLATE = "%s:%s:%s";
     private final String opaqueKey;
-
-    private static final String DISPLAY_NAME_TEMPLATE = "%s %s%s";
     private final String displayName;
 
     public static ValidationKey forObject(Descriptors.Descriptor messageType) {
@@ -67,14 +67,17 @@ public class ValidationKey implements Comparable<ValidationKey> {
                 messageType.getFullName(),
                 contextualPart);
 
-        var displayContextualPart = contextualPart.isEmpty()
-            ? ""
-            : " (" + contextualPart + ")";
-
-        this.displayName = String.format(DISPLAY_NAME_TEMPLATE,
-                validationType.name(),
-                messageType.getFullName(),
-                displayContextualPart);
+        if (method != null) {
+            this.displayName = String.format(METHOD_DISPLAY_NAME_TEMPLATE,
+                    method.getName(),
+                    messageType.getName(),
+                    validationType.name());
+        }
+        else {
+            this.displayName = String.format(DISPLAY_NAME_TEMPLATE,
+                    messageType.getName(),
+                    validationType.name());
+        }
     }
 
     public ValidationKey(
