@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.validation.startic_;
+package org.finos.tracdap.common.validation.static_;
 
 import com.google.protobuf.Message;
 import org.finos.tracdap.common.exception.EInputValidation;

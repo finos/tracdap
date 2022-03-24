@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.validation.startic_;
+package org.finos.tracdap.common.validation.static_;
 
 public class TagUpdateTest {
 }
