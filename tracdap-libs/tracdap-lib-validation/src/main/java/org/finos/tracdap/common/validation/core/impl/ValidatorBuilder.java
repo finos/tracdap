@@ -20,6 +20,7 @@ import com.google.common.reflect.ClassPath;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.validation.api.DataApiValidator;
 import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
@@ -43,17 +44,27 @@ public class ValidatorBuilder {
 
     public static Map<ValidationKey, ValidationFunction<?>> buildValidatorMap() {
 
-        var fixedValidatorPackage = ObjectIdValidator.class.getPackage();
-        var fixedValidators = scanPackage(fixedValidatorPackage);
-
+        var apiValidatorPackage = DataApiValidator.class.getPackage();
+        var staticValidatorPackage = ObjectIdValidator.class.getPackage();
         var versionValidatorPackage = SchemaVersionValidator.class.getPackage();
-        var versionValidators = scanPackage(versionValidatorPackage);
 
-        var allValidators = new HashMap<ValidationKey, ValidationFunction<?>>();
-        allValidators.putAll(fixedValidators);
-        allValidators.putAll(versionValidators);
+        return scanPackages(
+                apiValidatorPackage,
+                staticValidatorPackage,
+                versionValidatorPackage);
+    }
 
-        return allValidators;
+    public static Map<ValidationKey, ValidationFunction<?>> scanPackages(Package... packages) {
+
+        var validatorMap = new HashMap<ValidationKey, ValidationFunction<?>>();
+
+        for (var package_ : packages) {
+
+            var packageValidators = scanPackage(package_);
+            validatorMap.putAll(packageValidators);
+        }
+
+        return validatorMap;
     }
 
     public static Map<ValidationKey, ValidationFunction<?>> scanPackage(Package package_) {

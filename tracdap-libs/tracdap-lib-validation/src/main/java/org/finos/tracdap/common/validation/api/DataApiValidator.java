@@ -14,13 +14,17 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.validation.static_;
+package org.finos.tracdap.common.validation.api;
 
 import com.google.protobuf.ByteString;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.common.validation.core.ValidatorUtils;
+import org.finos.tracdap.common.validation.static_.CommonValidators;
+import org.finos.tracdap.common.validation.static_.ObjectIdValidator;
+import org.finos.tracdap.common.validation.static_.SchemaValidator;
+import org.finos.tracdap.common.validation.static_.TagUpdateValidator;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.SchemaDefinition;
 import org.finos.tracdap.metadata.TagSelector;

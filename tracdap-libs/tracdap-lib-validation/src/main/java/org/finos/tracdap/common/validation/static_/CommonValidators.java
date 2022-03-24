@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
 
 public class CommonValidators {
 
-    static ValidationContext required(ValidationContext ctx) {
+    public static ValidationContext required(ValidationContext ctx) {
 
         var parentMsg = ctx.parentMsg();
 
@@ -67,7 +67,7 @@ public class CommonValidators {
         return ctx;
     }
 
-    static ValidationContext omitted(ValidationContext ctx) {
+    public static ValidationContext omitted(ValidationContext ctx) {
 
         var parentMsg = ctx.parentMsg();
 
@@ -89,7 +89,7 @@ public class CommonValidators {
         return ctx;
     }
 
-    static ValidationContext optional(ValidationContext ctx) {
+    public static ValidationContext optional(ValidationContext ctx) {
 
         var parentMsg = ctx.parentMsg();
 
@@ -107,7 +107,7 @@ public class CommonValidators {
         return ctx;
     }
 
-    static <T> ValidationFunction.Typed<T> equalTo(T other, String errorMessage) {
+    public static <T> ValidationFunction.Typed<T> equalTo(T other, String errorMessage) {
 
         return (value, ctx) -> {
 
@@ -148,7 +148,7 @@ public class CommonValidators {
         return ctx;
     }
 
-    static ValidationContext uuid(String value, ValidationContext ctx) {
+    public static ValidationContext uuid(String value, ValidationContext ctx) {
 
         try {
             @SuppressWarnings("unused")
@@ -162,7 +162,7 @@ public class CommonValidators {
         return ctx;
     }
 
-    static ValidationContext decimal(String value, ValidationContext ctx) {
+    public static ValidationContext decimal(String value, ValidationContext ctx) {
 
         if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
             throw new EUnexpected();
@@ -182,7 +182,7 @@ public class CommonValidators {
         }
     }
 
-    static ValidationContext isoDate(String value, ValidationContext ctx) {
+    public static ValidationContext isoDate(String value, ValidationContext ctx) {
 
         if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
             throw new EUnexpected();
@@ -202,7 +202,7 @@ public class CommonValidators {
         }
     }
 
-    static ValidationContext isoDatetime(String value, ValidationContext ctx) {
+    public static ValidationContext isoDatetime(String value, ValidationContext ctx) {
 
         if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
             throw new EUnexpected();
@@ -226,21 +226,21 @@ public class CommonValidators {
         }
     }
 
-    static ValidationContext identifier(String value, ValidationContext ctx) {
+    public static ValidationContext identifier(String value, ValidationContext ctx) {
 
         return regexMatch(
                 MetadataConstants.VALID_IDENTIFIER, true,
                 "is not a valid identifier", value, ctx);
     }
 
-    static ValidationContext notTracReserved(String value, ValidationContext ctx) {
+    public static ValidationContext notTracReserved(String value, ValidationContext ctx) {
 
         return regexMatch(
                 MetadataConstants.TRAC_RESERVED_IDENTIFIER, false,
                 "is a TRAC reserved identifier", value, ctx);
     }
 
-    static ValidationContext mimeType(String value, ValidationContext ctx) {
+    public static ValidationContext mimeType(String value, ValidationContext ctx) {
 
         // First check the value matches the mime type regex, i.e. has the right form
         ctx = regexMatch(
@@ -261,7 +261,7 @@ public class CommonValidators {
         return ctx;
     }
 
-    static ValidationContext fileName(String value, ValidationContext ctx) {
+    public static ValidationContext fileName(String value, ValidationContext ctx) {
 
         ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_CHARS, false,
                 "contains illegal characters", value, ctx);
@@ -314,7 +314,7 @@ public class CommonValidators {
         return ctx;
     }
 
-    static ValidationContext notNegative(Object value, ValidationContext ctx) {
+    public static ValidationContext notNegative(Object value, ValidationContext ctx) {
 
         boolean negative;
 
@@ -350,7 +350,7 @@ public class CommonValidators {
         return ctx;
     }
 
-    static ValidationContext optionalTrue(boolean value, ValidationContext ctx) {
+    public static ValidationContext optionalTrue(boolean value, ValidationContext ctx) {
 
         if (!value) {
             var err = String.format("Optional field [%s] must either be omitted or set to 'true'", ctx.fieldName());
@@ -360,7 +360,7 @@ public class CommonValidators {
         return ctx;
     }
 
-    static ValidationContext positive(Object value, ValidationContext ctx) {
+    public static ValidationContext positive(Object value, ValidationContext ctx) {
 
         boolean positive;
 
