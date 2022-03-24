@@ -224,15 +224,17 @@ public class TypeSystemValidator {
 
     public static ValidationContext arrayValue(ArrayValue msg, TypeDescriptor arrayType, ValidationContext ctx) {
 
-        return ctx.push(AV_ITEMS)
+        return ctx.pushRepeated(AV_ITEMS)
                 .applyRepeatedWith(TypeSystemValidator::value, Value.class, arrayType)
                 .pop();
     }
 
     public static ValidationContext mapValue(MapValue msg, TypeDescriptor mapType, ValidationContext ctx) {
 
-        return ctx.push(MV_ENTRIES)
-                .applyRepeatedWith(TypeSystemValidator::value, Value.class, mapType)
+        return ctx.pushMap(MV_ENTRIES)
+//                .applyKeys(CommonValidators::required)
+//                .applyKeys(CommonValidators::identifier)
+//                .applyValues(TypeSystemValidator::value, Value.class, mapType)
                 .pop();
     }
 }

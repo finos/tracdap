@@ -42,11 +42,61 @@ public interface ValidationContext {
         return ValidationContextImpl.forVersion(current, prior);
     }
 
-    ValidationContext push(Descriptors.FieldDescriptor fd);
-    ValidationContext pushOneOf(Descriptors.OneofDescriptor oneOf);
+    /**
+     * Push a member field of the current object onto the validation stack
+     *
+     * @param field The field that will be pushed onto the stack
+     * @return A new validation context, pointing at the field that has been pushed onto the stack
+     */
+    ValidationContext push(Descriptors.FieldDescriptor field);
+
+    /**
+     * Push a repeated member field of the current object onto the validation stack
+     *
+     * @param repeatedField The field that will be pushed onto the stack
+     * @return A new validation context, pointing at the field that has been pushed onto the stack
+     */
+    ValidationContext pushRepeated(Descriptors.FieldDescriptor repeatedField);
+
+    /**
+     * Push a map member field of the current object onto the validation stack
+     *
+     * @param mapField The field that will be pushed onto the stack
+     * @return A new validation context, pointing at the field that has been pushed onto the stack
+     */
+    ValidationContext pushMap(Descriptors.FieldDescriptor mapField);
+
+    /**
+     * Push a "one-of" field of the current object onto the validation stack
+     *
+     * @param oneOfField The one-of field that will be pushed onto the stack
+     * @return A new validation context, pointing at the field that has been pushed onto the stack
+     */
+    ValidationContext pushOneOf(Descriptors.OneofDescriptor oneOfField);
+
+    /**
+     * Pop the current object from the validation stack
+     *
+     * @return A new validation context, pointing at the parent of the current object
+     */
     ValidationContext pop();
 
+    /**
+     * Record an error against the current location in the validation stack
+     *
+     * @param message The error message to record
+     * @return A new validation context, which includes the recorded error
+     */
     ValidationContext error(String message);
+
+    /**
+     * Skip the current location in the validation stack
+     *
+     * Any future calls to apply() at this location or child locations will be ignored.
+     * Errors already recorded at this location or child locations are still included in the validation report.
+     *
+     * @return A new context with the current object in the validation stack marked as skipped.
+     */
     ValidationContext skip();
 
     ValidationContext apply(ValidationFunction.Basic validator);

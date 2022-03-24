@@ -95,7 +95,7 @@ public class SchemaValidator {
     @Validator
     public static ValidationContext tableSchema(TableSchema table, ValidationContext ctx) {
 
-        ctx = ctx.push(TS_FIELDS)
+        ctx = ctx.pushRepeated(TS_FIELDS)
                 .apply(CommonValidators::listNotEmpty, List.class)
                 .applyRepeated(SchemaValidator::fieldSchema, FieldSchema.class)
                 .pop();

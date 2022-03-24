@@ -150,7 +150,7 @@ public class DataApiValidator {
                 .apply(CommonValidators::identifier)
                 .pop();
 
-        ctx = ctx.push(DWR_TAG_UPDATES)
+        ctx = ctx.pushRepeated(DWR_TAG_UPDATES)
                 .applyRepeated(MetadataValidator::validateTagUpdate, TagUpdate.class)
                 .pop();
 
@@ -257,7 +257,7 @@ public class DataApiValidator {
                 .apply(CommonValidators::identifier)
                 .pop();
 
-        ctx = ctx.push(FWR_TAG_UPDATES)
+        ctx = ctx.pushRepeated(FWR_TAG_UPDATES)
                 .applyRepeated(MetadataValidator::validateTagUpdate, TagUpdate.class)
                 .pop();
 
