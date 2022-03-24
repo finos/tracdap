@@ -139,6 +139,7 @@ public class ValidationContextImpl implements ValidationContext {
         return this;
     }
 
+    @SuppressWarnings("unchecked")
     private ValidationContext pushRepeated(Integer index, boolean mapKey) {
 
         var parentLoc = location.peek();
@@ -155,11 +156,11 @@ public class ValidationContextImpl implements ValidationContext {
 
             var mapEntry = (MapEntry<String, ?>) obj;
             var fieldName = String.format("[%s]", mapEntry.getKey());
-
             obj = mapKey ? mapEntry.getKey() : mapEntry.getValue();
             loc = new ValidationLocation(parentLoc, null, obj, null, parentLoc.field(), fieldName);
         }
         else {
+
             var fieldName = String.format("[%s]", index);
             loc = new ValidationLocation(parentLoc, null, obj, null, parentLoc.field(), fieldName);
         }
@@ -223,7 +224,7 @@ public class ValidationContextImpl implements ValidationContext {
         return apply((obj, arg, ctx) -> validator.apply(obj, ctx), targetClass, null);
     }
 
-    @SuppressWarnings({"unchecked", "rawTypes"})
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public <T, U>
     ValidationContext apply(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
 
@@ -271,7 +272,7 @@ public class ValidationContextImpl implements ValidationContext {
         return apply(validator, Object.class);
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public <T> ValidationContext apply(ValidationFunction.Version<T> validator, Class<T> targetClass) {
 
         if (priorCtx == null)
