@@ -18,6 +18,7 @@ package org.finos.tracdap.common.validation.core;
 
 
 import com.google.protobuf.Message;
+import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import java.io.IOException;
@@ -132,7 +133,11 @@ public class ValidationFunction<T> {
                 return (ValidationContext) method.invoke(null, msg, ctx);
             }
             catch (IllegalAccessException | InvocationTargetException e) {
-                throw new EUnexpected();
+
+                if (e.getCause() != null && e.getCause() instanceof ETrac)
+                    throw (ETrac) e.getCause();
+
+                throw new EUnexpected(e);
             }
         };
     }
@@ -160,7 +165,11 @@ public class ValidationFunction<T> {
                 return (ValidationContext) method.invoke(null, msg, prior, ctx);
             }
             catch (IllegalAccessException | InvocationTargetException e) {
-                throw new EUnexpected();
+
+                if (e.getCause() != null && e.getCause() instanceof ETrac)
+                    throw (ETrac) e.getCause();
+
+                throw new EUnexpected(e);
             }
         };
     }
