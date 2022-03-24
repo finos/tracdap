@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.validation.core.impl;
 
 import com.google.protobuf.Descriptors;
+import com.google.protobuf.MapEntry;
 import com.google.protobuf.Message;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
@@ -38,33 +39,39 @@ public class ValidationContextImpl implements ValidationContext {
     private final Stack<ValidationLocation> location;
     private final List<ValidationFailure> failures;
 
-    private ValidationContextImpl(ValidationLocation root) {
+    private final ValidationContextImpl priorCtx;
 
-        location = new Stack<>();
-        location.push(root);
+    private ValidationContextImpl(ValidationLocation root, ValidationContextImpl priorCtx) {
 
-        failures = new ArrayList<>();
+        this.location = new Stack<>();
+        this.location.push(root);
+
+        this.priorCtx = priorCtx;
+
+        this.failures = new ArrayList<>();
     }
 
     public static ValidationContext forMethod(Message msg, Descriptors.MethodDescriptor descriptor) {
 
         var key = ValidationKey.forMethod(msg.getDescriptorForType(), descriptor);
         var root = new ValidationLocation(null, key, msg, null, null);
-        return new ValidationContextImpl(root);
+        return new ValidationContextImpl(root, null);
     }
 
     public static ValidationContext forMessage(Message msg) {
 
         var key = ValidationKey.forMethod(msg.getDescriptorForType(), null);
         var root = new ValidationLocation(null, key, msg, null, null);
-        return new ValidationContextImpl(root);
+        return new ValidationContextImpl(root, null);
     }
 
     public static ValidationContext forVersion(Message current, Message prior) {
 
-        var key = ValidationKey.forVersion(prior.getDescriptorForType());
-        var root = new ValidationLocation(null, key, current, prior, null, null, null);
-        return new ValidationContextImpl(root);
+        var key = ValidationKey.forVersion(current.getDescriptorForType());
+        var currentRoot = new ValidationLocation(null, key, current, null, null, null);
+        var priorRoot = new ValidationLocation(null, key, prior, null, null, null);
+        var priorCtx = new ValidationContextImpl(priorRoot, null);
+        return new ValidationContextImpl(currentRoot, priorCtx);
     }
 
 
@@ -87,7 +94,6 @@ public class ValidationContextImpl implements ValidationContext {
 
         var parentLoc = location.peek();
         var msg = parentLoc.msg();
-        var priorMsg = parentLoc.priorMsg();
 
         // If the oneOf field has been set, look up the fd, field name and value for the field in use
         // In this case the location ctx be reported as that field in any error messages
@@ -99,17 +105,15 @@ public class ValidationContextImpl implements ValidationContext {
         var fd = msg.hasOneof(oneOf) ? msg.getOneofFieldDescriptor(oneOf) : null;
         var name = fd != null ? fd.getName() : oneOf.getName();
         var obj = fd != null ? msg.getField(fd) : null;
-
-        var priorFd = priorMsg != null && priorMsg.hasOneof(oneOf) ? priorMsg.getOneofFieldDescriptor(oneOf) : null;
-        var priorName = priorFd != null ? priorFd.getName() : oneOf.getName();
-        var priorObj = priorFd != null ? priorMsg.getField(priorFd) : null;
-
-        var loc = new ValidationLocation(parentLoc, null, obj, priorObj, oneOf, fd, name, priorFd, priorName);
+        var loc = new ValidationLocation(parentLoc, null, obj, oneOf, fd, name);
 
         if (parentLoc.skipped())
             loc.skip();
 
         location.push(loc);
+
+        if (priorCtx != null)
+            priorCtx.pushOneOf(oneOf);
 
         return this;
     }
@@ -121,23 +125,55 @@ public class ValidationContextImpl implements ValidationContext {
 
         var parentLoc = location.peek();
         var msg = parentLoc.msg();
-        var priorMsg = parentLoc.priorMsg();
-
         var obj = msg.getField(fd);
-        var priorObj = priorMsg != null ? priorMsg.getField(fd) : null;
-
-        var field = fd.getName();
-        var loc = new ValidationLocation(parentLoc, null, obj, priorObj, null, fd, field);
+        var loc = new ValidationLocation(parentLoc, null, obj, null, fd, fd.getName());
 
         if (parentLoc.skipped())
             loc.skip();
 
         location.push(loc);
 
+        if (priorCtx != null)
+            priorCtx.push(fd, repeated, map);
+
         return this;
     }
 
-    private ValidationContext pushRepeatedItem(Integer index) {
+    private ValidationContext pushRepeated(Integer index) {
+
+        var parentLoc = location.peek();
+
+        if (!parentLoc.field().isRepeated())
+            throw new EUnexpected();
+
+        var list = (List<?>) parentLoc.target();
+        var obj = list.get(index);
+
+        String fieldName;
+
+        if (parentLoc.field().isMapField()) {
+            var mapEntry = (MapEntry<String, ?>) obj;
+            var mapKey = mapEntry.getKey();
+            fieldName = String.format("[%d]", mapKey);
+        }
+        else {
+            fieldName = String.format("[%d]", index);
+        }
+
+        var loc = new ValidationLocation(parentLoc, null, obj, null, parentLoc.field(), fieldName);
+
+        if (parentLoc.skipped())
+            loc.skip();
+
+        location.push(loc);
+
+        if (priorCtx != null)
+            priorCtx.pushRepeated(index);
+
+        return this;
+    }
+
+    private ValidationContext pushMapKey(Integer index) {
 
         var parentLoc = location.peek();
 
@@ -145,19 +181,19 @@ public class ValidationContextImpl implements ValidationContext {
             throw new EUnexpected();
 
         var list = (List<?>) parentLoc.target();
-        var priorList = (List<?>) parentLoc.prior();
-
         var obj = list.get(index);
-        var priorObj = priorList != null ? priorList.get(index) : null;
 
         var fieldName = String.format("[%d]", index);
 
-        var loc = new ValidationLocation(parentLoc, null, obj, priorObj, null, parentLoc.field(), fieldName);
+        var loc = new ValidationLocation(parentLoc, null, obj, null, parentLoc.field(), fieldName);
 
         if (parentLoc.skipped())
             loc.skip();
 
         location.push(loc);
+
+        if (priorCtx != null)
+            priorCtx.pushMapKey(index);
 
         return this;
     }
@@ -168,6 +204,9 @@ public class ValidationContextImpl implements ValidationContext {
             throw new IllegalStateException();
 
         location.pop();
+
+        if (priorCtx != null)
+            priorCtx.pop();
 
         return this;
     }
@@ -252,23 +291,20 @@ public class ValidationContextImpl implements ValidationContext {
 
     public ValidationContext apply(ValidationFunction.Version<Object> validator) {
 
-        if (done())
-            return this;
-
-        var current = location.peek().target();
-        var prior = location.peek().prior();
-
-        return validator.apply(current, prior, this);
+        return apply(validator, Object.class);
     }
 
     @SuppressWarnings("unchecked")
     public <T> ValidationContext apply(ValidationFunction.Version<T> validator, Class<T> targetClass) {
 
+        if (priorCtx == null)
+            throw new ETracInternal("Version validator requires a version validation context (ValidationContext.forVersion())");
+
         if (done())
             return this;
 
         var current = location.peek().target();
-        var prior = location.peek().prior();
+        var prior = priorCtx.location.peek().target();
 
         if (targetClass.isInstance(prior) && targetClass.isInstance(current)) {
 
@@ -336,25 +372,92 @@ public class ValidationContextImpl implements ValidationContext {
     public <T, U>
     ValidationContext applyRepeated(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
 
-        if (done())
-            return this;
-
         var loc = location.peek();
 
         if (!loc.field().isRepeated() || loc.field().isMapField())
-            throw new EUnexpected();
+            throw new ETracInternal("applyRepeated() can only apply to repeated fields (not including map fields)");
 
-        var list = (List<?>) loc.target();
+        if (done())
+            return this;
 
-        if (list == null)
-            throw new EUnexpected();
+        var size = loc.parent().msg().getRepeatedFieldCount(loc.field());
 
         var resultCtx = this;
 
-        for (var i = 0; i < list.size(); i++) {
+        for (var i = 0; i < size; i++) {
 
             resultCtx = (ValidationContextImpl) resultCtx
-                    .pushRepeatedItem(i)
+                    .pushRepeated(i)
+                    .apply(validator, targetClass, arg)
+                    .pop();
+        }
+
+        return resultCtx;
+    }
+
+    @Override public ValidationContext
+    applyMapKeys(ValidationFunction.Basic validator) {
+
+        return applyMapKeys((obj, arg, ctx) -> validator.apply(ctx), null);
+    }
+
+    @Override public ValidationContext
+    applyMapKeys(ValidationFunction.Typed<String> validator) {
+
+        return applyMapKeys((obj, arg, ctx) -> validator.apply(obj, ctx), null);
+    }
+
+    @Override public <U> ValidationContext
+    applyMapKeys(ValidationFunction.TypedArg<String, U> validator, U arg) {
+
+        var loc = location.peek();
+
+        if (!loc.field().isMapField())
+            throw new ETracInternal("applyMapKeys() can only apply to map fields");
+
+        if (done())
+            return this;
+
+        var size = loc.parent().msg().getRepeatedFieldCount(loc.field());
+
+        var resultCtx = this;
+
+        for (var i = 0; i < size; i++) {
+
+            resultCtx = (ValidationContextImpl) resultCtx
+                    .pushMapKey(i)
+                    .apply(validator, String.class, arg)
+                    .pop();
+        }
+
+        return resultCtx;
+    }
+
+    @Override public <T> ValidationContext
+    applyMapValues(ValidationFunction.Typed<T> validator, Class<T> targetClass) {
+
+        return applyMapValues((obj, arg, ctx) -> validator.apply(obj, ctx), targetClass, null);
+    }
+
+    @Override public <T, U> ValidationContext
+    applyMapValues(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
+
+        var loc = location.peek();
+
+        if (!loc.field().isMapField())
+            throw new ETracInternal("applyMapKeys() can only apply to map fields");
+
+        if (done())
+            return this;
+
+        var size = loc.parent().msg().getRepeatedFieldCount(loc.field());
+
+        var resultCtx = this;
+
+        for (var i = 0; i < size; i++) {
+
+            resultCtx = (ValidationContextImpl) resultCtx
+                    .pushMapKey(i)  // todo
                     .apply(validator, targetClass, arg)
                     .pop();
         }
@@ -395,11 +498,11 @@ public class ValidationContextImpl implements ValidationContext {
     }
 
     public Descriptors.FieldDescriptor priorField() {
-        return location.peek().priorField();
+        return priorCtx.location.peek().field();
     }
 
     public String priorFieldName() {
-        return location.peek().priorFieldName();
+        return priorCtx.location.peek().fieldName();
     }
 
 
