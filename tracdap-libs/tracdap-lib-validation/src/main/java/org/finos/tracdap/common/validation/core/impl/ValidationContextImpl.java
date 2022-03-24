@@ -193,57 +193,18 @@ public class ValidationContextImpl implements ValidationContext {
 
     public ValidationContext apply(ValidationFunction.Basic validator) {
 
-        if (done())
-            return this;
-
-        return validator.apply(this);
+        return apply((obj, arg, ctx) -> validator.apply(ctx), Object.class, null);
     }
 
     public ValidationContext apply(ValidationFunction.Typed<String> validator) {
-        return apply(validator, String.class);
+
+        return apply((obj, arg, ctx) -> validator.apply(obj, ctx), String.class, null);
     }
 
-    @SuppressWarnings({"unchecked", "rawTypes"})
     public <T>
     ValidationContext apply(ValidationFunction.Typed<T> validator, Class<T> targetClass) {
 
-        if (done())
-            return this;
-
-        var obj = location.peek().target();
-
-        // Simple case - obj is an instance of the expected target class
-
-        if (targetClass.isInstance(obj)) {
-            var target = (T) obj;
-            return validator.apply(target, this);
-        }
-
-        // Protobuf stores enum values as EnumValueDescriptor objects
-        // So, special handling is needed for enums
-
-        if (Enum.class.isAssignableFrom(targetClass)) {
-
-            if (obj instanceof Descriptors.EnumValueDescriptor) {
-
-                var valueDesc = (Descriptors.EnumValueDescriptor) obj;
-                var enumType = (Class<? extends Enum>) targetClass;
-                var enumVal = Enum.valueOf(enumType, valueDesc.getName());
-
-                return validator.apply((T) enumVal, this);
-            }
-        }
-
-        // If obj does not match the expected target type, blow up the validation process
-
-        // Type mis-match errors should be detected during development, otherwise the validator won't run
-        // In the event of a type mis-match at run time, blow up the validator!
-        // I.e. report as an unexpected internal error, validation cannot be completed.
-
-        log.error("Validator type mismatch (this is a bug): expected [{}], got [{}]", targetClass, obj.getClass());
-        log.error("(Expected target class is specified in ctx.apply())");
-
-        throw new EUnexpected();
+        return apply((obj, arg, ctx) -> validator.apply(obj, ctx), targetClass, null);
     }
 
     @SuppressWarnings({"unchecked", "rawTypes"})
@@ -257,7 +218,7 @@ public class ValidationContextImpl implements ValidationContext {
 
         // Simple case - obj is an instance of the expected target class
 
-        if (targetClass.isInstance(obj)) {
+        if (obj == null || targetClass.isInstance(obj)) {
             var target = (T) obj;
             return validator.apply(target, arg, this);
         }
@@ -279,8 +240,8 @@ public class ValidationContextImpl implements ValidationContext {
 
         // If obj does not match the expected target type, blow up the validation process
 
-        // Type mis-match errors should be detected during development, otherwise the validator won't run
-        // In the event of a type mis-match at run time, blow up the validator!
+        // Type mismatch errors should be detected during development, otherwise the validator won't run
+        // In the event of a type mismatch at run time, blow up the validator!
         // I.e. report as an unexpected internal error, validation cannot be completed.
 
         log.error("Validator type mismatch (this is a bug): expected [{}], got [{}]", targetClass, obj.getClass());
@@ -367,36 +328,13 @@ public class ValidationContextImpl implements ValidationContext {
     }
 
     public <T>
-    ValidationContext applyRepeated(ValidationFunction.Typed<T> validator, Class<T> msgClass) {
+    ValidationContext applyRepeated(ValidationFunction.Typed<T> validator, Class<T> targetClass) {
 
-        if (done())
-            return this;
-
-        var loc = location.peek();
-
-        if (!loc.field().isRepeated() || loc.field().isMapField())
-            throw new EUnexpected();
-
-        var list = (List<?>) loc.target();
-
-        if (list == null)
-            throw new EUnexpected();
-
-        var resultCtx = this;
-
-        for (var i = 0; i < list.size(); i++) {
-
-            resultCtx = (ValidationContextImpl) resultCtx
-                    .pushRepeatedItem(i)
-                    .apply(validator, msgClass)
-                    .pop();
-        }
-
-        return resultCtx;
+        return applyRepeated((obj, arg, ctx) -> validator.apply(obj, ctx), targetClass, null);
     }
 
     public <T, U>
-    ValidationContext applyRepeated(ValidationFunction.TypedArg<T, U> validator, Class<T> msgClass, U arg) {
+    ValidationContext applyRepeated(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
 
         if (done())
             return this;
@@ -417,7 +355,7 @@ public class ValidationContextImpl implements ValidationContext {
 
             resultCtx = (ValidationContextImpl) resultCtx
                     .pushRepeatedItem(i)
-                    .apply(validator, msgClass, arg)
+                    .apply(validator, targetClass, arg)
                     .pop();
         }
 
