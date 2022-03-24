@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.common.validation.static_;
 
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.*;
@@ -86,7 +88,7 @@ public class ObjectIdValidator {
 
         ctx = ctx.push(TH_OBJECT_VERSION)
                 .apply(CommonValidators::required)
-                .apply(CommonValidators::positive)
+                .apply(CommonValidators::positive, Integer.class)
                 .pop();
 
         ctx = ctx.push(TH_OBJECT_TIMESTAMP)
@@ -96,13 +98,30 @@ public class ObjectIdValidator {
 
         ctx = ctx.push(TH_TAG_VERSION)
                 .apply(CommonValidators::required)
-                .apply(CommonValidators::positive)
+                .apply(CommonValidators::positive, Integer.class)
                 .pop();
 
         ctx = ctx.push(TH_TAG_TIMESTAMP)
                 .apply(CommonValidators::required)
                 .apply(TypeSystemValidator::datetimeValue, DatetimeValue.class)
                 .pop();
+
+        if (!ctx.failed()) {
+
+            var objectTimestamp = MetadataCodec.decodeDatetime(msg.getObjectTimestamp());
+            var tagTimestamp = MetadataCodec.decodeDatetime(msg.getTagTimestamp());
+
+            if (msg.getTagVersion() == MetadataConstants.TAG_FIRST_VERSION) {
+
+                if (!tagTimestamp.equals(objectTimestamp))
+                    ctx.error("Tag timestamp should be the same as object timestamp when tag version = " + MetadataConstants.TAG_FIRST_VERSION);
+            }
+            else {
+
+                if (!tagTimestamp.isAfter(objectTimestamp))
+                    ctx.error("Tag timestamp should be later than object timestamp when tag version > " + MetadataConstants.TAG_FIRST_VERSION);
+            }
+        }
 
         return ctx;
     }
