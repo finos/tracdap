@@ -82,10 +82,10 @@ public class Validator {
 
         if (!result.ok()) {
 
-            log.error("VALIDATION FAILED: [{}]", key.displayName());
-
             for (var failure: result.failures())
                 log.error(failure.message());
+
+            log.error("VALIDATION FAILED: [{}]", key.displayName());
 
             switch (ctx.validationType()) {
 
