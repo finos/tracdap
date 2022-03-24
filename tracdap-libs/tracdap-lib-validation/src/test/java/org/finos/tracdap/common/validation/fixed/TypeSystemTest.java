@@ -692,6 +692,26 @@ class TypeSystemTest {
     }
 
     @Test
+    void map_keyNotBlank() {
+
+        var type = TypeDescriptor.newBuilder()
+                .setBasicType(BasicType.MAP)
+                .setMapType(TypeDescriptor.newBuilder().setBasicType(BasicType.STRING))
+                .build();
+
+        var map = MapValue.newBuilder();
+        map.putEntries("key_1", Value.newBuilder().setStringValue("map_value_1").build());
+        map.putEntries("", Value.newBuilder().setStringValue("map_value_2").build());
+
+        var value = Value.newBuilder()
+                .setType(type)
+                .setMapValue(map)
+                .build();
+
+        expectInvalid(value);
+    }
+
+    @Test
     void map_noTypeInfo() {
 
         var map = MapValue.newBuilder();
