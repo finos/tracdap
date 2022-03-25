@@ -35,18 +35,7 @@ public class MetadataSearchService {
     public CompletableFuture<List<Tag>>
     search(String tenant, SearchParameters searchParameters) {
 
-        // TODO: Validation
-
-        // Validation will use a generic metadata validator
-        // to recursively check any metadata object, making
-        // sure it is consistent with itself. Errors in this
-        // phase will result in an INVALID ARGUMENT error.
-
-        // A second phase can check the metadata request
-        // contextually, for example making sure referenced
-        // IDs are valid in a write request. Errors in this
-        // phase will result in a FAILED PRECONDITION error
-        // (including duplicate / missing item errors).
+        // Validation currently in the API layer
 
         return dal.search(tenant, searchParameters);
     }

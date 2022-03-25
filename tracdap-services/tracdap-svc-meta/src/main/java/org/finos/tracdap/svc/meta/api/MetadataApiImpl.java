@@ -35,8 +35,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import static org.finos.tracdap.svc.meta.api.TracMetadataApi.READ_BATCH_METHOD;
-import static org.finos.tracdap.svc.meta.api.TracMetadataApi.READ_OBJECT_METHOD;
+import static org.finos.tracdap.svc.meta.api.TracMetadataApi.*;
 import static org.finos.tracdap.svc.meta.services.MetadataConstants.PUBLIC_API;
 
 
@@ -155,6 +154,8 @@ public class MetadataApiImpl {
     }
 
     CompletableFuture<MetadataSearchResponse> search(MetadataSearchRequest request) {
+
+        validateRequest(SEARCH_METHOD, request);
 
         var tenant = request.getTenant();
         var searchParams = request.getSearchParams();

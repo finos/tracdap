@@ -22,6 +22,8 @@ import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.common.validation.static_.CommonValidators;
 import org.finos.tracdap.common.validation.static_.ObjectIdValidator;
+import org.finos.tracdap.common.validation.static_.SearchValidator;
+import org.finos.tracdap.metadata.SearchParameters;
 import org.finos.tracdap.metadata.TagSelector;
 
 import com.google.protobuf.Descriptors;
@@ -39,6 +41,10 @@ public class MetadataApiValidator {
     private static final Descriptors.FieldDescriptor MRR_TENANT;
     private static final Descriptors.FieldDescriptor MRR_SELECTOR;
 
+    private static final Descriptors.Descriptor METADATA_SEARCH_REQUEST;
+    private static final Descriptors.FieldDescriptor MSR_TENANT;
+    private static final Descriptors.FieldDescriptor MSR_SEARCH_PARAMS;
+
     private static final Descriptors.Descriptor BATCH_READ_REQUEST;
     private static final Descriptors.FieldDescriptor BRR_TENANT;
     private static final Descriptors.FieldDescriptor BRR_SELECTORS;
@@ -51,6 +57,10 @@ public class MetadataApiValidator {
         METADATA_READ_REQUEST = MetadataReadRequest.getDescriptor();
         MRR_TENANT = field(METADATA_READ_REQUEST, MetadataReadRequest.TENANT_FIELD_NUMBER);
         MRR_SELECTOR = field(METADATA_READ_REQUEST, MetadataReadRequest.SELECTOR_FIELD_NUMBER);
+
+        METADATA_SEARCH_REQUEST = MetadataSearchRequest.getDescriptor();
+        MSR_TENANT = field(METADATA_SEARCH_REQUEST, MetadataSearchRequest.TENANT_FIELD_NUMBER);
+        MSR_SEARCH_PARAMS = field(METADATA_SEARCH_REQUEST, MetadataSearchRequest.SEARCHPARAMS_FIELD_NUMBER);
 
         BATCH_READ_REQUEST = MetadataBatchRequest.getDescriptor();
         BRR_TENANT = field(BATCH_READ_REQUEST, MetadataBatchRequest.TENANT_FIELD_NUMBER);
@@ -68,6 +78,22 @@ public class MetadataApiValidator {
         ctx = ctx.push(MRR_SELECTOR)
                 .apply(CommonValidators::required)
                 .apply(ObjectIdValidator::tagSelector, TagSelector.class)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "search")
+    public static ValidationContext search(MetadataSearchRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(MSR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.push(MSR_SEARCH_PARAMS)
+                .apply(CommonValidators::required)
+                .apply(SearchValidator::searchParameters, SearchParameters.class)
                 .pop();
 
         return ctx;
