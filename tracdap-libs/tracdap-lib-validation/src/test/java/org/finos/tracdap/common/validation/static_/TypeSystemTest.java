@@ -16,15 +16,12 @@
 
 package org.finos.tracdap.common.validation.static_;
 
-import com.google.protobuf.Message;
-import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.TypeSystem;
-import org.finos.tracdap.common.validation.Validator;
+import org.finos.tracdap.common.validation.test.BaseValidatorTest;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.test.meta.TestData;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -33,29 +30,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 
-class TypeSystemTest {
-
-    static Validator validator;
-
-    @BeforeAll
-    static void setupValidator() {
-
-        validator = new Validator();
-    }
-
-    static <TMsg extends Message> void expectValid(TMsg msg) {
-
-        Assertions.assertDoesNotThrow(
-                () -> validator.validateFixedObject(msg),
-                "Validation failed for a valid message");
-    }
-
-    static <TMsg extends Message> void expectInvalid(TMsg msg) {
-
-        Assertions.assertThrows(EInputValidation.class,
-                () -> validator.validateFixedObject(msg),
-                "Validation passed for an invalid message");
-    }
+class TypeSystemTest extends BaseValidatorTest {
 
     @Test
     void typeDescriptor_okPrimitive() {

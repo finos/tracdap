@@ -16,45 +16,20 @@
 
 package org.finos.tracdap.common.validation.static_;
 
-import com.google.protobuf.Message;
-import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
-import org.finos.tracdap.common.validation.Validator;
+import org.finos.tracdap.common.validation.test.BaseValidatorTest;
 import org.finos.tracdap.metadata.DatetimeValue;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagHeader;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
+
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.UUID;
 
 
-class ObjectIdTest {
-
-    static Validator validator;
-
-    @BeforeAll
-    static void setupValidator() {
-
-        validator = new Validator();
-    }
-
-    static <TMsg extends Message> void expectValid(TMsg msg) {
-
-        Assertions.assertDoesNotThrow(
-                () -> validator.validateFixedObject(msg),
-                "Validation failed for a valid message");
-    }
-
-    static <TMsg extends Message> void expectInvalid(TMsg msg) {
-
-        Assertions.assertThrows(EInputValidation.class,
-                () -> validator.validateFixedObject(msg),
-                "Validation passed for an invalid message");
-    }
+class ObjectIdTest extends BaseValidatorTest {
 
     @Test
     void tagHeader_ok1() {
