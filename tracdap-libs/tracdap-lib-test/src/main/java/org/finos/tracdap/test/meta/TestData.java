@@ -506,8 +506,8 @@ public class TestData {
 
             case BOOLEAN: return ! ((Boolean) originalObject);
             case INTEGER: return ((Long) originalObject) + 1L;
-            case FLOAT: return ((Double) originalObject) * 2.0D;
-            case DECIMAL: return ((BigDecimal) originalObject).multiply(new BigDecimal(2));
+            case FLOAT: return ((Double) originalObject) + 2.0D;
+            case DECIMAL: return ((BigDecimal) originalObject).add(new BigDecimal(2));
             case STRING: return originalObject.toString() + " and friends";
             case DATE: return ((LocalDate) originalObject).plusDays(1);
             case DATETIME: return ((OffsetDateTime) originalObject).plusHours(1);

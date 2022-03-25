@@ -292,10 +292,10 @@ abstract class MetadataSearchApiTest {
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
-    void allAttrTypes(BasicType attrType) {
+                names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP", "FLOAT", "DECIMAL", "DATETIME"})
+    void discreteAttrTypes(BasicType attrType) {
 
-        var attrToLookFor = "allAttrTypes_" + attrType.name();
+        var attrToLookFor = "discreteTypes_" + attrType.name();
         var valueToLookFor = objectOfType(attrType);
         var valueNotToLookFor = differentObjectOfSameType(attrType, valueToLookFor);
 
@@ -341,6 +341,76 @@ abstract class MetadataSearchApiTest {
                         .setAttrType(attrType)
                         .setOperator(SearchOperator.EQ)
                         .setSearchValue(encodeNativeObject(valueToLookFor)))))
+                .build();
+
+        var searchResult = searchApi.search(searchRequest);
+
+        // Search results do not include the definition body
+        var t1 = tag1.toBuilder()
+                .setHeader(id1)
+                .clearDefinition()
+                .build();
+
+        assertEquals(1, searchResult.getSearchResultCount());
+        assertEquals(t1, searchResult.getSearchResult(0));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = BasicType.class, mode = EnumSource.Mode.INCLUDE,
+            names = {"FLOAT", "DECIMAL", "DATETIME"})
+    void continuousAttrTypes(BasicType attrType) {
+
+        // For continuous types, create three ordered values
+        // Save attrs with low and high values, then look for attrs < middle value
+        // Result should be a single match, the low value
+
+        var attrToLookFor = "continuousTypes_" + attrType.name();
+        var valueLow = objectOfType(attrType);
+        var valueMid = differentObjectOfSameType(attrType, valueLow);
+        var valueHigh = differentObjectOfSameType(attrType, valueMid);
+
+        var obj1 = TestData.dummyDataDef();
+        var obj2 = TestData.dummyDataDef();
+
+        var tag1 = Tag.newBuilder()
+                .setDefinition(obj1)
+                .putAttrs(attrToLookFor, encodeNativeObject(valueLow))
+                .build();
+
+        var tag2 = Tag.newBuilder()
+                .setDefinition(obj2)
+                .putAttrs(attrToLookFor, encodeNativeObject(valueHigh))
+                .build();
+
+        var save1 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(obj1)
+                .addAllTagUpdates(tagUpdatesForAttrs(tag1.getAttrsMap()))
+                .build();
+
+        var save2 = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.DATA)
+                .setDefinition(obj2)
+                .addAllTagUpdates(tagUpdatesForAttrs(tag2.getAttrsMap()))
+                .build();
+
+        var id1 = writeApi.createObject(save1);
+
+        // noinspection ResultOfMethodCallIgnored
+        writeApi.createObject(save2);
+
+        var searchRequest = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                        .setAttrName(attrToLookFor)
+                        .setAttrType(attrType)
+                        .setOperator(SearchOperator.LT)
+                        .setSearchValue(encodeNativeObject(valueMid)))))
                 .build();
 
         var searchResult = searchApi.search(searchRequest);
