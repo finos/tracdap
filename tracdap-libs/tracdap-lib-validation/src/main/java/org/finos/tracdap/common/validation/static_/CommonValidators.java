@@ -34,10 +34,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
+
 
 public class CommonValidators {
 
@@ -87,10 +86,14 @@ public class CommonValidators {
             }
         }
 
-        return ctx;
+        // Field is not present, skip remaining validators
+
+        return ctx.skip();
     }
 
     public static ValidationContext optional(ValidationContext ctx) {
+
+        // If field is not present, skip remaining validators
 
         var parentMsg = ctx.parentMsg();
 
@@ -106,6 +109,14 @@ public class CommonValidators {
         }
 
         return ctx;
+    }
+
+    public static ValidationFunction.Basic ifAndOnlyIf(boolean condition) {
+
+        if (condition)
+            return CommonValidators::required;
+        else
+            return CommonValidators::omitted;
     }
 
     public static <T> ValidationFunction.Typed<T> equalTo(T other, String errorMessage) {

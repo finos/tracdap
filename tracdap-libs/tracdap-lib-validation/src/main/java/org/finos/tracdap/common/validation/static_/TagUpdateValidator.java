@@ -17,30 +17,36 @@
 package org.finos.tracdap.common.validation.static_;
 
 import com.google.protobuf.Descriptors;
+import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.common.validation.core.ValidatorUtils;
 import org.finos.tracdap.metadata.*;
 
+import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
+
 
 @Validator(type = ValidationType.STATIC)
 public class TagUpdateValidator {
-
-    // Rough implementation that provides only a few validation points
-    // Full implementation will be comprehensive across the metadata model
-    // Requires generic handling of all message, enum and primitive types, as well as the TRAC type system
 
     private static final Descriptors.Descriptor TAG_UPDATE;
     private static final Descriptors.FieldDescriptor TU_OPERATION;
     private static final Descriptors.FieldDescriptor TU_ATTR_NAME;
     private static final Descriptors.FieldDescriptor TU_VALUE;
+
+    private static final Descriptors.Descriptor VALUE;
+    private static final Descriptors.OneofDescriptor V_VALUE;
+
     static {
 
         TAG_UPDATE = TagUpdate.getDescriptor();
         TU_ATTR_NAME = ValidatorUtils.field(TAG_UPDATE, TagUpdate.ATTRNAME_FIELD_NUMBER);
         TU_OPERATION = ValidatorUtils.field(TAG_UPDATE, TagUpdate.OPERATION_FIELD_NUMBER);
         TU_VALUE = ValidatorUtils.field(TAG_UPDATE, TagUpdate.VALUE_FIELD_NUMBER);
+
+        VALUE = Value.getDescriptor();
+        V_VALUE = field(VALUE, Value.BOOLEANVALUE_FIELD_NUMBER).getContainingOneof();
     }
 
     @Validator
@@ -51,38 +57,46 @@ public class TagUpdateValidator {
                 .apply(CommonValidators::recognizedEnum, TagOperation.class)
                 .pop();
 
-        // attrName is not needed fot the CLEAR_ALL_ATTR operation
-        if (msg.getOperation() == TagOperation.CLEAR_ALL_ATTR) {
+        var nameRequired = msg.getOperation() != TagOperation.CLEAR_ALL_ATTR;
+        var valueRequired = nameRequired && msg.getOperation() != TagOperation.DELETE_ATTR;
 
-            ctx = ctx.push(TU_ATTR_NAME)
-                    .apply(CommonValidators::omitted)
-                    .pop();
-        }
-        else {
+        ctx = ctx.push(TU_ATTR_NAME)
+                .apply(CommonValidators.ifAndOnlyIf(nameRequired))
+                .apply(CommonValidators::identifier)
+                .pop();
 
-            ctx = ctx.push(TU_ATTR_NAME)
-                    .apply(CommonValidators::required)
-                    .apply(CommonValidators::identifier)
-                    .apply(CommonValidators::notTracReserved)
-                    .pop();
-        }
-
-        // value is not needed for CLEAR_ALL_ATTR or DELETE_ATTR
-        if (msg.getOperation() == TagOperation.CLEAR_ALL_ATTR || msg.getOperation() == TagOperation.DELETE_ATTR) {
-
-            ctx = ctx.push(TU_VALUE)
-                    .apply(CommonValidators::omitted)
-                    .pop();
-        }
-        else {
-
-            ctx = ctx.push(TU_VALUE)
-                    .apply(CommonValidators::required)
-                    .apply(TypeSystemValidator::value, Value.class)
-                    .pop();
-        }
+        ctx = ctx.push(TU_VALUE)
+                .apply(CommonValidators.ifAndOnlyIf(valueRequired))
+                .apply(TypeSystemValidator::value, Value.class)
+                .apply(TagUpdateValidator::notNull, Value.class)
+                .apply(TagUpdateValidator::allowedValueTypes, Value.class)
+                .pop();
 
         return ctx;
     }
 
+    private static ValidationContext notNull(Value msg, ValidationContext ctx) {
+
+        if (!msg.hasOneof(V_VALUE))
+            return ctx.error("Null values are not allowed for tag updates");
+
+        return ctx;
+    }
+
+    private static ValidationContext allowedValueTypes(Value msg, ValidationContext ctx) {
+
+        if (TypeSystem.isPrimitive(msg))
+            return ctx;
+
+        if (TypeSystem.basicType(msg) == BasicType.ARRAY) {
+
+            if (TypeSystem.isPrimitive(msg.getType().getArrayType()))
+                return ctx;
+
+            return ctx.error("Nested array types are now allowed for tag updates");
+        }
+
+        var err = String.format("Value type [%s] is not allowed for tag updates", TypeSystem.basicType(msg));
+        return ctx.error(err);
+    }
 }
