@@ -16,7 +16,9 @@
 
 package org.finos.tracdap.svc.meta.api;
 
+import com.google.protobuf.Descriptors;
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.GrpcServerWrap;
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.TagHeader;
@@ -29,6 +31,9 @@ import org.finos.tracdap.svc.meta.services.MetadataConstants;
 
 
 public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataApiImplBase {
+
+    private static final String SERVICE_NAME = TrustedMetadataApiGrpc.SERVICE_NAME.substring(TrustedMetadataApiGrpc.SERVICE_NAME.lastIndexOf(".") + 1);
+    private static final Descriptors.ServiceDescriptor TRUSTED_METADATA_SERVICE = MetadataTrusted.getDescriptor().findServiceByName(SERVICE_NAME);
 
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreateObjectMethod();
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getUpdateObjectMethod();
@@ -49,7 +54,10 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
             MetadataWriteService writeService,
             MetadataSearchService searchService) {
 
-        apiImpl = new MetadataApiImpl(readService, writeService, searchService, MetadataConstants.TRUSTED_API);
+        if (TRUSTED_METADATA_SERVICE == null)
+            throw new EUnexpected();
+
+        apiImpl = new MetadataApiImpl(TRUSTED_METADATA_SERVICE, readService, writeService, searchService, MetadataConstants.TRUSTED_API);
         grpcWrap = new GrpcServerWrap(getClass());
     }
 

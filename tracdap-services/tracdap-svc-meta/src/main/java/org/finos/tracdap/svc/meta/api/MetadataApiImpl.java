@@ -16,7 +16,12 @@
 
 package org.finos.tracdap.svc.meta.api;
 
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Message;
+import io.grpc.MethodDescriptor;
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.api.Data;
+import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
 
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
@@ -30,6 +35,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import static org.finos.tracdap.svc.meta.api.TracMetadataApi.READ_BATCH_METHOD;
+import static org.finos.tracdap.svc.meta.api.TracMetadataApi.READ_OBJECT_METHOD;
 import static org.finos.tracdap.svc.meta.services.MetadataConstants.PUBLIC_API;
 
 
@@ -42,6 +49,9 @@ public class MetadataApiImpl {
             ObjectType.FLOW,
             ObjectType.CUSTOM);
 
+    private final Descriptors.ServiceDescriptor serviceDescriptor;
+    private final Validator validator;
+
     private final MetadataReadService readService;
     private final MetadataWriteService writeService;
     private final MetadataSearchService searchService;
@@ -49,10 +59,14 @@ public class MetadataApiImpl {
     private final boolean apiTrustLevel;
 
     public MetadataApiImpl(
+            Descriptors.ServiceDescriptor serviceDescriptor,
             MetadataReadService readService,
             MetadataWriteService writeService,
             MetadataSearchService searchService,
             boolean apiTrustLevel) {
+
+        this.serviceDescriptor = serviceDescriptor;
+        this.validator = new Validator();
 
         this.readService = readService;
         this.writeService = writeService;
@@ -126,10 +140,14 @@ public class MetadataApiImpl {
 
     CompletableFuture<Tag> readObject(MetadataReadRequest request) {
 
+        validateRequest(READ_OBJECT_METHOD, request);
+
         return readService.readObject(request.getTenant(), request.getSelector());
     }
 
     CompletableFuture<MetadataBatchResponse> readBatch(MetadataBatchRequest request) {
+
+        validateRequest(READ_BATCH_METHOD, request);
 
         return readService
                 .readObjects(request.getTenant(), request.getSelectorList())
@@ -177,5 +195,13 @@ public class MetadataApiImpl {
         var objectVersion = request.getObjectVersion();
 
         return readService.loadLatestTag(tenant, objectType, objectId, objectVersion);
+    }
+
+    private <TReq extends Message>
+    void validateRequest(MethodDescriptor<TReq, ?> method, TReq request) {
+
+        var protoMethod = serviceDescriptor.findMethodByName(method.getBareMethodName());
+
+        validator.validateFixedMethod(request, protoMethod);
     }
 }
