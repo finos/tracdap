@@ -96,7 +96,7 @@ public class SchemaValidator {
     public static ValidationContext tableSchema(TableSchema table, ValidationContext ctx) {
 
         ctx = ctx.pushRepeated(TS_FIELDS)
-                .apply(CommonValidators::listNotEmpty, List.class)
+                .apply(CommonValidators::listNotEmpty)
                 .applyRepeated(SchemaValidator::fieldSchema, FieldSchema.class)
                 .pop();
 

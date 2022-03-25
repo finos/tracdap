@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.validation.static_;
 
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -422,20 +423,30 @@ public class CommonValidators {
         return ctx;
     }
 
-    public static ValidationContext listNotEmpty(List<?> list, ValidationContext ctx) {
+    public static ValidationContext listNotEmpty(ValidationContext ctx) {
 
-        if (list.isEmpty()) {
-            var err = String.format("The list [%s] contains no values", ctx.fieldName());
+        if (!ctx.field().isRepeated() || ctx.field().isMapField())
+            throw new ETracInternal("Validator [listNotEmpty] can only be applied to repeated fields (and not map fields)");
+
+        var nItems = ctx.parentMsg().getRepeatedFieldCount(ctx.field());
+
+        if (nItems == 0) {
+            var err = String.format("The list of [%s] contains no items", ctx.fieldName());
             return ctx.error(err);
         }
 
         return ctx;
     }
 
-    public static ValidationContext mapNotEmpty(Map<?, ?> list, ValidationContext ctx) {
+    public static ValidationContext mapNotEmpty(ValidationContext ctx) {
 
-        if (list.isEmpty()) {
-            var err = String.format("The map [%s] contains no values", ctx.fieldName());
+        if (!ctx.field().isMapField())
+            throw new ETracInternal("Validator [mapNotEmpty] can only be applied to map fields");
+
+        var nItems = ctx.parentMsg().getRepeatedFieldCount(ctx.field());
+
+        if (nItems == 0) {
+            var err = String.format("The map of [%s] contains no entries", ctx.fieldName());
             return ctx.error(err);
         }
 
