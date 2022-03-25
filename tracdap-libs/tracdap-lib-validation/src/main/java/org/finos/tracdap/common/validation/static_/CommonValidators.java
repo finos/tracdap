@@ -396,36 +396,6 @@ public class CommonValidators {
         return ctx;
     }
 
-    public static ValidationFunction.Typed<TagSelector> selectorType(ObjectType requiredType) {
-
-        return (selector, ctx) -> selectorType(requiredType, selector, ctx);
-    }
-
-    public static ValidationContext selectorType(ObjectType requiredType, TagSelector selector, ValidationContext ctx) {
-
-        if (!selector.getObjectType().equals(requiredType)) {
-            var err = String.format("Wrong object type for [%s]: expected [%s], got [%s]",
-                    ctx.fieldName(), requiredType, selector.getObjectType());
-            return ctx.error(err);
-        }
-
-        return ctx;
-    }
-
-    public static ValidationContext fixedObjectVersion(TagSelector selector, ValidationContext ctx) {
-
-        if (selector.hasLatestObject()) {
-
-            var err = String.format(
-                    "The [%s] selector must refer to a fixed object version, [latestObject] is not allowed",
-                    ctx.fieldName());
-
-            ctx = ctx.error(err);
-        }
-
-        return ctx;
-    }
-
     public static ValidationContext recognizedEnum(ProtocolMessageEnum protoEnum, ValidationContext ctx) {
 
         if (protoEnum.getNumber() < 0) {

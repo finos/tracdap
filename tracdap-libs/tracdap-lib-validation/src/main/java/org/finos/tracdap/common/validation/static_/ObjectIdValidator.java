@@ -18,6 +18,7 @@ package org.finos.tracdap.common.validation.static_;
 
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
+import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.*;
@@ -159,4 +160,47 @@ public class ObjectIdValidator {
         return ctx;
     }
 
+    public static ValidationFunction.Typed<TagSelector> selectorType(ObjectType requiredType) {
+
+        return (selector, ctx) -> selectorType(selector, requiredType, ctx);
+    }
+
+    public static ValidationContext selectorType(TagSelector selector, ObjectType requiredType, ValidationContext ctx) {
+
+        if (!selector.getObjectType().equals(requiredType)) {
+            var err = String.format("Wrong object type for [%s]: expected [%s], got [%s]",
+                    ctx.fieldName(), requiredType, selector.getObjectType());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext selectorForLatest(TagSelector selector, ValidationContext ctx) {
+
+        if (!selector.getLatestObject() || !selector.getLatestTag()) {
+
+            var err = String.format(
+                    "The [%s] selector must refer to the latest object and tag version, fixed versions are not allowed",
+                    ctx.fieldName());
+
+            ctx = ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext fixedObjectVersion(TagSelector selector, ValidationContext ctx) {
+
+        if (selector.hasLatestObject()) {
+
+            var err = String.format(
+                    "The [%s] selector must refer to a fixed object version, [latestObject] is not allowed",
+                    ctx.fieldName());
+
+            ctx = ctx.error(err);
+        }
+
+        return ctx;
+    }
 }

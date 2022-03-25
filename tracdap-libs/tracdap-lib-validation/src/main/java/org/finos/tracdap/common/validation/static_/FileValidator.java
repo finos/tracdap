@@ -74,8 +74,8 @@ public class FileValidator {
         ctx = ctx.push(FD_STORAGE_ID)
                 .apply(CommonValidators::required)
                 .apply(ObjectIdValidator::tagSelector, TagSelector.class)
-                .apply(CommonValidators.selectorType(ObjectType.STORAGE), TagSelector.class)
-                .apply(FileValidator::selectorForLatest, TagSelector.class)
+                .apply(ObjectIdValidator::selectorType, TagSelector.class, ObjectType.STORAGE)
+                .apply(ObjectIdValidator::selectorForLatest, TagSelector.class)
                 .pop();
 
         return ctx;
@@ -97,16 +97,6 @@ public class FileValidator {
 
                 ctx = ctx.error(err);
             }
-        }
-
-        return ctx;
-    }
-
-    private static ValidationContext selectorForLatest(TagSelector selector, ValidationContext ctx) {
-
-        if (!selector.getLatestObject() || !selector.getLatestTag()) {
-
-            ctx = ctx.error("File storage selector must refer to the latest object and tag version of the storage object");
         }
 
         return ctx;
