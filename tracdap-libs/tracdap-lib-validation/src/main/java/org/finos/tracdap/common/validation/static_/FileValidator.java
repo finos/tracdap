@@ -38,6 +38,7 @@ public class FileValidator {
     private static final Descriptors.FieldDescriptor FD_EXTENSION;
     private static final Descriptors.FieldDescriptor FD_MIME_TYPE;
     private static final Descriptors.FieldDescriptor FD_SIZE;
+    private static final Descriptors.FieldDescriptor FD_DATA_ITEM;
     private static final Descriptors.FieldDescriptor FD_STORAGE_ID;
 
     static {
@@ -46,6 +47,7 @@ public class FileValidator {
         FD_EXTENSION = ValidatorUtils.field(FILE_DEF, FileDefinition.EXTENSION_FIELD_NUMBER);
         FD_MIME_TYPE = ValidatorUtils.field(FILE_DEF, FileDefinition.MIMETYPE_FIELD_NUMBER);
         FD_SIZE = ValidatorUtils.field(FILE_DEF, FileDefinition.SIZE_FIELD_NUMBER);
+        FD_DATA_ITEM = ValidatorUtils.field(FILE_DEF, FileDefinition.DATAITEM_FIELD_NUMBER);
         FD_STORAGE_ID = ValidatorUtils.field(FILE_DEF, FileDefinition.STORAGEID_FIELD_NUMBER);
     }
 
@@ -69,6 +71,10 @@ public class FileValidator {
         ctx = ctx.push(FD_SIZE)
                 .apply(CommonValidators::optional)
                 .apply(CommonValidators::notNegative, Long.class)
+                .pop();
+
+        ctx = ctx.push(FD_DATA_ITEM)
+                .apply(CommonValidators::required)
                 .pop();
 
         ctx = ctx.push(FD_STORAGE_ID)
