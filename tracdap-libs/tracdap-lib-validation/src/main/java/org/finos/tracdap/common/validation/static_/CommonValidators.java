@@ -45,23 +45,35 @@ public class CommonValidators {
 
         var parentMsg = ctx.parentMsg();
 
-        if (ctx.isOneOf() && !parentMsg.hasOneof(ctx.oneOf())) {
-            var err = String.format("A value is required for [%s]", ctx.fieldName());
-            return ctx.error(err);
-        }
-
-        if (!parentMsg.hasField(ctx.field())) {
-            var err = String.format("A value is required for [%s]", ctx.fieldName());
-            return ctx.error(err);
-        }
-
-        if (ctx.field().getType() == Descriptors.FieldDescriptor.Type.STRING) {
-
-            var str = (String) ctx.target();
-
-            if (str.isEmpty()) {
+        if (ctx.isOneOf()) {
+            if (!parentMsg.hasOneof(ctx.oneOf())) {
                 var err = String.format("A value is required for [%s]", ctx.fieldName());
                 return ctx.error(err);
+            }
+        }
+        else if (ctx.isRepeated()) {
+
+            if (parentMsg.getRepeatedFieldCount(ctx.field()) == 0) {
+                var err = String.format("A value is required for [%s]", ctx.fieldName());
+                return ctx.error(err);
+            }
+        }
+        else {
+
+            if (!parentMsg.hasField(ctx.field())) {
+                var err = String.format("A value is required for [%s]", ctx.fieldName());
+                return ctx.error(err);
+            }
+
+            // For single string values, required means the string cannot be empty
+            if (ctx.field().getType() == Descriptors.FieldDescriptor.Type.STRING) {
+
+                var str = (String) ctx.target();
+
+                if (str.isEmpty()) {
+                    var err = String.format("A value is required for [%s]", ctx.fieldName());
+                    return ctx.error(err);
+                }
             }
         }
 
@@ -75,6 +87,13 @@ public class CommonValidators {
         if (ctx.isOneOf()) {
 
             if (parentMsg.hasOneof(ctx.oneOf())) {
+                var err = String.format("A value must not be provided for [%s]", ctx.fieldName());
+                return ctx.error(err);
+            }
+        }
+        else if (ctx.isRepeated()) {
+
+            if (parentMsg.getRepeatedFieldCount(ctx.field()) != 0) {
                 var err = String.format("A value must not be provided for [%s]", ctx.fieldName());
                 return ctx.error(err);
             }
@@ -101,6 +120,11 @@ public class CommonValidators {
         if (ctx.isOneOf()) {
 
             if (!parentMsg.hasOneof(ctx.oneOf()))
+                return ctx.skip();
+        }
+        else if (ctx.isRepeated()) {
+
+            if (parentMsg.getRepeatedFieldCount(ctx.field()) == 0)
                 return ctx.skip();
         }
         else {
