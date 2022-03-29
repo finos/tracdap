@@ -433,7 +433,7 @@ public class ValidationContextImpl implements ValidationContext {
         if (!loc.isOneOf())
             throw new ETracInternal("applyOneOf() can only be applied to one-of fields");
 
-        if (loc.field().getContainingOneof() != oneOfField.getContainingOneof())
+        if (loc.oneOf() != oneOfField.getContainingOneof())
             throw new ETracInternal("applyOneOf() field is not a member of the current one-of");
 
         return loc.field() == oneOfField;
