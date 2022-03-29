@@ -99,6 +99,8 @@ public interface ValidationContext {
      */
     ValidationContext skip();
 
+    ValidationContext applyRegistered();
+
     ValidationContext apply(ValidationFunction.Basic validator);
     ValidationContext apply(ValidationFunction.Typed<String> validator);
     <T> ValidationContext apply(ValidationFunction.Typed<T> validator, Class<T> targetClass);

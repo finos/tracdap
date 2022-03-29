@@ -20,8 +20,6 @@ import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.exception.EVersionValidation;
 import org.finos.tracdap.common.validation.core.*;
-import org.finos.tracdap.common.validation.core.impl.ValidationKey;
-import org.finos.tracdap.common.validation.core.impl.ValidatorBuilder;
 import org.finos.tracdap.common.validation.core.impl.ValidationResult;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.TagHeader;
@@ -35,8 +33,6 @@ import java.util.Map;
 
 
 public class Validator {
-
-    private static final Map<ValidationKey, ValidationFunction<?>> validators = ValidatorBuilder.buildValidatorMap();
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -77,7 +73,7 @@ public class Validator {
 
         log.info("VALIDATION START: [{}]", key.displayName());
 
-        var resultCtx = registeredValidation(msg, ctx);
+        var resultCtx = ctx.applyRegistered();
         var result = ValidationResult.forContext(resultCtx);
 
         if (!result.ok()) {
@@ -100,47 +96,5 @@ public class Validator {
         }
 
         log.info("VALIDATION SUCCEEDED: [{}]", key.displayName());
-    }
-
-    private <TMsg extends Message>
-    ValidationContext registeredValidation(TMsg msg, ValidationContext ctx) {
-
-        var key = ctx.key();
-        var validator = validators.get(key);
-
-        if (validator == null) {
-            log.error("Required validator is not registered: [{}]", key.displayName());
-            throw new EUnexpected();
-        }
-
-        if (validator.isBasic())
-            return ctx.apply(validator.basic());
-
-        if (!validator.targetClass().isInstance(msg))
-            throw new EUnexpected();
-
-        if (validator.isTyped()) {
-
-            @SuppressWarnings("unchecked")
-            var typedValidator = (ValidationFunction.Typed<TMsg>) validator.typed();
-
-            @SuppressWarnings("unchecked")
-            var typedTarget = (Class<TMsg>) msg.getClass();
-
-            return ctx.apply(typedValidator, typedTarget);
-        }
-
-        if (validator.isVersion()) {
-
-            @SuppressWarnings("unchecked")
-            var typedValidator = (ValidationFunction.Version<TMsg>) validator.version();
-
-            @SuppressWarnings("unchecked")
-            var typedTarget = (Class<TMsg>) msg.getClass();
-
-            return ctx.apply(typedValidator, typedTarget);
-        }
-
-        throw new EUnexpected();
     }
 }

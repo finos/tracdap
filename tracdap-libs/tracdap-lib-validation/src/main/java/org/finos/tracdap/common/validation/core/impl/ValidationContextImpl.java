@@ -29,10 +29,13 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Stack;
 
 
 public class ValidationContextImpl implements ValidationContext {
+
+    private static final Map<ValidationKey, ValidationFunction<?>> validators = ValidatorBuilder.buildValidatorMap();
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -211,6 +214,40 @@ public class ValidationContextImpl implements ValidationContext {
         loc.skip();
 
         return this;
+    }
+
+    @Override
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public ValidationContext applyRegistered() {
+
+        var key = location.peek().key();
+        var msg = location.peek().msg();
+        var validator = validators.get(key);
+
+        if (validator == null) {
+            log.error("Required validator is not registered: [{}]", key.displayName());
+            throw new EUnexpected();
+        }
+
+        if (validator.isBasic())
+            return apply(validator.basic());
+
+        if (!validator.targetClass().isInstance(msg))
+            throw new EUnexpected();
+
+        if (validator.isTyped()) {
+
+            var typedValidator = (ValidationFunction.Typed) validator.typed();
+            return apply(typedValidator, msg.getClass());
+        }
+
+        if (validator.isVersion()) {
+
+            var versionValidator = (ValidationFunction.Version) validator.version();
+            return apply(versionValidator, msg.getClass());
+        }
+
+        throw new EUnexpected();
     }
 
     public ValidationContext apply(ValidationFunction.Basic validator) {
