@@ -1300,6 +1300,8 @@ abstract class MetadataWriteApiTest {
         var preallocateSelector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.MODEL)
                 .setObjectId(preallocateHeader.getObjectId())
+                .setObjectVersion(0)
+                .setTagVersion(0)
                 .build();
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.MODEL);
