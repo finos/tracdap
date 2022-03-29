@@ -97,15 +97,13 @@ public class TypeSystemValidator {
         var isMap = typeDescriptor.getBasicType() == BasicType.MAP;
 
         ctx = ctx.push(TD_ARRAY_TYPE)
-                .applyIf(!isArray, CommonValidators::omitted)
-                .applyIf(isArray, CommonValidators::required)
-                .applyIf(isArray, TypeSystemValidator::typeDescriptor, TypeDescriptor.class)
+                .apply(CommonValidators.ifAndOnlyIf(isArray))
+                .apply(TypeSystemValidator::typeDescriptor, TypeDescriptor.class)
                 .pop();
 
         ctx = ctx.push(TD_MAP_TYPE)
-                .applyIf(!isMap, CommonValidators::omitted)
-                .applyIf(isMap, CommonValidators::required)
-                .applyIf(isMap, TypeSystemValidator::typeDescriptor, TypeDescriptor.class)
+                .apply(CommonValidators.ifAndOnlyIf(isMap))
+                .apply(TypeSystemValidator::typeDescriptor, TypeDescriptor.class)
                 .pop();
 
         return ctx;
