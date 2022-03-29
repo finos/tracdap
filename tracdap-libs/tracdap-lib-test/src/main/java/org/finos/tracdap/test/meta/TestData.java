@@ -157,7 +157,19 @@ public class TestData {
                         .setFieldName("widgets_ordered")
                         .setFieldType(BasicType.INTEGER)
                         .setFieldOrder(3)
-                        .setBusinessKey(true)))))
+                        .setBusinessKey(true))))
+
+                .putParts("part-root", DataDefinition.Part.newBuilder()
+                        .setPartKey(PartKey.newBuilder()
+                        .setPartType(PartType.PART_ROOT)
+                        .setOpaqueKey("part-root"))
+                        .setSnap(DataDefinition.Snap.newBuilder()
+                        .setSnapIndex(0)
+                        .addDeltas(DataDefinition.Delta.newBuilder()
+                        .setDeltaIndex(0)
+                        .setDataItem("data/table/" + UUID.randomUUID() + "/snap-0/delta-0-x123456")))
+                        .build()))
+
             .build();
     }
 
@@ -207,28 +219,34 @@ public class TestData {
 
     public static ObjectDefinition dummyStorageDef() {
 
+        var storageTimestamp = OffsetDateTime.now();
+
         return ObjectDefinition.newBuilder()
             .setObjectType(ObjectType.STORAGE)
             .setStorage(StorageDefinition.newBuilder()
             .putDataItems("dummy_item", StorageItem.newBuilder()
                 .addIncarnations(StorageIncarnation.newBuilder()
                 .setIncarnationIndex(1)
-                .setIncarnationTimestamp(MetadataCodec.encodeDatetime(OffsetDateTime.now()))
+                .setIncarnationTimestamp(MetadataCodec.encodeDatetime(storageTimestamp))
                 .setIncarnationStatus(IncarnationStatus.INCARNATION_AVAILABLE)
                 .addCopies(StorageCopy.newBuilder()
                     .setStorageKey("DUMMY_STORAGE")
                     .setStoragePath("path/to/the/dataset")
                     .setStorageFormat("AVRO")
+                    .setCopyTimestamp(MetadataCodec.encodeDatetime(storageTimestamp))
                     .setCopyStatus(CopyStatus.COPY_AVAILABLE)))
                     .build())).build();
     }
 
     public static ObjectDefinition nextStorageDef(ObjectDefinition definition) {
 
+        var storageTimestamp = OffsetDateTime.now();
+
         var archiveCopy = StorageCopy.newBuilder()
             .setStorageKey("DUMMY_ARCHIVE_STORAGE")
             .setStoragePath("path/to/the/dataset")
             .setStorageFormat("PARQUET")
+            .setCopyTimestamp(MetadataCodec.encodeDatetime(storageTimestamp))
             .setCopyStatus(CopyStatus.COPY_AVAILABLE);
 
         var archivedIncarnation = definition
