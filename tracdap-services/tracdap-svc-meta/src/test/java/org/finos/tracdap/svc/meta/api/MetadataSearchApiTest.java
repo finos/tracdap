@@ -598,7 +598,6 @@ abstract class MetadataSearchApiTest {
     }
 
     @Test
-    @Disabled("Metadata validation not implemented yet")
     void invalidSearch_nullParams() {
 
         var searchRequest = MetadataSearchRequest.newBuilder()
@@ -623,7 +622,6 @@ abstract class MetadataSearchApiTest {
     }
 
     @Test
-    @Disabled("Metadata validation not implemented yet")
     void invalidSearch_badParams() {
 
         // An invalid search request
