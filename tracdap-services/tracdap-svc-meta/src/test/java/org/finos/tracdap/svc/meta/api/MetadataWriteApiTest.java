@@ -1229,6 +1229,8 @@ abstract class MetadataWriteApiTest {
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setObjectId(newObjectId.toString())
+                .setObjectVersion(0)
+                .setTagVersion(0)
                 .build();
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
