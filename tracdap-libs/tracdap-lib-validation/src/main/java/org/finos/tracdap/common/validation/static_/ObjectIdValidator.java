@@ -159,6 +159,40 @@ public class ObjectIdValidator {
         return ctx;
     }
 
+    public static ValidationContext preallocated(TagSelector selector, ValidationContext ctx) {
+
+        // Use a separate top level validator for preallocated selectors
+        // For regular selectors, we want to enforce a positive value for object and tag version
+        // But for preallocated selectors, these must both be present and set to zero
+
+        ctx = ctx.push(TS_OBJECT_TYPE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::recognizedEnum, ObjectType.class)
+                .pop();
+
+        ctx = ctx.push(TS_OBJECT_ID)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::uuid)
+                .pop();
+
+        var isPreallocated =
+                selector.hasObjectVersion() &&
+                selector.hasTagVersion() &&
+                selector.getObjectVersion() == 0 &&
+                selector.getTagVersion() == 0;
+
+        if (!isPreallocated) {
+
+            var err = String.format(
+                    "The [%s] selector is not a preallocated object ID (object and tag version must be set to zero)",
+                    ctx.fieldName());
+
+            ctx = ctx.error(err);
+        }
+
+        return ctx;
+    }
+
     public static ValidationContext selectorType(TagSelector selector, ObjectType requiredType, ValidationContext ctx) {
 
         if (!selector.getObjectType().equals(requiredType)) {
@@ -191,6 +225,34 @@ public class ObjectIdValidator {
             var err = String.format(
                     "The [%s] selector must refer to a fixed object version, [latestObject] is not allowed",
                     ctx.fieldName());
+
+            ctx = ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext explicitObjectVersion(TagSelector selector, ValidationContext ctx) {
+
+        if (!selector.hasObjectVersion()) {
+
+            var err = String.format(
+                    "The [%s] selector must use an explicit [%s]",
+                    ctx.fieldName(), TS_OBJECT_VERSION.getName());
+
+            ctx = ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext explicitTagVersion(TagSelector selector, ValidationContext ctx) {
+
+        if (!selector.hasTagVersion()) {
+
+            var err = String.format(
+                    "The [%s] selector must use an explicit [%s]",
+                    ctx.fieldName(), TS_TAG_VERSION.getName());
 
             ctx = ctx.error(err);
         }

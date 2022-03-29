@@ -105,7 +105,7 @@ public class MetadataApiValidator {
                 .apply(CommonValidators::required)
                 .apply(ObjectIdValidator::tagSelector, TagSelector.class)
                 .apply(ObjectIdValidator::selectorType, TagSelector.class, msg.getObjectType())
-                .apply(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
+                .apply(ObjectIdValidator::explicitObjectVersion, TagSelector.class)
                 .pop();
 
         ctx = ctx.push(MWR_DEFINITION)
@@ -126,12 +126,53 @@ public class MetadataApiValidator {
                 .apply(CommonValidators::required)
                 .apply(ObjectIdValidator::tagSelector, TagSelector.class)
                 .apply(ObjectIdValidator::selectorType, TagSelector.class, msg.getObjectType())
-                .apply(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
-                // .apply(ObjectIdValidator::fixedTagVersion, TagSelector.class)  // todo
+                .apply(ObjectIdValidator::explicitObjectVersion, TagSelector.class)
+                .apply(ObjectIdValidator::explicitTagVersion, TagSelector.class)
                 .pop();
 
         ctx = ctx.push(MWR_DEFINITION)
                 .apply(CommonValidators::omitted)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "preallocateId", serviceFile = MetadataTrusted.class, serviceName = TrustedMetadataApiGrpc.SERVICE_NAME)
+    public static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx) {
+
+        ctx = createOrUpdate(ctx);
+
+        ctx = ctx.push(MWR_PRIOR_VERSION)
+                .apply(CommonValidators::omitted)
+                .pop();
+
+        ctx = ctx.push(MWR_DEFINITION)
+                .apply(CommonValidators::omitted)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "createPreallocatedObject", serviceFile = MetadataTrusted.class, serviceName = TrustedMetadataApiGrpc.SERVICE_NAME)
+    public static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx) {
+
+        ctx = createOrUpdate(ctx);
+
+        // Do not use the regular tag selector validator (ObjectIdValidator::tagSelector)
+        // The regular validator will enforce object and tag version > 0
+        // Which is a requirement for a regular, valid selector
+        // But preallocated IDs have object version = tag version = 0
+
+        ctx = ctx.push(MWR_PRIOR_VERSION)
+                .apply(CommonValidators::required)
+                .apply(ObjectIdValidator::preallocated, TagSelector.class)
+                .apply(ObjectIdValidator::selectorType, TagSelector.class, msg.getObjectType())
+                .pop();
+
+        ctx = ctx.push(MWR_DEFINITION)
+                .apply(CommonValidators::required)
+                // TODO: Object type matches
+                .applyRegistered()
                 .pop();
 
         return ctx;

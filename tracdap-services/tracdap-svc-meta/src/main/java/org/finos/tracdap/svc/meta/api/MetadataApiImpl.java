@@ -36,6 +36,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.finos.tracdap.svc.meta.api.TracMetadataApi.*;
+import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.CREATE_PREALLOCATED_OBJECT_METHOD;
+import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.PREALLOCATE_ID_METHOD;
 import static org.finos.tracdap.svc.meta.services.MetadataConstants.PUBLIC_API;
 
 
@@ -127,6 +129,8 @@ public class MetadataApiImpl {
 
     CompletableFuture<TagHeader> preallocateId(MetadataWriteRequest request) {
 
+        validateRequest(PREALLOCATE_ID_METHOD, request);
+
         var tenant = request.getTenant();
         var objectType = request.getObjectType();
 
@@ -134,6 +138,8 @@ public class MetadataApiImpl {
     }
 
     CompletableFuture<TagHeader> createPreallocatedObject(MetadataWriteRequest request) {
+
+        validateRequest(CREATE_PREALLOCATED_OBJECT_METHOD, request);
 
         return writeService.createPreallocatedObject(
                 request.getTenant(),
