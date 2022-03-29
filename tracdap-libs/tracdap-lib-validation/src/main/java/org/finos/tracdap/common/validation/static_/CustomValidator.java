@@ -16,13 +16,13 @@
 
 package org.finos.tracdap.common.validation.static_;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.Descriptors;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.CustomDefinition;
-import org.finos.tracdap.metadata.FileDefinition;
+
+import com.google.protobuf.ByteString;
+import com.google.protobuf.Descriptors;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
@@ -43,7 +43,7 @@ public class CustomValidator {
     }
 
     @Validator
-    public static ValidationContext custom(FileDefinition msg, ValidationContext ctx) {
+    public static ValidationContext custom(CustomDefinition msg, ValidationContext ctx) {
 
         ctx = ctx.push(CD_CUSTOM_SCHEMA_TYPE)
                 .apply(CommonValidators::required)
@@ -53,7 +53,7 @@ public class CustomValidator {
 
         ctx = ctx.push(CD_CUSTOM_SCHEMA_VERSION)
                 .apply(CommonValidators::required)
-                .apply(CommonValidators::positive)
+                .apply(CommonValidators::positive, Integer.class)
                 .pop();
 
         ctx = ctx.push(CD_CUSTOM_DATA)
@@ -64,4 +64,3 @@ public class CustomValidator {
         return ctx;
     }
 }
-

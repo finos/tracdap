@@ -129,8 +129,7 @@ public class DataValidator {
     public static ValidationContext dataSnap(DataDefinition.Snap msg, ValidationContext ctx) {
 
         ctx = ctx.push(DS_SNAP_INDEX)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::notNegative)
+                .apply(CommonValidators::notNegative, Integer.class)
                 .pop();
 
         ctx = ctx.pushRepeated(DS_DELTAS)
@@ -146,8 +145,7 @@ public class DataValidator {
     public static ValidationContext dataDelta(DataDefinition.Delta msg, ValidationContext ctx) {
 
         ctx = ctx.push(DD_DELTA_INDEX)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::notNegative)
+                .apply(CommonValidators::notNegative, Integer.class)
                 .pop();
 
         ctx = ctx.push(DD_DATA_ITEM)
