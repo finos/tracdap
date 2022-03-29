@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.validation.static_;
 
-import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
@@ -25,11 +24,15 @@ import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Descriptors;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 
 @Validator(type = ValidationType.STATIC)
 public class SchemaValidator {
+
+    private static final Map<SchemaDefinition.SchemaTypeDefinitionCase, SchemaType> SCHEMA_TYPE_CASE_MAPPING = Map.ofEntries(
+            Map.entry(SchemaDefinition.SchemaTypeDefinitionCase.TABLE, SchemaType.TABLE));
 
     private static final List<BasicType> ALLOWED_BUSINESS_KEY_TYPES = List.of(
             BasicType.STRING, BasicType.INTEGER, BasicType.DATE);
@@ -77,19 +80,30 @@ public class SchemaValidator {
 
         ctx = ctx.pushOneOf(SD_SCHEMA_TYPE_DEFINITION)
                 .apply(CommonValidators::required)
+                .apply(SchemaValidator::schemaMatchesType)
+                .applyRegistered()
                 .pop();
 
-        if (schema.getSchemaType() == SchemaType.TABLE) {
+        return ctx;
+    }
 
-            return ctx.push(SD_TABLE)
-                    .apply(SchemaValidator::tableSchema, TableSchema.class)
-                    .pop();
-        }
-        else {
+    public static ValidationContext schemaMatchesType(ValidationContext ctx) {
 
-            // TABLE is the only schema type available at present
-            throw new EUnexpected();
+        var schemaDef = (SchemaDefinition) ctx.parentMsg();
+        var schemaTypeCase = schemaDef.getSchemaTypeDefinitionCase();
+
+        var schemaType = schemaDef.getSchemaType();
+        var definitionType = SCHEMA_TYPE_CASE_MAPPING.getOrDefault(schemaTypeCase, SchemaType.UNRECOGNIZED);
+
+        if (schemaType != definitionType) {
+
+            var err = String.format("Schema has type [%s] but contains definition type [%s]",
+                    schemaType, definitionType);
+
+            return ctx.error(err);
         }
+
+        return ctx;
     }
 
     @Validator
