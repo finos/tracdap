@@ -21,8 +21,6 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 import org.finos.tracdap.svc.meta.validation.MetadataValidator;
-import com.google.protobuf.Descriptors;
-import com.google.protobuf.Message;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -36,16 +34,8 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.TAG_FIRST_VERS
 
 public class MetadataWriteService {
 
-    private static final Descriptors.OneofDescriptor OBJECT_DEFINITION_ONEOF = ObjectDefinition
-            .getDescriptor()
-            .findFieldByNumber(ObjectDefinition.DATA_FIELD_NUMBER)
-            .getContainingOneof();
-
-    private final List<ObjectType> NEW_VALIDATION_TYPES = List.of(ObjectType.FILE, ObjectType.SCHEMA);
     private final Validator newValidator = new Validator();
-
     private final IMetadataDal dal;
-
 
     public MetadataWriteService(IMetadataDal dal) {
         this.dal = dal;
@@ -62,23 +52,10 @@ public class MetadataWriteService {
         var validator = new MetadataValidator();
 
         var normalDefinition = validator.normalizeObjectType(definition);
-        validator.definitionMatchesType(normalDefinition, objectType);
-        validator.tagAttributesAreValid(tagUpdates);
-        validator.checkAndThrow();
 
         if (apiTrust == MetadataConstants.PUBLIC_API) {
             validator.tagAttributesAreNotReserved(tagUpdates);
             validator.checkAndThrowPermissions();
-        }
-
-        // New structured validation is only available for some object types
-
-        if (NEW_VALIDATION_TYPES.contains(objectType)) {
-
-            var objectTypeOneOf = definition.getOneofFieldDescriptor(OBJECT_DEFINITION_ONEOF);
-            var objectTypeDef = (Message) definition.getField(objectTypeOneOf);
-
-            newValidator.validateFixedObject(objectTypeDef);
         }
 
         // Validation complete!
@@ -123,25 +100,10 @@ public class MetadataWriteService {
         validator.checkAndThrow();
 
         var normalDefinition = validator.normalizeObjectType(definition);
-        validator.validObjectID(priorVersion);
-        validator.priorVersionMatchesType(priorVersion, objectType);
-        validator.definitionMatchesType(normalDefinition, objectType);
-        validator.tagAttributesAreValid(tagUpdates);
-        validator.checkAndThrow();
 
         if (apiTrust == MetadataConstants.PUBLIC_API) {
             validator.tagAttributesAreNotReserved(tagUpdates);
             validator.checkAndThrowPermissions();
-        }
-
-        // New structured validation is only available for some object types
-
-        if (NEW_VALIDATION_TYPES.contains(objectType)) {
-
-            var objectTypeOneOf = definition.getOneofFieldDescriptor(OBJECT_DEFINITION_ONEOF);
-            var objectTypeDef = (Message) definition.getField(objectTypeOneOf);
-
-            newValidator.validateFixedObject(objectTypeDef);
         }
 
         // Validation complete!
@@ -158,17 +120,9 @@ public class MetadataWriteService {
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
 
-        // TODO: Version increment validation
+        // Validate version increment on the object
+        newValidator.validateVersion(definition, priorTag.getDefinition());
 
-        // New structured validation is only available for some object types
-        if (NEW_VALIDATION_TYPES.contains(definition.getObjectType())) {
-
-            var objectTypeOneOf = definition.getOneofFieldDescriptor(OBJECT_DEFINITION_ONEOF);
-            var currentTypeDef = (Message) definition.getField(objectTypeOneOf);
-            var priorTypeDef = (Message) priorTag.getDefinition().getField(objectTypeOneOf);
-
-            newValidator.validateVersion(currentTypeDef, priorTypeDef);
-        }
 
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
@@ -198,14 +152,8 @@ public class MetadataWriteService {
             List<TagUpdate> tagUpdates,
             boolean apiTrust) {
 
-        var validator = new MetadataValidator();
-
-        validator.validObjectID(priorVersion);
-        validator.priorVersionMatchesType(priorVersion, objectType);
-        validator.tagAttributesAreValid(tagUpdates);
-        validator.checkAndThrow();
-
         if (apiTrust == MetadataConstants.PUBLIC_API) {
+            var validator = new MetadataValidator();
             validator.tagAttributesAreNotReserved(tagUpdates);
             validator.checkAndThrowPermissions();
         }
@@ -265,13 +213,7 @@ public class MetadataWriteService {
             List<TagUpdate> tagUpdates) {
 
         var validator = new MetadataValidator();
-
         var normalDefinition = validator.normalizeObjectType(definition);
-        validator.validObjectID(priorVersion);
-        validator.priorVersionMatchesType(priorVersion, objectType);
-        validator.definitionMatchesType(normalDefinition, objectType);
-        validator.tagAttributesAreValid(tagUpdates);
-        validator.checkAndThrow();
 
         // Preallocated objects are always on the trusted API
         // So no need to check reserved tag attributes
