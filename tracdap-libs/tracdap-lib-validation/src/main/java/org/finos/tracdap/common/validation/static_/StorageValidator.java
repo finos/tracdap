@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.common.validation.static_;
 
+import org.finos.tracdap.common.metadata.MetadataConstants;
+import org.finos.tracdap.common.validation.ValidationConstants;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
@@ -130,6 +132,7 @@ public class StorageValidator {
 
         ctx = ctx.push(SD_STORAGE_PATH)
                 .apply(CommonValidators::required)
+                // TODO:
                 // is a valid path
                 // is relative path
                 // does not include .. or .
@@ -137,7 +140,7 @@ public class StorageValidator {
 
         ctx = ctx.push(SD_STORAGE_FORMAT)
                 .apply(CommonValidators::required)
-                .apply(CommonValidators::mimeType)  // todo: or identifier?
+                .apply(StorageValidator::storageFormat)
                 .pop();
 
         ctx = ctx.push(SD_COPY_STATUS)
@@ -150,6 +153,22 @@ public class StorageValidator {
                 .apply(TypeSystemValidator::datetimeValue, DatetimeValue.class)
                 // not in the future?
                 .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext storageFormat(String storageFormat, ValidationContext ctx) {
+
+        var mimeTypeMatcher = ValidationConstants.MIME_TYPE.matcher(storageFormat);
+        var identifierMatcher = MetadataConstants.VALID_IDENTIFIER.matcher(storageFormat);
+
+        if (!mimeTypeMatcher.matches() && !identifierMatcher.matches()) {
+
+            var err = String.format("Invalid [%s], expected an identifier or a mime type, got [%s]",
+                    ctx.fieldName(), storageFormat);
+
+            return ctx.error(err);
+        }
 
         return ctx;
     }
