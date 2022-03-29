@@ -229,8 +229,9 @@ public class ValidationContextImpl implements ValidationContext {
         var validator = validators.get(key);
 
         if (validator == null) {
-            log.error("Required validator is not registered: [{}]", key.displayName());
-            throw new EUnexpected();
+            var err = String.format("Required validator is not registered: [%s]", key.displayName());
+            log.error(err);
+            throw new ETracInternal(err);
         }
 
         if (validator.isBasic())
