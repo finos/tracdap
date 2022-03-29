@@ -18,7 +18,6 @@ package org.finos.tracdap.common.validation.static_;
 
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
-import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.*;
@@ -145,24 +144,19 @@ public class ObjectIdValidator {
 
         ctx = ctx.pushOneOf(TS_OBJECT_CRITERIA)
                 .apply(CommonValidators::required)
-                .applyIf(CommonValidators::optionalTrue, Boolean.class, msg.hasField(TS_LATEST_OBJECT))
-                .applyIf(CommonValidators::positive, Integer.class, msg.hasField(TS_OBJECT_VERSION))
-                .applyIf(TypeSystemValidator::datetimeValue, DatetimeValue.class, msg.hasField(TS_OBJECT_ASOF))
+                .applyOneOf(TS_LATEST_OBJECT, CommonValidators::optionalTrue, Boolean.class)
+                .applyOneOf(TS_OBJECT_VERSION, CommonValidators::positive, Integer.class)
+                .applyOneOf(TS_OBJECT_ASOF, TypeSystemValidator::datetimeValue, DatetimeValue.class)
                 .pop();
 
         ctx = ctx.pushOneOf(TS_TAG_CRITERIA)
                 .apply(CommonValidators::required)
-                .applyIf(CommonValidators::optionalTrue, Boolean.class, msg.hasField(TS_LATEST_TAG))
-                .applyIf(CommonValidators::positive, Integer.class, msg.hasField(TS_TAG_VERSION))
-                .applyIf(TypeSystemValidator::datetimeValue, DatetimeValue.class, msg.hasField(TS_TAG_ASOF))
+                .applyOneOf(TS_LATEST_TAG, CommonValidators::optionalTrue, Boolean.class)
+                .applyOneOf(TS_TAG_VERSION, CommonValidators::positive, Integer.class)
+                .applyOneOf(TS_TAG_ASOF, TypeSystemValidator::datetimeValue, DatetimeValue.class)
                 .pop();
 
         return ctx;
-    }
-
-    public static ValidationFunction.Typed<TagSelector> selectorType(ObjectType requiredType) {
-
-        return (selector, ctx) -> selectorType(selector, requiredType, ctx);
     }
 
     public static ValidationContext selectorType(TagSelector selector, ObjectType requiredType, ValidationContext ctx) {

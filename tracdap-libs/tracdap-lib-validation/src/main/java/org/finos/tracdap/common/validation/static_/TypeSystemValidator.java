@@ -97,15 +97,15 @@ public class TypeSystemValidator {
         var isMap = typeDescriptor.getBasicType() == BasicType.MAP;
 
         ctx = ctx.push(TD_ARRAY_TYPE)
-                .applyIf(CommonValidators::omitted, !isArray)
-                .applyIf(CommonValidators::required, isArray)
-                .applyIf(TypeSystemValidator::typeDescriptor, TypeDescriptor.class, isArray)
+                .applyIf(!isArray, CommonValidators::omitted)
+                .applyIf(isArray, CommonValidators::required)
+                .applyIf(isArray, TypeSystemValidator::typeDescriptor, TypeDescriptor.class)
                 .pop();
 
         ctx = ctx.push(TD_MAP_TYPE)
-                .applyIf(CommonValidators::omitted, !isMap)
-                .applyIf(CommonValidators::required, isMap)
-                .applyIf(TypeSystemValidator::typeDescriptor, TypeDescriptor.class, isMap)
+                .applyIf(!isMap, CommonValidators::omitted)
+                .applyIf(isMap, CommonValidators::required)
+                .applyIf(isMap, TypeSystemValidator::typeDescriptor, TypeDescriptor.class)
                 .pop();
 
         return ctx;
@@ -170,9 +170,9 @@ public class TypeSystemValidator {
 
             ctx = ctx.pushOneOf(V_VALUE)
                     .apply(CommonValidators::optional)
-                    .applyIf(TypeSystemValidator::decimalValue, DecimalValue.class, valueType == BasicType.DECIMAL)
-                    .applyIf(TypeSystemValidator::dateValue, DateValue.class, valueType == BasicType.DATE)
-                    .applyIf(TypeSystemValidator::datetimeValue, DatetimeValue.class, valueType == BasicType.DATETIME)
+                    .applyIf(valueType == BasicType.DECIMAL, TypeSystemValidator::decimalValue, DecimalValue.class)
+                    .applyIf(valueType == BasicType.DATE, TypeSystemValidator::dateValue, DateValue.class)
+                    .applyIf(valueType == BasicType.DATETIME, TypeSystemValidator::datetimeValue, DatetimeValue.class)
                     .pop();
 
             // If the value is non-null, make sure the value matches its type descriptor

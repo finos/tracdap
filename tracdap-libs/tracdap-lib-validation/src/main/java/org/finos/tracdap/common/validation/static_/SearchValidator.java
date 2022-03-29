@@ -142,8 +142,8 @@ public class SearchValidator {
 
         ctx = ctx.pushOneOf(SE_EXPR)
                 .apply(CommonValidators::required)
-                .applyIf(SearchValidator::searchTerm, SearchTerm.class, msg.hasField(SE_TERM))
-                .applyIf(SearchValidator::logicalExpression, LogicalExpression.class, msg.hasField(SE_LOGICAL))
+                .applyOneOf(SE_TERM, SearchValidator::searchTerm, SearchTerm.class)
+                .applyOneOf(SE_LOGICAL, SearchValidator::logicalExpression, LogicalExpression.class)
                 .pop();
 
         return ctx;

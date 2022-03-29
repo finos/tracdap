@@ -160,10 +160,10 @@ public class DataApiValidator {
 
         ctx = ctx.pushOneOf(DWR_SCHEMA_SPECIFIER)
                 .apply(CommonValidators::required)
-                .applyIf(ObjectIdValidator::tagSelector, TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
-                .applyIf(ObjectIdValidator.selectorType(ObjectType.SCHEMA), TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
-                .applyIf(ObjectIdValidator::fixedObjectVersion, TagSelector.class, msg.hasField(DWR_SCHEMA_ID))
-                .applyIf(SchemaValidator::schema, SchemaDefinition.class, msg.hasField(DWR_SCHEMA))
+                .applyOneOf(DWR_SCHEMA_ID, ObjectIdValidator::tagSelector, TagSelector.class)
+                .applyOneOf(DWR_SCHEMA_ID, ObjectIdValidator::selectorType, TagSelector.class, ObjectType.SCHEMA)
+                .applyOneOf(DWR_SCHEMA_ID, ObjectIdValidator::fixedObjectVersion, TagSelector.class)
+                .applyOneOf(DWR_SCHEMA, SchemaValidator::schema, SchemaDefinition.class)
                 .pop();
 
         ctx = ctx.push(DWR_FORMAT)

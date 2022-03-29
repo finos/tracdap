@@ -33,20 +33,24 @@ public class CommonValidators {
     private static final Descriptors.Descriptor TAG_SELECTOR;
     private static final Descriptors.FieldDescriptor OBJECT_TYPE;
     private static final Descriptors.FieldDescriptor OBJECT_ID;
-    private static final Descriptors.FieldDescriptor LATEST_OBJECT;
-    private static final Descriptors.FieldDescriptor LATEST_TAG;
     private static final Descriptors.OneofDescriptor OBJECT_CRITERIA;
+    private static final Descriptors.FieldDescriptor OBJECT_VERSION;
+    private static final Descriptors.FieldDescriptor OBJECT_ASOF;
     private static final Descriptors.OneofDescriptor TAG_CRITERIA;
+    private static final Descriptors.FieldDescriptor TAG_VERSION;
+    private static final Descriptors.FieldDescriptor TAG_ASOF;
 
     static {
 
         TAG_SELECTOR = TagSelector.getDescriptor();
         OBJECT_TYPE = field(TAG_SELECTOR, TagSelector.OBJECTTYPE_FIELD_NUMBER);
         OBJECT_ID = field(TAG_SELECTOR, TagSelector.OBJECTID_FIELD_NUMBER);
-        LATEST_OBJECT = field(TAG_SELECTOR, TagSelector.LATESTOBJECT_FIELD_NUMBER);
-        LATEST_TAG = field(TAG_SELECTOR, TagSelector.LATESTTAG_FIELD_NUMBER);
-        OBJECT_CRITERIA = LATEST_OBJECT.getContainingOneof();
-        TAG_CRITERIA = LATEST_TAG.getContainingOneof();
+        OBJECT_CRITERIA = field(TAG_SELECTOR, TagSelector.LATESTOBJECT_FIELD_NUMBER).getContainingOneof();
+        OBJECT_VERSION = field(TAG_SELECTOR, TagSelector.OBJECTVERSION_FIELD_NUMBER);
+        OBJECT_ASOF = field(TAG_SELECTOR, TagSelector.OBJECTASOF_FIELD_NUMBER);
+        TAG_CRITERIA = field(TAG_SELECTOR, TagSelector.LATESTTAG_FIELD_NUMBER).getContainingOneof();
+        TAG_VERSION = field(TAG_SELECTOR, TagSelector.TAGVERSION_FIELD_NUMBER);
+        TAG_ASOF = field(TAG_SELECTOR, TagSelector.TAGASOF_FIELD_NUMBER);
     }
 
 
@@ -128,8 +132,8 @@ public class CommonValidators {
 
         ctx = ctx.pushOneOf(OBJECT_CRITERIA)
                 .apply(CommonValidators::sameOneOf)
-                .applyIf(CommonValidators::equalOrGreater, Integer.class, prior.hasObjectVersion())
-                .applyIf(CommonValidators::equalOrAfter, DatetimeValue.class, prior.hasObjectAsOf())
+                .applyOneOf(OBJECT_VERSION, CommonValidators::equalOrGreater, Integer.class)
+                .applyOneOf(OBJECT_ASOF, CommonValidators::equalOrAfter, DatetimeValue.class)
                 .pop();
 
         if (ctx.getErrors().size() > initialErrCount)
@@ -137,8 +141,8 @@ public class CommonValidators {
 
         ctx = ctx.pushOneOf(TAG_CRITERIA)
                 .apply(CommonValidators::sameOneOf)
-                .applyIf(CommonValidators::equalOrGreater, Integer.class, prior.hasTagVersion())
-                .applyIf(CommonValidators::equalOrAfter, DatetimeValue.class, prior.hasTagAsOf())
+                .applyOneOf(TAG_VERSION, CommonValidators::equalOrGreater, Integer.class)
+                .applyOneOf(TAG_ASOF, CommonValidators::equalOrAfter, DatetimeValue.class)
                 .pop();
 
         return ctx;
