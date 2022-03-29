@@ -26,10 +26,9 @@ import java.util.List;
 class ValidationLocation {
 
     private final ValidationLocation parent;
-    private final ValidationKey key;
     private final Object target;
 
-    private final Descriptors.MethodDescriptor method = null;
+    private final Descriptors.MethodDescriptor method;
     private final Descriptors.OneofDescriptor oneOf;
     private final Descriptors.FieldDescriptor field;
     private final String fieldName;
@@ -39,17 +38,15 @@ class ValidationLocation {
 
     public ValidationLocation(
             ValidationLocation parent,
-            ValidationKey key,
             Object target,
-
+            Descriptors.MethodDescriptor method,
             Descriptors.OneofDescriptor oneOf,
             Descriptors.FieldDescriptor field,
             String fieldName) {
 
         this.parent = parent;
-        this.key = key;
         this.target = target;
-
+        this.method = method;
         this.oneOf = oneOf;
         this.field = field;
         this.fieldName = fieldName;
@@ -60,20 +57,25 @@ class ValidationLocation {
 
     public ValidationLocation(
             ValidationLocation parent,
-            ValidationKey key,
+            Object target,
+            Descriptors.OneofDescriptor oneOf,
+            Descriptors.FieldDescriptor field,
+            String fieldName) {
+
+        this(parent, target, null, oneOf, field, fieldName);
+    }
+
+    public ValidationLocation(
+            ValidationLocation parent,
             Object target,
             Descriptors.FieldDescriptor field,
             String fieldName) {
 
-        this(parent, key, target, null, field, fieldName);
+        this(parent, target, null, field, fieldName);
     }
 
     public ValidationLocation parent() {
         return parent;
-    }
-
-    public ValidationKey key() {
-        return key;
     }
 
     public String fieldName() {
@@ -82,6 +84,10 @@ class ValidationLocation {
 
     public Object target() {
         return target;
+    }
+
+    public Descriptors.MethodDescriptor method() {
+        return method;
     }
 
     public boolean isOneOf() {

@@ -39,13 +39,15 @@ public class ValidationContextImpl implements ValidationContext {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final ValidationType validationType;
     private final Stack<ValidationLocation> location;
     private final ValidationContextImpl priorCtx;
     private final List<ValidationFailure> failures;
 
 
-    private ValidationContextImpl(ValidationLocation root, ValidationContextImpl priorCtx) {
+    private ValidationContextImpl(ValidationType validationType, ValidationLocation root, ValidationContextImpl priorCtx) {
 
+        this.validationType = validationType;
         this.location = new Stack<>();
         this.location.push(root);
 
@@ -54,27 +56,24 @@ public class ValidationContextImpl implements ValidationContext {
         this.failures = new ArrayList<>();
     }
 
-    public static ValidationContext forMethod(Message msg, Descriptors.MethodDescriptor descriptor) {
+    public static ValidationContext forMethod(Message msg, Descriptors.MethodDescriptor method) {
 
-        var key = ValidationKey.forMethod(msg.getDescriptorForType(), descriptor);
-        var root = new ValidationLocation(null, key, msg, null, null);
-        return new ValidationContextImpl(root, null);
+        var root = new ValidationLocation(null, msg, method, null, null, null);
+        return new ValidationContextImpl(ValidationType.STATIC, root, null);
     }
 
     public static ValidationContext forMessage(Message msg) {
 
-        var key = ValidationKey.forMethod(msg.getDescriptorForType(), null);
-        var root = new ValidationLocation(null, key, msg, null, null);
-        return new ValidationContextImpl(root, null);
+        var root = new ValidationLocation(null, msg, null, null);
+        return new ValidationContextImpl(ValidationType.STATIC, root, null);
     }
 
     public static ValidationContext forVersion(Message current, Message prior) {
 
-        var key = ValidationKey.forVersion(current.getDescriptorForType());
-        var currentRoot = new ValidationLocation(null, key, current, null, null, null);
-        var priorRoot = new ValidationLocation(null, key, prior, null, null, null);
-        var priorCtx = new ValidationContextImpl(priorRoot, null);
-        return new ValidationContextImpl(currentRoot, priorCtx);
+        var currentRoot = new ValidationLocation(null, current, null, null);
+        var priorRoot = new ValidationLocation(null, prior, null, null);
+        var priorCtx = new ValidationContextImpl(ValidationType.VERSION, priorRoot, null);
+        return new ValidationContextImpl(ValidationType.VERSION, currentRoot, priorCtx);
     }
 
 
@@ -101,7 +100,7 @@ public class ValidationContextImpl implements ValidationContext {
         var parentLoc = location.peek();
         var msg = parentLoc.msg();
         var obj = msg.getField(fd);
-        var loc = new ValidationLocation(parentLoc, null, obj, null, fd, fd.getName());
+        var loc = new ValidationLocation(parentLoc, obj, null, fd, fd.getName());
 
         if (parentLoc.skipped())
             loc.skip();
@@ -129,7 +128,7 @@ public class ValidationContextImpl implements ValidationContext {
         var fd = msg.hasOneof(oneOf) ? msg.getOneofFieldDescriptor(oneOf) : null;
         var name = fd != null ? fd.getName() : oneOf.getName();
         var obj = fd != null ? msg.getField(fd) : null;
-        var loc = new ValidationLocation(parentLoc, null, obj, oneOf, fd, name);
+        var loc = new ValidationLocation(parentLoc, obj, oneOf, fd, name);
 
         if (parentLoc.skipped())
             loc.skip();
@@ -160,12 +159,12 @@ public class ValidationContextImpl implements ValidationContext {
             var mapEntry = (MapEntry<String, ?>) obj;
             var fieldName = String.format("[%s]", mapEntry.getKey());
             obj = mapKey ? mapEntry.getKey() : mapEntry.getValue();
-            loc = new ValidationLocation(parentLoc, null, obj, null, parentLoc.field(), fieldName);
+            loc = new ValidationLocation(parentLoc, obj, parentLoc.field(), fieldName);
         }
         else {
 
             var fieldName = String.format("[%s]", index);
-            loc = new ValidationLocation(parentLoc, null, obj, null, parentLoc.field(), fieldName);
+            loc = new ValidationLocation(parentLoc, obj, parentLoc.field(), fieldName);
         }
 
         if (parentLoc.skipped())
@@ -220,8 +219,13 @@ public class ValidationContextImpl implements ValidationContext {
     @SuppressWarnings({"rawtypes", "unchecked"})
     public ValidationContext applyRegistered() {
 
-        var key = location.peek().key();
-        var msg = location.peek().msg();
+        var loc = location.peek();
+        var msg = loc.msg();
+
+        if (msg == null)
+            throw new ETracInternal("applyRegistered() can only be applied to message types");
+
+        var key = new ValidationKey(validationType, msg.getDescriptorForType(), loc.method());
         var validator = validators.get(key);
 
         if (validator == null) {
@@ -549,11 +553,18 @@ public class ValidationContextImpl implements ValidationContext {
     }
 
     public ValidationType validationType() {
-        return location.peek().key().validationType();
+        return validationType;
     }
 
     public ValidationKey key() {
-        return location.peek().key();
+
+        var loc = location.peek();
+        var msg = loc.msg();
+
+        if (msg == null)
+            throw new EUnexpected();
+
+        return new ValidationKey(validationType, msg.getDescriptorForType(), loc.method());
     }
 
     public Object target() {
