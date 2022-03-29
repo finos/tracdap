@@ -20,16 +20,10 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
-import org.finos.tracdap.common.validation.static_.CommonValidators;
-import org.finos.tracdap.common.validation.static_.ObjectIdValidator;
-import org.finos.tracdap.common.validation.static_.SearchValidator;
-import org.finos.tracdap.common.validation.static_.TagUpdateValidator;
-import org.finos.tracdap.metadata.ObjectType;
-import org.finos.tracdap.metadata.SearchParameters;
-import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.common.validation.static_.*;
+import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
-import org.finos.tracdap.metadata.TagUpdate;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
@@ -89,7 +83,7 @@ public class MetadataApiValidator {
 
         ctx = ctx.push(MWR_DEFINITION)
                 .apply(CommonValidators::required)
-                // TODO: Object type matches
+                .apply(ObjectValidator::objectType, ObjectDefinition.class, msg.getObjectType())
                 .applyRegistered()
                 .pop();
 
@@ -110,7 +104,7 @@ public class MetadataApiValidator {
 
         ctx = ctx.push(MWR_DEFINITION)
                 .apply(CommonValidators::required)
-                // TODO: Object type matches
+                .apply(ObjectValidator::objectType, ObjectDefinition.class, msg.getObjectType())
                 .applyRegistered()
                 .pop();
 
@@ -171,7 +165,7 @@ public class MetadataApiValidator {
 
         ctx = ctx.push(MWR_DEFINITION)
                 .apply(CommonValidators::required)
-                // TODO: Object type matches
+                .apply(ObjectValidator::objectType, ObjectDefinition.class, msg.getObjectType())
                 .applyRegistered()
                 .pop();
 

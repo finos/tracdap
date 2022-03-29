@@ -70,7 +70,25 @@ public class ObjectValidator {
         return ctx;
     }
 
-    public static ValidationContext definitionMatchesType(ValidationContext ctx) {
+    public static ValidationContext objectType(ObjectDefinition msg, ObjectType expectedType, ValidationContext ctx) {
+
+        var objectType = msg.hasField(OD_OBJECT_TYPE)
+                ? msg.getObjectType()
+                : DEFINITION_CASE_MAPPING.getOrDefault(msg.getDefinitionCase(), ObjectType.UNRECOGNIZED);
+
+        if (objectType != expectedType) {
+
+            var err = String.format(
+                    "The given [%s] has the wrong object type: expected [%s], got [%s]",
+                    ctx.fieldName(), expectedType, objectType);
+
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext definitionMatchesType(ValidationContext ctx) {
 
         var objectDef = (ObjectDefinition) ctx.parentMsg();
         var definitionCase = objectDef.getDefinitionCase();
