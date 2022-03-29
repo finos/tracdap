@@ -321,7 +321,7 @@ public class ValidationContextImpl implements ValidationContext {
     }
 
     public ValidationContext
-    applyIf(ValidationFunction.Basic validator, boolean condition) {
+    applyIf(boolean condition, ValidationFunction.Basic validator) {
 
         if (!condition)
             return this;
@@ -330,7 +330,7 @@ public class ValidationContextImpl implements ValidationContext {
     }
 
     public <T> ValidationContext
-    applyIf(ValidationFunction.Typed<T> validator, Class<T> targetClass, boolean condition) {
+    applyIf(boolean condition, ValidationFunction.Typed<T> validator, Class<T> targetClass) {
 
         if (!condition)
             return this;
@@ -338,13 +338,63 @@ public class ValidationContextImpl implements ValidationContext {
         return apply(validator, targetClass);
     }
 
+    public <T, U> ValidationContext
+    applyIf(boolean condition, ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
+
+        if (!condition)
+            return this;
+
+        return apply(validator, targetClass, arg);
+    }
+
     public <T> ValidationContext
-    applyIf(ValidationFunction.Version<T> validator, Class<T> targetClass, boolean condition) {
+    applyIf(boolean condition, ValidationFunction.Version<T> validator, Class<T> targetClass) {
 
         if (!condition)
             return this;
 
         return apply(validator, targetClass);
+    }
+
+    public ValidationContext
+    applyOneOf(Descriptors.FieldDescriptor field, ValidationFunction.Basic validator) {
+
+        var oneOfCondition = oneOfFieldMatch(field);
+        return applyIf(oneOfCondition, validator);
+    }
+
+    public <T> ValidationContext
+    applyOneOf(Descriptors.FieldDescriptor field, ValidationFunction.Typed<T> validator, Class<T> targetClass) {
+
+        var oneOfCondition = oneOfFieldMatch(field);
+        return applyIf(oneOfCondition, validator, targetClass);
+    }
+
+    public <T, U> ValidationContext
+    applyOneOf(Descriptors.FieldDescriptor field,ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
+
+        var oneOfCondition = oneOfFieldMatch(field);
+        return applyIf(oneOfCondition, validator, targetClass, arg);
+    }
+
+    public <T> ValidationContext
+    applyOneOf(Descriptors.FieldDescriptor field, ValidationFunction.Version<T> validator, Class<T> targetClass) {
+
+        var oneOfCondition = oneOfFieldMatch(field);
+        return applyIf(oneOfCondition, validator, targetClass);
+    }
+
+    private boolean oneOfFieldMatch(Descriptors.FieldDescriptor oneOfField) {
+
+        var loc = location.peek();
+
+        if (!loc.isOneOf())
+            throw new ETracInternal("applyOneOf() can only be applied to one-of fields");
+
+        if (loc.field().getContainingOneof() != oneOfField.getContainingOneof())
+            throw new ETracInternal("applyOneOf() field is not a member of the current one-of");
+
+        return loc.field() == oneOfField;
     }
 
     public ValidationContext

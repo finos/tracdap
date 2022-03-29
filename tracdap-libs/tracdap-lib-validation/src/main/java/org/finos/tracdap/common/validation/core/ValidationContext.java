@@ -103,13 +103,18 @@ public interface ValidationContext {
     ValidationContext apply(ValidationFunction.Typed<String> validator);
     <T> ValidationContext apply(ValidationFunction.Typed<T> validator, Class<T> targetClass);
     <T, U> ValidationContext apply(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg);
-
     ValidationContext apply(ValidationFunction.Version<Object> validator);
     <T> ValidationContext apply(ValidationFunction.Version<T> validator, Class<T> targetClass);
 
-    ValidationContext applyIf(ValidationFunction.Basic validator, boolean condition);
-    <T> ValidationContext applyIf(ValidationFunction.Typed<T> validator, Class<T> targetClass, boolean condition);
-    <T> ValidationContext applyIf(ValidationFunction.Version<T> validator, Class<T> targetClass, boolean condition);
+    ValidationContext applyIf(boolean condition, ValidationFunction.Basic validator);
+    <T> ValidationContext applyIf(boolean condition, ValidationFunction.Typed<T> validator, Class<T> targetClass);
+    <T, U> ValidationContext applyIf(boolean condition, ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg);
+    <T> ValidationContext applyIf(boolean condition, ValidationFunction.Version<T> validator, Class<T> targetClass);
+
+    ValidationContext applyOneOf(Descriptors.FieldDescriptor field, ValidationFunction.Basic validator);
+    <T> ValidationContext applyOneOf(Descriptors.FieldDescriptor field, ValidationFunction.Typed<T> validator, Class<T> targetClass);
+    <T, U> ValidationContext applyOneOf(Descriptors.FieldDescriptor field, ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg);
+    <T> ValidationContext applyOneOf(Descriptors.FieldDescriptor field, ValidationFunction.Version<T> validator, Class<T> targetClass);
 
     <T> ValidationContext applyRepeated(ValidationFunction.Basic validator);
     <T> ValidationContext applyRepeated(ValidationFunction.Typed<T> validator, Class<T> targetClass);
