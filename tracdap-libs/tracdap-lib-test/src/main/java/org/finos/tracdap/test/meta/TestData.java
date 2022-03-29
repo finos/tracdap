@@ -352,7 +352,7 @@ public class TestData {
         return ObjectDefinition.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
                 .setCustom(CustomDefinition.newBuilder()
-                .setCustomType("REPORT")
+                .setCustomSchemaType("REPORT")
                 .setCustomSchemaVersion(2)
                 .setCustomData(ByteString.copyFromUtf8(jsonReportDef)))
                 .build();

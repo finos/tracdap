@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.validation.static_;
 
+import com.google.protobuf.ByteString;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -459,6 +460,16 @@ public class CommonValidators {
         if (nItems == 0) {
             var err = String.format("The map of [%s] contains no entries", ctx.fieldName());
             return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext bytesNotEmpty(ByteString content, ValidationContext ctx) {
+
+        if (content.isEmpty()) {
+
+            return ctx.error(String.format("[%s] cannot be empty", ctx.fieldName()));
         }
 
         return ctx;

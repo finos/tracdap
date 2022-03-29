@@ -23,7 +23,7 @@ option java_multiple_files = true;
 
 message CustomDefinition {
 
-  string customType = 1;
+  string customSchemaType = 1;
   uint32 customSchemaVersion = 2;
 
   bytes customData = 3;
