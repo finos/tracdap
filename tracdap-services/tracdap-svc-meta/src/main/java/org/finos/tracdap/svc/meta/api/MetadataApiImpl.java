@@ -76,6 +76,8 @@ public class MetadataApiImpl {
 
     CompletableFuture<TagHeader> createObject(MetadataWriteRequest request) {
 
+        validateRequest(CREATE_OBJECT_METHOD, request);
+
         var tenant = request.getTenant();
         var objectType = request.getObjectType();
 
@@ -92,6 +94,8 @@ public class MetadataApiImpl {
     }
 
     CompletableFuture<TagHeader> updateObject(MetadataWriteRequest request) {
+
+        validateRequest(UPDATE_OBJECT_METHOD, request);
 
         var tenant = request.getTenant();
         var objectType = request.getObjectType();
@@ -110,6 +114,8 @@ public class MetadataApiImpl {
     }
 
     CompletableFuture<TagHeader> updateTag(MetadataWriteRequest request) {
+
+        validateRequest(UPDATE_TAG_METHOD, request);
 
         return writeService.updateTag(
                 request.getTenant(),

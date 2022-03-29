@@ -23,10 +23,13 @@ import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.common.validation.static_.CommonValidators;
 import org.finos.tracdap.common.validation.static_.ObjectIdValidator;
 import org.finos.tracdap.common.validation.static_.SearchValidator;
+import org.finos.tracdap.common.validation.static_.TagUpdateValidator;
+import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.SearchParameters;
 import org.finos.tracdap.metadata.TagSelector;
 
 import com.google.protobuf.Descriptors;
+import org.finos.tracdap.metadata.TagUpdate;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
@@ -36,6 +39,10 @@ public class MetadataApiValidator {
 
     private static final Descriptors.Descriptor METADATA_WRITE_REQUEST;
     private static final Descriptors.FieldDescriptor MWR_TENANT;
+    private static final Descriptors.FieldDescriptor MWR_OBJECT_TYPE;
+    private static final Descriptors.FieldDescriptor MWR_PRIOR_VERSION;
+    private static final Descriptors.FieldDescriptor MWR_DEFINITION;
+    private static final Descriptors.FieldDescriptor MWR_ATTRS;
 
     private static final Descriptors.Descriptor METADATA_READ_REQUEST;
     private static final Descriptors.FieldDescriptor MRR_TENANT;
@@ -53,6 +60,10 @@ public class MetadataApiValidator {
 
         METADATA_WRITE_REQUEST = MetadataWriteRequest.getDescriptor();
         MWR_TENANT = field(METADATA_WRITE_REQUEST, MetadataWriteRequest.TENANT_FIELD_NUMBER);
+        MWR_OBJECT_TYPE = field(METADATA_WRITE_REQUEST, MetadataWriteRequest.OBJECTTYPE_FIELD_NUMBER);
+        MWR_PRIOR_VERSION = field(METADATA_WRITE_REQUEST, MetadataWriteRequest.PRIORVERSION_FIELD_NUMBER);
+        MWR_DEFINITION = field(METADATA_WRITE_REQUEST, MetadataWriteRequest.DEFINITION_FIELD_NUMBER);
+        MWR_ATTRS = field(METADATA_WRITE_REQUEST, MetadataWriteRequest.TAGUPDATES_FIELD_NUMBER);
 
         METADATA_READ_REQUEST = MetadataReadRequest.getDescriptor();
         MRR_TENANT = field(METADATA_READ_REQUEST, MetadataReadRequest.TENANT_FIELD_NUMBER);
@@ -65,6 +76,84 @@ public class MetadataApiValidator {
         BATCH_READ_REQUEST = MetadataBatchRequest.getDescriptor();
         BRR_TENANT = field(BATCH_READ_REQUEST, MetadataBatchRequest.TENANT_FIELD_NUMBER);
         BRR_SELECTORS = field(BATCH_READ_REQUEST, MetadataBatchRequest.SELECTOR_FIELD_NUMBER);
+    }
+
+    @Validator(method = "createObject")
+    public static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx) {
+
+        ctx = createOrUpdate(ctx);
+
+        ctx = ctx.push(MWR_PRIOR_VERSION)
+                .apply(CommonValidators::omitted)
+                .pop();
+
+        ctx = ctx.push(MWR_DEFINITION)
+                .apply(CommonValidators::required)
+                // TODO: Object type matches
+                .applyRegistered()
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "updateObject")
+    public static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx) {
+
+        ctx = createOrUpdate(ctx);
+
+        ctx = ctx.push(MWR_PRIOR_VERSION)
+                .apply(CommonValidators::required)
+                .apply(ObjectIdValidator::tagSelector, TagSelector.class)
+                .apply(ObjectIdValidator::selectorType, TagSelector.class, msg.getObjectType())
+                .apply(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
+                .pop();
+
+        ctx = ctx.push(MWR_DEFINITION)
+                .apply(CommonValidators::required)
+                // TODO: Object type matches
+                .applyRegistered()
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "updateTag")
+    public static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx) {
+
+        ctx = createOrUpdate(ctx);
+
+        ctx = ctx.push(MWR_PRIOR_VERSION)
+                .apply(CommonValidators::required)
+                .apply(ObjectIdValidator::tagSelector, TagSelector.class)
+                .apply(ObjectIdValidator::selectorType, TagSelector.class, msg.getObjectType())
+                .apply(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
+                // .apply(ObjectIdValidator::fixedTagVersion, TagSelector.class)  // todo
+                .pop();
+
+        ctx = ctx.push(MWR_DEFINITION)
+                .apply(CommonValidators::omitted)
+                .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext createOrUpdate(ValidationContext ctx) {
+
+        ctx = ctx.push(MWR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.push(MWR_OBJECT_TYPE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::nonZeroEnum, ObjectType.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(MWR_ATTRS)
+                .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                .pop();
+
+        return ctx;
     }
 
     @Validator(method = "readObject")

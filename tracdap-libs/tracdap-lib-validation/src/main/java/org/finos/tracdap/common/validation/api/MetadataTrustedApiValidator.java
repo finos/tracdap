@@ -34,6 +34,21 @@ public class MetadataTrustedApiValidator {
 
     // Based on this thinking, trusted API validator is just a wrapper on untrusted API validator
 
+    @Validator(method = "createObject")
+    public static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.createObject(msg, ctx);
+    }
+
+    @Validator(method = "updateObject")
+    public static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.updateObject(msg, ctx);
+    }
+
+    @Validator(method = "updateTag")
+    public static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.updateTag(msg, ctx);
+    }
+
     @Validator(method = "readObject")
     public static ValidationContext readObject(MetadataReadRequest msg, ValidationContext ctx) {
         return MetadataApiValidator.readObject(msg, ctx);
