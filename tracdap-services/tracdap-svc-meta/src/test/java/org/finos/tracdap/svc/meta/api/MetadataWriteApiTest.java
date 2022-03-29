@@ -196,7 +196,6 @@ abstract class MetadataWriteApiTest {
     }
 
     @Test
-    @Disabled("Object definition content validation is not implemented yet")
     void createObject_invalidContent() {
 
         var validFlow = TestData.dummyFlowDef();
@@ -662,7 +661,6 @@ abstract class MetadataWriteApiTest {
     }
 
     @Test
-    @Disabled("Object definition content validation is not implemented yet")
     void updateObject_invalidContent() {
 
         // V1 object created and saved
@@ -1389,7 +1387,6 @@ abstract class MetadataWriteApiTest {
     }
 
     @Test
-    @Disabled("Content validation not implemented yet")
     void preallocateObject_saveInvalidContent() {
         fail();
     }
