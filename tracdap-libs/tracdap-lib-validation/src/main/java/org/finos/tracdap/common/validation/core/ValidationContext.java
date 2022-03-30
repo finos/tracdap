@@ -47,7 +47,7 @@ public interface ValidationContext {
      * Push a member field of the current object onto the validation stack
      *
      * @param field The field that will be pushed onto the stack
-     * @return A new validation context, pointing at the field that has been pushed onto the stack
+     * @return A validation context pointing at the field that has been pushed
      */
     ValidationContext push(Descriptors.FieldDescriptor field);
 
@@ -55,39 +55,111 @@ public interface ValidationContext {
      * Push a "one-of" field of the current object onto the validation stack
      *
      * @param oneOfField The one-of field that will be pushed onto the stack
-     * @return A new validation context, pointing at the field that has been pushed onto the stack
+     * @return A validation context pointing at the field that has been pushed
      */
     ValidationContext pushOneOf(Descriptors.OneofDescriptor oneOfField);
 
     /**
      * Push a repeated member field of the current object onto the validation stack
      *
+     * This method pushes a list onto the validation stack, so the target becomes a Java List object.
+     * To push individual list items, use pushRepeatedItem() after calling this method.
+     *
      * @param repeatedField The field that will be pushed onto the stack
-     * @return A new validation context, pointing at the field that has been pushed onto the stack
+     * @return A validation context pointing at the list that has been pushed
      */
     ValidationContext pushRepeated(Descriptors.FieldDescriptor repeatedField);
 
+    /**
+     * Push an individual list item onto the validation stack
+     *
+     * Requires that the current target is a repeated field.
+     *
+     * @param index The index of the list item to push onto the stack (must be within bounds of the list)
+     * @return A validation context pointing at the list item that has been pushed
+     */
     ValidationContext pushRepeatedItem(int index);
+
+    /**
+     * Push an individual list item onto the validation stack
+     *
+     * Requires that the current target is a repeated field.
+     *
+     * This overload allows a prior version of the object to be specified for version comparison.
+     * This is helpful for version validators, which need to match current / prior entries in a list.
+     *
+     * @param index The index of the list item to push onto the stack (must be within bounds of the list)
+     * @param priorObject The prior object to be compared against this list item in version validators
+     * @return A validation context pointing at the list item that has been pushed
+     */
     ValidationContext pushRepeatedItem(int index, Object priorObject);
+
+    /**
+     * Push an individual list item onto the validation stack
+     *
+     * Requires that the current target is a repeated field.
+     *
+     * This overload allows a prior version of the object to be specified for version comparison.
+     * This is helpful for version validators, which need to match current / prior entries in a list.
+     *
+     * @param obj The current list item to push onto the stack (must be a member of the list)
+     * @param priorObject The prior object to be compared against this list item in version validators
+     * @return A validation context pointing at the list item that has been pushed
+     */
     ValidationContext pushRepeatedItem(Object obj, Object priorObject);
 
     /**
      * Push a map member field of the current object onto the validation stack
      *
+     * This method only pushes the map itself onto the stack, the validation target will be a Java Map object.
+     * To push individual keys or values, use pushMapKey() or pushMapValue() after calling this method.
+     *
+     * This method needs a method reference from the parent message class to return Java map object
+     * associated with this field (protobuf for Java does not yet provide a generic way of looking up map keys).
+     *
      * @param mapField The field that will be pushed onto the stack
-     * @return A new validation context, pointing at the field that has been pushed onto the stack
+     * @param getMapFunc Method reference, on the parent message to return the field as a Java map
+     * @return A validation context pointing at the map that has been pushed (this is a Map object)
+     */
+    <TMsg extends Message> ValidationContext
+    pushMap(Descriptors.FieldDescriptor mapField, Function<TMsg, Map<?, ?>> getMapFunc);
+
+    /**
+     * Push a map member field of the current object onto the validation stack
+     *
+     * This method will work with applyMapKeys() and applyMapValues(). If you need to look up map items
+     * by key or want to call pushMapKey() / pushMapValue() explicitly, use the overload which takes
+     * getMapFunc as a parameter (protobuf for Java does not provide a generic way of looking up map keys).
+     *
+     * @param mapField The field that will be pushed onto the stack
+     * @return A validation context pointing at the map that has been pushed (this is not a Map object)
      */
     ValidationContext pushMap(Descriptors.FieldDescriptor mapField);
 
-    <TMsg extends Message> ValidationContext
-    pushMap(Descriptors.FieldDescriptor mapField, Function<TMsg, Map<?, ?>> getMapFunc);
+    /**
+     * Push an individual map key onto the validation stack
+     *
+     * Requires that the current target is a map field.
+     *
+     * @param key The map key to push onto the stack
+     * @return A validation context pointing at the map key that has been pushed
+     */
     ValidationContext pushMapKey(Object key);
+
+    /**
+     * Push an individual map value onto the validation stack
+     *
+     * Requires that the current target is a map field.
+     *
+     * @param key The key of the map value to push onto the stack
+     * @return A validation context pointing at the map value that has been pushed
+     */
     ValidationContext pushMapValue(Object key);
 
     /**
      * Pop the current object from the validation stack
      *
-     * @return A new validation context, pointing at the parent of the current object
+     * @return A validation context pointing at the parent of the current object
      */
     ValidationContext pop();
 
@@ -95,7 +167,7 @@ public interface ValidationContext {
      * Record an error against the current location in the validation stack
      *
      * @param message The error message to record
-     * @return A new validation context, which includes the recorded error
+     * @return A validation context which includes the recorded error
      */
     ValidationContext error(String message);
 
@@ -105,7 +177,7 @@ public interface ValidationContext {
      * Any future calls to apply() at this location or child locations will be ignored.
      * Errors already recorded at this location or child locations are still included in the validation report.
      *
-     * @return A new context with the current object in the validation stack marked as skipped.
+     * @return A validation context with the current object marked as skipped
      */
     ValidationContext skip();
 
