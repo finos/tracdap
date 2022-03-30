@@ -23,6 +23,7 @@ import org.finos.tracdap.common.validation.core.impl.ValidationFailure;
 import org.finos.tracdap.common.validation.core.impl.ValidationKey;
 
 import java.util.*;
+import java.util.function.Function;
 
 
 public interface ValidationContext {
@@ -51,12 +52,24 @@ public interface ValidationContext {
     ValidationContext push(Descriptors.FieldDescriptor field);
 
     /**
+     * Push a "one-of" field of the current object onto the validation stack
+     *
+     * @param oneOfField The one-of field that will be pushed onto the stack
+     * @return A new validation context, pointing at the field that has been pushed onto the stack
+     */
+    ValidationContext pushOneOf(Descriptors.OneofDescriptor oneOfField);
+
+    /**
      * Push a repeated member field of the current object onto the validation stack
      *
      * @param repeatedField The field that will be pushed onto the stack
      * @return A new validation context, pointing at the field that has been pushed onto the stack
      */
     ValidationContext pushRepeated(Descriptors.FieldDescriptor repeatedField);
+
+    ValidationContext pushRepeatedItem(int index);
+    ValidationContext pushRepeatedItem(int index, Object priorObject);
+    ValidationContext pushRepeatedItem(Object obj, Object priorObject);
 
     /**
      * Push a map member field of the current object onto the validation stack
@@ -66,13 +79,10 @@ public interface ValidationContext {
      */
     ValidationContext pushMap(Descriptors.FieldDescriptor mapField);
 
-    /**
-     * Push a "one-of" field of the current object onto the validation stack
-     *
-     * @param oneOfField The one-of field that will be pushed onto the stack
-     * @return A new validation context, pointing at the field that has been pushed onto the stack
-     */
-    ValidationContext pushOneOf(Descriptors.OneofDescriptor oneOfField);
+    <TMsg extends Message> ValidationContext
+    pushMap(Descriptors.FieldDescriptor mapField, Function<TMsg, Map<?, ?>> getMapFunc);
+    ValidationContext pushMapKey(Object key);
+    ValidationContext pushMapValue(Object key);
 
     /**
      * Pop the current object from the validation stack

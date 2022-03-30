@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
+import java.util.function.Function;
 
 
 public class ValidationContextImpl implements ValidationContext {
@@ -76,31 +77,30 @@ public class ValidationContextImpl implements ValidationContext {
         return new ValidationContextImpl(ValidationType.VERSION, currentRoot, priorCtx);
     }
 
-
+    @Override
     public ValidationContext push(Descriptors.FieldDescriptor fd) {
 
-        return push(fd, false, false);
+        return push(fd, false, false, null);
     }
 
-    public ValidationContext pushRepeated(Descriptors.FieldDescriptor fd) {
-
-        return push(fd, true, false);
-    }
-
-    public ValidationContext pushMap(Descriptors.FieldDescriptor fd) {
-
-        return push(fd, true, true);
-    }
-
-    private ValidationContext push(Descriptors.FieldDescriptor fd, boolean repeated, boolean map) {
+    private ValidationContext push(
+            Descriptors.FieldDescriptor fd,
+            boolean repeated, boolean map,
+            Function<Message, Map<?, ?>> getMapFunc) {
 
         if (fd.isRepeated() != repeated || fd.isMapField() != map)
             throw new ETracInternal("Use push, pushRepeated and pushMap for regular, repeated and map fields respectively");
 
         var parentLoc = location.peek();
-        var msg = parentLoc.msg();
-        var obj = msg.getField(fd);
-        var loc = new ValidationLocation(parentLoc, obj, null, fd, fd.getName());
+        var msg = (Message) parentLoc.msg();
+
+        var obj = map && getMapFunc != null
+            ? getMapFunc.apply(msg)
+            : msg.getField(fd);
+
+        var loc = new ValidationLocation(
+                parentLoc, obj,
+                null, fd, fd.getName());
 
         if (parentLoc.skipped())
             loc.skip();
@@ -108,11 +108,12 @@ public class ValidationContextImpl implements ValidationContext {
         location.push(loc);
 
         if (priorCtx != null)
-            priorCtx.push(fd, repeated, map);
+            priorCtx.push(fd, repeated, map, getMapFunc);
 
         return this;
     }
 
+    @Override
     public ValidationContext pushOneOf(Descriptors.OneofDescriptor oneOf) {
 
         var parentLoc = location.peek();
@@ -141,39 +142,162 @@ public class ValidationContextImpl implements ValidationContext {
         return this;
     }
 
-    @SuppressWarnings("unchecked")
-    private ValidationContext pushRepeated(Integer index, boolean mapKey) {
+    @Override
+    public ValidationContext pushRepeated(Descriptors.FieldDescriptor fd) {
+
+        return push(fd, true, false, null);
+    }
+
+    @Override
+    public ValidationContext pushRepeatedItem(int index) {
+
+        return pushRepeatedItem(index, null, false, null);
+    }
+
+    @Override
+    public ValidationContext pushRepeatedItem(int index, Object priorObj) {
+
+        return pushRepeatedItem(index, null, false, priorObj);
+    }
+
+    @Override
+    public ValidationContext pushRepeatedItem(Object obj, Object priorObj) {
+
+        return pushRepeatedItem(-1, obj, false, priorObj);
+    }
+
+    private ValidationContext pushRepeatedItem(int index, Object obj, boolean isPrior, Object priorObj) {
 
         var parentLoc = location.peek();
 
-        if (!parentLoc.field().isRepeated())
-            throw new EUnexpected();
+        if (!parentLoc.field().isRepeated() || parentLoc.field().isMapField())
+            throw new ETracInternal("[pushRepeatedItem] is only for repeated fields (and not map fields)");
 
         var msg = parentLoc.parent().msg();
-        var obj = msg.getRepeatedField(parentLoc.field(), index);
 
-        ValidationLocation loc;
+        if (!isPrior) {
 
-        if (parentLoc.field().isMapField()) {
+            if (index < 0 && obj != null) {
 
-            var mapEntry = (MapEntry<String, ?>) obj;
-            var fieldName = mapEntry.getKey();
-            obj = mapKey ? mapEntry.getKey() : mapEntry.getValue();
-            loc = new ValidationLocation(parentLoc, obj, parentLoc.field(), fieldName);
+                var list = (List<?>) msg.getField(parentLoc.field());
+                index = list.indexOf(obj);
+
+                if (index < 0)
+                    throw new ETracInternal("Object not in list for [pushRepeatedItem]");
+            }
+
+            if (index < 0 || index >= msg.getRepeatedFieldCount(parentLoc.field()))
+                throw new ETracInternal("Index out of bounds for [pushRepeatedItem]");
+
+            if (obj == null) {
+                var list = (List<?>) msg.getField(parentLoc.field());
+                obj = list.get(index);
+            }
         }
-        else {
 
-            var fieldName = String.format("%d", index);
-            loc = new ValidationLocation(parentLoc, obj, parentLoc.field(), fieldName);
-        }
+        var fieldName = String.format("%d", index);
+        var loc = new ValidationLocation(parentLoc, obj, parentLoc.field(), fieldName);
+        location.push(loc);
+
+        if (priorCtx != null)
+            priorCtx.pushRepeatedItem(-1, priorObj, true, null);
+
+        return this;
+    }
+
+    @Override public ValidationContext
+    pushMap(Descriptors.FieldDescriptor fd) {
+
+        if (priorCtx != null)
+            throw new ETracInternal("Use [pushMap] with [getMapFunc] for version validation");
+
+        return push(fd, true, true, null);
+    }
+
+    @Override public <TMsg extends Message> ValidationContext
+    pushMap(Descriptors.FieldDescriptor mapField, Function<TMsg, Map<?, ?>> getMapFunc) {
+
+        @SuppressWarnings("unchecked")
+        var getMapFunc_ = (Function<Message, Map<?, ?>>) getMapFunc;
+
+        return push(mapField, true, true, getMapFunc_);
+    }
+
+    @Override
+    public ValidationContext pushMapKey(Object key) {
+
+        return pushMapEntry(key, true);
+    }
+
+    @Override
+    public ValidationContext pushMapValue(Object key) {
+
+        return pushMapEntry(key, false);
+    }
+
+    private ValidationContext pushMapEntry(Object key, boolean pushKey) {
+
+        var methodName = pushKey ? "[pushMapKey]" : "[pushMapValue]";
+
+        var parentLoc = location.peek();
+
+        if (!parentLoc.field().isMapField())
+            throw new ETracInternal(methodName + " can only be used on map fields");
+
+        if (!(parentLoc.target() instanceof Map))
+            throw new ETracInternal(methodName + " requires [pushMap] is called with [getMapFunc]");
+
+        var map = (Map<?, ?>) parentLoc.target();
+
+        if (!map.containsKey(key))
+            throw new ETracInternal(methodName + " attempted to push a key that is not in the map");
+
+        var fieldName = key.toString();
+        var obj = pushKey ? key : map.getOrDefault(key, null);
+        var loc = new ValidationLocation(parentLoc, obj, parentLoc.field(), fieldName);
+
+        location.push(loc);
 
         if (parentLoc.skipped())
             loc.skip();
 
-        location.push(loc);
+        if (priorCtx != null)
+            priorCtx.pushMapEntry(key, pushKey);
+
+        return this;
+    }
+
+    private ValidationContext pushMapEntry(int index, boolean pushKey) {
+
+        // Push map entry by index is only called from the applyMap* functions
+        var methodName = pushKey ? "[applyMapKeys]" : "[applyMapValues]";
+
+        var parentLoc = location.peek();
+
+        if (!parentLoc.field().isMapField())
+            throw new ETracInternal(methodName + " can only be used on map fields");
+
+        if (!(parentLoc.target() instanceof List))
+            throw new ETracInternal(methodName + " requires [pushMap] is called without [getMapFunc]");
 
         if (priorCtx != null)
-            priorCtx.pushRepeated(index, mapKey);
+            throw new ETracInternal(methodName + " by index is not allowed for version validators");
+
+        @SuppressWarnings("unchecked")
+        var list = (List<MapEntry<?, ?>>) parentLoc.target();
+
+        if (index < 0 || index > list.size())
+            throw new ETracInternal(methodName + " map entry index is out of range");
+
+        var entry = list.get(index);
+        var fieldName = entry.getKey().toString();
+        var obj = pushKey ? entry.getKey() : entry.getValue();
+        var loc = new ValidationLocation(parentLoc, obj, parentLoc.field(), fieldName);
+
+        location.push(loc);
+
+        if (parentLoc.skipped())
+            loc.skip();
 
         return this;
     }
@@ -308,10 +432,12 @@ public class ValidationContextImpl implements ValidationContext {
         // In the event of a type mismatch at run time, blow up the validator!
         // I.e. report as an unexpected internal error, validation cannot be completed.
 
-        log.error("Validator type mismatch (this is a bug): expected [{}], got [{}]", targetClass, obj.getClass());
-        log.error("(Expected target class is specified in ctx.apply())");
+        var err = String.format(
+                "Validator type mismatch (this is a bug): expected [%s], got [%s]",
+                targetClass.getSimpleName(), obj.getClass().getSimpleName());
 
-        throw new EUnexpected();
+        log.error(err);
+        throw new ETracInternal(err);
     }
 
     public ValidationContext apply(ValidationFunction.Version<Object> validator) {
@@ -331,7 +457,8 @@ public class ValidationContextImpl implements ValidationContext {
         var current = location.peek().target();
         var prior = priorCtx.location.peek().target();
 
-        if (targetClass.isInstance(prior) && targetClass.isInstance(current)) {
+        if ((current == null || targetClass.isInstance(current)) &&
+            (prior == null || targetClass.isInstance(prior))) {
 
             var typedCurrent = (T) current;
             var typedPrior = (T) prior;
@@ -354,12 +481,14 @@ public class ValidationContextImpl implements ValidationContext {
             }
         }
 
-        log.error("Validator type mismatch (this is a bug): expected [{}], got prior = [{}], current = [{}]",
-                targetClass, prior.getClass(), current.getClass());
+        var currentClass = current != null ? current.getClass().getSimpleName() : "(null)";
+        var priorClass = prior != null ? prior.getClass().getSimpleName() : "(null)";
+        var err = String.format(
+                "Validator type mismatch (this is a bug): expected [%s], got prior = [%s], current = [%s]",
+                targetClass.getSimpleName(), priorClass, currentClass);
 
-        log.error("(Expected target class is specified in ctx.apply())");
-
-        throw new EUnexpected();
+        log.error(err);
+        throw new ETracInternal(err);
     }
 
     public ValidationContext
@@ -469,7 +598,7 @@ public class ValidationContextImpl implements ValidationContext {
         for (var i = 0; i < size; i++) {
 
             resultCtx = (ValidationContextImpl) resultCtx
-                    .pushRepeated(i, false)
+                    .pushRepeatedItem(i)
                     .apply(validator, targetClass, arg)
                     .pop();
         }
@@ -480,74 +609,75 @@ public class ValidationContextImpl implements ValidationContext {
     @Override public ValidationContext
     applyMapKeys(ValidationFunction.Basic validator) {
 
-        return applyMapKeys((obj, arg, ctx) -> validator.apply(ctx), null);
+        return applyMap((obj, arg, ctx) -> validator.apply(ctx), String.class, null, true);
     }
 
     @Override public ValidationContext
     applyMapKeys(ValidationFunction.Typed<String> validator) {
 
-        return applyMapKeys((obj, arg, ctx) -> validator.apply(obj, ctx), null);
+        return applyMap((obj, arg, ctx) -> validator.apply(obj, ctx), String.class, null, true);
     }
 
     @Override public <U> ValidationContext
     applyMapKeys(ValidationFunction.TypedArg<String, U> validator, U arg) {
 
-        var loc = location.peek();
-
-        if (!loc.field().isMapField())
-            throw new ETracInternal("applyMapKeys() can only apply to map fields");
-
-        if (done())
-            return this;
-
-        var size = loc.parent().msg().getRepeatedFieldCount(loc.field());
-
-        var resultCtx = this;
-
-        for (var i = 0; i < size; i++) {
-
-            resultCtx = (ValidationContextImpl) resultCtx
-                    .pushRepeated(i, true)
-                    .apply(validator, String.class, arg)
-                    .pop();
-        }
-
-        return resultCtx;
+        return applyMap(validator, String.class, arg, true);
     }
 
     @Override public ValidationContext
     applyMapValues(ValidationFunction.Basic validator) {
 
-        return applyMapValues((obj, arg, ctx) -> validator.apply(ctx), Object.class, null);
+        return applyMap((obj, arg, ctx) -> validator.apply(ctx), Object.class, null, false);
     }
 
     @Override public <T> ValidationContext
     applyMapValues(ValidationFunction.Typed<T> validator, Class<T> targetClass) {
 
-        return applyMapValues((obj, arg, ctx) -> validator.apply(obj, ctx), targetClass, null);
+        return applyMap((obj, arg, ctx) -> validator.apply(obj, ctx), targetClass, null, false);
     }
 
     @Override public <T, U> ValidationContext
     applyMapValues(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
 
+        return applyMap(validator, targetClass, arg, false);
+    }
+
+    private <T, U> ValidationContext
+    applyMap(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg, boolean pushKey) {
+
+        var funcName = pushKey ? "[applyMapKeys]" : "[applyMapValues]";
+
         var loc = location.peek();
 
         if (!loc.field().isMapField())
-            throw new ETracInternal("applyMapKeys() can only apply to map fields");
+            throw new ETracInternal(funcName + " can only apply to map fields");
 
         if (done())
             return this;
 
-        var size = loc.parent().msg().getRepeatedFieldCount(loc.field());
-
         var resultCtx = this;
 
-        for (var i = 0; i < size; i++) {
+        if (loc.target() instanceof Map) {
 
-            resultCtx = (ValidationContextImpl) resultCtx
-                    .pushRepeated(i, false)
-                    .apply(validator, targetClass, arg)
-                    .pop();
+            var map = (Map<?, ?>) loc.target();
+
+            for (var key : map.keySet())
+
+                resultCtx = (ValidationContextImpl) resultCtx
+                        .pushMapEntry(key, pushKey)
+                        .apply(validator, targetClass, arg)
+                        .pop();
+        }
+        else {
+
+            var mapSize = loc.parent().msg().getRepeatedFieldCount(loc.field());
+
+            for (var i = 0; i < mapSize; i++)
+
+                resultCtx = (ValidationContextImpl) resultCtx
+                        .pushMapEntry(i, pushKey)
+                        .apply(validator, targetClass, arg)
+                        .pop();
         }
 
         return resultCtx;
