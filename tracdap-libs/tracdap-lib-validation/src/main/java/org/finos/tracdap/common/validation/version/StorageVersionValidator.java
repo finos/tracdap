@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.validation.version;
 
-import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
@@ -200,7 +199,7 @@ public class StorageVersionValidator {
 
         // Static validation for storage should ensure every item has at least one incarnation recorded
         if (maxPriorIncarnation.isEmpty())
-            throw new EUnexpected();
+            return ctx.error("Version validation failed because the prior version is invalid");
 
         if (current.getIncarnationIndex() <= maxPriorIncarnation.getAsInt()) {
 
