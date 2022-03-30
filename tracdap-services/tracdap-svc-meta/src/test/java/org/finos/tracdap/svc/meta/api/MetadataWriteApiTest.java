@@ -1392,7 +1392,47 @@ abstract class MetadataWriteApiTest {
 
     @Test
     void preallocateObject_saveInvalidContent() {
-        fail();
+
+        var preallocateRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .build();
+
+        var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
+        var preallocateSelector = selectorForTag(preallocateHeader);
+
+        var validSchema = TestData.dummySchemaDef();
+
+        // Create a flow with an invalid node graph, this should get picked up by the validation layer
+
+        var brokenTableSchema = validSchema.getSchema().toBuilder()
+                .setTable(validSchema.getSchema().getTable().toBuilder()
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("# invalid_identifier")
+                        .setFieldType(BasicType.ARRAY)
+                        .setFieldOrder(-1)
+                        .setLabel("This is a totally invalid field")))
+                .build();
+
+        var invalidSchema = validSchema.toBuilder()
+                .setSchema(brokenTableSchema)
+                .build();
+
+        var tagToSave = TestData.dummyTag(invalidSchema, TestData.NO_HEADER);
+        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+
+        // Try to save the flow with a broken graph, should fail validation
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setPriorVersion(preallocateSelector)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(invalidSchema)
+                .addAllTagUpdates(tagUpdates)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test
