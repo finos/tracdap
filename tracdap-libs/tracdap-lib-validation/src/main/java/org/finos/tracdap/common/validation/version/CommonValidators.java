@@ -108,11 +108,11 @@ public class CommonValidators {
         if (!ctx.isOneOf())
             throw new EUnexpected();
 
-        if (ctx.field().getNumber() != ctx.priorField().getNumber()) {
+        if (ctx.field().getNumber() != ctx.prior().field().getNumber()) {
 
             var err = String.format(
                     "Selected one of [%s] must not change between versions: prior = [%s], new = [%s]",
-                    ctx.oneOf().getName(), ctx.priorFieldName(), ctx.fieldName());
+                    ctx.oneOf().getName(), ctx.prior().fieldName(), ctx.fieldName());
 
             return ctx.error(err);
         }

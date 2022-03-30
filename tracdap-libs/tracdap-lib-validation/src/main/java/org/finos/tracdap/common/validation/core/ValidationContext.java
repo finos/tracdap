@@ -139,10 +139,9 @@ public interface ValidationContext {
     boolean isMap();
     Descriptors.OneofDescriptor oneOf();
     Descriptors.FieldDescriptor field();
-
     String fieldName();
-    Descriptors.FieldDescriptor priorField();
-    String priorFieldName();
+
+    ValidationContext prior();
 
     boolean failed();
     boolean skipped();

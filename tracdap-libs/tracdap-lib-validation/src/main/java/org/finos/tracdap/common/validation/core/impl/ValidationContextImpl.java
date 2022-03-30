@@ -157,13 +157,13 @@ public class ValidationContextImpl implements ValidationContext {
         if (parentLoc.field().isMapField()) {
 
             var mapEntry = (MapEntry<String, ?>) obj;
-            var fieldName = String.format("[%s]", mapEntry.getKey());
+            var fieldName = mapEntry.getKey();
             obj = mapKey ? mapEntry.getKey() : mapEntry.getValue();
             loc = new ValidationLocation(parentLoc, obj, parentLoc.field(), fieldName);
         }
         else {
 
-            var fieldName = String.format("[%s]", index);
+            var fieldName = String.format("%d", index);
             loc = new ValidationLocation(parentLoc, obj, parentLoc.field(), fieldName);
         }
 
@@ -600,12 +600,8 @@ public class ValidationContextImpl implements ValidationContext {
         return location.peek().fieldName();
     }
 
-    public Descriptors.FieldDescriptor priorField() {
-        return priorCtx.location.peek().field();
-    }
-
-    public String priorFieldName() {
-        return priorCtx.location.peek().fieldName();
+    public ValidationContext prior() {
+        return priorCtx;
     }
 
     public boolean failed() {
