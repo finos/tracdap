@@ -295,6 +295,7 @@ abstract class MetadataWriteApiTest {
     // UPDATE OBJECT
     // -----------------------------------------------------------------------------------------------------------------
 
+    // Versioned types, as listed in MetadataConstants.VERSIONED_OBJECT_TYPES
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
                 names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
@@ -303,6 +304,7 @@ abstract class MetadataWriteApiTest {
         updateObject_ok(objectType, request -> trustedApi.updateObject(request));
     }
 
+    // Versioned types that are also publicly writable
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
                 names = {"SCHEMA", "CUSTOM"})
@@ -311,9 +313,10 @@ abstract class MetadataWriteApiTest {
         updateObject_ok(objectType, request -> publicApi.updateObject(request));
     }
 
+    // Versioned types that are not publicly writable
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "SCHEMA", "FLOW", "CUSTOM"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
+                names = {"DATA", "FILE", "STORAGE"})
     void updateObject_publicTypesNotAllowed(ObjectType objectType) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
@@ -333,6 +336,7 @@ abstract class MetadataWriteApiTest {
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
     }
 
+    // Object types not included in MetadataConstants.VERSIONED_OBJECT_TYPES
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
                 names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})

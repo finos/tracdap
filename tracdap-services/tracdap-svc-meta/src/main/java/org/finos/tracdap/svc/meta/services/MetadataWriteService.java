@@ -86,18 +86,13 @@ public class MetadataWriteService {
 
 
     public CompletableFuture<TagHeader> updateObject(
-            String tenant, ObjectType objectType,
+            String tenant,
             TagSelector priorVersion,
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates,
             boolean apiTrust) {
 
         var validator = new MetadataValidator();
-
-        // Check whether versioning is supported for this object type
-        // If not, we want to raise an error without reporting any other validation issues
-        validator.typeSupportsVersioning(objectType);
-        validator.checkAndThrow();
 
         var normalDefinition = validator.normalizeObjectType(definition);
 

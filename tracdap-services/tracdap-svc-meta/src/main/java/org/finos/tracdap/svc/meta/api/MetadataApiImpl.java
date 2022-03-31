@@ -16,25 +16,22 @@
 
 package org.finos.tracdap.svc.meta.api;
 
-import com.google.protobuf.Descriptors;
-import com.google.protobuf.Message;
-import io.grpc.MethodDescriptor;
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.api.Data;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
-
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
 import org.finos.tracdap.svc.meta.services.MetadataSearchService;
 import org.finos.tracdap.svc.meta.services.MetadataWriteService;
 
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Message;
+import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import static org.finos.tracdap.common.metadata.MetadataConstants.PUBLIC_WRITABLE_OBJECT_TYPES;
 import static org.finos.tracdap.svc.meta.api.TracMetadataApi.*;
 import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.CREATE_PREALLOCATED_OBJECT_METHOD;
 import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.PREALLOCATE_ID_METHOD;
@@ -42,13 +39,6 @@ import static org.finos.tracdap.svc.meta.services.MetadataConstants.PUBLIC_API;
 
 
 public class MetadataApiImpl {
-
-    // Only a limited set of object types can be created directly by clients
-    // Everything else can only be created by the trusted API, i.e. by other TRAC platform components
-    public static final List<ObjectType> PUBLIC_TYPES = Arrays.asList(
-            ObjectType.SCHEMA,
-            ObjectType.FLOW,
-            ObjectType.CUSTOM);
 
     private final Descriptors.ServiceDescriptor serviceDescriptor;
     private final Validator validator;
@@ -83,7 +73,7 @@ public class MetadataApiImpl {
         var tenant = request.getTenant();
         var objectType = request.getObjectType();
 
-        if (apiTrustLevel == PUBLIC_API && !PUBLIC_TYPES.contains(objectType)) {
+        if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
             var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
             var status = Status.PERMISSION_DENIED.withDescription(message);
             return CompletableFuture.failedFuture(status.asRuntimeException());
@@ -102,13 +92,13 @@ public class MetadataApiImpl {
         var tenant = request.getTenant();
         var objectType = request.getObjectType();
 
-        if (apiTrustLevel == PUBLIC_API && !PUBLIC_TYPES.contains(objectType)) {
+        if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
             var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
             var status = Status.PERMISSION_DENIED.withDescription(message);
             return CompletableFuture.failedFuture(status.asRuntimeException());
         }
 
-        return writeService.updateObject(tenant, objectType,
+        return writeService.updateObject(tenant,
                 request.getPriorVersion(),
                 request.getDefinition(),
                 request.getTagUpdatesList(),
