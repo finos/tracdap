@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.validation.static_;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.MapEntry;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -35,8 +36,12 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 
 public class CommonValidators {
@@ -332,14 +337,9 @@ public class CommonValidators {
         return ctx;
     }
 
-
-
     private static ValidationContext regexMatch(
             Pattern regex, boolean invertMatch, String desc,
             String value, ValidationContext ctx) {
-
-        if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
-            throw new EUnexpected();
 
         var matcher = regex.matcher(value);
 
@@ -497,6 +497,84 @@ public class CommonValidators {
         }
 
         return ctx;
+    }
+
+    public static ValidationContext caseInsensitiveDuplicates(ValidationContext ctx) {
+
+        var itemCount = ctx.parentMsg().getRepeatedFieldCount(ctx.field());
+        var knownItems = new HashMap<String, String>(itemCount);
+
+        try (var items = caseInsensitiveDuplicatesItems(ctx)) {
+
+            items.forEach(itemCase -> {
+
+                var lowerCase = itemCase.toLowerCase();
+                var priorCase = knownItems.getOrDefault(lowerCase, null);
+
+                if (priorCase == null) {
+                    knownItems.put(lowerCase, itemCase);
+                }
+                else if (itemCase.equals(priorCase)) {
+
+                    var err = String.format(
+                            "[%s] is included more than once in [%s]",
+                            itemCase, ctx.fieldName());
+
+                    ctx.error(err);
+                }
+                else {
+
+                    var err = String.format(
+                            "In [%s], [%s] and [%s] differ only by case",
+                            ctx.fieldName(), priorCase, itemCase);
+
+                    ctx.error(err);
+                }
+            });
+        }
+
+        return ctx;
+    }
+
+    private static Stream<String> caseInsensitiveDuplicatesItems(ValidationContext ctx) {
+
+        if (ctx.isMap()) {
+
+            var keyField = ctx.field().getMessageType().findFieldByNumber(1);
+
+            if (keyField.getType() != Descriptors.FieldDescriptor.Type.STRING)
+                throw new ETracInternal("[caseInsensitiveDuplicates] can only be applied to repeated string fields or maps with string keys");
+
+            // Different behaviour depending on whether the field was pushed as a real map or list of entries
+            if (ctx.target() instanceof Map) {
+
+                var map = (Map<?, ?>) ctx.target();
+
+                return map.keySet().stream()
+                        .map(Object::toString);
+            }
+            else {
+
+                @SuppressWarnings("unchecked")
+                var entries = (List<MapEntry<?, ?>>) ctx.target();
+
+                return entries.stream()
+                        .map(MapEntry::getKey)
+                        .map(Object::toString);
+            }
+        }
+        else if (ctx.isRepeated()) {
+
+            if (ctx.field().getType() != Descriptors.FieldDescriptor.Type.STRING)
+                throw new ETracInternal("[caseInsensitiveDuplicates] can only be applied to repeated string fields or maps with string keys");
+
+            @SuppressWarnings("unchecked")
+            var list = (List<String>) ctx.target();
+
+            return list.stream();
+        }
+        else
+            throw new ETracInternal("[caseInsensitiveDuplicates] can only be applied to repeated string fields or maps with string keys");
     }
 
 }
