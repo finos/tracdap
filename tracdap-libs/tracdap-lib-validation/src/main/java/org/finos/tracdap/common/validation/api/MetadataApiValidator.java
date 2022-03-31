@@ -75,7 +75,7 @@ public class MetadataApiValidator {
     @Validator(method = "createObject")
     public static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx);
+        ctx = createOrUpdate(ctx, false);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::omitted)
@@ -93,7 +93,7 @@ public class MetadataApiValidator {
     @Validator(method = "updateObject")
     public static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx);
+        ctx = createOrUpdate(ctx, true);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::required)
@@ -114,7 +114,7 @@ public class MetadataApiValidator {
     @Validator(method = "updateTag")
     public static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx);
+        ctx = createOrUpdate(ctx, false);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::required)
@@ -134,7 +134,7 @@ public class MetadataApiValidator {
     @Validator(method = "preallocateId", serviceFile = MetadataTrusted.class, serviceName = TrustedMetadataApiGrpc.SERVICE_NAME)
     public static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx);
+        ctx = createOrUpdate(ctx, false);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::omitted)
@@ -150,7 +150,7 @@ public class MetadataApiValidator {
     @Validator(method = "createPreallocatedObject", serviceFile = MetadataTrusted.class, serviceName = TrustedMetadataApiGrpc.SERVICE_NAME)
     public static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx);
+        ctx = createOrUpdate(ctx, false);
 
         // Do not use the regular tag selector validator (ObjectIdValidator::tagSelector)
         // The regular validator will enforce object and tag version > 0
@@ -172,7 +172,7 @@ public class MetadataApiValidator {
         return ctx;
     }
 
-    private static ValidationContext createOrUpdate(ValidationContext ctx) {
+    private static ValidationContext createOrUpdate(ValidationContext ctx, boolean isVersioned) {
 
         ctx = ctx.push(MWR_TENANT)
                 .apply(CommonValidators::required)
@@ -182,6 +182,7 @@ public class MetadataApiValidator {
         ctx = ctx.push(MWR_OBJECT_TYPE)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::nonZeroEnum, ObjectType.class)
+                .applyIf(isVersioned, ObjectIdValidator::versioningSupported, ObjectType.class)
                 .pop();
 
         ctx = ctx.pushRepeated(MWR_ATTRS)

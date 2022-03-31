@@ -259,4 +259,18 @@ public class ObjectIdValidator {
 
         return ctx;
     }
+
+    public static ValidationContext versioningSupported(ObjectType objectType, ValidationContext ctx) {
+
+        if (!MetadataConstants.VERSIONED_OBJECT_TYPES.contains(objectType)) {
+
+            var err = String.format(
+                    "Object type [%s] does not support versioning",
+                    objectType.name());
+
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
 }
