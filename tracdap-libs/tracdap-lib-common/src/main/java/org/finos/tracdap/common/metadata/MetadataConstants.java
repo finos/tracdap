@@ -16,6 +16,11 @@
 
 package org.finos.tracdap.common.metadata;
 
+import org.finos.tracdap.metadata.ObjectType;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 
@@ -23,6 +28,25 @@ public class MetadataConstants {
 
     public static final int OBJECT_FIRST_VERSION = 1;
     public static final int TAG_FIRST_VERSION = 1;
+
+    // A limited set of object types can be created directly by clients
+    // Everything else can only be created by the TRAC platform
+    // I.e. TRAC components have to make trusted calls to the metadata service
+    public static final List<ObjectType> PUBLIC_WRITABLE_OBJECT_TYPES = Arrays.asList(
+            ObjectType.SCHEMA,
+            ObjectType.FLOW,
+            ObjectType.CUSTOM);
+
+    // Only certain object types can be versioned
+    // To enable versioning for an object type, add it to this list
+    // A version validator must also be implemented for the object type
+    // Otherwise update operations will fail due to a missing validator
+    public static final Set<ObjectType> VERSIONED_OBJECT_TYPES = Set.of(
+            ObjectType.DATA,
+            ObjectType.SCHEMA,
+            ObjectType.FILE,
+            ObjectType.STORAGE,
+            ObjectType.CUSTOM);
 
     // Valid identifiers are made up of alphanumeric characters, numbers and the underscore, not starting with a number
     // Use \\A - \\Z to match the whole input
