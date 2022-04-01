@@ -23,6 +23,8 @@ import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
 
+import java.util.Map;
+
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
 
@@ -64,7 +66,7 @@ public class FlowValidator {
 
         FLOW_EDGE = FlowEdge.getDescriptor();
         FE_SOURCE = field(FLOW_EDGE, FlowEdge.SOURCE_FIELD_NUMBER);
-        FE_TARGET = field(FLOW_EDGE, FlowEdge.SOURCE_FIELD_NUMBER);
+        FE_TARGET = field(FLOW_EDGE, FlowEdge.TARGET_FIELD_NUMBER);
 
         FLOW_SOCKET = FlowSocket.getDescriptor();
         FS_NODE = field(FLOW_SOCKET, FlowSocket.NODE_FIELD_NUMBER);
@@ -79,6 +81,8 @@ public class FlowValidator {
     @Validator
     public static ValidationContext flow(FlowDefinition msg, ValidationContext ctx) {
 
+        // Semantic checks look at each element in isolation
+
         ctx = ctx.pushMap(FD_NODES)
                 .apply(CommonValidators::mapNotEmpty)
                 .applyMapKeys(CommonValidators::identifier)
@@ -91,6 +95,11 @@ public class FlowValidator {
                 .apply(CommonValidators::listNotEmpty)
                 .applyRepeated(FlowValidator::flowEdge, FlowEdge.class)
                 .pop();
+
+        // Only apply consistency checks if all the individual items in the flow are semantically valid
+
+        if (!ctx.failed())
+            ctx = ctx.apply(FlowValidator::flowConsistency, FlowDefinition.class);
 
         return ctx;
     }
@@ -119,7 +128,7 @@ public class FlowValidator {
     }
 
     @Validator
-    public static ValidationContext flowEdge(FlowEdge msg, ValidationContext ctx) {
+    private static ValidationContext flowEdge(FlowEdge msg, ValidationContext ctx) {
 
         ctx = ctx.push(FE_SOURCE)
                 .apply(CommonValidators::required)
@@ -171,6 +180,99 @@ public class FlowValidator {
                 .applyRepeated(CommonValidators::notTracReserved, String.class)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
                 .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext flowConsistency(FlowDefinition msg, ValidationContext ctx) {
+
+        var nodes = msg.getNodesMap();
+
+        ctx = ctx.pushRepeated(FD_EDGES)
+                .applyRepeated(FlowValidator::edgeConnection, FlowEdge.class, nodes)
+                .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext edgeConnection(FlowEdge edge, Map<String, FlowNode> nodes, ValidationContext ctx) {
+
+        // Check both source and target connect to valid sockets
+
+        ctx.push(FE_SOURCE);
+        ctx.apply(FlowValidator::socketConnection, FlowSocket.class, nodes);
+        ctx.pop();
+
+        ctx.push(FE_TARGET);
+        ctx.apply(FlowValidator::socketConnection, FlowSocket.class, nodes);
+        ctx.pop();
+
+        // Do not allow an edge to connect a node to itself
+
+        if (edge.getSource().getNode().equals(edge.getTarget().getNode()))
+            ctx.error(String.format("Source and target both point to the same node [%s]", edge.getSource().getNode()));
+
+        // Do not allow an input to be wired directly to an output
+
+        var sourceNode = nodes.getOrDefault(edge.getSource().getNode(), null);
+        var targetNode = nodes.getOrDefault(edge.getTarget().getNode(), null);
+
+        if (sourceNode != null && sourceNode.getNodeType() == FlowNodeType.INPUT_NODE &&
+            targetNode != null && targetNode.getNodeType() == FlowNodeType.OUTPUT_NODE) {
+
+            ctx.error(String.format(
+                    "Input node [%s] is connected directly to output node [%s]",
+                    edge.getSource().getNode(), edge.getTarget().getNode()));
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext socketConnection(FlowSocket socket, Map<String, FlowNode> nodes, ValidationContext ctx) {
+
+        var socketType = ctx.field().equals(FE_SOURCE) ? "Source" : "Target";
+        var node = nodes.getOrDefault(socket.getNode(), null);
+
+        if (node == null) {
+
+            ctx.error(String.format("%s node [%s] does not exist", socketType, socket.getNode()));
+        }
+        else if (node.getNodeType() == FlowNodeType.OUTPUT_NODE) {
+
+            if (ctx.field().equals(FE_SOURCE))
+                ctx.error(String.format("Output node [%s] cannot be used as a source", socket.getNode()));
+
+            else if (socket.hasField(FS_SOCKET))
+                ctx.error(String.format("Target node [%s] is an output node, do not specify a [socket]", socket.getNode()));
+        }
+        else if (node.getNodeType() == FlowNodeType.INPUT_NODE) {
+
+            if (ctx.field().equals(FE_TARGET))
+                ctx.error(String.format("Input node [%s] cannot be used as a target", socket.getNode()));
+
+            else if (socket.hasField(FS_SOCKET))
+                ctx.error(String.format("Source node [%s] is an input node, do not specify a [socket]", socket.getNode()));
+        }
+        else {
+
+            var inputOrOutput = ctx.field().equals(FE_SOURCE) ? "output" : "input";
+            var modelSockets = ctx.field().equals(FE_SOURCE)
+                    ? node.getModelStub().getOutputsList()
+                    : node.getModelStub().getInputsList();
+
+            if (!socket.hasField(FS_SOCKET)) {
+
+                ctx.error(String.format(
+                        "%s node [%s] is a model node, specify a [socket] to connect to a model %s",
+                        socketType, socket.getNode(), inputOrOutput));
+            }
+            else if (!modelSockets.contains(socket.getSocket())) {
+
+                ctx.error(String.format(
+                        "Socket [%s] is not an %s of node [%s]",
+                        socket.getSocket(), inputOrOutput, socket.getNode()));
+            }
+        }
 
         return ctx;
     }
