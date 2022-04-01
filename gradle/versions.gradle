@@ -28,7 +28,7 @@ ext {
 
     // Data technologies
     arrow_version = '6.0.1'
-    jackson_version = '2.13.2'
+    jackson_version = '2.13.2.2'
 
 
     // Util libraries
