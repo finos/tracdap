@@ -74,6 +74,24 @@ class ValidationLocation {
         this(parent, target, null, field, fieldName);
     }
 
+    public boolean isRoot() {
+        return parent == null;
+    }
+
+    public String elementPath() {
+
+        if (isRoot())
+            return "";
+
+        if (parent.isRoot())
+            return fieldName;
+
+        if (isRepeated() && field == parent.field)
+            return parent.elementPath() +  "[" + fieldName + "]";
+
+        return parent.elementPath() + "." + fieldName;
+    }
+
     public ValidationLocation parent() {
         return parent;
     }

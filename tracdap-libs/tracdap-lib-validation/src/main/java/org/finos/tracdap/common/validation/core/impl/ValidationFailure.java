@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.validation.core.impl;
 
-import org.finos.tracdap.common.validation.core.impl.ValidationLocation;
 
 public class ValidationFailure {
 
@@ -29,6 +28,10 @@ public class ValidationFailure {
     }
 
     public String message() {
-        return message;
+
+        if (location.isRoot())
+            return message;
+        else
+            return location.elementPath() + ": " + message;
     }
 }
