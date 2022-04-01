@@ -283,9 +283,13 @@ abstract class MetadataWriteApiTest {
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
+        // At present this is enforced through validation, so it should come back as INVALID_ATTRIBUTE
+        // In the future if public/trusted APIs are unified and reserved attrs are managed with permissions,
+        // Then the result would be PERMISSION_DENIED instead
+
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObject(writeRequest));
-        assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         assertDoesNotThrow(() -> trustedApi.createObject(writeRequest));
     }
@@ -756,9 +760,13 @@ abstract class MetadataWriteApiTest {
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
+        // At present this is enforced through validation, so it should come back as INVALID_ATTRIBUTE
+        // In the future if public/trusted APIs are unified and reserved attrs are managed with permissions,
+        // Then the result would be PERMISSION_DENIED instead
+
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
-        assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         assertDoesNotThrow(() -> trustedApi.updateObject(v2WriteRequest));
     }
@@ -1163,9 +1171,13 @@ abstract class MetadataWriteApiTest {
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
+        // At present this is enforced through validation, so it should come back as INVALID_ATTRIBUTE
+        // In the future if public/trusted APIs are unified and reserved attrs are managed with permissions,
+        // Then the result would be PERMISSION_DENIED instead
+
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t2WriteRequest));
-        assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         assertDoesNotThrow(() -> trustedApi.updateTag(t2WriteRequest));
     }
