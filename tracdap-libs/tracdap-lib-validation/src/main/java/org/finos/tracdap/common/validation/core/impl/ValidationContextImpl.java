@@ -507,6 +507,15 @@ public class ValidationContextImpl implements ValidationContext {
         return apply(validator);
     }
 
+    public ValidationContext
+    applyIf(boolean condition, ValidationFunction.Typed<String> validator) {
+
+        if (!condition)
+            return this;
+
+        return apply(validator);
+    }
+
     public <T> ValidationContext
     applyIf(boolean condition, ValidationFunction.Typed<T> validator, Class<T> targetClass) {
 
