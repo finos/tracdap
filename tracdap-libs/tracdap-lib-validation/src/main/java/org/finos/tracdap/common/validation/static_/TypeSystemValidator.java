@@ -16,12 +16,15 @@
 
 package org.finos.tracdap.common.validation.static_;
 
+import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Descriptors;
+
+import java.time.OffsetDateTime;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
@@ -126,6 +129,20 @@ public class TypeSystemValidator {
         return ctx.apply(TypeSystemValidator::innerValue, Value.class, expectedType);
     }
 
+    public static ValidationContext valueWithType(Value value, TypeDescriptor expectedType, ValidationContext ctx) {
+
+        if (!value.hasType()) {
+
+            if (!value.hasOneof(V_VALUE))
+                return ctx.error(String.format("Type cannot be inferred for null value [%s]", ctx.fieldName()));
+
+            if (!TypeSystem.isPrimitive(value))
+                return ctx.error(String.format("Type cannot be inferred for non-primitive value [%s]", ctx.fieldName()));
+        }
+
+        return ctx.apply(TypeSystemValidator::innerValue, Value.class, expectedType);
+    }
+
     @Validator
     public static ValidationContext decimalValue(DecimalValue msg, ValidationContext ctx) {
 
@@ -153,18 +170,19 @@ public class TypeSystemValidator {
                 .pop();
     }
 
-    public static ValidationContext valueWithType(Value value, TypeDescriptor expectedType, ValidationContext ctx) {
+    public static ValidationContext notInTheFuture(DatetimeValue msg, ValidationContext ctx) {
 
-        if (!value.hasType()) {
+        var now = OffsetDateTime.now();
+        var datetime = MetadataCodec.decodeDatetime(msg);
 
-            if (!value.hasOneof(V_VALUE))
-                return ctx.error(String.format("Type cannot be inferred for null value [%s]", ctx.fieldName()));
+        if (datetime.isAfter(now)) {
 
-            if (!TypeSystem.isPrimitive(value))
-                return ctx.error(String.format("Type cannot be inferred for non-primitive value [%s]", ctx.fieldName()));
+            var err = String.format("[%s] is in the future", ctx.fieldName());
+
+            return ctx.error(err);
         }
 
-        return ctx.apply(TypeSystemValidator::innerValue, Value.class, expectedType);
+        return ctx;
     }
 
     private static ValidationContext innerValue(Value value, TypeDescriptor expectedType, ValidationContext ctx) {
@@ -228,7 +246,7 @@ public class TypeSystemValidator {
     // This is because the array type needs to be known
     // So, an array value must always be wrapped in a value
 
-    public static ValidationContext arrayValue(ArrayValue msg, TypeDescriptor arrayType, ValidationContext ctx) {
+    private static ValidationContext arrayValue(ArrayValue msg, TypeDescriptor arrayType, ValidationContext ctx) {
 
         return ctx.pushRepeated(AV_ITEMS)
                 .applyRepeated(TypeSystemValidator::innerValue, Value.class, arrayType)

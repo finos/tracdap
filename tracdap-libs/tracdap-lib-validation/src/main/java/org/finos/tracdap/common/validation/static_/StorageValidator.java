@@ -106,7 +106,7 @@ public class StorageValidator {
         ctx = ctx.push(SIC_INCARNATION_TIMESTAMP)
                 .apply(CommonValidators::required)
                 .apply(TypeSystemValidator::datetimeValue, DatetimeValue.class)
-                // not in the future?
+                .apply(TypeSystemValidator::notInTheFuture, DatetimeValue.class)
                 .pop();
 
         ctx = ctx.push(SIC_INCARNATION_STATUS)
@@ -132,10 +132,7 @@ public class StorageValidator {
 
         ctx = ctx.push(SD_STORAGE_PATH)
                 .apply(CommonValidators::required)
-                // TODO:
-                // is a valid path
-                // is relative path
-                // does not include .. or .
+                .apply(CommonValidators::relativePath)
                 .pop();
 
         ctx = ctx.push(SD_STORAGE_FORMAT)
@@ -151,7 +148,7 @@ public class StorageValidator {
         ctx = ctx.push(SD_COPY_TIMESTAMP)
                 .apply(CommonValidators::required)
                 .apply(TypeSystemValidator::datetimeValue, DatetimeValue.class)
-                // not in the future?
+                .apply(TypeSystemValidator::notInTheFuture, DatetimeValue.class)
                 .pop();
 
         return ctx;

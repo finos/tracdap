@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.validation.static_;
 
-import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
@@ -24,7 +23,6 @@ import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
@@ -123,7 +121,7 @@ public class SearchValidator {
         ctx = ctx.push(SP_SEARCH_ASOF)
                 .apply(CommonValidators::optional)
                 .apply(TypeSystemValidator::datetimeValue, DatetimeValue.class)
-                .apply(SearchValidator::dontSearchTheFuture, DatetimeValue.class)
+                .apply(TypeSystemValidator::notInTheFuture, DatetimeValue.class)
                 .pop();
 
         ctx = ctx.push(SP_PRIOR_VERSIONS)
@@ -193,19 +191,6 @@ public class SearchValidator {
 
         if (msg.getOperator() == LogicalOperator.NOT && msg.getExprCount() > 1)
             ctx.error("Logical NOT expression cannot have multiple sub-expressions");
-
-        return ctx;
-    }
-
-    private static ValidationContext dontSearchTheFuture(DatetimeValue msg, ValidationContext ctx) {
-
-        var now = OffsetDateTime.now();
-        var searchAsof = MetadataCodec.decodeDatetime(msg);
-
-        if (searchAsof.isAfter(now)) {
-
-            return ctx.error("Search as-of time is in the future");
-        }
 
         return ctx;
     }
