@@ -34,6 +34,9 @@ public class FlowValidator {
     private static final Descriptors.Descriptor FLOW_DEFINITION;
     private static final Descriptors.FieldDescriptor FD_NODES;
     private static final Descriptors.FieldDescriptor FD_EDGES;
+    private static final Descriptors.FieldDescriptor FD_PARAMETERS;
+    private static final Descriptors.FieldDescriptor FD_INPUTS;
+    private static final Descriptors.FieldDescriptor FD_OUTPUTS;
 
     private static final Descriptors.Descriptor FLOW_NODE;
     private static final Descriptors.FieldDescriptor FN_NODE_TYPE;
@@ -58,6 +61,9 @@ public class FlowValidator {
         FLOW_DEFINITION = FlowDefinition.getDescriptor();
         FD_NODES = field(FLOW_DEFINITION, FlowDefinition.NODES_FIELD_NUMBER);
         FD_EDGES = field(FLOW_DEFINITION, FlowDefinition.EDGES_FIELD_NUMBER);
+        FD_PARAMETERS = field(FLOW_DEFINITION, FlowDefinition.PARAMETERS_FIELD_NUMBER);
+        FD_INPUTS = field(FLOW_DEFINITION, FlowDefinition.INPUTS_FIELD_NUMBER);
+        FD_OUTPUTS = field(FLOW_DEFINITION, FlowDefinition.OUTPUTS_FIELD_NUMBER);
 
         FLOW_NODE = FlowNode.getDescriptor();
         FN_NODE_TYPE = field(FLOW_NODE, FlowNode.NODETYPE_FIELD_NUMBER);
@@ -95,6 +101,11 @@ public class FlowValidator {
                 .apply(CommonValidators::listNotEmpty)
                 .applyRepeated(FlowValidator::flowEdge, FlowEdge.class)
                 .pop();
+
+        // Parameters, inputs & outputs on a flow have the same structure as a model
+        // They are validated the same way too
+
+        ctx = ModelValidator.modelSchema(FD_PARAMETERS, FD_INPUTS, FD_OUTPUTS, ctx);
 
         // Only apply consistency checks if all the individual items in the flow are semantically valid
 

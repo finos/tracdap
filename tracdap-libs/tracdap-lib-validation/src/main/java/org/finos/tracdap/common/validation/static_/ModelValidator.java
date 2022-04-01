@@ -16,22 +16,163 @@
 
 package org.finos.tracdap.common.validation.static_;
 
+import com.google.protobuf.Descriptors;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
-import org.finos.tracdap.metadata.ModelDefinition;
+import org.finos.tracdap.metadata.*;
 
 import org.slf4j.LoggerFactory;
+
+import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
 
 @Validator(type = ValidationType.STATIC)
 public class ModelValidator {
 
+    private static final Descriptors.Descriptor MODEL_DEFINITION;
+    private static final Descriptors.FieldDescriptor MD_LANGUAGE;
+    private static final Descriptors.FieldDescriptor MD_REPOSITORY;
+    private static final Descriptors.FieldDescriptor MD_PATH;
+    private static final Descriptors.FieldDescriptor MD_ENTRY_POINT;
+    private static final Descriptors.FieldDescriptor MD_VERSION;
+    private static final Descriptors.FieldDescriptor MD_PARAMETERS;
+    private static final Descriptors.FieldDescriptor MD_INPUTS;
+    private static final Descriptors.FieldDescriptor MD_OUTPUTS;
+
+    private static final Descriptors.Descriptor MODEL_PARAMETER;
+    private static final Descriptors.FieldDescriptor MP_PARAM_TYPE;
+    private static final Descriptors.FieldDescriptor MP_LABEL;
+    private static final Descriptors.FieldDescriptor MP_DEFAULT_VALUE;
+
+    private static final Descriptors.Descriptor MODEL_INPUT_SCHEMA;
+    private static final Descriptors.FieldDescriptor MIS_SCHEMA;
+
+    private static final Descriptors.Descriptor MODEL_OUTPUT_SCHEMA;
+    private static final Descriptors.FieldDescriptor MOS_SCHEMA;
+
+    static {
+
+        MODEL_DEFINITION = ModelDefinition.getDescriptor();
+        MD_LANGUAGE = field(MODEL_DEFINITION, ModelDefinition.LANGUAGE_FIELD_NUMBER);
+        MD_REPOSITORY = field(MODEL_DEFINITION, ModelDefinition.REPOSITORY_FIELD_NUMBER);
+        MD_PATH = field(MODEL_DEFINITION, ModelDefinition.PATH_FIELD_NUMBER);
+        MD_ENTRY_POINT = field(MODEL_DEFINITION, ModelDefinition.ENTRYPOINT_FIELD_NUMBER);
+        MD_VERSION = field(MODEL_DEFINITION, ModelDefinition.VERSION_FIELD_NUMBER);
+        MD_PARAMETERS = field(MODEL_DEFINITION, ModelDefinition.PARAMETERS_FIELD_NUMBER);
+        MD_INPUTS = field(MODEL_DEFINITION, ModelDefinition.INPUTS_FIELD_NUMBER);
+        MD_OUTPUTS = field(MODEL_DEFINITION, ModelDefinition.OUTPUTS_FIELD_NUMBER);
+
+        MODEL_PARAMETER = ModelParameter.getDescriptor();
+        MP_PARAM_TYPE = field(MODEL_PARAMETER, ModelParameter.PARAMTYPE_FIELD_NUMBER);
+        MP_LABEL = field(MODEL_PARAMETER, ModelParameter.LABEL_FIELD_NUMBER);
+        MP_DEFAULT_VALUE = field(MODEL_PARAMETER, ModelParameter.DEFAULTVALUE_FIELD_NUMBER);
+
+        MODEL_INPUT_SCHEMA = ModelInputSchema.getDescriptor();
+        MIS_SCHEMA = field(MODEL_INPUT_SCHEMA, ModelInputSchema.SCHEMA_FIELD_NUMBER);
+
+        MODEL_OUTPUT_SCHEMA = ModelOutputSchema.getDescriptor();
+        MOS_SCHEMA = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.SCHEMA_FIELD_NUMBER);
+    }
+
     @Validator
     public static ValidationContext model(ModelDefinition msg, ValidationContext ctx) {
 
-        LoggerFactory.getLogger(ModelValidator.class).warn("Validator not implemented");
+        ctx = ctx.push(MD_LANGUAGE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.push(MD_REPOSITORY)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        // todo
+
+//        ctx = ctx.push(MD_PATH)
+//                .apply(CommonValidators::required)
+//                .apply(CommonValidators::identifier)
+//                .pop();
+//
+//        ctx = ctx.push(MD_ENTRY_POINT)
+//                .apply(CommonValidators::required)
+//                .apply(CommonValidators::identifier)
+//                .pop();
+//
+//        ctx = ctx.push(MD_VERSION)
+//                .apply(CommonValidators::required)
+//                .apply(CommonValidators::identifier)
+//                .pop();
+
+        return modelSchema(MD_PARAMETERS, MD_INPUTS, MD_OUTPUTS, ctx);
+    }
+
+    public static ValidationContext modelSchema(
+            Descriptors.FieldDescriptor paramsField,
+            Descriptors.FieldDescriptor inputsField,
+            Descriptors.FieldDescriptor outputsField,
+            ValidationContext ctx) {
+
+        ctx = ctx.pushMap(paramsField)
+                .applyMapKeys(CommonValidators::identifier)
+                .applyMapKeys(CommonValidators::notTracReserved)
+                .apply(CommonValidators::caseInsensitiveDuplicates)
+                .applyMapValues(ModelValidator::modelParameter, ModelParameter.class)
+                .pop();
+
+        ctx = ctx.pushMap(inputsField)
+                .applyMapKeys(CommonValidators::identifier)
+                .applyMapKeys(CommonValidators::notTracReserved)
+                .apply(CommonValidators::caseInsensitiveDuplicates)
+                .applyMapValues(ModelValidator::modelInputSchema, ModelInputSchema.class)
+                .pop();
+
+        ctx = ctx.pushMap(outputsField)
+                .applyMapKeys(CommonValidators::identifier)
+                .applyMapKeys(CommonValidators::notTracReserved)
+                .apply(CommonValidators::caseInsensitiveDuplicates)
+                .applyMapValues(ModelValidator::modelOutputSchema, ModelOutputSchema.class)
+                .pop();
 
         return ctx;
+    }
+
+    @Validator
+    public static ValidationContext modelParameter(ModelParameter msg, ValidationContext ctx) {
+
+        ctx = ctx.push(MP_PARAM_TYPE)
+                .apply(CommonValidators::required)
+                .apply(TypeSystemValidator::typeDescriptor, TypeDescriptor.class)
+                .pop();
+
+        ctx = ctx.push(MP_LABEL)
+                .apply(CommonValidators::optional)
+                .pop();
+
+        ctx = ctx.push(MP_DEFAULT_VALUE)
+                .apply(CommonValidators::optional)
+                .apply(TypeSystemValidator::valueWithType, Value.class, msg.getParamType())
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator
+    public static ValidationContext modelInputSchema(ModelInputSchema msg, ValidationContext ctx) {
+
+        return ctx.push(MIS_SCHEMA)
+                .apply(CommonValidators::required)
+                .applyRegistered()
+                .pop();
+    }
+
+    @Validator
+    public static ValidationContext modelOutputSchema(ModelOutputSchema msg, ValidationContext ctx) {
+
+        return ctx.push(MOS_SCHEMA)
+                .apply(CommonValidators::required)
+                .applyRegistered()
+                .pop();
     }
 }
