@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.config.DataServiceConfig;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.codec.ICodec;
@@ -35,6 +36,8 @@ import org.finos.tracdap.common.validation.Validator;
 import io.grpc.MethodDescriptor;
 import io.netty.buffer.ByteBuf;
 import org.apache.arrow.memory.BufferAllocator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -53,14 +56,16 @@ import static org.finos.tracdap.common.metadata.MetadataUtil.selectorForLatest;
 
 public class DataService {
 
-    private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d-%s";
-    private static final String DATA_ITEM_SUFFIX_TEMPLATE = "x%06x";
+    private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d";
+    private static final String STORAGE_PATH_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d-x%06x";
 
     private static final MethodDescriptor<MetadataReadRequest, Tag> READ_OBJECT_METHOD = TrustedMetadataApiGrpc.getReadObjectMethod();
     private static final MethodDescriptor<MetadataBatchRequest, MetadataBatchResponse> READ_BATCH_METHOD = TrustedMetadataApiGrpc.getReadBatchMethod();
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> PREALLOCATE_ID_METHOD = TrustedMetadataApiGrpc.getPreallocateIdMethod();
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_PREALLOCATED_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectMethod();
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getUpdateObjectMethod();
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final DataServiceConfig config;
     private final BufferAllocator arrowAllocator;
@@ -373,8 +378,10 @@ public class DataService {
         state.delta = 0;
 
         var dataItem = buildDataItem(state);
+        var storagePath = buildStoragePath(state);
+
         var dataDef = createDataDef(request, state, dataItem);
-        var storageDef = createStorageDef(dataItem, objectTimestamp);
+        var storageDef = createStorageDef(dataItem, storagePath, objectTimestamp);
 
         state.data = dataDef;
         state.storage = storageDef;
@@ -413,8 +420,24 @@ public class DataService {
         }
 
         var dataItem = buildDataItem(state);
+        var storagePath = buildStoragePath(state);
+
+        // We are going to add this data item to the storage definition
+        // If the item already exists in storage, then the file object must have been superseded
+        // If we can spot the update already, there is no need to continue with the write operation
+
+        if (prior.storage.containsDataItems(dataItem)) {
+
+            var err = String.format("File version [%d] has been superseded", prior.dataId.getObjectVersion());
+
+            log.error(err);
+            log.error("(updates are present in the storage definition)");
+
+            throw new EMetadataDuplicate(err);
+        }
+
         state.data = updateDataDef(request, state, dataItem, prior.data);
-        state.storage = updateStorageDef(prior.storage, dataItem, objectTimestamp);
+        state.storage = updateStorageDef(prior.storage, dataItem, storagePath, objectTimestamp);
 
         state.copy = state.storage
                 .getDataItemsOrThrow(dataItem)
@@ -426,17 +449,26 @@ public class DataService {
 
     private String buildDataItem(RequestState state) {
 
-        var suffixBytes = random.nextInt(1 << 24);
-        var suffix = String.format(DATA_ITEM_SUFFIX_TEMPLATE, suffixBytes);
-
         var dataType = state.schema.getSchemaType().name().toLowerCase();
         var objectId = state.dataId.getObjectId();
         var partKey = state.part.getOpaqueKey();
 
         return String.format(DATA_ITEM_TEMPLATE,
                 dataType, objectId,
+                partKey, state.snap, state.delta);
+    }
+
+    private String buildStoragePath(RequestState state) {
+
+        var dataType = state.schema.getSchemaType().name().toLowerCase();
+        var objectId = state.dataId.getObjectId();
+        var partKey = state.part.getOpaqueKey();
+        var suffixBytes = random.nextInt(1 << 24);
+
+        return String.format(STORAGE_PATH_TEMPLATE,
+                dataType, objectId,
                 partKey, state.snap, state.delta,
-                suffix);
+                suffixBytes);
     }
 
     private DataDefinition createDataDef(DataWriteRequest request, RequestState state, String dataItem) {
@@ -513,25 +545,30 @@ public class DataService {
         return dataDef.build();
     }
 
-    private StorageDefinition createStorageDef(String dataItem, OffsetDateTime objectTimestamp) {
+    private StorageDefinition createStorageDef(
+            String dataItem, String storagePath,
+            OffsetDateTime objectTimestamp) {
 
-        var storageItem = buildStorageItem(dataItem, objectTimestamp);
+        var storageItem = buildStorageItem(storagePath, objectTimestamp);
 
         return StorageDefinition.newBuilder()
                 .putDataItems(dataItem, storageItem)
                 .build();
     }
 
-    private StorageDefinition updateStorageDef(StorageDefinition priorDef, String dataItem, OffsetDateTime objectTimestamp) {
+    private StorageDefinition updateStorageDef(
+            StorageDefinition priorDef,
+            String dataItem, String storagePath,
+            OffsetDateTime objectTimestamp) {
 
-        var storageItem = buildStorageItem(dataItem, objectTimestamp);
+        var storageItem = buildStorageItem(storagePath, objectTimestamp);
 
         return priorDef.toBuilder()
                 .putDataItems(dataItem, storageItem)
                 .build();
     }
 
-    private StorageItem buildStorageItem(String dataItem, OffsetDateTime objectTimestamp) {
+    private StorageItem buildStorageItem(String storagePath, OffsetDateTime objectTimestamp) {
 
         var storageKey = config.getDefaultStorageKey();
         var storageFormat = config.getDefaultStorageFormat();
@@ -544,7 +581,7 @@ public class DataService {
                 .setCopyStatus(CopyStatus.COPY_AVAILABLE)
                 .setCopyTimestamp(MetadataCodec.encodeDatetime(objectTimestamp))
                 .setStorageKey(storageKey)
-                .setStoragePath(dataItem)
+                .setStoragePath(storagePath)
                 .setStorageFormat(storageFormat);
 
         var incarnation = StorageIncarnation.newBuilder()
