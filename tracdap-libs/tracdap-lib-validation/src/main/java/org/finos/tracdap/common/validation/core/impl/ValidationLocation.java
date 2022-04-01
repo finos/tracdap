@@ -94,6 +94,10 @@ class ValidationLocation {
         return oneOf != null;
     }
 
+    public boolean isRepeated() {
+        return field != null && field.isRepeated();
+    }
+
     public Descriptors.OneofDescriptor oneOf() {
         return oneOf;
     }

@@ -226,16 +226,16 @@ public class ValidationContextImpl implements ValidationContext {
     @Override
     public ValidationContext pushMapKey(Object key) {
 
-        return pushMapEntry(key, true);
+        return pushMapEntry(key, true, false);
     }
 
     @Override
     public ValidationContext pushMapValue(Object key) {
 
-        return pushMapEntry(key, false);
+        return pushMapEntry(key, false, false);
     }
 
-    private ValidationContext pushMapEntry(Object key, boolean pushKey) {
+    private ValidationContext pushMapEntry(Object key, boolean pushKey, boolean keyAlreadySeen) {
 
         var methodName = pushKey ? "[pushMapKey]" : "[pushMapValue]";
 
@@ -248,9 +248,16 @@ public class ValidationContextImpl implements ValidationContext {
             throw new ETracInternal(methodName + " requires [pushMap] is called with [getMapFunc]");
 
         var map = (Map<?, ?>) parentLoc.target();
+        var keyPresent = map.containsKey(key);
 
-        if (!map.containsKey(key))
-            throw new ETracInternal(methodName + " attempted to push a key that is not in the map");
+        if (!keyPresent) {
+
+            // For version validators, allow pushing keys that exist in either the current or prior map
+            // For the current ctx, if the key is not present we need to check the prior ctx
+            // For the prior ctx, we allow the key if it was already seen in the current ctx
+            if (priorCtx == null && !keyAlreadySeen)
+                throw new ETracInternal(methodName + " attempted to push a key that is not in the map");
+        }
 
         var fieldName = key.toString();
         var obj = pushKey ? key : map.getOrDefault(key, null);
@@ -262,7 +269,7 @@ public class ValidationContextImpl implements ValidationContext {
             loc.skip();
 
         if (priorCtx != null)
-            priorCtx.pushMapEntry(key, pushKey);
+            priorCtx.pushMapEntry(key, pushKey, keyPresent);
 
         return this;
     }
@@ -664,7 +671,7 @@ public class ValidationContextImpl implements ValidationContext {
             for (var key : map.keySet())
 
                 resultCtx = (ValidationContextImpl) resultCtx
-                        .pushMapEntry(key, pushKey)
+                        .pushMapEntry(key, pushKey, false)
                         .apply(validator, targetClass, arg)
                         .pop();
         }
@@ -705,13 +712,16 @@ public class ValidationContextImpl implements ValidationContext {
     public Message parentMsg() {
 
         var loc = location.peek();
+        var parent = loc.parent();
+
+        if (parent == null)
+            throw new ETracInternal("Attempt to access parent of root location");
 
         // For repeated field items, we need to go up two levels in the location hierarchy
-        if (loc.field().isRepeated() && loc.field().equals(loc.parent().field()))
-            return loc.parent().parent().msg();
+        if (loc.isRepeated() && loc.field().equals(parent.field()))
+            parent = parent.parent();
 
-        else
-            return location.peek().parent().msg();
+        return parent.msg();
     }
 
     public boolean isOneOf() {
