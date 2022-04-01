@@ -123,7 +123,7 @@ public class TypeSystemValidator {
 
         var expectedType = TypeSystem.descriptor(value);
 
-        return ctx.apply(TypeSystemValidator::valueWithType_, Value.class, expectedType);
+        return ctx.apply(TypeSystemValidator::innerValue, Value.class, expectedType);
     }
 
     @Validator
@@ -164,10 +164,10 @@ public class TypeSystemValidator {
                 return ctx.error(String.format("Type cannot be inferred for non-primitive value [%s]", ctx.fieldName()));
         }
 
-        return ctx.apply(TypeSystemValidator::valueWithType_, Value.class, expectedType);
+        return ctx.apply(TypeSystemValidator::innerValue, Value.class, expectedType);
     }
 
-    private static ValidationContext valueWithType_(Value value, TypeDescriptor expectedType, ValidationContext ctx) {
+    private static ValidationContext innerValue(Value value, TypeDescriptor expectedType, ValidationContext ctx) {
 
         var wrongTypeMessage = String.format("Wrong type supplied for [%s]", ctx.fieldName());
 
@@ -231,7 +231,7 @@ public class TypeSystemValidator {
     public static ValidationContext arrayValue(ArrayValue msg, TypeDescriptor arrayType, ValidationContext ctx) {
 
         return ctx.pushRepeated(AV_ITEMS)
-                .applyRepeated(TypeSystemValidator::valueWithType, Value.class, arrayType)
+                .applyRepeated(TypeSystemValidator::innerValue, Value.class, arrayType)
                 .pop();
     }
 
@@ -239,7 +239,7 @@ public class TypeSystemValidator {
 
         return ctx.pushMap(MV_ENTRIES)
                 .applyMapKeys(TypeSystemValidator::mapKey)
-                .applyMapValues(TypeSystemValidator::valueWithType, Value.class, mapType)
+                .applyMapValues(TypeSystemValidator::innerValue, Value.class, mapType)
                 .pop();
     }
 
