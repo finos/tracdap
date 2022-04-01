@@ -196,7 +196,7 @@ public class ObjectIdValidator {
     public static ValidationContext selectorType(TagSelector selector, ObjectType requiredType, ValidationContext ctx) {
 
         if (!selector.getObjectType().equals(requiredType)) {
-            var err = String.format("Wrong object type for [%s]: expected [%s], got [%s]",
+            var err = String.format("Wrong object type in [%s] selector: expected [%s], got [%s]",
                     ctx.fieldName(), requiredType, selector.getObjectType());
             return ctx.error(err);
         }

@@ -342,15 +342,16 @@ public class TestData {
         // Ok for e.g. DAL testing, but will fail metadata validation
 
         var targetSelector = TagSelector.newBuilder()
-                .setObjectType(ObjectType.FLOW)
+                .setObjectType(ObjectType.MODEL)
                 .setObjectId(UUID.randomUUID().toString())
-                .setObjectVersion(1);
+                .setObjectVersion(1)
+                .setLatestTag(true);
 
         return ObjectDefinition.newBuilder()
                 .setObjectType(ObjectType.JOB)
                 .setJob(JobDefinition.newBuilder()
                 .setJobType(JobType.RUN_MODEL)
-                .setRunModel( RunModelJob.newBuilder()
+                .setRunModel(RunModelJob.newBuilder()
                 .setModel(targetSelector)))
                 .build();
     }
