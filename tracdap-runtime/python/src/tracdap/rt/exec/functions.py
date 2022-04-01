@@ -308,8 +308,15 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
 
         data_id = self.node.data_obj_id
         storage_id = self.node.storage_obj_id
-        # TODO: pass this in from somewhere
-        object_timestamp = datetime.datetime.utcnow()
+
+        # TODO: pass the object timestamp in from somewhere
+
+        # Note that datetime.utcnow() creates a datetime with no zone
+        # datetime.now(utc) creates a datetime with an explicit UTC zone
+        # The latter is more precise, also missing zones are rejected by validation
+        # (lenient validation might infer the zone, this should be limited to front-facing APIs)
+
+        object_timestamp = datetime.datetime.now(datetime.timezone.utc)
 
         part_key = meta.PartKey("part-root", meta.PartType.PART_ROOT)
         snap_index = 0
