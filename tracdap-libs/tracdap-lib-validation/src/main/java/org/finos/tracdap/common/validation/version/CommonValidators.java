@@ -18,9 +18,9 @@ package org.finos.tracdap.common.validation.version;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.validation.core.ValidationContext;
-import org.finos.tracdap.metadata.DatetimeValue;
-import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Descriptors;
 
 import java.util.Objects;
@@ -62,7 +62,7 @@ public class CommonValidators {
 
             var err = String.format(
                     "Value of [%s] must not change between versions: prior = [%s], new = [%s]",
-                    ctx.fieldName(), prior.toString(), current.toString());
+                    ctx.fieldName(), displayValue(prior), displayValue(current));
 
             return ctx.error(err);
         }
@@ -146,5 +146,19 @@ public class CommonValidators {
                 .pop();
 
         return ctx;
+    }
+
+    private static String displayValue(Object value) {
+
+        if (value instanceof DatetimeValue)
+            return ((DatetimeValue) value).getIsoDatetime();
+
+        if (value instanceof Value) {
+
+            if (TypeSystem.isPrimitive((Value) value))
+                return MetadataCodec.decodeValue((Value) value).toString();
+        }
+
+        return value.toString();
     }
 }
