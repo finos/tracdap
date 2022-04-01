@@ -77,7 +77,7 @@ public class StorageValidator {
 
         ctx = ctx.pushMap(SD_DATA_ITEMS)
                 .apply(CommonValidators::mapNotEmpty)
-                // map keys valid data item keys
+                // todo: map keys valid data item keys
                 .applyMapValues(StorageValidator::storageItem, StorageItem.class)
                 .pop();
 

@@ -16,19 +16,22 @@
 
 package org.finos.tracdap.common.validation.static_;
 
-import com.google.protobuf.Descriptors;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.*;
 
-import org.slf4j.LoggerFactory;
+import com.google.protobuf.Descriptors;
+import java.util.regex.Pattern;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
 
 @Validator(type = ValidationType.STATIC)
 public class ModelValidator {
+
+    private static final Pattern MODEL_ENTRY_POINT = Pattern.compile("\\A[a-zA-Z]\\w*(\\.[a-zA-Z]\\w*)*\\Z");
+    private static final Pattern MODEL_VERSION = Pattern.compile("\\A\\p{Alnum}[\\w-.]*\\Z");
 
     private static final Descriptors.Descriptor MODEL_DEFINITION;
     private static final Descriptors.FieldDescriptor MD_LANGUAGE;
@@ -88,22 +91,20 @@ public class ModelValidator {
                 .apply(CommonValidators::identifier)
                 .pop();
 
-        // todo
+        ctx = ctx.push(MD_PATH)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::relativePath)
+                .pop();
 
-//        ctx = ctx.push(MD_PATH)
-//                .apply(CommonValidators::required)
-//                .apply(CommonValidators::identifier)
-//                .pop();
-//
-//        ctx = ctx.push(MD_ENTRY_POINT)
-//                .apply(CommonValidators::required)
-//                .apply(CommonValidators::identifier)
-//                .pop();
-//
-//        ctx = ctx.push(MD_VERSION)
-//                .apply(CommonValidators::required)
-//                .apply(CommonValidators::identifier)
-//                .pop();
+        ctx = ctx.push(MD_ENTRY_POINT)
+                .apply(CommonValidators::required)
+                .apply(ModelValidator::modelEntryPoint)
+                .pop();
+
+        ctx = ctx.push(MD_VERSION)
+                .apply(CommonValidators::required)
+                .apply(ModelValidator::modelVersion)
+                .pop();
 
         return modelSchema(MD_PARAMETERS, MD_INPUTS, MD_OUTPUTS, ctx);
     }
@@ -174,5 +175,37 @@ public class ModelValidator {
                 .apply(CommonValidators::required)
                 .applyRegistered()
                 .pop();
+    }
+
+    public static ValidationContext modelEntryPoint(String modelEntryPoint, ValidationContext ctx) {
+
+        var matcher = MODEL_ENTRY_POINT.matcher(modelEntryPoint);
+
+        if (!matcher.matches()) {
+
+            var err = String.format(
+                    "Invalid model entry point [%s] (expected format: pkg.sub_pkg.ModelClass)",
+                    modelEntryPoint);
+
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext modelVersion(String modelVersion, ValidationContext ctx) {
+
+        var matcher = MODEL_VERSION.matcher(modelVersion);
+
+        if (!matcher.matches()) {
+
+            var err = String.format(
+                    "Invalid model version [%s] (version can contain letters, numbers, hyphen, underscore and period, starting with a letter or number)",
+                    modelVersion);
+
+            return ctx.error(err);
+        }
+
+        return ctx;
     }
 }

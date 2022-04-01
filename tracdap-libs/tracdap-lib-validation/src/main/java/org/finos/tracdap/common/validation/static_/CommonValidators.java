@@ -337,6 +337,13 @@ public class CommonValidators {
         return ctx;
     }
 
+    public static ValidationContext relativePath(String value, ValidationContext ctx) {
+
+        // TODO: Relative path validator
+
+        return ctx;
+    }
+
     private static ValidationContext regexMatch(
             Pattern regex, boolean invertMatch, String desc,
             String value, ValidationContext ctx) {
