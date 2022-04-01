@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.validation.static_;
 
 import com.google.protobuf.Descriptors;
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
@@ -71,6 +72,25 @@ public class TagUpdateValidator {
                 .apply(TagUpdateValidator::notNull, Value.class)
                 .apply(TagUpdateValidator::allowedValueTypes, Value.class)
                 .pop();
+
+        return ctx;
+    }
+
+    public static ValidationContext reservedAttrs(TagUpdate msg, boolean allowReserved, ValidationContext ctx) {
+
+        if (allowReserved)
+            return ctx;
+
+        var isReserved = MetadataConstants.TRAC_RESERVED_IDENTIFIER.matcher(msg.getAttrName());
+
+        if (isReserved.matches()) {
+
+            var err = String.format(
+                    "Attribute name [%s] is a reserved identifier",
+                    msg.getAttrName());
+
+            return ctx.error(err);
+        }
 
         return ctx;
     }

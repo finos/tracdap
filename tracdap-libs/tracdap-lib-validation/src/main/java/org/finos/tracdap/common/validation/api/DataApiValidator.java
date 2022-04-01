@@ -156,6 +156,7 @@ public class DataApiValidator {
 
         ctx = ctx.pushRepeated(DWR_TAG_UPDATES)
                 .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, false)
                 .pop();
 
         ctx = ctx.pushOneOf(DWR_SCHEMA_SPECIFIER)
@@ -263,6 +264,7 @@ public class DataApiValidator {
 
         ctx = ctx.pushRepeated(FWR_TAG_UPDATES)
                 .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, false)
                 .pop();
 
         ctx = ctx.push(FWR_NAME)
