@@ -22,16 +22,14 @@ import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
-import java.util.regex.Pattern;
 
+import static org.finos.tracdap.common.validation.ValidationConstants.MODEL_ENTRY_POINT;
+import static org.finos.tracdap.common.validation.ValidationConstants.MODEL_VERSION;
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
 
 @Validator(type = ValidationType.STATIC)
 public class ModelValidator {
-
-    private static final Pattern MODEL_ENTRY_POINT = Pattern.compile("\\A[a-zA-Z]\\w*(\\.[a-zA-Z]\\w*)*\\Z");
-    private static final Pattern MODEL_VERSION = Pattern.compile("\\A\\p{Alnum}[\\w-.]*\\Z");
 
     private static final Descriptors.Descriptor MODEL_DEFINITION;
     private static final Descriptors.FieldDescriptor MD_LANGUAGE;

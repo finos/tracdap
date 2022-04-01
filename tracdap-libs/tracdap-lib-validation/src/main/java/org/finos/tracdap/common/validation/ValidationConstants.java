@@ -37,5 +37,6 @@ public class ValidationConstants {
     public static final Pattern FILENAME_RESERVED = Pattern.compile(
             "\\A(COM\\d*|LPT\\d*|PRN|AUX|NUL)(\\..*)?\\Z", Pattern.CASE_INSENSITIVE);
 
-
+    public static final Pattern MODEL_ENTRY_POINT = Pattern.compile("\\A[a-zA-Z]\\w*(\\.[a-zA-Z]\\w*)*\\Z");
+    public static final Pattern MODEL_VERSION = Pattern.compile("\\A\\p{Alnum}[\\w-.]*\\Z");
 }
