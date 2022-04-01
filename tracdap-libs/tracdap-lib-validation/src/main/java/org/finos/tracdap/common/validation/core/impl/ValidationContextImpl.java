@@ -703,7 +703,15 @@ public class ValidationContextImpl implements ValidationContext {
     }
 
     public Message parentMsg() {
-        return location.peek().parent().msg();
+
+        var loc = location.peek();
+
+        // For repeated field items, we need to go up two levels in the location hierarchy
+        if (loc.field().isRepeated() && loc.field().equals(loc.parent().field()))
+            return loc.parent().parent().msg();
+
+        else
+            return location.peek().parent().msg();
     }
 
     public boolean isOneOf() {
