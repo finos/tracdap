@@ -21,7 +21,6 @@ option java_package = "org.finos.tracdap.metadata";
 option java_multiple_files = true;
 
 import "tracdap/metadata/type.proto";
-import "tracdap/metadata/object_id.proto";
 
 
 /**
