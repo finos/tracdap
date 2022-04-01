@@ -112,17 +112,18 @@ public class TypeSystemValidator {
     @Validator
     public static ValidationContext value(Value value, ValidationContext ctx) {
 
-        if (value.hasType())
-            return ctx.apply(TypeSystemValidator::valueWithType, Value.class, value.getType());
+        if (!value.hasType()) {
 
-        if (!value.hasOneof(V_VALUE))
-            return ctx.error(String.format("Type cannot be inferred for null value [%s]", ctx.fieldName()));
+            if (!value.hasOneof(V_VALUE))
+                return ctx.error(String.format("Type cannot be inferred for null value [%s]", ctx.fieldName()));
 
-        if (!TypeSystem.isPrimitive(value))
-            return ctx.error(String.format("Type cannot be inferred for non-primitive value [%s]", ctx.fieldName()));
+            if (!TypeSystem.isPrimitive(value))
+                return ctx.error(String.format("Type cannot be inferred for non-primitive value [%s]", ctx.fieldName()));
+        }
 
-        var type = TypeSystem.descriptor(value);
-        return ctx.apply(TypeSystemValidator::valueWithType, Value.class, type);
+        var expectedType = TypeSystem.descriptor(value);
+
+        return ctx.apply(TypeSystemValidator::valueWithType_, Value.class, expectedType);
     }
 
     @Validator
@@ -152,7 +153,21 @@ public class TypeSystemValidator {
                 .pop();
     }
 
-    private static ValidationContext valueWithType(Value value, TypeDescriptor expectedType, ValidationContext ctx) {
+    public static ValidationContext valueWithType(Value value, TypeDescriptor expectedType, ValidationContext ctx) {
+
+        if (!value.hasType()) {
+
+            if (!value.hasOneof(V_VALUE))
+                return ctx.error(String.format("Type cannot be inferred for null value [%s]", ctx.fieldName()));
+
+            if (!TypeSystem.isPrimitive(value))
+                return ctx.error(String.format("Type cannot be inferred for non-primitive value [%s]", ctx.fieldName()));
+        }
+
+        return ctx.apply(TypeSystemValidator::valueWithType_, Value.class, expectedType);
+    }
+
+    private static ValidationContext valueWithType_(Value value, TypeDescriptor expectedType, ValidationContext ctx) {
 
         var wrongTypeMessage = String.format("Wrong type supplied for [%s]", ctx.fieldName());
 
