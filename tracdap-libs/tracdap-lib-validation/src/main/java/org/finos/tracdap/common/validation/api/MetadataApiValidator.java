@@ -31,6 +31,9 @@ import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 @Validator(type = ValidationType.STATIC, serviceFile = Metadata.class, serviceName = TracMetadataApiGrpc.SERVICE_NAME)
 public class MetadataApiValidator {
 
+    public static final boolean PUBLIC_API = false;
+    public static final boolean TRUSTED_API = true;
+
     private static final Descriptors.Descriptor METADATA_WRITE_REQUEST;
     private static final Descriptors.FieldDescriptor MWR_TENANT;
     private static final Descriptors.FieldDescriptor MWR_OBJECT_TYPE;
@@ -75,7 +78,12 @@ public class MetadataApiValidator {
     @Validator(method = "createObject")
     public static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx, false);
+        return createObject(msg, ctx, PUBLIC_API);
+    }
+
+    static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust) {
+
+        ctx = createOrUpdate(ctx, false, apiTrust);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::omitted)
@@ -93,7 +101,12 @@ public class MetadataApiValidator {
     @Validator(method = "updateObject")
     public static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx, true);
+        return updateObject(msg, ctx, PUBLIC_API);
+    }
+
+    static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust) {
+
+        ctx = createOrUpdate(ctx, true, apiTrust);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::required)
@@ -114,7 +127,12 @@ public class MetadataApiValidator {
     @Validator(method = "updateTag")
     public static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx, false);
+        return updateTag(msg, ctx, PUBLIC_API);
+    }
+
+    static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust) {
+
+        ctx = createOrUpdate(ctx, false, apiTrust);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::required)
@@ -131,10 +149,9 @@ public class MetadataApiValidator {
         return ctx;
     }
 
-    @Validator(method = "preallocateId", serviceFile = MetadataTrusted.class, serviceName = TrustedMetadataApiGrpc.SERVICE_NAME)
-    public static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx) {
+    static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx, false);
+        ctx = createOrUpdate(ctx, false, TRUSTED_API);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::omitted)
@@ -147,10 +164,9 @@ public class MetadataApiValidator {
         return ctx;
     }
 
-    @Validator(method = "createPreallocatedObject", serviceFile = MetadataTrusted.class, serviceName = TrustedMetadataApiGrpc.SERVICE_NAME)
-    public static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx) {
+    static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx, false);
+        ctx = createOrUpdate(ctx, false, TRUSTED_API);
 
         // Do not use the regular tag selector validator (ObjectIdValidator::tagSelector)
         // The regular validator will enforce object and tag version > 0
@@ -172,7 +188,7 @@ public class MetadataApiValidator {
         return ctx;
     }
 
-    private static ValidationContext createOrUpdate(ValidationContext ctx, boolean isVersioned) {
+    private static ValidationContext createOrUpdate(ValidationContext ctx, boolean isVersioned, boolean apiTrust) {
 
         ctx = ctx.push(MWR_TENANT)
                 .apply(CommonValidators::required)
@@ -187,6 +203,8 @@ public class MetadataApiValidator {
 
         ctx = ctx.pushRepeated(MWR_ATTRS)
                 .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                // Only allow reserved attrs for requests on the trusted API
+                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, (apiTrust == TRUSTED_API))
                 .pop();
 
         return ctx;

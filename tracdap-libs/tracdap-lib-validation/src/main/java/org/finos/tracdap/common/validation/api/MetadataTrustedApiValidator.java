@@ -20,6 +20,7 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
+import org.finos.tracdap.common.validation.static_.CommonValidators;
 
 
 @Validator(type = ValidationType.STATIC, serviceFile = MetadataTrusted.class, serviceName = TrustedMetadataApiGrpc.SERVICE_NAME)
@@ -36,17 +37,27 @@ public class MetadataTrustedApiValidator {
 
     @Validator(method = "createObject")
     public static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.createObject(msg, ctx);
+        return MetadataApiValidator.createObject(msg, ctx, MetadataApiValidator.TRUSTED_API);
     }
 
     @Validator(method = "updateObject")
     public static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.updateObject(msg, ctx);
+        return MetadataApiValidator.updateObject(msg, ctx, MetadataApiValidator.TRUSTED_API);
     }
 
     @Validator(method = "updateTag")
     public static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.updateTag(msg, ctx);
+        return MetadataApiValidator.updateTag(msg, ctx, MetadataApiValidator.TRUSTED_API);
+    }
+
+    @Validator(method = "preallocateId")
+    public static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.preallocateId(msg, ctx);  // always a trusted call
+    }
+
+    @Validator(method = "createPreallocatedObject")
+    public static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.createPreallocatedObject(msg, ctx);  // always a trusted call
     }
 
     @Validator(method = "readObject")
