@@ -45,13 +45,20 @@ public class MetadataApiValidator {
     private static final Descriptors.FieldDescriptor MRR_TENANT;
     private static final Descriptors.FieldDescriptor MRR_SELECTOR;
 
+    private static final Descriptors.Descriptor BATCH_READ_REQUEST;
+    private static final Descriptors.FieldDescriptor BRR_TENANT;
+    private static final Descriptors.FieldDescriptor BRR_SELECTORS;
+
     private static final Descriptors.Descriptor METADATA_SEARCH_REQUEST;
     private static final Descriptors.FieldDescriptor MSR_TENANT;
     private static final Descriptors.FieldDescriptor MSR_SEARCH_PARAMS;
 
-    private static final Descriptors.Descriptor BATCH_READ_REQUEST;
-    private static final Descriptors.FieldDescriptor BRR_TENANT;
-    private static final Descriptors.FieldDescriptor BRR_SELECTORS;
+    private static final Descriptors.Descriptor METADATA_GET_REQUEST;
+    private static final Descriptors.FieldDescriptor MGR_TENANT;
+    private static final Descriptors.FieldDescriptor MGR_OBJECT_TYPE;
+    private static final Descriptors.FieldDescriptor MGR_OBJECT_ID;
+    private static final Descriptors.FieldDescriptor MGR_OBJECT_VERSION;
+    private static final Descriptors.FieldDescriptor MGR_TAG_VERSION;
 
     static {
 
@@ -66,13 +73,20 @@ public class MetadataApiValidator {
         MRR_TENANT = field(METADATA_READ_REQUEST, MetadataReadRequest.TENANT_FIELD_NUMBER);
         MRR_SELECTOR = field(METADATA_READ_REQUEST, MetadataReadRequest.SELECTOR_FIELD_NUMBER);
 
+        BATCH_READ_REQUEST = MetadataBatchRequest.getDescriptor();
+        BRR_TENANT = field(BATCH_READ_REQUEST, MetadataBatchRequest.TENANT_FIELD_NUMBER);
+        BRR_SELECTORS = field(BATCH_READ_REQUEST, MetadataBatchRequest.SELECTOR_FIELD_NUMBER);
+
         METADATA_SEARCH_REQUEST = MetadataSearchRequest.getDescriptor();
         MSR_TENANT = field(METADATA_SEARCH_REQUEST, MetadataSearchRequest.TENANT_FIELD_NUMBER);
         MSR_SEARCH_PARAMS = field(METADATA_SEARCH_REQUEST, MetadataSearchRequest.SEARCHPARAMS_FIELD_NUMBER);
 
-        BATCH_READ_REQUEST = MetadataBatchRequest.getDescriptor();
-        BRR_TENANT = field(BATCH_READ_REQUEST, MetadataBatchRequest.TENANT_FIELD_NUMBER);
-        BRR_SELECTORS = field(BATCH_READ_REQUEST, MetadataBatchRequest.SELECTOR_FIELD_NUMBER);
+        METADATA_GET_REQUEST = MetadataGetRequest.getDescriptor();
+        MGR_TENANT = field(METADATA_GET_REQUEST, MetadataGetRequest.TENANT_FIELD_NUMBER);
+        MGR_OBJECT_TYPE = field(METADATA_GET_REQUEST, MetadataGetRequest.OBJECTTYPE_FIELD_NUMBER);
+        MGR_OBJECT_ID = field(METADATA_GET_REQUEST, MetadataGetRequest.OBJECTID_FIELD_NUMBER);
+        MGR_OBJECT_VERSION = field(METADATA_GET_REQUEST, MetadataGetRequest.OBJECTVERSION_FIELD_NUMBER);
+        MGR_TAG_VERSION = field(METADATA_GET_REQUEST, MetadataGetRequest.TAGVERSION_FIELD_NUMBER);
     }
 
     @Validator(method = "createObject")
@@ -226,6 +240,22 @@ public class MetadataApiValidator {
         return ctx;
     }
 
+    @Validator(method = "readBatch")
+    public static ValidationContext readBatch(MetadataBatchRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(BRR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.pushRepeated(BRR_SELECTORS)
+                .apply(CommonValidators::listNotEmpty)
+                .applyRepeated(ObjectIdValidator::tagSelector, TagSelector.class)
+                .pop();
+
+        return ctx;
+    }
+
     @Validator(method = "search")
     public static ValidationContext search(MetadataSearchRequest msg, ValidationContext ctx) {
 
@@ -242,17 +272,72 @@ public class MetadataApiValidator {
         return ctx;
     }
 
-    @Validator(method = "readBatch")
-    public static ValidationContext readBatch(MetadataBatchRequest msg, ValidationContext ctx) {
+    @Validator(method = "getObject")
+    public static ValidationContext getObject(MetadataGetRequest msg, ValidationContext ctx) {
 
-        ctx = ctx.push(BRR_TENANT)
+        ctx = ctx.apply(MetadataApiValidator::getRequest, MetadataGetRequest.class);
+
+        ctx = ctx.push(MGR_OBJECT_VERSION)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::positive, Integer.class)
+                .pop();
+
+        ctx = ctx.push(MGR_TAG_VERSION)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::positive, Integer.class)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "getObject")
+    public static ValidationContext getLatestObject(MetadataGetRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.apply(MetadataApiValidator::getRequest, MetadataGetRequest.class);
+
+        ctx = ctx.push(MGR_OBJECT_VERSION)
+                .apply(CommonValidators::omitted)
+                .pop();
+
+        ctx = ctx.push(MGR_TAG_VERSION)
+                .apply(CommonValidators::omitted)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "getObject")
+    public static ValidationContext getLatestTag(MetadataGetRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.apply(MetadataApiValidator::getRequest, MetadataGetRequest.class);
+
+        ctx = ctx.push(MGR_OBJECT_VERSION)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::positive, Integer.class)
+                .pop();
+
+        ctx = ctx.push(MGR_TAG_VERSION)
+                .apply(CommonValidators::omitted)
+                .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext getRequest(MetadataGetRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(MGR_TENANT)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::identifier)
                 .pop();
 
-        ctx = ctx.pushRepeated(BRR_SELECTORS)
-                .apply(CommonValidators::listNotEmpty)
-                .applyRepeated(ObjectIdValidator::tagSelector, TagSelector.class)
+        ctx = ctx.push(MGR_OBJECT_TYPE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::recognizedEnum, ObjectType.class)
+                .pop();
+
+        ctx = ctx.push(MGR_OBJECT_ID)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::uuid)
                 .pop();
 
         return ctx;

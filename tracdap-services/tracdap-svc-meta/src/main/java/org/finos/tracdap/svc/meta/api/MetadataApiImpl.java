@@ -167,6 +167,8 @@ public class MetadataApiImpl {
 
     CompletableFuture<Tag> getObject(MetadataGetRequest request) {
 
+        validateRequest(GET_OBJECT_METHOD, request);
+
         var tenant = request.getTenant();
         var objectType = request.getObjectType();
         var objectId = UUID.fromString(request.getObjectId());
@@ -178,6 +180,8 @@ public class MetadataApiImpl {
 
     CompletableFuture<Tag> getLatestObject(MetadataGetRequest request) {
 
+        validateRequest(GET_LATEST_OBJECT_METHOD, request);
+
         var tenant = request.getTenant();
         var objectType = request.getObjectType();
         var objectId = UUID.fromString(request.getObjectId());
@@ -186,6 +190,8 @@ public class MetadataApiImpl {
     }
 
     CompletableFuture<Tag> getLatestTag(MetadataGetRequest request) {
+
+        validateRequest(GET_LATEST_TAG_METHOD, request);
 
         var tenant = request.getTenant();
         var objectType = request.getObjectType();
