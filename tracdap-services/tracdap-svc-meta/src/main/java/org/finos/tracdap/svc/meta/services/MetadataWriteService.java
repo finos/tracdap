@@ -20,7 +20,6 @@ import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
-import org.finos.tracdap.svc.meta.validation.MetadataValidator;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -34,7 +33,7 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.TAG_FIRST_VERS
 
 public class MetadataWriteService {
 
-    private final Validator newValidator = new Validator();
+    private final Validator validator = new Validator();
     private final IMetadataDal dal;
 
     public MetadataWriteService(IMetadataDal dal) {
@@ -42,30 +41,15 @@ public class MetadataWriteService {
     }
 
     public CompletableFuture<TagHeader> createObject(
-            String tenant, ObjectType objectType,
+            String tenant,
             ObjectDefinition definition,
-            List<TagUpdate> tagUpdates,
-            boolean apiTrust) {
-
-        // Original validation
-
-        var validator = new MetadataValidator();
-
-        var normalDefinition = validator.normalizeObjectType(definition);
-
-        if (apiTrust == MetadataConstants.PUBLIC_API) {
-            validator.tagAttributesAreNotReserved(tagUpdates);
-            validator.checkAndThrowPermissions();
-        }
-
-        // Validation complete!
-
+            List<TagUpdate> tagUpdates) {
 
         var objectId = UUID.randomUUID();
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var newHeader = TagHeader.newBuilder()
-                .setObjectType(objectType)
+                .setObjectType(definition.getObjectType())
                 .setObjectId(objectId.toString())
                 .setObjectVersion(OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
@@ -75,7 +59,7 @@ public class MetadataWriteService {
 
         var newTag = Tag.newBuilder()
                 .setHeader(newHeader)
-                .setDefinition(normalDefinition)
+                .setDefinition(definition)
                 .build();
 
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
@@ -86,28 +70,14 @@ public class MetadataWriteService {
 
 
     public CompletableFuture<TagHeader> updateObject(
-            String tenant,
-            TagSelector priorVersion,
+            String tenant, TagSelector priorVersion,
             ObjectDefinition definition,
-            List<TagUpdate> tagUpdates,
-            boolean apiTrust) {
-
-        var validator = new MetadataValidator();
-
-        var normalDefinition = validator.normalizeObjectType(definition);
-
-        if (apiTrust == MetadataConstants.PUBLIC_API) {
-            validator.tagAttributesAreNotReserved(tagUpdates);
-            validator.checkAndThrowPermissions();
-        }
-
-        // Validation complete!
-
+            List<TagUpdate> tagUpdates) {
 
         return dal.loadObject(tenant, priorVersion)
 
                 .thenCompose(priorTag ->
-                updateObject(tenant, priorTag, normalDefinition, tagUpdates));
+                updateObject(tenant, priorTag, definition, tagUpdates));
     }
 
     private CompletableFuture<TagHeader> updateObject(
@@ -116,8 +86,7 @@ public class MetadataWriteService {
             List<TagUpdate> tagUpdates) {
 
         // Validate version increment on the object
-        newValidator.validateVersion(definition, priorTag.getDefinition());
-
+        validator.validateVersion(definition, priorTag.getDefinition());
 
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
@@ -142,19 +111,8 @@ public class MetadataWriteService {
     }
 
     public CompletableFuture<TagHeader> updateTag(
-            String tenant, ObjectType objectType,
-            TagSelector priorVersion,
-            List<TagUpdate> tagUpdates,
-            boolean apiTrust) {
-
-        if (apiTrust == MetadataConstants.PUBLIC_API) {
-            var validator = new MetadataValidator();
-            validator.tagAttributesAreNotReserved(tagUpdates);
-            validator.checkAndThrowPermissions();
-        }
-
-        // Validation complete!
-
+            String tenant, TagSelector priorVersion,
+            List<TagUpdate> tagUpdates) {
 
         return dal.loadObject(tenant, priorVersion)
 
@@ -202,26 +160,16 @@ public class MetadataWriteService {
     }
 
     public CompletableFuture<TagHeader> createPreallocatedObject(
-            String tenant, ObjectType objectType,
-            TagSelector priorVersion,
+            String tenant, TagSelector priorVersion,
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
-
-        var validator = new MetadataValidator();
-        var normalDefinition = validator.normalizeObjectType(definition);
-
-        // Preallocated objects are always on the trusted API
-        // So no need to check reserved tag attributes
-
-        // Validation complete!
-
 
         // In this case priorVersion refers to the preallocated ID
         var objectId = UUID.fromString(priorVersion.getObjectId());
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var newHeader = TagHeader.newBuilder()
-                .setObjectType(objectType)
+                .setObjectType(definition.getObjectType())
                 .setObjectId(objectId.toString())
                 .setObjectVersion(OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
@@ -231,7 +179,7 @@ public class MetadataWriteService {
 
         var newTag = Tag.newBuilder()
                 .setHeader(newHeader)
-                .setDefinition(normalDefinition)
+                .setDefinition(definition)
                 .build();
 
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);

@@ -70,7 +70,6 @@ public class MetadataApiImpl {
 
         validateRequest(CREATE_OBJECT_METHOD, request);
 
-        var tenant = request.getTenant();
         var objectType = request.getObjectType();
 
         if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
@@ -79,17 +78,16 @@ public class MetadataApiImpl {
             return CompletableFuture.failedFuture(status.asRuntimeException());
         }
 
-        return writeService.createObject(tenant, objectType,
+        return writeService.createObject(
+                request.getTenant(),
                 request.getDefinition(),
-                request.getTagUpdatesList(),
-                apiTrustLevel);
+                request.getTagUpdatesList());
     }
 
     CompletableFuture<TagHeader> updateObject(MetadataWriteRequest request) {
 
         validateRequest(UPDATE_OBJECT_METHOD, request);
 
-        var tenant = request.getTenant();
         var objectType = request.getObjectType();
 
         if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
@@ -98,11 +96,11 @@ public class MetadataApiImpl {
             return CompletableFuture.failedFuture(status.asRuntimeException());
         }
 
-        return writeService.updateObject(tenant,
+        return writeService.updateObject(
+                request.getTenant(),
                 request.getPriorVersion(),
                 request.getDefinition(),
-                request.getTagUpdatesList(),
-                apiTrustLevel);
+                request.getTagUpdatesList());
     }
 
     CompletableFuture<TagHeader> updateTag(MetadataWriteRequest request) {
@@ -111,10 +109,8 @@ public class MetadataApiImpl {
 
         return writeService.updateTag(
                 request.getTenant(),
-                request.getObjectType(),
                 request.getPriorVersion(),
-                request.getTagUpdatesList(),
-                apiTrustLevel);
+                request.getTagUpdatesList());
     }
 
     CompletableFuture<TagHeader> preallocateId(MetadataWriteRequest request) {
@@ -133,7 +129,6 @@ public class MetadataApiImpl {
 
         return writeService.createPreallocatedObject(
                 request.getTenant(),
-                request.getObjectType(),
                 request.getPriorVersion(),
                 request.getDefinition(),
                 request.getTagUpdatesList());
