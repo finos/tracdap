@@ -1,4 +1,3 @@
-#
 # Copyright 2021 Accenture Global Solutions Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
+
+ALLOWED_LICENSES="Apache Software License;MIT License;BSD License;BSD-3-Clause;3-Clause BSD License"
 
 # The "certifi" package is a dependency of Python Safety, licensed under MPL 2.0
 # It is OK to use since the compliance tools are not distributed

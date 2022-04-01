@@ -109,13 +109,13 @@ jobs:
         run: |
 
           # Source license excpetions
-          . dev/compliance/license-exceptions-python.sh
+          . dev/compliance/license-config-python.sh
 
           mkdir -p build/compliance/python-runtime-licenses
           cd tracdap-runtime/python
           pip-licenses --format=json --ignore-packages $IGNORE_LICENSE > ../../build/compliance/python-runtime-licenses/python-runtime-licenses.json
           pip-licenses --format=html --ignore-packages $IGNORE_LICENSE > ../../build/compliance/python-runtime-licenses/python-runtime-licenses.html
-          pip-licenses --allow-only="Apache Software License;MIT License;BSD License;3-Clause BSD License" --ignore-packages $IGNORE_LICENSE
+          pip-licenses --allow-only="$ALLOWED_LICENSES" --ignore-packages $IGNORE_LICENSE
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
