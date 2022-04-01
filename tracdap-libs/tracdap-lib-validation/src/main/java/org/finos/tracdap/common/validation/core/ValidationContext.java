@@ -201,7 +201,8 @@ public interface ValidationContext {
     <T, U> ValidationContext applyOneOf(Descriptors.FieldDescriptor field, ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg);
     <T> ValidationContext applyOneOf(Descriptors.FieldDescriptor field, ValidationFunction.Version<T> validator, Class<T> targetClass);
 
-    <T> ValidationContext applyRepeated(ValidationFunction.Basic validator);
+    ValidationContext applyRepeated(ValidationFunction.Basic validator);
+    ValidationContext applyRepeated(ValidationFunction.Typed<String> validator);
     <T> ValidationContext applyRepeated(ValidationFunction.Typed<T> validator, Class<T> targetClass);
     <T, U> ValidationContext applyRepeated(ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg);
 

@@ -590,6 +590,12 @@ public class ValidationContextImpl implements ValidationContext {
         return applyRepeated((obj, arg, ctx) -> validator.apply(ctx), Object.class, null);
     }
 
+    public ValidationContext
+    applyRepeated(ValidationFunction.Typed<String> validator) {
+
+        return applyRepeated((obj, arg, ctx) -> validator.apply(obj, ctx), String.class, null);
+    }
+
     public <T> ValidationContext
     applyRepeated(ValidationFunction.Typed<T> validator, Class<T> targetClass) {
 
