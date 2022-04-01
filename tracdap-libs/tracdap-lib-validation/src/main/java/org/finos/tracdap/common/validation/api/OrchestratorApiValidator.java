@@ -20,14 +20,10 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
-import org.finos.tracdap.common.validation.static_.CommonValidators;
-import org.finos.tracdap.common.validation.static_.ObjectIdValidator;
-import org.finos.tracdap.common.validation.static_.TagUpdateValidator;
-import org.finos.tracdap.metadata.ObjectType;
-import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.common.validation.static_.*;
+import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
-import org.finos.tracdap.metadata.TagUpdate;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
@@ -78,6 +74,7 @@ public class OrchestratorApiValidator {
         ctx = ctx.push(JR_JOB)
                 .apply(CommonValidators::required)
                 .applyRegistered()
+                .apply(JobValidator::outputsMustBeEmpty, JobDefinition.class)
                 .pop();
 
         ctx = ctx.pushRepeated(JR_JOB_ATTRS)

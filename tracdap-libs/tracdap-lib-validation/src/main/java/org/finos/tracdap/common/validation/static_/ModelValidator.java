@@ -79,32 +79,47 @@ public class ModelValidator {
     @Validator
     public static ValidationContext model(ModelDefinition msg, ValidationContext ctx) {
 
-        ctx = ctx.push(MD_LANGUAGE)
+        ctx = modelDetails(MD_LANGUAGE, MD_REPOSITORY, MD_PATH, MD_ENTRY_POINT, MD_VERSION, ctx);
+
+        ctx = modelSchema(MD_PARAMETERS, MD_INPUTS, MD_OUTPUTS, ctx);
+
+        return ctx;
+    }
+
+    public static ValidationContext modelDetails(
+            Descriptors.FieldDescriptor languageField,
+            Descriptors.FieldDescriptor repositoryField,
+            Descriptors.FieldDescriptor pathField,
+            Descriptors.FieldDescriptor entryPointField,
+            Descriptors.FieldDescriptor versionField,
+            ValidationContext ctx) {
+
+        ctx = ctx.push(languageField)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::identifier)
                 .pop();
 
-        ctx = ctx.push(MD_REPOSITORY)
+        ctx = ctx.push(repositoryField)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::identifier)
                 .pop();
 
-        ctx = ctx.push(MD_PATH)
+        ctx = ctx.push(pathField)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::relativePath)
                 .pop();
 
-        ctx = ctx.push(MD_ENTRY_POINT)
+        ctx = ctx.push(entryPointField)
                 .apply(CommonValidators::required)
                 .apply(ModelValidator::modelEntryPoint)
                 .pop();
 
-        ctx = ctx.push(MD_VERSION)
+        ctx = ctx.push(versionField)
                 .apply(CommonValidators::required)
                 .apply(ModelValidator::modelVersion)
                 .pop();
 
-        return modelSchema(MD_PARAMETERS, MD_INPUTS, MD_OUTPUTS, ctx);
+        return ctx;
     }
 
     public static ValidationContext modelSchema(
