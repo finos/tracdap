@@ -461,7 +461,6 @@ class ImportModelFunc(NodeFunction[meta.ModelDefinition]):
             language=self.node.import_details.language,
             repository=self.node.import_details.repository,
             path=self.node.import_details.path,
-            package=self.node.import_details.package,
             entryPoint=self.node.import_details.entryPoint,
             version=self.node.import_details.version)
 
