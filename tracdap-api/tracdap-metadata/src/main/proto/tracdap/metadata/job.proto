@@ -90,9 +90,8 @@ message ImportModelJob {
   string language = 1;
   string repository = 2;
   string path = 3;
-  string package = 4;
-  string entryPoint = 5;
-  string version = 6;
+  string entryPoint = 4;
+  string version = 5;
 
-  repeated TagUpdate modelAttrs = 7;
+  repeated TagUpdate modelAttrs = 6;
 }
