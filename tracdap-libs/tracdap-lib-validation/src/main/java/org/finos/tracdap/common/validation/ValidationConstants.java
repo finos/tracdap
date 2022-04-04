@@ -37,8 +37,25 @@ public class ValidationConstants {
     public static final Pattern FILENAME_RESERVED = Pattern.compile(
             "\\A(COM\\d*|LPT\\d*|PRN|AUX|NUL)(\\..*)?\\Z", Pattern.CASE_INSENSITIVE);
 
+    // Data item key is a logical key not a path
+    // But a path-like structure is used to create unique, deterministic keys
+    // Segments are limited alphanumeric, underscore, dot and hyphen, with the unix slash as the separator
     public static final Pattern DATA_ITEM_KEY = Pattern.compile("\\A\\w[\\w-.]*(/\\w[\\w-.]*)*\\Z");
 
+    // Opaque part key is deterministic based on the full part key definition
+    // There are three types of part key, single (root), part by range and part by value
+    public static final Pattern OPAQUE_PART_KEY = Pattern.compile("\\Apart-(root|range-.*|value-.*)\\Z");
+
+    // Model entry point is a class in a package structure
+    // Package and class names are identifiers, separated by dots
+    // Any depth of package structure is allowed, including zero
+    // So pkg.sub_pkg.ModelClass and ModelClass are both valid
     public static final Pattern MODEL_ENTRY_POINT = Pattern.compile("\\A[a-zA-Z]\\w*(\\.[a-zA-Z]\\w*)*\\Z");
+
+    // Version can be a release version number or a commit hash
+    // Common version schemes allow hyphen and period, we also allow underscore
+    // E.g. v1.3-beta.1 or v1.3-dev_suffix
+    // Commit hash might start with a number
+    // If these criteria are too restrictive we made need to relax this later
     public static final Pattern MODEL_VERSION = Pattern.compile("\\A\\p{Alnum}[\\w-.]*\\Z");
 }

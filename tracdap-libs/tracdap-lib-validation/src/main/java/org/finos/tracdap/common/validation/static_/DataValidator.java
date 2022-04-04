@@ -16,12 +16,16 @@
 
 package org.finos.tracdap.common.validation.static_;
 
+import org.finos.tracdap.common.metadata.PartKeys;
+import org.finos.tracdap.common.validation.ValidationConstants;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
+
+import java.util.Map;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
@@ -37,6 +41,7 @@ public class DataValidator {
     private static final Descriptors.FieldDescriptor DD_STORAGE_ID;
 
     private static final Descriptors.Descriptor PART_KEY;
+    private static final Descriptors.FieldDescriptor PK_OPAQUE_KEY;
     private static final Descriptors.FieldDescriptor PK_PART_TYPE;
     private static final Descriptors.FieldDescriptor PK_PART_VALUES;
     private static final Descriptors.FieldDescriptor PK_PART_RANGE_MIN;
@@ -64,6 +69,7 @@ public class DataValidator {
         DD_STORAGE_ID = field(DATA_DEFINITION, DataDefinition.STORAGEID_FIELD_NUMBER);
 
         PART_KEY = PartKey.getDescriptor();
+        PK_OPAQUE_KEY = field(PART_KEY, PartKey.OPAQUEKEY_FIELD_NUMBER);
         PK_PART_TYPE = field(PART_KEY, PartKey.PARTTYPE_FIELD_NUMBER);
         PK_PART_VALUES = field(PART_KEY, PartKey.PARTVALUES_FIELD_NUMBER);
         PK_PART_RANGE_MIN = field(PART_KEY, PartKey.PARTRANGEMIN_FIELD_NUMBER);
@@ -93,10 +99,11 @@ public class DataValidator {
                 .applyOneOf(DD_SCHEMA, SchemaValidator::schema, SchemaDefinition.class)
                 .pop();
 
-        ctx = ctx.pushMap(DD_PARTS)
+        ctx = ctx.pushMap(DD_PARTS, DataDefinition::getPartsMap)
                 .apply(CommonValidators::mapNotEmpty)
-                // TODO: map keys are valid opaque part keys
+                .applyMapKeys(DataValidator::opaqueKey)
                 .applyMapValues(DataValidator::dataPart, DataDefinition.Part.class)
+                .apply(DataValidator::partMapIsConsistent, Map.class)
                 .pop();
 
         ctx = ctx.push(DD_STORAGE_ID)
@@ -180,8 +187,66 @@ public class DataValidator {
                 .apply(TypeSystemValidator::value, Value.class)
                 .pop();
 
+        var keyFieldsOk = !ctx.failed();
+
+        ctx = ctx.push(PK_OPAQUE_KEY)
+                .apply(CommonValidators::required)
+                .apply(DataValidator::opaqueKey)
+                // Do not try to check opaque key match if the part key has already failed validation
+                .applyIf(keyFieldsOk, DataValidator::opaqueKeyMatchesPart, String.class, msg)
+                .pop();
+
         // Type of values and range min/max constraints needs to match schema
         // Should that check be a referential check? Because data def does not always contain the schema...
+
+        return ctx;
+    }
+
+    private static ValidationContext opaqueKey(String opaqueKey, ValidationContext ctx) {
+
+        var matcher = ValidationConstants.OPAQUE_PART_KEY.matcher(opaqueKey);
+
+        if (!matcher.matches()) {
+
+            var err = String.format("Invalid part key [%s]", opaqueKey);
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext opaqueKeyMatchesPart(String opaqueKey, PartKey partKey, ValidationContext ctx) {
+
+        var expectedOpaqueKey = PartKeys.opaqueKey(partKey);
+
+        if (!opaqueKey.equals(expectedOpaqueKey)) {
+
+            var err = String.format("Part key does not match part definition (expected [%s], got [%s])",
+                    expectedOpaqueKey, opaqueKey);
+
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext partMapIsConsistent(Map<String, DataDefinition.Part> partMap, ValidationContext ctx) {
+
+        for (var partEntry : partMap.entrySet()) {
+
+            var partKey = partEntry.getKey();
+            var part = partEntry.getValue().getPartKey().getOpaqueKey();
+
+            if (!partKey.equals(part)) {
+
+                var err = String.format("Part key [%s] does not match part definition for [%s]",
+                        partKey, part);
+
+                return ctx.error(err);
+            }
+
+            return ctx;
+        }
 
         return ctx;
     }
