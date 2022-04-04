@@ -75,6 +75,7 @@ public class FileValidator {
 
         ctx = ctx.push(FD_DATA_ITEM)
                 .apply(CommonValidators::required)
+                .apply(StorageValidator::dataItemKey)
                 .pop();
 
         ctx = ctx.push(FD_STORAGE_ID)

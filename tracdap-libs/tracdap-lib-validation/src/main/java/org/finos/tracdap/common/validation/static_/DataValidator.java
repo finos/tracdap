@@ -150,7 +150,7 @@ public class DataValidator {
 
         ctx = ctx.push(DD_DATA_ITEM)
                 .apply(CommonValidators::required)
-                // valid data item TODO
+                .apply(StorageValidator::dataItemKey)
                 .pop();
 
         return ctx;

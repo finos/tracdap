@@ -77,7 +77,7 @@ public class StorageValidator {
 
         ctx = ctx.pushMap(SD_DATA_ITEMS)
                 .apply(CommonValidators::mapNotEmpty)
-                // todo: map keys valid data item keys
+                .applyMapKeys(StorageValidator::dataItemKey)
                 .applyMapValues(StorageValidator::storageItem, StorageItem.class)
                 .pop();
 
@@ -99,7 +99,7 @@ public class StorageValidator {
     public static ValidationContext storageIncarnation(StorageIncarnation msg, ValidationContext ctx) {
 
         ctx = ctx.push(SIC_INCARNATION_INDEX)
-                .apply(CommonValidators::optional)  // incarnation = 0 makes index optional
+                .apply(CommonValidators::optional)  // zero-based index must be optional
                 .apply(CommonValidators::notNegative, Integer.class)
                 .pop();
 
@@ -150,6 +150,19 @@ public class StorageValidator {
                 .apply(TypeSystemValidator::datetimeValue, DatetimeValue.class)
                 .apply(TypeSystemValidator::notInTheFuture, DatetimeValue.class)
                 .pop();
+
+        return ctx;
+    }
+
+    public static ValidationContext dataItemKey(String dataItem, ValidationContext ctx) {
+
+        var dataItemMatcher = ValidationConstants.DATA_ITEM_KEY.matcher(dataItem);
+
+        if (!dataItemMatcher.matches()) {
+
+            var err = String.format("Invalid data item key [%s]", dataItem);
+            return ctx.error(err);
+        }
 
         return ctx;
     }
