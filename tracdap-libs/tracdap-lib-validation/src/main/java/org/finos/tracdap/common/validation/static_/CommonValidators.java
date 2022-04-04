@@ -54,7 +54,7 @@ public class CommonValidators {
     private static ValidationContext required(ValidationContext ctx, String qualifier) {
 
         var err = qualifier != null
-                ? String.format("A value is required for [%s] when %s", ctx.fieldName(), qualifier)
+                ? String.format("A value is required for [%s] %s", ctx.fieldName(), qualifier)
                 : String.format("A value is required for [%s]", ctx.fieldName());
 
         var parentMsg = ctx.parentMsg();
@@ -95,8 +95,8 @@ public class CommonValidators {
     private static ValidationContext omitted(ValidationContext ctx, String qualifier) {
 
         var err = qualifier != null
-                ? String.format("A value cannot be provided for [%s] unless %s", ctx.fieldName(), qualifier)
-                : String.format("A value cannot be provided for [%s]", ctx.fieldName());
+                ? String.format("A value cannot be given for [%s] %s", ctx.fieldName(), qualifier)
+                : String.format("A value cannot be given for [%s]", ctx.fieldName());
 
         var parentMsg = ctx.parentMsg();
 
@@ -154,8 +154,8 @@ public class CommonValidators {
 
     public static ValidationFunction.Basic ifAndOnlyIf(boolean condition, String qualifier, boolean inverted) {
 
-        var positiveQualifier = (inverted ? "until " : "when ") + qualifier;
-        var negativeQualifier = (inverted ? "when " : "until ") + qualifier;
+        var positiveQualifier = (inverted ? "unless " : "when ") + qualifier;
+        var negativeQualifier = (inverted ? "when " : "unless ") + qualifier;
 
         if (condition)
             return ctx -> required(ctx, positiveQualifier);
