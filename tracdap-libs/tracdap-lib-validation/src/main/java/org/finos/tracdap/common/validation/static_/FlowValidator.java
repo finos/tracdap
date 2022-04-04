@@ -203,6 +203,13 @@ public class FlowValidator {
                 .applyRepeated(FlowValidator::edgeConnection, FlowEdge.class, nodes)
                 .pop();
 
+        // TODO: Flow consistency
+        // - Cyclic dependency check
+        // - Orphan / unreachable nodes
+        // - Duplicate edges
+        // - Consistent parameter types (same name => same type)
+        // - Flow model schema matches input / output nodes and parameters (including case)
+
         return ctx;
     }
 
