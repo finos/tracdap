@@ -190,19 +190,22 @@ public class DataValidator {
                 .apply(CommonValidators::recognizedEnum, PartType.class)
                 .pop();
 
+        var partByValueQualifier =  String.format("%s == %s", PK_PART_TYPE.getName(), PartType.PART_BY_VALUE.name());
+        var partByRangeQualifier =  String.format("%s == %s", PK_PART_TYPE.getName(), PartType.PART_BY_RANGE.name());
+
         ctx = ctx.pushRepeated(PK_PART_VALUES)
-                .apply(CommonValidators.ifAndOnlyIf(msg.getPartType() == PartType.PART_BY_VALUE))
+                .apply(CommonValidators.ifAndOnlyIf(msg.getPartType() == PartType.PART_BY_VALUE, partByValueQualifier))
                 .apply(CommonValidators::listNotEmpty)
                 .applyRepeated(TypeSystemValidator::value, Value.class)
                 .pop();
 
         ctx = ctx.push(PK_PART_RANGE_MIN)
-                .apply(CommonValidators.ifAndOnlyIf(msg.getPartType() == PartType.PART_BY_RANGE))
+                .apply(CommonValidators.ifAndOnlyIf(msg.getPartType() == PartType.PART_BY_RANGE, partByRangeQualifier))
                 .apply(TypeSystemValidator::value, Value.class)
                 .pop();
 
         ctx = ctx.push(PK_PART_RANGE_MAX)
-                .apply(CommonValidators.ifAndOnlyIf(msg.getPartType() == PartType.PART_BY_RANGE))
+                .apply(CommonValidators.ifAndOnlyIf(msg.getPartType() == PartType.PART_BY_RANGE, partByRangeQualifier))
                 .apply(TypeSystemValidator::value, Value.class)
                 .pop();
 

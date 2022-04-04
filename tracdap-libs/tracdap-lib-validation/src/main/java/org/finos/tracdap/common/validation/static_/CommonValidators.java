@@ -48,37 +48,39 @@ public class CommonValidators {
 
     public static ValidationContext required(ValidationContext ctx) {
 
+        return required(ctx, null);
+    }
+
+    private static ValidationContext required(ValidationContext ctx, String qualifier) {
+
+        var err = qualifier != null
+                ? String.format("A value is required for [%s] when %s", ctx.fieldName(), qualifier)
+                : String.format("A value is required for [%s]", ctx.fieldName());
+
         var parentMsg = ctx.parentMsg();
 
         if (ctx.isOneOf()) {
-            if (!parentMsg.hasOneof(ctx.oneOf())) {
-                var err = String.format("A value is required for [%s]", ctx.fieldName());
+
+            if (!parentMsg.hasOneof(ctx.oneOf()))
                 return ctx.error(err);
-            }
         }
         else if (ctx.isRepeated()) {
 
-            if (parentMsg.getRepeatedFieldCount(ctx.field()) == 0) {
-                var err = String.format("A value is required for [%s]", ctx.fieldName());
+            if (parentMsg.getRepeatedFieldCount(ctx.field()) == 0)
                 return ctx.error(err);
-            }
         }
         else {
 
-            if (!parentMsg.hasField(ctx.field())) {
-                var err = String.format("A value is required for [%s]", ctx.fieldName());
+            if (!parentMsg.hasField(ctx.field()))
                 return ctx.error(err);
-            }
 
             // For single string values, required means the string cannot be empty
             if (ctx.field().getType() == Descriptors.FieldDescriptor.Type.STRING) {
 
                 var str = (String) ctx.target();
 
-                if (str.isEmpty()) {
-                    var err = String.format("A value is required for [%s]", ctx.fieldName());
+                if (str.isEmpty())
                     return ctx.error(err);
-                }
             }
         }
 
@@ -87,28 +89,32 @@ public class CommonValidators {
 
     public static ValidationContext omitted(ValidationContext ctx) {
 
+        return omitted(ctx, null);
+    }
+
+    private static ValidationContext omitted(ValidationContext ctx, String qualifier) {
+
+        var err = qualifier != null
+                ? String.format("A value cannot be provided for [%s] unless %s", ctx.fieldName(), qualifier)
+                : String.format("A value cannot be provided for [%s]", ctx.fieldName());
+
         var parentMsg = ctx.parentMsg();
 
         if (ctx.isOneOf()) {
 
             if (parentMsg.hasOneof(ctx.oneOf())) {
-                var err = String.format("A value must not be provided for [%s]", ctx.fieldName());
                 return ctx.error(err);
             }
         }
         else if (ctx.isRepeated()) {
 
-            if (parentMsg.getRepeatedFieldCount(ctx.field()) != 0) {
-                var err = String.format("A value must not be provided for [%s]", ctx.fieldName());
+            if (parentMsg.getRepeatedFieldCount(ctx.field()) != 0)
                 return ctx.error(err);
-            }
         }
         else {
 
-            if (parentMsg.hasField(ctx.field())) {
-                var err = String.format("A value must not be provided for [%s]", ctx.fieldName());
+            if (parentMsg.hasField(ctx.field()))
                 return ctx.error(err);
-            }
         }
 
         // Field is not present, skip remaining validators
@@ -141,12 +147,20 @@ public class CommonValidators {
         return ctx;
     }
 
-    public static ValidationFunction.Basic ifAndOnlyIf(boolean condition) {
+    public static ValidationFunction.Basic ifAndOnlyIf(boolean condition, String qualifier) {
+
+        return ifAndOnlyIf(condition, qualifier, false);
+    }
+
+    public static ValidationFunction.Basic ifAndOnlyIf(boolean condition, String qualifier, boolean inverted) {
+
+        var positiveQualifier = (inverted ? "until " : "when ") + qualifier;
+        var negativeQualifier = (inverted ? "when " : "until ") + qualifier;
 
         if (condition)
-            return CommonValidators::required;
+            return ctx -> required(ctx, positiveQualifier);
         else
-            return CommonValidators::omitted;
+            return ctx -> omitted(ctx, negativeQualifier);
     }
 
     public static <T> ValidationFunction.Typed<T> equalTo(T other, String errorMessage) {

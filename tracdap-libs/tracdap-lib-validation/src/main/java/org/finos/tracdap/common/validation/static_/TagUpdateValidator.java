@@ -61,13 +61,19 @@ public class TagUpdateValidator {
         var nameRequired = msg.getOperation() != TagOperation.CLEAR_ALL_ATTR;
         var valueRequired = nameRequired && msg.getOperation() != TagOperation.DELETE_ATTR;
 
+        var nameRequiredQualifier = String.format("%s == %s",
+                TU_OPERATION.getName(), TagOperation.CLEAR_ALL_ATTR.name());
+        var valueRequiredQualifier = String.format("%s == %s or %s == %s",
+                TU_OPERATION.getName(), TagOperation.DELETE_ATTR.name(),
+                TU_OPERATION.getName(), TagOperation.CLEAR_ALL_ATTR.name());
+
         ctx = ctx.push(TU_ATTR_NAME)
-                .apply(CommonValidators.ifAndOnlyIf(nameRequired))
+                .apply(CommonValidators.ifAndOnlyIf(nameRequired, nameRequiredQualifier, true))
                 .apply(CommonValidators::identifier)
                 .pop();
 
         ctx = ctx.push(TU_VALUE)
-                .apply(CommonValidators.ifAndOnlyIf(valueRequired))
+                .apply(CommonValidators.ifAndOnlyIf(valueRequired, valueRequiredQualifier, true))
                 .apply(TypeSystemValidator::value, Value.class)
                 .apply(TagUpdateValidator::notNull, Value.class)
                 .apply(TagUpdateValidator::allowedValueTypes, Value.class)

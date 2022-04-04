@@ -129,9 +129,10 @@ public class FlowValidator {
                 .pop();
 
         var isModelNode = msg.getNodeType() == FlowNodeType.MODEL_NODE;
+        var isModelNodeQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), FlowNodeType.MODEL_NODE.name());
 
         ctx = ctx.push(FN_MODEL_STUB)
-                .apply(CommonValidators.ifAndOnlyIf(isModelNode))
+                .apply(CommonValidators.ifAndOnlyIf(isModelNode, isModelNodeQualifier))
                 .apply(FlowValidator::flowModelStub, FlowModelStub.class)
                 .pop();
 
