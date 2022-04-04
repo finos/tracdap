@@ -142,7 +142,7 @@ public class DataValidator {
         ctx = ctx.pushRepeated(DS_DELTAS)
                 .apply(CommonValidators::listNotEmpty)
                 .applyRepeated(DataValidator::dataDelta, DataDefinition.Delta.class)
-                // todo: delta index
+                .applyRepeated(DataValidator::deltaMatchesIndex, DataDefinition.Delta.class, msg)
                 .pop();
 
         return ctx;
@@ -159,6 +159,25 @@ public class DataValidator {
                 .apply(CommonValidators::required)
                 .apply(StorageValidator::dataItemKey)
                 .pop();
+
+        var snap = (DataDefinition.Snap) ctx.parentMsg();
+
+        if (snap.getDeltasCount() <= msg.getDeltaIndex() || snap.getDeltas(msg.getDeltaIndex()) != msg) {
+
+            var err = String.format("Unexpected delta index [%d] (should match list index)", msg.getDeltaIndex());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext deltaMatchesIndex(DataDefinition.Delta msg, DataDefinition.Snap snap, ValidationContext ctx) {
+
+        if (snap.getDeltasCount() <= msg.getDeltaIndex() || snap.getDeltas(msg.getDeltaIndex()) != msg) {
+
+            var err = String.format("Unexpected delta index [%d] (should match list index in the snap)", msg.getDeltaIndex());
+            return ctx.error(err);
+        }
 
         return ctx;
     }
