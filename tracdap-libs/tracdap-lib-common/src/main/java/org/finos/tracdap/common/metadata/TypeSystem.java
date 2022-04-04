@@ -159,7 +159,6 @@ public class TypeSystem {
         if (value == null)
             throw new NullPointerException("Descriptor requested for null value");
 
-        // TODO: Apply validation here? Do not return an unchecked descriptor
         if (value.hasType())
             return value.getType();
 
