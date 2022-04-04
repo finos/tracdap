@@ -118,10 +118,10 @@ public class TypeSystemValidator {
         if (!value.hasType()) {
 
             if (!value.hasOneof(V_VALUE))
-                return ctx.error(String.format("Type cannot be inferred for null value [%s]", ctx.fieldName()));
+                return ctx.error("Type cannot be inferred for null value");
 
             if (!TypeSystem.isPrimitive(value))
-                return ctx.error(String.format("Type cannot be inferred for non-primitive value [%s]", ctx.fieldName()));
+                return ctx.error("Type cannot be inferred for non-primitive value");
         }
 
         var expectedType = TypeSystem.descriptor(value);
@@ -134,10 +134,10 @@ public class TypeSystemValidator {
         if (!value.hasType()) {
 
             if (!value.hasOneof(V_VALUE))
-                return ctx.error(String.format("Type cannot be inferred for null value [%s]", ctx.fieldName()));
+                return ctx.error("Type cannot be inferred for null value");
 
             if (!TypeSystem.isPrimitive(value))
-                return ctx.error(String.format("Type cannot be inferred for non-primitive value [%s]", ctx.fieldName()));
+                return ctx.error("Type cannot be inferred for non-primitive value");
         }
 
         return ctx.apply(TypeSystemValidator::innerValue, Value.class, expectedType);
@@ -187,7 +187,7 @@ public class TypeSystemValidator {
 
     private static ValidationContext innerValue(Value value, TypeDescriptor expectedType, ValidationContext ctx) {
 
-        var wrongTypeMessage = String.format("Wrong type supplied for [%s]", ctx.fieldName());
+        var wrongTypeMessage = "Value does not match the expected type";
 
         ctx = ctx.push(V_TYPE)
                 .apply(CommonValidators::optional)
