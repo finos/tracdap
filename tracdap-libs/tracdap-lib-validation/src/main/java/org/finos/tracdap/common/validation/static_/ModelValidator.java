@@ -17,11 +17,15 @@
 package org.finos.tracdap.common.validation.static_;
 
 import org.finos.tracdap.common.validation.core.ValidationContext;
+import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.finos.tracdap.common.validation.ValidationConstants.MODEL_ENTRY_POINT;
 import static org.finos.tracdap.common.validation.ValidationConstants.MODEL_VERSION;
@@ -128,10 +132,13 @@ public class ModelValidator {
             Descriptors.FieldDescriptor outputsField,
             ValidationContext ctx) {
 
+        var knownIdentifiers = new HashMap<String, String>();
+
         ctx = ctx.pushMap(paramsField)
                 .applyMapKeys(CommonValidators::identifier)
                 .applyMapKeys(CommonValidators::notTracReserved)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
+                .applyMapKeys(uniqueContextCheck(knownIdentifiers, paramsField.getName()))
                 .applyMapValues(ModelValidator::modelParameter, ModelParameter.class)
                 .pop();
 
@@ -139,6 +146,7 @@ public class ModelValidator {
                 .applyMapKeys(CommonValidators::identifier)
                 .applyMapKeys(CommonValidators::notTracReserved)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
+                .applyMapKeys(uniqueContextCheck(knownIdentifiers, inputsField.getName()))
                 .applyMapValues(ModelValidator::modelInputSchema, ModelInputSchema.class)
                 .pop();
 
@@ -146,6 +154,7 @@ public class ModelValidator {
                 .applyMapKeys(CommonValidators::identifier)
                 .applyMapKeys(CommonValidators::notTracReserved)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
+                .applyMapKeys(uniqueContextCheck(knownIdentifiers, outputsField.getName()))
                 .applyMapValues(ModelValidator::modelOutputSchema, ModelOutputSchema.class)
                 .pop();
 
@@ -220,5 +229,26 @@ public class ModelValidator {
         }
 
         return ctx;
+    }
+
+    private static ValidationFunction.Typed<String> uniqueContextCheck(Map<String, String> knownIdentifiers, String fieldName) {
+
+        return (key, ctx) -> {
+
+            var lowerKey = key.toLowerCase();
+
+            if (knownIdentifiers.containsKey(lowerKey)) {
+
+                var err = String.format(
+                        "[%s] is already defined in [%s]",
+                        key,  knownIdentifiers.get(lowerKey));
+
+                return ctx.error(err);
+            }
+
+            knownIdentifiers.put(lowerKey, fieldName);
+
+            return ctx;
+        };
     }
 }
