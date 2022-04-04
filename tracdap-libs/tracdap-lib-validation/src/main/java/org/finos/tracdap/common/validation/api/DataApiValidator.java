@@ -270,6 +270,7 @@ public class DataApiValidator {
         ctx = ctx.push(FWR_NAME)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::fileName)
+                .apply(CommonValidators::notTracReserved)
                 .pop();
 
         ctx = ctx.push(FWR_MIME_TYPE)

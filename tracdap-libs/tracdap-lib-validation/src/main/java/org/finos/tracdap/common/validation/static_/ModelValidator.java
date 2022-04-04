@@ -109,7 +109,7 @@ public class ModelValidator {
                 .pop();
 
         ctx = ctx.push(pathField)
-                .apply(CommonValidators::required)
+                .apply(CommonValidators::optional)
                 .apply(CommonValidators::relativePath)
                 .pop();
 

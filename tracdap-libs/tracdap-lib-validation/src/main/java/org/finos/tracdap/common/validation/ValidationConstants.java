@@ -29,13 +29,30 @@ public class ValidationConstants {
             "image", "message", "model", "multipart",
             "text", "video");
 
-    public static final Pattern FILENAME_ILLEGAL_CHARS = Pattern.compile(".*[<>:\"/\\\\|?*].*");
-    public static final Pattern FILENAME_ILLEGAL_WHITESPACE = Pattern.compile(".*[\\s\\vR&&[^ ]].*");
-    public static final Pattern FILENAME_ILLEGAL_CTRL = Pattern.compile(".*\\p{Cntrl}.*");
+    public static final Pattern PATH_ILLEGAL_CHARS = Pattern.compile(".*[<>\"|?*].*");
+    public static final Pattern PATH_ILLEGAL_WHITESPACE = Pattern.compile(".*[\\s\\vR&&[^ ]].*");
+    public static final Pattern PATH_ILLEGAL_CTRL = Pattern.compile(".*\\p{Cntrl}.*");
+
+    public static final Pattern PATH_SEPARATORS = Pattern.compile("[/\\\\]");
+    public static final String UNIX_PATH_SEPARATOR = "/";
+    public static final String WINDOWS_PATH_SEPARATOR = "\\";
+
+    public static final Pattern PATH_SINGLE_DOT = Pattern.compile("\\A\\.\\Z");
+    public static final Pattern PATH_DOUBLE_DOT = Pattern.compile("\\A\\.\\.\\Z");
+
+    public static final Pattern FILENAME_ILLEGAL_CHARS = Pattern.compile(".*[:/\\\\].*");
     public static final Pattern FILENAME_ILLEGAL_START = Pattern.compile("\\A[ ].*");
     public static final Pattern FILENAME_ILLEGAL_ENDING = Pattern.compile(".*[. ]\\Z");
     public static final Pattern FILENAME_RESERVED = Pattern.compile(
             "\\A(COM\\d*|LPT\\d*|PRN|AUX|NUL)(\\..*)?\\Z", Pattern.CASE_INSENSITIVE);
+
+    // Relative path constraints
+    // Since : is illegal, C: and file: are illegal
+    // Anything starting with a slash is absolute
+    // UNC-style paths and empty path segments are picked up by the double slash
+    public static final Pattern RELATIVE_PATH_ILLEGAL_CHARS = Pattern.compile(".*[:].*");
+    public static final Pattern RELATIVE_PATH_IS_ABSOLUTE = Pattern.compile("\\A[/\\\\]");
+    public static final Pattern RELATIVE_PATH_DOUBLE_SLASH = Pattern.compile("[/\\\\]{2}");
 
     // Data item key is a logical key not a path
     // But a path-like structure is used to create unique, deterministic keys

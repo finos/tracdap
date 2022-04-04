@@ -305,22 +305,12 @@ public class CommonValidators {
 
     public static ValidationContext fileName(String value, ValidationContext ctx) {
 
+        ctx = ctx.apply(CommonValidators::pathAlwaysIllegal);
+
+        // Particular constraints for file names
+
         ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_CHARS, false,
-                "contains illegal characters", value, ctx);
-
-        ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_WHITESPACE, false,
-                "contains non-standard whitespace (tab, return, form-feed etc.)", value, ctx);
-
-        // Only check for ctrl characters if illegal whitespace is not present
-        // This is because non-standard whitespace is included in the ctrl chars
-
-        // There is a possibility ctrl chars are present as well and will not be reported
-        // In that case the error for ctrl chars will become visible when non-standard whitespace is removed
-
-        if (! ValidationConstants.FILENAME_ILLEGAL_WHITESPACE.matcher(value).matches())
-
-            ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_CTRL, false,
-                    "contains ASCII control characters", value, ctx);
+                "contains characters not allowed in a filename (:, / or \\)", value, ctx);
 
         ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_START, false,
                 "starts with a space character", value, ctx);
@@ -331,15 +321,93 @@ public class CommonValidators {
         ctx = regexMatch(ValidationConstants.FILENAME_RESERVED, false,
                 "is a reserved filename", value, ctx);
 
-        ctx = regexMatch(MetadataConstants.TRAC_RESERVED_IDENTIFIER, false,
-                "is a TRAC reserved identifier", value, ctx);
+        return ctx;
+    }
+
+    public static ValidationContext relativePath(String path, ValidationContext ctx) {
+
+        ctx = ctx.apply(CommonValidators::pathAlwaysIllegal);
+
+        if (path.contains(ValidationConstants.UNIX_PATH_SEPARATOR) &&
+                path.contains(ValidationConstants.WINDOWS_PATH_SEPARATOR)) {
+
+            ctx = ctx.error("Path contains both Windows and Unix separators (use one or the other, not both)");
+        }
+
+        // Particular constraints for relative paths
+
+        ctx = regexMatch(ValidationConstants.RELATIVE_PATH_ILLEGAL_CHARS, false,
+                "contains characters not allowed in a relative path (:)", path, ctx);
+
+        ctx = regexMatch(ValidationConstants.RELATIVE_PATH_IS_ABSOLUTE, false,
+                "is an absolute path", path, ctx);
+
+        ctx = regexMatch(ValidationConstants.RELATIVE_PATH_DOUBLE_SLASH, false,
+                "contains a double slash", path, ctx);
+
+        // Only attempt segment validation if there are no failures at the whole path level
+
+        if (ctx.failed())
+            return ctx;
+
+        var segments = path.split(ValidationConstants.PATH_SEPARATORS.pattern());
+
+        var singleDotPredicate = ValidationConstants.PATH_SINGLE_DOT.asPredicate();
+        var doubleDotPredicate = ValidationConstants.PATH_SINGLE_DOT.asPredicate();
+
+        for (var segment : segments) {
+
+            ctx = regexMatch(ValidationConstants.PATH_DOUBLE_DOT, false,
+                    "segment refers to parent directory", segment, ctx);
+
+            // Sometimes an empty relative path is needed, e.g. for the root of a model directory or storage bin
+            // In this case, a path of "." or "./" is allowed
+            // However, subdirectories such as ./sub_dir can and should be normalized to just "sub_dir"
+            // So, only allow single dot when the path consists of exactly one segment
+
+            if (segments.length > 1) {
+                ctx = regexMatch(ValidationConstants.PATH_SINGLE_DOT, false,
+                        "segment refers to itself and can be omitted", segment, ctx);
+            }
+
+            // Avoid multiple error messages per segment
+            if (singleDotPredicate.test(segment) || doubleDotPredicate.test(segment))
+                continue;
+
+            ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_CHARS, false,
+                    "segment contains characters illegal characters", segment, ctx);
+
+            ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_START, false,
+                    "segment starts with a space character", segment, ctx);
+
+            ctx = regexMatch(ValidationConstants.FILENAME_ILLEGAL_ENDING, false,
+                    "segment ends with a space or period character", segment, ctx);
+
+            ctx = regexMatch(ValidationConstants.FILENAME_RESERVED, false,
+                    "segment is a reserved filename", segment, ctx);
+        }
 
         return ctx;
     }
 
-    public static ValidationContext relativePath(String value, ValidationContext ctx) {
+    private static ValidationContext pathAlwaysIllegal(String path, ValidationContext ctx) {
 
-        // TODO: Relative path validator
+        ctx = regexMatch(ValidationConstants.PATH_ILLEGAL_CHARS, false,
+                "contains illegal characters", path, ctx);
+
+        ctx = regexMatch(ValidationConstants.PATH_ILLEGAL_WHITESPACE, false,
+                "contains non-standard whitespace (tab, return, form-feed etc.)", path, ctx);
+
+        // Only check for ctrl characters if illegal whitespace is not present
+        // This is because non-standard whitespace is included in the ctrl chars
+
+        // There is a possibility ctrl chars are present as well and will not be reported
+        // In that case the error for ctrl chars will become visible when non-standard whitespace is removed
+
+        if (! ValidationConstants.PATH_ILLEGAL_WHITESPACE.matcher(path).matches())
+
+            ctx = regexMatch(ValidationConstants.PATH_ILLEGAL_CTRL, false,
+                    "contains ASCII control characters", path, ctx);
 
         return ctx;
     }
@@ -351,7 +419,7 @@ public class CommonValidators {
         var matcher = regex.matcher(value);
 
         if (matcher.matches() ^ invertMatch) {
-            var err = String.format("Value of [%s] %s: [%s]", ctx.fieldName(), desc, value);
+            var err = String.format("[%s] %s: [%s]", ctx.fieldName(), desc, value);
             return ctx.error(err);
         }
 
