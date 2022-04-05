@@ -132,11 +132,22 @@
          */
         const setup = {};
 
+        // We need the following typedef for rpcImpl methods:
+        // @typedef {typeof $protobuf.rpc.Service} tracdap.setup.ServiceType
+
+        // The JSDoc generator for .d.ts files cannot handle type names with spaces
+        // So, use a placeholder instead, the real type is substituted in by api_builder.js
+
+        /**
+         * Type declaration for gRPC service classes
+         * @typedef {$SERVICE_TYPE} tracdap.setup.ServiceType
+         */
+
         /**
          * Create an rpcImpl for use in a web browser, requests will be sent to the page origin server
          * @function rpcImplForBrowser
          * @memberof tracdap.setup
-         * @param {$protobuf.rpc.Service} serviceClass The service class to create an rpcImpl for
+         * @param serviceClass {ServiceType} The service class to create an rpcImpl for
          * @returns {$protobuf.RPCImpl} An rpcImpl function that can be used with the specified service class
          */
         setup.rpcImplForBrowser = function(serviceClass) {
@@ -149,7 +160,7 @@
          * Create an rpcImpl that connects to a specific target
          * @function rpcImplForTarget
          * @memberof tracdap.setup
-         * @param {$protobuf.rpc.Service} serviceClass The service class to create an rpcImpl for
+         * @param serviceClass {ServiceType} The service class to create an rpcImpl for
          * @param {string} protocol The protocol to use for connection (either "http" or "https")
          * @param {string} host The host to connect to
          * @param {number} port The port to connect to
