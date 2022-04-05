@@ -1,4 +1,4 @@
-# ![TRAC Data & Analytics Platform](doc/_images/tracdap_horizontal.png | width=200px)
+# ![TRAC Data & Analytics Platform](doc/_images/tracdap_horizontal_400.png)
 
 *A next-generation data and analytics platform for use in highly regulated environments*
 
