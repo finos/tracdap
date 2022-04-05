@@ -106,7 +106,7 @@ function generateBasicTypeMapping(mappingDict) {
     return mappingCode;
 }
 
-function writeJsMapping(methodTypes, apiMapping) {
+function writeJsSubstitutions(methodTypes, apiMapping) {
 
     fs.readFile(jsOutFile, 'utf8', function (err, jsCode) {
 
@@ -123,13 +123,16 @@ function writeJsMapping(methodTypes, apiMapping) {
     });
 }
 
-function writeTsMapping(importMapping) {
+function writeTsSubstitutions(importMapping) {
 
     fs.readFile(tsOutFile, 'utf8', function (err, tsCode) {
 
         if (err) {
             return console.log(err);
         }
+
+        // Write substitutions for enum and basic type mappings
+        // Enums and basic types are mapped into the top level tracdap namespace
 
         const setupLocation = tsCode.indexOf("namespace setup {")
         const insertPoint = tsCode.lastIndexOf("\n", tsCode.lastIndexOf("\n", setupLocation) - 1);
@@ -140,11 +143,27 @@ function writeTsMapping(importMapping) {
             tsCode.slice(insertPoint)
         ].join("\n");
 
+        // Write substitution for $SERVICE_TYPE
+        // This is to get around a gap in the JSDoc generator for .d.ts files
+        // It cannot handle typedef statements using "typeof", which contain a space
+
+        // This could (should) be replaced with a more general approach,
+        // and maintain a set of variable substitutions in api_mapping.js
+
+        const serviceInsertPoint = tsCode.indexOf("$SERVICE_TYPE")
+
+        tsCode = [
+            tsCode.slice(0, serviceInsertPoint),
+            "typeof $protobuf.rpc.Service",
+            tsCode.slice(serviceInsertPoint + "$SERVICE_TYPE".length)
+        ].join("");
+
         fs.writeFile(tsOutFile, tsCode, 'utf8', function (err) {
             if (err) return console.log(err);
         });
     });
 }
+
 
 function main() {
 
@@ -155,7 +174,7 @@ function main() {
         const methodTypes = generateJsMapping(mapping.methodTypes, "", 2);
         const apiMappingDict = {...mapping.enumMapping, ...mapping.basicTypeMapping};
         const apiMapping = generateJsMapping(apiMappingDict, "$root.", 1);
-        writeJsMapping(methodTypes, apiMapping);
+        writeJsSubstitutions(methodTypes, apiMapping);
     });
 
     pbts.main(pbtsArgs, () => {
@@ -163,7 +182,7 @@ function main() {
         const enumMapping = generateEnumMapping(mapping.enumMapping);
         const basicTypeMapping = generateBasicTypeMapping(mapping.basicTypeMapping);
         const tsMapping = enumMapping + basicTypeMapping;
-        writeTsMapping(tsMapping);
+        writeTsSubstitutions(tsMapping);
     });
 }
 
