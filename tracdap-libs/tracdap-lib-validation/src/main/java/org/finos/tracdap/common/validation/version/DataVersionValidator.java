@@ -17,37 +17,41 @@
 package org.finos.tracdap.common.validation.version;
 
 import org.finos.tracdap.common.validation.core.ValidationContext;
+import org.finos.tracdap.common.validation.core.ValidationType;
+import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.DataDefinition;
 import org.finos.tracdap.metadata.SchemaDefinition;
 import org.finos.tracdap.metadata.TagSelector;
 import com.google.protobuf.Descriptors;
 
+import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
+
+@Validator(type = ValidationType.VERSION)
 public class DataVersionValidator {
 
     private static final Descriptors.Descriptor DATA_DEFINITION;
-    private static final Descriptors.FieldDescriptor DD_STORAGE_ID;
     private static final Descriptors.OneofDescriptor DD_SCHEMA_DEFINITION;
     private static final Descriptors.FieldDescriptor DD_SCHEMA_ID;
+    private static final Descriptors.FieldDescriptor DD_SCHEMA;
+    private static final Descriptors.FieldDescriptor DD_STORAGE_ID;
 
     static {
 
         DATA_DEFINITION = DataDefinition.getDescriptor();
-        DD_STORAGE_ID = field(DATA_DEFINITION, DataDefinition.STORAGEID_FIELD_NUMBER);
+        DD_SCHEMA_DEFINITION = field(DATA_DEFINITION, DataDefinition.SCHEMAID_FIELD_NUMBER).getContainingOneof();
         DD_SCHEMA_ID = field(DATA_DEFINITION, DataDefinition.SCHEMAID_FIELD_NUMBER);
-        DD_SCHEMA_DEFINITION = DD_SCHEMA_ID.getContainingOneof();
+        DD_SCHEMA = field(DATA_DEFINITION, DataDefinition.SCHEMA_FIELD_NUMBER);
+        DD_STORAGE_ID = field(DATA_DEFINITION, DataDefinition.STORAGEID_FIELD_NUMBER);
     }
 
-    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
-        return msg.findFieldByNumber(fieldNo);
-    }
-
+    @Validator
     public static ValidationContext data(DataDefinition current, DataDefinition prior, ValidationContext ctx) {
 
         ctx = ctx.pushOneOf(DD_SCHEMA_DEFINITION)
                 .apply(CommonValidators::sameOneOf)
-                .applyIf(CommonValidators::equalOrLaterVersion, TagSelector.class, prior.hasSchemaId())
-                .applyIf(SchemaVersionValidator::schema, SchemaDefinition.class, prior.hasSchema())
+                .applyOneOf(DD_SCHEMA_ID, CommonValidators::equalOrLaterVersion, TagSelector.class)
+                .applyOneOf(DD_SCHEMA, SchemaVersionValidator::schema, SchemaDefinition.class)
                 .pop();
 
         ctx = ctx.push(DD_STORAGE_ID)

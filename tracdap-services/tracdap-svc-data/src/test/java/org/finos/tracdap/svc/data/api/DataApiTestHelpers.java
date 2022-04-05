@@ -57,8 +57,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-import static org.finos.tracdap.svc.data.api.DataApiTestBase.TEST_TENANT;
-
 
 class DataApiTestHelpers {
 
@@ -130,12 +128,12 @@ class DataApiTestHelpers {
         return clientStreaming(grpcMethod, Flows.publish(Stream.of(request)));
     }
 
-    static FileReadRequest readRequest(TagHeader fileId) {
+    static FileReadRequest readRequest(String tenant, TagHeader fileId) {
 
         var fileSelector = MetadataUtil.selectorFor(fileId);
 
         return FileReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
+                .setTenant(tenant)
                 .setSelector(fileSelector)
                 .build();
     }

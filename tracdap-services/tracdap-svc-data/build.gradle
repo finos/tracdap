@@ -57,6 +57,7 @@ dependencies {
 
     // Make sure to use the correct version of Jackson
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "$jackson_databind_version"
     implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-csv', version: "$jackson_version"
 
     testImplementation project(':tracdap-lib-test')

@@ -16,11 +16,15 @@
 
 package org.finos.tracdap.svc.data.api;
 
+import io.netty.util.concurrent.DefaultEventExecutor;
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.Flows;
+import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.metadata.*;
 
 import org.finos.tracdap.test.data.SampleDataFormats;
+import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.helpers.TestResourceHelpers;
 import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
@@ -28,6 +32,7 @@ import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -44,17 +49,31 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 
-class DataRoundTripTest extends DataApiTestBase {
+class DataRoundTripTest {
+
+    private static final String TRAC_UNIT_CONFIG = "config/trac-unit.yaml";
+    private static final String TEST_TENANT = "ACME_CORP";
+    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
 
     private static final String BASIC_CSV_DATA = SampleDataFormats.BASIC_CSV_DATA_RESOURCE;
     private static final String BASIC_JSON_DATA = SampleDataFormats.BASIC_JSON_DATA_RESOURCE;
 
-    static final byte[] BASIC_CSV_CONTENT = TestResourceHelpers.loadResourceAsBytes(BASIC_CSV_DATA);
+    private static final byte[] BASIC_CSV_CONTENT = TestResourceHelpers.loadResourceAsBytes(BASIC_CSV_DATA);
 
-    private final List<Vector<Object>> BASIC_TEST_DATA = DataApiTestHelpers.decodeCsv(
+    private static final List<Vector<Object>> BASIC_TEST_DATA = DataApiTestHelpers.decodeCsv(
             SampleDataFormats.BASIC_TABLE_SCHEMA,
             List.of(ByteString.copyFrom(BASIC_CSV_CONTENT)));
 
+
+    @RegisterExtension
+    private static final PlatformTest platform = PlatformTest.forConfig(TRAC_UNIT_CONFIG)
+            .addTenant(TEST_TENANT)
+            .startMeta()
+            .startData()
+            .build();
+
+    IExecutionContext execContext = new ExecutionContext(new DefaultEventExecutor());
+    TracDataApiGrpc.TracDataApiStub dataClient = platform.dataClient();
 
     @Test
     void roundTrip_arrowStream() throws Exception {

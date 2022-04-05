@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.test.meta;
 
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -26,10 +27,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
@@ -44,6 +42,9 @@ public class TestData {
     public static final boolean KEEP_ORIGINAL_TAG_VERSION = false;
 
     public static final String TEST_TENANT = "ACME_CORP";
+
+
+    private static final Random random = new Random(Instant.now().getEpochSecond());
 
 
     public static ObjectDefinition dummyDefinitionForType(ObjectType objectType) {
@@ -156,7 +157,19 @@ public class TestData {
                         .setFieldName("widgets_ordered")
                         .setFieldType(BasicType.INTEGER)
                         .setFieldOrder(3)
-                        .setBusinessKey(true)))))
+                        .setBusinessKey(true))))
+
+                .putParts("part-root", DataDefinition.Part.newBuilder()
+                        .setPartKey(PartKey.newBuilder()
+                        .setPartType(PartType.PART_ROOT)
+                        .setOpaqueKey("part-root"))
+                        .setSnap(DataDefinition.Snap.newBuilder()
+                        .setSnapIndex(0)
+                        .addDeltas(DataDefinition.Delta.newBuilder()
+                        .setDeltaIndex(0)
+                        .setDataItem("data/table/" + UUID.randomUUID() + "/snap-0/delta-0-x123456")))
+                        .build()))
+
             .build();
     }
 
@@ -206,28 +219,34 @@ public class TestData {
 
     public static ObjectDefinition dummyStorageDef() {
 
+        var storageTimestamp = OffsetDateTime.now();
+
         return ObjectDefinition.newBuilder()
             .setObjectType(ObjectType.STORAGE)
             .setStorage(StorageDefinition.newBuilder()
             .putDataItems("dummy_item", StorageItem.newBuilder()
                 .addIncarnations(StorageIncarnation.newBuilder()
                 .setIncarnationIndex(1)
-                .setIncarnationTimestamp(MetadataCodec.encodeDatetime(OffsetDateTime.now()))
+                .setIncarnationTimestamp(MetadataCodec.encodeDatetime(storageTimestamp))
                 .setIncarnationStatus(IncarnationStatus.INCARNATION_AVAILABLE)
                 .addCopies(StorageCopy.newBuilder()
                     .setStorageKey("DUMMY_STORAGE")
                     .setStoragePath("path/to/the/dataset")
                     .setStorageFormat("AVRO")
+                    .setCopyTimestamp(MetadataCodec.encodeDatetime(storageTimestamp))
                     .setCopyStatus(CopyStatus.COPY_AVAILABLE)))
                     .build())).build();
     }
 
     public static ObjectDefinition nextStorageDef(ObjectDefinition definition) {
 
+        var storageTimestamp = OffsetDateTime.now();
+
         var archiveCopy = StorageCopy.newBuilder()
             .setStorageKey("DUMMY_ARCHIVE_STORAGE")
             .setStoragePath("path/to/the/dataset")
             .setStorageFormat("PARQUET")
+            .setCopyTimestamp(MetadataCodec.encodeDatetime(storageTimestamp))
             .setCopyStatus(CopyStatus.COPY_AVAILABLE);
 
         var archivedIncarnation = definition
@@ -250,29 +269,33 @@ public class TestData {
                 .setObjectType(ObjectType.MODEL)
                 .setModel(ModelDefinition.newBuilder()
                 .setLanguage("python")
-                .setRepository("trac-test-repo")
+                .setRepository("trac_test_repo")
                 .setPath("src/main/python")
-                .setPackage("trac-test-package")
                 .setVersion("trac-test-repo-1.2.3-RC4")
                 .setEntryPoint("trac_test.test1.SampleModel1")
                 .putParameters("param1", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.STRING)).build())
                 .putParameters("param2", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.INTEGER)).build())
                 .putInputs("input1", ModelInputSchema.newBuilder()
                         .setSchema(SchemaDefinition.newBuilder()
+                        .setSchemaType(SchemaType.TABLE)
                         .setTable(TableSchema.newBuilder()
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("field1")
-                                .setFieldType(BasicType.DATE))
+                                .setFieldType(BasicType.DATE)
+                                .setBusinessKey(true))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("field2")
+                                .setFieldType(BasicType.STRING)
+                                .setCategorical(true))
+                        .addFields(FieldSchema.newBuilder()
+                                .setFieldName("field3")
                                 .setFieldType(BasicType.DECIMAL)
                                 .setLabel("A display name")
-                                .setBusinessKey(true)
-                                .setCategorical(true)
                                 .setFormatCode("GBP"))))
                         .build())
                 .putOutputs("output1", ModelOutputSchema.newBuilder()
                         .setSchema(SchemaDefinition.newBuilder()
+                        .setSchemaType(SchemaType.TABLE)
                         .setTable(TableSchema.newBuilder()
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("checksum_field")
@@ -296,14 +319,20 @@ public class TestData {
                 .setObjectType(ObjectType.FLOW)
                 .setFlow(FlowDefinition.newBuilder()
                 .putNodes("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
-                .putNodes("main_model", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE).build())
                 .putNodes("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .putNodes("main_model", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.MODEL_NODE)
+                        .setModelStub(FlowModelStub.newBuilder()
+                        .putParameters("param_1", TypeSystem.descriptor(BasicType.FLOAT))
+                        .addInputs("input_1")
+                        .addOutputs("output_1"))
+                        .build())
                 .addEdges(FlowEdge.newBuilder()
-                        .setTarget(FlowSocket.newBuilder().setNode("main_model").setSocket("input_1"))
-                        .setSource(FlowSocket.newBuilder().setNode("input_1")))
+                        .setSource(FlowSocket.newBuilder().setNode("input_1"))
+                        .setTarget(FlowSocket.newBuilder().setNode("main_model").setSocket("input_1")))
                 .addEdges(FlowEdge.newBuilder()
-                        .setTarget(FlowSocket.newBuilder().setNode("output_1"))
-                        .setSource(FlowSocket.newBuilder().setNode("main_model").setSocket("output_1"))))
+                        .setSource(FlowSocket.newBuilder().setNode("main_model").setSocket("output_1"))
+                        .setTarget(FlowSocket.newBuilder().setNode("output_1"))))
                 .build();
     }
 
@@ -313,15 +342,16 @@ public class TestData {
         // Ok for e.g. DAL testing, but will fail metadata validation
 
         var targetSelector = TagSelector.newBuilder()
-                .setObjectType(ObjectType.FLOW)
+                .setObjectType(ObjectType.MODEL)
                 .setObjectId(UUID.randomUUID().toString())
-                .setObjectVersion(1);
+                .setObjectVersion(1)
+                .setLatestTag(true);
 
         return ObjectDefinition.newBuilder()
                 .setObjectType(ObjectType.JOB)
                 .setJob(JobDefinition.newBuilder()
                 .setJobType(JobType.RUN_MODEL)
-                .setRunModel( RunModelJob.newBuilder()
+                .setRunModel(RunModelJob.newBuilder()
                 .setModel(targetSelector)))
                 .build();
     }
@@ -351,7 +381,7 @@ public class TestData {
         return ObjectDefinition.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
                 .setCustom(CustomDefinition.newBuilder()
-                .setCustomType("REPORT")
+                .setCustomSchemaType("REPORT")
                 .setCustomSchemaVersion(2)
                 .setCustomData(ByteString.copyFromUtf8(jsonReportDef)))
                 .build();
@@ -505,8 +535,8 @@ public class TestData {
 
             case BOOLEAN: return ! ((Boolean) originalObject);
             case INTEGER: return ((Long) originalObject) + 1L;
-            case FLOAT: return ((Double) originalObject) * 2.0D;
-            case DECIMAL: return ((BigDecimal) originalObject).multiply(new BigDecimal(2));
+            case FLOAT: return ((Double) originalObject) + 2.0D;
+            case DECIMAL: return ((BigDecimal) originalObject).add(new BigDecimal(2));
             case STRING: return originalObject.toString() + " and friends";
             case DATE: return ((LocalDate) originalObject).plusDays(1);
             case DATETIME: return ((OffsetDateTime) originalObject).plusHours(1);
@@ -539,5 +569,76 @@ public class TestData {
     public static TagSelector selectorForTag(Tag tag) {
 
         return selectorForTag(tag.getHeader());
+    }
+
+    public static Value randomPrimitive(BasicType basicType) {
+
+        var typeDescriptor = TypeSystem.descriptor(basicType);
+
+        switch (basicType) {
+
+            case BOOLEAN:
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setBooleanValue(true)
+                        .build();
+
+            case INTEGER:
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setIntegerValue(random.nextLong())
+                        .build();
+
+            case FLOAT:
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setFloatValue(random.nextDouble())
+                        .build();
+
+            case DECIMAL:
+
+                var decimalValue = BigDecimal.valueOf(random.nextDouble());
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setDecimalValue(DecimalValue.newBuilder()
+                        .setDecimal(decimalValue.toPlainString()))
+                        .build();
+
+            case STRING:
+
+                var stringValue = "random_string_" + random.nextLong();
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setStringValue(stringValue)
+                        .build();
+
+            case DATE:
+
+                var dateValue = MetadataCodec.encodeDate(LocalDate.now());
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setDateValue(dateValue)
+                        .build();
+
+            case DATETIME:
+
+                var datetimeValue = MetadataCodec.encodeDatetime(Instant.now());
+
+                return Value.newBuilder()
+                        .setType(typeDescriptor)
+                        .setDatetimeValue(datetimeValue)
+                        .build();
+
+            default:
+
+                throw new EUnexpected();
+        }
+
     }
 }

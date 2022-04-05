@@ -29,4 +29,8 @@ dependencies {
     implementation group: 'com.amazonaws', name: 'aws-java-sdk-s3', version: "$aws_sdk_version"
     implementation group: 'com.amazonaws', name: 'aws-java-sdk-kms', version: "$aws_sdk_version"
     implementation group: 'com.amazonaws', name: 'aws-java-sdk-core', version: "$aws_sdk_version"
+
+    // Force the version of Jackson (only latest stable will ever pass compliance)
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "$jackson_databind_version"
 }

@@ -159,7 +159,6 @@ public class TypeSystem {
         if (value == null)
             throw new NullPointerException("Descriptor requested for null value");
 
-        // TODO: Apply validation here? Do not return an unchecked descriptor
         if (value.hasType())
             return value.getType();
 
@@ -193,5 +192,10 @@ public class TypeSystem {
             throw new NullPointerException("Is-primitive check requested for null type");
 
         return PRIMITIVE_TYPES.contains(basicType);
+    }
+
+    public static BasicType valueCaseType(Value value) {
+
+        return VALUE_CASE_MAPPING.getOrDefault(value.getValueCase(), BasicType.UNRECOGNIZED);
     }
 }

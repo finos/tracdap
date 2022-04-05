@@ -35,4 +35,8 @@ dependencies {
         // Do not pull in the JavaX annotation JAR, which is licensed under CDDL
         exclude group: 'javax.annotation', module: 'javax.annotation-api'
     }
+
+    // Force the version of Jackson (only latest stable will ever pass compliance)
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "$jackson_databind_version"
 }

@@ -20,9 +20,6 @@ import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
-import org.finos.tracdap.svc.meta.validation.MetadataValidator;
-import com.google.protobuf.Descriptors;
-import com.google.protobuf.Message;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -36,59 +33,23 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.TAG_FIRST_VERS
 
 public class MetadataWriteService {
 
-    private static final Descriptors.OneofDescriptor OBJECT_DEFINITION_ONEOF = ObjectDefinition
-            .getDescriptor()
-            .findFieldByNumber(ObjectDefinition.DATA_FIELD_NUMBER)
-            .getContainingOneof();
-
-    private final List<ObjectType> NEW_VALIDATION_TYPES = List.of(ObjectType.FILE, ObjectType.SCHEMA);
-    private final Validator newValidator = new Validator();
-
+    private final Validator validator = new Validator();
     private final IMetadataDal dal;
-
 
     public MetadataWriteService(IMetadataDal dal) {
         this.dal = dal;
     }
 
     public CompletableFuture<TagHeader> createObject(
-            String tenant, ObjectType objectType,
+            String tenant,
             ObjectDefinition definition,
-            List<TagUpdate> tagUpdates,
-            boolean apiTrust) {
-
-        // Original validation
-
-        var validator = new MetadataValidator();
-
-        var normalDefinition = validator.normalizeObjectType(definition);
-        validator.definitionMatchesType(normalDefinition, objectType);
-        validator.tagAttributesAreValid(tagUpdates);
-        validator.checkAndThrow();
-
-        if (apiTrust == MetadataConstants.PUBLIC_API) {
-            validator.tagAttributesAreNotReserved(tagUpdates);
-            validator.checkAndThrowPermissions();
-        }
-
-        // New structured validation is only available for some object types
-
-        if (NEW_VALIDATION_TYPES.contains(objectType)) {
-
-            var objectTypeOneOf = definition.getOneofFieldDescriptor(OBJECT_DEFINITION_ONEOF);
-            var objectTypeDef = (Message) definition.getField(objectTypeOneOf);
-
-            newValidator.validateFixedObject(objectTypeDef);
-        }
-
-        // Validation complete!
-
+            List<TagUpdate> tagUpdates) {
 
         var objectId = UUID.randomUUID();
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var newHeader = TagHeader.newBuilder()
-                .setObjectType(objectType)
+                .setObjectType(definition.getObjectType())
                 .setObjectId(objectId.toString())
                 .setObjectVersion(OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
@@ -98,7 +59,7 @@ public class MetadataWriteService {
 
         var newTag = Tag.newBuilder()
                 .setHeader(newHeader)
-                .setDefinition(normalDefinition)
+                .setDefinition(definition)
                 .build();
 
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
@@ -109,48 +70,14 @@ public class MetadataWriteService {
 
 
     public CompletableFuture<TagHeader> updateObject(
-            String tenant, ObjectType objectType,
-            TagSelector priorVersion,
+            String tenant, TagSelector priorVersion,
             ObjectDefinition definition,
-            List<TagUpdate> tagUpdates,
-            boolean apiTrust) {
-
-        var validator = new MetadataValidator();
-
-        // Check whether versioning is supported for this object type
-        // If not, we want to raise an error without reporting any other validation issues
-        validator.typeSupportsVersioning(objectType);
-        validator.checkAndThrow();
-
-        var normalDefinition = validator.normalizeObjectType(definition);
-        validator.validObjectID(priorVersion);
-        validator.priorVersionMatchesType(priorVersion, objectType);
-        validator.definitionMatchesType(normalDefinition, objectType);
-        validator.tagAttributesAreValid(tagUpdates);
-        validator.checkAndThrow();
-
-        if (apiTrust == MetadataConstants.PUBLIC_API) {
-            validator.tagAttributesAreNotReserved(tagUpdates);
-            validator.checkAndThrowPermissions();
-        }
-
-        // New structured validation is only available for some object types
-
-        if (NEW_VALIDATION_TYPES.contains(objectType)) {
-
-            var objectTypeOneOf = definition.getOneofFieldDescriptor(OBJECT_DEFINITION_ONEOF);
-            var objectTypeDef = (Message) definition.getField(objectTypeOneOf);
-
-            newValidator.validateFixedObject(objectTypeDef);
-        }
-
-        // Validation complete!
-
+            List<TagUpdate> tagUpdates) {
 
         return dal.loadObject(tenant, priorVersion)
 
                 .thenCompose(priorTag ->
-                updateObject(tenant, priorTag, normalDefinition, tagUpdates));
+                updateObject(tenant, priorTag, definition, tagUpdates));
     }
 
     private CompletableFuture<TagHeader> updateObject(
@@ -158,17 +85,8 @@ public class MetadataWriteService {
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
 
-        // TODO: Version increment validation
-
-        // New structured validation is only available for some object types
-        if (NEW_VALIDATION_TYPES.contains(definition.getObjectType())) {
-
-            var objectTypeOneOf = definition.getOneofFieldDescriptor(OBJECT_DEFINITION_ONEOF);
-            var currentTypeDef = (Message) definition.getField(objectTypeOneOf);
-            var priorTypeDef = (Message) priorTag.getDefinition().getField(objectTypeOneOf);
-
-            newValidator.validateVersion(currentTypeDef, priorTypeDef);
-        }
+        // Validate version increment on the object
+        validator.validateVersion(definition, priorTag.getDefinition());
 
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
@@ -193,25 +111,8 @@ public class MetadataWriteService {
     }
 
     public CompletableFuture<TagHeader> updateTag(
-            String tenant, ObjectType objectType,
-            TagSelector priorVersion,
-            List<TagUpdate> tagUpdates,
-            boolean apiTrust) {
-
-        var validator = new MetadataValidator();
-
-        validator.validObjectID(priorVersion);
-        validator.priorVersionMatchesType(priorVersion, objectType);
-        validator.tagAttributesAreValid(tagUpdates);
-        validator.checkAndThrow();
-
-        if (apiTrust == MetadataConstants.PUBLIC_API) {
-            validator.tagAttributesAreNotReserved(tagUpdates);
-            validator.checkAndThrowPermissions();
-        }
-
-        // Validation complete!
-
+            String tenant, TagSelector priorVersion,
+            List<TagUpdate> tagUpdates) {
 
         return dal.loadObject(tenant, priorVersion)
 
@@ -259,32 +160,16 @@ public class MetadataWriteService {
     }
 
     public CompletableFuture<TagHeader> createPreallocatedObject(
-            String tenant, ObjectType objectType,
-            TagSelector priorVersion,
+            String tenant, TagSelector priorVersion,
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
-
-        var validator = new MetadataValidator();
-
-        var normalDefinition = validator.normalizeObjectType(definition);
-        validator.validObjectID(priorVersion);
-        validator.priorVersionMatchesType(priorVersion, objectType);
-        validator.definitionMatchesType(normalDefinition, objectType);
-        validator.tagAttributesAreValid(tagUpdates);
-        validator.checkAndThrow();
-
-        // Preallocated objects are always on the trusted API
-        // So no need to check reserved tag attributes
-
-        // Validation complete!
-
 
         // In this case priorVersion refers to the preallocated ID
         var objectId = UUID.fromString(priorVersion.getObjectId());
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var newHeader = TagHeader.newBuilder()
-                .setObjectType(objectType)
+                .setObjectType(definition.getObjectType())
                 .setObjectId(objectId.toString())
                 .setObjectVersion(OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
@@ -294,7 +179,7 @@ public class MetadataWriteService {
 
         var newTag = Tag.newBuilder()
                 .setHeader(newHeader)
-                .setDefinition(normalDefinition)
+                .setDefinition(definition)
                 .build();
 
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);

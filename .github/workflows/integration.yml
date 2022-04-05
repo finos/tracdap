@@ -48,6 +48,15 @@ jobs:
       - name: Slow tests
         run: ./gradlew integration -DintegrationTags="slow"
 
+      # If the tests fail, make the output available for download
+      - name: Store failed test results
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: junit-test-results
+          path: build/modules/*/reports/**
+          retention-days: 7
+
 
   end-to-end:
 
@@ -199,3 +208,12 @@ jobs:
 
       - name: Integration Tests
         run: ./gradlew integration -DintegrationTags="int-metadb"
+
+      # If the tests fail, make the output available for download
+      - name: Store failed test results
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: junit-test-results
+          path: build/modules/*/reports/**
+          retention-days: 7

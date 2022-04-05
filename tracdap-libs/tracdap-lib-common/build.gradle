@@ -46,6 +46,7 @@ dependencies {
 
     // Config parser uses Jackson for YAML and JSON
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "$jackson_databind_version"
     implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: "$jackson_version"
 
     // Logging facade is an API dependency

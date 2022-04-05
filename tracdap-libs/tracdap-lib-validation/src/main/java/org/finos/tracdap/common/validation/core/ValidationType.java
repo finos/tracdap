@@ -17,7 +17,8 @@
 package org.finos.tracdap.common.validation.core;
 
 public enum ValidationType {
-    FIXED,
+    STATIC,
     VERSION,
-    REFERENTIAL
+    REFERENTIAL,
+    UNDEFINED
 }

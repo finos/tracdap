@@ -21,6 +21,7 @@ import org.finos.tracdap.common.exception.EValidationGap;
 import org.finos.tracdap.metadata.*;
 
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
@@ -388,6 +389,8 @@ public class MetadataCodec {
         }
     }
 
+    public static final DecimalFormat DECIMAL_FORMAT;
+
     public static final DateTimeFormatter ISO_DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
 
     // Using DateTimeFormatter.ISO_OFFSET_DATE_TIME results in > 6 decimal points.
@@ -420,4 +423,10 @@ public class MetadataCodec {
             .toFormatter();
 
     // private static final DateTimeFormatter ISO_DATETIME_FORMAT = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+
+    static {
+
+        DECIMAL_FORMAT = new DecimalFormat();
+        DECIMAL_FORMAT.setParseBigDecimal(true);
+    }
 }

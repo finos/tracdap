@@ -18,12 +18,14 @@ package org.finos.tracdap.common.validation.version;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.validation.core.ValidationContext;
-import org.finos.tracdap.metadata.DatetimeValue;
-import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Descriptors;
 
 import java.util.Objects;
+
+import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
 
 public class CommonValidators {
@@ -31,25 +33,26 @@ public class CommonValidators {
     private static final Descriptors.Descriptor TAG_SELECTOR;
     private static final Descriptors.FieldDescriptor OBJECT_TYPE;
     private static final Descriptors.FieldDescriptor OBJECT_ID;
-    private static final Descriptors.FieldDescriptor LATEST_OBJECT;
-    private static final Descriptors.FieldDescriptor LATEST_TAG;
     private static final Descriptors.OneofDescriptor OBJECT_CRITERIA;
+    private static final Descriptors.FieldDescriptor OBJECT_VERSION;
+    private static final Descriptors.FieldDescriptor OBJECT_ASOF;
     private static final Descriptors.OneofDescriptor TAG_CRITERIA;
+    private static final Descriptors.FieldDescriptor TAG_VERSION;
+    private static final Descriptors.FieldDescriptor TAG_ASOF;
 
     static {
 
         TAG_SELECTOR = TagSelector.getDescriptor();
         OBJECT_TYPE = field(TAG_SELECTOR, TagSelector.OBJECTTYPE_FIELD_NUMBER);
         OBJECT_ID = field(TAG_SELECTOR, TagSelector.OBJECTID_FIELD_NUMBER);
-        LATEST_OBJECT = field(TAG_SELECTOR, TagSelector.LATESTOBJECT_FIELD_NUMBER);
-        LATEST_TAG = field(TAG_SELECTOR, TagSelector.LATESTTAG_FIELD_NUMBER);
-        OBJECT_CRITERIA = LATEST_OBJECT.getContainingOneof();
-        TAG_CRITERIA = LATEST_TAG.getContainingOneof();
+        OBJECT_CRITERIA = field(TAG_SELECTOR, TagSelector.LATESTOBJECT_FIELD_NUMBER).getContainingOneof();
+        OBJECT_VERSION = field(TAG_SELECTOR, TagSelector.OBJECTVERSION_FIELD_NUMBER);
+        OBJECT_ASOF = field(TAG_SELECTOR, TagSelector.OBJECTASOF_FIELD_NUMBER);
+        TAG_CRITERIA = field(TAG_SELECTOR, TagSelector.LATESTTAG_FIELD_NUMBER).getContainingOneof();
+        TAG_VERSION = field(TAG_SELECTOR, TagSelector.TAGVERSION_FIELD_NUMBER);
+        TAG_ASOF = field(TAG_SELECTOR, TagSelector.TAGASOF_FIELD_NUMBER);
     }
 
-    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
-        return msg.findFieldByNumber(fieldNo);
-    }
 
     public static ValidationContext exactMatch(Object current, Object prior, ValidationContext ctx) {
 
@@ -59,7 +62,7 @@ public class CommonValidators {
 
             var err = String.format(
                     "Value of [%s] must not change between versions: prior = [%s], new = [%s]",
-                    ctx.fieldName(), prior.toString(), current.toString());
+                    ctx.fieldName(), displayValue(prior), displayValue(current));
 
             return ctx.error(err);
         }
@@ -105,11 +108,11 @@ public class CommonValidators {
         if (!ctx.isOneOf())
             throw new EUnexpected();
 
-        if (ctx.field().getNumber() != ctx.priorField().getNumber()) {
+        if (ctx.field().getNumber() != ctx.prior().field().getNumber()) {
 
             var err = String.format(
                     "Selected one of [%s] must not change between versions: prior = [%s], new = [%s]",
-                    ctx.oneOf().getName(), ctx.priorFieldName(), ctx.fieldName());
+                    ctx.oneOf().getName(), ctx.prior().fieldName(), ctx.fieldName());
 
             return ctx.error(err);
         }
@@ -129,8 +132,8 @@ public class CommonValidators {
 
         ctx = ctx.pushOneOf(OBJECT_CRITERIA)
                 .apply(CommonValidators::sameOneOf)
-                .applyIf(CommonValidators::equalOrGreater, Integer.class, prior.hasObjectVersion())
-                .applyIf(CommonValidators::equalOrAfter, DatetimeValue.class, prior.hasObjectAsOf())
+                .applyOneOf(OBJECT_VERSION, CommonValidators::equalOrGreater, Integer.class)
+                .applyOneOf(OBJECT_ASOF, CommonValidators::equalOrAfter, DatetimeValue.class)
                 .pop();
 
         if (ctx.getErrors().size() > initialErrCount)
@@ -138,10 +141,24 @@ public class CommonValidators {
 
         ctx = ctx.pushOneOf(TAG_CRITERIA)
                 .apply(CommonValidators::sameOneOf)
-                .applyIf(CommonValidators::equalOrGreater, Integer.class, prior.hasTagVersion())
-                .applyIf(CommonValidators::equalOrAfter, DatetimeValue.class, prior.hasTagAsOf())
+                .applyOneOf(TAG_VERSION, CommonValidators::equalOrGreater, Integer.class)
+                .applyOneOf(TAG_ASOF, CommonValidators::equalOrAfter, DatetimeValue.class)
                 .pop();
 
         return ctx;
+    }
+
+    private static String displayValue(Object value) {
+
+        if (value instanceof DatetimeValue)
+            return ((DatetimeValue) value).getIsoDatetime();
+
+        if (value instanceof Value) {
+
+            if (TypeSystem.isPrimitive((Value) value))
+                return MetadataCodec.decodeValue((Value) value).toString();
+        }
+
+        return value.toString();
     }
 }

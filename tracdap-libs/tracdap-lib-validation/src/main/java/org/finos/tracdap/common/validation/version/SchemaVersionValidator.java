@@ -18,12 +18,18 @@ package org.finos.tracdap.common.validation.version;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.core.ValidationContext;
+import org.finos.tracdap.common.validation.core.ValidationType;
+import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Descriptors;
 
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
+
+
+@Validator(type = ValidationType.VERSION)
 public class SchemaVersionValidator {
 
     private static final Descriptors.Descriptor SCHEMA_DEFINITION;
@@ -37,10 +43,8 @@ public class SchemaVersionValidator {
         SD_TABLE = field(SCHEMA_DEFINITION, SchemaDefinition.TABLE_FIELD_NUMBER);
     }
 
-    static Descriptors.FieldDescriptor field(Descriptors.Descriptor msg, int fieldNo) {
-        return msg.findFieldByNumber(fieldNo);
-    }
 
+    @Validator
     public static ValidationContext schema(SchemaDefinition current, SchemaDefinition prior, ValidationContext ctx) {
 
         ctx = ctx.push(SD_SCHEMA_TYPE)
@@ -60,6 +64,7 @@ public class SchemaVersionValidator {
         }
     }
 
+    @Validator
     public static ValidationContext tableSchema(TableSchema current, TableSchema prior, ValidationContext ctx) {
 
         var priorFields = prior

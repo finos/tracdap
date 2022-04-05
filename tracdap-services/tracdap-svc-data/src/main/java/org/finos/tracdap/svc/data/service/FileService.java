@@ -18,6 +18,7 @@ package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
+import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.DataServiceConfig;
 import org.finos.tracdap.metadata.*;
@@ -129,7 +130,7 @@ public class FileService {
                 .thenAccept(x -> state.file = createFileDef(state.fileId, name, mimeType, state.storageId))
                 .thenAccept(x -> state.storage = createStorageDef(
                         config.getDefaultStorageKey(),  state.objectTimestamp,
-                        state.fileId, name, mimeType, random))
+                        state.fileId, name, mimeType))
 
                 // Write file content stream to the storage layer
                 .thenCompose(x -> writeDataItem(
@@ -175,7 +176,7 @@ public class FileService {
                 .thenAccept(x -> state.file = updateFileDef(prior.file, state.fileId, name, mimeType))
                 .thenAccept(x -> state.storage = updateStorageDef(
                         prior.storage, config.getDefaultStorageKey(), state.objectTimestamp,
-                        state.fileId, name, mimeType, random))
+                        state.fileId, name, mimeType))
 
                 .thenAccept(x -> validator.validateVersion(state.file, prior.file))
 
@@ -359,20 +360,20 @@ public class FileService {
     // METADATA BUILDERS
     // -----------------------------------------------------------------------------------------------------------------
 
-    private static FileDefinition createFileDef(
+    private FileDefinition createFileDef(
             TagHeader fileHeader, String fileName, String mimeType, TagHeader storageId) {
 
         return buildFileDef(FileDefinition.newBuilder(), fileHeader, fileName, mimeType, selectorForLatest(storageId));
     }
 
-    private static FileDefinition updateFileDef(
+    private FileDefinition updateFileDef(
             FileDefinition priorFile,
             TagHeader fileHeader, String fileName, String mimeType) {
 
         return buildFileDef(priorFile.toBuilder(), fileHeader, fileName, mimeType, priorFile.getStorageId());
     }
 
-    private static FileDefinition buildFileDef(
+    private FileDefinition buildFileDef(
             FileDefinition.Builder fileDef,
             TagHeader fileHeader, String fileName, String mimeType,
             TagSelector storageId) {
@@ -396,41 +397,55 @@ public class FileService {
                 .build();
     }
 
-    private static StorageDefinition createStorageDef(
+    private StorageDefinition createStorageDef(
             String storageKey, Instant storageTimestamp,
-            TagHeader fileHeader, String fileName, String mimeType, Random random) {
+            TagHeader fileHeader, String fileName, String mimeType) {
 
         return buildStorageDef(
                 StorageDefinition.newBuilder(), storageKey, storageTimestamp,
-                fileHeader, fileName, mimeType, random);
+                fileHeader, fileName, mimeType);
     }
 
-    private static StorageDefinition updateStorageDef(
+    private StorageDefinition updateStorageDef(
             StorageDefinition priorStorage, String storageKey, Instant storageTimestamp,
-            TagHeader fileHeader, String fileName, String mimeType, Random random) {
+            TagHeader fileHeader, String fileName, String mimeType) {
 
         return buildStorageDef(
                 priorStorage.toBuilder(), storageKey, storageTimestamp,
-                fileHeader, fileName, mimeType, random);
+                fileHeader, fileName, mimeType);
     }
 
-    private static StorageDefinition buildStorageDef(
+    private StorageDefinition buildStorageDef(
             StorageDefinition.Builder storageDef, String storageKey, Instant storageTimestamp,
-            TagHeader fileHeader, String fileName, String mimeType, Random random) {
+            TagHeader fileHeader, String fileName, String mimeType) {
 
         var fileId = UUID.fromString(fileHeader.getObjectId());
         var fileVersion = fileHeader.getObjectVersion();
 
         var dataItem = String.format(FILE_DATA_ITEM_TEMPLATE, fileId, fileVersion);
 
-        // It is possible to call updateFile twice on the same prior version at the same time
-        // In this case both calls will try to create the same file at the same time
+        // We are going to add this data item to the storage definition
+        // If the item already exists in storage, then the file object must have been superseded
+        // If we can spot the update already, there is no need to continue with the write operation
+
+        if (storageDef.containsDataItems(dataItem)) {
+
+            var err = String.format("File version [%d] has been superseded", fileVersion - 1);
+
+            log.error(err);
+            log.error("(updates are present in the storage definition)");
+
+            throw new EMetadataDuplicate(err);
+        }
+
+        // It is possible to call updateFile twice on the same prior version at the same time,
+        // In this case, the check above passes and both calls try to create the same file at the same time
         // It is also possible that a failed call leaves behind a file without creating a valid metadata record
-        // In this case, it would not be possible for an update to succeed one the orphans file is there
+        // In this case, it would not be possible for an update to succeed as an orphan file is there
         // Best efforts checks can be made but will never cover all possible concurrent code paths
 
         // To get around this problem, we add some random hex digits into the storage path
-        // Update collisions are still resolved when the metadata record is created
+        // Update collisions are still resolved when the final metadata record is created
         // In this case, the request error handler *should* clean up the file
         // For orphaned files, there is still a chance the random bytes collide
         // But this can be resolved by retrying
@@ -466,7 +481,7 @@ public class FileService {
                 .build();
     }
 
-    private static List<TagUpdate> createFileAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
+    private List<TagUpdate> createFileAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
 
         var nameAttr = TagUpdate.newBuilder()
                 .setAttrName(TRAC_FILE_NAME_ATTR)
@@ -497,7 +512,7 @@ public class FileService {
         return Stream.concat(tags.stream(), fileAttrs.stream()).collect(Collectors.toList());
     }
 
-    private static List<TagUpdate> updateFileAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
+    private List<TagUpdate> updateFileAttrs(List<TagUpdate> tags, FileDefinition fileDef) {
 
         // Extension and mime type are not allowed to change between file versions
 
@@ -518,7 +533,7 @@ public class FileService {
         return Stream.concat(tags.stream(), fileAttrs.stream()).collect(Collectors.toList());
     }
 
-    private static List<TagUpdate> createStorageAttrs(List<TagUpdate> tags, TagHeader objectId) {
+    private List<TagUpdate> createStorageAttrs(List<TagUpdate> tags, TagHeader objectId) {
 
         // TODO: Special metadata Value type for handling tag selectors
         var selector = selectorForLatest(objectId);

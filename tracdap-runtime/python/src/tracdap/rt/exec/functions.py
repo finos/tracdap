@@ -289,7 +289,8 @@ class StaticDataSpecFunc(NodeFunction[_data.DataItemSpec]):
 
 class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
 
-    DATA_ITEM_TEMPLATE = "data/{}/{}/{}/snap-{:d}/delta-{:d}-x{:0>6x}"
+    DATA_ITEM_TEMPLATE = "data/{}/{}/{}/snap-{:d}/delta-{:d}"
+    STORAGE_PATH_TEMPLATE = "data/{}/{}/{}/snap-{:d}/delta-{:d}-x{:0>6x}"
 
     RANDOM = random.Random()
     RANDOM.seed()
@@ -307,20 +308,25 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
 
         data_id = self.node.data_obj_id
         storage_id = self.node.storage_obj_id
-        # TODO: pass this in from somewhere
-        object_timestamp = datetime.datetime.utcnow()
+
+        # TODO: pass the object timestamp in from somewhere
+
+        # Note that datetime.utcnow() creates a datetime with no zone
+        # datetime.now(utc) creates a datetime with an explicit UTC zone
+        # The latter is more precise, also missing zones are rejected by validation
+        # (lenient validation might infer the zone, this should be limited to front-facing APIs)
+
+        object_timestamp = datetime.datetime.now(datetime.timezone.utc)
 
         part_key = meta.PartKey("part-root", meta.PartType.PART_ROOT)
         snap_index = 0
         delta_index = 0
 
         data_type = data_view.schema.schemaType.name.lower()
-        suffix_bytes = random.randint(0, 1 << 24)
 
         data_item = self.DATA_ITEM_TEMPLATE.format(
             data_type, data_id.objectId,
-            part_key.opaqueKey, snap_index, delta_index,
-            suffix_bytes)
+            part_key.opaqueKey, snap_index, delta_index)
 
         delta = meta.DataDefinition.Delta(delta_index, data_item)
         snap = meta.DataDefinition.Snap(snap_index, [delta])
@@ -333,7 +339,12 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
 
         storage_key = self.storage.default_storage_key()
         storage_format = self.storage.default_storage_format()
-        storage_path = data_item
+        storage_suffix_bytes = random.randint(0, 1 << 24)
+
+        storage_path = self.DATA_ITEM_TEMPLATE.format(
+            data_type, data_id.objectId,
+            part_key.opaqueKey, snap_index, delta_index,
+            storage_suffix_bytes)
 
         storage_copy = meta.StorageCopy(
             storage_key, storage_path, storage_format,
@@ -461,7 +472,6 @@ class ImportModelFunc(NodeFunction[meta.ModelDefinition]):
             language=self.node.import_details.language,
             repository=self.node.import_details.repository,
             path=self.node.import_details.path,
-            package=self.node.import_details.package,
             entryPoint=self.node.import_details.entryPoint,
             version=self.node.import_details.version)
 

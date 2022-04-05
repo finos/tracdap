@@ -33,6 +33,7 @@ dependencies {
 
     // Jackson used for implementations of formats included as standard
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "$jackson_databind_version"
     implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-csv', version: "$jackson_version"
 
     testImplementation project(':tracdap-lib-test')

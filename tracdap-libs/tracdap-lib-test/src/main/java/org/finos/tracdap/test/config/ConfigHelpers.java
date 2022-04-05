@@ -36,7 +36,12 @@ public class ConfigHelpers {
 
         // URL of config file resource in JAR or on file system
 
-        var rootConfigUrl = ConfigHelpers.class
+        var rootConfigUrl = Files.exists(Paths.get(rootConfigFile))
+            ? Paths.get(rootConfigFile)
+                .toAbsolutePath()
+                .normalize()
+                .toUri().toURL()
+            : ConfigHelpers.class
                 .getClassLoader()
                 .getResource(rootConfigFile);
 

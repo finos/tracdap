@@ -19,94 +19,70 @@ package org.finos.tracdap.svc.meta.api;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
-import org.finos.tracdap.svc.meta.dal.IMetadataDal;
-import org.finos.tracdap.svc.meta.services.MetadataReadService;
-import org.finos.tracdap.svc.meta.services.MetadataSearchService;
-import org.finos.tracdap.svc.meta.services.MetadataWriteService;
-
-import org.finos.tracdap.test.meta.JdbcIntegration;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
-import io.grpc.inprocess.InProcessChannelBuilder;
-import io.grpc.inprocess.InProcessServerBuilder;
-import io.grpc.testing.GrpcCleanupRule;
-
-import java.util.UUID;
-import java.util.function.Function;
-
-import org.finos.tracdap.test.meta.IDalTestable;
-import org.finos.tracdap.test.meta.JdbcUnit;
+import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.meta.TestData;
 
-import org.junit.Rule;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+
+import java.util.UUID;
+import java.util.function.Function;
 
 import static org.finos.tracdap.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 
-abstract class MetadataWriteApiTest implements IDalTestable {
+abstract class MetadataWriteApiTest {
 
-    private IMetadataDal dal;
+    public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
+    public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
 
-    public void setDal(IMetadataDal dal) {
-        this.dal = dal;
-    }
+    protected TracMetadataApiGrpc.TracMetadataApiBlockingStub readApi, publicApi;
+    protected TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub trustedApi;
 
     // Include this test case as a unit test
-    @ExtendWith(JdbcUnit.class)
-    static class UnitTest extends MetadataWriteApiTest {}
+    static class UnitTest extends MetadataWriteApiTest {
+
+        @RegisterExtension
+        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+                .addTenant(TEST_TENANT)
+                .startMeta()
+                .build();
+
+        @BeforeEach
+        void setup() {
+            readApi = publicApi = platform.metaClientBlocking();
+            trustedApi = platform.metaClientTrustedBlocking();
+        }
+    }
 
     // Include this test case for integration against different database backends
     @org.junit.jupiter.api.Tag("integration")
     @org.junit.jupiter.api.Tag("int-metadb")
-    @ExtendWith(JdbcIntegration.class)
-    static class IntegrationTest extends MetadataWriteApiTest {}
+    static class IntegrationTest extends MetadataWriteApiTest {
 
-    @Rule
-    final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
+        private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
 
-    private TracMetadataApiGrpc.TracMetadataApiBlockingStub publicApi;
-    private TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub trustedApi;
-    private TracMetadataApiGrpc.TracMetadataApiBlockingStub readApi;
+        @RegisterExtension
+        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+                .addTenant(TEST_TENANT)
+                .runDbDeploy(false)
+                .startMeta()
+                .build();
 
-    @BeforeEach
-    void setup() throws Exception {
-
-        var serverName = InProcessServerBuilder.generateName();
-
-        var readService = new MetadataReadService(dal);
-        var writeService = new MetadataWriteService(dal);
-        var searchService = new MetadataSearchService(dal);
-
-        var publicApiImpl = new TracMetadataApi(readService, writeService, searchService);
-        var trustedApiImpl = new TrustedMetadataApi(readService, writeService, searchService);
-
-        // Create a server, add service, start, and register for automatic graceful shutdown.
-        grpcCleanup.register(InProcessServerBuilder
-                .forName(serverName)
-                .directExecutor()
-                .addService(publicApiImpl)
-                .addService(trustedApiImpl)
-                .build()
-                .start());
-
-        trustedApi = TrustedMetadataApiGrpc.newBlockingStub(
-                // Create a client channel and register for automatic graceful shutdown.
-                grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
-
-        publicApi = TracMetadataApiGrpc.newBlockingStub(
-                // Create a client channel and register for automatic graceful shutdown.
-                grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build()));
-
-        readApi = publicApi;
+        @BeforeEach
+        void setup() {
+            readApi = publicApi = platform.metaClientBlocking();
+            trustedApi = platform.metaClientTrustedBlocking();
+        }
     }
-
 
     // -----------------------------------------------------------------------------------------------------------------
     // CREATE OBJECT
@@ -220,7 +196,6 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     }
 
     @Test
-    @Disabled("Object definition content validation is not implemented yet")
     void createObject_invalidContent() {
 
         var validFlow = TestData.dummyFlowDef();
@@ -308,9 +283,13 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
+        // At present this is enforced through validation, so it should come back as INVALID_ATTRIBUTE
+        // In the future if public/trusted APIs are unified and reserved attrs are managed with permissions,
+        // Then the result would be PERMISSION_DENIED instead
+
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObject(writeRequest));
-        assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         assertDoesNotThrow(() -> trustedApi.createObject(writeRequest));
     }
@@ -320,6 +299,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     // UPDATE OBJECT
     // -----------------------------------------------------------------------------------------------------------------
 
+    // Versioned types, as listed in MetadataConstants.VERSIONED_OBJECT_TYPES
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
                 names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
@@ -328,6 +308,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         updateObject_ok(objectType, request -> trustedApi.updateObject(request));
     }
 
+    // Versioned types that are also publicly writable
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
                 names = {"SCHEMA", "CUSTOM"})
@@ -336,9 +317,10 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         updateObject_ok(objectType, request -> publicApi.updateObject(request));
     }
 
+    // Versioned types that are not publicly writable
     @ParameterizedTest
-    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
-                names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "SCHEMA", "FLOW", "CUSTOM"})
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
+                names = {"DATA", "FILE", "STORAGE"})
     void updateObject_publicTypesNotAllowed(ObjectType objectType) {
 
         var v1SavedTag = updateObject_prepareV1(objectType);
@@ -358,6 +340,7 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
     }
 
+    // Object types not included in MetadataConstants.VERSIONED_OBJECT_TYPES
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
                 names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
@@ -686,7 +669,6 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     }
 
     @Test
-    @Disabled("Object definition content validation is not implemented yet")
     void updateObject_invalidContent() {
 
         // V1 object created and saved
@@ -778,9 +760,13 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
+        // At present this is enforced through validation, so it should come back as INVALID_ATTRIBUTE
+        // In the future if public/trusted APIs are unified and reserved attrs are managed with permissions,
+        // Then the result would be PERMISSION_DENIED instead
+
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
-        assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         assertDoesNotThrow(() -> trustedApi.updateObject(v2WriteRequest));
     }
@@ -1185,9 +1171,13 @@ abstract class MetadataWriteApiTest implements IDalTestable {
 
         // Setting reserved attributes is allowed through the trusted API but not the public API
 
+        // At present this is enforced through validation, so it should come back as INVALID_ATTRIBUTE
+        // In the future if public/trusted APIs are unified and reserved attrs are managed with permissions,
+        // Then the result would be PERMISSION_DENIED instead
+
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateTag(t2WriteRequest));
-        assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         assertDoesNotThrow(() -> trustedApi.updateTag(t2WriteRequest));
     }
@@ -1255,6 +1245,8 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setObjectId(newObjectId.toString())
+                .setObjectVersion(0)
+                .setTagVersion(0)
                 .build();
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
@@ -1324,6 +1316,8 @@ abstract class MetadataWriteApiTest implements IDalTestable {
         var preallocateSelector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.MODEL)
                 .setObjectId(preallocateHeader.getObjectId())
+                .setObjectVersion(0)
+                .setTagVersion(0)
                 .build();
 
         var newObject = TestData.dummyDefinitionForType(ObjectType.MODEL);
@@ -1413,9 +1407,48 @@ abstract class MetadataWriteApiTest implements IDalTestable {
     }
 
     @Test
-    @Disabled("Content validation not implemented yet")
     void preallocateObject_saveInvalidContent() {
-        fail();
+
+        var preallocateRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .build();
+
+        var preallocateHeader = trustedApi.preallocateId(preallocateRequest);
+        var preallocateSelector = selectorForTag(preallocateHeader);
+
+        var validSchema = TestData.dummySchemaDef();
+
+        // Create a flow with an invalid node graph, this should get picked up by the validation layer
+
+        var brokenTableSchema = validSchema.getSchema().toBuilder()
+                .setTable(validSchema.getSchema().getTable().toBuilder()
+                .addFields(FieldSchema.newBuilder()
+                        .setFieldName("# invalid_identifier")
+                        .setFieldType(BasicType.ARRAY)
+                        .setFieldOrder(-1)
+                        .setLabel("This is a totally invalid field")))
+                .build();
+
+        var invalidSchema = validSchema.toBuilder()
+                .setSchema(brokenTableSchema)
+                .build();
+
+        var tagToSave = TestData.dummyTag(invalidSchema, TestData.NO_HEADER);
+        var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+
+        // Try to save the flow with a broken graph, should fail validation
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setPriorVersion(preallocateSelector)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(invalidSchema)
+                .addAllTagUpdates(tagUpdates)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObject(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
     }
 
     @Test

@@ -16,10 +16,19 @@
 
 package org.finos.tracdap.svc.data.api;
 
+import io.netty.util.concurrent.DefaultEventExecutor;
+import org.finos.tracdap.api.TracDataApiGrpc;
+import org.finos.tracdap.api.TracMetadataApiGrpc;
+import org.finos.tracdap.common.concurrent.ExecutionContext;
+import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import org.finos.tracdap.test.helpers.PlatformTest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
+
+import java.time.Duration;
 
 import static org.finos.tracdap.svc.data.api.DataApiTestHelpers.readRequest;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
@@ -27,7 +36,24 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-public class TenantSeparationTest extends DataApiTestBase {
+public class TenantSeparationTest {
+
+    private static final String TRAC_UNIT_CONFIG = "config/trac-unit.yaml";
+    private static final String TEST_TENANT = "ACME_CORP";
+    private static final String TEST_TENANT_2 = "SOME_OTHER_CORP";
+    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+
+    @RegisterExtension
+    private static final PlatformTest platform = PlatformTest.forConfig(TRAC_UNIT_CONFIG)
+            .addTenant(TEST_TENANT)
+            .addTenant(TEST_TENANT_2)
+            .startMeta()
+            .startData()
+            .build();
+
+    IExecutionContext execContext = new ExecutionContext(new DefaultEventExecutor());
+    TracMetadataApiGrpc.TracMetadataApiFutureStub metaClient = platform.metaClientFuture();
+    TracDataApiGrpc.TracDataApiStub dataClient = platform.dataClient();
 
     @Test
     void testCreateFile_tenantOmitted() {
@@ -137,7 +163,7 @@ public class TenantSeparationTest extends DataApiTestBase {
         var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, FileOperationsTest.BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
-        var readRequest = readRequest(v1Id);
+        var readRequest = readRequest(TEST_TENANT, v1Id);
 
         var noTenant = readRequest.toBuilder().clearTenant().build();
         var noTenantResult = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, noTenant, execContext);
@@ -152,7 +178,7 @@ public class TenantSeparationTest extends DataApiTestBase {
         var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, FileOperationsTest.BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
-        var readRequest = readRequest(v1Id);
+        var readRequest = readRequest(TEST_TENANT, v1Id);
 
         var invalidTenant = readRequest.toBuilder().setTenant("£$%^**!\0\n/`¬").build();
         var invalidTenantResult = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, invalidTenant, execContext);
@@ -167,7 +193,7 @@ public class TenantSeparationTest extends DataApiTestBase {
         var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, FileOperationsTest.BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
-        var readRequest = readRequest(v1Id);
+        var readRequest = readRequest(TEST_TENANT, v1Id);
 
         var unknownTenant = readRequest.toBuilder().setTenant("UNKNOWN").build();
         var unknownTenantResult = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, unknownTenant, execContext);
@@ -185,7 +211,7 @@ public class TenantSeparationTest extends DataApiTestBase {
         var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, FileOperationsTest.BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);
         var v1Id = resultOf(createFile);
-        var readRequest = readRequest(v1Id);
+        var readRequest = readRequest(TEST_TENANT, v1Id);
 
         var crossTenant = readRequest.toBuilder().setTenant(TEST_TENANT_2).build();
         var crossTenantResult = DataApiTestHelpers.serverStreamingDiscard(dataClient::readFile, crossTenant, execContext);

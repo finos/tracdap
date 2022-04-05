@@ -21,6 +21,7 @@
     ],
 
     "definition": {
+    "objectType": "FLOW",
     "flow": {
 
         "nodes": {

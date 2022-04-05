@@ -19,6 +19,7 @@ package org.finos.tracdap.svc.orch.service;
 import org.finos.tracdap.common.config.ConfigFormat;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
+import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.config.*;
 import org.finos.tracdap.metadata.JobStatusCode;
 
@@ -52,6 +53,8 @@ public class JobManagementService {
     private final ScheduledExecutorService executorService;
 
     private ScheduledFuture<?> pollingTask;
+
+    private final Validator validator = new Validator();
 
     public JobManagementService(
             JobLifecycle jobLifecycle,
@@ -216,6 +219,15 @@ public class JobManagementService {
             var jobResultBytes = jobExecutor.readFile(execState, "result", jobResultFile);
 
             jobState.jobResult = decodeProto(jobResultBytes, ConfigFormat.JSON, JobResult.class, JobResult.newBuilder());
+
+            // If the validator is extended to cover the config interface,
+            // The top level job result could be validated directly
+
+            for (var result : jobState.jobResult.getResultsMap().entrySet()) {
+
+                log.info("Validating job result [{}]", result.getKey());
+                validator.validateFixedObject(result.getValue());
+            }
 
             jobLifecycle.processJobResult(jobState).toCompletableFuture().join();
         }
