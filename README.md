@@ -1,4 +1,4 @@
-# TRAC Data & Analytics Platform
+# ![TRAC Data & Analytics Platform](doc/_images/tracdap_horizontal_400.png)
 
 *A next-generation data and analytics platform for use in highly regulated environments*
 
@@ -45,16 +45,16 @@ https://github.com/finos/tracdap/actions/workflows/packaging.yml)
 https://tracdap.finos.org/en/stable/?badge=stable)
 
 
-The current release series (0.4.x) is intended for reference and experimentation.
-It includes the metadata service, data service and core data engine, runtime engine
-for Python and preview versions of the orchestration service and platform Gateway.
-This release can be used to prototype client applications (e.g. web UIs), to build
-and run models and to run small calculation workflows.
+The current release series (0.4.x) is intended for model development and prototyping.
+It provides an end-to-end workflow to build and run individual models in a local
+environment. It also provides the platform APIs needed to build client applications
+such as web tools or system client system integrations.
 
-At the moment TRAC's API calls and metadata structures are subject to change between 
-versions, including between point versions. As the platform evolves these APIs will
-stabilise before eventually being frozen for TRAC version 1.0, after which they may 
-be added to but not removed or changed.
+The TRAC metadata structures and API calls are mostly complete. Metadata compatibility
+is ensured within a release series starting from version 0.4.0 - the 0.4.x series
+will be compatible with 0.4.0 but changes may be introduced in 0.5.0. The metadata
+model will continue to stabilise before eventually being frozen for version 1.0.0,
+after which it may be added to but no fields will be removed or changed.
 
 For more information see the
 [development roadmap](https://github.com/finos/tracdap/wiki/Development-Roadmap).
