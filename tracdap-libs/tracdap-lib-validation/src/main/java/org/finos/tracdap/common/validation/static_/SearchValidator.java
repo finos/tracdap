@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.validation.static_;
 
+import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
@@ -171,8 +172,13 @@ public class SearchValidator {
                 .apply(TypeSystemValidator::value, Value.class)
                 .pop();
 
-        ctx = ctx.apply(SearchValidator::operatorMatchesType, SearchTerm.class);
-        ctx = ctx.apply(SearchValidator::valueMatchesType, SearchTerm.class);
+        // Only attempt type comparisons if there are no other failures for the search term
+        // In particular, do not attempt type inference on invalid types!
+
+        if (!ctx.failed()) {
+            ctx = ctx.apply(SearchValidator::operatorMatchesType, SearchTerm.class);
+            ctx = ctx.apply(SearchValidator::valueMatchesType, SearchTerm.class);
+        }
 
         return ctx;
     }
@@ -220,7 +226,10 @@ public class SearchValidator {
 
     private static ValidationContext valueMatchesType(SearchTerm msg, ValidationContext ctx) {
 
-        var searchValueType = msg.getSearchValue().getType();
+        // Only called if the individual fields in the search term are already validated
+        // In particular, do not attempt type inference on invalid types!
+
+        var searchValueType = TypeSystem.descriptor(msg.getSearchValue());
 
         if (msg.getOperator() == SearchOperator.IN && searchValueType.getBasicType() != BasicType.ARRAY) {
 
