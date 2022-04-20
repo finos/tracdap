@@ -86,5 +86,5 @@ class UsingDataModel(trac.TracModel):
 
 
 if __name__ == "__main__":
-    import trac.rt.launch as launch
+    import tracdap.rt.launch as launch
     launch.launch_model(UsingDataModel, "using_data.yaml", "../sys_config.yaml")
