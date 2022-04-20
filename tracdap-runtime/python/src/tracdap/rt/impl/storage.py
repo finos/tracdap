@@ -445,11 +445,16 @@ class _CsvStorageFormat(IDataFormat):
             if not pa.types.is_decimal(column_type):
                 continue
 
-            # Format string using the scale of the column as the maximum d.p.
-            column_format = f".{column_type.scale}g"
+            # Ensure the full information from the column is recorded in text form
+            # Use the scale of the column as the maximum d.p., then strip away any unneeded trailing chars
+
+            def format_decimal(d: pa.Decimal128Scalar):
+                base_format = f".{column_type.scale}f"
+                base_str = format(d.as_py(), base_format)
+                return base_str.rstrip('0').rstrip('.')
 
             raw_column: pa.Array = table.column(column_index)
-            str_column = pa.array(map(lambda d: format(d.as_py(), column_format), raw_column), pa.utf8())
+            str_column = pa.array(map(format_decimal, raw_column), pa.utf8())
             str_field = pa.field(table.schema.names[column_index], pa.utf8())
 
             table = table \
