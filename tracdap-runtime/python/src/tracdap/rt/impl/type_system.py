@@ -228,11 +228,14 @@ def convert_datetime_value(raw_value: tp.Any) -> meta.Value:
 
 # Matches TRAC_ARROW_TYPE_MAPPING in ArrowSchema, tracdap-lib-data
 
+__TRAC_DECIMAL_PRECISION = 38
+__TRAC_DECIMAL_SCALE = 12
+
 __TRAC_TO_ARROW_TYPE_MAPPING = {
     meta.BasicType.BOOLEAN: pa.bool_(),
     meta.BasicType.INTEGER: pa.int64(),
     meta.BasicType.FLOAT: pa.float64(),
-    meta.BasicType.DECIMAL: pa.decimal128(38, 12),
+    meta.BasicType.DECIMAL: pa.decimal128(__TRAC_DECIMAL_PRECISION, __TRAC_DECIMAL_SCALE),
     meta.BasicType.STRING: pa.utf8(),
     meta.BasicType.DATE: pa.date32(),
     meta.BasicType.DATETIME: pa.timestamp("ms", tz=None)
@@ -264,3 +267,7 @@ def trac_to_arrow_basic_type(trac_basic_type: meta.BasicType) -> pa.DataType:
         raise ex.ETracInternal(f"Cannot convert TRAC data type [{trac_basic_type}] for use with Apache Arrow")
 
     return arrow_type
+
+
+def trac_arrow_decimal_type() -> pa.Decimal128Type:
+    return pa.decimal128(__TRAC_DECIMAL_PRECISION, __TRAC_DECIMAL_SCALE)

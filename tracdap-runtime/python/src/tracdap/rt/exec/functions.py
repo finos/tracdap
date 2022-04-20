@@ -34,6 +34,7 @@ import json
 import random
 
 import pyarrow as pa
+import pyarrow.compute as pc
 import yaml
 import uuid
 
@@ -451,6 +452,21 @@ class SaveDataFunc(NodeFunction, _LoadSaveDataFunc):
         data_item = _ctx_lookup(self.node.data_item_id, ctx)
         df = data_item.pandas
         table = pa.Table.from_pandas(df, preserve_index=False)  # noqa
+
+        # Bring computed decimal values into TRAC-standard decimal format
+        # TODO: Create a data-standardization layer and move this functionality there
+
+        trac_decimal = _types.trac_arrow_decimal_type()
+
+        for i in range(len(table.schema.types)):
+            if pa.types.is_decimal(table.schema.types[i]):
+
+                col_name = table.schema.names[i]
+                col_rounded = pc.round(table.column(i), ndigits=trac_decimal.scale)  # noqa
+                col_typed = pc.cast(col_rounded, trac_decimal)
+
+                table = table.remove_column(i)
+                table = table.add_column(i, col_name, col_typed)
 
         # Assumption that dataset is a table, and not some other schema type
 
