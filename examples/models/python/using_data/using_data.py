@@ -62,7 +62,7 @@ class UsingDataModel(trac.TracModel):
         customer_loans = ctx.get_pandas_table("customer_loans")
 
         if filter_defaults:
-            customer_loans.loc[:, :] = customer_loans[customer_loans["loan_condition_cat"] == 0]
+            customer_loans = customer_loans[customer_loans["loan_condition_cat"] == 0]
 
         customer_loans.loc[:, "gross_profit_unweighted"] = \
             customer_loans["total_pymnt"] - \
