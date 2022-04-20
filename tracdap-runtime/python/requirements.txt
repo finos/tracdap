@@ -1,4 +1,7 @@
 
+# Baseline support for Arrow, on series 6.x
+pyarrow >= 6.0.0, < 7.0.0
+
 # Baseline support for Pandas on series 1.x
 # Try to avoid supporting the 0.x series!
 pandas >= 1.0.0, < 2.0.0
