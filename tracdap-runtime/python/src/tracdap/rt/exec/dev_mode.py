@@ -92,10 +92,17 @@ class DevModeTranslator:
             data_id = util.new_object_id(meta.ObjectType.DATA)
             storage_id = util.new_object_id(meta.ObjectType.STORAGE)
 
+            if is_input and job_config.job.jobType == meta.JobType.RUN_MODEL:
+                model_def = job_config.resources[util.object_key(job_config.job.runModel.model)]
+                schema = model_def.model.inputs[data_key].schema
+            else:
+                schema = None
+
             data_obj, storage_obj = cls._process_job_io(
                 sys_config, sys_config_dir,
                 data_key, data_value, data_id, storage_id,
-                new_unique_file=not is_input)
+                new_unique_file=not is_input,
+                schema=schema)
 
             translated_resources[util.object_key(data_id)] = data_obj
             translated_resources[util.object_key(storage_id)] = storage_obj
@@ -294,7 +301,7 @@ class DevModeTranslator:
     def _process_job_io(
             cls, sys_config, sys_config_dir,
             data_key, data_value, data_id, storage_id,
-            new_unique_file=False):
+            new_unique_file=False, schema: tp.Optional[meta.SchemaDefinition] = None):
 
         if isinstance(data_value, str):
             storage_path = data_value
@@ -338,7 +345,8 @@ class DevModeTranslator:
 
         data_obj, storage_obj = cls._generate_input_definition(
             data_id, storage_id, storage_key, storage_path, storage_format,
-            snap_index=snap_version, delta_index=1, incarnation_index=1)
+            snap_index=snap_version, delta_index=1, incarnation_index=1,
+            schema=schema)
 
         return data_obj, storage_obj
 
@@ -346,7 +354,8 @@ class DevModeTranslator:
     def _generate_input_definition(
             cls, data_id: meta.TagHeader, storage_id: meta.TagHeader,
             storage_key: str, storage_path: str, storage_format: str,
-            snap_index: int, delta_index: int, incarnation_index: int) \
+            snap_index: int, delta_index: int, incarnation_index: int,
+            schema: tp.Optional[meta.SchemaDefinition] = None) \
             -> (meta.ObjectDefinition, meta.ObjectDefinition):
 
         part_key = meta.PartKey(
@@ -369,13 +378,16 @@ class DevModeTranslator:
             snap=snap)
 
         data_def = meta.DataDefinition(parts={})
+        data_def.parts[part_key.opaqueKey] = part
+
+        if schema is not None:
+            data_def.schema = schema
+        else:
+            data_def.schema = meta.SchemaDefinition(schemaType=meta.SchemaType.TABLE, table=meta.TableSchema())
 
         data_def.storageId = meta.TagSelector(
             meta.ObjectType.STORAGE, storage_id.objectId,
             objectVersion=storage_id.objectVersion, latestTag=True)
-
-        data_def.schema = meta.SchemaDefinition(schemaType=meta.SchemaType.TABLE, table=meta.TableSchema())
-        data_def.parts[part_key.opaqueKey] = part
 
         storage_copy = meta.StorageCopy(
             storageKey=storage_key,
