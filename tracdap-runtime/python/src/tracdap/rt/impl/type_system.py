@@ -27,6 +27,7 @@
 import typing as tp
 import decimal
 import datetime as dt
+import pyarrow as pa
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
@@ -223,3 +224,43 @@ def convert_datetime_value(raw_value: tp.Any) -> meta.Value:
         return meta.Value(type_desc, datetimeValue=meta.DatetimeValue(isoDatetime=datetime_value.isoformat()))
 
     raise ex.ETracInternal(f"Value of type [{type(raw_value)}] cannot be converted to {meta.BasicType.DATETIME.name}")
+
+
+# Matches TRAC_ARROW_TYPE_MAPPING in ArrowSchema, tracdap-lib-data
+
+__TRAC_TO_ARROW_TYPE_MAPPING = {
+    meta.BasicType.BOOLEAN: pa.bool_(),
+    meta.BasicType.INTEGER: pa.int64(),
+    meta.BasicType.FLOAT: pa.float64(),
+    meta.BasicType.DECIMAL: pa.decimal128(38, 12),
+    meta.BasicType.STRING: pa.utf8(),
+    meta.BasicType.DATE: pa.date32(),
+    meta.BasicType.DATETIME: pa.timestamp("ms", tz=None)
+}
+
+
+def trac_to_arrow_schema(trac_schema: meta.SchemaDefinition) -> pa.Schema:
+
+    if trac_schema.schemaType != meta.SchemaType.TABLE:
+        raise ex.ETracInternal(f"Schema type [{trac_schema.schemaType}] cannot be converted for Apache Arrow")
+
+    arrow_fields = [
+        (f.fieldName, trac_to_arrow_basic_type(f.fieldType))
+        for f in trac_schema.table.fields]
+
+    return pa.schema(arrow_fields, metadata={})
+
+
+def trac_to_arrow_type(trac_type: meta.TypeDescriptor) -> pa.DataType:
+
+    return trac_to_arrow_basic_type(trac_type.basicType)
+
+
+def trac_to_arrow_basic_type(trac_basic_type: meta.BasicType) -> pa.DataType:
+
+    arrow_type = __TRAC_TO_ARROW_TYPE_MAPPING.get(trac_basic_type)
+
+    if arrow_type is None:
+        raise ex.ETracInternal(f"Cannot convert TRAC data type [{trac_basic_type}] for use with Apache Arrow")
+
+    return arrow_type
