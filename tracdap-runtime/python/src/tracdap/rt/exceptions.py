@@ -150,6 +150,15 @@ class EStorageConfig(EStorage):
     pass
 
 
+class EStorageFormat(EStorage):
+
+    """
+    Storage format is either not supported or not configured
+    """
+
+    pass
+
+
 class EStorageCommunication(EStorage):
 
     """
