@@ -31,7 +31,11 @@ import datetime as dt
 import dataclasses as dc
 import enum
 
-import pandas as pd
+import pyarrow as pa
+import pyarrow.csv as pa_csv
+import pyarrow.json as pa_json
+import pyarrow.feather as pa_ft
+import pyarrow.parquet as pa_pq
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
@@ -128,17 +132,19 @@ class IFileStorage:
 class IDataStorage:
 
     @abc.abstractmethod
-    def read_pandas_table(
-            self, schema: _meta.TableSchema,
+    def read_table(
+            self,
             storage_path: str, storage_format: str,
+            schema: tp.Optional[pa.Schema],
             storage_options: tp.Dict[str, tp.Any]) \
-            -> pd.DataFrame:
+            -> pa.Table:
         pass
 
     @abc.abstractmethod
-    def write_pandas_table(
-            self, schema: _meta.TableSchema, df: pd.DataFrame,
+    def write_table(
+            self,
             storage_path: str, storage_format: str,
+            table: pa.Table,
             storage_options: tp.Dict[str, tp.Any],
             overwrite: bool = False):
         pass
@@ -146,6 +152,86 @@ class IDataStorage:
     @abc.abstractmethod
     def query_table(self):
         pass
+
+
+class IDataFormat:
+
+    @abc.abstractmethod
+    def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
+        pass
+
+    @abc.abstractmethod
+    def write_table(self, target: tp.BinaryIO, table: pa.Table):
+        pass
+
+
+class FormatManager:
+
+    __formats: tp.Dict[str, IDataFormat.__class__] = dict()
+    __extensions: tp.Dict[str, IDataFormat.__class__] = dict()
+
+    __extension_to_format: tp.Dict[str, str] = dict()
+    __format_to_extension: tp.Dict[str, str] = dict()
+
+    @classmethod
+    def register_data_format(
+            cls, format_code: str,
+            format_impl: IDataFormat.__class__):
+
+        cls.__formats[format_code.lower()] = format_impl
+
+        for extension, impl in cls.__extensions.items():
+            if impl == format_impl:
+                cls.__extension_to_format[extension] = format_code
+                cls.__format_to_extension[format_code] = extension
+
+    @classmethod
+    def register_extension(
+            cls, extension: str,
+            format_impl: IDataFormat.__class__):
+
+        if extension.startswith("."):
+            extension = extension[1:]
+
+        cls.__extensions[extension.lower()] = format_impl
+
+        for format_code, impl in cls.__formats.items():
+            if impl == format_impl:
+                cls.__extension_to_format[extension] = format_code
+                cls.__format_to_extension[format_code] = extension
+
+    @classmethod
+    def get_data_format(cls, format_code: str) -> IDataFormat:
+
+        format_impl = cls.__formats.get(format_code.lower())
+
+        if format_impl is None:
+            raise _ex.EStorageFormat(f"Unsupported storage format [{format_code}]")
+
+        return format_impl.__call__()
+
+    @classmethod
+    def extension_for_format(cls, format_code: str) -> str:
+
+        extension = cls.__format_to_extension.get(format_code.lower())
+
+        if extension is None:
+            raise _ex.EStorageFormat(f"Unsupported storage format [{format_code}]")
+
+        return extension
+
+    @classmethod
+    def format_for_extension(cls, extension: str) -> str:
+
+        if extension.startswith("."):
+            extension = extension[1:]
+
+        format_code = cls.__extension_to_format[extension]
+
+        if format_code is None:
+            raise _ex.EStorageFormat(f"No storage format is registered for file extension [{extension}]")
+
+        return extension
 
 
 class StorageManager:
@@ -236,38 +322,7 @@ class StorageManager:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class _StorageFormat:
-
-    @abc.abstractmethod
-    def read_pandas(self, src, schema: _meta.TableSchema, options: dict) -> pd.DataFrame:
-        pass
-
-    @abc.abstractmethod
-    def write_pandas(self, tgt, schema: _meta.TableSchema, data: pd.DataFrame, options: dict):
-        pass
-
-
-class _CsvStorageFormat(_StorageFormat):
-
-    def read_pandas(self, src, schema: _meta.TableSchema, options: dict):
-
-        columns = list(map(lambda f: f.fieldName, schema.fields)) if schema.fields else None
-
-        return pd.read_csv(src, usecols=columns, **options)
-
-    def write_pandas(self, tgt, schema: _meta.TableSchema, data: pd.DataFrame, options: dict):
-
-        columns = list(map(lambda f: f.fieldName, schema.fields)) if schema.fields else None
-
-        data.to_csv(tgt, columns=columns, index=False, **options)
-
-
 class CommonDataStorage(IDataStorage):
-
-    __formats = {
-        'csv': _CsvStorageFormat(),
-        'text/csv': _CsvStorageFormat()
-    }
 
     def __init__(
             self, config: _cfg.StorageConfig, file_storage: IFileStorage,
@@ -280,16 +335,13 @@ class CommonDataStorage(IDataStorage):
         self.__pushdown_pandas = pushdown_pandas
         self.__pushdown_spark = pushdown_spark
 
-    def read_pandas_table(
-            self, schema: _meta.TableSchema,
-            storage_path: str, storage_format: str,
+    def read_table(
+            self, storage_path: str, storage_format: str,
+            schema: tp.Optional[pa.Schema],
             storage_options: tp.Dict[str, tp.Any]) \
-            -> pd.DataFrame:
+            -> pa.Table:
 
-        format_impl = self.__formats.get(storage_format.lower())
-
-        if format_impl is None:
-            raise _ex.EStorageConfig(f"Requested storage format [{storage_format}] is not available")
+        format_impl = FormatManager.get_data_format(storage_format)
 
         stat = self.__file_storage.stat(storage_path)
 
@@ -302,48 +354,28 @@ class CommonDataStorage(IDataStorage):
             else:
                 raise NotImplementedError("Directory storage format not available yet")
 
-        if self.__pushdown_pandas:
-            full_path = self.__root_path / storage_path
-            return format_impl.read_pandas(full_path, schema, storage_options)
+        with self.__file_storage.read_byte_stream(storage_path) as byte_stream:
+            return format_impl.read_table(byte_stream, schema)
 
-        else:
-            with self.__file_storage.read_text_stream(storage_path) as text_stream:
-                return format_impl.read_pandas(text_stream, schema, storage_options)
-
-    def write_pandas_table(
-            self, schema: _meta.TableSchema, df: pd.DataFrame,
-            storage_path: str, storage_format: str,
+    def write_table(
+            self, storage_path: str, storage_format: str,
+            table: pa.Table,
             storage_options: tp.Dict[str, tp.Any],
             overwrite: bool = False):
 
-        format_impl = self.__formats.get(storage_format.lower())
-
-        if format_impl is None:
-            raise _ex.EStorageConfig(f"Requested storage format [{storage_format}] is not available")
-
-        # TODO: Switch between binary and text mode depending on format, also set encoding (default is utf-8)
+        format_impl = FormatManager.get_data_format(storage_format)
+        format_extension = FormatManager.extension_for_format(storage_format)
 
         # TODO: Full handling of directory storage formats
-        format_extension = f".{storage_format.lower()}"
 
         if not storage_path.endswith(format_extension):
-            storage_path_ = storage_path.rstrip("/\\") + f"/chunk-0.{storage_format.lower()}"
+            storage_path_ = storage_path.rstrip("/\\") + f"/chunk-0.{format_extension}"
             self.__file_storage.mkdir(storage_path, True, False)
         else:
             storage_path_ = storage_path
 
-        if self.__pushdown_pandas:
-
-            full_path = self.__root_path / storage_path_
-            file_mode = 'wt' if overwrite else 'xt'
-            pushdown_options = {**storage_options, 'mode': file_mode}
-
-            return format_impl.write_pandas(full_path, schema, df, pushdown_options)
-
-        else:
-
-            with self.__file_storage.write_text_stream(storage_path_, overwrite=overwrite) as text_stream:
-                format_impl.write_pandas(text_stream, schema, df, storage_options)
+        with self.__file_storage.write_byte_stream(storage_path_, overwrite=overwrite) as byte_stream:
+            format_impl.write_table(byte_stream, table)
 
     def read_spark_table(
             self, schema: _meta.TableSchema,
@@ -358,6 +390,129 @@ class CommonDataStorage(IDataStorage):
 
     def query_table(self):
         pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# DATA FORMATS
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class _CsvStorageFormat(IDataFormat):
+
+    def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
+
+        # For CSV data, if there is no schema then type inference will do unpredictable things!
+
+        if schema is None or len(schema.names) == 0 or len(schema.types) == 0:
+            raise _ex.EStorageFormat("An explicit schema is required to load CSV data")
+
+        read_options = pa_csv.ReadOptions()
+        read_options.encoding = 'utf-8'
+        read_options.use_threads = False
+
+        parse_options = pa_csv.ParseOptions()
+        parse_options.newlines_in_values = True
+
+        convert_options = pa_csv.ConvertOptions()
+        convert_options.strings_can_be_null = True
+
+        if schema is not None:
+            convert_options.include_columns = schema.names
+            convert_options.column_types = {n: t for (n, t) in zip(schema.names, schema.types)}
+
+        return pa_csv.read_csv(source, read_options, parse_options, convert_options)
+
+    def write_table(self, target: tp.Union[str, pathlib.Path, tp.BinaryIO], table: pa.Table):
+
+        write_options = pa_csv.WriteOptions()
+        write_options.include_header = True
+
+        if any(map(pa.types.is_decimal, table.schema.types)):
+            table = self._format_decimals(table)
+
+        pa_csv.write_csv(table, target, write_options)
+
+    @staticmethod
+    def _format_decimals(table: pa.Table):
+
+        # PyArrow does not support output of decimals as text, the cast (format) function is not implemented
+        # So, explicitly format any decimal fields as strings before trying to save them
+
+        for column_index in range(len(table.schema.names)):
+
+            column_type: pa.Decimal128Type = table.schema.types[column_index]
+
+            if not pa.types.is_decimal(column_type):
+                continue
+
+            # Format string using the scale of the column as the maximum d.p.
+            column_format = f".{column_type.scale}g"
+
+            raw_column: pa.Array = table.column(column_index)
+            str_column = pa.array(map(lambda d: format(d.as_py(), column_format), raw_column), pa.utf8())
+            str_field = pa.field(table.schema.names[column_index], pa.utf8())
+
+            table = table \
+                .remove_column(column_index) \
+                .add_column(column_index, str_field, str_column)
+
+        return table
+
+
+class _JsonStorageFormat(IDataFormat):
+
+    def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
+
+        return pa_json.read_json(source)
+
+    def write_table(self, target: tp.BinaryIO, table: pa.Table):
+
+        raise _ex.EStorageFormat("Output to JSON format is not currently supported")
+
+
+class _ArrowFileFormat(IDataFormat):
+
+    def read_table(self, source: tp.Union[str, pathlib.Path, tp.BinaryIO], schema: tp.Optional[pa.Schema]) -> pa.Table:
+
+        return pa_ft.read_table(source)
+
+    def write_table(self, target: tp.Union[str, pathlib.Path, tp.BinaryIO], table: pa.Table):
+
+        # Compression support in Java is limited
+        # For now, let's get Arrow format working without compression or dictionaries
+
+        pa_ft.write_feather(table, target, compression="uncompressed")
+
+
+class _ParquetStorageFormat(IDataFormat):
+
+    def read_table(self, source: tp.Union[str, pathlib.Path, tp.BinaryIO], schema: tp.Optional[pa.Schema]) -> pa.Table:
+
+        return pa_pq.read_table(source)
+
+    def write_table(self, target: tp.Union[str, pathlib.Path, tp.BinaryIO], table: pa.Table):
+
+        pa_pq.write_table(table, target)
+
+
+FormatManager.register_data_format("CSV", _CsvStorageFormat)
+FormatManager.register_data_format("text/csv", _CsvStorageFormat)
+FormatManager.register_extension(".csv", _CsvStorageFormat)
+
+FormatManager.register_data_format("JSON", _JsonStorageFormat)
+FormatManager.register_data_format("text/json", _JsonStorageFormat)
+FormatManager.register_extension(".json", _JsonStorageFormat)
+
+FormatManager.register_data_format("ARROW_FILE", _ArrowFileFormat)
+FormatManager.register_data_format("application/vnd.apache.arrow.file", _ArrowFileFormat)
+FormatManager.register_data_format("application/x-apache-arrow-file", _ArrowFileFormat)
+FormatManager.register_extension(".arrow", _ArrowFileFormat)
+
+# Mime type for Parquet is not registered yet! But there is an issue open to register one:
+# https://issues.apache.org/jira/browse/PARQUET-1889
+FormatManager.register_data_format("PARQUET", _ParquetStorageFormat)
+FormatManager.register_data_format("application/vnd.apache.parquet", _ParquetStorageFormat)
+FormatManager.register_extension(".parquet", _ParquetStorageFormat)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

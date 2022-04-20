@@ -33,6 +33,7 @@ import abc
 import json
 import random
 
+import pyarrow as pa
 import yaml
 import uuid
 
@@ -414,13 +415,15 @@ class LoadDataFunc(NodeFunction[_data.DataItem], _LoadSaveDataFunc):
         data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
         data_storage = self.storage.get_data_storage(data_copy.storageKey)
 
-        df = data_storage.read_pandas_table(
-            data_spec.data_def.schema.table,
+        arrow_schema = _types.trac_to_arrow_schema(data_spec.data_def.schema)
+
+        table = data_storage.read_table(
             data_copy.storagePath,
             data_copy.storageFormat,
+            arrow_schema,
             storage_options={})
 
-        return _data.DataItem(pandas=df)
+        return _data.DataItem(pandas=table.to_pandas())
 
 
 class SaveDataFunc(NodeFunction, _LoadSaveDataFunc):
@@ -447,12 +450,13 @@ class SaveDataFunc(NodeFunction, _LoadSaveDataFunc):
         # Item to be saved should exist in the current context, for now assume it is always Pandas
         data_item = _ctx_lookup(self.node.data_item_id, ctx)
         df = data_item.pandas
+        table = pa.Table.from_pandas(df, preserve_index=False)  # noqa
 
         # Assumption that dataset is a table, and not some other schema type
 
-        data_storage.write_pandas_table(
-            data_spec.data_def.schema.table, df,
+        data_storage.write_table(
             data_copy.storagePath, data_copy.storageFormat,
+            table,
             storage_options={}, overwrite=False)
 
         return True
