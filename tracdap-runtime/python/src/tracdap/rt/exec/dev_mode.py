@@ -306,7 +306,7 @@ class DevModeTranslator:
         if isinstance(data_value, str):
             storage_path = data_value
             storage_key = sys_config.storageSettings.defaultStorage
-            storage_format = sys_config.storageSettings.defaultFormat
+            storage_format = cls.infer_format(storage_path, sys_config.storageSettings)
             snap_version = 1
 
         elif isinstance(data_value, dict):
@@ -317,7 +317,7 @@ class DevModeTranslator:
                 raise _ex.EConfigParse(f"Invalid configuration for input [{data_key}] (missing required value 'path'")
 
             storage_key = data_value.get("storageKey") or sys_config.storageSettings.defaultStorage
-            storage_format = data_value.get("format") or sys_config.storageSettings.defaultFormat
+            storage_format = data_value.get("format") or cls.infer_format(storage_path, sys_config.storageSettings)
             snap_version = 1
 
         else:
@@ -349,6 +349,14 @@ class DevModeTranslator:
             schema=schema)
 
         return data_obj, storage_obj
+
+    @staticmethod
+    def infer_format(storage_path: str, storage_settings: cfg.StorageSettings):
+
+        if re.match(r'.*\.\w+$', storage_path):
+            return _storage.FormatManager.format_for_extension(pathlib.Path(storage_path).suffix)
+        else:
+            return storage_settings.defaultFormat
 
     @classmethod
     def _generate_input_definition(
