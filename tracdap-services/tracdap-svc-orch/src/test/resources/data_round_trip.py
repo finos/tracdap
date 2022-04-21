@@ -26,8 +26,7 @@ class DataRoundTripModel(trac.TracModel):
         trac.F("decimal_field", trac.BasicType.DECIMAL, label="DECIMAL field"),
         trac.F("string_field", trac.BasicType.STRING, label="STRING field"),
         trac.F("date_field", trac.BasicType.DATE, label="DATE field"),
-        trac.F("datetime_field", trac.BasicType.DATETIME, label="DATETIME field"),
-        trac.F("categorical_field", trac.BasicType.STRING, categorical=True, label="CATEGORICAL field")]
+        trac.F("datetime_field", trac.BasicType.DATETIME, label="DATETIME field")]
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
