@@ -22,6 +22,7 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.metadata.ImportModelJob;
 import org.finos.tracdap.metadata.RunModelJob;
+import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import com.google.protobuf.ByteString;
@@ -35,7 +36,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 
@@ -137,7 +137,7 @@ public class RunModelTest {
         var metaClient = platform.metaClientBlocking();
         var orchClient = platform.orchClientBlocking();
 
-        var modelVersion = getCurrentCommit();
+        var modelVersion = GitHelpers.getCurrentCommit();
 
         var importModel = ImportModelJob.newBuilder()
                 .setLanguage("python")
@@ -213,25 +213,6 @@ public class RunModelTest {
 
         modelId = modelTag.getHeader();
     }
-
-    private String getCurrentCommit() throws Exception {
-
-        var pb = new ProcessBuilder();
-        pb.command("git", "rev-parse", "HEAD");
-
-        var proc = pb.start();
-
-        try {
-            proc.waitFor(10, TimeUnit.SECONDS);
-
-            var procResult = proc.getInputStream().readAllBytes();
-            return new String(procResult, StandardCharsets.UTF_8).strip();
-        }
-        finally {
-            proc.destroy();
-        }
-    }
-
 
     @Test @Order(3)
     void runModel() throws Exception {
