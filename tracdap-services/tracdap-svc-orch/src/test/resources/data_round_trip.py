@@ -20,18 +20,19 @@ import tracdap.rt.api as trac
 class DataRoundTripModel(trac.TracModel):
 
     ROUND_TRIP_FIELDS = [
-        trac.F("boolean_field", trac.BasicType.BOOLEAN),
-        trac.F("integer_field", trac.BasicType.INTEGER),
-        trac.F("float_field", trac.BasicType.FLOAT),
-        trac.F("decimal_field", trac.BasicType.DECIMAL),
-        trac.F("string_field", trac.BasicType.STRING),
-        trac.F("date_field", trac.BasicType.DATE),
-        trac.F("datetime_field", trac.BasicType.DATETIME),
-        trac.F("categorical_field", trac.BasicType.STRING, categorical=True)]
+        trac.F("boolean_field", trac.BasicType.BOOLEAN, label="BOOLEAN field"),
+        trac.F("integer_field", trac.BasicType.INTEGER, label="INTEGER field"),
+        trac.F("float_field", trac.BasicType.FLOAT, label="FLOAT field"),
+        trac.F("decimal_field", trac.BasicType.DECIMAL, label="DECIMAL field"),
+        trac.F("string_field", trac.BasicType.STRING, label="STRING field"),
+        trac.F("date_field", trac.BasicType.DATE, label="DATE field"),
+        trac.F("datetime_field", trac.BasicType.DATETIME, label="DATETIME field"),
+        trac.F("categorical_field", trac.BasicType.STRING, categorical=True, label="CATEGORICAL field")]
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
-        return trac.declare_parameters(trac.P("use_spark", trac.BasicType.BOOLEAN, default_value=False))
+        return trac.declare_parameters(
+            trac.P("use_spark", trac.BasicType.BOOLEAN, default_value=False, label="Use Spark for round trip testing"))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
 
