@@ -136,7 +136,7 @@ class IDataStorage:
             self,
             storage_path: str, storage_format: str,
             schema: tp.Optional[pa.Schema],
-            storage_options: tp.Dict[str, tp.Any]) \
+            storage_options: tp.Dict[str, tp.Any] = None) \
             -> pa.Table:
         pass
 
@@ -145,7 +145,7 @@ class IDataStorage:
             self,
             storage_path: str, storage_format: str,
             table: pa.Table,
-            storage_options: tp.Dict[str, tp.Any],
+            storage_options: tp.Dict[str, tp.Any] = None,
             overwrite: bool = False):
         pass
 
@@ -328,9 +328,7 @@ class CommonDataStorage(IDataStorage):
             self, config: _cfg.StorageConfig, file_storage: IFileStorage,
             pushdown_pandas: bool = False, pushdown_spark: bool = False):
 
-        # TODO: How to handle root path in a generic way, re-using logic from underlying file storage
-        self.__root_path = file_storage._get_root()  # noqa
-
+        self.__config = config
         self.__file_storage = file_storage
         self.__pushdown_pandas = pushdown_pandas
         self.__pushdown_spark = pushdown_spark
@@ -338,7 +336,7 @@ class CommonDataStorage(IDataStorage):
     def read_table(
             self, storage_path: str, storage_format: str,
             schema: tp.Optional[pa.Schema],
-            storage_options: tp.Dict[str, tp.Any]) \
+            storage_options: tp.Dict[str, tp.Any] = None) \
             -> pa.Table:
 
         format_impl = FormatManager.get_data_format(storage_format)
@@ -360,7 +358,7 @@ class CommonDataStorage(IDataStorage):
     def write_table(
             self, storage_path: str, storage_format: str,
             table: pa.Table,
-            storage_options: tp.Dict[str, tp.Any],
+            storage_options: tp.Dict[str, tp.Any] = None,
             overwrite: bool = False):
 
         format_impl = FormatManager.get_data_format(storage_format)
