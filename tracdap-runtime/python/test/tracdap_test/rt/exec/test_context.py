@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
 import logging
 import typing as tp
 import unittest
@@ -138,12 +139,17 @@ class TracContextTest(unittest.TestCase):
         }
 
         customer_loans_schema = _test_model_def.inputs.get("customer_loans").schema
-        customer_loans_delta0 = _data.DataItem(pandas=self.LOANS_DATA)
-        customer_loans_parts = {_data.DataPartKey.for_root(): [customer_loans_delta0]}
-        customer_loans_view = _data.DataView(customer_loans_schema, customer_loans_parts)
+        customer_loans_view = _data.DataView.for_trac_schema(customer_loans_schema)
+
+        customer_loans_delta0 = _data.DataMapping.item_from_pandas(
+            self.LOANS_DATA, customer_loans_view.arrow_schema)
+
+        customer_loans_view = _data.DataMapping.add_item_to_view(
+            customer_loans_view, _data.DataPartKey.for_root(),
+            customer_loans_delta0)
 
         profit_by_region_schema = _test_model_def.outputs.get("profit_by_region").schema
-        profit_by_region_view = _data.DataView(profit_by_region_schema, {})
+        profit_by_region_view = _data.DataView.for_trac_schema(profit_by_region_schema)
 
         data = {
             "customer_loans": customer_loans_view,

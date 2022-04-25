@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import logging
 import typing as tp
-import copy
 import re
 import traceback
 
@@ -101,10 +100,11 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_context_item_exists(dataset_name)
         self.__val.check_context_item_is_dataset(dataset_name)
+        self.__val.check_dataset_schema_defined(dataset_name)
 
         data_view = self.__data[dataset_name]
 
-        return data_view.schema
+        return data_view.trac_schema
 
     def get_pandas_table(self, dataset_name: str) -> pd.DataFrame:
 
@@ -117,13 +117,8 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_dataset_part_present(dataset_name, part_key)
 
         data_view = self.__data[dataset_name]
-        deltas = data_view.parts[part_key]
-        data_item = deltas[0]
 
-        if data_item.pandas is not None:
-            return data_item.pandas
-        else:
-            raise NotImplementedError("Spark / Pandas conversion not implemented yet")
+        return _data.DataMapping.view_to_pandas(data_view, part_key)
 
     def get_spark_table(self, dataset_name: str) -> pyss.DataFrame:
         raise NotImplementedError()
@@ -144,14 +139,12 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_provided_dataset_not_null(dataset)
         self.__val.check_provided_dataset_type(dataset, pd.DataFrame)
 
-        data_view = self.__data[dataset_name]
-        data_item = _data.DataItem(pandas=dataset, column_filter=None)
+        prior_view = self.__data[dataset_name]
 
-        new_data_parts = copy.copy(data_view.parts)
-        new_data_parts[part_key] = [data_item]  # List of a single delta
-        new_data_view = _data.DataView(data_view.schema, new_data_parts)
+        data_item = _data.DataMapping.item_from_pandas(dataset, schema=prior_view.arrow_schema)
+        data_view = _data.DataMapping.add_item_to_view(prior_view, part_key, data_item)
 
-        self.__data[dataset_name] = new_data_view
+        self.__data[dataset_name] = data_view
 
     def put_spark_table(self, dataset_name: str, dataset: pyss.DataFrame):
         raise NotImplementedError()
@@ -190,7 +183,7 @@ class TracContextValidator:
     def _report_error(self, message):
 
         model_stack = self._build_model_stack_trace()
-        model_stack_str = ''.join(traceback.format_list(reversed(model_stack)))
+        model_stack_str = ''.join(traceback.format_list(list(reversed(model_stack))))
 
         self.__log.error(message)
         self.__log.error(f"Model stack trace:\n{model_stack_str}")
@@ -251,14 +244,14 @@ class TracContextValidator:
 
     def check_dataset_schema_defined(self, dataset_name: str):
 
-        schema = self.__data_ctx[dataset_name].schema
+        schema = self.__data_ctx[dataset_name].trac_schema
 
         if schema is None or not schema.table or not schema.table.fields:
             self._report_error(f"Schema not defined for dataset {dataset_name} in the current context")
 
     def check_dataset_schema_not_defined(self, dataset_name: str):
 
-        schema = self.__data_ctx[dataset_name].schema
+        schema = self.__data_ctx[dataset_name].trac_schema
 
         if schema is not None and (schema.table or schema.schemaType != _meta.SchemaType.SCHEMA_TYPE_NOT_SET):
             self._report_error(f"Schema already defined for dataset {dataset_name} in the current context")
