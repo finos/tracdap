@@ -369,10 +369,13 @@ class CommonDataStorage(IDataStorage):
         # TODO: Full handling of directory storage formats
 
         if not storage_path.endswith(format_extension):
+            parent_dir_ = storage_path
             storage_path_ = storage_path.rstrip("/\\") + f"/chunk-0.{format_extension}"
-            self.__file_storage.mkdir(storage_path, True, False)
+            self.__file_storage.mkdir(parent_dir_, True, exists_ok=overwrite)  # Allow exists_ok when overwrite == True
         else:
+            parent_dir_ = str(pathlib.PurePath(storage_path).parent)
             storage_path_ = storage_path
+            self.__file_storage.mkdir(parent_dir_, True, True)
 
         with self.__file_storage.write_byte_stream(storage_path_, overwrite=overwrite) as byte_stream:
             format_impl.write_table(byte_stream, table)
@@ -399,6 +402,12 @@ class CommonDataStorage(IDataStorage):
 
 class _CsvStorageFormat(IDataFormat):
 
+    __TIMESTAMP_PARSE_FORMATS = [
+        pa_csv.ISO8601,
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S"
+    ]
+
     def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
         # For CSV data, if there is no schema then type inference will do unpredictable things!
@@ -414,11 +423,12 @@ class _CsvStorageFormat(IDataFormat):
         parse_options.newlines_in_values = True
 
         convert_options = pa_csv.ConvertOptions()
+        convert_options.include_columns = schema.names
+        convert_options.column_types = {n: t for (n, t) in zip(schema.names, schema.types)}
         convert_options.strings_can_be_null = True
 
-        if schema is not None:
-            convert_options.include_columns = schema.names
-            convert_options.column_types = {n: t for (n, t) in zip(schema.names, schema.types)}
+        # Allow loose input formatting
+        # convert_options.timestamp_parsers = self.__TIMESTAMP_PARSE_FORMATS
 
         return pa_csv.read_csv(source, read_options, parse_options, convert_options)
 
@@ -477,11 +487,13 @@ class _JsonStorageFormat(IDataFormat):
 
 class _ArrowFileFormat(IDataFormat):
 
-    def read_table(self, source: tp.Union[str, pathlib.Path, tp.BinaryIO], schema: tp.Optional[pa.Schema]) -> pa.Table:
+    def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
-        return pa_ft.read_table(source)
+        columns = schema.names if schema else None
 
-    def write_table(self, target: tp.Union[str, pathlib.Path, tp.BinaryIO], table: pa.Table):
+        return pa_ft.read_table(source, columns)
+
+    def write_table(self, target: tp.BinaryIO, table: pa.Table):
 
         # Compression support in Java is limited
         # For now, let's get Arrow format working without compression or dictionaries
@@ -491,11 +503,13 @@ class _ArrowFileFormat(IDataFormat):
 
 class _ParquetStorageFormat(IDataFormat):
 
-    def read_table(self, source: tp.Union[str, pathlib.Path, tp.BinaryIO], schema: tp.Optional[pa.Schema]) -> pa.Table:
+    def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
-        return pa_pq.read_table(source)
+        columns = schema.names if schema else None
 
-    def write_table(self, target: tp.Union[str, pathlib.Path, tp.BinaryIO], table: pa.Table):
+        return pa_pq.read_table(source, columns)
+
+    def write_table(self, target: tp.BinaryIO, table: pa.Table):
 
         pa_pq.write_table(table, target)
 
