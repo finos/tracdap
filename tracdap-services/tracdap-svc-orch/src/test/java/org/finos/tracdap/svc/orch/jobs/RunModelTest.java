@@ -38,6 +38,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.finos.tracdap.svc.orch.jobs.Helpers.runJob;
+
 
 @Tag("integration")
 @Tag("int-e2e")
@@ -47,11 +49,6 @@ public class RunModelTest {
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
     private static final String INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
-
-    private static final List<JobStatusCode> COMPLETED_JOB_STATES = List.of(
-            JobStatusCode.SUCCEEDED,
-            JobStatusCode.FAILED,
-            JobStatusCode.CANCELLED);
 
     @RegisterExtension
     private static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
@@ -160,24 +157,10 @@ public class RunModelTest {
                         .setValue(MetadataCodec.encodeValue("run_model:import_model")))
                 .build();
 
-        var jobStatus = orchClient.submitJob(jobRequest);
-        log.info("Job ID: [{}]", MetadataUtil.objectKey(jobStatus.getJobId()));
-        log.info("Job status: [{}] {}", jobStatus.getStatusCode(), jobStatus.getStatusMessage());
-
-        var statusRequest = JobStatusRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(jobStatus.getJobId()))
-                .build();
-
-        while (!COMPLETED_JOB_STATES.contains(jobStatus.getStatusCode())) {
-            Thread.sleep(1000);
-            jobStatus = orchClient.checkJob(statusRequest);
-            log.info("Job status: [{}] {}", jobStatus.getStatusCode(), jobStatus.getStatusMessage());
-        }
+        var jobStatus = runJob(orchClient, jobRequest);
+        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
 
         Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
-
-        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
 
         var modelSearch = MetadataSearchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -215,7 +198,7 @@ public class RunModelTest {
     }
 
     @Test @Order(3)
-    void runModel() throws Exception {
+    void runModel() {
 
         var metaClient = platform.metaClientBlocking();
         var orchClient = platform.orchClientBlocking();
@@ -241,24 +224,10 @@ public class RunModelTest {
                         .setValue(MetadataCodec.encodeValue("run_model:run_model")))
                 .build();
 
-        var jobStatus = orchClient.submitJob(jobRequest);
-        log.info("Job ID: [{}]", MetadataUtil.objectKey(jobStatus.getJobId()));
-        log.info("Job status: [{}] {}", jobStatus.getStatusCode(), jobStatus.getStatusMessage());
-
-        var statusRequest = JobStatusRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(jobStatus.getJobId()))
-                .build();
-
-        while (!COMPLETED_JOB_STATES.contains(jobStatus.getStatusCode())) {
-            Thread.sleep(1000);
-            jobStatus = orchClient.checkJob(statusRequest);
-            log.info("Job status: [{}] {}", jobStatus.getStatusCode(), jobStatus.getStatusMessage());
-        }
+        var jobStatus = runJob(orchClient, jobRequest);
+        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
 
         Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
-
-        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
 
         var dataSearch = MetadataSearchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
