@@ -274,8 +274,12 @@ class TracContextTest(unittest.TestCase):
     def test_put_pandas_table_empty(self):
 
         # Corner case: Empty result sets are allowed
+        # But, type information must still be set up correctly!
 
-        empty_results = pd.DataFrame({"region": [], "gross_profit": []})
+        empty_results = pd.DataFrame({
+            "region": pd.Series(dtype=str),
+            "gross_profit": pd.Series(dtype=pd.Float64Dtype)})
+
         self.ctx.put_pandas_table("profit_by_region", empty_results)
 
         result_data = self.ctx.get_pandas_table("profit_by_region")

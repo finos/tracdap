@@ -169,6 +169,9 @@ class DataMapping:
     @classmethod
     def _coerce_vector(cls, vector: pa.Array, target_type: pa.DataType) -> pa.Array:
 
+        if len(vector) == 0 and (vector.type is None or pa.types.is_null(vector.type)):
+            return pa.array([], type=target_type, size=0)
+
         if pa.types.is_boolean(target_type):
             return cls._coerce_boolean(vector)
 
