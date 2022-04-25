@@ -22,6 +22,7 @@ import pyarrow.compute as pc
 import pandas as pd
 
 import tracdap.rt.metadata as _meta
+import tracdap.rt.exceptions as _ex
 import tracdap.rt.impl.type_system as _types
 
 
@@ -72,19 +73,13 @@ class DataView:
 class DataMapping:
 
     @classmethod
-    def item_to_pandas(cls, item: DataItem) -> pd.DataFrame:
+    def add_item_to_view(cls, view: DataView, part: DataPartKey, item: DataItem) -> DataView:
 
-        if item.pandas is not None:
-            return item.pandas.copy()
+        prior_deltas = view.parts.get(part) or list()
+        deltas = [*prior_deltas, item]
+        parts = {**view.parts, part: deltas}
 
-        if item.table is not None:
-            return item.table.to_pandas()
-
-        if item.batches is not None:
-            table = pa.Table.from_batches(item.batches, data_item.schema)  # noqa
-            return table.to_pandas()
-
-        raise RuntimeError()  # todo
+        return DataView(view.trac_schema, view.arrow_schema, parts)
 
     @classmethod
     def view_to_pandas(cls, view: DataView, part: DataPartKey) -> pd.DataFrame:
@@ -109,35 +104,181 @@ class DataMapping:
         return table.to_pandas()
 
     @classmethod
+    def item_to_pandas(cls, item: DataItem) -> pd.DataFrame:
+
+        if item.pandas is not None:
+            return item.pandas.copy()
+
+        if item.table is not None:
+            return item.table.to_pandas()
+
+        if item.batches is not None:
+            table = pa.Table.from_batches(item.batches, data_item.schema)  # noqa
+            return table.to_pandas()
+
+        raise RuntimeError()  # todo
+
+    @classmethod
     def item_from_pandas(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema]) -> DataItem:
+
+        table = cls.pandas_to_arrow(df, schema)
+        return DataItem(table.schema, table)
+
+    @classmethod
+    def pandas_to_arrow(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
 
         if len(df) == 0:
             df_schema = pa.Schema.from_pandas(df)  # noqa
             table = pa.Table.from_batches(list(), df_schema)  # noqa
         else:
-            table = pa.Table.from_pandas(df, preserve_index=False, columns=schema.names)  # noqa
+            schema_columns = schema.names if schema is not None else None
+            table = pa.Table.from_pandas(df, preserve_index=False, columns=schema_columns)  # noqa
+
+        # If there is no explict schema, give back the table exactly as it was received from Pandas
+        # There could be an option here to coerce types to the appropriate TRAC standard types
+        # E.g. unsigned int 32 -> signed int 64, TRAC standard integer type
+
+        if schema is None:
+            return table
 
         # Coerce types to match expected schema where possible
+        for schem_index in range(len(schema.types)):
 
-        trac_decimal = _types.trac_arrow_decimal_type()
+            schema_column_name = schema.names[schem_index]
+            schema_column_type = schema.types[schem_index]
 
-        for i in range(len(table.schema.types)):
-            if pa.types.is_decimal(table.schema.types[i]):
+            table_index = table.schema.get_field_index(schema_column_name)
+            table_column: pa.Array = table.column(table_index)
 
-                col_name = table.schema.names[i]
-                col_rounded = pc.round(table.column(i), ndigits=trac_decimal.scale)  # noqa
-                col_typed = pc.cast(col_rounded, trac_decimal)
+            # Avoid manipulating columns that already have the correct type and location
+            if table_index == schem_index and table_column.type == schema_column_type:
+                continue
 
-                table = table.remove_column(i)
-                table = table.add_column(i, col_name, col_typed)
+            if table_column.type != schema_column_type:
+                table_column = cls._coerce_vector(table_column, schema_column_type)
 
-        return DataItem(schema, table)
+            table = table.remove_column(table_index)
+            table = table.add_column(schem_index, schema_column_name, table_column)
+
+        # Only include columns explicitly defined in the schema
+        while table.num_columns > len(schema.types):
+            table = table.remove_column(table.num_columns - 1)
+
+        return table
 
     @classmethod
-    def add_item_to_view(cls, view: DataView, part: DataPartKey, item: DataItem) -> DataView:
+    def _coerce_vector(cls, vector: pa.Array, target_type: pa.DataType) -> pa.Array:
 
-        prior_deltas = view.parts.get(part) or list()
-        deltas = [*prior_deltas, item]
-        parts = {**view.parts, part: deltas}
+        if pa.types.is_boolean(target_type):
+            return cls._coerce_boolean(vector)
 
-        return DataView(view.trac_schema, view.arrow_schema, parts)
+        if pa.types.is_integer(target_type):
+            return cls._coerce_integer(vector, target_type)
+
+        if pa.types.is_floating(target_type):
+            return cls._coerce_float(vector, target_type)
+
+        if pa.types.is_decimal(target_type):
+            return cls._coerce_decimal(vector, target_type)
+
+        if pa.types.is_string(target_type):
+            return cls._coerce_string(vector, target_type)
+
+        if pa.types.is_date(target_type):
+            return cls._coerce_date(vector, target_type)
+
+        if pa.types.is_timestamp(target_type):
+            return cls._coerce_timestamp(vector, target_type)
+
+        raise _ex.EDataValidation(f"Unsupported data type {target_type}")
+
+    @staticmethod
+    def _coerce_boolean(vector: pa.Array) -> pa.BooleanArray:
+
+        if pa.types.is_boolean(vector.type):
+            return vector  # noqa
+
+        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {pa.bool_()}")
+
+    @staticmethod
+    def _coerce_integer(vector: pa.Array, target_type: pa.DataType) -> pa.IntegerArray:
+
+        if pa.types.is_integer(vector.type):
+
+            source_bit_width = vector.type.bit_width
+            target_bit_width = target_type.bit_width
+            source_signed = pa.types.is_signed_integer(vector.type)
+            target_signed = pa.types.is_signed_integer(target_type)
+
+            if source_bit_width == target_bit_width and source_signed == target_signed:
+                return vector  # noqa
+
+            if source_bit_width < target_bit_width and source_signed == target_signed:
+                return pc.cast(vector, target_type)
+
+            # Unsigned types can be safely cast to signed types with larger byte width
+            if source_bit_width < target_bit_width and target_signed:
+                return pc.cast(vector, target_type)
+
+        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
+
+    @staticmethod
+    def _coerce_float(vector: pa.Array, target_type: pa.DataType) -> pa.FloatingPointArray:
+
+        if pa.types.is_floating(vector.type):
+
+            source_bit_width = vector.type.bit_wdith
+            target_bit_width = target_type.bit_width
+
+            if source_bit_width == target_bit_width:
+                return vector  # noqa
+
+            if source_bit_width < target_bit_width:
+                return pc.cast(vector, target_type)
+
+        if pa.types.is_integer(vector.type):
+            return pc.cast(vector, target_type)
+
+        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
+
+    @staticmethod
+    def _coerce_decimal(vector: pa.Array, target_type: pa.DataType) -> pa.Decimal128Array:
+
+        # Allow coercing decimal 128 -> decimal 256, but not vice versa
+        if pa.types.is_decimal(vector.type) and target_type.bit_width >= vector.type.bit_width:
+            rounded = pc.round(vector, ndigits=target_type.scale)  # noqa
+            return pc.cast(rounded, target_type)
+
+        # Coerce floats and integers to decimal, always allowed
+        if pa.types.is_floating(vector.type) or pa.types.is_integer(vector.type):
+            return pc.cast(vector, target_type)
+
+        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
+
+    @staticmethod
+    def _coerce_string(vector: pa.Array, target_type: pa.DataType) -> pa.StringArray:
+
+        if pa.types.is_string(vector.type):
+            return vector  # noqa
+
+        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
+
+    @staticmethod
+    def _coerce_date(vector: pa.Array, target_type: pa.DataType) -> pa.Decimal128Array:
+
+        if pa.types.is_date(vector.type):
+
+            if target_type.bit_width >= vector.type.bit_width:
+                return pc.cast(vector, target_type)
+
+        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
+
+    @staticmethod
+    def _coerce_timestamp(vector: pa.Array, target_type: pa.DataType) -> pa.Decimal128Array:
+
+        if pa.types.is_timestamp(vector.type):
+
+            if target_type.bit_width >= vector.type.bit_width:
+                return pc.cast(vector, target_type)
+
+        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
