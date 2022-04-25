@@ -278,7 +278,7 @@ class TracContextTest(unittest.TestCase):
 
         empty_results = pd.DataFrame({
             "region": pd.Series(dtype=str),
-            "gross_profit": pd.Series(dtype=pd.Float64Dtype)})
+            "gross_profit": pd.Series(dtype=float)})
 
         self.ctx.put_pandas_table("profit_by_region", empty_results)
 
