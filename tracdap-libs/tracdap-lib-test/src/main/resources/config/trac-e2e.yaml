@@ -55,7 +55,7 @@ services:
     port: 8082
 
     defaultStorageKey: UNIT_TEST_STORAGE
-    defaultStorageFormat: ARROW_FILE
+    defaultStorageFormat: ${STORAGE_FORMAT}
 
     storage:
 

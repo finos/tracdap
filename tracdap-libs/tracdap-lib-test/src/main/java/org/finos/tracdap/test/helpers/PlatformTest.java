@@ -56,6 +56,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     public static final String TRAC_EXEC_DIR = "TRAC_EXEC_DIR";
     public static final String STORAGE_ROOT_DIR = "storage_root";
+    public static final String DEFAULT_STORAGE_FORMAT = "ARROW_FILE";
 
     private static final boolean IS_WINDOWS = System.getProperty("os.name").toLowerCase().contains("windows");
     private static final String PYTHON_EXE = IS_WINDOWS ? "python.exe" : "python";
@@ -67,17 +68,20 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     private final String testConfig;
     private final List<String> tenants;
+    private final String storageFormat;
+
     private final boolean runDbDeploy;
     private final boolean startMeta;
     private final boolean startData;
     private final boolean startOrch;
 
     private PlatformTest(
-            String testConfig, List<String> tenants, boolean runDbDeploy,
-            boolean startMeta, boolean startData, boolean startOrch) {
+            String testConfig, List<String> tenants, String storageFormat,
+            boolean runDbDeploy, boolean startMeta, boolean startData, boolean startOrch) {
 
         this.testConfig = testConfig;
         this.tenants = tenants;
+        this.storageFormat = storageFormat;
         this.runDbDeploy = runDbDeploy;
         this.startMeta = startMeta;
         this.startData = startData;
@@ -92,14 +96,16 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
     public static class Builder {
 
-        private final List<String> tenants = new ArrayList<>();
         private String testConfig;
+        private final List<String> tenants = new ArrayList<>();
+        private String storageFormat = DEFAULT_STORAGE_FORMAT;
         private boolean runDbDeploy = true;  // Run DB deploy by default
         private boolean startMeta;
         private boolean startData;
         private boolean startOrch;
 
         public Builder addTenant(String testTenant) { this.tenants.add(testTenant); return this; }
+        public Builder storageFormat(String storageFormat) { this.storageFormat = storageFormat; return this; }
         public Builder runDbDeploy(boolean runDbDeploy) { this.runDbDeploy = runDbDeploy; return this; }
         public Builder startMeta() { startMeta = true; return this; }
         public Builder startData() { startData = true; return this; }
@@ -109,8 +115,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         public PlatformTest build() {
 
             return new PlatformTest(
-                    testConfig, tenants, runDbDeploy,
-                    startMeta, startData, startOrch);
+                    testConfig, tenants, storageFormat,
+                    runDbDeploy, startMeta, startData, startOrch);
         }
     }
 
@@ -233,7 +239,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
                 "${TRAC_DIR}", tracDir.toString().replace("\\", "\\\\"),
                 "${TRAC_STORAGE_DIR}", tracStorageDir.toString().replace("\\", "\\\\"),
                 "${TRAC_EXEC_DIR}", tracExecDir.toString().replace("\\", "\\\\"),
-                "${CURRENT_GIT_ORIGIN}", currentGitOrigin);
+                "${CURRENT_GIT_ORIGIN}", currentGitOrigin,
+                "${STORAGE_FORMAT}", storageFormat);
 
         platformConfigUrl = ConfigHelpers.prepareConfig(
                 testConfig, tracDir,
