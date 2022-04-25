@@ -18,6 +18,7 @@ import dataclasses as dc
 import typing as tp
 
 import pyarrow as pa
+import pyarrow.compute as pc
 import pandas as pd
 
 import tracdap.rt.metadata as _meta
@@ -111,9 +112,24 @@ class DataMapping:
     def item_from_pandas(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema]) -> DataItem:
 
         if len(df) == 0:
-            table = pa.Table.from_batches(list(), schema)  # noqa
+            df_schema = pa.Schema.from_pandas(df)  # noqa
+            table = pa.Table.from_batches(list(), df_schema)  # noqa
         else:
-            table = pa.Table.from_pandas(df, schema, preserve_index=False)  # noqa
+            table = pa.Table.from_pandas(df, preserve_index=False, columns=schema.names)  # noqa
+
+        # Coerce types to match expected schema where possible
+
+        trac_decimal = _types.trac_arrow_decimal_type()
+
+        for i in range(len(table.schema.types)):
+            if pa.types.is_decimal(table.schema.types[i]):
+
+                col_name = table.schema.names[i]
+                col_rounded = pc.round(table.column(i), ndigits=trac_decimal.scale)  # noqa
+                col_typed = pc.cast(col_rounded, trac_decimal)
+
+                table = table.remove_column(i)
+                table = table.add_column(i, col_name, col_typed)
 
         return DataItem(schema, table)
 
