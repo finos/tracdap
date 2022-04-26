@@ -164,6 +164,16 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
     def tearDownClass(cls):
         cls.storage_root.cleanup()
 
+    def test_csv_basic(self):
+
+        storage_options = {"csv_fallback_parser": True}
+
+        schema = _types.trac_to_arrow_schema(self.sample_schema())
+        table = self.test_lib_storage.read_table("csv_basic.csv", "CSV", schema, storage_options)
+
+        self.assertEqual(7, table.num_columns)
+        self.assertEqual(10, table.num_rows)
+
     def test_csv_edge_cases(self):
 
         storage_options = {"csv_fallback_parser": True}
