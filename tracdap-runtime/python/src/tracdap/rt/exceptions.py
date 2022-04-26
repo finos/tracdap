@@ -106,15 +106,6 @@ class ERuntimeValidation(EValidation):
     pass
 
 
-class EDataValidation(EValidation):
-
-    """
-    Validation failure when a model output is checked for conformance to its data schema
-    """
-
-    pass
-
-
 class EModelExec(ETrac):
 
     """
@@ -127,6 +118,42 @@ class EModelExec(ETrac):
     This exception is not used for TRAC errors, e.g. validation or storage errors, which have their own exceptions.
     Error types that extend BaseException instead of Exception will not be wrapped; this specifically includes
     SystemExit and KeyboardInterrupt errors.
+    """
+
+    pass
+
+
+class EData(ETrac):
+
+    """
+    A data exception indicates a problem with primary data itself (as opposed to storage or marshalling errors)
+    """
+
+    pass
+
+
+class EDataConversion(EData):
+
+    """
+    Data cannot be converted into the required format
+    """
+
+    pass
+
+
+class EDataConformity(EData):
+
+    """
+    Data does not conform to the required the schema (and cannot be coerced)
+    """
+
+    pass
+
+
+class EDataValidation(EValidation):
+
+    """
+    Validation failure when a model output is checked for conformance to its data schema
     """
 
     pass
