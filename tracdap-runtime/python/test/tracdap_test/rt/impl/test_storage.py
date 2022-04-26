@@ -14,6 +14,7 @@
 
 import datetime as dt
 import decimal
+import pathlib
 import tempfile
 import unittest
 
@@ -25,6 +26,14 @@ import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.storage as _storage
 import tracdap.rt.impl.util as _util
+
+ROOT_DIR = pathlib.Path(__file__).parent \
+    .joinpath("../../../../../..") \
+    .resolve()
+
+TEST_DATA_DIR = ROOT_DIR \
+    .joinpath("tracdap-libs/tracdap-lib-test/src/main/resources/sample_data")
+
 
 _util.configure_logging()
 
@@ -45,6 +54,7 @@ class DataStorageTestSuite:
     storage_format: str
 
     assertEqual = unittest.TestCase.assertEqual
+    assertTrue = unittest.TestCase.assertTrue
 
     @staticmethod
     def sample_schema():
@@ -53,8 +63,8 @@ class DataStorageTestSuite:
             _meta.SchemaType.TABLE,
             _meta.PartType.PART_ROOT,
             _meta.TableSchema(fields=[
-                _meta.FieldSchema("bool_field", fieldType=_meta.BasicType.BOOLEAN),
-                _meta.FieldSchema("int_field", fieldType=_meta.BasicType.INTEGER),
+                _meta.FieldSchema("boolean_field", fieldType=_meta.BasicType.BOOLEAN),
+                _meta.FieldSchema("integer_field", fieldType=_meta.BasicType.INTEGER),
                 _meta.FieldSchema("float_field", fieldType=_meta.BasicType.FLOAT),
                 _meta.FieldSchema("decimal_field", fieldType=_meta.BasicType.DECIMAL),
                 _meta.FieldSchema("string_field", fieldType=_meta.BasicType.STRING),
@@ -66,8 +76,8 @@ class DataStorageTestSuite:
     def sample_data():
 
         return pd.DataFrame({
-            "bool_field": [True, False, True, False],
-            "int_field": [1, 2, 3, 4],
+            "boolean_field": [True, False, True, False],
+            "integer_field": [1, 2, 3, 4],
             "float_field": [1.0, 2.0, 3.0, 4.0],
             "decimal_field": [decimal.Decimal(1.0), decimal.Decimal(2.0), decimal.Decimal(3.0), decimal.Decimal(4.0)],
             "string_field": ["hello", "world", "what's", "up"],
@@ -93,7 +103,21 @@ class DataStorageTestSuite:
         self.assertEqual(table, rt_table)
 
     def test_round_trip_nulls(self):
-        pass
+
+        trac_schema = self.sample_schema()
+        df = self.sample_data()
+
+        for col in df.columns:
+            df[col, 2] = None
+            self.assertTrue(df[col, 2].isnull)
+
+        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
+        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
+
+        self.storage.write_table("round_trip_nulls", self.storage_format, table)
+        rt_table = self.storage.read_table("round_trip_nulls", self.storage_format, table.schema)
+
+        self.assertEqual(table, rt_table)
 
     def test_round_trip_edge_cases(self):
         pass
@@ -126,9 +150,29 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
         cls.storage = LocalStorageTest.make_storage()
         cls.storage_format = "CSV"
 
+        test_lib_storage_instance = _cfg.StorageInstance(
+            storageType="LOCAL",
+            storageProps={"rootPath": str(TEST_DATA_DIR)})
+
+        test_lib_storage_config = _cfg.StorageConfig([test_lib_storage_instance])
+        test_lib_file_storage = _storage.LocalFileStorage(test_lib_storage_instance)
+        test_lib_data_storage = _storage.CommonDataStorage(test_lib_storage_config, test_lib_file_storage)
+
+        cls.test_lib_storage = test_lib_data_storage
+
     @classmethod
     def tearDownClass(cls):
         cls.storage_root.cleanup()
+
+    def test_csv_edge_cases(self):
+
+        storage_options = {"csv_fallback_parser": True}
+
+        schema = _types.trac_to_arrow_schema(self.sample_schema())
+        table = self.test_lib_storage.read_table("csv_edge_cases.csv", "CSV", schema, storage_options)
+
+        self.assertEqual(7, table.num_columns)
+        self.assertEqual(10, table.num_rows)
 
 
 class LocalArrowStorageTest(unittest.TestCase, LocalStorageTest):

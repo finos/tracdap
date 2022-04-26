@@ -25,21 +25,25 @@
 #  limitations under the License.
 
 import abc
+import decimal
 import typing as tp
 import pathlib
 import datetime as dt
 import dataclasses as dc
 import enum
 
+import codecs
+import csv
+
 import pyarrow as pa
-import pyarrow.csv as pa_csv
-import pyarrow.json as pa_json
 import pyarrow.feather as pa_ft
 import pyarrow.parquet as pa_pq
+import pyarrow.csv as pa_csv
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.util as _util
 
 
@@ -201,14 +205,14 @@ class FormatManager:
                 cls.__format_to_extension[format_code] = extension
 
     @classmethod
-    def get_data_format(cls, format_code: str) -> IDataFormat:
+    def get_data_format(cls, format_code: str, format_options: tp.Dict[str, tp.Any]) -> IDataFormat:
 
         format_impl = cls.__formats.get(format_code.lower())
 
         if format_impl is None:
             raise _ex.EStorageFormat(f"Unsupported storage format [{format_code}]")
 
-        return format_impl.__call__()
+        return format_impl.__call__(format_options)
 
     @classmethod
     def extension_for_format(cls, format_code: str) -> str:
@@ -339,7 +343,7 @@ class CommonDataStorage(IDataStorage):
             storage_options: tp.Dict[str, tp.Any] = None) \
             -> pa.Table:
 
-        format_impl = FormatManager.get_data_format(storage_format)
+        format_impl = FormatManager.get_data_format(storage_format, storage_options)
 
         stat = self.__file_storage.stat(storage_path)
 
@@ -361,7 +365,7 @@ class CommonDataStorage(IDataStorage):
             storage_options: tp.Dict[str, tp.Any] = None,
             overwrite: bool = False):
 
-        format_impl = FormatManager.get_data_format(storage_format)
+        format_impl = FormatManager.get_data_format(storage_format, storage_options)
         format_extension = FormatManager.extension_for_format(storage_format)
 
         # TODO: Full handling of directory storage formats
@@ -398,6 +402,41 @@ class CommonDataStorage(IDataStorage):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class _ArrowFileFormat(IDataFormat):
+
+    def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
+        self._format_options = format_options
+
+    def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
+
+        columns = schema.names if schema else None
+
+        return pa_ft.read_table(source, columns)
+
+    def write_table(self, target: tp.BinaryIO, table: pa.Table):
+
+        # Compression support in Java is limited
+        # For now, let's get Arrow format working without compression or dictionaries
+
+        pa_ft.write_feather(table, target, compression="uncompressed")  # noqa
+
+
+class _ParquetStorageFormat(IDataFormat):
+
+    def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
+        self._format_options = format_options
+
+    def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
+
+        columns = schema.names if schema else None
+
+        return pa_pq.read_table(source, columns)
+
+    def write_table(self, target: tp.BinaryIO, table: pa.Table):
+
+        pa_pq.write_table(table, target)
+
+
 class _CsvStorageFormat(IDataFormat):
 
     __TIMESTAMP_PARSE_FORMATS = [
@@ -406,12 +445,43 @@ class _CsvStorageFormat(IDataFormat):
         "%Y-%m-%d %H:%M:%S"
     ]
 
+    __TRUE_VALUES = ['true', 't', 'yes' 'y', '1']
+    __FALSE_VALUES = ['false', 'f', 'no' 'n', '0']
+
+    __CSV_FALLBACK_PARSER = "csv_fallback_parser"
+
+    def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
+        self._format_options = format_options
+        self._use_fallback_parser = False
+
+        if format_options:
+            if format_options.get(self.__CSV_FALLBACK_PARSER) is True:
+                self._use_fallback_parser = True
+
     def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
         # For CSV data, if there is no schema then type inference will do unpredictable things!
 
         if schema is None or len(schema.names) == 0 or len(schema.types) == 0:
             raise _ex.EStorageFormat("An explicit schema is required to load CSV data")
+
+        if self._use_fallback_parser:
+            return self._read_table_fallback(source, schema)
+        else:
+            return self._read_table_arrow(source, schema)
+
+    def write_table(self, target: tp.Union[str, pathlib.Path, tp.BinaryIO], table: pa.Table):
+
+        write_options = pa_csv.WriteOptions()
+        write_options.include_header = True
+
+        if any(map(pa.types.is_decimal, table.schema.types)):
+            table = self._format_decimals(table)
+
+        pa_csv.write_csv(table, target, write_options)
+
+    @classmethod
+    def _read_table_arrow(cls, source: tp.BinaryIO, schema: pa.Schema) -> pa.Table:
 
         read_options = pa_csv.ReadOptions()
         read_options.encoding = 'utf-8'
@@ -430,18 +500,8 @@ class _CsvStorageFormat(IDataFormat):
 
         return pa_csv.read_csv(source, read_options, parse_options, convert_options)
 
-    def write_table(self, target: tp.Union[str, pathlib.Path, tp.BinaryIO], table: pa.Table):
-
-        write_options = pa_csv.WriteOptions()
-        write_options.include_header = True
-
-        if any(map(pa.types.is_decimal, table.schema.types)):
-            table = self._format_decimals(table)
-
-        pa_csv.write_csv(table, target, write_options)
-
-    @staticmethod
-    def _format_decimals(table: pa.Table):
+    @classmethod
+    def _format_decimals(cls, table: pa.Table):
 
         # PyArrow does not support output of decimals as text, the cast (format) function is not implemented
         # So, explicitly format any decimal fields as strings before trying to save them
@@ -471,54 +531,105 @@ class _CsvStorageFormat(IDataFormat):
 
         return table
 
+    @classmethod
+    def _read_table_fallback(cls, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
-class _JsonStorageFormat(IDataFormat):
+        stream_reader = codecs.getreader('utf-8')
+        text_source = stream_reader(source)
 
-    def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
+        csv_params = {
+            "skipinitialspace": True,
+            "doublequote": True
+        }
 
-        return pa_json.read_json(source)
+        csv_reader = csv.reader(text_source, **csv_params)
+        header = next(csv_reader)
 
-    def write_table(self, target: tp.BinaryIO, table: pa.Table):
+        for col in schema.names:
+            if col not in header:
+                raise _ex.EDataConformity(f"Missing column {col}")  # TODO
 
-        raise _ex.EStorageFormat("Output to JSON format is not currently supported")
+        schema_columns = dict(zip(schema.names, range(len(schema.names))))
+        col_mapping = [schema_columns.get(col) for col in header]
+        python_types = list(map(_types.arrow_to_python_type, schema.types))
 
+        data = [[] for _ in range(len(schema.names))]
 
-class _ArrowFileFormat(IDataFormat):
+        for row in csv_reader:
 
-    def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
+            csv_col = 0
 
-        columns = schema.names if schema else None
+            for raw_value in row:
 
-        return pa_ft.read_table(source, columns)
+                output_col = col_mapping[csv_col]
 
-    def write_table(self, target: tp.BinaryIO, table: pa.Table):
+                if output_col is None:
+                    continue
 
-        # Compression support in Java is limited
-        # For now, let's get Arrow format working without compression or dictionaries
+                python_type = python_types[output_col]
+                python_value = cls._convert_python_value(raw_value, python_type)
 
-        pa_ft.write_feather(table, target, compression="uncompressed")
+                data[output_col].append(python_value)
 
+                csv_col += 1
 
-class _ParquetStorageFormat(IDataFormat):
+        data_dict = dict(zip(schema.names, data))
+        table = pa.Table.from_pydict(data_dict, schema)  # noqa
 
-    def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
+        return table
 
-        columns = schema.names if schema else None
+    @classmethod
+    def _convert_python_value(cls, raw_value: tp.Any, python_type: type) -> tp.Any:
 
-        return pa_pq.read_table(source, columns)
+        if raw_value is None:
+            return None
 
-    def write_table(self, target: tp.BinaryIO, table: pa.Table):
+        if isinstance(raw_value, python_type):
+            return raw_value
 
-        pa_pq.write_table(table, target)
+        if python_type == bool:
+            if isinstance(raw_value, str):
+                if raw_value.lower() in cls.__TRUE_VALUES:
+                    return True
+                if raw_value.lower() in cls.__FALSE_VALUES:
+                    return False
+            if isinstance(raw_value, int) or isinstance(raw_value, float):
+                if raw_value == 1:
+                    return True
+                if raw_value == 0:
+                    return False
 
+        if python_type == int:
+            if isinstance(raw_value, float):
+                return int(raw_value)
+            if isinstance(raw_value, str):
+                return int(raw_value)
 
-FormatManager.register_data_format("CSV", _CsvStorageFormat)
-FormatManager.register_data_format("text/csv", _CsvStorageFormat)
-FormatManager.register_extension(".csv", _CsvStorageFormat)
+        if python_type == float:
+            if isinstance(raw_value, int):
+                return float(raw_value)
+            if isinstance(raw_value, str):
+                return float(raw_value)
 
-FormatManager.register_data_format("JSON", _JsonStorageFormat)
-FormatManager.register_data_format("text/json", _JsonStorageFormat)
-FormatManager.register_extension(".json", _JsonStorageFormat)
+        if python_type == decimal.Decimal:
+            if isinstance(raw_value, int):
+                return decimal.Decimal.from_float(float(raw_value))
+            if isinstance(raw_value, float):
+                return decimal.Decimal.from_float(raw_value)
+            if isinstance(raw_value, str):
+                return decimal.Decimal(raw_value)
+
+        if python_type == str:
+            return str(raw_value)
+
+        if python_type == dt.date:
+            if isinstance(raw_value, str):
+                return dt.date.fromisoformat(raw_value)
+
+        if python_type == dt.datetime:
+            if isinstance(raw_value, str):
+                return dt.datetime.fromisoformat(raw_value)
+
 
 FormatManager.register_data_format("ARROW_FILE", _ArrowFileFormat)
 FormatManager.register_data_format("application/vnd.apache.arrow.file", _ArrowFileFormat)
@@ -530,6 +641,10 @@ FormatManager.register_extension(".arrow", _ArrowFileFormat)
 FormatManager.register_data_format("PARQUET", _ParquetStorageFormat)
 FormatManager.register_data_format("application/vnd.apache.parquet", _ParquetStorageFormat)
 FormatManager.register_extension(".parquet", _ParquetStorageFormat)
+
+FormatManager.register_data_format("CSV", _CsvStorageFormat)
+FormatManager.register_data_format("text/csv", _CsvStorageFormat)
+FormatManager.register_extension(".csv", _CsvStorageFormat)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
