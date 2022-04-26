@@ -606,54 +606,62 @@ class _CsvStorageFormat(IDataFormat):
     @classmethod
     def _convert_python_value(cls, raw_value: tp.Any, python_type: type) -> tp.Any:
 
-        if raw_value is None:
-            return None
+        try:
 
-        if isinstance(raw_value, python_type):
-            return raw_value
+            if raw_value is None:
+                return None
 
-        if python_type == bool:
-            if isinstance(raw_value, str):
-                if raw_value.lower() in cls.__TRUE_VALUES:
-                    return True
-                if raw_value.lower() in cls.__FALSE_VALUES:
-                    return False
-            if isinstance(raw_value, int) or isinstance(raw_value, float):
-                if raw_value == 1:
-                    return True
-                if raw_value == 0:
-                    return False
+            if isinstance(raw_value, python_type):
+                return raw_value
 
-        if python_type == int:
-            if isinstance(raw_value, float):
-                return int(raw_value)
-            if isinstance(raw_value, str):
-                return int(raw_value)
+            if python_type == bool:
+                if isinstance(raw_value, str):
+                    if raw_value.lower() in cls.__TRUE_VALUES:
+                        return True
+                    if raw_value.lower() in cls.__FALSE_VALUES:
+                        return False
+                if isinstance(raw_value, int) or isinstance(raw_value, float):
+                    if raw_value == 1:
+                        return True
+                    if raw_value == 0:
+                        return False
 
-        if python_type == float:
-            if isinstance(raw_value, int):
-                return float(raw_value)
-            if isinstance(raw_value, str):
-                return float(raw_value)
+            if python_type == int:
+                if isinstance(raw_value, float):
+                    return int(raw_value)
+                if isinstance(raw_value, str):
+                    return int(raw_value)
 
-        if python_type == decimal.Decimal:
-            if isinstance(raw_value, int):
-                return decimal.Decimal.from_float(float(raw_value))
-            if isinstance(raw_value, float):
-                return decimal.Decimal.from_float(raw_value)
-            if isinstance(raw_value, str):
-                return decimal.Decimal(raw_value)
+            if python_type == float:
+                if isinstance(raw_value, int):
+                    return float(raw_value)
+                if isinstance(raw_value, str):
+                    return float(raw_value)
 
-        if python_type == str:
-            return str(raw_value)
+            if python_type == decimal.Decimal:
+                if isinstance(raw_value, int):
+                    return decimal.Decimal.from_float(float(raw_value))
+                if isinstance(raw_value, float):
+                    return decimal.Decimal.from_float(raw_value)
+                if isinstance(raw_value, str):
+                    return decimal.Decimal(raw_value)
 
-        if python_type == dt.date:
-            if isinstance(raw_value, str):
-                return dt.date.fromisoformat(raw_value)
+            if python_type == str:
+                return str(raw_value)
 
-        if python_type == dt.datetime:
-            if isinstance(raw_value, str):
-                return dt.datetime.fromisoformat(raw_value)
+            if python_type == dt.date:
+                if isinstance(raw_value, str):
+                    return dt.date.fromisoformat(raw_value)
+
+            if python_type == dt.datetime:
+                if isinstance(raw_value, str):
+                    return dt.datetime.fromisoformat(raw_value)
+
+            raise _ex.EDataConversion("No data conversion available for input type")  # TODO
+
+        except Exception as e:
+
+            raise _ex.EDataConversion("Could not convert input data") from e  # TODO
 
 
 FormatManager.register_data_format("ARROW_FILE", _ArrowFileFormat)
