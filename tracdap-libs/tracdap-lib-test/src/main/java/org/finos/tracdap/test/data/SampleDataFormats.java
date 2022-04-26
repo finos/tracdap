@@ -32,9 +32,9 @@ import java.util.stream.Collectors;
 
 public class SampleDataFormats {
 
-    public static final String BASIC_CSV_DATA_RESOURCE = "/sample_data_formats/csv_basic.csv";
-    public static final String BASIC_CSV_DATA_RESOURCE_V2 = "/sample_data_formats/csv_basic_v2.csv";
-    public static final String BASIC_JSON_DATA_RESOURCE = "/sample_data_formats/json_basic.json";
+    public static final String BASIC_CSV_DATA_RESOURCE = "/sample_data/csv_basic.csv";
+    public static final String BASIC_CSV_DATA_RESOURCE_V2 = "/sample_data/csv_basic_v2.csv";
+    public static final String BASIC_JSON_DATA_RESOURCE = "/sample_data/json_basic.json";
 
     public static final SchemaDefinition BASIC_TABLE_SCHEMA
             = SchemaDefinition.newBuilder()
