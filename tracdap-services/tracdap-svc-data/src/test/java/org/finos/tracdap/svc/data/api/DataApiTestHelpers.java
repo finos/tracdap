@@ -410,7 +410,7 @@ class DataApiTestHelpers {
                 if (rawObject instanceof LocalDateTime) return rawObject;
 
                 if (rawObject instanceof String)
-                    return LocalDateTime.parse(rawObject.toString(), MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT);
+                    return LocalDateTime.parse(rawObject.toString(), MetadataCodec.ISO_DATETIME_INPUT_NO_ZONE_FORMAT);
 
                 break;
 
