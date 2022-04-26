@@ -439,20 +439,13 @@ class _ParquetStorageFormat(IDataFormat):
 
 class _CsvStorageFormat(IDataFormat):
 
-    __TIMESTAMP_PARSE_FORMATS = [
-        pa_csv.ISO8601,
-        "%Y-%m-%dT%H:%M:%S.%f",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%d %H:%M:%S.%f",
-        "%Y-%m-%d %H:%M:%S"
-    ]
+    __CSV_FALLBACK_PARSER = "csv_fallback_parser"
 
     __TRUE_VALUES = ['true', 't', 'yes' 'y', '1']
     __FALSE_VALUES = ['false', 'f', 'no' 'n', '0']
 
-    __CSV_FALLBACK_PARSER = "csv_fallback_parser"
-
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
+
         self._format_options = format_options
         self._use_fallback_parser = False
 
@@ -477,10 +470,12 @@ class _CsvStorageFormat(IDataFormat):
         write_options = pa_csv.WriteOptions()
         write_options.include_header = True
 
-        if any(map(pa.types.is_decimal, table.schema.types)):
-            table = self._format_decimals(table)
+        # Arrow cannot yet apply the required output formatting for all data types
+        # For types that require extra formatting, explicitly format them in code and output the string values
 
-        pa_csv.write_csv(table, target, write_options)
+        formatted_table = self._format_outputs(table)
+
+        pa_csv.write_csv(formatted_table, target, write_options)
 
     @classmethod
     def _read_table_arrow(cls, source: tp.BinaryIO, schema: pa.Schema) -> pa.Table:
@@ -496,40 +491,70 @@ class _CsvStorageFormat(IDataFormat):
         convert_options.include_columns = schema.names
         convert_options.column_types = {n: t for (n, t) in zip(schema.names, schema.types)}
         convert_options.strings_can_be_null = True
-        convert_options.timestamp_parsers = cls.__TIMESTAMP_PARSE_FORMATS
 
         return pa_csv.read_csv(source, read_options, parse_options, convert_options)
 
     @classmethod
-    def _format_decimals(cls, table: pa.Table):
+    def _format_outputs(cls, table: pa.Table) -> pa.Table:
+
+        for column_index in range(table.num_columns):
+
+            column: pa.Array = table.column(column_index)
+            format_applied = False
+
+            if pa.types.is_decimal(column.type):
+                column = cls._format_decimal(column)
+                format_applied = True
+
+            if pa.types.is_timestamp(column.type):
+                column = cls._format_timestamp(column)
+                format_applied = True
+
+            if format_applied:
+                field = pa.field(table.schema.names[column_index], pa.utf8())
+                table = table \
+                    .remove_column(column_index) \
+                    .add_column(column_index, field, column)
+
+        return table
+
+    @classmethod
+    def _format_decimal(cls, column: pa.Array) -> pa.Array:
 
         # PyArrow does not support output of decimals as text, the cast (format) function is not implemented
         # So, explicitly format any decimal fields as strings before trying to save them
 
-        for column_index in range(len(table.schema.names)):
+        column_type = column.type
 
-            column_type: pa.Decimal128Type = table.schema.types[column_index]
+        # Ensure the full information from the column is recorded in text form
+        # Use the scale of the column as the maximum d.p., then strip away any unneeded trailing chars
 
-            if not pa.types.is_decimal(column_type):
-                continue
+        def format_decimal(d: pa.Scalar):
+            base_format = f".{column_type.scale}f"
+            base_str = format(d.as_py(), base_format)
+            return base_str.rstrip('0').rstrip('.')
 
-            # Ensure the full information from the column is recorded in text form
-            # Use the scale of the column as the maximum d.p., then strip away any unneeded trailing chars
+        return pa.array(map(format_decimal, column), pa.utf8())
 
-            def format_decimal(d: pa.Decimal128Scalar):
-                base_format = f".{column_type.scale}f"
-                base_str = format(d.as_py(), base_format)
-                return base_str.rstrip('0').rstrip('.')
+    @classmethod
+    def _format_timestamp(cls, column: pa.Array) -> pa.Array:
 
-            raw_column: pa.Array = table.column(column_index)
-            str_column = pa.array(map(format_decimal, raw_column), pa.utf8())
-            str_field = pa.field(table.schema.names[column_index], pa.utf8())
+        # PyArrow outputs timestamps with a space (' ') separator between date and time
+        # ISO format requires a 'T' between date and time
 
-            table = table \
-                .remove_column(column_index) \
-                .add_column(column_index, str_field, str_column)
+        column_type: pa.TimestampType = column.type
 
-        return table
+        if column_type.unit == "s":
+            timespec = 'seconds'
+        elif column_type.unit == "ms":
+            timespec = "milliseconds"
+        else:
+            timespec = "microseconds"
+
+        def format_timestamp(t: pa.Scalar) -> str:
+            return t.as_py().isoformat(timespec=timespec)
+
+        return pa.array(map(format_timestamp, column), pa.utf8())
 
     @classmethod
     def _read_table_fallback(cls, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
