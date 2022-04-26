@@ -73,13 +73,28 @@ class DataView:
 class DataMapping:
 
     @classmethod
-    def add_item_to_view(cls, view: DataView, part: DataPartKey, item: DataItem) -> DataView:
+    def arrow_to_pandas(cls, table: pa.Table) -> pd.DataFrame:
 
-        prior_deltas = view.parts.get(part) or list()
-        deltas = [*prior_deltas, item]
-        parts = {**view.parts, part: deltas}
+        return table.to_pandas()
 
-        return DataView(view.trac_schema, view.arrow_schema, parts)
+    @classmethod
+    def pandas_to_arrow(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
+
+        if len(df) == 0:
+            df_schema = pa.Schema.from_pandas(df)  # noqa
+            table = pa.Table.from_batches(list(), df_schema)  # noqa
+        else:
+            schema_columns = schema.names if schema is not None else None
+            table = pa.Table.from_pandas(df, preserve_index=False, columns=schema_columns)  # noqa
+
+        # If there is no explict schema, give back the table exactly as it was received from Pandas
+        # There could be an option here to coerce types to the appropriate TRAC standard types
+        # E.g. unsigned int 32 -> signed int 64, TRAC standard integer type
+
+        if schema is None:
+            return table
+        else:
+            return DataConformity.conform_table(table, schema)
 
     @classmethod
     def view_to_pandas(cls, view: DataView, part: DataPartKey) -> pd.DataFrame:
@@ -110,36 +125,34 @@ class DataMapping:
             return item.pandas.copy()
 
         if item.table is not None:
-            return item.table.to_pandas()
+            return cls.arrow_to_pandas(item.table)
 
         if item.batches is not None:
             table = pa.Table.from_batches(item.batches, data_item.schema)  # noqa
-            return table.to_pandas()
+            return cls.arrow_to_pandas(table)
 
         raise RuntimeError()  # todo
 
     @classmethod
-    def item_from_pandas(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema]) -> DataItem:
+    def pandas_to_item(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema]) -> DataItem:
 
         table = cls.pandas_to_arrow(df, schema)
         return DataItem(table.schema, table)
 
     @classmethod
-    def pandas_to_arrow(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
+    def add_item_to_view(cls, view: DataView, part: DataPartKey, item: DataItem) -> DataView:
 
-        if len(df) == 0:
-            df_schema = pa.Schema.from_pandas(df)  # noqa
-            table = pa.Table.from_batches(list(), df_schema)  # noqa
-        else:
-            schema_columns = schema.names if schema is not None else None
-            table = pa.Table.from_pandas(df, preserve_index=False, columns=schema_columns)  # noqa
+        prior_deltas = view.parts.get(part) or list()
+        deltas = [*prior_deltas, item]
+        parts = {**view.parts, part: deltas}
 
-        # If there is no explict schema, give back the table exactly as it was received from Pandas
-        # There could be an option here to coerce types to the appropriate TRAC standard types
-        # E.g. unsigned int 32 -> signed int 64, TRAC standard integer type
+        return DataView(view.trac_schema, view.arrow_schema, parts)
 
-        if schema is None:
-            return table
+
+class DataConformity:
+
+    @classmethod
+    def conform_table(cls, table: pa.Table, schema: pa.Schema) -> pa.Table:
 
         # Coerce types to match expected schema where possible
         for schem_index in range(len(schema.types)):

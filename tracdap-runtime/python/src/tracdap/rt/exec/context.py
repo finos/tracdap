@@ -141,7 +141,7 @@ class TracContextImpl(_api.TracContext):
 
         prior_view = self.__data[dataset_name]
 
-        data_item = _data.DataMapping.item_from_pandas(dataset, schema=prior_view.arrow_schema)
+        data_item = _data.DataMapping.pandas_to_item(dataset, schema=prior_view.arrow_schema)
         data_view = _data.DataMapping.add_item_to_view(prior_view, part_key, data_item)
 
         self.__data[dataset_name] = data_view

@@ -141,7 +141,7 @@ class TracContextTest(unittest.TestCase):
         customer_loans_schema = _test_model_def.inputs.get("customer_loans").schema
         customer_loans_view = _data.DataView.for_trac_schema(customer_loans_schema)
 
-        customer_loans_delta0 = _data.DataMapping.item_from_pandas(
+        customer_loans_delta0 = _data.DataMapping.pandas_to_item(
             self.LOANS_DATA, customer_loans_view.arrow_schema)
 
         customer_loans_view = _data.DataMapping.add_item_to_view(
