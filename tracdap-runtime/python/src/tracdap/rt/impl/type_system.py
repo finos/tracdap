@@ -27,6 +27,7 @@
 import typing as tp
 import decimal
 import datetime as dt
+
 import pyarrow as pa
 
 import tracdap.rt.metadata as meta
@@ -230,6 +231,8 @@ def convert_datetime_value(raw_value: tp.Any) -> meta.Value:
 
 __TRAC_DECIMAL_PRECISION = 38
 __TRAC_DECIMAL_SCALE = 12
+__TRAC_TIMESTAMP_UNIT = "ms"
+__TRAC_TIMESTAMP_ZONE = None
 
 __TRAC_TO_ARROW_TYPE_MAPPING = {
     meta.BasicType.BOOLEAN: pa.bool_(),
@@ -238,8 +241,60 @@ __TRAC_TO_ARROW_TYPE_MAPPING = {
     meta.BasicType.DECIMAL: pa.decimal128(__TRAC_DECIMAL_PRECISION, __TRAC_DECIMAL_SCALE),
     meta.BasicType.STRING: pa.utf8(),
     meta.BasicType.DATE: pa.date32(),
-    meta.BasicType.DATETIME: pa.timestamp("ms", tz=None)
+    meta.BasicType.DATETIME: pa.timestamp(__TRAC_TIMESTAMP_UNIT, __TRAC_TIMESTAMP_ZONE)
 }
+
+
+def arrow_to_python_type(arrow_type: pa.DataType) -> type:
+
+    if pa.types.is_boolean(arrow_type):
+        return bool
+
+    if pa.types.is_integer(arrow_type):
+        return int
+
+    if pa.types.is_floating(arrow_type):
+        return float
+
+    if pa.types.is_decimal(arrow_type):
+        return decimal.Decimal
+
+    if pa.types.is_string(arrow_type):
+        return str
+
+    if pa.types.is_date(arrow_type):
+        return dt.date
+
+    if pa.types.is_timestamp(arrow_type):
+        return dt.datetime
+
+    raise ex.EDataConversion(f"No Python type conversion available for Arrow type {arrow_type}")
+
+
+def python_to_arrow_type(python_type: type) -> pa.DataType:
+
+    if python_type == bool:
+        return pa.bool_()
+
+    if python_type == int:
+        return pa.int64()
+
+    if python_type == float:
+        return pa.float64()
+
+    if python_type == decimal.Decimal:
+        return pa.decimal128(__TRAC_DECIMAL_PRECISION, __TRAC_DECIMAL_SCALE)
+
+    if python_type == str:
+        return pa.utf8()
+
+    if python_type == dt.date:
+        return pa.date32()
+
+    if python_type == dt.datetime:
+        return pa.timestamp(__TRAC_TIMESTAMP_UNIT, __TRAC_TIMESTAMP_ZONE)
+
+    raise ex.EDataConversion(f"No Arrow type conversion available for Python type {python_type}")
 
 
 def trac_to_arrow_schema(trac_schema: meta.SchemaDefinition) -> pa.Schema:
