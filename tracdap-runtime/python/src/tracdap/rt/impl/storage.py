@@ -441,7 +441,9 @@ class _CsvStorageFormat(IDataFormat):
 
     __TIMESTAMP_PARSE_FORMATS = [
         pa_csv.ISO8601,
+        "%Y-%m-%dT%H:%M:%S.%f",
         "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S.%f",
         "%Y-%m-%d %H:%M:%S"
     ]
 
@@ -494,9 +496,7 @@ class _CsvStorageFormat(IDataFormat):
         convert_options.include_columns = schema.names
         convert_options.column_types = {n: t for (n, t) in zip(schema.names, schema.types)}
         convert_options.strings_can_be_null = True
-
-        # Allow loose input formatting
-        # convert_options.timestamp_parsers = self.__TIMESTAMP_PARSE_FORMATS
+        convert_options.timestamp_parsers = cls.__TIMESTAMP_PARSE_FORMATS
 
         return pa_csv.read_csv(source, read_options, parse_options, convert_options)
 
