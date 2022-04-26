@@ -223,10 +223,10 @@ public class JacksonValues {
 
                 else {
 
-                    OffsetDateTime zoneAdjustedVal = parseOffsetDateTime(parser);
+                    LocalDateTime datetimeNoZone = parseDatetimeNoZone(parser);
                     long unixEpochMillis =
-                            (zoneAdjustedVal.toEpochSecond() * 1000) +
-                            (zoneAdjustedVal.getNano() / 1000000);
+                            (datetimeNoZone.toEpochSecond(ZoneOffset.UTC) * 1000) +
+                            (datetimeNoZone.getNano() / 1000000);
 
                     timeStampMVec.set(row, unixEpochMillis);
                 }
@@ -305,12 +305,11 @@ public class JacksonValues {
         }
     }
 
-    static private OffsetDateTime parseOffsetDateTime(JsonParser parser) throws IOException {
+    static private LocalDateTime parseDatetimeNoZone(JsonParser parser) throws IOException {
 
         try {
             String datetimeStr = parser.getValueAsString();
-            LocalDateTime datetimeVal = LocalDateTime.parse(datetimeStr, MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT);
-            return datetimeVal.atOffset(ZoneOffset.UTC);
+            return LocalDateTime.parse(datetimeStr, MetadataCodec.ISO_DATETIME_INPUT_NO_ZONE_FORMAT);
         }
         catch (DateTimeParseException e) {
             throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
@@ -448,8 +447,9 @@ public class JacksonValues {
                 long unixEpochSec = unixEpochMillis / 1000;
                 int nanos = ((int) (unixEpochMillis - (unixEpochSec * 1000))) * 1000000;
 
-                LocalDateTime datetimeVal = LocalDateTime.ofEpochSecond(unixEpochSec, nanos, ZoneOffset.UTC);
-                String datetimeStr = MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT.format(datetimeVal);
+                LocalDateTime localDatetimeVal = LocalDateTime.ofEpochSecond(unixEpochSec, nanos, ZoneOffset.UTC);
+                OffsetDateTime offsetDatetimeVal = localDatetimeVal.atOffset(ZoneOffset.UTC);
+                String datetimeStr = MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT.format(offsetDatetimeVal);
 
                 generator.writeString(datetimeStr);
 
