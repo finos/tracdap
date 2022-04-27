@@ -112,7 +112,19 @@ class DataMapping:
     @classmethod
     def arrow_to_pandas(cls, table: pa.Table) -> pd.DataFrame:
 
-        return table.to_pandas()
+        return table.to_pandas(
+            ignore_metadata=True,  # noqa
+            date_as_object=True,  # noqa
+            timestamp_as_object=True,  # noqa
+            types_mapper=cls.__ARROW_TO_PANDAS_TYPES.get)
+
+    # TODO: Move to type_system
+    # However only partial mapping is possible, object dtypes will not map this way
+    __ARROW_TO_PANDAS_TYPES = {
+        pa.bool_(): pd.BooleanDtype(),
+        pa.int64(): pd.Int64Dtype(),
+        pa.float64(): pd.Float64Dtype(),
+    }
 
     @classmethod
     def pandas_to_view(cls, df: pd.DataFrame, prior_view: DataView, part: DataPartKey):
