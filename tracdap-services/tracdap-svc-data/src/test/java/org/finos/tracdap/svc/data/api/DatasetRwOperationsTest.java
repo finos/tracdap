@@ -24,7 +24,7 @@ import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.PartKeys;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.test.data.SampleDataFormats;
+import org.finos.tracdap.test.data.SampleData;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -75,8 +75,8 @@ public class DatasetRwOperationsTest {
 
     // Reuse sample data from the test lib
 
-    static final SchemaDefinition BASIC_SCHEMA = SampleDataFormats.BASIC_TABLE_SCHEMA;
-    static final ByteString BASIC_CSV_CONTENT = loadResourceAsByteString(SampleDataFormats.BASIC_CSV_DATA_RESOURCE);
+    static final SchemaDefinition BASIC_SCHEMA = SampleData.BASIC_TABLE_SCHEMA;
+    static final ByteString BASIC_CSV_CONTENT = loadResourceAsByteString(SampleData.BASIC_CSV_DATA_RESOURCE);
 
     static final List<TagUpdate> BASIC_TAG_UPDATES = List.of(
             TagUpdate.newBuilder()
@@ -98,8 +98,8 @@ public class DatasetRwOperationsTest {
             .setContent(BASIC_CSV_CONTENT)
             .build();
 
-    static final SchemaDefinition BASIC_SCHEMA_V2 = SampleDataFormats.BASIC_TABLE_SCHEMA_V2;
-    static final ByteString BASIC_CSV_CONTENT_V2 = loadResourceAsByteString(SampleDataFormats.BASIC_CSV_DATA_RESOURCE_V2);
+    static final SchemaDefinition BASIC_SCHEMA_V2 = SampleData.BASIC_TABLE_SCHEMA_V2;
+    static final ByteString BASIC_CSV_CONTENT_V2 = loadResourceAsByteString(SampleData.BASIC_CSV_DATA_RESOURCE_V2);
 
     static final List<TagUpdate> BASIC_TAG_UPDATES_V2 = List.of(
             TagUpdate.newBuilder()

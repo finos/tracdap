@@ -24,6 +24,7 @@ import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.VectorLoader;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.VectorUnloader;
+import org.apache.arrow.vector.types.pojo.Schema;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.codec.arrow.ArrowFileCodec;
 import org.finos.tracdap.common.codec.arrow.ArrowSchema;
@@ -34,7 +35,7 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.metadata.ImportModelJob;
 import org.finos.tracdap.metadata.RunModelJob;
-import org.finos.tracdap.test.data.SampleDataFormats;
+import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.junit.jupiter.api.*;
@@ -48,7 +49,6 @@ import java.util.stream.Stream;
 
 import static org.finos.tracdap.svc.orch.jobs.Helpers.runJob;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
-import static org.finos.tracdap.test.data.SampleDataFormats.generateBasicData;
 
 
 @Tag("integration")
@@ -80,11 +80,7 @@ public abstract class DataRoundTripTest {
             .build();
 
     static BufferAllocator ALLOCATOR;
-    static VectorSchemaRoot originalData;
-
     static TagHeader modelId;
-    static TagHeader inputDataId;
-    static TagHeader outputDataId;
 
     @BeforeAll
     static void setUp() {
@@ -95,14 +91,10 @@ public abstract class DataRoundTripTest {
     @AfterAll
     static void cleanUp() {
 
-        if (originalData != null)
-            originalData.close();
-
         ALLOCATOR.close();
     }
 
-    @Test
-    @Order(1)
+    @Test @Order(1)
     void importModel() throws Exception {
 
         log.info("Running IMPORT_MODEL job...");
@@ -156,20 +148,78 @@ public abstract class DataRoundTripTest {
     }
 
     @Test
-    @Order(2)
-    void saveInputData() throws Exception {
+    void basicData() throws Exception {
 
-        var arrowSchema = ArrowSchema.tracToArrow(SampleDataFormats.BASIC_TABLE_SCHEMA);
-        var root = generateBasicData(ALLOCATOR);
+        var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
+        var data = SampleData.generateBasicData(ALLOCATOR);
 
-        var unloader = new VectorUnloader(root);
+        doRoundTrip(schema, data, "basicData");
+    }
+
+    @Test
+    void nullDataItems() throws Exception {
+
+        var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
+        var data = SampleData.generateBasicData(ALLOCATOR);
+
+        // This is a quick way of masking a value in an Arrow vector
+        // Zeroing byte zero of the validity buffer will set the first 8 values to null (validity is a bit map)
+        for (var col = 0; col < data.getSchema().getFields().size(); ++col) {
+
+            var vector = data.getVector(col);
+            vector.getValidityBuffer().setZero(0, 1);
+            Assertions.assertNull(vector.getObject(0));
+        }
+
+        doRoundTrip(schema, data, "nullDataItems");
+    }
+
+    void doRoundTrip(Schema schema, VectorSchemaRoot inputData, String testName) throws Exception {
+
+        VectorSchemaRoot outputData = null;
+
+        try {
+
+            var inputDataId = saveInputData(schema, inputData, testName);
+            var outputDataId = runModel(inputDataId, testName);
+            outputData = loadOutputData(outputDataId);
+
+            Assertions.assertEquals(inputData.getSchema(), outputData.getSchema());
+            Assertions.assertEquals(inputData.getRowCount(), outputData.getRowCount());
+
+            for (var field : outputData.getSchema().getFields()) {
+
+                for (var i = 0; i < outputData.getRowCount(); i++) {
+
+                    var original = inputData.getVector(field).getObject(i);
+                    var rt = outputData.getVector(field).getObject(i);
+
+                    Assertions.assertEquals(
+                            original, rt,
+                            String.format("Difference in column [%s] row [%d]", field.getName(), i));
+                }
+            }
+        }
+        finally {
+
+            inputData.close();
+
+            if (outputData != null) {
+                outputData.close();
+            }
+        }
+    }
+
+    TagHeader saveInputData(Schema schema, VectorSchemaRoot data, String testName) throws Exception {
+
+        var unloader = new VectorUnloader(data);
         var batch = unloader.getRecordBatch();
-        var schemaBlock = DataBlock.forSchema(arrowSchema);
+        var schemaBlock = DataBlock.forSchema(schema);
         var dataBlock = DataBlock.forRecords(batch);
         var blockStream = Flows.publish(Stream.of(schemaBlock, dataBlock));
 
         var codec = new ArrowFileCodec();
-        var encoder = codec.getEncoder(ALLOCATOR, SampleDataFormats.BASIC_TABLE_SCHEMA, Map.of());
+        var encoder = codec.getEncoder(ALLOCATOR, SampleData.BASIC_TABLE_SCHEMA, Map.of());
 
         blockStream.subscribe(encoder);
         var opaqueData_ = Flows.fold(encoder, (bs, b) -> bs.addComponent(true, b), ByteBufAllocator.DEFAULT.compositeBuffer());
@@ -177,22 +227,21 @@ public abstract class DataRoundTripTest {
 
         var writeRequest = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setSchema(SampleDataFormats.BASIC_TABLE_SCHEMA)
+                .setSchema(SampleData.BASIC_TABLE_SCHEMA)
                 .setFormat("application/vnd.apache.arrow.file")
                 .setContent(ByteString.copyFrom(opaqueData.nioBuffer()))
                 .addTagUpdates(TagUpdate.newBuilder()
                         .setAttrName("round_trip_dataset")
-                        .setValue(MetadataCodec.encodeValue("round_trip:input")))
+                        .setValue(MetadataCodec.encodeValue(testName + ":input")))
                 .build();
 
         var dataClient = platform.dataClientBlocking();
-        inputDataId = dataClient.createSmallDataset(writeRequest);
 
-        originalData = root;
+
+        return dataClient.createSmallDataset(writeRequest);
     }
 
-    @Test @Order(3)
-    void runModel() {
+    TagHeader runModel(TagHeader inputDataId, String testName) {
 
         var metaClient = platform.metaClientBlocking();
         var orchClient = platform.orchClientBlocking();
@@ -203,7 +252,7 @@ public abstract class DataRoundTripTest {
                 .putInputs("round_trip_input", MetadataUtil.selectorFor(inputDataId))
                 .addOutputAttrs(TagUpdate.newBuilder()
                 .setAttrName("round_trip_dataset")
-                .setValue(MetadataCodec.encodeValue("round_trip:output")))
+                .setValue(MetadataCodec.encodeValue(testName + ":output")))
                 .build();
 
         var jobRequest = JobRequest.newBuilder()
@@ -213,7 +262,7 @@ public abstract class DataRoundTripTest {
                 .setRunModel(runModel))
                 .addJobAttrs(TagUpdate.newBuilder()
                 .setAttrName("round_trip_job")
-                .setValue(MetadataCodec.encodeValue("round_trip:run_model")))
+                .setValue(MetadataCodec.encodeValue(testName + ":run_model")))
                 .build();
 
         var jobStatus = runJob(orchClient, jobRequest);
@@ -237,12 +286,10 @@ public abstract class DataRoundTripTest {
 
         Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
 
-        outputDataId = dataSearchResult.getSearchResult(0).getHeader();
+        return dataSearchResult.getSearchResult(0).getHeader();
     }
 
-    @Test
-    @Order(4)
-    void checkOutputData() throws Exception {
+    VectorSchemaRoot loadOutputData(TagHeader outputDataId) throws Exception {
 
         var readRequest = DataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -257,7 +304,7 @@ public abstract class DataRoundTripTest {
 
         var codec = new ArrowFileCodec();
         var allocator = new RootAllocator();
-        var decoder = codec.getDecoder(allocator, SampleDataFormats.BASIC_TABLE_SCHEMA, Map.of());
+        var decoder = codec.getDecoder(allocator, SampleData.BASIC_TABLE_SCHEMA, Map.of());
 
         dataStream.subscribe(decoder);
         var blocks = resultOf(Flows.toList(decoder));
@@ -270,22 +317,6 @@ public abstract class DataRoundTripTest {
         var loader = new VectorLoader(root);
         loader.load(arrowRecords);
 
-        Assertions.assertEquals(originalData.getSchema(), root.getSchema());
-        Assertions.assertEquals(originalData.getRowCount(), root.getRowCount());
-
-        for (var field : root.getSchema().getFields()) {
-
-            for (var i = 0; i < root.getRowCount(); i++) {
-
-                var original = originalData.getVector(field).getObject(i);
-                var rt = root.getVector(field).getObject(i);
-
-                Assertions.assertEquals(
-                        original, rt,
-                        String.format("Difference in column [%s] row [%d]", field.getName(), i));
-            }
-        }
-
-        root.close();
+        return root;
     }
 }

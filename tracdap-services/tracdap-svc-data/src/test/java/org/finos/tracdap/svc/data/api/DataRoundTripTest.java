@@ -23,7 +23,7 @@ import org.finos.tracdap.common.concurrent.Flows;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.metadata.*;
 
-import org.finos.tracdap.test.data.SampleDataFormats;
+import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.helpers.TestResourceHelpers;
 import com.google.common.collect.Streams;
@@ -55,13 +55,13 @@ class DataRoundTripTest {
     private static final String TEST_TENANT = "ACME_CORP";
     private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
 
-    private static final String BASIC_CSV_DATA = SampleDataFormats.BASIC_CSV_DATA_RESOURCE;
-    private static final String BASIC_JSON_DATA = SampleDataFormats.BASIC_JSON_DATA_RESOURCE;
+    private static final String BASIC_CSV_DATA = SampleData.BASIC_CSV_DATA_RESOURCE;
+    private static final String BASIC_JSON_DATA = SampleData.BASIC_JSON_DATA_RESOURCE;
 
     private static final byte[] BASIC_CSV_CONTENT = TestResourceHelpers.loadResourceAsBytes(BASIC_CSV_DATA);
 
     private static final List<Vector<Object>> BASIC_TEST_DATA = DataApiTestHelpers.decodeCsv(
-            SampleDataFormats.BASIC_TABLE_SCHEMA,
+            SampleData.BASIC_TABLE_SCHEMA,
             List.of(ByteString.copyFrom(BASIC_CSV_CONTENT)));
 
 
@@ -81,7 +81,7 @@ class DataRoundTripTest {
         // Create a single batch of Arrow data
 
         var allocator = new RootAllocator();
-        var root = SampleDataFormats.generateBasicData(allocator);
+        var root = SampleData.generateBasicData(allocator);
 
         // Use a writer to encode the batch as a stream of chunks (arrow record batches, including the schema)
 
@@ -138,7 +138,7 @@ class DataRoundTripTest {
 
         var requestParams = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setSchema(SampleDataFormats.BASIC_TABLE_SCHEMA)
+                .setSchema(SampleData.BASIC_TABLE_SCHEMA)
                 .setFormat(writeFormat)
                 .build();
 
@@ -168,7 +168,7 @@ class DataRoundTripTest {
 
         var roundTripData = decodeFunc.apply(roundTripSchema, List.of(roundTripBytes));
 
-        Assertions.assertEquals(SampleDataFormats.BASIC_TABLE_SCHEMA, roundTripSchema);
+        Assertions.assertEquals(SampleData.BASIC_TABLE_SCHEMA, roundTripSchema);
 
         for (int i = 0; i < roundTripSchema.getTable().getFieldsCount(); i++) {
 

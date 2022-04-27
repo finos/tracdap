@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 
-public class SampleDataFormats {
+public class SampleData {
 
     public static final String BASIC_CSV_DATA_RESOURCE = "/sample_data/csv_basic.csv";
     public static final String BASIC_CSV_DATA_RESOURCE_V2 = "/sample_data/csv_basic_v2.csv";

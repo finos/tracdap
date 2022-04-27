@@ -29,7 +29,7 @@ import org.finos.tracdap.common.data.DataBlock;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.metadata.SchemaDefinition;
-import org.finos.tracdap.test.data.SampleDataFormats;
+import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.TestResourceHelpers;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -51,7 +51,7 @@ import java.util.stream.Stream;
 
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
-import static org.finos.tracdap.test.data.SampleDataFormats.generateBasicData;
+import static org.finos.tracdap.test.data.SampleData.generateBasicData;
 
 
 public abstract class CodecTestSuite {
@@ -70,12 +70,12 @@ public abstract class CodecTestSuite {
 
     static class CSVTest extends CodecTestSuite { @BeforeAll static void setup() {
         codec = new CsvCodec();
-        basicData = SampleDataFormats.BASIC_CSV_DATA_RESOURCE;
+        basicData = SampleData.BASIC_CSV_DATA_RESOURCE;
     } }
 
     static class JSONTest extends CodecTestSuite { @BeforeAll static void setup() {
         codec = new JsonCodec();
-        basicData = SampleDataFormats.BASIC_JSON_DATA_RESOURCE;
+        basicData = SampleData.BASIC_JSON_DATA_RESOURCE;
     } }
 
     private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
@@ -91,17 +91,17 @@ public abstract class CodecTestSuite {
     void roundTrip_basic() throws Exception {
 
         var allocator = new RootAllocator();
-        var arrowSchema = ArrowSchema.tracToArrow(SampleDataFormats.BASIC_TABLE_SCHEMA);
+        var arrowSchema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var root = generateBasicData(allocator);
 
-        roundTrip_impl(SampleDataFormats.BASIC_TABLE_SCHEMA, arrowSchema, root, allocator);
+        roundTrip_impl(SampleData.BASIC_TABLE_SCHEMA, arrowSchema, root, allocator);
     }
 
     @Test
     void roundTrip_nulls() throws Exception {
 
         var allocator = new RootAllocator();
-        var arrowSchema = ArrowSchema.tracToArrow(SampleDataFormats.BASIC_TABLE_SCHEMA);
+        var arrowSchema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var root = generateBasicData(allocator);
 
         // With the basic test data, we'll get one null value for each data type
@@ -129,7 +129,7 @@ public abstract class CodecTestSuite {
 
         }
 
-        roundTrip_impl(SampleDataFormats.BASIC_TABLE_SCHEMA, arrowSchema, root, allocator);
+        roundTrip_impl(SampleData.BASIC_TABLE_SCHEMA, arrowSchema, root, allocator);
     }
 
     @Test
@@ -201,14 +201,14 @@ public abstract class CodecTestSuite {
     void decode_basic() throws Exception {
 
         var allocator = new RootAllocator();
-        var arrowSchema = ArrowSchema.tracToArrow(SampleDataFormats.BASIC_TABLE_SCHEMA);
+        var arrowSchema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var root = generateBasicData(allocator);
 
         var testData = TestResourceHelpers.loadResourceAsBytes(basicData);
         var testDataBuf = Unpooled.wrappedBuffer(testData);
         var testDataStream = Flows.publish(List.of(testDataBuf));
 
-        var decoder = codec.getDecoder(allocator, SampleDataFormats.BASIC_TABLE_SCHEMA, Map.of());
+        var decoder = codec.getDecoder(allocator, SampleData.BASIC_TABLE_SCHEMA, Map.of());
         testDataStream.subscribe(decoder);
 
         var roundTrip = Flows.fold(decoder, (bs, b) -> {bs.add(b); return bs;}, new ArrayList<DataBlock>());
@@ -235,7 +235,7 @@ public abstract class CodecTestSuite {
         // An empty stream (i.e. with no buffers)
 
         var noBufStream = Flows.publish(List.<ByteBuf>of());
-        var noBufDecoder = codec.getDecoder(allocator, SampleDataFormats.BASIC_TABLE_SCHEMA, Map.of());
+        var noBufDecoder = codec.getDecoder(allocator, SampleData.BASIC_TABLE_SCHEMA, Map.of());
         noBufStream.subscribe(noBufDecoder);
 
         var noBufResult = Flows.fold(noBufDecoder, (bs, b) -> {bs.add(b); return bs;}, new ArrayList<DataBlock>());
@@ -251,7 +251,7 @@ public abstract class CodecTestSuite {
                 new EmptyByteBuf(ByteBufAllocator.DEFAULT));
 
         var emptyBufStream = Flows.publish(emptyBuffers);
-        var emptyBufDecoder = codec.getDecoder(allocator, SampleDataFormats.BASIC_TABLE_SCHEMA, Map.of());
+        var emptyBufDecoder = codec.getDecoder(allocator, SampleData.BASIC_TABLE_SCHEMA, Map.of());
         emptyBufStream.subscribe(emptyBufDecoder);
 
         var emptyBufResult = Flows.fold(emptyBufDecoder, (bs, b) -> {bs.add(b); return bs;}, new ArrayList<DataBlock>());
@@ -279,7 +279,7 @@ public abstract class CodecTestSuite {
         // Run the garbage data through the decoder
 
         var allocator = new RootAllocator();
-        var decoder = codec.getDecoder(allocator, SampleDataFormats.BASIC_TABLE_SCHEMA, Map.of());
+        var decoder = codec.getDecoder(allocator, SampleData.BASIC_TABLE_SCHEMA, Map.of());
         testDataStream.subscribe(decoder);
 
         // Decoder should report EDataCorruption
