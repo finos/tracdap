@@ -44,6 +44,7 @@ import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.impl.type_system as _types
+import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.util as _util
 
 
@@ -357,7 +358,12 @@ class CommonDataStorage(IDataStorage):
                 raise NotImplementedError("Directory storage format not available yet")
 
         with self.__file_storage.read_byte_stream(storage_path) as byte_stream:
-            return format_impl.read_table(byte_stream, schema)
+            table = format_impl.read_table(byte_stream, schema)
+
+        if schema is not None:
+            return _data.DataConformance.conform_to_schema(table, schema)
+        else:
+            return table
 
     def write_table(
             self, storage_path: str, storage_format: str,
