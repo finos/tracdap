@@ -93,7 +93,7 @@ class DataStorageTestSuite:
         sample_data = self.sample_data()
 
         for col, values in sample_data.items():
-            values[2] = None
+            values[0] = None
 
         table = pa.Table.from_pydict(sample_data, self.sample_schema())  # noqa
 
