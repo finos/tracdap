@@ -19,22 +19,21 @@ import tempfile
 import unittest
 import sys
 
-import pandas as pd
+import pyarrow as pa
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.metadata as _meta
 import tracdap.rt.impl.type_system as _types
-import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.storage as _storage
 import tracdap.rt.impl.util as _util
 
-ROOT_DIR = pathlib.Path(__file__).parent \
+
+_ROOT_DIR = pathlib.Path(__file__).parent \
     .joinpath("../../../../../..") \
     .resolve()
 
-TEST_DATA_DIR = ROOT_DIR \
+_TEST_DATA_DIR = _ROOT_DIR \
     .joinpath("tracdap-libs/tracdap-lib-test/src/main/resources/sample_data")
-
 
 _util.configure_logging()
 
@@ -50,7 +49,7 @@ class DataStorageTestSuite:
     @staticmethod
     def sample_schema():
 
-        return _meta.SchemaDefinition(
+        trac_schema = _meta.SchemaDefinition(
             _meta.SchemaType.TABLE,
             _meta.PartType.PART_ROOT,
             _meta.TableSchema(fields=[
@@ -63,10 +62,12 @@ class DataStorageTestSuite:
                 _meta.FieldSchema("datetime_field", fieldType=_meta.BasicType.DATETIME),
             ]))
 
+        return _types.trac_to_arrow_schema(trac_schema)
+
     @staticmethod
     def sample_data():
 
-        return pd.DataFrame({
+        return {
             "boolean_field": [True, False, True, False],
             "integer_field": [1, 2, 3, 4],
             "float_field": [1.0, 2.0, 3.0, 4.0],
@@ -76,17 +77,11 @@ class DataStorageTestSuite:
             "datetime_field": [
                 dt.datetime(2000, 1, 1, 0, 0, 0), dt.datetime(2000, 1, 2, 1, 1, 1),
                 dt.datetime(2000, 1, 3, 2, 2, 2), dt.datetime(2000, 1, 4, 3, 3, 3)]
-        })
+        }
 
     def test_round_trip_basic(self):
 
-        # Use the schema to create a table using standard TRAC data types
-
-        trac_schema = self.sample_schema()
-        df = self.sample_data()
-
-        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
-        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
+        table = pa.Table.from_pydict(self.sample_data(), self.sample_schema())  # noqa
 
         self.storage.write_table("round_trip_basic", self.storage_format, table)
         rt_table = self.storage.read_table("round_trip_basic", self.storage_format, table.schema)
@@ -95,15 +90,12 @@ class DataStorageTestSuite:
 
     def test_round_trip_nulls(self):
 
-        trac_schema = self.sample_schema()
-        df = self.sample_data()
+        sample_data = self.sample_data()
 
-        for col in df.columns:
-            df[col, 2] = None
-            self.assertTrue(df[col, 2].isnull)
+        for col, values in sample_data.items():
+            values[2] = None
 
-        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
-        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
+        table = pa.Table.from_pydict(sample_data, self.sample_schema())  # noqa
 
         self.storage.write_table("round_trip_nulls", self.storage_format, table)
         rt_table = self.storage.read_table("round_trip_nulls", self.storage_format, table.schema)
@@ -112,16 +104,13 @@ class DataStorageTestSuite:
 
     def test_edge_cases_integer(self):
 
-        trac_schema = self.one_field_schema(_meta.BasicType.INTEGER)
-        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
-
-        df = pd.DataFrame({"integer_field": [
+        schema = self.one_field_schema(_meta.BasicType.INTEGER)
+        table = pa.Table.from_pydict({"integer_field": [  # noqa
             0,
             sys.maxsize,
             -sys.maxsize - 1
-        ]})
+        ]}, schema)
 
-        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
         self.storage.write_table("edge_cases_integer", self.storage_format, table)
         rt_table = self.storage.read_table("edge_cases_integer", self.storage_format, table.schema)
 
@@ -129,18 +118,15 @@ class DataStorageTestSuite:
 
     def test_edge_cases_float(self):
 
-        trac_schema = self.one_field_schema(_meta.BasicType.FLOAT)
-        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
-
-        df = pd.DataFrame({"float_field": [
+        schema = self.one_field_schema(_meta.BasicType.FLOAT)
+        table = pa.Table.from_pydict({"float_field": [  # noqa
             0.0,
             sys.float_info.min,
             sys.float_info.max,
             sys.float_info.epsilon,
             -sys.float_info.epsilon
-        ]})
+        ]}, schema)
 
-        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
         self.storage.write_table("edge_cases_float", self.storage_format, table)
         rt_table = self.storage.read_table("edge_cases_float", self.storage_format, table.schema)
 
@@ -151,18 +137,15 @@ class DataStorageTestSuite:
         # TRAC basic decimal has precision 38, scale 12
         # Should allow for 26 places before the decimal place and 12 after
 
-        trac_schema = self.one_field_schema(_meta.BasicType.DECIMAL)
-        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
-
-        df = pd.DataFrame({"decimal_field": [
+        schema = self.one_field_schema(_meta.BasicType.DECIMAL)
+        table = pa.Table.from_pydict({"decimal_field": [  # noqa
             decimal.Decimal(0.0),
             decimal.Decimal(1.0) * decimal.Decimal(1.0).shift(25),
             decimal.Decimal(1.0) / decimal.Decimal(1.0).shift(12),
             decimal.Decimal(-1.0) * decimal.Decimal(1.0).shift(25),
             decimal.Decimal(-1.0) / decimal.Decimal(1.0).shift(12)
-        ]})
+        ]}, schema)
 
-        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
         self.storage.write_table("edge_cases_decimal", self.storage_format, table)
         rt_table = self.storage.read_table("edge_cases_decimal", self.storage_format, table.schema)
 
@@ -170,17 +153,14 @@ class DataStorageTestSuite:
 
     def test_edge_cases_string(self):
 
-        trac_schema = self.one_field_schema(_meta.BasicType.STRING)
-        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
-
-        df = pd.DataFrame({"string_field": [
+        schema = self.one_field_schema(_meta.BasicType.STRING)
+        table = pa.Table.from_pydict({"string_field": [  # noqa
             "", " ", "  ", "\t", "\r\n", "  \r\n   ",
             "a, b\",", "'@@'", "[\"\"%^&", "£££", "#@",
             "Olá Mundo", "你好，世界", "Привет, мир", "नमस्ते दुनिया",
             "𝜌 = ∑ 𝑃𝜓 | 𝜓 ⟩ ⟨ 𝜓 |"
-        ]})
+        ]}, schema)
 
-        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
         self.storage.write_table("edge_cases_string", self.storage_format, table)
         rt_table = self.storage.read_table("edge_cases_string", self.storage_format, table.schema)
 
@@ -188,18 +168,15 @@ class DataStorageTestSuite:
 
     def test_edge_cases_date(self):
 
-        trac_schema = self.one_field_schema(_meta.BasicType.DATE)
-        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
-
-        df = pd.DataFrame({"date_field": [
+        schema = self.one_field_schema(_meta.BasicType.DATE)
+        table = pa.Table.from_pydict({"date_field": [  # noqa
             dt.date(1970, 1, 1),
             dt.date(2000, 1, 1),
             dt.date(2038, 1, 20),
             dt.date.max,
             dt.date.min
-        ]})
+        ]}, schema)
 
-        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
         self.storage.write_table("edge_cases_date", self.storage_format, table)
         rt_table = self.storage.read_table("edge_cases_date", self.storage_format, table.schema)
 
@@ -207,18 +184,15 @@ class DataStorageTestSuite:
 
     def test_edge_cases_datetime(self):
 
-        trac_schema = self.one_field_schema(_meta.BasicType.DATETIME)
-        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
-
-        df = pd.DataFrame({"datetime_field": [
+        schema = self.one_field_schema(_meta.BasicType.DATETIME)
+        table = pa.Table.from_pydict({"datetime_field": [  # noqa
             dt.datetime(1970, 1, 1),
             dt.datetime(2000, 1, 1),
             dt.datetime(2038, 1, 20),
             dt.datetime.max,
             dt.datetime.min
-        ]})
+        ]}, schema)
 
-        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
         self.storage.write_table("edge_cases_datetime", self.storage_format, table)
         rt_table = self.storage.read_table("edge_cases_datetime", self.storage_format, table.schema)
 
@@ -229,11 +203,13 @@ class DataStorageTestSuite:
 
         field_name = f"{field_type.name.lower()}_field"
 
-        return _meta.SchemaDefinition(
+        trac_schema = _meta.SchemaDefinition(
             _meta.SchemaType.TABLE,
             _meta.PartType.PART_ROOT,
             _meta.TableSchema(fields=[
                 _meta.FieldSchema(field_name, fieldType=field_type)]))
+
+        return _types.trac_to_arrow_schema(trac_schema)
 
 
 class LocalStorageTest(DataStorageTestSuite):
@@ -265,7 +241,7 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
 
         test_lib_storage_instance = _cfg.StorageInstance(
             storageType="LOCAL",
-            storageProps={"rootPath": str(TEST_DATA_DIR)})
+            storageProps={"rootPath": str(_TEST_DATA_DIR)})
 
         test_lib_storage_config = _cfg.StorageConfig([test_lib_storage_instance])
         test_lib_file_storage = _storage.LocalFileStorage(test_lib_storage_instance)
@@ -281,7 +257,7 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
 
         storage_options = {"lenient_csv_parser": True}
 
-        schema = _types.trac_to_arrow_schema(self.sample_schema())
+        schema = self.sample_schema()
         table = self.test_lib_storage.read_table("csv_basic.csv", "CSV", schema, storage_options)
 
         self.assertEqual(7, table.num_columns)
@@ -291,7 +267,7 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
 
         storage_options = {"lenient_csv_parser": True}
 
-        schema = _types.trac_to_arrow_schema(self.sample_schema())
+        schema = self.sample_schema()
         table = self.test_lib_storage.read_table("csv_edge_cases.csv", "CSV", schema, storage_options)
 
         self.assertEqual(7, table.num_columns)
