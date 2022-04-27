@@ -439,7 +439,7 @@ class _ParquetStorageFormat(IDataFormat):
 
 class _CsvStorageFormat(IDataFormat):
 
-    __CSV_FALLBACK_PARSER = "csv_fallback_parser"
+    __LENIENT_CSV_PARSER = "lenient_csv_parser"
 
     __TRUE_VALUES = ['true', 't', 'yes' 'y', '1']
     __FALSE_VALUES = ['false', 'f', 'no' 'n', '0']
@@ -447,11 +447,11 @@ class _CsvStorageFormat(IDataFormat):
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
 
         self._format_options = format_options
-        self._use_fallback_parser = False
+        self._use_lenient_parser = False
 
         if format_options:
-            if format_options.get(self.__CSV_FALLBACK_PARSER) is True:
-                self._use_fallback_parser = True
+            if format_options.get(self.__LENIENT_CSV_PARSER) is True:
+                self._use_lenient_parser = True
 
     def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
@@ -460,8 +460,8 @@ class _CsvStorageFormat(IDataFormat):
         if schema is None or len(schema.names) == 0 or len(schema.types) == 0:
             raise _ex.EStorageFormat("An explicit schema is required to load CSV data")
 
-        if self._use_fallback_parser:
-            return self._read_table_fallback(source, schema)
+        if self._use_lenient_parser:
+            return self._read_table_lenient(source, schema)
         else:
             return self._read_table_arrow(source, schema)
 
@@ -557,7 +557,7 @@ class _CsvStorageFormat(IDataFormat):
         return pa.array(map(format_timestamp, column), pa.utf8())
 
     @classmethod
-    def _read_table_fallback(cls, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
+    def _read_table_lenient(cls, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
         stream_reader = codecs.getreader('utf-8')
         text_source = stream_reader(source)

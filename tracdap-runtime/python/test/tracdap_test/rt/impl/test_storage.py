@@ -166,7 +166,7 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
 
     def test_csv_basic(self):
 
-        storage_options = {"csv_fallback_parser": True}
+        storage_options = {"lenient_csv_parser": True}
 
         schema = _types.trac_to_arrow_schema(self.sample_schema())
         table = self.test_lib_storage.read_table("csv_basic.csv", "CSV", schema, storage_options)
@@ -176,7 +176,7 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
 
     def test_csv_edge_cases(self):
 
-        storage_options = {"csv_fallback_parser": True}
+        storage_options = {"lenient_csv_parser": True}
 
         schema = _types.trac_to_arrow_schema(self.sample_schema())
         table = self.test_lib_storage.read_table("csv_edge_cases.csv", "CSV", schema, storage_options)
