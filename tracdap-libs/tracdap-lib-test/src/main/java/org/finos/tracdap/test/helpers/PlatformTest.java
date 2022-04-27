@@ -41,7 +41,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -226,20 +225,13 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         log.info("Prepare config for platform testing...");
 
-        // Git is not available in CI for tests run inside containers
-        // So, only look up the current repo if it is needed by the orchestrator
-        // To run orchestrator tests in a container, we'd need to pass the repo URL in, e.g. with an env var from CI
-        String currentGitOrigin = startOrch
-                ? getCurrentGitOrigin()
-                : "git_repo_not_configured";
-
         // Substitutions are used by template config files in test resources
         // But it is harmless to apply them to fully defined config files as well
         var substitutions = Map.of(
                 "${TRAC_DIR}", tracDir.toString().replace("\\", "\\\\"),
                 "${TRAC_STORAGE_DIR}", tracStorageDir.toString().replace("\\", "\\\\"),
                 "${TRAC_EXEC_DIR}", tracExecDir.toString().replace("\\", "\\\\"),
-                "${CURRENT_GIT_ORIGIN}", currentGitOrigin,
+                "${TRAC_REPO_DIR}", tracRepoDir.toString(),
                 "${STORAGE_FORMAT}", storageFormat);
 
         platformConfigUrl = ConfigHelpers.prepareConfig(
@@ -254,28 +246,6 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         var config = new ConfigManager(platformConfigUrl.toString(), tracDir, plugins);
         platformConfig = config.loadRootConfigObject(PlatformConfig.class);
-    }
-
-    String getCurrentGitOrigin() throws Exception {
-
-        var pb = new ProcessBuilder();
-        pb.command("git", "config", "--get", "remote.origin.url");
-
-        var proc = pb.start();
-
-        try {
-            proc.waitFor(10, TimeUnit.SECONDS);
-
-            var procResult = proc.getInputStream().readAllBytes();
-            var origin = new String(procResult, StandardCharsets.UTF_8).strip();
-
-            log.info("Using Git origin: {}", origin);
-
-            return origin;
-        }
-        finally {
-            proc.destroy();
-        }
     }
 
     void prepareDatabase() {
