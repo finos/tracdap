@@ -141,7 +141,7 @@ class EDataConversion(EData):
     pass
 
 
-class EDataConformity(EData):
+class EDataConformance(EData):
 
     """
     Data does not conform to the required the schema (and cannot be coerced)

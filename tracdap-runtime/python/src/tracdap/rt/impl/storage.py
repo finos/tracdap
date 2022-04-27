@@ -582,7 +582,7 @@ class _CsvStorageFormat(IDataFormat):
 
         for col in schema.names:
             if col not in header:
-                raise _ex.EDataConformity(f"Missing column {col}")  # TODO
+                raise _ex.EDataConformance(f"Missing column {col}")  # TODO
 
         schema_columns = dict(zip(schema.names, range(len(schema.names))))
         col_mapping = [schema_columns.get(col) for col in header]
