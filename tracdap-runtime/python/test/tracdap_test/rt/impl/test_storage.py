@@ -17,6 +17,7 @@ import decimal
 import pathlib
 import tempfile
 import unittest
+import sys
 
 import pandas as pd
 
@@ -36,16 +37,6 @@ TEST_DATA_DIR = ROOT_DIR \
 
 
 _util.configure_logging()
-
-
-class FileStorageTest(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        pass
-
-    def test_fs_1(self):
-        pass
 
 
 class DataStorageTestSuite:
@@ -119,8 +110,130 @@ class DataStorageTestSuite:
 
         self.assertEqual(table, rt_table)
 
-    def test_round_trip_edge_cases(self):
-        pass
+    def test_edge_cases_integer(self):
+
+        trac_schema = self.one_field_schema(_meta.BasicType.INTEGER)
+        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
+
+        df = pd.DataFrame({"integer_field": [
+            0,
+            sys.maxsize,
+            -sys.maxsize - 1
+        ]})
+
+        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
+        self.storage.write_table("edge_cases_integer", self.storage_format, table)
+        rt_table = self.storage.read_table("edge_cases_integer", self.storage_format, table.schema)
+
+        self.assertEqual(table, rt_table)
+
+    def test_edge_cases_float(self):
+
+        trac_schema = self.one_field_schema(_meta.BasicType.FLOAT)
+        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
+
+        df = pd.DataFrame({"float_field": [
+            0.0,
+            sys.float_info.min,
+            sys.float_info.max,
+            sys.float_info.epsilon,
+            -sys.float_info.epsilon
+        ]})
+
+        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
+        self.storage.write_table("edge_cases_float", self.storage_format, table)
+        rt_table = self.storage.read_table("edge_cases_float", self.storage_format, table.schema)
+
+        self.assertEqual(table, rt_table)
+
+    def test_edge_cases_decimal(self):
+
+        # TRAC basic decimal has precision 38, scale 12
+        # Should allow for 26 places before the decimal place and 12 after
+
+        trac_schema = self.one_field_schema(_meta.BasicType.DECIMAL)
+        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
+
+        df = pd.DataFrame({"decimal_field": [
+            decimal.Decimal(0.0),
+            decimal.Decimal(1.0) * decimal.Decimal(1.0).shift(25),
+            decimal.Decimal(1.0) / decimal.Decimal(1.0).shift(12),
+            decimal.Decimal(-1.0) * decimal.Decimal(1.0).shift(25),
+            decimal.Decimal(-1.0) / decimal.Decimal(1.0).shift(12)
+        ]})
+
+        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
+        self.storage.write_table("edge_cases_decimal", self.storage_format, table)
+        rt_table = self.storage.read_table("edge_cases_decimal", self.storage_format, table.schema)
+
+        self.assertEqual(table, rt_table)
+
+    def test_edge_cases_string(self):
+
+        trac_schema = self.one_field_schema(_meta.BasicType.STRING)
+        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
+
+        df = pd.DataFrame({"string_field": [
+            "", " ", "  ", "\t", "\r\n", "  \r\n   ",
+            "a, b\",", "'@@'", "[\"\"%^&", "£££", "#@",
+            "Olá Mundo", "你好，世界", "Привет, мир", "नमस्ते दुनिया",
+            "𝜌 = ∑ 𝑃𝜓 | 𝜓 ⟩ ⟨ 𝜓 |"
+        ]})
+
+        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
+        self.storage.write_table("edge_cases_string", self.storage_format, table)
+        rt_table = self.storage.read_table("edge_cases_string", self.storage_format, table.schema)
+
+        self.assertEqual(table, rt_table)
+
+    def test_edge_cases_date(self):
+
+        trac_schema = self.one_field_schema(_meta.BasicType.DATE)
+        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
+
+        df = pd.DataFrame({"date_field": [
+            dt.date(1970, 1, 1),
+            dt.date(2000, 1, 1),
+            dt.date(2038, 1, 20),
+            dt.date.max,
+            dt.date.min
+        ]})
+
+        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
+        self.storage.write_table("edge_cases_date", self.storage_format, table)
+        rt_table = self.storage.read_table("edge_cases_date", self.storage_format, table.schema)
+
+        self.assertEqual(table, rt_table)
+
+    def test_edge_cases_datetime(self):
+
+        trac_schema = self.one_field_schema(_meta.BasicType.DATETIME)
+        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
+
+        df = pd.DataFrame({"datetime_field": [
+            dt.datetime(1970, 1, 1),
+            dt.datetime(2000, 1, 1),
+            dt.datetime(2038, 1, 20),
+            dt.datetime.max,
+            dt.datetime.min
+        ]})
+
+        table = _data.DataMapping.pandas_to_arrow(df, arrow_schema)
+        self.storage.write_table("edge_cases_datetime", self.storage_format, table)
+        rt_table = self.storage.read_table("edge_cases_datetime", self.storage_format, table.schema)
+
+        self.assertEqual(table, rt_table)
+
+    @staticmethod
+    def one_field_schema(field_type: _meta.BasicType):
+
+        field_name = f"{field_type.name.lower()}_field"
+
+        return _meta.SchemaDefinition(
+            _meta.SchemaType.TABLE,
+            _meta.PartType.PART_ROOT,
+            _meta.TableSchema(fields=[
+                _meta.FieldSchema(field_name, fieldType=field_type)]))
 
 
 class LocalStorageTest(DataStorageTestSuite):

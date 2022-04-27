@@ -258,12 +258,17 @@ class DataConformity:
         raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
 
     @staticmethod
-    def _coerce_decimal(vector: pa.Array, target_type: pa.DataType) -> pa.Decimal128Array:
+    def _coerce_decimal(vector: pa.Array, target_type: pa.DataType) -> pa.Array:
 
         # Allow coercing decimal 128 -> decimal 256, but not vice versa
-        if pa.types.is_decimal(vector.type) and target_type.bit_width >= vector.type.bit_width:
-            rounded = pc.round(vector, ndigits=target_type.scale)  # noqa
-            return pc.cast(rounded, target_type)
+        if pa.types.is_decimal(vector.type):
+
+            source_max = vector.type.precision - vector.type.scale
+            target_max = target_type.precision - target_type.scale  # noqa
+
+            if source_max <= target_max:
+                rounded = pc.round(vector, ndigits=target_type.scale)  # noqa
+                return pc.cast(rounded, target_type)
 
         # Coerce floats and integers to decimal, always allowed
         if pa.types.is_floating(vector.type) or pa.types.is_integer(vector.type):
@@ -272,15 +277,15 @@ class DataConformity:
         raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
 
     @staticmethod
-    def _coerce_string(vector: pa.Array, target_type: pa.DataType) -> pa.StringArray:
+    def _coerce_string(vector: pa.Array, target_type: pa.DataType) -> pa.Array:
 
         if pa.types.is_string(vector.type):
-            return vector  # noqa
+            return vector
 
         raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
 
     @staticmethod
-    def _coerce_date(vector: pa.Array, target_type: pa.DataType) -> pa.Decimal128Array:
+    def _coerce_date(vector: pa.Array, target_type: pa.DataType) -> pa.Array:
 
         if pa.types.is_date(vector.type):
 
@@ -290,11 +295,30 @@ class DataConformity:
         raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
 
     @staticmethod
-    def _coerce_timestamp(vector: pa.Array, target_type: pa.DataType) -> pa.Decimal128Array:
+    def _coerce_timestamp(vector: pa.Array, target_type: pa.DataType) -> pa.Array:
 
         if pa.types.is_timestamp(vector.type):
 
+            if not isinstance(target_type, pa.TimestampType):
+                raise _ex.EUnexpected()
+
+            if target_type.unit == "s":
+                rounding_unit = "second"
+            elif target_type.unit == "ms":
+                rounding_unit = "millisecond"
+            elif target_type.unit == "us":
+                rounding_unit = "microsecond"
+            elif target_type.unit == "ns":
+                rounding_unit = "nanosecond"
+            else:
+                raise _ex.EUnexpected()
+
+            # round_temporal does not change the type for the rounded vector
+            # E.g. rounding "us" vector to "ms" results in "us" vector with truncated values
+            # So, we need to set safe=False when calling pc.cast()
+
             if target_type.bit_width >= vector.type.bit_width:
-                return pc.cast(vector, target_type)
+                rounded_vector = pc.round_temporal(vector, unit=rounding_unit)  # noqa
+                return pc.cast(vector, target_type, safe=False)
 
         raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")

@@ -491,6 +491,7 @@ class _CsvStorageFormat(IDataFormat):
         convert_options.include_columns = schema.names
         convert_options.column_types = {n: t for (n, t) in zip(schema.names, schema.types)}
         convert_options.strings_can_be_null = True
+        convert_options.quoted_strings_can_be_null = False
 
         return pa_csv.read_csv(source, read_options, parse_options, convert_options)
 
