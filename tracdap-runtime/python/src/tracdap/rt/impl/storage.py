@@ -531,9 +531,14 @@ class _CsvStorageFormat(IDataFormat):
         # Use the scale of the column as the maximum d.p., then strip away any unneeded trailing chars
 
         def format_decimal(d: pa.Scalar):
-            base_format = f".{column_type.scale}f"
-            base_str = format(d.as_py(), base_format)
-            return base_str.rstrip('0').rstrip('.')
+
+            if not d.is_valid:
+                return None
+
+            decimal_format = f".{column_type.scale}f"
+            decimal_str = format(d.as_py(), decimal_format)
+
+            return decimal_str.rstrip('0').rstrip('.')
 
         return pa.array(map(format_decimal, column), pa.utf8())
 
@@ -552,7 +557,11 @@ class _CsvStorageFormat(IDataFormat):
         else:
             timespec = "microseconds"
 
-        def format_timestamp(t: pa.Scalar) -> str:
+        def format_timestamp(t: pa.Scalar):
+
+            if not t.is_valid:
+                return None
+
             return t.as_py().isoformat(timespec=timespec)
 
         return pa.array(map(format_timestamp, column), pa.utf8())
