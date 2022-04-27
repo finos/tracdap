@@ -17,6 +17,7 @@ from __future__ import annotations
 import dataclasses as dc
 import typing as tp
 
+import pandas.core.dtypes.dtypes
 import pyarrow as pa
 import pyarrow.compute as pc
 import pandas as pd
@@ -123,7 +124,9 @@ class DataMapping:
     __ARROW_TO_PANDAS_TYPES = {
         pa.bool_(): pd.BooleanDtype(),
         pa.int64(): pd.Int64Dtype(),
-        pa.float64(): pd.Float64Dtype(),
+        # TODO: What should be the default behavior for floats?
+        # Float64DType is available in Pandas 1.2 and later, it offers more consistent handling of NaN / null
+        pa.float64(): pd.Float64Dtype() if "Float64DType" in pd.__dict__ else None
     }
 
     @classmethod
