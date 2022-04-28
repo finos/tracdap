@@ -135,6 +135,19 @@ class DataStorageTestSuite:
 
         self.assertEqual(table, rt_table)
 
+    def test_edge_cases_float_nan(self):
+
+        # For NaN, a special test that checks math.isnan on the round-trip result
+        # Because math.nan != math.nan
+
+        schema = self.one_field_schema(_meta.BasicType.FLOAT)
+        table = pa.Table.from_pydict({"float_field": [math.nan]}, schema)  # noqa
+
+        self.storage.write_table("edge_cases_float_nan", self.storage_format, table)
+        rt_table = self.storage.read_table("edge_cases_float_nan", self.storage_format, table.schema)
+
+        self.assertTrue(math.isnan(rt_table.column(0)[0].as_py()))
+
     def test_edge_cases_decimal(self):
 
         # TRAC basic decimal has precision 38, scale 12
