@@ -17,14 +17,12 @@
 package org.finos.tracdap.test.data;
 
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.finos.tracdap.common.codec.arrow.ArrowSchema;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.metadata.*;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.*;
-import org.apache.arrow.vector.types.pojo.ArrowType;
-import org.apache.arrow.vector.types.pojo.Field;
-import org.apache.arrow.vector.types.pojo.FieldType;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -35,6 +33,7 @@ import java.time.ZoneOffset;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 
 public class SampleData {
@@ -88,55 +87,70 @@ public class SampleData {
 
     public static VectorSchemaRoot generateBasicData(BufferAllocator arrowAllocator) {
 
-        var decimalPrecision = 38;
-        var decimalScale = 12;
-        var decimalWidth = 16;
+        var javaData = new HashMap<String, List<Object>>();
 
-        var decimalArrowType = new ArrowType.Decimal(decimalPrecision, decimalScale, decimalWidth * 8);
-        var decimalFieldType = FieldType.nullable(decimalArrowType);
-        var decimalField = new Field("decimal_field", decimalFieldType, null);
+        for (var field : BASIC_TABLE_SCHEMA.getTable().getFieldsList()) {
 
-        var booleanVec = new BitVector("boolean_field", arrowAllocator);
-        booleanVec.allocateNew(10);
-        var integerVec = new BigIntVector("integer_field", arrowAllocator);
-        integerVec.allocateNew(10);
-        var floatVec = new Float8Vector("float_field", arrowAllocator);
-        floatVec.allocateNew(10);
-        var decimalVec = new DecimalVector(decimalField, arrowAllocator);
-        decimalVec.allocateNew(10);
-        var stringVec = new VarCharVector("string_field", arrowAllocator);
-        stringVec.allocateNew(10);
-        var dateVec = new DateDayVector("date_field", arrowAllocator);
-        dateVec.allocateNew(10);
-        var datetimeVec = new TimeStampMilliVector("datetime_field", arrowAllocator);
-        datetimeVec.allocateNew(10);
-
-        for (int row = 0; row < 10; row++) {
-
-            var decimalVal = new BigDecimal(row);
-            var scaledDecimalVal = decimalVal.setScale(decimalScale, RoundingMode.UNNECESSARY);
-
-            var varcharVal = String.format("Hello world %d", row).getBytes(StandardCharsets.UTF_8);
-
-            booleanVec.set(row, row % 2 == 0 ? 1 : 0);
-            integerVec.set(row, row);
-            floatVec.set(row, 1.0 * row);
-            decimalVec.set(row, scaledDecimalVal);
-            stringVec.set(row, varcharVal);
-            dateVec.set(row, row);  // using epoch day = row index
-            datetimeVec.set(row, row * 1000);  // milliseconds after epoch
+            var javaValues = generateJavaValues(field.getFieldType(), 10);
+            javaData.put(field.getFieldName(), javaValues);
         }
 
-        var vectors = List.<FieldVector>of(booleanVec, integerVec, floatVec, decimalVec, stringVec, dateVec, datetimeVec);
-        var fields = vectors.stream().map(FieldVector::getField).collect(Collectors.toList());
-
-        var root = new VectorSchemaRoot(fields, vectors);
-        root.setRowCount(10);
-
-        return root;
+        return convertData(BASIC_TABLE_SCHEMA, javaData, 10, arrowAllocator);
     }
 
-    public static VectorSchemaRoot generateDataFor(
+    public static List<Object> generateJavaValues(BasicType basicType, int n) {
+
+        switch (basicType) {
+
+            case BOOLEAN:
+                return IntStream.range(0, n)
+                        .mapToObj(i -> i % 2 == 0)
+                        .collect(Collectors.toList());
+
+            case INTEGER:
+                return IntStream.range(0, n)
+                        .mapToObj(i -> (long) i)
+                        .collect(Collectors.toList());
+
+            case FLOAT:
+                return IntStream.range(0, n)
+                        .mapToObj(i -> (double) i)
+                        .collect(Collectors.toList());
+
+            case DECIMAL:
+                return IntStream.range(0, n)
+                        .mapToObj(BigDecimal::valueOf)
+                        .map(d -> d.setScale(12, RoundingMode.UNNECESSARY))
+                        .collect(Collectors.toList());
+
+            case STRING:
+                return IntStream.range(0, n)
+                        .mapToObj(i -> "Hello world " + i)
+                        .collect(Collectors.toList());
+
+            case DATE:
+                return IntStream.range(0, n)
+                        .mapToObj(i -> LocalDate.now().plusDays(i))
+                        .collect(Collectors.toList());
+
+            case DATETIME:
+                return IntStream.range(0, n)
+                        .mapToObj(i -> LocalDateTime.now().plusDays(i))
+                        .collect(Collectors.toList());
+
+            default:
+                throw new EUnexpected();
+        }
+    }
+
+    public static VectorSchemaRoot convertData(
+            SchemaDefinition schema, Map<String, List<Object>> data,
+            int size, BufferAllocator arrowAllocator) {
+
+        return convertData(ArrowSchema.tracToArrow(schema), data, size, arrowAllocator);
+    }
+
+    public static VectorSchemaRoot convertData(
             Schema schema, Map<String, List<Object>> data,
             int size, BufferAllocator arrowAllocator) {
 

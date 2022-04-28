@@ -44,6 +44,12 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -159,18 +165,38 @@ public abstract class DataRoundTripTest {
     }
 
     @Test
-    void nullDataItems() throws Exception {
+    void nullFirstRow() throws Exception {
 
         var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.generateBasicData(ALLOCATOR);
 
-        // This is a quick way of masking a value in an Arrow vector
-        // Zeroing byte zero of the validity buffer will set the first 8 values to null (validity is a bit map)
+        // This is a quick way of nulling a value in an Arrow vector
+        // Unsetting the first bit of the validity buffer makes the first value null
         for (var col = 0; col < data.getSchema().getFields().size(); ++col) {
 
             var vector = data.getVector(col);
-            vector.getValidityBuffer().setZero(0, 1);
+            var validityMask0 = vector.getValidityBuffer().getByte(0);
+            validityMask0 = (byte) (validityMask0 & (byte) 0xfe);
+
+            vector.getValidityBuffer().setByte(0, validityMask0);
             Assertions.assertNull(vector.getObject(0));
+        }
+
+        doRoundTrip(schema, data, "nullDataItems");
+    }
+
+    @Test
+    void nullEntireTable() throws Exception {
+
+        var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
+        var data = SampleData.generateBasicData(ALLOCATOR);
+
+        // This is a quick way of nulling an entire vector, by setting the validity buffer to zero
+        for (var col = 0; col < data.getSchema().getFields().size(); ++col) {
+
+            var vector = data.getVector(0);
+            vector.getValidityBuffer().setZero(0, vector.getValidityBuffer().capacity());
+            Assertions.assertEquals(vector.getValueCount(), vector.getNullCount());
         }
 
         doRoundTrip(schema, data, "nullDataItems");
@@ -180,7 +206,7 @@ public abstract class DataRoundTripTest {
     void emptyTable() throws Exception {
 
         var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
-        var data = SampleData.generateDataFor(schema, Map.of(), 0, ALLOCATOR);
+        var data = SampleData.convertData(schema, Map.of(), 0, ALLOCATOR);
 
         doRoundTrip(schema, data, "emptyTable");
     }
@@ -197,7 +223,7 @@ public abstract class DataRoundTripTest {
     void edgeCaseFloats() throws Exception {
 
         List<Object>  edgeCases = List.of(
-                0,
+                0.0,
                 Double.MIN_VALUE, Double.MAX_VALUE,
                 Double.MIN_NORMAL, -Double.MIN_NORMAL,
                 Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
@@ -205,14 +231,92 @@ public abstract class DataRoundTripTest {
         doEdgeCaseTest("float_field", edgeCases);
     }
 
+    @Test
+    void edgeCaseDecimals() throws Exception {
+
+        var d0 = BigDecimal.ZERO;
+        var d1 = BigDecimal.TEN.pow(25);
+        var d2 = BigDecimal.TEN.pow(25).negate();
+        var d3 = new BigDecimal("0.000000000001");
+        var d4 = new BigDecimal("-0.000000000001");
+
+        Assertions.assertNotEquals(BigDecimal.ZERO, d3);
+        Assertions.assertNotEquals(BigDecimal.ZERO, d4);
+
+        List<Object>  edgeCases = Stream.of(d0, d1, d2, d3, d4)
+                .map(d -> d.setScale(12, RoundingMode.UNNECESSARY))
+                .collect(Collectors.toList());
+
+        doEdgeCaseTest("decimal_field", edgeCases);
+    }
+
+    @Test
+    void edgeCaseStrings() throws Exception {
+
+        List<Object>  edgeCases = List.of(
+                "", " ", "  ", "\t", "\r\n", "  \r\n   ",
+                "a, b\",", "'@@'", "[\"\"%^&", "£££", "#@",
+                "Olá Mundo", "你好，世界", "Привет, мир", "नमस्ते दुनिया",
+                "𝜌 = ∑ 𝑃𝜓 | 𝜓 ⟩ ⟨ 𝜓 |");
+
+        doEdgeCaseTest("string_field", edgeCases);
+    }
+
+    @Test
+    void edgeCaseDates() throws Exception {
+
+        List<Object> edgeCases = List.of(
+                LocalDate.EPOCH,
+                LocalDate.of(2000, 1, 1),
+                LocalDate.of(2038, 1, 20),
+
+                // Python min/max dates are for the years 1 and 9999 CE
+                // By default, dates are converted as date objects when translating to Pandas
+                // Using np.datetime64 would allow a much wider range, if this is needed
+                LocalDate.of(1, 1, 1),
+                LocalDate.of(9999, 12, 31)
+        );
+
+        doEdgeCaseTest("date_field", edgeCases);
+    }
+
+    @Test
+    void edgeCaseDateTimes() throws Exception {
+
+        List<Object> edgeCases = List.of(
+                LocalDateTime.ofEpochSecond(0, 0, ZoneOffset.UTC),
+                LocalDateTime.of(2000, 1, 1, 0, 0, 0),
+                LocalDateTime.of(2038, 1, 19, 3, 14, 8),
+
+                // Python min/max date-times are for the years 1 and 9999 CE
+                // By default, date-times are converted as datetime objects when translating to Pandas
+                // Using np.datetime64 would allow a much wider range, if this is needed
+                LocalDateTime.of(1, 1, 1, 0, 0, 0),
+                LocalDateTime.of(9999, 12, 31, 23, 59, 59)
+        );
+
+        doEdgeCaseTest("datetime_field", edgeCases);
+    }
+
     void doEdgeCaseTest(String fieldName, List<Object> edgeCases) throws Exception {
 
-        var edgeCaseMap = Map.of(fieldName, edgeCases);
+        var javaData = new HashMap<String, List<Object>>();
+
+        for (var field : SampleData.BASIC_TABLE_SCHEMA.getTable().getFieldsList()) {
+
+            if (field.getFieldName().equals(fieldName)) {
+                javaData.put(field.getFieldName(), edgeCases);
+            }
+            else {
+                var javaValues = SampleData.generateJavaValues(field.getFieldType(), edgeCases.size());
+                javaData.put(field.getFieldName(), javaValues);
+            }
+        }
 
         var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
-        var data = SampleData.generateDataFor(schema, edgeCaseMap, edgeCases.size(), ALLOCATOR);
+        var data = SampleData.convertData(schema, javaData, edgeCases.size(), ALLOCATOR);
 
-        doRoundTrip(schema, data, "edgeCaseIntegers");
+        doRoundTrip(schema, data, "edgeCase:" + fieldName);
     }
 
     void doRoundTrip(Schema schema, VectorSchemaRoot inputData, String testName) throws Exception {
