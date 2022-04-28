@@ -17,7 +17,6 @@ from __future__ import annotations
 import dataclasses as dc
 import typing as tp
 
-import pandas.core.dtypes.dtypes
 import pyarrow as pa
 import pyarrow.compute as pc
 import pandas as pd
@@ -25,6 +24,7 @@ import pandas as pd
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.impl.type_system as _types
+import tracdap.rt.impl.util as _util
 
 
 @dc.dataclass(frozen=True)
@@ -145,7 +145,7 @@ class DataMapping:
     def pandas_to_arrow(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
 
         if len(df) == 0:
-            df_schema = pa.Schema.from_pandas(df)  # noqa
+            df_schema = pa.Schema.from_pandas(df, preserve_index=False)  # noqa
             table = pa.Table.from_batches(list(), df_schema)  # noqa
         else:
             schema_columns = schema.names if schema is not None else None
@@ -170,41 +170,54 @@ class DataMapping:
         return DataView(view.trac_schema, view.arrow_schema, parts)
 
 
+class _Logging:
+    pass
+
+
 class DataConformance:
+
+    __log = _util.logger_for_namespace(_Logging.__module__ + ".DataConformance")
 
     @classmethod
     def conform_to_schema(cls, table: pa.Table, schema: pa.Schema) -> pa.Table:
 
         # Coerce types to match expected schema where possible
-        for schem_index in range(len(schema.types)):
+        for schem_index in range(len(schema.names)):
 
-            schema_column_name = schema.names[schem_index]
-            schema_column_type = schema.types[schem_index]
+            schema_field = schema.field(schem_index)
+            column_index = table.schema.get_field_index(schema_field.name)
+            column_data: pa.Array = table.column(column_index)
+            column_modified = False
 
-            table_index = table.schema.get_field_index(schema_column_name)
-            table_column: pa.Array = table.column(table_index)
+            if column_data.type != schema_field.type:
+                column_data = cls._coerce_vector(column_data, schema_field)
+                column_modified = True
 
-            # Avoid manipulating columns that already have the correct type and location
-            if table_index == schem_index and table_column.type == schema_column_type:
-                continue
+            if not schema_field.nullable and column_data.null_count > 0:
+                raise _ex.EDataConformance(f"Null values present in non-null field [{schema_field.name}]")
 
-            if table_column.type != schema_column_type:
-                table_column = cls._coerce_vector(table_column, schema_column_type)
-
-            table = table.remove_column(table_index)
-            table = table.add_column(schem_index, schema_column_name, table_column)
+            if column_modified or column_index != schem_index:
+                table = table.remove_column(column_index)
+                table = table.add_column(schem_index, schema_field.name, column_data)
 
         # Only include columns explicitly defined in the schema
         while table.num_columns > len(schema.types):
+            cls.__log.warning(f"Removing unrecognized column [{table.field(table.num_columns - 1).name}]")
             table = table.remove_column(table.num_columns - 1)
 
         return table
 
     @classmethod
-    def _coerce_vector(cls, vector: pa.Array, target_type: pa.DataType) -> pa.Array:
+    def _coerce_vector(cls, vector: pa.Array, field: pa.Field) -> pa.Array:
 
-        if len(vector) == 0 and (vector.type is None or pa.types.is_null(vector.type)):
-            return pa.array([], type=target_type, size=0)
+        if pa.types.is_null(vector.type):
+
+            if field.nullable:
+                return pa.array([], type=field.type, size=len(vector))
+            else:
+                raise _ex.EDataConformance(f"All null values in non-null field [{field.name}]")
+
+        target_type = field.type
 
         if pa.types.is_boolean(target_type):
             return cls._coerce_boolean(vector)
@@ -235,7 +248,7 @@ class DataConformance:
         if pa.types.is_boolean(vector.type):
             return vector  # noqa
 
-        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {pa.bool_()}")
+        raise _ex.EDataConformance(f"Cannot convert type {vector.type} into {pa.bool_()}")
 
     @staticmethod
     def _coerce_integer(vector: pa.Array, target_type: pa.DataType) -> pa.IntegerArray:
