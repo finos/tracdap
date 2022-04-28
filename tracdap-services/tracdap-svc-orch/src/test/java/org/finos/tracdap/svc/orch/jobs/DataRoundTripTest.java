@@ -44,7 +44,9 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.finos.tracdap.svc.orch.jobs.Helpers.runJob;
@@ -172,6 +174,45 @@ public abstract class DataRoundTripTest {
         }
 
         doRoundTrip(schema, data, "nullDataItems");
+    }
+
+    @Test
+    void emptyTable() throws Exception {
+
+        var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
+        var data = SampleData.generateDataFor(schema, Map.of(), 0, ALLOCATOR);
+
+        doRoundTrip(schema, data, "emptyTable");
+    }
+
+    @Test
+    void edgeCaseIntegers() throws Exception {
+
+        List<Object> edgeCases = List.of(0, Long.MIN_VALUE, Long.MAX_VALUE);
+
+        doEdgeCaseTest("integer_field", edgeCases);
+    }
+
+    @Test
+    void edgeCaseFloats() throws Exception {
+
+        List<Object>  edgeCases = List.of(
+                0,
+                Double.MIN_VALUE, Double.MAX_VALUE,
+                Double.MIN_NORMAL, -Double.MIN_NORMAL,
+                Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+
+        doEdgeCaseTest("float_field", edgeCases);
+    }
+
+    void doEdgeCaseTest(String fieldName, List<Object> edgeCases) throws Exception {
+
+        var edgeCaseMap = Map.of(fieldName, edgeCases);
+
+        var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
+        var data = SampleData.generateDataFor(schema, edgeCaseMap, edgeCases.size(), ALLOCATOR);
+
+        doRoundTrip(schema, data, "edgeCaseIntegers");
     }
 
     void doRoundTrip(Schema schema, VectorSchemaRoot inputData, String testName) throws Exception {
@@ -309,7 +350,16 @@ public abstract class DataRoundTripTest {
         dataStream.subscribe(decoder);
         var blocks = resultOf(Flows.toList(decoder));
 
-        Assertions.assertEquals(2, blocks.size());
+        Assertions.assertTrue(blocks.size() == 1 || blocks.size() == 2);
+        Assertions.assertNotNull(blocks.get(0).arrowSchema);
+
+        if (blocks.size() == 1) {
+            var fields = blocks.get(0).arrowSchema.getFields();
+            var emptyVectors = fields.stream()
+                    .map(f -> f.createVector(ALLOCATOR))
+                    .collect(Collectors.toList());
+            return new VectorSchemaRoot(fields, emptyVectors, 0);
+        }
 
         var arrowSchema = blocks.get(0).arrowSchema;
         var arrowRecords = blocks.get(1).arrowRecords;
