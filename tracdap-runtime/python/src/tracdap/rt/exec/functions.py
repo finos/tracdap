@@ -441,11 +441,15 @@ class SaveDataFunc(NodeFunction, _LoadSaveDataFunc):
         data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
         data_storage = self.storage.get_data_storage(data_copy.storageKey)
 
-        # Item to be saved should exist in the current context, for now assume it is always Pandas
+        # Item to be saved should exist in the current context
         data_item = _ctx_lookup(self.node.data_item_id, ctx)
 
-        if not data_item.table:
-            raise _ex.EUnexpected()  # Current implementation will always put an Arrow table in the data item
+        # Current implementation will always put an Arrow table in the data item
+        # Empty tables are allowed, so explicitly check if table is None
+        # Testing "if not data_item.table" will fail for empty tables
+
+        if data_item.table is None:
+            raise _ex.EUnexpected()
 
         data_storage.write_table(
             data_copy.storagePath, data_copy.storageFormat,
