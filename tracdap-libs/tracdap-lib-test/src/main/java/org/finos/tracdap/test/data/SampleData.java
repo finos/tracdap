@@ -100,6 +100,8 @@ public class SampleData {
 
     public static List<Object> generateJavaValues(BasicType basicType, int n) {
 
+        // NOTE: These values should match the pre-saved basic test files in resources/sample_data of -lib-test
+
         switch (basicType) {
 
             case BOOLEAN:
@@ -130,12 +132,12 @@ public class SampleData {
 
             case DATE:
                 return IntStream.range(0, n)
-                        .mapToObj(i -> LocalDate.now().plusDays(i))
+                        .mapToObj(i -> LocalDate.ofEpochDay(0).plusDays(i))
                         .collect(Collectors.toList());
 
             case DATETIME:
                 return IntStream.range(0, n)
-                        .mapToObj(i -> LocalDateTime.now().plusDays(i))
+                        .mapToObj(i -> LocalDateTime.ofEpochSecond(0, 0, ZoneOffset.UTC).plusSeconds(i))
                         .collect(Collectors.toList());
 
             default:
