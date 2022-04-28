@@ -80,6 +80,19 @@ class DataStorageTestSuite:
                 dt.datetime(2000, 1, 3, 2, 2, 2), dt.datetime(2000, 1, 4, 3, 3, 3)]
         }
 
+    @staticmethod
+    def one_field_schema(field_type: _meta.BasicType):
+
+        field_name = f"{field_type.name.lower()}_field"
+
+        trac_schema = _meta.SchemaDefinition(
+            _meta.SchemaType.TABLE,
+            _meta.PartType.PART_ROOT,
+            _meta.TableSchema(fields=[
+                _meta.FieldSchema(field_name, fieldType=field_type)]))
+
+        return _types.trac_to_arrow_schema(trac_schema)
+
     def test_round_trip_basic(self):
 
         table = pa.Table.from_pydict(self.sample_data(), self.sample_schema())  # noqa
@@ -213,19 +226,6 @@ class DataStorageTestSuite:
         rt_table = self.storage.read_table("edge_cases_datetime", self.storage_format, table.schema)
 
         self.assertEqual(table, rt_table)
-
-    @staticmethod
-    def one_field_schema(field_type: _meta.BasicType):
-
-        field_name = f"{field_type.name.lower()}_field"
-
-        trac_schema = _meta.SchemaDefinition(
-            _meta.SchemaType.TABLE,
-            _meta.PartType.PART_ROOT,
-            _meta.TableSchema(fields=[
-                _meta.FieldSchema(field_name, fieldType=field_type)]))
-
-        return _types.trac_to_arrow_schema(trac_schema)
 
 
 class LocalStorageTest(DataStorageTestSuite):

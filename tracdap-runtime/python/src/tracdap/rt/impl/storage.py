@@ -36,6 +36,7 @@ import codecs
 import csv
 
 import pyarrow as pa
+import pyarrow.compute as pac
 import pyarrow.feather as pa_ft
 import pyarrow.parquet as pa_pq
 import pyarrow.csv as pa_csv
@@ -509,6 +510,19 @@ class _CsvStorageFormat(IDataFormat):
             column: pa.Array = table.column(column_index)
             format_applied = False
 
+            if pa.types.is_floating(column.type):
+
+                # Arrow outputs NaN as null
+                # If a float column contains NaN, use our own formatter to distinguish between them
+
+                has_nan = pac.any(pac.and_not(  # noqa
+                    column.is_null(nan_is_null=True),
+                    column.is_null(nan_is_null=False)))
+
+                if has_nan.as_py():
+                    column = cls._format_float(column)
+                    format_applied = True
+
             if pa.types.is_decimal(column.type):
                 column = cls._format_decimal(column)
                 format_applied = True
@@ -524,6 +538,18 @@ class _CsvStorageFormat(IDataFormat):
                     .add_column(column_index, field, column)
 
         return table
+
+    @classmethod
+    def _format_float(cls, column: pa.Array) -> pa.Array:
+
+        def format_float(f: pa.FloatScalar):
+
+            if not f.is_valid:
+                return None
+
+            return str(f.as_py())
+
+        return pa.array(map(format_float, column), pa.utf8())
 
     @classmethod
     def _format_decimal(cls, column: pa.Array) -> pa.Array:
