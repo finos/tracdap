@@ -38,11 +38,18 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.util.List;
+
+import static com.fasterxml.jackson.core.JsonToken.VALUE_NUMBER_INT;
 
 
 public class JacksonValues {
 
     private static final Logger log = LoggerFactory.getLogger(JacksonValues.class);
+
+    private static final List<String> NAN_VALUES = List.of("nan, na");
+    private static final List<String> INFINITY_VALUES = List.of("inf", "infinity");
+
 
     public static void parseAndSet(
             FieldVector vector, int row,
@@ -84,7 +91,7 @@ public class JacksonValues {
                     String boolStr = parser.getValueAsString();
                     boolVal = Boolean.parseBoolean(boolStr) ? 1 : 0;
                 }
-                else if (token == JsonToken.VALUE_NUMBER_INT) {
+                else if (token == VALUE_NUMBER_INT) {
                     boolVal = parser.getIntValue();
                     if (boolVal != 0 && boolVal != 1)
                         throw new JsonParseException(parser, "Invalid boolean value", parser.currentLocation());
@@ -135,7 +142,7 @@ public class JacksonValues {
             case FLOAT8:
 
                 Float8Vector doubleVec = (Float8Vector) vector;
-                double doubleVal = isSet != 0 ? parser.getDoubleValue() : 0;
+                double doubleVal = isSet != 0 ? parseFloat8(parser, token) : 0;
 
                 doubleVec.set(row, isSet, doubleVal);
 
@@ -144,7 +151,7 @@ public class JacksonValues {
             case FLOAT4:
 
                 Float4Vector floatVec = (Float4Vector) vector;
-                float floatVal = isSet != 0 ? parser.getFloatValue() : 0;
+                float floatVal = isSet != 0 ? parseFloat4(parser, token) : 0;
 
                 floatVec.set(row, isSet, floatVal);
 
@@ -266,13 +273,91 @@ public class JacksonValues {
         }
     }
 
+    static private float parseFloat4(JsonParser parser, JsonToken token) throws IOException {
+
+        try {
+
+            if (parser.currentToken() == JsonToken.VALUE_NUMBER_INT ||
+                parser.currentToken() == JsonToken.VALUE_NUMBER_FLOAT) {
+
+                return parser.getFloatValue();
+            }
+            else if (parser.currentToken() == JsonToken.VALUE_STRING) {
+
+                // Jackson does not recognise the default infinity value encoded by Arrow, which is "inf"
+                // This logic allows for special values encoded using a variety of standard words
+
+                var lowerToken = parser.getValueAsString().toLowerCase();
+
+                if (NAN_VALUES.contains(lowerToken))
+                    return Float.NaN;
+
+                if (INFINITY_VALUES.contains(lowerToken))
+                    return Float.POSITIVE_INFINITY;
+
+                if (lowerToken.startsWith("-") && INFINITY_VALUES.contains(lowerToken.substring(1)))
+                    return Float.NEGATIVE_INFINITY;
+
+                return Float.parseFloat(parser.getValueAsString());
+            }
+            else {
+
+                var msg = "Parsing failed: Excepted a floating point value, got [" + token.name() + "]";
+                throw new JsonParseException(parser, msg, parser.currentLocation());
+            }
+        }
+        catch (NumberFormatException e) {
+
+            throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
+        }
+    }
+
+    static private double parseFloat8(JsonParser parser, JsonToken token) throws IOException {
+
+        try {
+
+            if (parser.currentToken() == JsonToken.VALUE_NUMBER_INT ||
+                parser.currentToken() == JsonToken.VALUE_NUMBER_FLOAT) {
+
+                return parser.getDoubleValue();
+            }
+            else if (parser.currentToken() == JsonToken.VALUE_STRING) {
+
+                // Jackson does not recognise the default infinity value encoded by Arrow, which is "inf"
+                // This logic allows for special values encoded using a variety of standard words
+
+                var lowerToken = parser.getValueAsString().toLowerCase();
+
+                if (NAN_VALUES.contains(lowerToken))
+                    return Double.NaN;
+
+                if (INFINITY_VALUES.contains(lowerToken))
+                    return Double.POSITIVE_INFINITY;
+
+                if (lowerToken.startsWith("-") && INFINITY_VALUES.contains(lowerToken.substring(1)))
+                    return Double.NEGATIVE_INFINITY;
+
+                return Double.parseDouble(parser.getValueAsString());
+            }
+            else {
+
+                var msg = "Parsing failed: Excepted a floating point value, got [" + token.name() + "]";
+                throw new JsonParseException(parser, msg, parser.currentLocation());
+            }
+        }
+        catch (NumberFormatException e) {
+
+            throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
+        }
+    }
+
     static private BigDecimal parseBigDecimal(JsonParser parser, JsonToken token, int scale) throws IOException {
 
         try {
 
             BigDecimal decimalVal;
 
-            if (token == JsonToken.VALUE_NUMBER_INT || token == JsonToken.VALUE_NUMBER_FLOAT)
+            if (token == VALUE_NUMBER_INT || token == JsonToken.VALUE_NUMBER_FLOAT)
                 decimalVal = parser.getDecimalValue();
             else if (token == JsonToken.VALUE_STRING)
                 decimalVal = new BigDecimal(parser.getValueAsString());

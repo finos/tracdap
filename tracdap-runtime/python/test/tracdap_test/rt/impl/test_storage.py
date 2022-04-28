@@ -14,6 +14,7 @@
 
 import datetime as dt
 import decimal
+import math
 import pathlib
 import tempfile
 import unittest
@@ -124,7 +125,9 @@ class DataStorageTestSuite:
             sys.float_info.min,
             sys.float_info.max,
             sys.float_info.epsilon,
-            -sys.float_info.epsilon
+            -sys.float_info.epsilon,
+            math.inf,
+            -math.inf
         ]}, schema)
 
         self.storage.write_table("edge_cases_float", self.storage_format, table)
