@@ -132,6 +132,9 @@ class DataStorageTestSuite:
 
     def test_edge_cases_float(self):
 
+        # It may be helpful to check for / prohibit inf and -inf in some places, e.g. model outputs
+        # But still the storage layer should handle these values correctly if they are present
+
         schema = self.one_field_schema(_meta.BasicType.FLOAT)
         table = pa.Table.from_pydict({"float_field": [  # noqa
             0.0,

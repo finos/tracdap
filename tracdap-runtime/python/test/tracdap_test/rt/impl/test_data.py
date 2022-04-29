@@ -123,6 +123,9 @@ class DataMappingTest(unittest.TestCase):
 
     def test_edge_cases_float(self):
 
+        # It may be helpful to check for / prohibit inf and -inf in some places, e.g. model outputs
+        # But still the data mapping should handle these values correctly if they are present
+
         schema = self.one_field_schema(_meta.BasicType.FLOAT)
         table = pa.Table.from_pydict({"float_field": [  # noqa
             0.0,
@@ -142,8 +145,12 @@ class DataMappingTest(unittest.TestCase):
 
     def test_edge_cases_float_nan(self):
 
-        # For NaN, a special test that checks math.isnan on the round-trip result
-        # Because math.nan != math.nan
+        # NaN needs special consideration
+        # First, math.nan != math.nan, instead NaN must be checked with math.isnan
+        # Also, in Pandas NaN and None values are treated the same (by .isna(), .fillna() etc
+        # NaNs are converted to None in Pandas -> Arrow conversion
+        # Overriding this behaviour would be expensive
+        # So for now, just check that the round-trip yields either a NaN or a null
 
         schema = self.one_field_schema(_meta.BasicType.FLOAT)
         table = pa.Table.from_pydict({"float_field": [math.nan]}, schema)  # noqa
@@ -152,7 +159,10 @@ class DataMappingTest(unittest.TestCase):
         rt = _data.DataMapping.pandas_to_arrow(df, schema)
 
         self.assertEqual(schema, rt.schema)
-        self.assertEqual(table, rt)
+
+        nan_value = rt.column(0)[0].as_py()
+
+        self.assertTrue(nan_value is None or math.isnan(nan_value))
 
     def test_edge_cases_decimal(self):
 
