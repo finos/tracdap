@@ -21,6 +21,7 @@ import math
 import pyarrow as pa
 
 import tracdap.rt.metadata as _meta
+import tracdap.rt.exceptions as _ex
 import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.data as _data
 
@@ -241,8 +242,89 @@ class DataMappingTest(unittest.TestCase):
 
 class DataConformanceTest(unittest.TestCase):
 
-    def test_coercion_decimal(self):
+    def test_boolean_same_type(self):
+
+        schema = DataMappingTest.one_field_schema(_meta.BasicType.BOOLEAN)
+        table = pa.Table.from_pydict({"boolean_field": [True, False, True, False]})  # noqa
+
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+
+        self.assertEqual(table.column(0), conformed.column(0))
+
+    def test_boolean_wrong_type(self):
+
+        schema = DataMappingTest.one_field_schema(_meta.BasicType.BOOLEAN)
+
+        table = pa.Table.from_pydict({"boolean_field": [1.0, 2.0, 3.0, 4.0]})  # noqa
+        self.assertRaises(
+            _ex.EDataConformance, lambda:
+            _data.DataConformance.conform_to_schema(table, schema))
+
+        # Coercion does not include parsing string values
+        table = pa.Table.from_pydict({"boolean_field": ["True", "False", "True", "False"]})  # noqa
+        self.assertRaises(
+            _ex.EDataConformance, lambda:
+            _data.DataConformance.conform_to_schema(table, schema))
+
+    def test_integer_same_type(self):
+
+        schema = DataMappingTest.one_field_schema(_meta.BasicType.INTEGER)
+        table = pa.Table.from_pydict({"integer_field": [1, 2, 3, 4]})  # noqa
+
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+
+        self.assertEqual(table.column(0), conformed.column(0))
+
+    def test_integer_width(self):
         pass
 
-    def test_coercion_datetime(self):
+    def test_integer_signedness(self):
+        pass
+
+    def test_integer_wrong_type(self):
+        pass
+
+    def test_float_same_type(self):
+        pass
+
+    def test_float_width(self):
+        pass
+
+    def test_float_from_integer_types(self):
+        pass
+
+    def test_float_wrong_type(self):
+        pass
+
+    def test_decimal_same_type(self):
+        pass
+
+    def test_decimal_precision_and_scale(self):
+        pass
+
+    def test_decimal_128_256(self):
+        pass
+
+    def test_decimal_from_numeric_types(self):
+        pass
+
+    def test_decimal_wrong_type(self):
+        pass
+
+    def test_string_same_type(self):
+        pass
+
+    def test_string_wrong_type(self):
+        pass
+
+    def test_date_same_type(self):
+        pass
+
+    def test_date_wrong_type(self):
+        pass
+
+    def test_timestamp_same_type(self):
+        pass
+
+    def test_timestamp_wrong_type(self):
         pass

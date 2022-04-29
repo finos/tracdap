@@ -219,11 +219,11 @@ class DataConformance:
 
         target_type = field.type
 
-        if pa.types.is_boolean(target_type):
-            return cls._coerce_boolean(vector)
+        if pa.types.is_boolean(field.type):
+            return cls._coerce_boolean(vector, field)
 
-        if pa.types.is_integer(target_type):
-            return cls._coerce_integer(vector, target_type)
+        if pa.types.is_integer(field.type):
+            return cls._coerce_integer(vector, field)
 
         if pa.types.is_floating(target_type):
             return cls._coerce_float(vector, target_type)
@@ -242,35 +242,41 @@ class DataConformance:
 
         raise _ex.EDataValidation(f"Unsupported data type {target_type}")
 
-    @staticmethod
-    def _coerce_boolean(vector: pa.Array) -> pa.BooleanArray:
+    @classmethod
+    def _coerce_boolean(cls, vector: pa.Array, field: pa.Field) -> pa.BooleanArray:
 
         if pa.types.is_boolean(vector.type):
             return vector  # noqa
 
-        raise _ex.EDataConformance(f"Cannot convert type {vector.type} into {pa.bool_()}")
+        error_message = f"Field [{field.name}] contains the wrong data type (expected {pa.bool_()}, got {vector.type})"
+        cls.__log.error(error_message)
 
-    @staticmethod
-    def _coerce_integer(vector: pa.Array, target_type: pa.DataType) -> pa.IntegerArray:
+        raise _ex.EDataConformance(error_message)
+
+    @classmethod
+    def _coerce_integer(cls, vector: pa.Array, field: pa.Field) -> pa.IntegerArray:
 
         if pa.types.is_integer(vector.type):
 
             source_bit_width = vector.type.bit_width
-            target_bit_width = target_type.bit_width
+            target_bit_width = field.type.bit_width
             source_signed = pa.types.is_signed_integer(vector.type)
-            target_signed = pa.types.is_signed_integer(target_type)
+            target_signed = pa.types.is_signed_integer(field.type)
 
             if source_bit_width == target_bit_width and source_signed == target_signed:
                 return vector  # noqa
 
             if source_bit_width < target_bit_width and source_signed == target_signed:
-                return pc.cast(vector, target_type)
+                return pc.cast(vector, field.type)
 
             # Unsigned types can be safely cast to signed types with larger byte width
             if source_bit_width < target_bit_width and target_signed:
-                return pc.cast(vector, target_type)
+                return pc.cast(vector, field.type)
 
-        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
+        error_message = f"Field [{field.name}] contains the wrong data type (expected {pa.bool_()}, got {vector.type})"
+        cls.__log.error(error_message)
+
+        raise _ex.EDataConformance(error_message)
 
     @staticmethod
     def _coerce_float(vector: pa.Array, target_type: pa.DataType) -> pa.FloatingPointArray:
