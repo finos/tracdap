@@ -288,6 +288,11 @@ public abstract class DataRoundTripTest {
                 LocalDateTime.of(2000, 1, 1, 0, 0, 0),
                 LocalDateTime.of(2038, 1, 19, 3, 14, 8),
 
+                // Fractional seconds before and after the epoch
+                // Test fractions for both positive and negative encoded values
+                LocalDateTime.of(1972, 1, 1, 0, 0, 0, 500000000),
+                LocalDateTime.of(1968, 1, 1, 23, 59, 59, 500000000),
+
                 // Python min/max date-times are for the years 1 and 9999 CE
                 // By default, date-times are converted as datetime objects when translating to Pandas
                 // Using np.datetime64 would allow a much wider range, if this is needed
