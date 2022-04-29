@@ -211,9 +211,13 @@ class DataMappingTest(unittest.TestCase):
 
         schema = self.one_field_schema(_meta.BasicType.DATETIME)
         table = pa.Table.from_pydict({"datetime_field": [  # noqa
-            dt.datetime(1970, 1, 1),
-            dt.datetime(2000, 1, 1),
-            dt.datetime(2038, 1, 20),
+            dt.datetime(1970, 1, 1, 0, 0, 0),
+            dt.datetime(2000, 1, 1, 0, 0, 0),
+            dt.datetime(2038, 1, 19, 3, 14, 8),
+            # Fractional seconds before and after the epoch
+            # Test fractions for both positive and negative encoded values
+            dt.datetime(1972, 1, 1, 0, 0, 0, 500000),
+            dt.datetime(1968, 1, 1, 23, 59, 59, 500000),
             dt.datetime.max,
             dt.datetime.min
         ]}, schema)
