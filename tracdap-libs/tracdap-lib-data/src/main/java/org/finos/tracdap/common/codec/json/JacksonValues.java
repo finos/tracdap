@@ -33,10 +33,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.*;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 
@@ -528,11 +525,16 @@ public class JacksonValues {
 
                 TimeStampMilliVector timeStampMVec = (TimeStampMilliVector) vector;
 
-                long unixEpochMillis = timeStampMVec.get(row);
-                long unixEpochSec = unixEpochMillis / 1000;
-                int nanos = ((int) (unixEpochMillis - (unixEpochSec * 1000))) * 1000000;
+                long epochMillis = timeStampMVec.get(row);
+                long epochSeconds = epochMillis / 1000;
+                int nanos = (int) (epochMillis % 1000) * 1000000;
 
-                LocalDateTime localDatetimeVal = LocalDateTime.ofEpochSecond(unixEpochSec, nanos, ZoneOffset.UTC);
+                if (epochSeconds < 0 && nanos != 0) {
+                    --epochSeconds;
+                    nanos = nanos + 1000000000;
+                }
+
+                LocalDateTime localDatetimeVal = LocalDateTime.ofEpochSecond(epochSeconds, nanos, ZoneOffset.UTC);
                 OffsetDateTime offsetDatetimeVal = localDatetimeVal.atOffset(ZoneOffset.UTC);
                 String datetimeStr = MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT.format(offsetDatetimeVal);
 
