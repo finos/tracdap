@@ -782,7 +782,76 @@ class DataConformanceTest(unittest.TestCase):
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_timestamp_same_type(self):
+
+        def do_test(target_type):
+
+            schema = pa.schema([target_type])
+            table = pa.Table.from_pydict({"f": [dt.datetime(2000, 1, 1, 0, 0, 0)]}, pa.schema([target_type]))  # noqa
+            conformed = _data.DataConformance.conform_to_schema(table, schema)
+            self.assertEqual(schema, conformed.schema)
+            self.assertEqual(table.column(0), conformed.column(0))
+
+        ts1 = ("f", pa.timestamp("s"))
+        ts2 = ("f", pa.timestamp("ms"))
+        ts3 = ("f", pa.timestamp("us"))
+        ts4 = ("f", pa.timestamp("ns"))
+
+        do_test(ts1)
+        do_test(ts2)
+        do_test(ts3)
+        do_test(ts4)
+
+    def test_timestamp_units(self):
+
         self.fail()
 
-    def test_timestamp_wrong_type(self):
+    def test_timestamp_zones(self):
+
         self.fail()
+
+    def test_timestamp_from_pandas(self):
+
+        df = pd.DataFrame({"f": pd.to_datetime([dt.datetime(2001, 1, 1, 3, 15, 23, 500000)])})
+
+        def do_test(target_type):
+
+            # Conform should be applied inside DataMapping, allowing for conversion of NumPy native dates datetime64[ns]
+
+            schema = pa.schema([target_type])
+            conformed = _data.DataMapping.pandas_to_arrow(df, schema)
+            self.assertEqual(schema, conformed.schema)
+
+        ts1 = ("f", pa.timestamp("s"))
+        ts2 = ("f", pa.timestamp("ms"))
+        ts3 = ("f", pa.timestamp("us"))
+        ts4 = ("f", pa.timestamp("ns"))
+
+        do_test(ts1)
+        do_test(ts2)
+        do_test(ts3)
+        do_test(ts4)
+
+    def test_timestamp_wrong_type(self):
+
+        def do_test(target_type):
+
+            schema = pa.schema([target_type])
+
+            table = pa.Table.from_pydict({"f": ["2000-01-01T00:00:00"]}, pa.schema([("f", pa.utf8())]))  # noqa
+            self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+            table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([("f", pa.int32())]))  # noqa
+            self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+            table = pa.Table.from_pydict({"f": [dt.date(2001, 1, 1)]}, pa.schema([("f", pa.date32())]))  # noqa
+            self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        ts1 = ("f", pa.timestamp("s"))
+        ts2 = ("f", pa.timestamp("ms"))
+        ts3 = ("f", pa.timestamp("us"))
+        ts4 = ("f", pa.timestamp("ns"))
+
+        do_test(ts1)
+        do_test(ts2)
+        do_test(ts3)
+        do_test(ts4)
