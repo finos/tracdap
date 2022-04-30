@@ -279,43 +279,59 @@ class DataConformanceTest(unittest.TestCase):
         s16 = ("f", pa.int16())
         s32 = ("f", pa.int32())
         s64 = ("f", pa.int64())
-        u16 = ("f", pa.int16())
-        u32 = ("f", pa.int32())
-        u64 = ("f", pa.int64())
+        u16 = ("f", pa.uint16())
+        u32 = ("f", pa.uint32())
+        u64 = ("f", pa.uint64())
 
         schema = pa.schema([s64])
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([s32]))  # noqa
+        table = pa.Table.from_pydict({"f": [2 ** 31 - 1]}, pa.schema([s32]))  # noqa
         conformed = _data.DataConformance.conform_to_schema(table, schema)
         self.assertEqual(schema, conformed.schema)
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([s16]))  # noqa
+        table = pa.Table.from_pydict({"f": [2 ** 15 - 1]}, pa.schema([s16]))  # noqa
         conformed = _data.DataConformance.conform_to_schema(table, schema)
         self.assertEqual(schema, conformed.schema)
 
         schema = pa.schema([s32])
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([s64]))  # noqa
+        table = pa.Table.from_pydict({"f": [2 ** 31]}, pa.schema([s64]))  # noqa
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([s16]))  # noqa
+        table = pa.Table.from_pydict({"f": [2 ** 31 - 1]}, pa.schema([s64]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        table = pa.Table.from_pydict({"f": [2 ** 15 - 1]}, pa.schema([s16]))  # noqa
         conformed = _data.DataConformance.conform_to_schema(table, schema)
         self.assertEqual(schema, conformed.schema)
 
         schema = pa.schema([s16])
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([s64]))  # noqa
+        table = pa.Table.from_pydict({"f": [2 ** 15]}, pa.schema([s64]))  # noqa
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([s32]))  # noqa
+        table = pa.Table.from_pydict({"f": [2 ** 31 - 1]}, pa.schema([s32]))  # noqa
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        table = pa.Table.from_pydict({"f": [2 ** 15 - 1]}, pa.schema([s64]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        table = pa.Table.from_pydict({"f": [2 ** 15 - 1]}, pa.schema([s32]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
 
         schema = pa.schema([u32])
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([u64]))  # noqa
+        table = pa.Table.from_pydict({"f": [2 ** 32]}, pa.schema([u64]))  # noqa
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([u16]))  # noqa
+        table = pa.Table.from_pydict({"f": [2 ** 32 - 1]}, pa.schema([u64]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        table = pa.Table.from_pydict({"f": [2 ** 16 - 1]}, pa.schema([u16]))  # noqa
         conformed = _data.DataConformance.conform_to_schema(table, schema)
         self.assertEqual(schema, conformed.schema)
 
@@ -328,19 +344,23 @@ class DataConformanceTest(unittest.TestCase):
 
         schema = pa.schema([s64])
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([u32]))  # noqa
+        table = pa.Table.from_pydict({"f": [2 ** 32 - 1]}, pa.schema([u32]))  # noqa
         conformed = _data.DataConformance.conform_to_schema(table, schema)
         self.assertEqual(schema, conformed.schema)
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([u64]))  # noqa
+        table = pa.Table.from_pydict({"f": [2 ** 63 - 1]}, pa.schema([u64]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        table = pa.Table.from_pydict({"f": [2 ** 63 + 1]}, pa.schema([u64]))  # noqa
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
         schema = pa.schema([u64])
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([s32]))  # noqa
+        table = pa.Table.from_pydict({"f": [-1]}, pa.schema([s32]))  # noqa
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([s64]))  # noqa
+        table = pa.Table.from_pydict({"f": [-1]}, pa.schema([s64]))  # noqa
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_integer_wrong_type(self):
@@ -396,7 +416,7 @@ class DataConformanceTest(unittest.TestCase):
 
         schema = pa.schema([f32])
 
-        table = pa.Table.from_pydict({"f": [1.0, 2.0, 3.0, 4.0]}, pa.schema([f64]))  # noqa
+        table = pa.Table.from_pydict({"f": [2.0 ** 100]}, pa.schema([f64]))  # noqa
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_float_from_integer_types(self):
@@ -411,21 +431,21 @@ class DataConformanceTest(unittest.TestCase):
 
         schema = pa.schema([f64])
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([s64]))  # noqa
+        table = pa.Table.from_pydict({"f": [2 ** 53]}, pa.schema([s64]))  # noqa
         conformed = _data.DataConformance.conform_to_schema(table, schema)
         self.assertEqual(schema, conformed.schema)
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([u8]))  # noqa
+        table = pa.Table.from_pydict({"f": [255]}, pa.schema([u8]))  # noqa
         conformed = _data.DataConformance.conform_to_schema(table, schema)
         self.assertEqual(schema, conformed.schema)
 
         schema = pa.schema([f32])
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([u64]))  # noqa
+        table = pa.Table.from_pydict({"f": [2 ** 24]}, pa.schema([u64]))  # noqa
         conformed = _data.DataConformance.conform_to_schema(table, schema)
         self.assertEqual(schema, conformed.schema)
 
-        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([s8]))  # noqa
+        table = pa.Table.from_pydict({"f": [-128]}, pa.schema([s8]))  # noqa
         conformed = _data.DataConformance.conform_to_schema(table, schema)
         self.assertEqual(schema, conformed.schema)
 
@@ -476,17 +496,157 @@ class DataConformanceTest(unittest.TestCase):
         self.assertEqual(schema, conformed.schema)
         self.assertEqual(table.column(0), conformed.column(0))
 
-    def test_decimal_precision_and_scale(self):
-        self.fail()
+    def test_decimal_precision_and_scale_128(self):
+
+        dec1 = ("f", pa.decimal128(8, 2))
+        dec2 = ("f", pa.decimal128(10, 4))
+        dec3 = ("f", pa.decimal128(8, 4))
+
+        self._test_decimal_precision_and_scale(dec1, dec2, dec3)
+
+    def test_decimal_precision_and_scale_256(self):
+
+        dec1 = ("f", pa.decimal256(8, 2))
+        dec2 = ("f", pa.decimal256(10, 4))
+        dec3 = ("f", pa.decimal256(8, 4))
+
+        self._test_decimal_precision_and_scale(dec1, dec2, dec3)
+
+    def _test_decimal_precision_and_scale(self, dec1, dec2, dec3):
+
+        schema = pa.schema([dec1])
+
+        table = pa.Table.from_pydict({"f": [decimal.Decimal("100000.0001")]}, pa.schema([dec2]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        table = pa.Table.from_pydict({"f": [decimal.Decimal("1000.0001")]}, pa.schema([dec3]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        schema = pa.schema([dec2])
+
+        table = pa.Table.from_pydict({"f": [decimal.Decimal("100000.01")]}, pa.schema([dec1]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        table = pa.Table.from_pydict({"f": [decimal.Decimal("1000.0001")]}, pa.schema([dec3]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        schema = pa.schema([dec3])
+
+        table = pa.Table.from_pydict({"f": [decimal.Decimal("100000.01")]}, pa.schema([dec1]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        table = pa.Table.from_pydict({"f": [decimal.Decimal("100000.0001")]}, pa.schema([dec2]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_decimal_128_256(self):
-        self.fail()
+
+        d128_1 = ("f", pa.decimal128(8, 2))
+        d128_2 = ("f", pa.decimal128(8, 4))
+        d256_1 = ("f", pa.decimal256(8, 2))
+        d256_2 = ("f", pa.decimal256(8, 4))
+
+        # Allow conversion 128 <-> 256 if precision and scale are the same
+
+        schema = pa.schema([d128_1])
+        table = pa.Table.from_pydict({"f": [decimal.Decimal("100000.01")]}, pa.schema([d256_1]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        schema = pa.schema([d256_1])
+        table = pa.Table.from_pydict({"f": [decimal.Decimal("100000.01")]}, pa.schema([d128_1]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        # Allow conversion 128 <-> 256 if the target can hold larger numbers (max_exp = precision - scale - 1)
+
+        schema = pa.schema([d128_1])
+        table = pa.Table.from_pydict({"f": [decimal.Decimal("1000.01")]}, pa.schema([d256_2]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        schema = pa.schema([d256_1])
+        table = pa.Table.from_pydict({"f": [decimal.Decimal("1000.01")]}, pa.schema([d128_2]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        # Do not allow conversion in either direction if the source can hold larger numbers
+
+        schema = pa.schema([d128_2])
+        table = pa.Table.from_pydict({"f": [decimal.Decimal("100000.01")]}, pa.schema([d256_1]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        schema = pa.schema([d256_2])
+        table = pa.Table.from_pydict({"f": [decimal.Decimal("100000.01")]}, pa.schema([d128_1]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_decimal_from_numeric_types(self):
-        self.fail()
+
+        dec1 = ("f", pa.decimal128(38, 12))
+        dec2 = ("f", pa.decimal256(50, 15))
+
+        dec3 = ("f", pa.decimal128(6, 2))
+        dec4 = ("f", pa.decimal256(6, 2))
+
+        schema = pa.schema([dec1])
+
+        table = pa.Table.from_pydict({"f": [2.0 ** 32, 1.0 + 1 * 2.0 ** -15]}, pa.schema([("f", pa.float64())]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        table = pa.Table.from_pydict({"f": [2 ** 32, -1 * 2 ** 32]}, pa.schema([("f", pa.int64())]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        schema = pa.schema([dec2])
+
+        table = pa.Table.from_pydict({"f": [2.0 ** 32, 1.0 + 1 * 2.0 ** -15]}, pa.schema([("f", pa.float64())]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        table = pa.Table.from_pydict({"f": [2 ** 32, -1 * 2 ** 32]}, pa.schema([("f", pa.int64())]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        schema = pa.schema([dec3])
+
+        table = pa.Table.from_pydict({"f": [2.0 ** 32, -1 * 2.0 ** 32]}, pa.schema([("f", pa.float64())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        table = pa.Table.from_pydict({"f": [2 ** 32, -1 * 2 ** 32]}, pa.schema([("f", pa.int64())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        schema = pa.schema([dec4])
+
+        table = pa.Table.from_pydict({"f": [2.0 ** 32, -1 * 2.0 ** 32]}, pa.schema([("f", pa.float64())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        table = pa.Table.from_pydict({"f": [2 ** 32, -1 * 2 ** 32]}, pa.schema([("f", pa.int64())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_decimal_wrong_type(self):
-        self.fail()
+
+        dec1 = ("f", pa.decimal128(38, 12))
+        dec2 = ("f", pa.decimal256(50, 15))
+
+        schema = pa.schema([dec1])
+
+        table = pa.Table.from_pydict({"f": ["1.0", "2.0"]}, pa.schema([("f", pa.utf8())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        table = pa.Table.from_pydict({"f": [dt.date(2000, 1, 1)]}, pa.schema([("f", pa.date32())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        schema = pa.schema([dec2])
+
+        table = pa.Table.from_pydict({"f": ["1.0", "2.0"]}, pa.schema([("f", pa.utf8())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        table = pa.Table.from_pydict({"f": [dt.date(2000, 1, 1)]}, pa.schema([("f", pa.date32())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_string_same_type(self):
 

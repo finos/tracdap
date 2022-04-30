@@ -180,6 +180,15 @@ class DataConformance:
 
     __pandas_datetime_type = pd.to_datetime([]).dtype
 
+    __E_WRONG_DATA_TYPE = \
+        "Field [{field_name}] contains the wrong data type " + \
+        "(expected {field_type}, got {vector_type})"
+    __E_DATA_LOSS_WILL_OCCUR = \
+        "Field [{field_name}] cannot be converted from {vector_type} to {field_type}, data will be lost"
+    __E_DATA_LOSS_DID_OCCUR = \
+        "Field [{field_name}] cannot be converted from {vector_type} to {field_type}, " + \
+        "data will be lost ({error_details})"
+
     @classmethod
     def conform_to_schema(cls, table: pa.Table, schema: pa.Schema, pandas_types=None) -> pa.Table:
 
@@ -252,79 +261,101 @@ class DataConformance:
         if pa.types.is_boolean(vector.type):
             return vector  # noqa
 
-        error_message = f"Field [{field.name}] contains the wrong data type (expected {pa.bool_()}, got {vector.type})"
+        error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
         cls.__log.error(error_message)
-
         raise _ex.EDataConformance(error_message)
 
     @classmethod
     def _coerce_integer(cls, vector: pa.Array, field: pa.Field) -> pa.IntegerArray:
 
-        if pa.types.is_integer(vector.type):
+        try:
 
-            source_bit_width = vector.type.bit_width
-            target_bit_width = field.type.bit_width
-            source_signed = pa.types.is_signed_integer(vector.type)
-            target_signed = pa.types.is_signed_integer(field.type)
-
-            if source_bit_width == target_bit_width and source_signed == target_signed:
-                return vector  # noqa
-
-            if source_bit_width < target_bit_width and source_signed == target_signed:
+            if pa.types.is_integer(vector.type):
                 return pc.cast(vector, field.type)
 
-            # Unsigned types can be safely cast to signed types with larger byte width
-            if source_bit_width < target_bit_width and target_signed:
-                return pc.cast(vector, field.type)
+            else:
+                error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
+                cls.__log.error(error_message)
+                raise _ex.EDataConformance(error_message)
 
-        error_message = f"Field [{field.name}] contains the wrong data type (expected {field.type}, got {vector.type})"
-        cls.__log.error(error_message)
+        except pa.ArrowInvalid as e:
 
-        raise _ex.EDataConformance(error_message)
+            error_message = cls._format_error(cls.__E_DATA_LOSS_DID_OCCUR, vector, field, e)
+            cls.__log.error(error_message)
+            raise _ex.EDataConformance(error_message) from e
 
     @classmethod
     def _coerce_float(cls, vector: pa.Array, field: pa.Field) -> pa.FloatingPointArray:
 
-        if pa.types.is_floating(vector.type):
+        try:
 
-            source_bit_width = vector.type.bit_width
-            target_bit_width = field.type.bit_width
+            # Coercing between float types
+            if pa.types.is_floating(vector.type):
 
-            if source_bit_width == target_bit_width:
-                return vector  # noqa
+                # Casting floats to a wider type is allowed
+                # Casting to a less wide type does not raise exceptions when values do not fit
+                # So we need an explict check on which casts are allowed
 
-            if source_bit_width == 32 and target_bit_width == 64:
+                source_bit_width = vector.type.bit_width
+                target_bit_width = field.type.bit_width
+
+                if source_bit_width == target_bit_width:
+                    return vector  # noqa
+
+                # cast() is available for float32 -> float64, but not for float16 -> float32/float64
+                elif source_bit_width == 32 and target_bit_width == 64:
+                    return pc.cast(vector, field.type)
+
+                elif source_bit_width > target_bit_width:
+                    error_message = cls._format_error(cls.__E_DATA_LOSS_WILL_OCCUR, vector, field)
+                    cls.__log.error(error_message)
+                    raise _ex.EDataConformance(error_message)
+
+            # All integer types can be coerced to float32 or float64
+            if pa.types.is_integer(vector.type) and not pa.types.is_float16(field.type):
                 return pc.cast(vector, field.type)
 
-        if pa.types.is_integer(vector.type):
-            return pc.cast(vector, field.type)
+            if pa.types.is_integer(vector.type) and vector.type.bit_width <= 16:
+                return pc.cast(vector, field.type)
 
-        error_message = f"Field [{field.name}] contains the wrong data type (expected {field.type}, got {vector.type})"
-        cls.__log.error(error_message)
+            error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
+            cls.__log.error(error_message)
+            raise _ex.EDataConformance(error_message)
 
-        raise _ex.EDataConformance(error_message)
+        except pa.ArrowInvalid as e:
+
+            error_message = cls._format_error(cls.__E_DATA_LOSS_DID_OCCUR, vector, field, e)
+            cls.__log.error(error_message)
+            raise _ex.EDataConformance(error_message) from e
 
     @classmethod
     def _coerce_decimal(cls, vector: pa.Array, field: pa.Field) -> pa.Array:
 
-        # Allow coercing decimal 128 -> decimal 256, but not vice versa
-        if pa.types.is_decimal(vector.type):
+        # Loss of precision is allowed, but loss of data is not
+        # Arrow will raise an error if cast() results in loss of data
 
-            source_max = vector.type.precision - vector.type.scale
-            target_max = field.type.precision - field.type.scale  # noqa
+        try:
 
-            if source_max <= target_max:
+            # For decimal values, arrow will raise an error on loss of precision
+            # Round explicitly to the required scale so there is no loss of precision in cast()
+            if pa.types.is_decimal(vector.type):
                 rounded = pc.round(vector, ndigits=field.type.scale)  # noqa
                 return pc.cast(rounded, field.type)
 
-        # Coerce floats and integers to decimal, always allowed
-        if pa.types.is_floating(vector.type) or pa.types.is_integer(vector.type):
-            return pc.cast(vector, field.type)
+            # Floats and integers can always be coerced to decimal, so long as there is no data loss
+            elif pa.types.is_floating(vector.type) or pa.types.is_integer(vector.type):
+                return pc.cast(vector, field.type)
 
-        error_message = f"Field [{field.name}] contains the wrong data type (expected {field.type}, got {vector.type})"
-        cls.__log.error(error_message)
+            else:
+                error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
+                cls.__log.error(error_message)
+                raise _ex.EDataConformance(error_message)
 
-        raise _ex.EDataConformance(error_message)
+        except pa.ArrowInvalid as e:
+
+            error_message = cls._format_error(cls.__E_DATA_LOSS_DID_OCCUR, vector, field, e)
+            cls.__log.error(error_message)
+            raise _ex.EDataConformance(error_message) from e
 
     @classmethod
     def _coerce_string(cls, vector: pa.Array, field: pa.Field) -> pa.Array:
@@ -340,7 +371,7 @@ class DataConformance:
             if pa.types.is_string(vector.type):
                 return pc.cast(vector, field.type)
 
-        error_message = f"Field [{field.name}] contains the wrong data type (expected {field.type}, got {vector.type})"
+        error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
         cls.__log.error(error_message)
 
         raise _ex.EDataConformance(error_message)
@@ -360,7 +391,7 @@ class DataConformance:
             if pa.types.is_timestamp(vector.type) and vector.type.unit == "ns":
                 return pc.cast(vector, field.type)
 
-        error_message = f"Field [{field.name}] contains the wrong data type (expected {field.type}, got {vector.type})"
+        error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
         cls.__log.error(error_message)
 
         raise _ex.EDataConformance(error_message)
@@ -392,7 +423,15 @@ class DataConformance:
                 rounded_vector = pc.round_temporal(vector, unit=rounding_unit)  # noqa
                 return pc.cast(vector, field.type, safe=False)
 
-        error_message = f"Field [{field.name}] contains the wrong data type (expected {field.type}, got {vector.type})"
+        error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
         cls.__log.error(error_message)
-
         raise _ex.EDataConformance(error_message)
+
+    @classmethod
+    def _format_error(cls, error_template: str, vector: pa.Array, field: pa.Field, e: Exception = None):
+
+        return error_template.format(
+            field_name=field.name,
+            field_type=field.type,
+            vector_type=vector.type,
+            error_details=str(e))
