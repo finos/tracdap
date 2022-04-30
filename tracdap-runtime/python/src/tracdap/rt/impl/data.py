@@ -217,30 +217,28 @@ class DataConformance:
             else:
                 raise _ex.EDataConformance(f"All null values in non-null field [{field.name}]")
 
-        target_type = field.type
-
         if pa.types.is_boolean(field.type):
             return cls._coerce_boolean(vector, field)
 
         if pa.types.is_integer(field.type):
             return cls._coerce_integer(vector, field)
 
-        if pa.types.is_floating(target_type):
+        if pa.types.is_floating(field.type):
             return cls._coerce_float(vector, field)
 
-        if pa.types.is_decimal(target_type):
-            return cls._coerce_decimal(vector, target_type)
+        if pa.types.is_decimal(field.type):
+            return cls._coerce_decimal(vector, field)
 
-        if pa.types.is_string(target_type):
-            return cls._coerce_string(vector, target_type)
+        if pa.types.is_string(field.type) or pa.types.is_large_string(field.type):
+            return cls._coerce_string(vector, field)
 
-        if pa.types.is_date(target_type):
-            return cls._coerce_date(vector, target_type)
+        if pa.types.is_date(field.type):
+            return cls._coerce_date(vector, field)
 
-        if pa.types.is_timestamp(target_type):
-            return cls._coerce_timestamp(vector, target_type)
+        if pa.types.is_timestamp(field.type):
+            return cls._coerce_timestamp(vector, field)
 
-        raise _ex.EDataValidation(f"Unsupported data type {target_type}")
+        raise _ex.EDataValidation(f"Unsupported data type {field.type}")
 
     @classmethod
     def _coerce_boolean(cls, vector: pa.Array, field: pa.Field) -> pa.BooleanArray:
@@ -300,58 +298,81 @@ class DataConformance:
 
         raise _ex.EDataConformance(error_message)
 
-    @staticmethod
-    def _coerce_decimal(vector: pa.Array, target_type: pa.DataType) -> pa.Array:
+    @classmethod
+    def _coerce_decimal(cls, vector: pa.Array, field: pa.Field) -> pa.Array:
 
         # Allow coercing decimal 128 -> decimal 256, but not vice versa
         if pa.types.is_decimal(vector.type):
 
             source_max = vector.type.precision - vector.type.scale
-            target_max = target_type.precision - target_type.scale  # noqa
+            target_max = field.type.precision - field.type.scale  # noqa
 
             if source_max <= target_max:
-                rounded = pc.round(vector, ndigits=target_type.scale)  # noqa
-                return pc.cast(rounded, target_type)
+                rounded = pc.round(vector, ndigits=field.type.scale)  # noqa
+                return pc.cast(rounded, field.type)
 
         # Coerce floats and integers to decimal, always allowed
         if pa.types.is_floating(vector.type) or pa.types.is_integer(vector.type):
-            return pc.cast(vector, target_type)
+            return pc.cast(vector, field.type)
 
-        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
+        error_message = f"Field [{field.name}] contains the wrong data type (expected {field.type}, got {vector.type})"
+        cls.__log.error(error_message)
 
-    @staticmethod
-    def _coerce_string(vector: pa.Array, target_type: pa.DataType) -> pa.Array:
+        raise _ex.EDataConformance(error_message)
 
-        if pa.types.is_string(vector.type):
-            return vector
+    @classmethod
+    def _coerce_string(cls, vector: pa.Array, field: pa.Field) -> pa.Array:
 
-        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
+        if pa.types.is_string(field.type):
+            if pa.types.is_string(vector.type):
+                return vector
 
-    @staticmethod
-    def _coerce_date(vector: pa.Array, target_type: pa.DataType) -> pa.Array:
+        if pa.types.is_large_string(field.type):
+            if pa.types.is_large_string(vector.type):
+                return vector
+            if pa.types.is_string(vector.type):
+                return pc.cast(vector, field.type)
+
+        error_message = f"Field [{field.name}] contains the wrong data type (expected {field.type}, got {vector.type})"
+        cls.__log.error(error_message)
+
+        raise _ex.EDataConformance(error_message)
+
+    @classmethod
+    def _coerce_date(cls, vector: pa.Array, field: pa.Field) -> pa.Array:
 
         if pa.types.is_date(vector.type):
 
-            if target_type.bit_width >= vector.type.bit_width:
-                return pc.cast(vector, target_type)
+            if field.type.bit_width >= vector.type.bit_width:
+                return pc.cast(vector, field.type)
 
-        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
+        if pa.types.is_timestamp(vector.type) and vector.type.unit == "ns":
+            return pc.cast(vector, field.type)
+            # tsv: pa.TimestampArray
+            # tst: pa.TimestampType = tsv.type
+            # tst.unit
+            # pc.
 
-    @staticmethod
-    def _coerce_timestamp(vector: pa.Array, target_type: pa.DataType) -> pa.Array:
+        error_message = f"Field [{field.name}] contains the wrong data type (expected {field.type}, got {vector.type})"
+        cls.__log.error(error_message)
+
+        raise _ex.EDataConformance(error_message)
+
+    @classmethod
+    def _coerce_timestamp(cls, vector: pa.Array, field: pa.Field) -> pa.Array:
 
         if pa.types.is_timestamp(vector.type):
 
-            if not isinstance(target_type, pa.TimestampType):
+            if not isinstance(field.type, pa.TimestampType):
                 raise _ex.EUnexpected()
 
-            if target_type.unit == "s":
+            if field.type.unit == "s":
                 rounding_unit = "second"
-            elif target_type.unit == "ms":
+            elif field.type.unit == "ms":
                 rounding_unit = "millisecond"
-            elif target_type.unit == "us":
+            elif field.type.unit == "us":
                 rounding_unit = "microsecond"
-            elif target_type.unit == "ns":
+            elif field.type.unit == "ns":
                 rounding_unit = "nanosecond"
             else:
                 raise _ex.EUnexpected()
@@ -360,8 +381,11 @@ class DataConformance:
             # E.g. rounding "us" vector to "ms" results in "us" vector with truncated values
             # So, we need to set safe=False when calling pc.cast()
 
-            if target_type.bit_width >= vector.type.bit_width:
+            if field.type.bit_width >= vector.type.bit_width:
                 rounded_vector = pc.round_temporal(vector, unit=rounding_unit)  # noqa
-                return pc.cast(vector, target_type, safe=False)
+                return pc.cast(vector, field.type, safe=False)
 
-        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
+        error_message = f"Field [{field.name}] contains the wrong data type (expected {field.type}, got {vector.type})"
+        cls.__log.error(error_message)
+
+        raise _ex.EDataConformance(error_message)

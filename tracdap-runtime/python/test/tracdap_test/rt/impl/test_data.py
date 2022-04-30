@@ -452,34 +452,103 @@ class DataConformanceTest(unittest.TestCase):
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_decimal_same_type(self):
-        pass
+
+        dec1 = ("f", pa.decimal128(6, 3))
+        dec2 = ("f", pa.decimal128(38, 12))
+        dec3 = ("f", pa.decimal256(50, 15))
+
+        schema = pa.schema([dec1])
+        table = pa.Table.from_pydict({"f": [decimal.Decimal(1.0)]}, pa.schema([dec1]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+        self.assertEqual(table.column(0), conformed.column(0))
+
+        schema = pa.schema([dec2])
+        table = pa.Table.from_pydict({"f": [decimal.Decimal(1.0)]}, pa.schema([dec2]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+        self.assertEqual(table.column(0), conformed.column(0))
+
+        schema = pa.schema([dec3])
+        table = pa.Table.from_pydict({"f": [decimal.Decimal(1.0)]}, pa.schema([dec3]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+        self.assertEqual(table.column(0), conformed.column(0))
 
     def test_decimal_precision_and_scale(self):
-        pass
+        self.fail()
 
     def test_decimal_128_256(self):
-        pass
+        self.fail()
 
     def test_decimal_from_numeric_types(self):
-        pass
+        self.fail()
 
     def test_decimal_wrong_type(self):
-        pass
+        self.fail()
 
     def test_string_same_type(self):
-        pass
+
+        str1 = ("f", pa.utf8())
+        str2 = ("f", pa.large_utf8())
+
+        schema = pa.schema([str1])
+        table = pa.Table.from_pydict({"f": ["hello", "world"]}, pa.schema([str1]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+        self.assertEqual(table.column(0), conformed.column(0))
+
+        schema = pa.schema([str2])
+        table = pa.Table.from_pydict({"f": ["hello", "world"]}, pa.schema([str2]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+        self.assertEqual(table.column(0), conformed.column(0))
+
+    def test_string_small_to_large(self):
+
+        str1 = ("f", pa.utf8())
+        str2 = ("f", pa.large_utf8())
+
+        # utf8 -> large utf8 is allowed
+        schema = pa.schema([str2])
+        table = pa.Table.from_pydict({"f": ["hello", "world"]}, pa.schema([str1]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        # large utf8 -> utf8 is not allowed
+        schema = pa.schema([str1])
+        table = pa.Table.from_pydict({"f": ["hello", "world"]}, pa.schema([str2]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_string_wrong_type(self):
-        pass
+
+        str1 = ("f", pa.utf8())
+        str2 = ("f", pa.large_utf8())
+
+        schema = pa.schema([str1])
+
+        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([("f", pa.int64())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        table = pa.Table.from_pydict({"f": [dt.date(2000, 1, 1)]}, pa.schema([("f", pa.date32())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        schema = pa.schema([str2])
+
+        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([("f", pa.int64())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        table = pa.Table.from_pydict({"f": [dt.date(2000, 1, 1)]}, pa.schema([("f", pa.date32())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_date_same_type(self):
-        pass
+        self.fail()
 
     def test_date_wrong_type(self):
-        pass
+        self.fail()
 
     def test_timestamp_same_type(self):
-        pass
+        self.fail()
 
     def test_timestamp_wrong_type(self):
-        pass
+        self.fail()
