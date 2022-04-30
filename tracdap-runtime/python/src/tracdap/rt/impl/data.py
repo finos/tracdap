@@ -158,7 +158,7 @@ class DataMapping:
         if schema is None:
             return table
         else:
-            return DataConformance.conform_to_schema(table, schema)
+            return DataConformance.conform_to_schema(table, schema, df.dtypes)
 
     @classmethod
     def add_item_to_view(cls, view: DataView, part: DataPartKey, item: DataItem) -> DataView:
@@ -178,8 +178,10 @@ class DataConformance:
 
     __log = _util.logger_for_namespace(_Logging.__module__ + ".DataConformance")
 
+    __pandas_datetime_type = pd.to_datetime([]).dtype
+
     @classmethod
-    def conform_to_schema(cls, table: pa.Table, schema: pa.Schema) -> pa.Table:
+    def conform_to_schema(cls, table: pa.Table, schema: pa.Schema, pandas_types=None) -> pa.Table:
 
         # Coerce types to match expected schema where possible
         for schem_index in range(len(schema.names)):
@@ -189,8 +191,12 @@ class DataConformance:
             column_data: pa.Array = table.column(column_index)
             column_modified = False
 
+            pandas_type = pandas_types[schem_index] \
+                if pandas_types is not None \
+                else None
+
             if column_data.type != schema_field.type:
-                column_data = cls._coerce_vector(column_data, schema_field)
+                column_data = cls._coerce_vector(column_data, schema_field, pandas_type)
                 column_modified = True
 
             if not schema_field.nullable and column_data.null_count > 0:
@@ -208,7 +214,7 @@ class DataConformance:
         return table
 
     @classmethod
-    def _coerce_vector(cls, vector: pa.Array, field: pa.Field) -> pa.Array:
+    def _coerce_vector(cls, vector: pa.Array, field: pa.Field, pandas_type=None) -> pa.Array:
 
         if pa.types.is_null(vector.type):
 
@@ -233,7 +239,7 @@ class DataConformance:
             return cls._coerce_string(vector, field)
 
         if pa.types.is_date(field.type):
-            return cls._coerce_date(vector, field)
+            return cls._coerce_date(vector, field, pandas_type)
 
         if pa.types.is_timestamp(field.type):
             return cls._coerce_timestamp(vector, field)
@@ -330,6 +336,7 @@ class DataConformance:
         if pa.types.is_large_string(field.type):
             if pa.types.is_large_string(vector.type):
                 return vector
+            # Allow up-casting string -> large_string
             if pa.types.is_string(vector.type):
                 return pc.cast(vector, field.type)
 
@@ -339,19 +346,19 @@ class DataConformance:
         raise _ex.EDataConformance(error_message)
 
     @classmethod
-    def _coerce_date(cls, vector: pa.Array, field: pa.Field) -> pa.Array:
+    def _coerce_date(cls, vector: pa.Array, field: pa.Field, pandas_type=None) -> pa.Array:
 
+        # Allow casting date32 -> date64, both range and precision are greater so there is no data loss
         if pa.types.is_date(vector.type):
-
             if field.type.bit_width >= vector.type.bit_width:
                 return pc.cast(vector, field.type)
 
-        if pa.types.is_timestamp(vector.type) and vector.type.unit == "ns":
-            return pc.cast(vector, field.type)
-            # tsv: pa.TimestampArray
-            # tst: pa.TimestampType = tsv.type
-            # tst.unit
-            # pc.
+        # Special handling for Pandas/NumPy date values
+        # These are encoded as np.datetime64[ns] in Pandas -> pa.timestamp64[ns] in Arrow
+        # Only allow this conversion if the vector is coming from Pandas with datetime type
+        if pandas_type == cls.__pandas_datetime_type:
+            if pa.types.is_timestamp(vector.type) and vector.type.unit == "ns":
+                return pc.cast(vector, field.type)
 
         error_message = f"Field [{field.name}] contains the wrong data type (expected {field.type}, got {vector.type})"
         cls.__log.error(error_message)
