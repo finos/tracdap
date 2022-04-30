@@ -17,6 +17,7 @@ import decimal
 import unittest
 import sys
 import math
+import pandas as pd
 
 import pyarrow as pa
 
@@ -542,10 +543,83 @@ class DataConformanceTest(unittest.TestCase):
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_date_same_type(self):
-        self.fail()
+
+        d32 = ("f", pa.date32())
+        d64 = ("f", pa.date64())
+
+        schema = pa.schema([d32])
+        table = pa.Table.from_pydict({"f": [dt.date(2000, 1, 1)]}, pa.schema([d32]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+        self.assertEqual(table.column(0), conformed.column(0))
+
+        schema = pa.schema([d64])
+        table = pa.Table.from_pydict({"f": [dt.date(2000, 1, 1)]}, pa.schema([d64]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+        self.assertEqual(table.column(0), conformed.column(0))
+
+    def test_date_32_64(self):
+
+        d32 = ("f", pa.date32())
+        d64 = ("f", pa.date64())
+
+        # Up-cast 32-bit day to 64-bit date (millisecond) is allowed, no loss of data or precision
+        schema = pa.schema([d64])
+        table = pa.Table.from_pydict({"f": [dt.date(2000, 1, 1)]}, pa.schema([d32]))  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        # Down-cast is not allowed, could lose data and/or precision
+        schema = pa.schema([d32])
+        table = pa.Table.from_pydict({"f": [dt.date(2000, 1, 1)]}, pa.schema([d64]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+    def test_date_from_pandas(self):
+
+        d32 = ("f", pa.date32())
+        d64 = ("f", pa.date64())
+
+        df = pd.DataFrame({"f": pd.to_datetime([dt.date(2001, 1, 1)])})
+
+        # Conform should be applied inside DataMapping, allowing for conversion of NumPy native dates datetime64[ns]
+
+        schema = pa.schema([d32])
+        conformed = _data.DataMapping.pandas_to_arrow(df, schema)
+        self.assertEqual(schema, conformed.schema)
+
+        schema = pa.schema([d64])
+        conformed = _data.DataMapping.pandas_to_arrow(df, schema)
+        self.assertEqual(schema, conformed.schema)
 
     def test_date_wrong_type(self):
-        self.fail()
+
+        d32 = ("f", pa.date32())
+        d64 = ("f", pa.date64())
+
+        schema = pa.schema([d32])
+
+        table = pa.Table.from_pydict({"f": ["2000-01-01"]}, pa.schema([("f", pa.utf8())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([("f", pa.int32())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        # By default, do not down-cast timestamps as dates (only allowed as a special case for Pandas data)
+        table = pa.Table.from_pydict({"f": [dt.datetime(2001, 1, 1)]}, pa.schema([("f", pa.timestamp("ns"))]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        schema = pa.schema([d64])
+
+        table = pa.Table.from_pydict({"f": ["2000-01-01"]}, pa.schema([("f", pa.utf8())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        table = pa.Table.from_pydict({"f": [1, 2, 3, 4]}, pa.schema([("f", pa.int64())]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        # By default, do not down-cast timestamps as dates (only allowed as a special case for Pandas data)
+        table = pa.Table.from_pydict({"f": [dt.datetime(2001, 1, 1)]}, pa.schema([("f", pa.timestamp("ns"))]))  # noqa
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
     def test_timestamp_same_type(self):
         self.fail()
