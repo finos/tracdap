@@ -226,7 +226,7 @@ class DataConformance:
             return cls._coerce_integer(vector, field)
 
         if pa.types.is_floating(target_type):
-            return cls._coerce_float(vector, target_type)
+            return cls._coerce_float(vector, field)
 
         if pa.types.is_decimal(target_type):
             return cls._coerce_decimal(vector, target_type)
@@ -273,29 +273,32 @@ class DataConformance:
             if source_bit_width < target_bit_width and target_signed:
                 return pc.cast(vector, field.type)
 
-        error_message = f"Field [{field.name}] contains the wrong data type (expected {pa.bool_()}, got {vector.type})"
+        error_message = f"Field [{field.name}] contains the wrong data type (expected {field.type}, got {vector.type})"
         cls.__log.error(error_message)
 
         raise _ex.EDataConformance(error_message)
 
-    @staticmethod
-    def _coerce_float(vector: pa.Array, target_type: pa.DataType) -> pa.FloatingPointArray:
+    @classmethod
+    def _coerce_float(cls, vector: pa.Array, field: pa.Field) -> pa.FloatingPointArray:
 
         if pa.types.is_floating(vector.type):
 
-            source_bit_width = vector.type.bit_wdith
-            target_bit_width = target_type.bit_width
+            source_bit_width = vector.type.bit_width
+            target_bit_width = field.type.bit_width
 
             if source_bit_width == target_bit_width:
                 return vector  # noqa
 
-            if source_bit_width < target_bit_width:
-                return pc.cast(vector, target_type)
+            if source_bit_width == 32 and target_bit_width == 64:
+                return pc.cast(vector, field.type)
 
         if pa.types.is_integer(vector.type):
-            return pc.cast(vector, target_type)
+            return pc.cast(vector, field.type)
 
-        raise _ex.EDataValidation(f"Cannot coerce type {vector.type} into {target_type}")
+        error_message = f"Field [{field.name}] contains the wrong data type (expected {field.type}, got {vector.type})"
+        cls.__log.error(error_message)
+
+        raise _ex.EDataConformance(error_message)
 
     @staticmethod
     def _coerce_decimal(vector: pa.Array, target_type: pa.DataType) -> pa.Array:
