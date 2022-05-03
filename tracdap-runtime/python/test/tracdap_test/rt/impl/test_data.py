@@ -266,8 +266,8 @@ class DataConformanceTest(unittest.TestCase):
         schema = DataMappingTest.sample_schema()
 
         table = pa.Table.from_pydict(  # noqa
-            {"boolean_field_": [True, False, True, False]},  # noqa
-            pa.schema([("boolean_field_", pa.bool_())]))
+            {"boolean_field": [True, False, True, False]},  # noqa
+            pa.schema([("boolean_field", pa.bool_())]))
 
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
@@ -285,8 +285,8 @@ class DataConformanceTest(unittest.TestCase):
 
         sample_schema = DataMappingTest.sample_schema()
         sample_schema = pa.schema([
-            *zip(sample_schema.names, sample_schema.types),
-            ("integer_field_2", pa.int64())])
+            ("integer_field_2", pa.int64()),
+            *zip(sample_schema.names, sample_schema.types)])
 
         sample_data = DataMappingTest.sample_data()
         sample_data["integer_field_2"] = sample_data["integer_field"]
@@ -353,7 +353,7 @@ class DataConformanceTest(unittest.TestCase):
             ("integer_field", pa.int64())])
 
         schema = DataMappingTest.sample_schema()
-        table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
+        table = pa.Table.from_pydict(DataMappingTest.sample_data(), sample_schema)  # noqa
 
         self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
 
@@ -377,12 +377,13 @@ class DataConformanceTest(unittest.TestCase):
         sample_schema = pa.schema([
             ("decimal_field", _types.trac_arrow_decimal_type()),
             ("string_field", pa.utf8()),
+            ("FLOAT_FIELD", pa.float64()),
+            ("FLOAT_FIELD_2", pa.float64()),
+            ("FLOAT_FIELD_3", pa.float64()),
             ("booLEAn_field", pa.bool_()),
             ("integer_field", pa.uint32()),
             ("DATE_FIELD", pa.date32()),
-            ("FLOAT_FIELD", pa.float64()),
             ("datetime_field", pa.timestamp("ms", tz=None)),
-            ("FLOAT_FIELD_2", pa.float64()),
         ])
 
         sample_data = {
@@ -390,6 +391,7 @@ class DataConformanceTest(unittest.TestCase):
             "integer_field": [1, 2, 3, 4],
             "FLOAT_FIELD": [1.0, 2.0, 3.0, 4.0],
             "FLOAT_FIELD_2": [1.0, 2.0, 3.0, 4.0],
+            "FLOAT_FIELD_3": [1.0, 2.0, 3.0, 4.0],
             "decimal_field": [decimal.Decimal(1.0), decimal.Decimal(2.0), decimal.Decimal(3.0), decimal.Decimal(4.0)],
             "string_field": ["hello", "world", "what's", "up"],
             "DATE_FIELD": [dt.date(2000, 1, 1), dt.date(2000, 1, 2), dt.date(2000, 1, 3), dt.date(2000, 1, 4)],

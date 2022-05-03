@@ -180,6 +180,9 @@ class DataConformance:
 
     __pandas_datetime_type = pd.to_datetime([]).dtype
 
+    __E_FIELD_MISSING = \
+        "Field [{field_name}] is missing from the data"
+
     __E_WRONG_DATA_TYPE = \
         "Field [{field_name}] contains the wrong data type " + \
         "(expected {field_type}, got {vector_type})"
@@ -190,37 +193,104 @@ class DataConformance:
         "data will be lost ({error_details})"
 
     @classmethod
-    def conform_to_schema(cls, table: pa.Table, schema: pa.Schema, pandas_types=None) -> pa.Table:
+    def conform_to_schema(
+            cls, table: pa.Table, schema: pa.Schema,
+            pandas_types=None, warn_extra_columns=True) \
+            -> pa.Table:
+
+        # If Pandas types are supplied they must match the table, i.e. table has been converted from Pandas
+        if pandas_types is not None and len(pandas_types) != len(table.schema.types):
+            raise _ex.EUnexpected()
+
+        cls._check_duplicate_fields(schema, True)
+        cls._check_duplicate_fields(table.schema, False)
+
+        table_indices = {f.lower(): i for (i, f) in enumerate(table.schema.names)}
+        conformed_data = []
+        conformance_errors = []
 
         # Coerce types to match expected schema where possible
-        for schem_index in range(len(schema.names)):
+        for schema_index in range(len(schema.names)):
 
-            schema_field = schema.field(schem_index)
-            column_index = table.schema.get_field_index(schema_field.name)
-            column_data: pa.Array = table.column(column_index)
-            column_modified = False
+            try:
+                schema_field = schema.field(schema_index)
+                table_index = table_indices.get(schema_field.name.lower())
 
-            pandas_type = pandas_types[schem_index] \
-                if pandas_types is not None \
-                else None
+                if table_index is None:
+                    message = cls.__E_FIELD_MISSING.format(field_name=schema_field.name)
+                    cls.__log.error(message)
+                    raise _ex.EDataConformance(message)
 
-            if column_data.type != schema_field.type:
-                column_data = cls._coerce_vector(column_data, schema_field, pandas_type)
-                column_modified = True
+                table_column: pa.Array = table.column(table_index)
 
-            if not schema_field.nullable and column_data.null_count > 0:
-                raise _ex.EDataConformance(f"Null values present in non-null field [{schema_field.name}]")
+                pandas_type = pandas_types[table_index] \
+                    if pandas_types is not None \
+                    else None
 
-            if column_modified or column_index != schem_index:
-                table = table.remove_column(column_index)
-                table = table.add_column(schem_index, schema_field.name, column_data)
+                if table_column.type == schema_field.type:
+                    conformed_column = table_column
+                else:
+                    conformed_column = cls._coerce_vector(table_column, schema_field, pandas_type)
 
-        # Only include columns explicitly defined in the schema
-        while table.num_columns > len(schema.types):
-            cls.__log.warning(f"Removing unrecognized column [{table.field(table.num_columns - 1).name}]")
-            table = table.remove_column(table.num_columns - 1)
+                if not schema_field.nullable and table_column.null_count > 0:
+                    message = f"Null values present in non-null field [{schema_field.name}]"
+                    cls.__log.error(message)
+                    raise _ex.EDataConformance(message)
 
-        return table
+                conformed_data.append(conformed_column)
+
+            except _ex.EDataConformance as e:
+                conformance_errors.append(e)
+
+        # Columns not defined in the schema will not be included in the conformed output
+        if warn_extra_columns and table.num_columns > len(schema.types):
+
+            schema_columns = set(map(str.lower, schema.names))
+            extra_columns = [
+                f"[{col}]"
+                for col in table.schema.names
+                if col.lower() not in schema_columns]
+
+            message = f"Columns not defined in the schema will be dropped: {', '.join(extra_columns)}"
+            cls.__log.warning(message)
+
+        if any(conformance_errors):
+            if len(conformance_errors) == 1:
+                raise conformance_errors[0]
+            else:
+                cls.__log.error("There were multiple data conformance errors")
+                raise _ex.EDataConformance("There were multiple data conformance errors", conformance_errors)
+
+        return pa.Table.from_arrays(conformed_data, schema=schema)  # noqa
+
+    @classmethod
+    def _check_duplicate_fields(cls, schema: pa.Schema, schema_or_table: bool):
+
+        check = {}
+
+        for field in schema.names:
+            field_lower = field.lower()
+            if field_lower not in check:
+                check[field_lower] = []
+            check[field_lower].append(field)
+
+        duplicate_fields = dict(filter(lambda f_fs: len(f_fs[1]) > 1, check.items()))
+
+        if any(duplicate_fields):
+
+            duplicate_info = []
+
+            for field_lower, fields in duplicate_fields.items():
+                if all(map(lambda f: f == fields[0], fields)):
+                    duplicate_info.append(f"[{fields[0]}]")
+                else:
+                    duplicate_info.append(f"[{field_lower}] ({', '.join(fields)} differ only by case)")
+
+            source = "Schema" if schema_or_table else "Data"
+
+            error_message = f"{source} contains duplicate fields: " + ", ".join(duplicate_info)
+            cls.__log.error(error_message)
+            raise _ex.EDataConformance(error_message)
 
     @classmethod
     def _coerce_vector(cls, vector: pa.Array, field: pa.Field, pandas_type=None) -> pa.Array:
