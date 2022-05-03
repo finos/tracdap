@@ -967,7 +967,61 @@ class DataConformanceTest(unittest.TestCase):
 
     def test_timestamp_units(self):
 
-        self.fail()
+        int64_max = (1 << 63) - 1
+        epoch = dt.datetime(1970, 1, 1)
+
+        s_max = dt.datetime.max - dt.timedelta(seconds=1)
+        s_min = dt.datetime.min + dt.timedelta(seconds=1)
+        ms_max = dt.datetime.max - dt.timedelta(milliseconds=1)
+        ms_min = dt.datetime.min + dt.timedelta(milliseconds=1)
+        us_max = dt.datetime.max - dt.timedelta(microseconds=1)
+        us_min = dt.datetime.min + dt.timedelta(microseconds=1)
+        ns_max = epoch + dt.timedelta(microseconds=(int64_max / 1000) / 2)
+        ns_min = epoch - dt.timedelta(microseconds=(int64_max / 1000) / 2)
+
+        ts_s = ("f", pa.timestamp("s"))
+        ts_ms = ("f", pa.timestamp("ms"))
+        ts_us = ("f", pa.timestamp("us"))
+        ts_ns = ("f", pa.timestamp("ns"))
+
+        def convert_ok(min_val, max_val, src_type, tgt_type):
+            schema = pa.schema([tgt_type])
+            table = pa.Table.from_pydict({"f": [min_val, max_val]}, pa.schema([src_type]))  # noqa
+            conformed = _data.DataConformance.conform_to_schema(table, schema)
+            self.assertEqual(schema, conformed.schema)
+
+        def convert_fail(min_val, max_val, src_type, tgt_type):
+            schema = pa.schema([tgt_type])
+            table = pa.Table.from_pydict({"f": [min_val, max_val]}, pa.schema([src_type]))  # noqa
+            self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        # Casting to a less precise timestamp type should always be ok
+        # Less precision -> more range
+        convert_ok(ns_min, ns_max, ts_ns, ts_us)
+        convert_ok(ns_min, ns_max, ts_ns, ts_ms)
+        convert_ok(ns_min, ns_max, ts_ns, ts_s)
+        convert_ok(us_min, us_max, ts_us, ts_ms)
+        convert_ok(us_min, us_max, ts_us, ts_s)
+        convert_ok(ms_min, ms_max, ts_ms, ts_s)
+
+        # Casting to a more precise type will fail if the value is out of range for the target type
+        # More precision -> less range
+        # However, since Python date-time type is limited to the years 1 - 9999,
+        # It is only possible to create out-of-range test values for nanosecond target types
+        convert_fail(us_min, us_max, ts_us, ts_ns)
+        convert_fail(ms_min, ms_max, ts_ms, ts_ns)
+        convert_fail(s_min, s_max, ts_s, ts_ns)
+
+        # However, coercion should succeed if all values are inside the range of the target type
+        convert_ok(epoch, epoch, ts_us, ts_ns)
+        convert_ok(epoch, epoch, ts_ms, ts_ns)
+        convert_ok(epoch, epoch, ts_s, ts_ns)
+
+        # To test these out-of-range conversions
+        # would need Arrow source vectors with timestamps outside the range of Python the datetime object
+        # convert_fail(ms_min, ms_max, ts_ms, ts_us)
+        # convert_fail(s_min, s_max, ts_s, ts_us)
+        # convert_fail(s_min, s_max, ts_s, ts_ms)
 
     def test_timestamp_zones(self):
 

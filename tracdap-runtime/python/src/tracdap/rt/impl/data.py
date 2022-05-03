@@ -469,33 +469,41 @@ class DataConformance:
     @classmethod
     def _coerce_timestamp(cls, vector: pa.Array, field: pa.Field) -> pa.Array:
 
-        if pa.types.is_timestamp(vector.type):
+        try:
 
-            if not isinstance(field.type, pa.TimestampType):
-                raise _ex.EUnexpected()
+            if pa.types.is_timestamp(vector.type):
 
-            if field.type.unit == "s":
-                rounding_unit = "second"
-            elif field.type.unit == "ms":
-                rounding_unit = "millisecond"
-            elif field.type.unit == "us":
-                rounding_unit = "microsecond"
-            elif field.type.unit == "ns":
-                rounding_unit = "nanosecond"
-            else:
-                raise _ex.EUnexpected()
+                if not isinstance(field.type, pa.TimestampType):
+                    raise _ex.EUnexpected()
 
-            # round_temporal does not change the type for the rounded vector
-            # E.g. rounding "us" vector to "ms" results in "us" vector with truncated values
-            # So, we need to set safe=False when calling pc.cast()
+                if field.type.unit == "s":
+                    rounding_unit = "second"
+                elif field.type.unit == "ms":
+                    rounding_unit = "millisecond"
+                elif field.type.unit == "us":
+                    rounding_unit = "microsecond"
+                elif field.type.unit == "ns":
+                    rounding_unit = "nanosecond"
+                else:
+                    raise _ex.EUnexpected()
 
-            if field.type.bit_width >= vector.type.bit_width:
+                # Loss of precision is allowed, loss of data is not
+                # Rounding will prevent errors in cast() due to loss of precision
+                # cast() will fail if the source value is outside the range of the target type
+
                 rounded_vector = pc.round_temporal(vector, unit=rounding_unit)  # noqa
-                return pc.cast(vector, field.type, safe=False)
+                return pc.cast(rounded_vector, field.type)  # , safe=False)
 
-        error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
-        cls.__log.error(error_message)
-        raise _ex.EDataConformance(error_message)
+            else:
+                error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
+                cls.__log.error(error_message)
+                raise _ex.EDataConformance(error_message)
+
+        except pa.ArrowInvalid as e:
+
+            error_message = cls._format_error(cls.__E_DATA_LOSS_DID_OCCUR, vector, field, e)
+            cls.__log.error(error_message)
+            raise _ex.EDataConformance(error_message) from e
 
     @classmethod
     def _format_error(cls, error_template: str, vector: pa.Array, field: pa.Field, e: Exception = None):
