@@ -115,8 +115,8 @@ class DataMapping:
 
         return table.to_pandas(
             ignore_metadata=True,  # noqa
-            date_as_object=True,  # noqa
-            timestamp_as_object=True,  # noqa
+            date_as_object=False,  # noqa
+            timestamp_as_object=False,  # noqa
             types_mapper=cls.__ARROW_TO_PANDAS_TYPES.get)
 
     # TODO: Move to type_system
@@ -126,7 +126,8 @@ class DataMapping:
         pa.int64(): pd.Int64Dtype(),
         # TODO: What should be the default behavior for floats?
         # Float64DType is available in Pandas 1.2 and later, it offers more consistent handling of NaN / null
-        pa.float64(): pd.Float64Dtype() if "Float64DType" in pd.__dict__ else None
+        pa.float64(): pd.Float64Dtype() if "Float64Dtype" in pd.__dict__ else None,
+        pa.utf8(): pd.StringDtype()
     }
 
     @classmethod
