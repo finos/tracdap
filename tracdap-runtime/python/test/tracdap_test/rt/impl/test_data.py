@@ -274,6 +274,46 @@ class DataMappingTest(unittest.TestCase):
         self.assertEqual(schema, rt.schema)
         self.assertEqual(table, rt)
 
+    def test_time_zone_mapping(self):
+
+        epoch = dt.datetime(1970, 1, 1)
+        epoch_utc = dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc)
+        epoch_europe_london = dt.datetime(1970, 1, 1, tzinfo=dt.timezone(dt.timedelta(hours=+1), name="Europe/London"))
+
+        ts_no_zone = ("f", pa.timestamp("s"))
+        ts_utc = ("f", pa.timestamp("s", tz="UTC"))
+        ts_europe_london = ("f", pa.timestamp("s", tz="Europe/London"))
+        ts_ns_europe_london = ("f", pa.timestamp("ns", tz="Europe/London"))
+
+        def do_test(sample_val, sample_type):
+
+            schema = pa.schema([sample_type])
+            table = pa.Table.from_pydict({"f": [sample_val]}, schema)  # noqa
+            df = _data.DataMapping.arrow_to_pandas(table)
+            rt = _data.DataMapping.pandas_to_arrow(df, schema)
+
+            self.assertEqual(schema, rt.schema)
+            self.assertEqual(table, rt)
+
+            # Also check TZ shows up correctly in the Pandas dtype
+
+            if sample_type[1].tz:
+                expected_dtype = pd.DatetimeTZDtype(tz=sample_type[1].tz)
+            else:
+                expected_dtype = pd.to_datetime([dt.datetime(1970, 1, 1)]).dtype
+
+            self.assertListEqual([expected_dtype], df.dtypes.to_list())
+
+        # Fail all time zone conversions for now
+        # I.e., insist time zones match exactly and any conversion is defined in model code
+        # It is easier to add auto-conversion later than remove it
+        # (Or maybe just never add it, there is great potential for ambiguity)!
+
+        do_test(epoch, ts_no_zone)
+        do_test(epoch_utc, ts_utc)
+        do_test(epoch_europe_london, ts_europe_london)
+        do_test(epoch_europe_london, ts_ns_europe_london)
+
 
 class DataConformanceTest(unittest.TestCase):
 
@@ -1057,7 +1097,7 @@ class DataConformanceTest(unittest.TestCase):
         epoch = dt.datetime(1970, 1, 1)
         epoch_utc = dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc)
         epoch_plus_zero = dt.datetime(1970, 1, 1, tzinfo=dt.timezone(dt.timedelta(hours=0)))
-        epoch_plus_one = dt.datetime(1970, 1, 1, tzinfo=dt.timezone(dt.timedelta(hours=-1)))
+        epoch_plus_one = dt.datetime(1970, 1, 1, tzinfo=dt.timezone(dt.timedelta(hours=+1)))
 
         ts_no_zone = ("f", pa.timestamp("s"))
         ts_utc = ("f", pa.timestamp("s", tz="UTC"))
