@@ -1054,7 +1054,50 @@ class DataConformanceTest(unittest.TestCase):
 
     def test_timestamp_zones(self):
 
-        self.fail()
+        epoch = dt.datetime(1970, 1, 1)
+        epoch_utc = dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc)
+        epoch_plus_zero = dt.datetime(1970, 1, 1, tzinfo=dt.timezone(dt.timedelta(hours=0)))
+        epoch_plus_one = dt.datetime(1970, 1, 1, tzinfo=dt.timezone(dt.timedelta(hours=-1)))
+
+        ts_no_zone = ("f", pa.timestamp("s"))
+        ts_utc = ("f", pa.timestamp("s", tz="UTC"))
+        ts_plus_one = ("f", pa.timestamp("s", tz="+01:00"))
+        ts_europe_london = ("f", pa.timestamp("s", tz="Europe/London"))
+        ts_ns_europe_london = ("f", pa.timestamp("ns", tz="Europe/London"))
+
+        def convert_ok(src_val, src_type, tgt_type):
+            schema = pa.schema([tgt_type])
+            table = pa.Table.from_pydict({"f": [src_val]}, pa.schema([src_type]))  # noqa
+            conformed = _data.DataConformance.conform_to_schema(table, schema)
+            self.assertEqual(schema, conformed.schema)
+
+        def convert_fail(src_val, src_type, tgt_type):
+            schema = pa.schema([tgt_type])
+            table = pa.Table.from_pydict({"f": [src_val]}, pa.schema([src_type]))  # noqa
+            self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+        # Fail all time zone conversions for now
+        # I.e., insist time zones match exactly and any conversion is defined in model code
+        # It is easier to add auto-conversion later than remove it
+        # (Or maybe just never add it, there is great potential for ambiguity)!
+
+        convert_fail(epoch, ts_no_zone, ts_utc)
+        convert_fail(epoch, ts_no_zone, ts_plus_one)
+        convert_fail(epoch, ts_no_zone, ts_europe_london)
+
+        convert_fail(epoch_utc, ts_utc, ts_no_zone)
+        convert_fail(epoch_plus_one, ts_plus_one, ts_no_zone)
+        convert_fail(epoch_plus_zero, ts_europe_london, ts_no_zone)
+
+        convert_fail(epoch_utc, ts_utc, ts_plus_one)
+        convert_fail(epoch_utc, ts_utc, ts_europe_london)
+        convert_fail(epoch_plus_one, ts_plus_one, ts_utc)
+        convert_fail(epoch_plus_one, ts_plus_one, ts_europe_london)
+        convert_fail(epoch_plus_zero, ts_europe_london, ts_utc)
+        convert_fail(epoch_plus_zero, ts_europe_london, ts_plus_one)
+
+        # Make sure that precision conversion still works when a zone is set
+        convert_ok(epoch, ts_ns_europe_london, ts_europe_london)
 
     def test_timestamp_from_pandas(self):
 

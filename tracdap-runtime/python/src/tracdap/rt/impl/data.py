@@ -193,6 +193,10 @@ class DataConformance:
         "Field [{field_name}] cannot be converted from {vector_type} to {field_type}, " + \
         "data will be lost ({error_details})"
 
+    __E_TIMEZONE_DOES_NOT_MATCH = \
+        "Field [{field_name}] cannot be converted from {vector_type} to {field_type}, " + \
+        "source and target have different time zones"
+
     @classmethod
     def conform_to_schema(
             cls, table: pa.Table, schema: pa.Schema,
@@ -476,6 +480,11 @@ class DataConformance:
 
                 if not isinstance(field.type, pa.TimestampType):
                     raise _ex.EUnexpected()
+
+                if vector.type.tz != field.type.tz:
+                    error_message = cls._format_error(cls.__E_TIMEZONE_DOES_NOT_MATCH, vector, field)
+                    cls.__log.error(error_message)
+                    raise _ex.EDataConformance(error_message)
 
                 if field.type.unit == "s":
                     rounding_unit = "second"
