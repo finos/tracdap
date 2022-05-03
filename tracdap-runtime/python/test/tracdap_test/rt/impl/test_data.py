@@ -87,9 +87,6 @@ class DataMappingTest(unittest.TestCase):
 
         table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
         df = _data.DataMapping.arrow_to_pandas(table)
-
-        # TODO: Check schema on DF, i.e. at midway point?
-
         rt = _data.DataMapping.pandas_to_arrow(df, self.sample_schema())
 
         self.assertEqual(sample_schema, rt.schema)
@@ -105,13 +102,38 @@ class DataMappingTest(unittest.TestCase):
 
         table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
         df = _data.DataMapping.arrow_to_pandas(table)
-
-        # TODO: Check schema on DF, i.e. at midway point?
-
         rt = _data.DataMapping.pandas_to_arrow(df, self.sample_schema())
 
         self.assertEqual(sample_schema, rt.schema)
         self.assertEqual(table, rt)
+
+    def test_pandas_dtypes(self):
+
+        sample_schema = self.sample_schema()
+        sample_data = self.sample_data()
+
+        table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
+        df = _data.DataMapping.arrow_to_pandas(table)
+
+        expect_dtypes = [
+
+            pd.BooleanDtype(),
+            pd.Int64Dtype(),
+
+            # Pandas float dtype is only available from Pandas 1.2 onward, fallback is original NumPy float dtype
+            pd.Float64Dtype() if "Float64Dtype" in pd.__dict__ else pd.api.types.pandas_dtype(float),
+
+            # No special Dtype for decimals, these will just show up as objects
+            pd.api.types.pandas_dtype(object),
+
+            # Strings have a dedicated dtype!
+            pd.StringDtype(),
+
+            # Date/time types being converted as NumPy native (datetime64[ns])
+            pd.to_datetime([dt.date(1970, 1, 1)]).dtype,
+            pd.to_datetime([dt.datetime(1970, 1, 1)]).dtype]
+
+        self.assertListEqual(expect_dtypes, df.dtypes.to_list())
 
     def test_edge_cases_integer(self):
 
@@ -209,13 +231,16 @@ class DataMappingTest(unittest.TestCase):
 
     def test_edge_cases_date(self):
 
+        max_pandas_date = dt.date(1970, 1, 1) + dt.timedelta(microseconds=(1 << 63) / 1000)
+        min_pandas_date = dt.date(1970, 1, 1) - dt.timedelta(microseconds=(1 << 63) / 1000)
+
         schema = self.one_field_schema(_meta.BasicType.DATE)
         table = pa.Table.from_pydict({"date_field": [  # noqa
             dt.date(1970, 1, 1),
             dt.date(2000, 1, 1),
             dt.date(2038, 1, 20),
-            dt.date.max,
-            dt.date.min
+            max_pandas_date,
+            min_pandas_date
         ]}, schema)
 
         df = _data.DataMapping.arrow_to_pandas(table)
@@ -226,6 +251,10 @@ class DataMappingTest(unittest.TestCase):
 
     def test_edge_cases_datetime(self):
 
+        # The extra second is subtracted to prevent sub-second part overflowing the max value
+        max_pandas_datetime = dt.datetime(1970, 1, 1) + dt.timedelta(microseconds=(1 << 63) / 1000 - 1000000)
+        min_pandas_datetime = dt.datetime(1970, 1, 1) - dt.timedelta(microseconds=(1 << 63) / 1000 - 1000000)
+
         schema = self.one_field_schema(_meta.BasicType.DATETIME)
         table = pa.Table.from_pydict({"datetime_field": [  # noqa
             dt.datetime(1970, 1, 1, 0, 0, 0),
@@ -235,8 +264,8 @@ class DataMappingTest(unittest.TestCase):
             # Test fractions for both positive and negative encoded values
             dt.datetime(1972, 1, 1, 0, 0, 0, 500000),
             dt.datetime(1968, 1, 1, 23, 59, 59, 500000),
-            dt.datetime.max,
-            dt.datetime.min
+            max_pandas_datetime,
+            min_pandas_datetime
         ]}, schema)
 
         df = _data.DataMapping.arrow_to_pandas(table)
