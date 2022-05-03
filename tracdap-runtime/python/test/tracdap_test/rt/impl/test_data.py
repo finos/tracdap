@@ -25,9 +25,14 @@ import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.data as _data
+import tracdap.rt.impl.util as _util
 
 
 class DataMappingTest(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        _util.configure_logging()
 
     @staticmethod
     def sample_data():
@@ -242,6 +247,163 @@ class DataMappingTest(unittest.TestCase):
 
 
 class DataConformanceTest(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        _util.configure_logging()
+
+    def test_fields_exact_match(self):
+
+        schema = DataMappingTest.sample_schema()
+        table = pa.Table.from_pydict(DataMappingTest.sample_data(), DataMappingTest.sample_schema())  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+
+        self.assertEqual(schema, table.schema)
+        self.assertEqual(schema, conformed.schema)
+
+    def test_fields_missing(self):
+        
+        schema = DataMappingTest.sample_schema()
+
+        table = pa.Table.from_pydict(  # noqa
+            {"boolean_field_": [True, False, True, False]},  # noqa
+            pa.schema([("boolean_field_", pa.bool_())]))
+
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+    def test_fields_missing_near_match(self):
+
+        schema = DataMappingTest.one_field_schema(_meta.BasicType.BOOLEAN)
+
+        table = pa.Table.from_pydict(  # noqa
+            {"boolean_field_": [True, False, True, False]},  # noqa
+            pa.schema([("boolean_field_", pa.bool_())]))
+
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+    def test_fields_extra_dropped(self):
+
+        sample_schema = DataMappingTest.sample_schema()
+        sample_schema = pa.schema([
+            *zip(sample_schema.names, sample_schema.types),
+            ("integer_field_2", pa.int64())])
+
+        sample_data = DataMappingTest.sample_data()
+        sample_data["integer_field_2"] = sample_data["integer_field"]
+
+        schema = DataMappingTest.sample_schema()
+        table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+
+        self.assertNotEqual(schema, table.schema)
+        self.assertEqual(schema, conformed.schema)
+
+    def test_fields_case_insensitive_match(self):
+
+        schema = DataMappingTest.one_field_schema(_meta.BasicType.BOOLEAN)
+
+        table = pa.Table.from_pydict(  # noqa
+            {"BOOLeaN_fIEld": [True, False, True, False]},  # noqa
+            pa.schema([("BOOLeaN_fIEld", pa.bool_())]))
+
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+
+        self.assertNotEqual(schema, table.schema)
+        self.assertEqual(schema, conformed.schema)
+
+    def test_fields_ordering(self):
+
+        sample_schema = DataMappingTest.sample_schema()
+        sample_schema = pa.schema(reversed(list(zip(sample_schema.names, sample_schema.types))))
+
+        schema = DataMappingTest.sample_schema()
+        table = pa.Table.from_pydict(DataMappingTest.sample_data(), sample_schema)  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+
+        self.assertNotEqual(schema, table.schema)
+        self.assertEqual(schema, conformed.schema)
+
+    def test_fields_duplicate_in_schema(self):
+
+        schema = DataMappingTest.sample_schema()
+        schema = pa.schema([
+            *zip(schema.names, schema.types),
+            ("integer_field", pa.int64())])
+
+        table = pa.Table.from_pydict(DataMappingTest.sample_data(), DataMappingTest.sample_schema())  # noqa
+
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+    def test_fields_duplicate_in_schema_case_insensitive(self):
+
+        schema = DataMappingTest.sample_schema()
+        schema = pa.schema([
+            *zip(schema.names, schema.types),
+            ("inTEGer_fiEld", pa.int64())])
+
+        table = pa.Table.from_pydict(DataMappingTest.sample_data(), DataMappingTest.sample_schema())  # noqa
+
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+    def test_fields_duplicate_in_data(self):
+
+        sample_schema = DataMappingTest.sample_schema()
+        sample_schema = pa.schema([
+            *zip(sample_schema.names, sample_schema.types),
+            ("integer_field", pa.int64())])
+
+        schema = DataMappingTest.sample_schema()
+        table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
+
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+    def test_fields_duplicate_in_data_case_insensitive(self):
+
+        sample_schema = DataMappingTest.sample_schema()
+        sample_schema = pa.schema([
+            *zip(sample_schema.names, sample_schema.types),
+            ("iNTEgeR_FieLd", pa.int64())])
+
+        sample_data = DataMappingTest.sample_data()
+        sample_data["iNTEgeR_FieLd"] = sample_data["integer_field"]
+
+        schema = DataMappingTest.sample_schema()
+        table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
+
+        self.assertRaises(_ex.EDataConformance, lambda: _data.DataConformance.conform_to_schema(table, schema))
+
+    def test_fields_combined_logic(self):
+        
+        sample_schema = pa.schema([
+            ("decimal_field", _types.trac_arrow_decimal_type()),
+            ("string_field", pa.utf8()),
+            ("booLEAn_field", pa.bool_()),
+            ("integer_field", pa.uint32()),
+            ("DATE_FIELD", pa.date32()),
+            ("FLOAT_FIELD", pa.float64()),
+            ("datetime_field", pa.timestamp("ms", tz=None)),
+            ("FLOAT_FIELD_2", pa.float64()),
+        ])
+
+        sample_data = {
+            "booLEAn_field": [True, False, True, False],
+            "integer_field": [1, 2, 3, 4],
+            "FLOAT_FIELD": [1.0, 2.0, 3.0, 4.0],
+            "FLOAT_FIELD_2": [1.0, 2.0, 3.0, 4.0],
+            "decimal_field": [decimal.Decimal(1.0), decimal.Decimal(2.0), decimal.Decimal(3.0), decimal.Decimal(4.0)],
+            "string_field": ["hello", "world", "what's", "up"],
+            "DATE_FIELD": [dt.date(2000, 1, 1), dt.date(2000, 1, 2), dt.date(2000, 1, 3), dt.date(2000, 1, 4)],
+            "datetime_field": [
+                dt.datetime(2000, 1, 1, 0, 0, 0), dt.datetime(2000, 1, 2, 1, 1, 1),
+                dt.datetime(2000, 1, 3, 2, 2, 2), dt.datetime(2000, 1, 4, 3, 3, 3)]
+        }
+
+        schema = DataMappingTest.sample_schema()
+        table = pa.Table.from_pydict(sample_data, sample_schema)  # noqa
+        conformed = _data.DataConformance.conform_to_schema(table, schema)
+
+        self.assertNotEqual(schema, table.schema)
+        self.assertEqual(schema, conformed.schema)
 
     def test_boolean_same_type(self):
 
@@ -855,3 +1017,7 @@ class DataConformanceTest(unittest.TestCase):
         do_test(ts2)
         do_test(ts3)
         do_test(ts4)
+
+
+if __name__ == "__main__":
+    unittest.main()
