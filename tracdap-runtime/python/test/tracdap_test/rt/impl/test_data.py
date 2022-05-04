@@ -1059,6 +1059,13 @@ class DataConformanceTest(unittest.TestCase):
             conformed = _data.DataConformance.conform_to_schema(table, schema)
             self.assertEqual(schema, conformed.schema)
 
+            # Quick sanity check to make sure values are not being corrupted
+            # Exact match will not happen due to rounding
+            # But this will guard against wrap-around, zero outputs and other severe failures
+            self.assertEqual(min_val.year, conformed.column(0)[0].as_py().year)
+            self.assertEqual(min_val.month, conformed.column(0)[0].as_py().month)
+            self.assertEqual(min_val.day, conformed.column(0)[0].as_py().day)
+
         def convert_fail(min_val, max_val, src_type, tgt_type):
             schema = pa.schema([tgt_type])
             table = pa.Table.from_pydict({"f": [min_val, max_val]}, pa.schema([src_type]))  # noqa
