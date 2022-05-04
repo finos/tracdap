@@ -61,9 +61,6 @@ jobs:
 
   python_runtime:
 
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
     # Testing targets for the Python model runtime
     # Include the latest stable release (3.9)
     # Oldest supported version is 3.6, this is required by Pandas 1.0
@@ -77,23 +74,36 @@ jobs:
       matrix:
         enviroment:
 
+          - { ENV_NAME: "Windows: Python 3.10, PySpark 3.2.x, Pandas >= 1.3",
+              PLATFORM: 'windows-latest',
+              PYTHON_VERSION: "3.10",
+              PYSPARK_VERSION: ">= 3.2.0, < 3.3.0",
+              PANDAS_VERSION: ">= 1.3.0, < 2.0.0",
+              PYPANDOC: false }
+
           - { ENV_NAME: "Latest: Python 3.10, PySpark 3.2.x, Pandas >= 1.3",
+              PLATFORM: 'ubuntu-latest',
               PYTHON_VERSION: "3.10",
               PYSPARK_VERSION: ">= 3.2.0, < 3.3.0",
               PANDAS_VERSION: ">= 1.3.0, < 2.0.0",
               PYPANDOC: false }
 
           - { ENV_NAME: "Middle: Python 3.8, PySpark 3.0.x, Pandas 1.1",
+              PLATFORM: 'ubuntu-latest',
               PYTHON_VERSION: "3.8",
               PYSPARK_VERSION: ">= 3.0.0, < 3.1.0",
               PANDAS_VERSION: ">= 1.1.0, < 1.2.0",
               PYPANDOC: false }
 
           - { ENV_NAME: "Oldest: Python 3.7, PySpark 2.4.0, Pandas 1.0.0",
+              PLATFORM: 'ubuntu-latest',
               PYTHON_VERSION: "3.7",
               PYSPARK_VERSION: "== 2.4.0",
               PANDAS_VERSION: "== 1.0.0",
               PYPANDOC: true }
+
+    runs-on: ${{ matrix.enviroment.PLATFORM }}
+    timeout-minutes: 20
 
     steps:
 
@@ -126,6 +136,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Protoc code generation
+        if: runner.os != 'Windows'
+        run: |
+          python tracdap-runtime/python/build_runtime.py --target codegen
+
+      - name: Protoc code generation (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
         run: |
           python tracdap-runtime/python/build_runtime.py --target codegen
 

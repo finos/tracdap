@@ -126,4 +126,6 @@ if __name__ == "__main__":
     response = plugin.generate()
     output = response.SerializeToString()
 
+    print(response, file=sys.stderr)
+
     sys.stdout.buffer.write(output)
