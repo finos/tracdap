@@ -131,7 +131,7 @@ def platform_args(base_args, proto_files):
 def build_protoc_args(generator, proto_paths, output_location, packages):
 
     if platform.system().lower().startswith("win"):
-        trac_plugin = "protoc-gen-trac.py"
+        trac_plugin = "protoc-gen-trac=protoc-gen-trac.py"
     else:
         trac_plugin = "protoc-gen-trac=./protoc-gen-trac.py"
 
