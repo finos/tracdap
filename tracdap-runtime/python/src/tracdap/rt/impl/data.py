@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import dataclasses as dc
 import typing as tp
+import platform
 
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -486,6 +487,18 @@ class DataConformance:
                     cls.__log.error(error_message)
                     raise _ex.EDataConformance(error_message)
 
+                # The cast() function applied to timestamp on Windows does not correctly detect overflows / under-flows
+                # To get consistent behavior, this custom implementation casts to int64, the underlying type
+                # Then performs the required scaling on the int64 vector, which does throw for overflows
+                # Bug exists in Arrow 7.0.0 as of May 2022
+
+                # This also avoids the need for timezone lookup on Windows
+                # Although zone conversion is not supported, a tz database is still required
+                # When casting timestamps with source and target type in the same zone
+
+                if platform.system().lower().startswith("win"):
+                    return cls._coerce_timestamp_windows(vector, field)
+
                 if field.type.unit == "s":
                     rounding_unit = "second"
                 elif field.type.unit == "ms":
@@ -502,7 +515,7 @@ class DataConformance:
                 # cast() will fail if the source value is outside the range of the target type
 
                 rounded_vector = pc.round_temporal(vector, unit=rounding_unit)  # noqa
-                return pc.cast(rounded_vector, field.type)  # , safe=False)
+                return pc.cast(rounded_vector, field.type)
 
             else:
                 error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
@@ -514,6 +527,32 @@ class DataConformance:
             error_message = cls._format_error(cls.__E_DATA_LOSS_DID_OCCUR, vector, field, e)
             cls.__log.error(error_message)
             raise _ex.EDataConformance(error_message) from e
+
+    @classmethod
+    def _coerce_timestamp_windows(cls, vector: pa.Array, field: pa.Field):
+
+        scaling_map = {"s": 1, "ms": 1000, "us": 1000000, "ns": 1000000000}
+        src_scale = scaling_map.get(vector.type.unit)
+        tgt_scale = scaling_map.get(field.type.unit)
+
+        if src_scale is None or tgt_scale is None:
+            raise _ex.EUnexpected()  # Invalid timestamp type
+
+        int64_vector: pa.IntegerArray = pc.cast(vector, pa.int64())
+
+        if src_scale > tgt_scale:
+
+            scaling = src_scale / tgt_scale
+            scaling_vector = pa.array([scaling for _ in range(len(vector))], pa.int64())
+            scaled_vector = pc.divide_checked(int64_vector, scaling_vector)  # noqa
+
+        else:
+
+            scaling = tgt_scale / src_scale
+            scaling_vector = pa.array([scaling for _ in range(len(vector))], pa.int64())
+            scaled_vector = pc.multiply_checked(int64_vector, scaling_vector)  # noqa
+
+        return pc.cast(scaled_vector, field.type)
 
     @classmethod
     def _format_error(cls, error_template: str, vector: pa.Array, field: pa.Field, e: Exception = None):
