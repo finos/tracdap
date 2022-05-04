@@ -30,8 +30,6 @@ class TracPlugin:
 
     def __init__(self, pb_request: pb_plugin.CodeGeneratorRequest):
 
-        print("Init plugin", file=sys.stderr)
-
         logging_format = f"%(levelname)s %(name)s: %(message)s"
         logging.basicConfig(format=logging_format, level=logging.INFO)
         self._log = logging.getLogger(TracPlugin.__name__)
@@ -56,9 +54,7 @@ class TracPlugin:
 
         try:
 
-            print("Running generate func", file=sys.stderr)
-
-            # Enable optional fields
+            # Make sure to enable optional fields
             generated_response = pb_plugin.CodeGeneratorResponse()
             generated_response.supported_features = pb_plugin.CodeGeneratorResponse.FEATURE_PROTO3_OPTIONAL
 
@@ -123,8 +119,6 @@ class TracPlugin:
 
 if __name__ == "__main__":
 
-    print("Running protoc-gen-trac", file=sys.stderr)
-
     data = sys.stdin.buffer.read()
 
     request = pb_plugin.CodeGeneratorRequest()
@@ -134,7 +128,5 @@ if __name__ == "__main__":
 
     response = plugin.generate()
     output = response.SerializeToString()
-
-    print(response, file=sys.stderr)
 
     sys.stdout.buffer.write(output)

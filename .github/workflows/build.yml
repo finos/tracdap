@@ -136,13 +136,6 @@ jobs:
           pip install -r requirements.txt
 
       - name: Protoc code generation
-        if: runner.os != 'Windows'
-        run: |
-          python tracdap-runtime/python/build_runtime.py --target codegen
-
-      - name: Protoc code generation (Windows)
-        if: runner.os == 'Windows'
-        shell: cmd
         run: |
           python tracdap-runtime/python/build_runtime.py --target codegen
 
