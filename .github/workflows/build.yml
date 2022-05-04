@@ -144,7 +144,6 @@ jobs:
         if: runner.os == 'Windows'
         shell: cmd
         run: |
-          set PATHEXT=%PATHEXT%;.PY
           python tracdap-runtime/python/build_runtime.py --target codegen
 
       - name: Unit tests
