@@ -146,6 +146,8 @@ class DataMapping:
     @classmethod
     def pandas_to_arrow(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
 
+        # TODO: Handle conformance of schema fields before converting, or convert all fields then conform
+
         if len(df) == 0:
             df_schema = pa.Schema.from_pandas(df, preserve_index=False)  # noqa
             table = pa.Table.from_batches(list(), df_schema)  # noqa
