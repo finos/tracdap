@@ -136,22 +136,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Protoc code generation
-        run: |
-          python tracdap-runtime/python/build_runtime.py --target codegen
+        run: python tracdap-runtime/python/build_runtime.py --target codegen
 
       - name: Unit tests
-        run: |
-          export PYTHONPATH=tracdap-runtime/python/generated
-          export PYTHONPATH=tracdap-runtime/python/src:$PYTHONPATH
-          export PYTHONPATH=tracdap-runtime/python/test:$PYTHONPATH
-          python -m unittest discover -s tracdap-runtime/python/test/tracdap_test -t tracdap-runtime/python/test
+        run: python tracdap-runtime/python/build_runtime.py --target test
 
       - name: Python example models
-        run: |
-          export PYTHONPATH=tracdap-runtime/python/generated
-          export PYTHONPATH=tracdap-runtime/python/src:$PYTHONPATH
-          export PYTHONPATH=tracdap-runtime/python/test:$PYTHONPATH
-          python -m unittest discover -s tracdap-runtime/python/test/tracdap_examples -t tracdap-runtime/python/test
+        run: python tracdap-runtime/python/build_runtime.py --target examples
 
 
   web_api:
