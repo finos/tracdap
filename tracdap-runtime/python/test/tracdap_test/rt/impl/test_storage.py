@@ -301,6 +301,20 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
         self.assertEqual(7, table.num_columns)
         self.assertEqual(10, table.num_rows)
 
+    def test_csv_nan(self):
+
+        # Test reading in CSV NaN with the strict (Apache Arrow) CSV parser
+
+        schema = pa.schema([("float_field", pa.float64())])
+        table = self.test_lib_storage.read_table("csv_nan.csv", "CSV", schema)
+
+        self.assertEqual(1, table.num_columns)
+        self.assertEqual(2, table.num_rows)
+
+        for row, value in enumerate(table.column(0)):
+            self.assertIsNotNone(value.as_py())
+            self.assertTrue(math.isnan(value.as_py()))
+
 
 class LocalArrowStorageTest(unittest.TestCase, LocalStorageTest):
 
