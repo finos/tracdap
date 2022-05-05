@@ -19,11 +19,13 @@ import pathlib
 import tempfile
 import unittest
 import sys
+import random
 
 import pyarrow as pa
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.metadata as _meta
+import tracdap.rt.exceptions as _ex
 import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.storage as _storage
 import tracdap.rt.impl.util as _util
@@ -47,6 +49,7 @@ class DataStorageTestSuite:
     assertEqual = unittest.TestCase.assertEqual
     assertTrue = unittest.TestCase.assertTrue
     assertIsNotNone = unittest.TestCase.assertIsNotNone
+    assertRaises = unittest.TestCase.assertRaises
 
     @staticmethod
     def sample_schema():
@@ -243,6 +246,7 @@ class DataStorageTestSuite:
 class LocalStorageTest(DataStorageTestSuite):
 
     storage_root: tempfile.TemporaryDirectory
+    file_storage: _storage.IFileStorage
 
     @classmethod
     def make_storage(cls):
@@ -257,7 +261,24 @@ class LocalStorageTest(DataStorageTestSuite):
         file_storage = _storage.LocalFileStorage(storage_instance)
         data_storage = _storage.CommonDataStorage(storage_config, file_storage)
 
+        cls.file_storage = file_storage
+
         return data_storage
+
+    # For file-based storage, test reading garbled data
+
+    def test_read_garbled_data(self):
+
+        garbage = random.randbytes(256)
+        schema = self.sample_schema()
+
+        self.file_storage.write_bytes(f"garbled_data.{self.storage_format}", garbage)
+
+        self.assertRaises(
+            _ex.EDataCorruption,
+            lambda: self.storage.read_table(
+                f"garbled_data.{self.storage_format}",
+                self.storage_format, schema))
 
 
 class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
@@ -300,6 +321,43 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
 
         self.assertEqual(7, table.num_columns)
         self.assertEqual(10, table.num_rows)
+
+    def test_csv_read_garbled_data(self):
+
+        # Try reading garbage data with the lenient CSV parser
+
+        storage_options = {"lenient_csv_parser": True}
+
+        garbage = random.randbytes(256)
+        schema = self.sample_schema()
+
+        self.file_storage.write_bytes(f"csv_garbled_data.{self.storage_format}", garbage)
+
+        self.assertRaises(
+            _ex.EDataCorruption,
+            lambda: self.storage.read_table(
+                f"csv_garbled_data.{self.storage_format}",
+                self.storage_format, schema, storage_options))
+
+    def test_csv_read_garbled_text(self):
+
+        # Try reading garbage textual data with the lenient CSV parser
+        # Because CSV is such a loose format, the parser will assemble rows and columns
+        # However, some form of EData exception should still be raised
+        # Since reading CSV requires a schema and the schema will not match, normally this will be EDataConformance
+
+        storage_options = {"lenient_csv_parser": True}
+
+        garbage = "£$%£$%£$%£$%'#[]09h8\t{}}},,,,AS£F".encode("utf-8")
+        schema = self.sample_schema()
+
+        self.file_storage.write_bytes(f"csv_garbled_data_2.{self.storage_format}", garbage)
+
+        self.assertRaises(
+            _ex.EData,
+            lambda: self.storage.read_table(
+                f"csv_garbled_data_2.{self.storage_format}",
+                self.storage_format, schema, storage_options))
 
     def test_csv_nan(self):
 

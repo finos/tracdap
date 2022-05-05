@@ -212,7 +212,7 @@ class FormatManager:
         format_impl = cls.__formats.get(format_code.lower())
 
         if format_impl is None:
-            raise _ex.EPluginNotAvailable(f"Unsupported storage format [{format_code}]")
+            raise _ex.EStorageConfig(f"Unsupported storage format [{format_code}]")
 
         return format_impl.__call__(format_options)
 
@@ -222,7 +222,7 @@ class FormatManager:
         extension = cls.__format_to_extension.get(format_code.lower())
 
         if extension is None:
-            raise _ex.EPluginNotAvailable(f"Unsupported storage format [{format_code}]")
+            raise _ex.EStorageConfig(f"Unsupported storage format [{format_code}]")
 
         return extension
 
@@ -235,7 +235,7 @@ class FormatManager:
         format_code = cls.__extension_to_format[extension]
 
         if format_code is None:
-            raise _ex.EPluginNotAvailable(f"No storage format is registered for file extension [{extension}]")
+            raise _ex.EStorageConfig(f"No storage format is registered for file extension [{extension}]")
 
         return extension
 
@@ -334,6 +334,8 @@ class CommonDataStorage(IDataStorage):
             self, config: _cfg.StorageConfig, file_storage: IFileStorage,
             pushdown_pandas: bool = False, pushdown_spark: bool = False):
 
+        self.__log = _util.logger_for_object(self)
+
         self.__config = config
         self.__file_storage = file_storage
         self.__pushdown_pandas = pushdown_pandas
@@ -345,26 +347,39 @@ class CommonDataStorage(IDataStorage):
             storage_options: tp.Dict[str, tp.Any] = None) \
             -> pa.Table:
 
-        format_impl = FormatManager.get_data_format(storage_format, storage_options)
+        try:
 
-        stat = self.__file_storage.stat(storage_path)
+            format_impl = FormatManager.get_data_format(storage_format, storage_options)
 
-        if stat.file_type == FileType.DIRECTORY:
+            stat = self.__file_storage.stat(storage_path)
 
-            dir_content = self.__file_storage.ls(storage_path)
+            if stat.file_type == FileType.DIRECTORY:
 
-            if len(dir_content) == 1:
-                storage_path = dir_content[0]
+                dir_content = self.__file_storage.ls(storage_path)
+
+                if len(dir_content) == 1:
+                    storage_path = dir_content[0]
+                else:
+                    raise NotImplementedError("Directory storage format not available yet")
+
+            with self.__file_storage.read_byte_stream(storage_path) as byte_stream:
+                table = format_impl.read_table(byte_stream, schema)
+
+            if schema is not None:
+                return _data.DataConformance.conform_to_schema(table, schema)
             else:
-                raise NotImplementedError("Directory storage format not available yet")
+                return table
 
-        with self.__file_storage.read_byte_stream(storage_path) as byte_stream:
-            table = format_impl.read_table(byte_stream, schema)
+        except (_ex.EStorage, _ex.EData) as e:
+            err = f"Failed to read table [{storage_path}]: {str(e)}"
+            self.__log.error(err)
+            raise type(e)(err) from e
 
-        if schema is not None:
-            return _data.DataConformance.conform_to_schema(table, schema)
-        else:
-            return table
+        except Exception as e:
+            err = f"Failed to read table [{storage_path}]: An unexpected error occurred"
+            self.__log.error(err)
+            self.__log.exception(str(e))
+            raise _ex.ETracInternal(err) from e
 
     def write_table(
             self, storage_path: str, storage_format: str,
@@ -372,22 +387,35 @@ class CommonDataStorage(IDataStorage):
             storage_options: tp.Dict[str, tp.Any] = None,
             overwrite: bool = False):
 
-        format_impl = FormatManager.get_data_format(storage_format, storage_options)
-        format_extension = FormatManager.extension_for_format(storage_format)
+        try:
 
-        # TODO: Full handling of directory storage formats
+            format_impl = FormatManager.get_data_format(storage_format, storage_options)
+            format_extension = FormatManager.extension_for_format(storage_format)
 
-        if not storage_path.endswith(format_extension):
-            parent_dir_ = storage_path
-            storage_path_ = storage_path.rstrip("/\\") + f"/chunk-0.{format_extension}"
-            self.__file_storage.mkdir(parent_dir_, True, exists_ok=overwrite)  # Allow exists_ok when overwrite == True
-        else:
-            parent_dir_ = str(pathlib.PurePath(storage_path).parent)
-            storage_path_ = storage_path
-            self.__file_storage.mkdir(parent_dir_, True, True)
+            # TODO: Full handling of directory storage formats
 
-        with self.__file_storage.write_byte_stream(storage_path_, overwrite=overwrite) as byte_stream:
-            format_impl.write_table(byte_stream, table)
+            if not storage_path.endswith(format_extension):
+                parent_dir_ = storage_path
+                storage_path_ = storage_path.rstrip("/\\") + f"/chunk-0.{format_extension}"
+                self.__file_storage.mkdir(parent_dir_, True, exists_ok=overwrite)  # Allow exists_ok when overwrite == True
+            else:
+                parent_dir_ = str(pathlib.PurePath(storage_path).parent)
+                storage_path_ = storage_path
+                self.__file_storage.mkdir(parent_dir_, True, True)
+
+            with self.__file_storage.write_byte_stream(storage_path_, overwrite=overwrite) as byte_stream:
+                format_impl.write_table(byte_stream, table)
+
+        except (_ex.EStorage, _ex.EData) as e:
+            err = f"Failed to write table [{storage_path}]: {str(e)}"
+            self.__log.error(err)
+            raise type(e)(err) from e
+
+        except Exception as e:
+            err = f"Failed to write table [{storage_path}]: An unexpected error occurred"
+            self.__log.error(err)
+            self.__log.exception(str(e))
+            raise _ex.ETracInternal(err) from e
 
     def read_spark_table(
             self, schema: _meta.TableSchema,
@@ -413,12 +441,18 @@ class _ArrowFileFormat(IDataFormat):
 
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
         self._format_options = format_options
+        self._log = _util.logger_for_object(self)
 
     def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
-        columns = schema.names if schema else None
+        try:
+            columns = schema.names if schema else None
+            return pa_ft.read_table(source, columns)
 
-        return pa_ft.read_table(source, columns)
+        except pa.ArrowInvalid as e:
+            err = f"Arrow file decoding failed, content is garbled"
+            self._log.exception(err)
+            raise _ex.EDataCorruption(err) from e
 
     def write_table(self, target: tp.BinaryIO, table: pa.Table):
 
@@ -432,12 +466,18 @@ class _ParquetStorageFormat(IDataFormat):
 
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
         self._format_options = format_options
+        self._log = _util.logger_for_object(self)
 
     def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
-        columns = schema.names if schema else None
+        try:
+            columns = schema.names if schema else None
+            return pa_pq.read_table(source, columns)
 
-        return pa_pq.read_table(source, columns)
+        except pa.ArrowInvalid as e:
+            err = f"Parquet file decoding failed, content is garbled"
+            self._log.exception(err)
+            raise _ex.EDataCorruption(err) from e
 
     def write_table(self, target: tp.BinaryIO, table: pa.Table):
 
@@ -452,6 +492,8 @@ class _CsvStorageFormat(IDataFormat):
     __FALSE_VALUES = ['false', 'f', 'no' 'n', '0']
 
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
+
+        self._log = _util.logger_for_object(self)
 
         self._format_options = format_options
         self._use_lenient_parser = False
@@ -484,23 +526,35 @@ class _CsvStorageFormat(IDataFormat):
 
         pa_csv.write_csv(formatted_table, target, write_options)
 
-    @classmethod
-    def _read_table_arrow(cls, source: tp.BinaryIO, schema: pa.Schema) -> pa.Table:
+    def _read_table_arrow(self, source: tp.BinaryIO, schema: pa.Schema) -> pa.Table:
 
-        read_options = pa_csv.ReadOptions()
-        read_options.encoding = 'utf-8'
-        read_options.use_threads = False
+        try:
 
-        parse_options = pa_csv.ParseOptions()
-        parse_options.newlines_in_values = True
+            read_options = pa_csv.ReadOptions()
+            read_options.encoding = 'utf-8'
+            read_options.use_threads = False
 
-        convert_options = pa_csv.ConvertOptions()
-        convert_options.include_columns = schema.names
-        convert_options.column_types = {n: t for (n, t) in zip(schema.names, schema.types)}
-        convert_options.strings_can_be_null = True
-        convert_options.quoted_strings_can_be_null = False
+            parse_options = pa_csv.ParseOptions()
+            parse_options.newlines_in_values = True
 
-        return pa_csv.read_csv(source, read_options, parse_options, convert_options)
+            convert_options = pa_csv.ConvertOptions()
+            convert_options.include_columns = schema.names
+            convert_options.column_types = {n: t for (n, t) in zip(schema.names, schema.types)}
+            convert_options.strings_can_be_null = True
+            convert_options.quoted_strings_can_be_null = False
+
+            return pa_csv.read_csv(source, read_options, parse_options, convert_options)
+
+        except pa.ArrowInvalid as e:
+            err = f"CSV file decoding failed, content is garbled"
+            self._log.exception(err)
+            raise _ex.EDataCorruption(err) from e
+
+        except pa.ArrowKeyError as e:
+            err = f"CSV file decoding failed, one or more columns is missing"
+            self._log.error(err)
+            self._log.exception(str(e))
+            raise _ex.EDataCorruption(err) from e
 
     @classmethod
     def _format_outputs(cls, table: pa.Table) -> pa.Table:
@@ -598,52 +652,58 @@ class _CsvStorageFormat(IDataFormat):
 
         return pa.array(map(format_timestamp, column), pa.utf8())
 
-    @classmethod
-    def _read_table_lenient(cls, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
+    def _read_table_lenient(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
-        stream_reader = codecs.getreader('utf-8')
-        text_source = stream_reader(source)
+        try:
 
-        csv_params = {
-            "skipinitialspace": True,
-            "doublequote": True
-        }
+            stream_reader = codecs.getreader('utf-8')
+            text_source = stream_reader(source)
 
-        csv_reader = csv.reader(text_source, **csv_params)
-        header = next(csv_reader)
+            csv_params = {
+                "skipinitialspace": True,
+                "doublequote": True
+            }
 
-        for col in schema.names:
-            if col not in header:
-                raise _ex.EDataConformance(f"Missing column {col}")  # TODO
+            csv_reader = csv.reader(text_source, **csv_params)
+            header = next(csv_reader)
 
-        schema_columns = dict(zip(schema.names, range(len(schema.names))))
-        col_mapping = [schema_columns.get(col) for col in header]
-        python_types = list(map(_types.arrow_to_python_type, schema.types))
+            for col in schema.names:
+                if col not in header:
+                    raise _ex.EDataConformance(f"Missing column {col}")  # TODO
 
-        data = [[] for _ in range(len(schema.names))]
+            schema_columns = dict(zip(schema.names, range(len(schema.names))))
+            col_mapping = [schema_columns.get(col) for col in header]
+            python_types = list(map(_types.arrow_to_python_type, schema.types))
 
-        for row in csv_reader:
+            data = [[] for _ in range(len(schema.names))]
 
-            csv_col = 0
+            for row in csv_reader:
 
-            for raw_value in row:
+                csv_col = 0
 
-                output_col = col_mapping[csv_col]
+                for raw_value in row:
 
-                if output_col is None:
-                    continue
+                    output_col = col_mapping[csv_col]
 
-                python_type = python_types[output_col]
-                python_value = cls._convert_python_value(raw_value, python_type)
+                    if output_col is None:
+                        continue
 
-                data[output_col].append(python_value)
+                    python_type = python_types[output_col]
+                    python_value = self._convert_python_value(raw_value, python_type)
 
-                csv_col += 1
+                    data[output_col].append(python_value)
 
-        data_dict = dict(zip(schema.names, data))
-        table = pa.Table.from_pydict(data_dict, schema)  # noqa
+                    csv_col += 1
 
-        return table
+            data_dict = dict(zip(schema.names, data))
+            table = pa.Table.from_pydict(data_dict, schema)  # noqa
+
+            return table
+
+        except UnicodeDecodeError as e:
+            err = f"CSV file decoding failed, content is garbled"
+            self._log.exception(err)
+            raise _ex.EDataCorruption(err) from e
 
     @classmethod
     def _convert_python_value(cls, raw_value: tp.Any, python_type: type) -> tp.Any:
