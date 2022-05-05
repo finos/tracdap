@@ -188,8 +188,17 @@ class DataMappingTest(unittest.TestCase):
 
         nan_value = rt.column(0)[0].as_py()
 
-        self.assertIsNotNone(nan_value)
-        self.assertTrue(math.isnan(nan_value))
+        # Correct handling of NaN in conversion is only available with pd.Float64Dtype() as the dtype for floats
+        # This extended dtype was made available in Pandas 1.2, but TRAC supports Pandas >= 1.0.0
+        # For earlier versions of Pandas, the fallback is that NaN is silently converted to null for Pandas outputs
+
+        pandas_extended_float_type = "Float64Dtype" in pd.__dict__
+
+        if pandas_extended_float_type:
+            self.assertIsNotNone(nan_value)
+            self.assertTrue(math.isnan(nan_value))
+        else:
+            self.assertIsNone(nan_value)
 
     def test_edge_cases_decimal(self):
 
