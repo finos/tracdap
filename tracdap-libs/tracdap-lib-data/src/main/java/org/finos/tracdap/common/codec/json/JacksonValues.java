@@ -48,9 +48,13 @@ public class JacksonValues {
 
     private static final Logger log = LoggerFactory.getLogger(JacksonValues.class);
 
+    // Standard NaN / infinity values are what gets quoted when encoding data
+    // For consistency, these values match the output of the Apache Arrow CSV implementation
     private static final String STANDARD_NAN = "nan";
     private static final String STANDARD_POSITIVE_INFINITY = "inf";
     private static final String STANDARD_NEGATIVE_INFINITY = "-inf";
+
+    // Values that are recognised as NaN / infinity during decoding
     private static final List<String> NAN_VALUES = List.of("nan", "na");
     private static final List<String> INFINITY_VALUES = List.of("inf", "infinity");
 
