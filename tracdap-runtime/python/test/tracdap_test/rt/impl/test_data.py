@@ -174,12 +174,9 @@ class DataMappingTest(unittest.TestCase):
 
     def test_edge_cases_float_nan(self):
 
-        # NaN needs special consideration
-        # First, math.nan != math.nan, instead NaN must be checked with math.isnan
-        # Also, in Pandas NaN and None values are treated the same (by .isna(), .fillna() etc
-        # NaNs are converted to None in Pandas -> Arrow conversion
-        # Overriding this behaviour would be expensive
-        # So for now, just check that the round-trip yields either a NaN or a null
+        # For NaN, a special test that checks math.isnan on the round-trip result
+        # Because math.nan != math.nan
+        # Also, make sure to keep the distinction between NaN and None
 
         schema = self.one_field_schema(_meta.BasicType.FLOAT)
         table = pa.Table.from_pydict({"float_field": [math.nan]}, schema)  # noqa
@@ -191,7 +188,8 @@ class DataMappingTest(unittest.TestCase):
 
         nan_value = rt.column(0)[0].as_py()
 
-        self.assertTrue(nan_value is None or math.isnan(nan_value))
+        self.assertIsNotNone(nan_value)
+        self.assertTrue(math.isnan(nan_value))
 
     def test_edge_cases_decimal(self):
 

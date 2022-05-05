@@ -46,6 +46,7 @@ class DataStorageTestSuite:
 
     assertEqual = unittest.TestCase.assertEqual
     assertTrue = unittest.TestCase.assertTrue
+    assertIsNotNone = unittest.TestCase.assertIsNotNone
 
     @staticmethod
     def sample_schema():
@@ -155,6 +156,7 @@ class DataStorageTestSuite:
 
         # For NaN, a special test that checks math.isnan on the round-trip result
         # Because math.nan != math.nan
+        # Also, make sure to keep the distinction between NaN and None
 
         schema = self.one_field_schema(_meta.BasicType.FLOAT)
         table = pa.Table.from_pydict({"float_field": [math.nan]}, schema)  # noqa
@@ -162,7 +164,10 @@ class DataStorageTestSuite:
         self.storage.write_table("edge_cases_float_nan", self.storage_format, table)
         rt_table = self.storage.read_table("edge_cases_float_nan", self.storage_format, table.schema)
 
-        self.assertTrue(math.isnan(rt_table.column(0)[0].as_py()))
+        nan_value = rt_table.column(0)[0].as_py()
+
+        self.assertIsNotNone(nan_value)
+        self.assertTrue(math.isnan(nan_value))
 
     def test_edge_cases_decimal(self):
 
