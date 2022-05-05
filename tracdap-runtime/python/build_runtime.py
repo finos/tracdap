@@ -214,10 +214,14 @@ def cli_args():
 def run_tests(test_path):
 
     cwd = os.getcwd()
+    python_path = [*sys.path]
 
     try:
 
         os.chdir(ROOT_PATH)
+        sys.path.append(str(SCRIPT_DIR.joinpath("generated")))
+        sys.path.append(str(SCRIPT_DIR.joinpath("src")))
+        sys.path.append(str(SCRIPT_DIR.joinpath("test")))
 
         runner = unittest.TextTestRunner()
         loader = unittest.TestLoader()
@@ -233,6 +237,7 @@ def run_tests(test_path):
     finally:
 
         os.chdir(cwd)
+        sys.path = python_path
 
 
 def main():
