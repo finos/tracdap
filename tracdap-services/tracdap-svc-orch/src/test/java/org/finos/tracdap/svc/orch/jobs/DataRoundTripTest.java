@@ -65,6 +65,23 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class DataRoundTripTest {
 
+    private static final String TEST_TENANT = "ACME_CORP";
+    private static final String E2E_CONFIG = "config/trac-e2e.yaml";
+
+    // Pandas / NumPy native dates and timestamps are encoded as 64-bit nanoseconds around the Unix epoch
+    private static final LocalDateTime MIN_PANDAS_TIMESTAMP = LocalDateTime
+            .ofEpochSecond(0, 0, ZoneOffset.UTC)
+            .minusNanos(Long.MAX_VALUE);
+
+    private static final LocalDateTime MAX_PANDAS_TIMESTAMP = LocalDateTime
+            .ofEpochSecond(0, 0, ZoneOffset.UTC)
+            .plusNanos(Long.MAX_VALUE);
+
+    // Python native min/max dates and timestamps are for the years 1 and 9999 CE
+    private static final LocalDateTime MIN_PYTHON_TIMESTAMP = LocalDateTime.of(1, 1, 1, 0, 0, 0);
+    private static final LocalDateTime MAX_PYTHON_TIMESTAMP = LocalDateTime.of(9999, 12, 31, 23, 59, 59, 999999000);
+
+
     protected abstract String storageFormat();
 
     public static class CsvFormatTest extends DataRoundTripTest {
@@ -76,9 +93,6 @@ public abstract class DataRoundTripTest {
     }
 
     private final Logger log = LoggerFactory.getLogger(getClass());
-
-    private static final String TEST_TENANT = "ACME_CORP";
-    private static final String E2E_CONFIG = "config/trac-e2e.yaml";
 
     @RegisterExtension
     private final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
@@ -226,9 +240,59 @@ public abstract class DataRoundTripTest {
                 0.0,
                 Double.MIN_VALUE, Double.MAX_VALUE,
                 Double.MIN_NORMAL, -Double.MIN_NORMAL,
-                Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+                Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
 
         doEdgeCaseTest("float_field", edgeCases);
+    }
+
+    @Test
+    void edgeCaseFloatNan() throws Exception {
+
+        // Special test for NaN, which may come back as null after round-trip
+
+        VectorSchemaRoot inputData = null;
+        VectorSchemaRoot outputData = null;
+
+        List<Object>  edgeCases = List.of(Double.NaN);
+
+        try {
+            var javaData = new HashMap<String, List<Object>>();
+
+            for (var field : SampleData.BASIC_TABLE_SCHEMA.getTable().getFieldsList()) {
+
+                if (field.getFieldName().equals("float_field")) {
+                    javaData.put(field.getFieldName(), edgeCases);
+                }
+                else {
+                    var javaValues = SampleData.generateJavaValues(field.getFieldType(), edgeCases.size());
+                    javaData.put(field.getFieldName(), javaValues);
+                }
+            }
+
+            var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
+
+            inputData = SampleData.convertData(schema, javaData, edgeCases.size(), ALLOCATOR);
+            var inputDataId = saveInputData(schema, inputData, "edgeCases:float_nan");
+
+            var outputDataId = runModel(inputDataId, "edgeCases:float_nan");
+            outputData = loadOutputData(outputDataId);
+
+            Assertions.assertEquals(inputData.getSchema(), outputData.getSchema());
+            Assertions.assertEquals(inputData.getRowCount(), outputData.getRowCount());
+
+            var floatValue = (Double) outputData.getVector("float_field").getObject(0);
+
+            // Models may down-cast NaN to null
+            Assertions.assertTrue(floatValue == null || Double.isNaN(floatValue));
+        }
+        finally {
+
+            if (inputData != null)
+                inputData.close();
+
+            if (outputData != null)
+                outputData.close();
+        }
     }
 
     @Test
@@ -270,11 +334,9 @@ public abstract class DataRoundTripTest {
                 LocalDate.of(2000, 1, 1),
                 LocalDate.of(2038, 1, 20),
 
-                // Python min/max dates are for the years 1 and 9999 CE
-                // By default, dates are converted as date objects when translating to Pandas
-                // Using np.datetime64 would allow a much wider range, if this is needed
-                LocalDate.of(1, 1, 1),
-                LocalDate.of(9999, 12, 31)
+                // Round-trip model is using Pandas-native timestamps by default
+                MIN_PANDAS_TIMESTAMP.toLocalDate().plusDays(1),
+                MAX_PANDAS_TIMESTAMP.toLocalDate()
         );
 
         doEdgeCaseTest("date_field", edgeCases);
@@ -293,11 +355,9 @@ public abstract class DataRoundTripTest {
                 LocalDateTime.of(1972, 1, 1, 0, 0, 0, 500000000),
                 LocalDateTime.of(1968, 1, 1, 23, 59, 59, 500000000),
 
-                // Python min/max date-times are for the years 1 and 9999 CE
-                // By default, date-times are converted as datetime objects when translating to Pandas
-                // Using np.datetime64 would allow a much wider range, if this is needed
-                LocalDateTime.of(1, 1, 1, 0, 0, 0),
-                LocalDateTime.of(9999, 12, 31, 23, 59, 59)
+                // Round-trip model is using Pandas-native timestamps by default
+                MIN_PANDAS_TIMESTAMP.plusSeconds(1),
+                MAX_PANDAS_TIMESTAMP
         );
 
         doEdgeCaseTest("datetime_field", edgeCases);
