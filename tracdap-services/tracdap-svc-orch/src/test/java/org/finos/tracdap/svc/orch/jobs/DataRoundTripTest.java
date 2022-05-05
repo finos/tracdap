@@ -236,63 +236,16 @@ public abstract class DataRoundTripTest {
     @Test
     void edgeCaseFloats() throws Exception {
 
+        // In Java, Double.NaN == Double.NaN is true, so NaN can be checked as a regular float edge case
+
         List<Object>  edgeCases = List.of(
                 0.0,
                 Double.MIN_VALUE, Double.MAX_VALUE,
                 Double.MIN_NORMAL, -Double.MIN_NORMAL,
-                Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+                Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY,
+                Double.NaN);
 
         doEdgeCaseTest("float_field", edgeCases);
-    }
-
-    @Test
-    void edgeCaseFloatNan() throws Exception {
-
-        // Special test for NaN, which may come back as null after round-trip
-
-        VectorSchemaRoot inputData = null;
-        VectorSchemaRoot outputData = null;
-
-        List<Object>  edgeCases = List.of(Double.NaN);
-
-        try {
-            var javaData = new HashMap<String, List<Object>>();
-
-            for (var field : SampleData.BASIC_TABLE_SCHEMA.getTable().getFieldsList()) {
-
-                if (field.getFieldName().equals("float_field")) {
-                    javaData.put(field.getFieldName(), edgeCases);
-                }
-                else {
-                    var javaValues = SampleData.generateJavaValues(field.getFieldType(), edgeCases.size());
-                    javaData.put(field.getFieldName(), javaValues);
-                }
-            }
-
-            var schema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
-
-            inputData = SampleData.convertData(schema, javaData, edgeCases.size(), ALLOCATOR);
-            var inputDataId = saveInputData(schema, inputData, "edgeCases:float_nan");
-
-            var outputDataId = runModel(inputDataId, "edgeCases:float_nan");
-            outputData = loadOutputData(outputDataId);
-
-            Assertions.assertEquals(inputData.getSchema(), outputData.getSchema());
-            Assertions.assertEquals(inputData.getRowCount(), outputData.getRowCount());
-
-            var floatValue = (Double) outputData.getVector("float_field").getObject(0);
-
-            // Models may down-cast NaN to null
-            Assertions.assertTrue(floatValue == null || Double.isNaN(floatValue));
-        }
-        finally {
-
-            if (inputData != null)
-                inputData.close();
-
-            if (outputData != null)
-                outputData.close();
-        }
     }
 
     @Test
