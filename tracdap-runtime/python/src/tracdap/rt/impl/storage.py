@@ -212,7 +212,7 @@ class FormatManager:
         format_impl = cls.__formats.get(format_code.lower())
 
         if format_impl is None:
-            raise _ex.EStorageFormat(f"Unsupported storage format [{format_code}]")
+            raise _ex.EPluginNotAvailable(f"Unsupported storage format [{format_code}]")
 
         return format_impl.__call__(format_options)
 
@@ -222,7 +222,7 @@ class FormatManager:
         extension = cls.__format_to_extension.get(format_code.lower())
 
         if extension is None:
-            raise _ex.EStorageFormat(f"Unsupported storage format [{format_code}]")
+            raise _ex.EPluginNotAvailable(f"Unsupported storage format [{format_code}]")
 
         return extension
 
@@ -235,7 +235,7 @@ class FormatManager:
         format_code = cls.__extension_to_format[extension]
 
         if format_code is None:
-            raise _ex.EStorageFormat(f"No storage format is registered for file extension [{extension}]")
+            raise _ex.EPluginNotAvailable(f"No storage format is registered for file extension [{extension}]")
 
         return extension
 
@@ -465,7 +465,7 @@ class _CsvStorageFormat(IDataFormat):
         # For CSV data, if there is no schema then type inference will do unpredictable things!
 
         if schema is None or len(schema.names) == 0 or len(schema.types) == 0:
-            raise _ex.EStorageFormat("An explicit schema is required to load CSV data")
+            raise _ex.EDataConformance("An explicit schema is required to load CSV data")
 
         if self._use_lenient_parser:
             return self._read_table_lenient(source, schema)
@@ -699,11 +699,11 @@ class _CsvStorageFormat(IDataFormat):
                 if isinstance(raw_value, str):
                     return dt.datetime.fromisoformat(raw_value)
 
-            raise _ex.EDataConversion("No data conversion available for input type")  # TODO
+            raise _ex.EDataConformance("No data conversion available for input type")  # TODO
 
         except Exception as e:
 
-            raise _ex.EDataConversion("Could not convert input data") from e  # TODO
+            raise _ex.EDataConformance("Could not convert input data") from e  # TODO
 
 
 FormatManager.register_data_format("ARROW_FILE", _ArrowFileFormat)

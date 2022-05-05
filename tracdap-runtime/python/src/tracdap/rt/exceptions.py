@@ -61,6 +61,11 @@ class EConfigParse(EConfig):
     pass
 
 
+class EPluginNotAvailable(ETrac):
+
+    pass
+
+
 class EValidation(ETrac):
 
     """
@@ -132,10 +137,19 @@ class EData(ETrac):
     pass
 
 
-class EDataConversion(EData):
+class EDataCorruption(EData):
 
     """
-    Data cannot be converted into the required format
+    Data is considered corrupt when it cannot be understood according to its own format
+
+    How corrupt data is detected depends on the data format. For example, for JSON text data,
+    a data stream might be corrupt if it contains an invalid Unicode sequence, or if the JSON
+    fails to parse, for example because of a missing brace. For binary formats can occur in the
+    structure of the binary data stream and will be detected if that data stream cannot be
+    understood.
+
+    Data corruption does not include data constraints, such as non-null or range constraints,
+    which are reported as EDataConstraint.
     """
 
     pass
@@ -145,15 +159,6 @@ class EDataConformance(EData):
 
     """
     Data does not conform to the required the schema (and cannot be coerced)
-    """
-
-    pass
-
-
-class EDataValidation(EValidation):
-
-    """
-    Validation failure when a model output is checked for conformance to its data schema
     """
 
     pass
@@ -172,15 +177,6 @@ class EStorageConfig(EStorage):
 
     """
     Storage referenced in metadata is either not supported or not configured
-    """
-
-    pass
-
-
-class EStorageFormat(EStorage):
-
-    """
-    Storage format is either not supported or not configured
     """
 
     pass
@@ -280,19 +276,7 @@ class ETracInternal(ETrac):
     pass
 
 
-class EValidationGap(ETracInternal):
-
-    """
-    A validation error has occurred in the TRAC runtime engine (this is a bug)
-
-    A validation gap is a type of internal error, it indicates a condition inside
-    TRAC that should have been caught higher up the stack in a validation layer.
-    """
-
-    pass
-
-
-class EUnexpected(ETrac):
+class EUnexpected(ETracInternal):
 
     """
     An unexpected error has occurred in the TRAC runtime engine (this is a bug)
@@ -306,6 +290,18 @@ class EUnexpected(ETrac):
     If a component exposes an interface to other components of the engine, and requests via that interface
     are invalid or can put the component into an illegal state, that does not count as unexpected.
     If this condition is not met, use ETracInternal instead.
+    """
+
+    pass
+
+
+class EValidationGap(ETracInternal):
+
+    """
+    A validation error has occurred in the TRAC runtime engine (this is a bug)
+
+    A validation gap is a type of internal error, it indicates a condition inside
+    TRAC that should have been caught higher up the stack in a validation layer.
     """
 
     pass

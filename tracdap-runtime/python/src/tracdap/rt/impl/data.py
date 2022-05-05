@@ -331,7 +331,7 @@ class DataConformance:
         if pa.types.is_timestamp(field.type):
             return cls._coerce_timestamp(vector, field)
 
-        raise _ex.EDataValidation(f"Unsupported data type {field.type}")
+        raise _ex.EDataConformance(f"Unsupported data type {field.type}")  # TODO
 
     @classmethod
     def _coerce_boolean(cls, vector: pa.Array, field: pa.Field) -> pa.BooleanArray:

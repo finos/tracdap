@@ -268,7 +268,7 @@ def arrow_to_python_type(arrow_type: pa.DataType) -> type:
     if pa.types.is_timestamp(arrow_type):
         return dt.datetime
 
-    raise ex.EDataConversion(f"No Python type conversion available for Arrow type {arrow_type}")
+    raise ex.EData(f"No Python type conversion available for Arrow type {arrow_type}")  # TODO
 
 
 def python_to_arrow_type(python_type: type) -> pa.DataType:
@@ -294,7 +294,7 @@ def python_to_arrow_type(python_type: type) -> pa.DataType:
     if python_type == dt.datetime:
         return pa.timestamp(__TRAC_TIMESTAMP_UNIT, __TRAC_TIMESTAMP_ZONE)
 
-    raise ex.EDataConversion(f"No Arrow type conversion available for Python type {python_type}")
+    raise ex.EData(f"No Arrow type conversion available for Python type {python_type}")  # TODO
 
 
 def trac_to_arrow_schema(trac_schema: meta.SchemaDefinition) -> pa.Schema:
