@@ -281,6 +281,42 @@ class DataMappingTest(unittest.TestCase):
         self.assertEqual(schema, rt.schema)
         self.assertEqual(table, rt)
 
+    def test_pandas_date(self):
+
+        df = pd.DataFrame({"date_field": [pd.Timestamp(1970, 1, 1)]})
+
+        schema = self.one_field_schema(_meta.BasicType.DATE)
+        table = _data.DataMapping.pandas_to_arrow(df, schema)
+
+        self.assertEqual(schema, table.schema)
+
+    def test_pandas_datetime(self):
+
+        df = pd.DataFrame({"datetime_field": [pd.Timestamp(1970, 1, 1, 12, 30, 0)]})
+
+        schema = self.one_field_schema(_meta.BasicType.DATETIME)
+        table = _data.DataMapping.pandas_to_arrow(df, schema)
+
+        self.assertEqual(schema, table.schema)
+
+    def test_python_date(self):
+
+        df = pd.DataFrame({"date_field": [dt.date(1970, 1, 1)]})
+
+        schema = self.one_field_schema(_meta.BasicType.DATE)
+        table = _data.DataMapping.pandas_to_arrow(df, schema)
+
+        self.assertEqual(schema, table.schema)
+
+    def test_python_datetime(self):
+
+        df = pd.DataFrame({"datetime_field": [dt.datetime(1970, 1, 1, 12, 30, 0)]})
+
+        schema = self.one_field_schema(_meta.BasicType.DATETIME)
+        table = _data.DataMapping.pandas_to_arrow(df, schema)
+
+        self.assertEqual(schema, table.schema)
+
     def test_time_zone_mapping(self):
 
         epoch = dt.datetime(1970, 1, 1)
