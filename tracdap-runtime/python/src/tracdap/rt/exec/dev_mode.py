@@ -335,7 +335,9 @@ class DevModeTranslator:
             x_storage = x_storage_mgr.get_file_storage(storage_key)
             x_orig_path = pathlib.PurePath(storage_path)
 
-            while x_storage.exists(storage_path):
+            existing_files = x_storage.ls(str(x_orig_path.parent))
+
+            while storage_path in existing_files:
 
                 snap_version += 1
                 x_stem = f"{x_orig_path.stem}-{snap_version}"

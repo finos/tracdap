@@ -827,14 +827,25 @@ class LocalFileStorage(IFileStorage):
 
     def exists(self, storage_path: str) -> bool:
 
+        operation = f"EXISTS [{storage_path}]"
+        return self._error_handling(operation, lambda: self._exists(storage_path))
+
+    def _exists(self, storage_path: str) -> bool:
+
         item_path = self.__root_path / storage_path
         return item_path.exists()
 
     def size(self, storage_path: str) -> int:
 
-        return self.stat(storage_path).size
+        operation = f"SIZE [{storage_path}]"
+        return self._error_handling(operation, lambda: self._stat(storage_path).size)
 
     def stat(self, storage_path: str) -> FileStat:
+
+        operation = f"STAT [{storage_path}]"
+        return self._error_handling(operation, lambda: self._stat(storage_path))
+
+    def _stat(self, storage_path: str) -> FileStat:
 
         item_path = self.__root_path / storage_path
         os_stat = item_path.stat()
@@ -855,6 +866,11 @@ class LocalFileStorage(IFileStorage):
 
     def ls(self, storage_path: str) -> tp.List[str]:
 
+        operation = f"LS [{storage_path}]"
+        return self._error_handling(operation, lambda: self._ls(storage_path))
+
+    def _ls(self, storage_path: str) -> tp.List[str]:
+
         item_path = self.__root_path / storage_path
         return [str(x.relative_to(self.__root_path))
                 for x in item_path.iterdir()
@@ -862,62 +878,150 @@ class LocalFileStorage(IFileStorage):
 
     def mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
 
+        operation = f"MKDIR [{storage_path}]"
+        self._error_handling(operation, lambda: self._mkdir(storage_path))
+
+    def _mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
+
         item_path = self.__root_path / storage_path
         item_path.mkdir(parents=recursive, exist_ok=exists_ok)
 
     def rm(self, storage_path: str, recursive: bool = False):
 
+        operation = f"MKDIR [{storage_path}]"
+        self._error_handling(operation, lambda: self._rm(storage_path))
+
+    def _rm(self, storage_path: str, recursive: bool = False):
+
         raise NotImplementedError()
 
     def read_bytes(self, storage_path: str) -> bytes:
+
+        operation = f"READ BYTES [{storage_path}]"
+        return self._error_handling(operation, lambda: self._read_bytes(storage_path))
+
+    def _read_bytes(self, storage_path: str) -> bytes:
 
         with self.read_byte_stream(storage_path) as stream:
             return stream.read()
 
     def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
 
-        item_path = self.__root_path / storage_path
+        operation = f"OPEN BYTE STREAM (READ) [{storage_path}]"
+        return self._error_handling(operation, lambda: self._read_byte_stream(storage_path))
 
-        return open(item_path, mode='rb')
+    def _read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
+
+        operation = f"CLOSE BYTE STREAM (READ) [{storage_path}]"
+        item_path = self.__root_path / storage_path
+        stream = open(item_path, mode='rb')
+
+        return _util.log_close(stream, self._log, operation)
 
     def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
+
+        operation = f"WRITE BYTES [{storage_path}]"
+        self._error_handling(operation, lambda: self._write_bytes(storage_path, data, overwrite))
+
+    def _write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
 
         with self.write_byte_stream(storage_path, overwrite) as stream:
             stream.write(data)
 
     def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
 
+        operation = f"OPEN BYTE STREAM (WRITE) [{storage_path}]"
+        return self._error_handling(operation, lambda: self._write_byte_stream(storage_path, overwrite))
+
+    def _write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
+
+        operation = f"CLOSE BYTE STREAM (WRITE) [{storage_path}]"
         item_path = self.__root_path / storage_path
 
         if overwrite:
-            return open(item_path, mode='wb')
+            stream = open(item_path, mode='wb')
         else:
-            return open(item_path, mode='xb')
+            stream = open(item_path, mode='xb')
+
+        return _util.log_close(stream, self._log, operation)
 
     def read_text(self, storage_path: str, encoding: str = 'utf-8') -> str:
+
+        operation = f"READ TEXT [{storage_path}]"
+        return self._error_handling(operation, lambda: self._read_text(storage_path, encoding))
+
+    def _read_text(self, storage_path: str, encoding: str = 'utf-8') -> str:
 
         with self.read_text_stream(storage_path, encoding) as stream:
             return stream.read()
 
     def read_text_stream(self, storage_path: str, encoding: str = 'utf-8') -> tp.TextIO:
 
-        item_path = self.__root_path / storage_path
+        operation = f"OPEN TEXT STREAM (READ) [{storage_path}]"
+        return self._error_handling(operation, lambda: self._read_text_stream(storage_path, encoding))
 
-        return open(item_path, mode='rt')
+    def _read_text_stream(self, storage_path: str, encoding: str = 'utf-8') -> tp.TextIO:
+
+        operation = f"CLOSE TEXT STREAM (READ) [{storage_path}]"
+        item_path = self.__root_path / storage_path
+        stream = open(item_path, mode='rt', encoding=encoding)
+
+        return _util.log_close(stream, self._log, operation)
 
     def write_text(self, storage_path: str, data: str, encoding: str = 'utf-8', overwrite: bool = False):
+
+        operation = f"WRITE TEXT [{storage_path}]"
+        self._error_handling(operation, lambda: self._write_text(storage_path, data, encoding, overwrite))
+
+    def _write_text(self, storage_path: str, data: str, encoding: str = 'utf-8', overwrite: bool = False):
 
         with self.write_text_stream(storage_path, encoding, overwrite) as stream:
             stream.write(data)
 
     def write_text_stream(self, storage_path: str, encoding: str = 'utf-8', overwrite: bool = False) -> tp.TextIO:
 
+        operation = f"OPEN TEXT STREAM (WRITE) [{storage_path}]"
+        return self._error_handling(operation, lambda: self._write_text_stream(storage_path, encoding, overwrite))
+
+    def _write_text_stream(self, storage_path: str, encoding: str = 'utf-8', overwrite: bool = False) -> tp.TextIO:
+
+        operation = f"CLOSE TEXT STREAM (WRITE) [{storage_path}]"
         item_path = self.__root_path / storage_path
 
         if overwrite:
-            return open(item_path, mode='wt')
+            stream = open(item_path, mode='wt', encoding=encoding)
         else:
-            return open(item_path, mode='xt')
+            stream = open(item_path, mode='xt', encoding=encoding)
+
+        return _util.log_close(stream, self._log, operation)
+
+    __T = tp.TypeVar("__T")
+
+    def _error_handling(self, operation: str, func: tp.Callable[[], __T]) -> __T:
+
+        try:
+            self._log.info(operation)
+            return func()
+
+        except FileNotFoundError as e:
+            msg = "File not found"
+            self._log.exception(f"{operation}: {msg}")
+            raise _ex.EStorageRequest(msg) from e
+
+        except FileExistsError as e:
+            msg = "File already exists"
+            self._log.exception(f"{operation}: {msg}")
+            raise _ex.EStorageRequest(msg) from e
+
+        except PermissionError as e:
+            msg = "Access denied"
+            self._log.exception(f"{operation}: {msg}")
+            raise _ex.EStorageAccess(msg) from e
+
+        except OSError as e:
+            msg = "Filesystem error"
+            self._log.exception(f"{operation}: {msg}")
+            raise _ex.EStorageAccess(msg) from e
 
 
 class LocalDataStorage(CommonDataStorage):
