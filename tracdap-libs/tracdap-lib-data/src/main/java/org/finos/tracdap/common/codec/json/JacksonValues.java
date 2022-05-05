@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.common.codec.json;
 
-import org.apache.arrow.vector.types.Types;
+
 import org.finos.tracdap.common.exception.EDataTypeNotSupported;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -25,7 +25,11 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.dataformat.csv.CsvGenerator;
+
+import org.apache.arrow.vector.types.Types;
 import org.apache.arrow.vector.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +48,10 @@ public class JacksonValues {
 
     private static final Logger log = LoggerFactory.getLogger(JacksonValues.class);
 
-    private static final List<String> NAN_VALUES = List.of("nan, na");
+    private static final String STANDARD_NAN = "nan";
+    private static final String STANDARD_POSITIVE_INFINITY = "inf";
+    private static final String STANDARD_NEGATIVE_INFINITY = "-inf";
+    private static final List<String> NAN_VALUES = List.of("nan", "na");
     private static final List<String> INFINITY_VALUES = List.of("inf", "infinity");
 
 
@@ -461,7 +468,18 @@ public class JacksonValues {
                 Float8Vector doubleVec = (Float8Vector) vector;
                 double doubleVal = doubleVec.get(row);
 
-                generator.writeNumber(doubleVal);
+                // Output NaN and infinities using the same standard format as the Apache Arrow CSV implementation
+
+                if (Double.isNaN(doubleVal))
+                    quoteNanAsString(generator, STANDARD_NAN);
+                else if (Double.isInfinite(doubleVal)) {
+                    if (doubleVal > 0)
+                        quoteNanAsString(generator, STANDARD_POSITIVE_INFINITY);
+                    else
+                        quoteNanAsString(generator, STANDARD_NEGATIVE_INFINITY);
+                }
+                else
+                    generator.writeNumber(doubleVal);
 
                 break;
 
@@ -470,7 +488,18 @@ public class JacksonValues {
                 Float4Vector floatVec = (Float4Vector) vector;
                 float floatVal = floatVec.get(row);
 
-                generator.writeNumber(floatVal);
+                // Output NaN and infinities using the same standard format as the Apache Arrow CSV implementation
+
+                if (Float.isNaN(floatVal))
+                    quoteNanAsString(generator, STANDARD_NAN);
+                else if (Float.isInfinite(floatVal)) {
+                    if (floatVal > 0)
+                        quoteNanAsString(generator, STANDARD_POSITIVE_INFINITY);
+                    else
+                        quoteNanAsString(generator, STANDARD_NEGATIVE_INFINITY);
+                }
+                else
+                    generator.writeNumber(floatVal);
 
                 break;
 
@@ -559,6 +588,36 @@ public class JacksonValues {
 
                 log.error(err);
                 throw new EDataTypeNotSupported(err);
+        }
+    }
+
+    private static void quoteNanAsString(JsonGenerator generator, String nanValue) throws IOException {
+
+        // Special handling for output of NaN values (NaN, +Infinity, -Infinity)
+
+        // In JSON, NaN values are not valid numbers so need to be quoted as strings
+
+        // In CSV NaN also looks like a string
+        // The Apache Arrow CSV implementation only works with quoted strings for NaN
+        // So, switch on quoting for NaN fields to match the Arrow implementation
+        // This allows the runtime to use the Arrow (C++) CSV parser instead of the lenient (Python) fallback
+
+        CsvGenerator csvGenerator = generator instanceof CsvGenerator
+            ? (CsvGenerator) generator
+            : null;
+
+        boolean switchQuoting = ! CsvGenerator.Feature
+                .ALWAYS_QUOTE_STRINGS
+                .enabledIn(generator.getFormatFeatures());
+
+        if (csvGenerator != null && switchQuoting) {
+            csvGenerator.enable(CsvGenerator.Feature.ALWAYS_QUOTE_STRINGS);
+        }
+
+        generator.writeString(nanValue);
+
+        if (csvGenerator != null && switchQuoting) {
+            csvGenerator.disable(CsvGenerator.Feature.ALWAYS_QUOTE_STRINGS);
         }
     }
 }
