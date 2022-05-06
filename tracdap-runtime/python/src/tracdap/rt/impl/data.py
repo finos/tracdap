@@ -83,6 +83,14 @@ class _DataInternal:
 
 class DataMapping:
 
+    """
+    Map primary data between different supported data frameworks, preserving equivalent data types.
+
+    DataMapping is for primary data, to map metadata types and values use
+    :py:class:`TypeMapping <tracdap.rt.impl.type_system.TypeMapping>` and
+    :py:class:`TypeMapping <tracdap.rt.impl.type_system.MetadataCodec>`.
+    """
+
     __log = _util.logger_for_namespace(_DataInternal.__module__ + ".DataMapping")
 
     # Matches TRAC_ARROW_TYPE_MAPPING in ArrowSchema, tracdap-lib-data
@@ -314,6 +322,10 @@ class DataMapping:
 
 class DataConformance:
 
+    """
+    Check and/or apply conformance between datasets and schemas.
+    """
+
     __log = _util.logger_for_namespace(_DataInternal.__module__ + ".DataConformance")
 
     __E_FIELD_MISSING = \
@@ -322,8 +334,10 @@ class DataConformance:
     __E_WRONG_DATA_TYPE = \
         "Field [{field_name}] contains the wrong data type " + \
         "(expected {field_type}, got {vector_type})"
+
     __E_DATA_LOSS_WILL_OCCUR = \
         "Field [{field_name}] cannot be converted from {vector_type} to {field_type}, data will be lost"
+
     __E_DATA_LOSS_DID_OCCUR = \
         "Field [{field_name}] cannot be converted from {vector_type} to {field_type}, " + \
         "data will be lost ({error_details})"
@@ -337,6 +351,31 @@ class DataConformance:
             cls, table: pa.Table, schema: pa.Schema,
             pandas_types=None, warn_extra_columns=True) \
             -> pa.Table:
+
+        """
+        Align an Arrow table to an Arrow schema.
+
+        Columns will be matched using case-insensitive matching and columns not in the schema will be dropped.
+        The resulting table will have the field order and case defined in the schema.
+
+        Where column types do not match exactly, type coercion will be applied if possible.
+        In some cases type coercion may result in overflows,
+        for example casting int64 -> int32 will fail if any values are greater than the maximum int32 value.
+
+        If the incoming data has been converted from Pandas, there are some conversions that can be applied
+        if the original Pandas dtype is known. These dtypes can be supplied via the pandas_dtypes parameter
+        and should line up with the data in the table (i.e. dtypes are for the source data, not the target schema).
+
+        The method will return a dataset whose schema exactly matches the requested schema.
+        If it is not possible to make the data conform to the schema for any reason, EDataConformance will be raised.
+
+        :param table: The data to be conformed
+        :param schema: The schema to conform to
+        :param pandas_types: Pandas dtypes for the table, if the table has been converted from Pandas
+        :param warn_extra_columns: Whether to log warnings it the table contains columns not in the schema
+        :return: The conformed data, whose schema will exactly match the supplied schema parameter
+        :raises: _ex.EDataConformance if conformance is not possible for any reason
+        """
 
         # If Pandas types are supplied they must match the table, i.e. table has been converted from Pandas
         if pandas_types is not None and len(pandas_types) != len(table.schema.types):

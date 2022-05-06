@@ -22,6 +22,13 @@ import tracdap.rt.exceptions as _ex
 
 class TypeMapping:
 
+    """
+    Map types between the TRAC metadata type system and native Python types.
+
+    To map individual values, use :py:class:`MetadataCodec`.
+    To map primary data, use :py:class:`DataMapping <tracdap.rt.impl.data.DataMapping>`.
+    """
+
     __TRAC_TO_PYTHON_BASIC_TYPE: tp.Dict[_meta.BasicType, type] = {
         _meta.BasicType.BOOLEAN: bool,
         _meta.BasicType.INTEGER: int,
@@ -75,6 +82,13 @@ class TypeMapping:
 
 
 class MetadataCodec:
+
+    """
+    Map values between TRAC metadata :py:class:`Value <tracdap.rt.metadata.Value>` objects and native Python values.
+
+    To map types, use :py:class:`TypeMapping`.
+    To map primary data, use :py:class:`DataMapping <tracdap.rt.impl.data.DataMapping>`.
+    """
 
     @staticmethod
     def decode_value(value: _meta.Value) -> tp.Any:
