@@ -145,7 +145,7 @@ def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
         tagTimestamp=meta.DatetimeValue(timestamp.isoformat()))
 
 
-def object_key(object_id: tp.Union[meta.TagHeader, meta.TagSelector]):
+def object_key(object_id: tp.Union[meta.TagHeader, meta.TagSelector]) -> str:
 
     if isinstance(object_id, meta.TagHeader):
         return f"{object_id.objectType.name}-{object_id.objectId}-v{object_id.objectVersion}"

@@ -139,12 +139,15 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
         job_result.jobId = self.node.job_id
         job_result.statusCode = meta.JobStatusCode.SUCCEEDED
 
-        for result_id in self.node.result_ids:
+        # TODO: Handle individual failed results
 
-            # TODO: Handle individual failed results
+        for obj_id, node_id in self.node.objects.items():
+            obj_def = _ctx_lookup(node_id, ctx)
+            job_result.results[obj_id] = obj_def
 
-            result_set = _ctx_lookup(result_id, ctx)
-            job_result.results.update(result_set.items())
+        for bundle_id in self.node.bundles:
+            bundle = _ctx_lookup(bundle_id, ctx)
+            job_result.results.update(bundle.items())
 
         return job_result
 
@@ -447,7 +450,7 @@ class SaveDataFunc(NodeFunction, _LoadSaveDataFunc):
         return True
 
 
-class ImportModelFunc(NodeFunction[meta.ModelDefinition]):
+class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
 
     def __init__(self, node: ImportModelNode, models: _models.ModelLoader):
         self.node = node
@@ -455,7 +458,7 @@ class ImportModelFunc(NodeFunction[meta.ModelDefinition]):
 
         self._log = _util.logger_for_object(self)
 
-    def __call__(self, ctx: NodeContext) -> meta.ModelDefinition:
+    def __call__(self, ctx: NodeContext) -> meta.ObjectDefinition:
 
         stub_model_def = meta.ModelDefinition(
             language=self.node.import_details.language,
@@ -472,22 +475,7 @@ class ImportModelFunc(NodeFunction[meta.ModelDefinition]):
         model_def.inputs = model_scan.inputs
         model_def.outputs = model_scan.outputs
 
-        return model_def
-
-
-class ImportModelResultFunc(NodeFunction[ObjectMap]):
-
-    def __init__(self, node: ImportModelResultNode):
-        self.node = node
-
-    def __call__(self, ctx: NodeContext) -> ObjectMap:
-
-        model_def = _ctx_lookup(self.node.import_id, ctx)
-
-        object_key = _util.object_key(self.node.object_id)
-        object_def = meta.ObjectDefinition(meta.ObjectType.MODEL, model=model_def)
-
-        return {object_key: object_def}
+        return meta.ObjectDefinition(meta.ObjectType.MODEL, model=model_def)
 
 
 class RunModelFunc(NodeFunction):
@@ -585,7 +573,6 @@ class FunctionResolver:
         SetParametersNode: SetParametersFunc,
         DataViewNode: DataViewFunc,
         DataItemNode: DataItemFunc,
-        ImportModelResultNode: ImportModelResultFunc,
         BuildJobResultNode: BuildJobResultFunc,
         SaveJobResultNode: SaveJobResultFunc,
         StaticDataSpecNode: StaticDataSpecFunc,

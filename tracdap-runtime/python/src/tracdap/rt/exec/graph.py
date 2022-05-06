@@ -298,7 +298,7 @@ class SaveDataNode(Node):
 
 
 @dc.dataclass(frozen=True)
-class ImportModelNode(Node[meta.ModelDefinition]):
+class ImportModelNode(Node[meta.ObjectDefinition]):
 
     model_scope: str
     import_details: meta.ImportModelJob
@@ -307,17 +307,6 @@ class ImportModelNode(Node[meta.ModelDefinition]):
 
     def __post_init__(self, explicit_deps):
         dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
-        object.__setattr__(self, 'dependencies', dependencies)
-
-
-@dc.dataclass(frozen=True)
-class ImportModelResultNode(Node[ObjectMap]):
-
-    import_id: NodeId[meta.ModelDefinition]
-    object_id: meta.TagHeader
-
-    def __post_init__(self):
-        dependencies = {self.import_id: DependencyType.HARD}
         object.__setattr__(self, 'dependencies', dependencies)
 
 
@@ -342,13 +331,16 @@ class RunModelNode(Node):
 class BuildJobResultNode(Node[cfg.JobResult]):
 
     job_id: meta.TagHeader
-    result_ids: tp.List[NodeId[ObjectMap]]
+
+    objects: tp.Dict[str, NodeId[meta.ObjectDefinition]] = dc.field(default_factory=dict)
+    bundles: tp.List[NodeId[ObjectMap]] = dc.field(default_factory=list)
 
     explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
 
     def __post_init__(self, explicit_deps):
         dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
-        dependencies.update({result_id: DependencyType.HARD for result_id in self.result_ids})
+        dependencies.update({result_id: DependencyType.HARD for result_id in self.objects.values()})
+        dependencies.update({result_id: DependencyType.HARD for result_id in self.bundles})
         object.__setattr__(self, 'dependencies', dependencies)
 
 

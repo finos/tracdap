@@ -49,6 +49,7 @@ class GraphBuilder:
 
         # TODO: Import model job should pre-allocate an ID, then model ID comes from job_config.resultMapping
         new_model_id = _util.new_object_id(meta.ObjectType.MODEL)
+        new_model_key = _util.object_key(new_model_id)
 
         model_scope = _util.object_key(job_config.jobId)
         import_details = job_config.job.importModel
@@ -56,13 +57,10 @@ class GraphBuilder:
         import_id = NodeId.of("trac_import_model", job_namespace, meta.ModelDefinition)
         import_node = ImportModelNode(import_id, model_scope, import_details, explicit_deps=[ctx_push_graph.root_id])
 
-        import_result_id = NodeId.of("trac_import_result", job_namespace, ObjectMap)
-        import_result_node = ImportModelResultNode(import_result_id, import_id, new_model_id)
-
         build_result_id = NodeId.of("trac_build_result", job_namespace, cfg.JobResult)
         build_result_node = BuildJobResultNode(
             build_result_id, job_config.jobId,
-            [import_result_id], explicit_deps=[import_id])
+            objects={new_model_key: import_id})
 
         save_result_id = NodeId("trac_save_result", job_namespace)
         save_result_node = SaveJobResultNode(save_result_id, build_result_id, result_spec)
@@ -74,7 +72,6 @@ class GraphBuilder:
         job_graph_nodes = {
             **ctx_push_graph.nodes,
             import_id: import_node,
-            import_result_id: import_result_node,
             build_result_id: build_result_node,
             job_node_id: job_node}
 
@@ -140,7 +137,8 @@ class GraphBuilder:
         build_result_id = NodeId.of("trac_build_result", job_namespace, cfg.JobResult)
         build_result_node = BuildJobResultNode(
             build_result_id, job_config.jobId,
-            data_result_ids, explicit_deps=[target_graph.root_id])
+            bundles=data_result_ids,
+            explicit_deps=[target_graph.root_id])
 
         save_result_id = NodeId("trac_save_result", job_namespace)
         save_result_node = SaveJobResultNode(save_result_id, build_result_id, result_spec)
