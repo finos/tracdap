@@ -365,7 +365,9 @@ class CommonDataStorage(IDataStorage):
                 table = format_impl.read_table(byte_stream, schema)
 
             if schema is not None:
-                return _data.DataConformance.conform_to_schema(table, schema)
+                # Apply conformance, in case the format was not able to apply it fully on read
+                # It is fine to silently ignore extra columns of an input
+                return _data.DataConformance.conform_to_schema(table, schema, warn_extra_columns=False)
             else:
                 return table
 
