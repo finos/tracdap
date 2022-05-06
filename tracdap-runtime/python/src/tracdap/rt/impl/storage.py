@@ -397,7 +397,7 @@ class CommonDataStorage(IDataStorage):
             if not storage_path.endswith(format_extension):
                 parent_dir_ = storage_path
                 storage_path_ = storage_path.rstrip("/\\") + f"/chunk-0.{format_extension}"
-                self.__file_storage.mkdir(parent_dir_, True, exists_ok=overwrite)  # Allow exists_ok when overwrite == True
+                self.__file_storage.mkdir(parent_dir_, True, exists_ok=overwrite)
             else:
                 parent_dir_ = str(pathlib.PurePath(storage_path).parent)
                 storage_path_ = storage_path
@@ -667,19 +667,23 @@ class _CsvStorageFormat(IDataFormat):
             csv_reader = csv.reader(text_source, **csv_params)
             header = next(csv_reader)
 
-            for col in schema.names:
-                if col not in header:
-                    raise _ex.EDataConformance(f"Missing column {col}")  # TODO
+            header_lower = list(map(str.lower, header))
+            missing_columns = list(filter(lambda col_: col_.lower() not in header_lower, schema.names))
 
-            schema_columns = dict(zip(schema.names, range(len(schema.names))))
-            col_mapping = [schema_columns.get(col) for col in header]
+            if any(missing_columns):
+                msg = f"CSV data is missing one of more columns: [{', '.join(missing_columns)}]"
+                self._log.error(msg)
+                raise _ex.EDataConformance(msg)
+
+            schema_columns = {col.lower(): index for index, col in enumerate(schema.names)}
+            col_mapping = [schema_columns.get(col.lower()) for col in header]
             python_types = list(map(_types.arrow_to_python_type, schema.types))
 
             data = [[] for _ in range(len(schema.names))]
+            csv_row = 1  # Allowing for header
+            csv_col = 0
 
             for row in csv_reader:
-
-                csv_col = 0
 
                 for raw_value in row:
 
@@ -689,11 +693,14 @@ class _CsvStorageFormat(IDataFormat):
                         continue
 
                     python_type = python_types[output_col]
-                    python_value = self._convert_python_value(raw_value, python_type)
+                    python_value = self._convert_python_value(raw_value, python_type, csv_row, csv_col)
 
                     data[output_col].append(python_value)
 
                     csv_col += 1
+
+                csv_col = 0
+                csv_row += 1
 
             data_dict = dict(zip(schema.names, data))
             table = pa.Table.from_pydict(data_dict, schema)  # noqa
@@ -701,12 +708,11 @@ class _CsvStorageFormat(IDataFormat):
             return table
 
         except UnicodeDecodeError as e:
-            err = f"CSV file decoding failed, content is garbled"
+            err = f"CSV decoding failed, content is garbled"
             self._log.exception(err)
             raise _ex.EDataCorruption(err) from e
 
-    @classmethod
-    def _convert_python_value(cls, raw_value: tp.Any, python_type: type) -> tp.Any:
+    def _convert_python_value(self, raw_value: tp.Any, python_type: type, row: int, col: int) -> tp.Any:
 
         try:
 
@@ -718,9 +724,9 @@ class _CsvStorageFormat(IDataFormat):
 
             if python_type == bool:
                 if isinstance(raw_value, str):
-                    if raw_value.lower() in cls.__TRUE_VALUES:
+                    if raw_value.lower() in self.__TRUE_VALUES:
                         return True
-                    if raw_value.lower() in cls.__FALSE_VALUES:
+                    if raw_value.lower() in self.__FALSE_VALUES:
                         return False
                 if isinstance(raw_value, int) or isinstance(raw_value, float):
                     if raw_value == 1:
@@ -759,11 +765,20 @@ class _CsvStorageFormat(IDataFormat):
                 if isinstance(raw_value, str):
                     return dt.datetime.fromisoformat(raw_value)
 
-            raise _ex.EDataConformance("No data conversion available for input type")  # TODO
+            msg = f"CSV data does not match the schema and cannot be converted" \
+                + f" (row = {row}, col = {col}, expected type = {python_type}, value = [{str(raw_value)}])"
+
+            self._log.error(msg)
+            raise _ex.EDataConformance(msg)
 
         except Exception as e:
 
-            raise _ex.EDataConformance("Could not convert input data") from e  # TODO
+            msg = f"CSV data does not match the schema and cannot be converted" \
+                + f" (row = {row}, col = {col}, expected type = {python_type}, value = [{str(raw_value)}])" \
+                + f": {str(e)}"
+
+            self._log.exception(msg)
+            raise _ex.EDataConformance(msg) from e
 
 
 FormatManager.register_data_format("ARROW_FILE", _ArrowFileFormat)
