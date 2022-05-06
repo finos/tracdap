@@ -98,6 +98,17 @@ class DataStorageTestSuite:
 
         return _types.trac_to_arrow_schema(trac_schema)
 
+    @staticmethod
+    def random_bytes(n_bytes: int) -> bytes:
+
+        bs = bytearray(n_bytes)
+
+        for i in range(n_bytes):
+            b = random.randint(0, 255)
+            bs[i] = b
+
+        return bytes(bs)
+
     def test_round_trip_basic(self):
 
         table = pa.Table.from_pydict(self.sample_data(), self.sample_schema())  # noqa
@@ -270,7 +281,7 @@ class LocalStorageTest(DataStorageTestSuite):
 
     def test_read_garbled_data(self):
 
-        garbage = random.randbytes(256)
+        garbage = self.random_bytes(256)
         schema = self.sample_schema()
 
         self.file_storage.write_bytes(f"garbled_data.{self.storage_format}", garbage)
@@ -335,7 +346,7 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
 
         storage_options = {"lenient_csv_parser": True}
 
-        garbage = random.randbytes(256)
+        garbage = self.random_bytes(256)
         schema = self.sample_schema()
 
         self.file_storage.write_bytes(f"csv_garbled_data.{self.storage_format}", garbage)
