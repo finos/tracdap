@@ -98,16 +98,16 @@ jobs:
           - { ENV_NAME: "Linux, 3.8, PySpark 3.0, Pandas 1.2",
               PLATFORM: 'ubuntu-latest',
               PYTHON_VERSION: "3.8",
-              PYSPARK_VERSION: ">= 3.0.0, < 3.1.0",
-              PANDAS_VERSION: ">= 1.2.0, < 1.3.0",
+              PYSPARK_VERSION: "== 3.0.0",
+              PANDAS_VERSION: "== 1.2.0",
               PYPANDOC: false }
 
           # Oldest supported versions, PySpark / Pandas on .0 patch release
-          - { ENV_NAME: "Linux, 3.7, PySpark 2.4.0, Pandas 1.0.0",
+          - { ENV_NAME: "Linux, 3.7, PySpark 2.4, Pandas 1.2",
               PLATFORM: 'ubuntu-latest',
               PYTHON_VERSION: "3.7",
               PYSPARK_VERSION: "== 2.4.0",
-              PANDAS_VERSION: "== 1.0.0",
+              PANDAS_VERSION: "== 1.2.0",
               PYPANDOC: true }
 
     runs-on: ${{ matrix.enviroment.PLATFORM }}
