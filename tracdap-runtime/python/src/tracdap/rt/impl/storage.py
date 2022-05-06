@@ -358,7 +358,7 @@ class CommonDataStorage(IDataStorage):
                 dir_content = self.__file_storage.ls(storage_path)
 
                 if len(dir_content) == 1:
-                    storage_path = dir_content[0]
+                    storage_path = storage_path.rstrip("/\\") + "/" + dir_content[0]
                 else:
                     raise NotImplementedError("Directory storage format not available yet")
 
@@ -872,14 +872,14 @@ class LocalFileStorage(IFileStorage):
     def _ls(self, storage_path: str) -> tp.List[str]:
 
         item_path = self.__root_path / storage_path
-        return [str(x.relative_to(self.__root_path))
+        return [str(x.relative_to(item_path))
                 for x in item_path.iterdir()
                 if x.is_file() or x.is_dir()]
 
     def mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
 
         operation = f"MKDIR [{storage_path}]"
-        self._error_handling(operation, lambda: self._mkdir(storage_path))
+        self._error_handling(operation, lambda: self._mkdir(storage_path, recursive, exists_ok))
 
     def _mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
 
@@ -889,7 +889,7 @@ class LocalFileStorage(IFileStorage):
     def rm(self, storage_path: str, recursive: bool = False):
 
         operation = f"MKDIR [{storage_path}]"
-        self._error_handling(operation, lambda: self._rm(storage_path))
+        self._error_handling(operation, lambda: self._rm(storage_path, recursive))
 
     def _rm(self, storage_path: str, recursive: bool = False):
 

@@ -334,14 +334,18 @@ class DevModeTranslator:
             x_storage_mgr = _storage.StorageManager(sys_config, sys_config_dir)
             x_storage = x_storage_mgr.get_file_storage(storage_key)
             x_orig_path = pathlib.PurePath(storage_path)
+            x_name = x_orig_path.name
 
-            existing_files = x_storage.ls(str(x_orig_path.parent))
+            if x_storage.exists(str(x_orig_path.parent)):
+                existing_files = x_storage.ls(str(x_orig_path.parent))
+            else:
+                existing_files = []
 
-            while storage_path in existing_files:
+            while x_name in existing_files:
 
                 snap_version += 1
-                x_stem = f"{x_orig_path.stem}-{snap_version}"
-                storage_path = str(x_orig_path.parent.joinpath(x_stem))
+                x_name = f"{x_orig_path.stem}-{snap_version}"
+                storage_path = str(x_orig_path.parent.joinpath(x_name))
 
             cls._log.info(f"Output for [{data_key}] will be snap version {snap_version}")
 
