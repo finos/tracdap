@@ -73,7 +73,17 @@ class DataView:
         return DataView(trac_schema, arrow_schema, dict())
 
 
+class _DataInternal:
+
+    @staticmethod
+    def float_dtype_check():
+        if "Float64Dtype" not in pd.__dict__:
+            raise _ex.EStartup("TRAC D.A.P. requires Pandas >= 1.2")
+
+
 class DataMapping:
+
+    __log = _util.logger_for_namespace(_DataInternal.__module__ + ".DataMapping")
 
     # Matches TRAC_ARROW_TYPE_MAPPING in ArrowSchema, tracdap-lib-data
 
@@ -92,14 +102,11 @@ class DataMapping:
         _meta.BasicType.DATETIME: pa.timestamp(__TRAC_TIMESTAMP_UNIT, __TRAC_TIMESTAMP_ZONE)
     }
 
-    @staticmethod
-    def __float_dtype_check():
-        if "Float64Dtype" not in pd.__dict__:
-            raise _ex.EStartup("TRAC D.A.P. requires Pandas >= 1.2")
+    # Check the Pandas dtypes for handling floats are available before setting up the type mapping
+    __PANDAS_FLOAT_DTYPE_CHECK = _DataInternal.float_dtype_check()
+    __PANDAS_DATETIME_TYPE = pd.to_datetime([]).dtype
 
-    __PANDAS_FLOAT_DTYPE_CHECK = __float_dtype_check()
-
-    # Only partial mapping is possible, object dtypes will not map this way
+    # Only partial mapping is possible, decimal and temporal dtypes cannot be mapped this way
     __ARROW_TO_PANDAS_TYPE_MAPPING = {
         pa.bool_(): pd.BooleanDtype(),
         pa.int8(): pd.Int8Dtype(),
@@ -140,7 +147,7 @@ class DataMapping:
         if pa.types.is_timestamp(arrow_type):
             return dt.datetime
 
-        raise _ex.EData(f"No Python type conversion available for Arrow type {arrow_type}")  # TODO
+        raise _ex.ETracInternal(f"No Python type mapping available for Arrow type [{arrow_type}]")
 
     @classmethod
     def python_to_arrow_type(cls, python_type: type) -> pa.DataType:
@@ -166,7 +173,7 @@ class DataMapping:
         if python_type == dt.datetime:
             return pa.timestamp(cls.__TRAC_TIMESTAMP_UNIT, cls.__TRAC_TIMESTAMP_ZONE)
 
-        raise _ex.EData(f"No Arrow type conversion available for Python type {python_type}")  # TODO
+        raise _ex.ETracInternal(f"No Arrow type mapping available for Python type [{python_type}]")
 
     @classmethod
     def trac_to_arrow_type(cls, trac_type: _meta.TypeDescriptor) -> pa.DataType:
@@ -179,7 +186,7 @@ class DataMapping:
         arrow_type = cls.__TRAC_TO_ARROW_BASIC_TYPE_MAPPING.get(trac_basic_type)
 
         if arrow_type is None:
-            raise _ex.ETracInternal(f"Cannot convert TRAC data type [{trac_basic_type}] for use with Apache Arrow")
+            raise _ex.ETracInternal(f"No Arrow type mapping available for TRAC type [{trac_basic_type}]")
 
         return arrow_type
 
@@ -201,6 +208,10 @@ class DataMapping:
         return pa.decimal128(
             cls.__TRAC_DECIMAL_PRECISION,
             cls.__TRAC_DECIMAL_SCALE)
+
+    @classmethod
+    def pandas_datetime_type(cls):
+        return cls.__PANDAS_DATETIME_TYPE
 
     @classmethod
     def view_to_pandas(cls, view: DataView, part: DataPartKey) -> pd.DataFrame:
@@ -291,15 +302,9 @@ class DataMapping:
         return DataView(view.trac_schema, view.arrow_schema, parts)
 
 
-class _Logging:
-    pass
-
-
 class DataConformance:
 
-    __log = _util.logger_for_namespace(_Logging.__module__ + ".DataConformance")
-
-    __pandas_datetime_type = pd.to_datetime([]).dtype
+    __log = _util.logger_for_namespace(_DataInternal.__module__ + ".DataConformance")
 
     __E_FIELD_MISSING = \
         "Field [{field_name}] is missing from the data"
@@ -584,7 +589,7 @@ class DataConformance:
         # Special handling for Pandas/NumPy date values
         # These are encoded as np.datetime64[ns] in Pandas -> pa.timestamp64[ns] in Arrow
         # Only allow this conversion if the vector is coming from Pandas with datetime type
-        if pandas_type == cls.__pandas_datetime_type:
+        if pandas_type == DataMapping.pandas_datetime_type():
             if pa.types.is_timestamp(vector.type) and vector.type.unit == "ns":
                 return pc.cast(vector, field.type)
 
