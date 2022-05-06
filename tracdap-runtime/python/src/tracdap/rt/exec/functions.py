@@ -32,7 +32,6 @@ import enum
 import abc
 import json
 import random
-
 import yaml
 import uuid
 
@@ -221,7 +220,7 @@ class SetParametersFunc(NodeFunction[tp.Dict[str, tp.Any]]):
         native_params = dict()
 
         for p_name, p_value in self.node.parameters.items():
-            native_value = _types.decode_value(p_value)
+            native_value = _types.MetadataCodec.decode_value(p_value)
             native_params[p_name] = native_value
             log.info(f"Set parameter [{p_name}] = {native_value} ({p_value.type.basicType.name})")
 
@@ -238,7 +237,8 @@ class DataViewFunc(NodeFunction[_data.DataView]):
         root_item = _ctx_lookup(self.node.root_item, ctx)
         root_part_key = _data.DataPartKey.for_root()
 
-        return _data.DataView(self.node.schema, {root_part_key: [root_item]})
+        empty_view = _data.DataView.for_trac_schema(self.node.schema)
+        return _data.DataMapping.add_item_to_view(empty_view, root_part_key, root_item)
 
 
 class DataItemFunc(NodeFunction[_data.DataItem]):
@@ -322,7 +322,7 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
         snap_index = 0
         delta_index = 0
 
-        data_type = data_view.schema.schemaType.name.lower()
+        data_type = data_view.trac_schema.schemaType.name.lower()
 
         data_item = self.DATA_ITEM_TEMPLATE.format(
             data_type, data_id.objectId,
@@ -334,7 +334,7 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
 
         data_def = meta.DataDefinition()
         data_def.storageId = _util.selector_for_latest(storage_id)
-        data_def.schema = data_view.schema
+        data_def.schema = data_view.trac_schema
         data_def.parts[part_key.opaqueKey] = part
 
         storage_key = self.storage.default_storage_key()
@@ -414,13 +414,16 @@ class LoadDataFunc(NodeFunction[_data.DataItem], _LoadSaveDataFunc):
         data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
         data_storage = self.storage.get_data_storage(data_copy.storageKey)
 
-        df = data_storage.read_pandas_table(
-            data_spec.data_def.schema.table,
+        trac_schema = data_spec.schema_def if data_spec.schema_def else data_spec.data_def.schema
+        arrow_schema = _data.DataMapping.trac_to_arrow_schema(trac_schema) if trac_schema else None
+
+        table = data_storage.read_table(
             data_copy.storagePath,
             data_copy.storageFormat,
+            arrow_schema,
             storage_options={})
 
-        return _data.DataItem(pandas=df)
+        return _data.DataItem(table.schema, table)
 
 
 class SaveDataFunc(NodeFunction, _LoadSaveDataFunc):
@@ -435,24 +438,22 @@ class SaveDataFunc(NodeFunction, _LoadSaveDataFunc):
         # i.e. it is already known which incarnation / copy of the data will be created
 
         data_spec = _ctx_lookup(self.node.spec_id, ctx)
-
         data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
-        file_storage = self.storage.get_file_storage(data_copy.storageKey)
         data_storage = self.storage.get_data_storage(data_copy.storageKey)
 
-        # Make sure parent directory exists
-        parent_dir = str(pathlib.PurePath(data_copy.storagePath).parent)
-        file_storage.mkdir(parent_dir, recursive=True, exists_ok=True)
-
-        # Item to be saved should exist in the current context, for now assume it is always Pandas
+        # Item to be saved should exist in the current context
         data_item = _ctx_lookup(self.node.data_item_id, ctx)
-        df = data_item.pandas
 
-        # Assumption that dataset is a table, and not some other schema type
+        # Current implementation will always put an Arrow table in the data item
+        # Empty tables are allowed, so explicitly check if table is None
+        # Testing "if not data_item.table" will fail for empty tables
 
-        data_storage.write_pandas_table(
-            data_spec.data_def.schema.table, df,
+        if data_item.table is None:
+            raise _ex.EUnexpected()
+
+        data_storage.write_table(
             data_copy.storagePath, data_copy.storageFormat,
+            data_item.table,
             storage_options={}, overwrite=False)
 
         return True
@@ -527,8 +528,9 @@ class RunModelFunc(NodeFunction):
         # Assuming outputs are all defined with static schemas
 
         for output_name in model_def.outputs:
-            blank_data_view = _data.DataView(schema=self.node.model_def.outputs[output_name].schema, parts={})
-            local_ctx[output_name] = blank_data_view
+            output_schema = self.node.model_def.outputs[output_name].schema
+            empty_data_view = _data.DataView.for_trac_schema(output_schema)
+            local_ctx[output_name] = empty_data_view
 
         # Run the model against the mapped local context
 

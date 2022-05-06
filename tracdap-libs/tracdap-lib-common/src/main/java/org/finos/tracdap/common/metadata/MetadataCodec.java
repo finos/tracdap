@@ -398,9 +398,14 @@ public class MetadataCodec {
     // To avoid discrepancies, define a formatter that always uses 6 d.p.
 
     public static final DateTimeFormatter ISO_DATETIME_FORMAT = new DateTimeFormatterBuilder()
-            .appendPattern("uuuu-MM-dd'T'kk:mm:ss")
-            .appendFraction(ChronoField.MICRO_OF_SECOND, 6, 6, true)
+            .appendPattern("yyyy-MM-dd'T'HH:mm:ss")
+            .appendFraction(ChronoField.MICRO_OF_SECOND, 3, 3, true)
             .appendOffsetId()
+            .toFormatter();
+
+    public static final DateTimeFormatter ISO_DATETIME_NO_ZONE_FORMAT = new DateTimeFormatterBuilder()
+            .appendPattern("yyyy-MM-dd'T'HH:mm:ss")
+            .appendFraction(ChronoField.MILLI_OF_SECOND, 3, 3, true)
             .toFormatter();
 
     // For parsing inputs, allow flexibility on case and the precision of fractional seconds
@@ -410,15 +415,15 @@ public class MetadataCodec {
     public static final DateTimeFormatter ISO_DATETIME_INPUT_FORMAT = new DateTimeFormatterBuilder()
             .parseCaseInsensitive()
             .parseLenient()
-            .appendPattern("uuuu-MM-dd'T'kk:mm:ss")
+            .appendPattern("yyyy-MM-dd'T'HH:mm:ss")
             .appendFraction(ChronoField.MICRO_OF_SECOND, 0, 9, true)
             .appendOffsetId()
             .toFormatter();
 
-    public static final DateTimeFormatter ISO_DATETIME_NO_ZONE_FORMAT = new DateTimeFormatterBuilder()
+    public static final DateTimeFormatter ISO_DATETIME_INPUT_NO_ZONE_FORMAT = new DateTimeFormatterBuilder()
             .parseCaseInsensitive()
             .parseLenient()
-            .appendPattern("uuuu-MM-dd'T'kk:mm:ss")
+            .appendPattern("yyyy-MM-dd'T'HH:mm:ss")
             .appendFraction(ChronoField.MICRO_OF_SECOND, 0, 9, true)
             .toFormatter();
 

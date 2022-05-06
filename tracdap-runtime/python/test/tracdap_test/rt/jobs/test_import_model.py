@@ -14,6 +14,7 @@
 
 import unittest
 import tempfile
+import pathlib
 import subprocess as sp
 
 import tracdap.rt.config as cfg
@@ -30,24 +31,22 @@ class ImportModelTest(unittest.TestCase):
 
     def setUp(self) -> None:
 
-        repo_url_proc = sp.run(["git", "config", "--get", "remote.origin.url"], stdout=sp.PIPE)
         commit_hash_proc = sp.run(["git", "rev-parse", "HEAD"], stdout=sp.PIPE)
-
-        if repo_url_proc.returncode != 0 or commit_hash_proc.returncode != 0:
-            raise RuntimeError("Could not discover details of the current git repo")
-
-        self.repo_url = repo_url_proc.stdout.decode('utf-8').strip()
         self.commit_hash = commit_hash_proc.stdout.decode('utf-8').strip()
+
+        current_repo_url = pathlib.Path(__file__) \
+            .joinpath("../../../../../../..") \
+            .resolve()
 
         repos = {
             "unit_test_repo": cfg.RepositoryConfig(
-                repoType="git",
-                repoUrl=self.repo_url)
+                repoType="local",
+                repoUrl=str(current_repo_url))
         }
 
         self.sys_config = cfg.RuntimeConfig(repositories=repos)
 
-    def test_import_from_git_ok(self):
+    def test_import_model_job(self):
 
         job_id = util.new_object_id(meta.ObjectType.JOB)
 

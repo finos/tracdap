@@ -55,7 +55,7 @@ jobs:
           pip install -r tracdap-runtime/python/requirements.txt
 
       - name: Build runtime package
-        run: python tracdap-runtime/python/build_runtime.py --target dist
+        run: python tracdap-runtime/python/build_runtime.py --target codegen dist
 
       - name: Save artifacts
         uses: actions/upload-artifact@v2

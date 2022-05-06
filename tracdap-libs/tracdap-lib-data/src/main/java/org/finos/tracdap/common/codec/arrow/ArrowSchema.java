@@ -42,14 +42,22 @@ public class ArrowSchema {
     private static final TimeUnit TIMESTAMP_PRECISION = TimeUnit.MILLISECOND;
     private static final String NO_ZONE = null;
 
+    public static final ArrowType ARROW_BASIC_BOOLEAN = ArrowType.Bool.INSTANCE;
+    public static final ArrowType ARROW_BASIC_INTEGER = new ArrowType.Int(64, true);
+    public static final ArrowType ARROW_BASIC_FLOAT = new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE);
+    public static final ArrowType ARROW_BASIC_DECIMAL =  new ArrowType.Decimal(DECIMAL_PRECISION, DECIMAL_SCALE, DECIMAL_BIT_WIDTH);
+    public static final ArrowType ARROW_BASIC_STRING = ArrowType.Utf8.INSTANCE;
+    public static final ArrowType ARROW_BASIC_DATE = new ArrowType.Date(DateUnit.DAY);
+    public static final ArrowType ARROW_BASIC_DATETIME = new ArrowType.Timestamp(TIMESTAMP_PRECISION, NO_ZONE);  // Using type without timezone
+
     private static final Map<BasicType, ArrowType> TRAC_ARROW_TYPE_MAPPING = Map.ofEntries(
-            Map.entry(BasicType.BOOLEAN, ArrowType.Bool.INSTANCE),
-            Map.entry(BasicType.INTEGER, new ArrowType.Int(64, true)),
-            Map.entry(BasicType.FLOAT, new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)),
-            Map.entry(BasicType.DECIMAL, new ArrowType.Decimal(DECIMAL_PRECISION, DECIMAL_SCALE, DECIMAL_BIT_WIDTH)),
-            Map.entry(BasicType.STRING, ArrowType.Utf8.INSTANCE),
-            Map.entry(BasicType.DATE, new ArrowType.Date(DateUnit.DAY)),
-            Map.entry(BasicType.DATETIME, new ArrowType.Timestamp(TIMESTAMP_PRECISION, NO_ZONE)));  // Using type without timezone
+            Map.entry(BasicType.BOOLEAN, ARROW_BASIC_BOOLEAN),
+            Map.entry(BasicType.INTEGER, ARROW_BASIC_INTEGER),
+            Map.entry(BasicType.FLOAT, ARROW_BASIC_FLOAT),
+            Map.entry(BasicType.DECIMAL, ARROW_BASIC_DECIMAL),
+            Map.entry(BasicType.STRING, ARROW_BASIC_STRING),
+            Map.entry(BasicType.DATE, ARROW_BASIC_DATE),
+            Map.entry(BasicType.DATETIME, ARROW_BASIC_DATETIME));
 
     private static final Map<ArrowType.ArrowTypeID, BasicType> ARROW_TRAC_TYPE_MAPPING = Map.ofEntries(
             Map.entry(ArrowType.ArrowTypeID.Bool, BasicType.BOOLEAN),

@@ -40,7 +40,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 
 
 public class CsvDecoder extends BaseDecoder {
@@ -52,21 +51,19 @@ public class CsvDecoder extends BaseDecoder {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final BufferAllocator arrowAllocator;
-    private final SchemaDefinition tracSchema;
 
     private final Schema arrowSchema;
     private VectorSchemaRoot root;
     private VectorUnloader unloader;
 
-    public CsvDecoder(BufferAllocator arrowAllocator, SchemaDefinition schema) {
+    public CsvDecoder(BufferAllocator arrowAllocator, SchemaDefinition tracSchema) {
 
         super(BUFFERED_DECODER);
 
         this.arrowAllocator = arrowAllocator;
-        this.tracSchema = schema;
 
         // Schema cannot be inferred from CSV, so it must always be set from a TRAC schema
-        this.arrowSchema = ArrowSchema.tracToArrow(this.tracSchema);
+        this.arrowSchema = ArrowSchema.tracToArrow(tracSchema);
     }
 
     @Override
@@ -97,6 +94,7 @@ public class CsvDecoder extends BaseDecoder {
 
             var csvSchema =  CsvSchemaMapping
                     .arrowToCsv(this.arrowSchema)
+                    //.setNullValue("")
                     .build();
 
             csvSchema = DEFAULT_HEADER_FLAG
@@ -127,14 +125,20 @@ public class CsvDecoder extends BaseDecoder {
 
                         if (minorType == Types.MinorType.VARCHAR) {
 
-                            // An empty string is encoded as "", i.e. token width = 2
+                            // Null strings are encoded with no space between commas (or EOL): some_value,,next_value
+                            // An empty string is encoded as "", i.e. token width = 2 (or more with padding)
+                            // Using token end - token start, a gap between commas -> empty string instead of null
 
-                            var tokenEnd = parser.currentLocation();
+                            // It would be nicer to check the original bytes to see if there are quote chars in there
+                            // But this is not possible with the current Jackson API
+
                             var tokenStart = parser.currentTokenLocation();
+                            var tokenEnd = parser.currentLocation();
                             var tokenWidth = tokenEnd.getColumnNr() - tokenStart.getColumnNr();
 
-                            if (tokenWidth == 2) {
+                            if (tokenWidth > 1) {
                                 JacksonValues.setEmptyString(nullVector, row);
+                                col++;
                                 continue;
                             }
                         }

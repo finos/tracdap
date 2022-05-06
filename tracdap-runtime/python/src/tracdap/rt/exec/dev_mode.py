@@ -92,10 +92,17 @@ class DevModeTranslator:
             data_id = util.new_object_id(meta.ObjectType.DATA)
             storage_id = util.new_object_id(meta.ObjectType.STORAGE)
 
+            if is_input and job_config.job.jobType == meta.JobType.RUN_MODEL:
+                model_def = job_config.resources[util.object_key(job_config.job.runModel.model)]
+                schema = model_def.model.inputs[data_key].schema
+            else:
+                schema = None
+
             data_obj, storage_obj = cls._process_job_io(
                 sys_config, sys_config_dir,
                 data_key, data_value, data_id, storage_id,
-                new_unique_file=not is_input)
+                new_unique_file=not is_input,
+                schema=schema)
 
             translated_resources[util.object_key(data_id)] = data_obj
             translated_resources[util.object_key(storage_id)] = storage_obj
@@ -228,7 +235,7 @@ class DevModeTranslator:
 
                 cls._log.info(f"Encoding parameter [{p_name}] as {p_spec.paramType.basicType}")
 
-                encoded_value = _types.convert_value(p_value, p_spec.paramType)
+                encoded_value = _types.MetadataCodec.convert_value(p_value, p_spec.paramType)
                 encoded_values[p_name] = encoded_value
 
         return encoded_values
@@ -294,12 +301,12 @@ class DevModeTranslator:
     def _process_job_io(
             cls, sys_config, sys_config_dir,
             data_key, data_value, data_id, storage_id,
-            new_unique_file=False):
+            new_unique_file=False, schema: tp.Optional[meta.SchemaDefinition] = None):
 
         if isinstance(data_value, str):
             storage_path = data_value
             storage_key = sys_config.storageSettings.defaultStorage
-            storage_format = sys_config.storageSettings.defaultFormat
+            storage_format = cls.infer_format(storage_path, sys_config.storageSettings)
             snap_version = 1
 
         elif isinstance(data_value, dict):
@@ -310,7 +317,7 @@ class DevModeTranslator:
                 raise _ex.EConfigParse(f"Invalid configuration for input [{data_key}] (missing required value 'path'")
 
             storage_key = data_value.get("storageKey") or sys_config.storageSettings.defaultStorage
-            storage_format = data_value.get("format") or sys_config.storageSettings.defaultFormat
+            storage_format = data_value.get("format") or cls.infer_format(storage_path, sys_config.storageSettings)
             snap_version = 1
 
         else:
@@ -327,26 +334,42 @@ class DevModeTranslator:
             x_storage_mgr = _storage.StorageManager(sys_config, sys_config_dir)
             x_storage = x_storage_mgr.get_file_storage(storage_key)
             x_orig_path = pathlib.PurePath(storage_path)
+            x_name = x_orig_path.name
 
-            while x_storage.exists(storage_path):
+            if x_storage.exists(str(x_orig_path.parent)):
+                existing_files = x_storage.ls(str(x_orig_path.parent))
+            else:
+                existing_files = []
+
+            while x_name in existing_files:
 
                 snap_version += 1
-                x_stem = f"{x_orig_path.stem}-{snap_version}"
-                storage_path = str(x_orig_path.parent.joinpath(x_stem))
+                x_name = f"{x_orig_path.stem}-{snap_version}"
+                storage_path = str(x_orig_path.parent.joinpath(x_name))
 
             cls._log.info(f"Output for [{data_key}] will be snap version {snap_version}")
 
         data_obj, storage_obj = cls._generate_input_definition(
             data_id, storage_id, storage_key, storage_path, storage_format,
-            snap_index=snap_version, delta_index=1, incarnation_index=1)
+            snap_index=snap_version, delta_index=1, incarnation_index=1,
+            schema=schema)
 
         return data_obj, storage_obj
+
+    @staticmethod
+    def infer_format(storage_path: str, storage_settings: cfg.StorageSettings):
+
+        if re.match(r'.*\.\w+$', storage_path):
+            return _storage.FormatManager.format_for_extension(pathlib.Path(storage_path).suffix)
+        else:
+            return storage_settings.defaultFormat
 
     @classmethod
     def _generate_input_definition(
             cls, data_id: meta.TagHeader, storage_id: meta.TagHeader,
             storage_key: str, storage_path: str, storage_format: str,
-            snap_index: int, delta_index: int, incarnation_index: int) \
+            snap_index: int, delta_index: int, incarnation_index: int,
+            schema: tp.Optional[meta.SchemaDefinition] = None) \
             -> (meta.ObjectDefinition, meta.ObjectDefinition):
 
         part_key = meta.PartKey(
@@ -369,13 +392,16 @@ class DevModeTranslator:
             snap=snap)
 
         data_def = meta.DataDefinition(parts={})
+        data_def.parts[part_key.opaqueKey] = part
+
+        if schema is not None:
+            data_def.schema = schema
+        else:
+            data_def.schema = meta.SchemaDefinition(schemaType=meta.SchemaType.TABLE, table=meta.TableSchema())
 
         data_def.storageId = meta.TagSelector(
             meta.ObjectType.STORAGE, storage_id.objectId,
             objectVersion=storage_id.objectVersion, latestTag=True)
-
-        data_def.schema = meta.SchemaDefinition(schemaType=meta.SchemaType.TABLE, table=meta.TableSchema())
-        data_def.parts[part_key.opaqueKey] = part
 
         storage_copy = meta.StorageCopy(
             storageKey=storage_key,

@@ -55,7 +55,7 @@ services:
     port: 8082
 
     defaultStorageKey: UNIT_TEST_STORAGE
-    defaultStorageFormat: CSV
+    defaultStorageFormat: ${STORAGE_FORMAT}
 
     storage:
 
@@ -70,8 +70,8 @@ services:
 
     repositories:
       UNIT_TEST_REPO:
-        repoType: git
-        repoUrl: ${CURRENT_GIT_ORIGIN}
+        repoType: local
+        repoUrl: ${TRAC_REPO_DIR}
 
     executor:
       executorType: LOCAL

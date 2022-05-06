@@ -89,6 +89,7 @@ public class DataValidator {
     }
 
     @Validator
+    @SuppressWarnings({"unchecked", "RedundantSuppression"})
     public static ValidationContext dataDefinition(DataDefinition msg, ValidationContext ctx) {
 
         ctx = ctx.pushOneOf(DD_SCHEMA_SPECIFIER)
@@ -98,6 +99,8 @@ public class DataValidator {
                 .applyOneOf(DD_SCHEMA_ID, ObjectIdValidator::fixedObjectVersion, TagSelector.class)
                 .applyOneOf(DD_SCHEMA, SchemaValidator::schema, SchemaDefinition.class)
                 .pop();
+
+        // Using apply() with Map.class produces an unchecked type warning, hence the suppression on this function
 
         ctx = ctx.pushMap(DD_PARTS, DataDefinition::getPartsMap)
                 .apply(CommonValidators::mapNotEmpty)

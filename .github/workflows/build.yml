@@ -61,9 +61,6 @@ jobs:
 
   python_runtime:
 
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
     # Testing targets for the Python model runtime
     # Include the latest stable release (3.9)
     # Oldest supported version is 3.6, this is required by Pandas 1.0
@@ -77,23 +74,44 @@ jobs:
       matrix:
         enviroment:
 
-          - { ENV_NAME: "Latest: Python 3.10, PySpark 3.2.x, Pandas >= 1.3",
+          - { ENV_NAME: "Windows, 3.10, PySpark 3.2, Pandas >= 1.4",
+              PLATFORM: 'windows-latest',
               PYTHON_VERSION: "3.10",
               PYSPARK_VERSION: ">= 3.2.0, < 3.3.0",
-              PANDAS_VERSION: ">= 1.3.0, < 2.0.0",
+              PANDAS_VERSION: ">= 1.4.0, < 2.0.0",
               PYPANDOC: false }
 
-          - { ENV_NAME: "Middle: Python 3.8, PySpark 3.0.x, Pandas 1.1",
+          - { ENV_NAME: "macOS, 3.10, PySpark 3.2, Pandas >= 1.4",
+              PLATFORM: 'macos-latest',
+              PYTHON_VERSION: "3.10",
+              PYSPARK_VERSION: ">= 3.2.0, < 3.3.0",
+              PANDAS_VERSION: ">= 1.4.0, < 2.0.0",
+              PYPANDOC: false }
+
+          - { ENV_NAME: "Linux, 3.10, PySpark 3.2, Pandas >= 1.4",
+              PLATFORM: 'ubuntu-latest',
+              PYTHON_VERSION: "3.10",
+              PYSPARK_VERSION: ">= 3.2.0, < 3.3.0",
+              PANDAS_VERSION: ">= 1.4.0, < 2.0.0",
+              PYPANDOC: false }
+
+          - { ENV_NAME: "Linux, 3.8, PySpark 3.0, Pandas 1.2",
+              PLATFORM: 'ubuntu-latest',
               PYTHON_VERSION: "3.8",
-              PYSPARK_VERSION: ">= 3.0.0, < 3.1.0",
-              PANDAS_VERSION: ">= 1.1.0, < 1.2.0",
+              PYSPARK_VERSION: "== 3.0.0",
+              PANDAS_VERSION: "== 1.2.0",
               PYPANDOC: false }
 
-          - { ENV_NAME: "Oldest: Python 3.7, PySpark 2.4.0, Pandas 1.0.0",
+          # Oldest supported versions, PySpark / Pandas on .0 patch release
+          - { ENV_NAME: "Linux, 3.7, PySpark 2.4, Pandas 1.2",
+              PLATFORM: 'ubuntu-latest',
               PYTHON_VERSION: "3.7",
               PYSPARK_VERSION: "== 2.4.0",
-              PANDAS_VERSION: "== 1.0.0",
+              PANDAS_VERSION: "== 1.2.0",
               PYPANDOC: true }
+
+    runs-on: ${{ matrix.enviroment.PLATFORM }}
+    timeout-minutes: 20
 
     steps:
 
@@ -126,22 +144,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Protoc code generation
-        run: |
-          python tracdap-runtime/python/build_runtime.py --target codegen
+        run: python tracdap-runtime/python/build_runtime.py --target codegen
 
       - name: Unit tests
-        run: |
-          export PYTHONPATH=tracdap-runtime/python/generated
-          export PYTHONPATH=tracdap-runtime/python/src:$PYTHONPATH
-          export PYTHONPATH=tracdap-runtime/python/test:$PYTHONPATH
-          python -m unittest discover -s tracdap-runtime/python/test/tracdap_test -t tracdap-runtime/python/test
+        run: python tracdap-runtime/python/build_runtime.py --target test
 
       - name: Python example models
-        run: |
-          export PYTHONPATH=tracdap-runtime/python/generated
-          export PYTHONPATH=tracdap-runtime/python/src:$PYTHONPATH
-          export PYTHONPATH=tracdap-runtime/python/test:$PYTHONPATH
-          python -m unittest discover -s tracdap-runtime/python/test/tracdap_examples -t tracdap-runtime/python/test
+        run: python tracdap-runtime/python/build_runtime.py --target examples
 
 
   web_api:

@@ -21,6 +21,7 @@ import platform
 import sys
 import packaging.version
 import argparse
+import unittest
 
 
 SCRIPT_DIR = pathlib.Path(__file__) \
@@ -203,21 +204,56 @@ def cli_args():
     parser = argparse.ArgumentParser(description='TRAC/Python Runtime Builder')
 
     parser.add_argument(
-        "--target", type=str, metavar="target", choices=["codegen", "dist"],
-        required=False, default="dist",
+        "--target", type=str, metavar="target",
+        choices=["codegen", "test", "examples", "dist"], nargs="*", required=True,
         help="The target to build")
 
     return parser.parse_args()
+
+
+def run_tests(test_path):
+
+    cwd = os.getcwd()
+    python_path = [*sys.path]
+
+    try:
+
+        os.chdir(ROOT_PATH)
+        sys.path.append(str(SCRIPT_DIR.joinpath("generated")))
+        sys.path.append(str(SCRIPT_DIR.joinpath("src")))
+        sys.path.append(str(SCRIPT_DIR.joinpath("test")))
+
+        runner = unittest.TextTestRunner()
+        loader = unittest.TestLoader()
+        suite = loader.discover(
+            start_dir=str(SCRIPT_DIR.joinpath(test_path)),
+            top_level_dir=str(SCRIPT_DIR.joinpath("test")))
+
+        result = runner.run(suite)
+
+        if not result.wasSuccessful():
+            exit(-1)
+
+    finally:
+
+        os.chdir(cwd)
+        sys.path = python_path
 
 
 def main():
 
     args = cli_args()
 
-    # Codegen step is always required
-    generate_from_proto()
+    if "codegen" in args.target:
+        generate_from_proto()
 
-    if args.target == "dist":
+    if "test" in args.target:
+        run_tests("test/tracdap_test")
+
+    if "examples" in args.target:
+        run_tests("test/tracdap_examples")
+
+    if "dist" in args.target:
 
         reset_build_dir()
         copy_source_files()

@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.common.codec.json;
 
-import org.apache.arrow.vector.types.Types;
+
 import org.finos.tracdap.common.exception.EDataTypeNotSupported;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -25,7 +25,11 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.dataformat.csv.CsvGenerator;
+
+import org.apache.arrow.vector.types.Types;
 import org.apache.arrow.vector.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,16 +37,27 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.*;
 import java.time.format.DateTimeParseException;
+import java.util.List;
+
+import static com.fasterxml.jackson.core.JsonToken.VALUE_NUMBER_INT;
 
 
 public class JacksonValues {
 
     private static final Logger log = LoggerFactory.getLogger(JacksonValues.class);
+
+    // Standard NaN / infinity values are what gets quoted when encoding data
+    // For consistency, these values match the output of the Apache Arrow CSV implementation
+    private static final String STANDARD_NAN = "nan";
+    private static final String STANDARD_POSITIVE_INFINITY = "inf";
+    private static final String STANDARD_NEGATIVE_INFINITY = "-inf";
+
+    // Values that are recognised as NaN / infinity during decoding
+    private static final List<String> NAN_VALUES = List.of("nan", "na");
+    private static final List<String> INFINITY_VALUES = List.of("inf", "infinity");
+
 
     public static void parseAndSet(
             FieldVector vector, int row,
@@ -84,7 +99,7 @@ public class JacksonValues {
                     String boolStr = parser.getValueAsString();
                     boolVal = Boolean.parseBoolean(boolStr) ? 1 : 0;
                 }
-                else if (token == JsonToken.VALUE_NUMBER_INT) {
+                else if (token == VALUE_NUMBER_INT) {
                     boolVal = parser.getIntValue();
                     if (boolVal != 0 && boolVal != 1)
                         throw new JsonParseException(parser, "Invalid boolean value", parser.currentLocation());
@@ -135,7 +150,7 @@ public class JacksonValues {
             case FLOAT8:
 
                 Float8Vector doubleVec = (Float8Vector) vector;
-                double doubleVal = isSet != 0 ? parser.getDoubleValue() : 0;
+                double doubleVal = isSet != 0 ? parseFloat8(parser, token) : 0;
 
                 doubleVec.set(row, isSet, doubleVal);
 
@@ -144,7 +159,7 @@ public class JacksonValues {
             case FLOAT4:
 
                 Float4Vector floatVec = (Float4Vector) vector;
-                float floatVal = isSet != 0 ? parser.getFloatValue() : 0;
+                float floatVal = isSet != 0 ? parseFloat4(parser, token) : 0;
 
                 floatVec.set(row, isSet, floatVal);
 
@@ -223,10 +238,10 @@ public class JacksonValues {
 
                 else {
 
-                    OffsetDateTime zoneAdjustedVal = parseOffsetDateTime(parser);
+                    LocalDateTime datetimeNoZone = parseDatetimeNoZone(parser);
                     long unixEpochMillis =
-                            (zoneAdjustedVal.toEpochSecond() * 1000) +
-                            (zoneAdjustedVal.getNano() / 1000000);
+                            (datetimeNoZone.toEpochSecond(ZoneOffset.UTC) * 1000) +
+                            (datetimeNoZone.getNano() / 1000000);
 
                     timeStampMVec.set(row, unixEpochMillis);
                 }
@@ -266,13 +281,91 @@ public class JacksonValues {
         }
     }
 
+    static private float parseFloat4(JsonParser parser, JsonToken token) throws IOException {
+
+        try {
+
+            if (parser.currentToken() == JsonToken.VALUE_NUMBER_INT ||
+                parser.currentToken() == JsonToken.VALUE_NUMBER_FLOAT) {
+
+                return parser.getFloatValue();
+            }
+            else if (parser.currentToken() == JsonToken.VALUE_STRING) {
+
+                // Jackson does not recognise the default infinity value encoded by Arrow, which is "inf"
+                // This logic allows for special values encoded using a variety of standard words
+
+                var lowerToken = parser.getValueAsString().toLowerCase();
+
+                if (NAN_VALUES.contains(lowerToken))
+                    return Float.NaN;
+
+                if (INFINITY_VALUES.contains(lowerToken))
+                    return Float.POSITIVE_INFINITY;
+
+                if (lowerToken.startsWith("-") && INFINITY_VALUES.contains(lowerToken.substring(1)))
+                    return Float.NEGATIVE_INFINITY;
+
+                return Float.parseFloat(parser.getValueAsString());
+            }
+            else {
+
+                var msg = "Parsing failed: Excepted a floating point value, got [" + token.name() + "]";
+                throw new JsonParseException(parser, msg, parser.currentLocation());
+            }
+        }
+        catch (NumberFormatException e) {
+
+            throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
+        }
+    }
+
+    static private double parseFloat8(JsonParser parser, JsonToken token) throws IOException {
+
+        try {
+
+            if (parser.currentToken() == JsonToken.VALUE_NUMBER_INT ||
+                parser.currentToken() == JsonToken.VALUE_NUMBER_FLOAT) {
+
+                return parser.getDoubleValue();
+            }
+            else if (parser.currentToken() == JsonToken.VALUE_STRING) {
+
+                // Jackson does not recognise the default infinity value encoded by Arrow, which is "inf"
+                // This logic allows for special values encoded using a variety of standard words
+
+                var lowerToken = parser.getValueAsString().toLowerCase();
+
+                if (NAN_VALUES.contains(lowerToken))
+                    return Double.NaN;
+
+                if (INFINITY_VALUES.contains(lowerToken))
+                    return Double.POSITIVE_INFINITY;
+
+                if (lowerToken.startsWith("-") && INFINITY_VALUES.contains(lowerToken.substring(1)))
+                    return Double.NEGATIVE_INFINITY;
+
+                return Double.parseDouble(parser.getValueAsString());
+            }
+            else {
+
+                var msg = "Parsing failed: Excepted a floating point value, got [" + token.name() + "]";
+                throw new JsonParseException(parser, msg, parser.currentLocation());
+            }
+        }
+        catch (NumberFormatException e) {
+
+            throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
+        }
+    }
+
     static private BigDecimal parseBigDecimal(JsonParser parser, JsonToken token, int scale) throws IOException {
 
         try {
 
             BigDecimal decimalVal;
 
-            if (token == JsonToken.VALUE_NUMBER_INT || token == JsonToken.VALUE_NUMBER_FLOAT)
+            if (token == VALUE_NUMBER_INT || token == JsonToken.VALUE_NUMBER_FLOAT)
                 decimalVal = parser.getDecimalValue();
             else if (token == JsonToken.VALUE_STRING)
                 decimalVal = new BigDecimal(parser.getValueAsString());
@@ -305,12 +398,11 @@ public class JacksonValues {
         }
     }
 
-    static private OffsetDateTime parseOffsetDateTime(JsonParser parser) throws IOException {
+    static private LocalDateTime parseDatetimeNoZone(JsonParser parser) throws IOException {
 
         try {
             String datetimeStr = parser.getValueAsString();
-            LocalDateTime datetimeVal = LocalDateTime.parse(datetimeStr, MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT);
-            return datetimeVal.atOffset(ZoneOffset.UTC);
+            return LocalDateTime.parse(datetimeStr, MetadataCodec.ISO_DATETIME_INPUT_NO_ZONE_FORMAT);
         }
         catch (DateTimeParseException e) {
             throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
@@ -380,7 +472,18 @@ public class JacksonValues {
                 Float8Vector doubleVec = (Float8Vector) vector;
                 double doubleVal = doubleVec.get(row);
 
-                generator.writeNumber(doubleVal);
+                // Output NaN and infinities using the same standard format as the Apache Arrow CSV implementation
+
+                if (Double.isNaN(doubleVal))
+                    quoteNanAsString(generator, STANDARD_NAN);
+                else if (Double.isInfinite(doubleVal)) {
+                    if (doubleVal > 0)
+                        quoteNanAsString(generator, STANDARD_POSITIVE_INFINITY);
+                    else
+                        quoteNanAsString(generator, STANDARD_NEGATIVE_INFINITY);
+                }
+                else
+                    generator.writeNumber(doubleVal);
 
                 break;
 
@@ -389,7 +492,18 @@ public class JacksonValues {
                 Float4Vector floatVec = (Float4Vector) vector;
                 float floatVal = floatVec.get(row);
 
-                generator.writeNumber(floatVal);
+                // Output NaN and infinities using the same standard format as the Apache Arrow CSV implementation
+
+                if (Float.isNaN(floatVal))
+                    quoteNanAsString(generator, STANDARD_NAN);
+                else if (Float.isInfinite(floatVal)) {
+                    if (floatVal > 0)
+                        quoteNanAsString(generator, STANDARD_POSITIVE_INFINITY);
+                    else
+                        quoteNanAsString(generator, STANDARD_NEGATIVE_INFINITY);
+                }
+                else
+                    generator.writeNumber(floatVal);
 
                 break;
 
@@ -444,12 +558,18 @@ public class JacksonValues {
 
                 TimeStampMilliVector timeStampMVec = (TimeStampMilliVector) vector;
 
-                long unixEpochMillis = timeStampMVec.get(row);
-                long unixEpochSec = unixEpochMillis / 1000;
-                int nanos = ((int) (unixEpochMillis - (unixEpochSec * 1000))) * 1000000;
+                long epochMillis = timeStampMVec.get(row);
+                long epochSeconds = epochMillis / 1000;
+                int nanos = (int) (epochMillis % 1000) * 1000000;
 
-                LocalDateTime datetimeVal = LocalDateTime.ofEpochSecond(unixEpochSec, nanos, ZoneOffset.UTC);
-                String datetimeStr = MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT.format(datetimeVal);
+                if (epochSeconds < 0 && nanos != 0) {
+                    --epochSeconds;
+                    nanos = nanos + 1000000000;
+                }
+
+                LocalDateTime localDatetimeVal = LocalDateTime.ofEpochSecond(epochSeconds, nanos, ZoneOffset.UTC);
+                OffsetDateTime offsetDatetimeVal = localDatetimeVal.atOffset(ZoneOffset.UTC);
+                String datetimeStr = MetadataCodec.ISO_DATETIME_NO_ZONE_FORMAT.format(offsetDatetimeVal);
 
                 generator.writeString(datetimeStr);
 
@@ -472,6 +592,36 @@ public class JacksonValues {
 
                 log.error(err);
                 throw new EDataTypeNotSupported(err);
+        }
+    }
+
+    private static void quoteNanAsString(JsonGenerator generator, String nanValue) throws IOException {
+
+        // Special handling for output of NaN values (NaN, +Infinity, -Infinity)
+
+        // In JSON, NaN values are not valid numbers so need to be quoted as strings
+
+        // In CSV NaN also looks like a string
+        // The Apache Arrow CSV implementation only works with quoted strings for NaN
+        // So, switch on quoting for NaN fields to match the Arrow implementation
+        // This allows the runtime to use the Arrow (C++) CSV parser instead of the lenient (Python) fallback
+
+        CsvGenerator csvGenerator = generator instanceof CsvGenerator
+            ? (CsvGenerator) generator
+            : null;
+
+        boolean switchQuoting = ! CsvGenerator.Feature
+                .ALWAYS_QUOTE_STRINGS
+                .enabledIn(generator.getFormatFeatures());
+
+        if (csvGenerator != null && switchQuoting) {
+            csvGenerator.enable(CsvGenerator.Feature.ALWAYS_QUOTE_STRINGS);
+        }
+
+        generator.writeString(nanValue);
+
+        if (csvGenerator != null && switchQuoting) {
+            csvGenerator.disable(CsvGenerator.Feature.ALWAYS_QUOTE_STRINGS);
         }
     }
 }

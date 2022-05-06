@@ -12,8 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import tracdap.rt.api as trac
+import decimal
 import typing as tp
+
+import tracdap.rt.api as trac
 
 
 class UsingDataModel(trac.TracModel):
@@ -60,20 +62,21 @@ class UsingDataModel(trac.TracModel):
         customer_loans = ctx.get_pandas_table("customer_loans")
 
         if filter_defaults:
-            customer_loans.loc[:, :] = customer_loans[customer_loans["loan_condition_cat"] == 0]
+            customer_loans = customer_loans[customer_loans["loan_condition_cat"] == 0]
 
         customer_loans.loc[:, "gross_profit_unweighted"] = \
             customer_loans["total_pymnt"] - \
             customer_loans["loan_amount"]
 
+        condition_weighting = customer_loans["loan_condition_cat"] \
+            .apply(lambda c: decimal.Decimal(default_weighting) if c > 0 else decimal.Decimal(1))
+
         customer_loans.loc[:, "gross_profit_weighted"] = \
-            customer_loans["gross_profit_unweighted"] * \
-            customer_loans["loan_condition_cat"] \
-            .apply(lambda c: default_weighting if c > 0 else 1.0)
+            customer_loans["gross_profit_unweighted"] * condition_weighting
 
         customer_loans.loc[:, "gross_profit"] = \
             customer_loans["gross_profit_weighted"] \
-            .apply(lambda x: x * eur_usd_rate)
+            .apply(lambda x: x * decimal.Decimal.from_float(eur_usd_rate))
 
         profit_by_region = customer_loans \
             .groupby("region", as_index=False) \
@@ -83,5 +86,5 @@ class UsingDataModel(trac.TracModel):
 
 
 if __name__ == "__main__":
-    import trac.rt.launch as launch
+    import tracdap.rt.launch as launch
     launch.launch_model(UsingDataModel, "using_data.yaml", "../sys_config.yaml")
