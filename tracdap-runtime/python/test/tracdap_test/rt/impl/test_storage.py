@@ -27,7 +27,7 @@ import pyarrow as pa
 import tracdap.rt.config as _cfg
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.impl.type_system as _types
+import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.storage as _storage
 import tracdap.rt.impl.util as _util
 
@@ -68,7 +68,7 @@ class DataStorageTestSuite:
                 _meta.FieldSchema("datetime_field", fieldType=_meta.BasicType.DATETIME),
             ]))
 
-        return _types.trac_to_arrow_schema(trac_schema)
+        return _data.DataMapping.trac_to_arrow_schema(trac_schema)
 
     @staticmethod
     def sample_data():
@@ -96,7 +96,7 @@ class DataStorageTestSuite:
             _meta.TableSchema(fields=[
                 _meta.FieldSchema(field_name, fieldType=field_type)]))
 
-        return _types.trac_to_arrow_schema(trac_schema)
+        return _data.DataMapping.trac_to_arrow_schema(trac_schema)
 
     @staticmethod
     def random_bytes(n_bytes: int) -> bytes:

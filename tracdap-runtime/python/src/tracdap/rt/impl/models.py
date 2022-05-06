@@ -113,7 +113,7 @@ class ModelLoader:
 
             for parameter in parameters.values():
                 if parameter.defaultValue is not None:
-                    parameter.defaultValue = _types.encode_value(parameter.defaultValue)
+                    parameter.defaultValue = _types.MetadataCodec.encode_value(parameter.defaultValue)
 
             # TODO: Model validation
 

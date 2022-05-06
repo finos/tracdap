@@ -220,7 +220,7 @@ class SetParametersFunc(NodeFunction[tp.Dict[str, tp.Any]]):
         native_params = dict()
 
         for p_name, p_value in self.node.parameters.items():
-            native_value = _types.decode_value(p_value)
+            native_value = _types.MetadataCodec.decode_value(p_value)
             native_params[p_name] = native_value
             log.info(f"Set parameter [{p_name}] = {native_value} ({p_value.type.basicType.name})")
 
@@ -415,7 +415,7 @@ class LoadDataFunc(NodeFunction[_data.DataItem], _LoadSaveDataFunc):
         data_storage = self.storage.get_data_storage(data_copy.storageKey)
 
         trac_schema = data_spec.schema_def if data_spec.schema_def else data_spec.data_def.schema
-        arrow_schema = _types.trac_to_arrow_schema(trac_schema) if trac_schema else None
+        arrow_schema = _data.DataMapping.trac_to_arrow_schema(trac_schema) if trac_schema else None
 
         table = data_storage.read_table(
             data_copy.storagePath,
@@ -529,7 +529,7 @@ class RunModelFunc(NodeFunction):
 
         for output_name in model_def.outputs:
             output_schema = self.node.model_def.outputs[output_name].schema
-            empty_data_view = _data.DataView.for_trac_schema (output_schema)
+            empty_data_view = _data.DataView.for_trac_schema(output_schema)
             local_ctx[output_name] = empty_data_view
 
         # Run the model against the mapped local context

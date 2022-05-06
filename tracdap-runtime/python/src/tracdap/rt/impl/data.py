@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import dataclasses as dc
 import typing as tp
+import datetime as dt
+import decimal
 import platform
 
 import pyarrow as pa
@@ -24,7 +26,6 @@ import pandas as pd
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.util as _util
 
 
@@ -68,11 +69,138 @@ class DataView:
 
     @staticmethod
     def for_trac_schema(trac_schema: _meta.SchemaDefinition):
-        arrow_schema = _types.trac_to_arrow_schema(trac_schema)
+        arrow_schema = DataMapping.trac_to_arrow_schema(trac_schema)
         return DataView(trac_schema, arrow_schema, dict())
 
 
 class DataMapping:
+
+    # Matches TRAC_ARROW_TYPE_MAPPING in ArrowSchema, tracdap-lib-data
+
+    __TRAC_DECIMAL_PRECISION = 38
+    __TRAC_DECIMAL_SCALE = 12
+    __TRAC_TIMESTAMP_UNIT = "ms"
+    __TRAC_TIMESTAMP_ZONE = None
+
+    __TRAC_TO_ARROW_BASIC_TYPE_MAPPING = {
+        _meta.BasicType.BOOLEAN: pa.bool_(),
+        _meta.BasicType.INTEGER: pa.int64(),
+        _meta.BasicType.FLOAT: pa.float64(),
+        _meta.BasicType.DECIMAL: pa.decimal128(__TRAC_DECIMAL_PRECISION, __TRAC_DECIMAL_SCALE),
+        _meta.BasicType.STRING: pa.utf8(),
+        _meta.BasicType.DATE: pa.date32(),
+        _meta.BasicType.DATETIME: pa.timestamp(__TRAC_TIMESTAMP_UNIT, __TRAC_TIMESTAMP_ZONE)
+    }
+
+    @staticmethod
+    def __float_dtype_check():
+        if "Float64Dtype" not in pd.__dict__:
+            raise _ex.EStartup("TRAC D.A.P. requires Pandas >= 1.2")
+
+    __PANDAS_FLOAT_DTYPE_CHECK = __float_dtype_check()
+
+    # Only partial mapping is possible, object dtypes will not map this way
+    __ARROW_TO_PANDAS_TYPE_MAPPING = {
+        pa.bool_(): pd.BooleanDtype(),
+        pa.int8(): pd.Int8Dtype(),
+        pa.int16(): pd.Int16Dtype(),
+        pa.int32(): pd.Int32Dtype(),
+        pa.int64(): pd.Int64Dtype(),
+        pa.uint8(): pd.UInt8Dtype(),
+        pa.uint16(): pd.UInt16Dtype(),
+        pa.uint32(): pd.UInt32Dtype(),
+        pa.uint64(): pd.UInt64Dtype(),
+        pa.float16(): pd.Float32Dtype(),
+        pa.float32(): pd.Float32Dtype(),
+        pa.float64(): pd.Float64Dtype(),
+        pa.utf8(): pd.StringDtype()
+    }
+
+    @staticmethod
+    def arrow_to_python_type(arrow_type: pa.DataType) -> type:
+
+        if pa.types.is_boolean(arrow_type):
+            return bool
+
+        if pa.types.is_integer(arrow_type):
+            return int
+
+        if pa.types.is_floating(arrow_type):
+            return float
+
+        if pa.types.is_decimal(arrow_type):
+            return decimal.Decimal
+
+        if pa.types.is_string(arrow_type):
+            return str
+
+        if pa.types.is_date(arrow_type):
+            return dt.date
+
+        if pa.types.is_timestamp(arrow_type):
+            return dt.datetime
+
+        raise _ex.EData(f"No Python type conversion available for Arrow type {arrow_type}")  # TODO
+
+    @classmethod
+    def python_to_arrow_type(cls, python_type: type) -> pa.DataType:
+
+        if python_type == bool:
+            return pa.bool_()
+
+        if python_type == int:
+            return pa.int64()
+
+        if python_type == float:
+            return pa.float64()
+
+        if python_type == decimal.Decimal:
+            return pa.decimal128(cls.__TRAC_DECIMAL_PRECISION, cls.__TRAC_DECIMAL_SCALE)
+
+        if python_type == str:
+            return pa.utf8()
+
+        if python_type == dt.date:
+            return pa.date32()
+
+        if python_type == dt.datetime:
+            return pa.timestamp(cls.__TRAC_TIMESTAMP_UNIT, cls.__TRAC_TIMESTAMP_ZONE)
+
+        raise _ex.EData(f"No Arrow type conversion available for Python type {python_type}")  # TODO
+
+    @classmethod
+    def trac_to_arrow_type(cls, trac_type: _meta.TypeDescriptor) -> pa.DataType:
+
+        return cls.trac_to_arrow_basic_type(trac_type.basicType)
+
+    @classmethod
+    def trac_to_arrow_basic_type(cls, trac_basic_type: _meta.BasicType) -> pa.DataType:
+
+        arrow_type = cls.__TRAC_TO_ARROW_BASIC_TYPE_MAPPING.get(trac_basic_type)
+
+        if arrow_type is None:
+            raise _ex.ETracInternal(f"Cannot convert TRAC data type [{trac_basic_type}] for use with Apache Arrow")
+
+        return arrow_type
+
+    @classmethod
+    def trac_to_arrow_schema(cls, trac_schema: _meta.SchemaDefinition) -> pa.Schema:
+
+        if trac_schema.schemaType != _meta.SchemaType.TABLE:
+            raise _ex.ETracInternal(f"Schema type [{trac_schema.schemaType}] cannot be converted for Apache Arrow")
+
+        arrow_fields = [
+            (f.fieldName, cls.trac_to_arrow_basic_type(f.fieldType))
+            for f in trac_schema.table.fields]
+
+        return pa.schema(arrow_fields, metadata={})
+
+    @classmethod
+    def trac_arrow_decimal_type(cls) -> pa.Decimal128Type:
+
+        return pa.decimal128(
+            cls.__TRAC_DECIMAL_PRECISION,
+            cls.__TRAC_DECIMAL_SCALE)
 
     @classmethod
     def view_to_pandas(cls, view: DataView, part: DataPartKey) -> pd.DataFrame:
@@ -118,18 +246,7 @@ class DataMapping:
             ignore_metadata=True,  # noqa
             date_as_object=False,  # noqa
             timestamp_as_object=False,  # noqa
-            types_mapper=cls.__ARROW_TO_PANDAS_TYPES.get)
-
-    # TODO: Move to type_system
-    # However only partial mapping is possible, object dtypes will not map this way
-    __ARROW_TO_PANDAS_TYPES = {
-        pa.bool_(): pd.BooleanDtype(),
-        pa.int64(): pd.Int64Dtype(),
-        # TODO: What should be the default behavior for floats?
-        # Float64DType is available in Pandas 1.2 and later, it offers more consistent handling of NaN / null
-        pa.float64(): pd.Float64Dtype() if "Float64Dtype" in pd.__dict__ else None,
-        pa.utf8(): pd.StringDtype()
-    }
+            types_mapper=cls.__ARROW_TO_PANDAS_TYPE_MAPPING.get)
 
     @classmethod
     def pandas_to_view(cls, df: pd.DataFrame, prior_view: DataView, part: DataPartKey):
@@ -331,7 +448,9 @@ class DataConformance:
         if pa.types.is_timestamp(field.type):
             return cls._coerce_timestamp(vector, field)
 
-        raise _ex.EDataConformance(f"Unsupported data type {field.type}")  # TODO
+        error_message = cls._format_error(cls.__E_WRONG_DATA_TYPE, vector, field)
+        cls.__log.error(error_message)
+        raise _ex.EDataConformance(error_message)
 
     @classmethod
     def _coerce_boolean(cls, vector: pa.Array, field: pa.Field) -> pa.BooleanArray:

@@ -23,7 +23,6 @@ import pyarrow as pa
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.util as _util
 
@@ -65,7 +64,7 @@ class DataMappingTest(unittest.TestCase):
                 _meta.FieldSchema("datetime_field", fieldType=_meta.BasicType.DATETIME),
             ]))
 
-        return _types.trac_to_arrow_schema(trac_schema)
+        return _data.DataMapping.trac_to_arrow_schema(trac_schema)
 
     @staticmethod
     def one_field_schema(field_type: _meta.BasicType):
@@ -78,7 +77,7 @@ class DataMappingTest(unittest.TestCase):
             _meta.TableSchema(fields=[
                 _meta.FieldSchema(field_name, fieldType=field_type)]))
 
-        return _types.trac_to_arrow_schema(trac_schema)
+        return _data.DataMapping.trac_to_arrow_schema(trac_schema)
 
     def test_round_trip_basic(self):
 
@@ -487,7 +486,7 @@ class DataConformanceTest(unittest.TestCase):
     def test_fields_combined_logic(self):
         
         sample_schema = pa.schema([
-            ("decimal_field", _types.trac_arrow_decimal_type()),
+            ("decimal_field", _data.DataMapping.trac_arrow_decimal_type()),
             ("string_field", pa.utf8()),
             ("FLOAT_FIELD", pa.float64()),
             ("FLOAT_FIELD_2", pa.float64()),

@@ -11,318 +11,267 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
 
 import typing as tp
 import decimal
 import datetime as dt
 
-import pyarrow as pa
+import tracdap.rt.metadata as _meta
+import tracdap.rt.exceptions as _ex
 
-import tracdap.rt.metadata as meta
-import tracdap.rt.exceptions as ex
 
+class TypeMapping:
 
-def decode_value(value: meta.Value) -> tp.Any:
+    __TRAC_TO_PYTHON_BASIC_TYPE: tp.Dict[_meta.BasicType, type] = {
+        _meta.BasicType.BOOLEAN: bool,
+        _meta.BasicType.INTEGER: int,
+        _meta.BasicType.FLOAT: float,
+        _meta.BasicType.DECIMAL: decimal.Decimal,
+        _meta.BasicType.STRING: str,
+        _meta.BasicType.DATE: dt.date,
+        _meta.BasicType.DATETIME: dt.datetime
+    }
 
-    if value is None or not isinstance(value, meta.Value):
-        raise ex.ETracInternal()
+    __PYTHON_TO_TRAC_BASIC_TYPE: tp.Dict[type, _meta.BasicType] = {
+        bool: _meta.BasicType.BOOLEAN,
+        int: _meta.BasicType.INTEGER,
+        float: _meta.BasicType.FLOAT,
+        decimal.Decimal: _meta.BasicType.DECIMAL,
+        str: _meta.BasicType.STRING,
+        dt.date: _meta.BasicType.DATE,
+        dt.datetime: _meta.BasicType.DATETIME
+    }
 
-    if value.type is None or \
-       value.type.basicType is None or \
-       value.type.basicType == meta.BasicType.BASIC_TYPE_NOT_SET:
+    @classmethod
+    def trac_to_python(cls, trac_type: _meta.TypeDescriptor) -> type:
 
-        raise ex.ETracInternal("Missing type information")
+        return cls.trac_to_python_basic_type(trac_type.basicType)
 
-    basic_type = value.type.basicType
+    @classmethod
+    def trac_to_python_basic_type(cls, trac_basic_type: _meta.BasicType) -> type:
 
-    if basic_type == meta.BasicType.BOOLEAN:
-        return value.booleanValue
+        python_type = cls.__TRAC_TO_PYTHON_BASIC_TYPE.get(trac_basic_type)
 
-    if basic_type == meta.BasicType.INTEGER:
-        return value.integerValue
+        if python_type is None:
+            raise _ex.ETracInternal(f"No Python type mapping available for TRAC type [{trac_basic_type}]")
 
-    if basic_type == meta.BasicType.FLOAT:
-        return value.floatValue
+        return python_type
 
-    if basic_type == meta.BasicType.DECIMAL:
-        return decimal.Decimal(value.decimalValue.decimal)
+    @classmethod
+    def python_to_trac(cls, python_type: type) -> _meta.TypeDescriptor:
 
-    if basic_type == meta.BasicType.STRING:
-        return value.stringValue
+        basic_type = cls.python_to_trac_basic_type(python_type)
+        return _meta.TypeDescriptor(basic_type)
 
-    if basic_type == meta.BasicType.DATE:
-        return dt.date.fromisoformat(value.dateValue.isoDate)
+    @classmethod
+    def python_to_trac_basic_type(cls, python_type: type) -> _meta.BasicType:
 
-    if basic_type == meta.BasicType.DATETIME:
-        return dt.datetime.fromisoformat(value.datetimeValue.isoDatetime)
+        basic_type = cls.__PYTHON_TO_TRAC_BASIC_TYPE.get(python_type)
 
-    raise ex.ETracInternal(f"Decoding value type [{basic_type}] is not supported yet")
+        if basic_type is None:
+            raise _ex.ETracInternal(f"No TRAC type mapping available for Python type [{python_type}]")
 
+        return basic_type
 
-def encode_value(value: tp.Any) -> meta.Value:
 
-    if value is None:
-        raise ex.ETracInternal("Cannot encode a null value")
+class MetadataCodec:
 
-    if isinstance(value, bool):
-        type_desc = meta.TypeDescriptor(meta.BasicType.BOOLEAN)
-        return meta.Value(type_desc, booleanValue=value)
+    @staticmethod
+    def decode_value(value: _meta.Value) -> tp.Any:
 
-    if isinstance(value, int):
-        type_desc = meta.TypeDescriptor(meta.BasicType.INTEGER)
-        return meta.Value(type_desc, integerValue=value)
+        if value is None or not isinstance(value, _meta.Value):
+            raise _ex.ETracInternal()
 
-    if isinstance(value, float):
-        type_desc = meta.TypeDescriptor(meta.BasicType.FLOAT)
-        return meta.Value(type_desc, floatValue=value)
+        if value.type is None or \
+           value.type.basicType is None or \
+           value.type.basicType == _meta.BasicType.BASIC_TYPE_NOT_SET:
 
-    if isinstance(value, decimal.Decimal):
-        type_desc = meta.TypeDescriptor(meta.BasicType.BOOLEAN)
-        return meta.Value(type_desc, decimalValue=meta.DecimalValue(str(value)))
+            raise _ex.ETracInternal("Missing type information")
 
-    if isinstance(value, str):
-        type_desc = meta.TypeDescriptor(meta.BasicType.STRING)
-        return meta.Value(type_desc, stringValue=value)
+        basic_type = value.type.basicType
 
-    if isinstance(value, dt.date):
-        type_desc = meta.TypeDescriptor(meta.BasicType.DATE)
-        return meta.Value(type_desc, dateValue=meta.DateValue(value.isoformat()))
+        if basic_type == _meta.BasicType.BOOLEAN:
+            return value.booleanValue
 
-    if isinstance(value, dt.datetime):
-        type_desc = meta.TypeDescriptor(meta.BasicType.DATETIME)
-        return meta.Value(type_desc, datetimeValue=meta.DatetimeValue(value.isoformat()))
+        if basic_type == _meta.BasicType.INTEGER:
+            return value.integerValue
 
-    raise ex.ETracInternal(f"Encoding value type [{type(value)}] is not supported yet")
+        if basic_type == _meta.BasicType.FLOAT:
+            return value.floatValue
 
+        if basic_type == _meta.BasicType.DECIMAL:
+            return decimal.Decimal(value.decimalValue.decimal)
 
-def convert_value(raw_value: tp.Any, type_desc: meta.TypeDescriptor):
+        if basic_type == _meta.BasicType.STRING:
+            return value.stringValue
 
-    if type_desc.basicType == meta.BasicType.BOOLEAN:
-        return convert_boolean_value(raw_value)
+        if basic_type == _meta.BasicType.DATE:
+            return dt.date.fromisoformat(value.dateValue.isoDate)
 
-    if type_desc.basicType == meta.BasicType.INTEGER:
-        return convert_integer_value(raw_value)
+        if basic_type == _meta.BasicType.DATETIME:
+            return dt.datetime.fromisoformat(value.datetimeValue.isoDatetime)
 
-    if type_desc.basicType == meta.BasicType.FLOAT:
-        return convert_float_value(raw_value)
+        raise _ex.ETracInternal(f"Decoding value type [{basic_type}] is not supported yet")
 
-    if type_desc.basicType == meta.BasicType.DECIMAL:
-        return convert_decimal_value(raw_value)
+    @classmethod
+    def encode_value(cls, value: tp.Any) -> _meta.Value:
 
-    if type_desc.basicType == meta.BasicType.STRING:
-        return convert_string_value(raw_value)
+        if value is None:
+            raise _ex.ETracInternal("Cannot encode a null value")
 
-    if type_desc.basicType == meta.BasicType.DATE:
-        return convert_date_value(raw_value)
+        if isinstance(value, bool):
+            type_desc = _meta.TypeDescriptor(_meta.BasicType.BOOLEAN)
+            return _meta.Value(type_desc, booleanValue=value)
 
-    if type_desc.basicType == meta.BasicType.DATETIME:
-        return convert_datetime_value(raw_value)
+        if isinstance(value, int):
+            type_desc = _meta.TypeDescriptor(_meta.BasicType.INTEGER)
+            return _meta.Value(type_desc, integerValue=value)
 
-    raise ex.ETracInternal(f"Conversion to value type [{type_desc.basicType.name}] is not supported yet")
+        if isinstance(value, float):
+            type_desc = _meta.TypeDescriptor(_meta.BasicType.FLOAT)
+            return _meta.Value(type_desc, floatValue=value)
 
+        if isinstance(value, decimal.Decimal):
+            type_desc = _meta.TypeDescriptor(_meta.BasicType.BOOLEAN)
+            return _meta.Value(type_desc, decimalValue=_meta.DecimalValue(str(value)))
 
-def convert_boolean_value(raw_value: tp.Any) -> meta.Value:
+        if isinstance(value, str):
+            type_desc = _meta.TypeDescriptor(_meta.BasicType.STRING)
+            return _meta.Value(type_desc, stringValue=value)
 
-    type_desc = meta.TypeDescriptor(meta.BasicType.BOOLEAN)
+        if isinstance(value, dt.date):
+            type_desc = _meta.TypeDescriptor(_meta.BasicType.DATE)
+            return _meta.Value(type_desc, dateValue=_meta.DateValue(value.isoformat()))
 
-    if isinstance(raw_value, bool):
-        return meta.Value(type_desc, booleanValue=raw_value)
+        if isinstance(value, dt.datetime):
+            type_desc = _meta.TypeDescriptor(_meta.BasicType.DATETIME)
+            return _meta.Value(type_desc, datetimeValue=_meta.DatetimeValue(value.isoformat()))
 
-    raise ex.ETracInternal(f"Value of type [{type(raw_value)}] cannot be converted to {meta.BasicType.BOOLEAN.name}")
+        raise _ex.ETracInternal(f"Encoding value type [{type(value)}] is not supported yet")
 
+    @classmethod
+    def convert_value(cls, raw_value: tp.Any, type_desc: _meta.TypeDescriptor):
 
-def convert_integer_value(raw_value: tp.Any) -> meta.Value:
+        if type_desc.basicType == _meta.BasicType.BOOLEAN:
+            return cls.convert_boolean_value(raw_value)
 
-    type_desc = meta.TypeDescriptor(meta.BasicType.INTEGER)
+        if type_desc.basicType == _meta.BasicType.INTEGER:
+            return cls.convert_integer_value(raw_value)
 
-    if isinstance(raw_value, int):
-        return meta.Value(type_desc, integerValue=raw_value)
+        if type_desc.basicType == _meta.BasicType.FLOAT:
+            return cls.convert_float_value(raw_value)
 
-    if isinstance(raw_value, float) and raw_value.is_integer():
-        return meta.Value(type_desc, integerValue=int(raw_value))
+        if type_desc.basicType == _meta.BasicType.DECIMAL:
+            return cls.convert_decimal_value(raw_value)
 
-    raise ex.ETracInternal(f"Value of type [{type(raw_value)}] cannot be converted to {meta.BasicType.INTEGER.name}")
+        if type_desc.basicType == _meta.BasicType.STRING:
+            return cls.convert_string_value(raw_value)
 
+        if type_desc.basicType == _meta.BasicType.DATE:
+            return cls.convert_date_value(raw_value)
 
-def convert_float_value(raw_value: tp.Any) -> meta.Value:
+        if type_desc.basicType == _meta.BasicType.DATETIME:
+            return cls.convert_datetime_value(raw_value)
 
-    type_desc = meta.TypeDescriptor(meta.BasicType.FLOAT)
+        raise _ex.ETracInternal(f"Conversion to value type [{type_desc.basicType.name}] is not supported yet")
 
-    if isinstance(raw_value, float):
-        return meta.Value(type_desc, floatValue=raw_value)
+    @staticmethod
+    def convert_boolean_value(raw_value: tp.Any) -> _meta.Value:
 
-    if isinstance(raw_value, int):
-        return meta.Value(type_desc, floatValue=float(raw_value))
+        type_desc = _meta.TypeDescriptor(_meta.BasicType.BOOLEAN)
 
-    raise ex.ETracInternal(f"Value of type [{type(raw_value)}] cannot be converted to {meta.BasicType.FLOAT.name}")
+        if isinstance(raw_value, bool):
+            return _meta.Value(type_desc, booleanValue=raw_value)
 
+        msg = f"Value of type [{type(raw_value)}] cannot be converted to {_meta.BasicType.BOOLEAN.name}"
+        raise _ex.ETracInternal(msg)
 
-def convert_decimal_value(raw_value: tp.Any) -> meta.Value:
+    @staticmethod
+    def convert_integer_value(raw_value: tp.Any) -> _meta.Value:
 
-    type_desc = meta.TypeDescriptor(meta.BasicType.DECIMAL)
+        type_desc = _meta.TypeDescriptor(_meta.BasicType.INTEGER)
 
-    if isinstance(raw_value, decimal.Decimal):
-        return meta.Value(type_desc, decimalValue=meta.DecimalValue(str(raw_value)))
+        if isinstance(raw_value, int):
+            return _meta.Value(type_desc, integerValue=raw_value)
 
-    if isinstance(raw_value, int) or isinstance(raw_value, float):
-        return meta.Value(type_desc, decimalValue=meta.DecimalValue(str(raw_value)))
+        if isinstance(raw_value, float) and raw_value.is_integer():
+            return _meta.Value(type_desc, integerValue=int(raw_value))
 
-    raise ex.ETracInternal(f"Value of type [{type(raw_value)}] cannot be converted to {meta.BasicType.DECIMAL.name}")
+        msg = f"Value of type [{type(raw_value)}] cannot be converted to {_meta.BasicType.INTEGER.name}"
+        raise _ex.ETracInternal(msg)
 
+    @staticmethod
+    def convert_float_value(raw_value: tp.Any) -> _meta.Value:
 
-def convert_string_value(raw_value: tp.Any) -> meta.Value:
+        type_desc = _meta.TypeDescriptor(_meta.BasicType.FLOAT)
 
-    type_desc = meta.TypeDescriptor(meta.BasicType.STRING)
+        if isinstance(raw_value, float):
+            return _meta.Value(type_desc, floatValue=raw_value)
 
-    if isinstance(raw_value, str):
-        return meta.Value(type_desc, stringValue=raw_value)
+        if isinstance(raw_value, int):
+            return _meta.Value(type_desc, floatValue=float(raw_value))
 
-    if isinstance(raw_value, bool) or \
-       isinstance(raw_value, int) or \
-       isinstance(raw_value, float) or \
-       isinstance(raw_value, decimal.Decimal):
+        msg = f"Value of type [{type(raw_value)}] cannot be converted to {_meta.BasicType.FLOAT.name}"
+        raise _ex.ETracInternal(msg)
 
-        return meta.Value(type_desc, stringValue=str(raw_value))
+    @staticmethod
+    def convert_decimal_value(raw_value: tp.Any) -> _meta.Value:
 
-    raise ex.ETracInternal(f"Value of type [{type(raw_value)}] cannot be converted to {meta.BasicType.STRING.name}")
+        type_desc = _meta.TypeDescriptor(_meta.BasicType.DECIMAL)
 
+        if isinstance(raw_value, decimal.Decimal):
+            return _meta.Value(type_desc, decimalValue=_meta.DecimalValue(str(raw_value)))
 
-def convert_date_value(raw_value: tp.Any) -> meta.Value:
+        if isinstance(raw_value, int) or isinstance(raw_value, float):
+            return _meta.Value(type_desc, decimalValue=_meta.DecimalValue(str(raw_value)))
 
-    type_desc = meta.TypeDescriptor(meta.BasicType.DATE)
+        msg = f"Value of type [{type(raw_value)}] cannot be converted to {_meta.BasicType.DECIMAL.name}"
+        raise _ex.ETracInternal(msg)
 
-    if isinstance(raw_value, dt.date):
-        return meta.Value(type_desc, dateValue=meta.DateValue(isoDate=raw_value.isoformat()))
+    @staticmethod
+    def convert_string_value(raw_value: tp.Any) -> _meta.Value:
 
-    if isinstance(raw_value, str):
-        date_value = dt.date.fromisoformat(raw_value)
-        return meta.Value(type_desc, dateValue=meta.DateValue(isoDate=date_value.isoformat()))
+        type_desc = _meta.TypeDescriptor(_meta.BasicType.STRING)
 
-    raise ex.ETracInternal(f"Value of type [{type(raw_value)}] cannot be converted to {meta.BasicType.DATE.name}")
+        if isinstance(raw_value, str):
+            return _meta.Value(type_desc, stringValue=raw_value)
 
+        if isinstance(raw_value, bool) or \
+           isinstance(raw_value, int) or \
+           isinstance(raw_value, float) or \
+           isinstance(raw_value, decimal.Decimal):
 
-def convert_datetime_value(raw_value: tp.Any) -> meta.Value:
+            return _meta.Value(type_desc, stringValue=str(raw_value))
 
-    type_desc = meta.TypeDescriptor(meta.BasicType.DATETIME)
+        msg = f"Value of type [{type(raw_value)}] cannot be converted to {_meta.BasicType.STRING.name}"
+        raise _ex.ETracInternal(msg)
 
-    if isinstance(raw_value, dt.datetime):
-        return meta.Value(type_desc, datetimeValue=meta.DatetimeValue(isoDatetime=raw_value.isoformat()))
+    @staticmethod
+    def convert_date_value(raw_value: tp.Any) -> _meta.Value:
 
-    if isinstance(raw_value, str):
-        datetime_value = dt.datetime.fromisoformat(raw_value)
-        return meta.Value(type_desc, datetimeValue=meta.DatetimeValue(isoDatetime=datetime_value.isoformat()))
+        type_desc = _meta.TypeDescriptor(_meta.BasicType.DATE)
 
-    raise ex.ETracInternal(f"Value of type [{type(raw_value)}] cannot be converted to {meta.BasicType.DATETIME.name}")
+        if isinstance(raw_value, dt.date):
+            return _meta.Value(type_desc, dateValue=_meta.DateValue(isoDate=raw_value.isoformat()))
 
+        if isinstance(raw_value, str):
+            date_value = dt.date.fromisoformat(raw_value)
+            return _meta.Value(type_desc, dateValue=_meta.DateValue(isoDate=date_value.isoformat()))
 
-# Matches TRAC_ARROW_TYPE_MAPPING in ArrowSchema, tracdap-lib-data
+        msg = f"Value of type [{type(raw_value)}] cannot be converted to {_meta.BasicType.DATE.name}"
+        raise _ex.ETracInternal(msg)
 
-__TRAC_DECIMAL_PRECISION = 38
-__TRAC_DECIMAL_SCALE = 12
-__TRAC_TIMESTAMP_UNIT = "ms"
-__TRAC_TIMESTAMP_ZONE = None
+    @staticmethod
+    def convert_datetime_value(raw_value: tp.Any) -> _meta.Value:
 
-__TRAC_TO_ARROW_TYPE_MAPPING = {
-    meta.BasicType.BOOLEAN: pa.bool_(),
-    meta.BasicType.INTEGER: pa.int64(),
-    meta.BasicType.FLOAT: pa.float64(),
-    meta.BasicType.DECIMAL: pa.decimal128(__TRAC_DECIMAL_PRECISION, __TRAC_DECIMAL_SCALE),
-    meta.BasicType.STRING: pa.utf8(),
-    meta.BasicType.DATE: pa.date32(),
-    meta.BasicType.DATETIME: pa.timestamp(__TRAC_TIMESTAMP_UNIT, __TRAC_TIMESTAMP_ZONE)
-}
+        type_desc = _meta.TypeDescriptor(_meta.BasicType.DATETIME)
 
+        if isinstance(raw_value, dt.datetime):
+            return _meta.Value(type_desc, datetimeValue=_meta.DatetimeValue(isoDatetime=raw_value.isoformat()))
 
-def arrow_to_python_type(arrow_type: pa.DataType) -> type:
+        if isinstance(raw_value, str):
+            datetime_value = dt.datetime.fromisoformat(raw_value)
+            return _meta.Value(type_desc, datetimeValue=_meta.DatetimeValue(isoDatetime=datetime_value.isoformat()))
 
-    if pa.types.is_boolean(arrow_type):
-        return bool
-
-    if pa.types.is_integer(arrow_type):
-        return int
-
-    if pa.types.is_floating(arrow_type):
-        return float
-
-    if pa.types.is_decimal(arrow_type):
-        return decimal.Decimal
-
-    if pa.types.is_string(arrow_type):
-        return str
-
-    if pa.types.is_date(arrow_type):
-        return dt.date
-
-    if pa.types.is_timestamp(arrow_type):
-        return dt.datetime
-
-    raise ex.EData(f"No Python type conversion available for Arrow type {arrow_type}")  # TODO
-
-
-def python_to_arrow_type(python_type: type) -> pa.DataType:
-
-    if python_type == bool:
-        return pa.bool_()
-
-    if python_type == int:
-        return pa.int64()
-
-    if python_type == float:
-        return pa.float64()
-
-    if python_type == decimal.Decimal:
-        return pa.decimal128(__TRAC_DECIMAL_PRECISION, __TRAC_DECIMAL_SCALE)
-
-    if python_type == str:
-        return pa.utf8()
-
-    if python_type == dt.date:
-        return pa.date32()
-
-    if python_type == dt.datetime:
-        return pa.timestamp(__TRAC_TIMESTAMP_UNIT, __TRAC_TIMESTAMP_ZONE)
-
-    raise ex.EData(f"No Arrow type conversion available for Python type {python_type}")  # TODO
-
-
-def trac_to_arrow_schema(trac_schema: meta.SchemaDefinition) -> pa.Schema:
-
-    if trac_schema.schemaType != meta.SchemaType.TABLE:
-        raise ex.ETracInternal(f"Schema type [{trac_schema.schemaType}] cannot be converted for Apache Arrow")
-
-    arrow_fields = [
-        (f.fieldName, trac_to_arrow_basic_type(f.fieldType))
-        for f in trac_schema.table.fields]
-
-    return pa.schema(arrow_fields, metadata={})
-
-
-def trac_to_arrow_type(trac_type: meta.TypeDescriptor) -> pa.DataType:
-
-    return trac_to_arrow_basic_type(trac_type.basicType)
-
-
-def trac_to_arrow_basic_type(trac_basic_type: meta.BasicType) -> pa.DataType:
-
-    arrow_type = __TRAC_TO_ARROW_TYPE_MAPPING.get(trac_basic_type)
-
-    if arrow_type is None:
-        raise ex.ETracInternal(f"Cannot convert TRAC data type [{trac_basic_type}] for use with Apache Arrow")
-
-    return arrow_type
-
-
-def trac_arrow_decimal_type() -> pa.Decimal128Type:
-    return pa.decimal128(__TRAC_DECIMAL_PRECISION, __TRAC_DECIMAL_SCALE)
+        msg = f"Value of type [{type(raw_value)}] cannot be converted to {_meta.BasicType.DATETIME.name}"
+        raise _ex.ETracInternal(msg)

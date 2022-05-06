@@ -235,7 +235,7 @@ class DevModeTranslator:
 
                 cls._log.info(f"Encoding parameter [{p_name}] as {p_spec.paramType.basicType}")
 
-                encoded_value = _types.convert_value(p_value, p_spec.paramType)
+                encoded_value = _types.MetadataCodec.convert_value(p_value, p_spec.paramType)
                 encoded_values[p_name] = encoded_value
 
         return encoded_values

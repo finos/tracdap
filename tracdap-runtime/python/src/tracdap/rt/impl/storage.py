@@ -44,7 +44,6 @@ import pyarrow.csv as pa_csv
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.util as _util
 
@@ -677,7 +676,7 @@ class _CsvStorageFormat(IDataFormat):
 
             schema_columns = {col.lower(): index for index, col in enumerate(schema.names)}
             col_mapping = [schema_columns.get(col.lower()) for col in header]
-            python_types = list(map(_types.arrow_to_python_type, schema.types))
+            python_types = list(map(_data.DataMapping.arrow_to_python_type, schema.types))
 
             data = [[] for _ in range(len(schema.names))]
             csv_row = 1  # Allowing for header
