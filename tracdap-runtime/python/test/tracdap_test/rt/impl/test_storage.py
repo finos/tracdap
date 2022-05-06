@@ -16,6 +16,7 @@ import datetime as dt
 import decimal
 import math
 import pathlib
+import platform
 import tempfile
 import unittest
 import sys
@@ -301,6 +302,12 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
     @classmethod
     def tearDownClass(cls):
         cls.storage_root.cleanup()
+
+    @unittest.skipIf(
+        platform.system().lower().startswith("win"),
+        "CSV read hangs with the Arrow CSV implementation for garbled data on Windows")
+    def test_read_garbled_data(self):
+        super().test_read_garbled_data()
 
     def test_csv_basic(self):
 
