@@ -1,0 +1,20 @@
+
+job:
+  runFlow:
+
+    flow: ./chaining_flow.json
+
+    parameters:
+      eur_usd_rate: 1.2071
+      default_weighting: 1.5
+      filter_defaults: false
+
+    inputs:
+      customer_loans: "inputs/loan_final313_100.csv"
+
+    outputs:
+      profit_by_region: "outputs/hello_pandas/profit_by_region.csv"
+
+    models:
+      model_1: model_1.FirstModel
+      model_2: model_2.SecondModel
