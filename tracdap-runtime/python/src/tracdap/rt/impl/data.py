@@ -218,8 +218,13 @@ class DataMapping:
 
         deltas = view.parts.get(part)
 
+        # Sanity checks
+
+        if not view.arrow_schema:
+            raise _ex.ETracInternal(f"Data view schema not set")
+
         if not deltas:
-            raise RuntimeError()  # todo
+            raise _ex.ETracInternal(f"Data view for part [{part.opaque_key}] does not contain any items")
 
         if len(deltas) == 1:
             return cls.item_to_pandas(deltas[0])
@@ -245,10 +250,10 @@ class DataMapping:
             return cls.arrow_to_pandas(item.table)
 
         if item.batches is not None:
-            table = pa.Table.from_batches(item.batches, data_item.schema)  # noqa
+            table = pa.Table.from_batches(item.batches, item.schema)  # noqa
             return cls.arrow_to_pandas(table)
 
-        raise RuntimeError()  # todo
+        raise _ex.ETracInternal(f"Data item does not contain any usable data")
 
     @classmethod
     def arrow_to_pandas(cls, table: pa.Table) -> pd.DataFrame:
@@ -274,14 +279,19 @@ class DataMapping:
     @classmethod
     def pandas_to_arrow(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
 
-        # TODO: Handle conformance of schema fields before converting, or convert all fields then conform
+        # Here we convert the whole Pandas df and then pass it to conformance
+        # An optimization would be to filter columns before applying conformance
+        # To do this, we'd need the case-insensitive field matching logic, including output of warnings
+
+        # Also, note that schema is not applied in from_pandas
+        # This is because the conformance logic allows for a wider range of conversions
+        # Applying the schema directly would fail for some types where casting is possible
 
         if len(df) == 0:
             df_schema = pa.Schema.from_pandas(df, preserve_index=False)  # noqa
             table = pa.Table.from_batches(list(), df_schema)  # noqa
         else:
-            schema_columns = schema.names if schema is not None else None
-            table = pa.Table.from_pandas(df, preserve_index=False, columns=schema_columns)  # noqa
+            table = pa.Table.from_pandas(df, preserve_index=False)  # noqa
 
         # If there is no explict schema, give back the table exactly as it was received from Pandas
         # There could be an option here to coerce types to the appropriate TRAC standard types

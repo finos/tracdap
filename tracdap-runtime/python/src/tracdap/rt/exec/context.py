@@ -114,6 +114,7 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_dataset_valid_identifier(dataset_name)
         self.__val.check_context_item_exists(dataset_name)
         self.__val.check_context_item_is_dataset(dataset_name)
+        self.__val.check_dataset_schema_defined(dataset_name)
         self.__val.check_dataset_part_present(dataset_name, part_key)
 
         data_view = self.__data[dataset_name]
