@@ -16,7 +16,6 @@ import datetime as dt
 import decimal
 import math
 import pathlib
-import platform
 import tempfile
 import unittest
 import sys
@@ -314,9 +313,7 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
     def tearDownClass(cls):
         cls.storage_root.cleanup()
 
-    @unittest.skipIf(
-        platform.system().lower().startswith("win"),
-        "CSV read hangs with the Arrow CSV implementation for garbled data on Windows")
+    @unittest.skip("CSV read hangs with the strict (Arrow) CSV implementation for garbled data")
     def test_read_garbled_data(self):
         super().test_read_garbled_data()
 
@@ -330,7 +327,7 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
         self.assertEqual(7, table.num_columns)
         self.assertEqual(10, table.num_rows)
 
-    def test_csv_edge_cases(self):
+    def test_lenient_edge_cases(self):
 
         storage_options = {"lenient_csv_parser": True}
 
@@ -340,7 +337,7 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
         self.assertEqual(7, table.num_columns)
         self.assertEqual(10, table.num_rows)
 
-    def test_csv_read_garbled_data(self):
+    def test_lenient_read_garbled_data(self):
 
         # Try reading garbage data with the lenient CSV parser
 
@@ -357,7 +354,7 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
                 f"csv_garbled_data.{self.storage_format}",
                 self.storage_format, schema, storage_options))
 
-    def test_csv_read_garbled_text(self):
+    def test_lenient_read_garbled_text(self):
 
         # Try reading garbage textual data with the lenient CSV parser
         # Because CSV is such a loose format, the parser will assemble rows and columns
