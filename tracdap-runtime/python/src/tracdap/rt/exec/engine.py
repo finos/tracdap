@@ -19,6 +19,7 @@ from copy import copy
 from dataclasses import dataclass, field
 
 import tracdap.rt.config as config
+import tracdap.rt.exceptions as _ex
 import tracdap.rt.impl.util as util
 import tracdap.rt.impl.models as _models
 import tracdap.rt.impl.storage as _storage
@@ -39,7 +40,7 @@ class GraphContextNode:
     node: _graph.Node
     dependencies: tp.Dict[NodeId, _graph.DependencyType]
     function: tp.Optional[_func.NodeFunction] = None
-    result: tp.Optional[tp.Any] = None
+    result: tp.Optional[_func.NodeResult] = None
     error: tp.Optional[str] = None
 
     def __post_init__(self):
@@ -59,6 +60,43 @@ class GraphContext:
     active_nodes: tp.Set[NodeId] = field(default_factory=set)
     succeeded_nodes: tp.Set[NodeId] = field(default_factory=set)
     failed_nodes: tp.Set[NodeId] = field(default_factory=set)
+
+
+class NodeFunctionContext(_func.NodeContext):
+
+    __T = tp.TypeVar("__T")
+
+    def __init__(self, nodes: tp.Dict[NodeId, GraphContextNode]):
+        self.__nodes = nodes
+
+    def __getitem__(self, node_id: NodeId[__T]) -> __T:
+
+        graph_node = self.__nodes.get(node_id)
+
+        if graph_node is None:
+            raise _ex.ETracInternal(f"Node ID [{node_id}] does not exist in the execution graph")  # todo
+
+        result: _func.NodeResult = graph_node.result
+
+        if result is None:
+            raise _ex.ETracInternal(f"Node ID [{node_id}] does not have a result available")  # todo
+
+        if not isinstance(result, _func.NodeResult):
+            raise _ex.ETracInternal(f"Node ID [{node_id}] result is not a valid node result")  # todo
+
+        if result.obj_type != graph_node.node.id.result_type:
+            raise _ex.ETracInternal(f"Node ID [{node_id}] result is the wrong type (expected {graph_node.node.id.result_type}, got {result.obj_type})")  # todo
+
+        return result.obj
+
+    def __getattr__(self, item):
+        return getattr(self.__nodes, item)
+
+    def __iter__(self):
+        return self.__nodes.__iter__()
+
+    def items(self):
+        return self.__nodes.items()
 
 
 class GraphBuilder(actors.Actor):
@@ -294,19 +332,24 @@ class NodeProcessor(actors.Actor):
 
         node_type = self._display_node_type()
         is_mapping_node = isinstance(self.node.node, _graph.MappingNode)
+        is_static_node = isinstance(self.node.node, _graph.StaticValueNode)
 
         try:
 
             if is_mapping_node:
-                self._log.info(f"MAPPING [{node_type}]: {str(self.node_id)}")
+                self._log.info(f"MAP [{node_type}]: {str(self.node_id)}")
                 self._log_mapping_info(self.node.node)
+            elif is_static_node:
+                self._log.info(f"SET [{self.node.node.id.name}] / {self.node.node.id.namespace}")
             else:
                 self._log.info(f"START [{node_type}]: {str(self.node_id)}")
 
-            result = self.node.function(self.graph.nodes)
+            ctx = NodeFunctionContext(self.graph.nodes)
+            result = self.node.function(ctx)
+
             self.actors().send_parent("node_succeeded", self.node_id, result)
 
-            if not is_mapping_node:
+            if not is_mapping_node and not is_static_node:
                 self._log.info(f"DONE [{node_type}]: {str(self.node_id)}")
 
         except Exception as e:

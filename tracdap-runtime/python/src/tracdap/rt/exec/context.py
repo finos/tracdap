@@ -26,6 +26,7 @@ import pyspark.sql as pyss
 import tracdap.rt.api as _api
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.util as _util
 
@@ -80,7 +81,9 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_param_valid_identifier(parameter_name)
         self.__val.check_param_exists(parameter_name)
 
-        return self.__parameters[parameter_name]
+        value: _meta.Value = self.__parameters[parameter_name]  # noqa
+
+        return _types.MetadataCodec.decode_value(value)
 
     def get_schema(self, dataset_name: str) -> _meta.SchemaDefinition:
 

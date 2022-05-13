@@ -31,26 +31,65 @@ import tracdap.rt.impl.storage as _storage
 import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.util as _util
 import tracdap.rt.impl.type_system as _types
-
 import tracdap.rt.exec.context as _ctx
+
 from tracdap.rt.exec.graph import *
 
-
-NodeContext = tp.Dict[NodeId, object]  # Available prior node results when a node function is called
-NodeResult = tp.Any  # Result of a node function (will be recorded against the node ID)
-
-_T = tp.TypeVar('_T')
+_T_RESULT = tp.TypeVar('_T_RESULT')
+_T_BUNDLE = tp.TypeVar('_T_BUNDLE')
 
 
-def _ctx_lookup(node_id: NodeId[_T], ctx: NodeContext) -> _T:
-    # TODO: Error handling and type checking
-    return ctx.get(node_id).result  # noqa
+@dc.dataclass(frozen=True)
+class NodeResult(tp.Generic[_T_RESULT]):
+
+    """
+    Result of a node function in the execution graph (will be recorded against the node ID)
+    """
+
+    obj: _T_RESULT
+    obj_type: tp.Type[_T_RESULT]
+
+    def is_bundle(self):
+        return False
 
 
-class NodeFunction(tp.Generic[_T]):
+@dc.dataclass(frozen=True)
+class BundleResult(NodeResult[Bundle[_T_BUNDLE]]):
+
+    """
+    Result of a node function in the execution graph (will be recorded against the node ID)
+    """
+
+    bundle: Bundle[_T_BUNDLE]
+    bundle_type: tp.Type[_T_BUNDLE] = _T_BUNDLE
+
+    def is_bundle(self):
+        return True
+
+
+NodeContext = tp.Dict[NodeId, NodeResult[tp.Any]]  # Available prior node results when a node function is called
+
+
+def _ctx_lookup(node_id: NodeId[_T_RESULT], ctx: NodeContext) -> _T_RESULT:
+
+    return ctx[node_id]
+
+    # node_result = ctx.get(node_id).result   # todo: this ctx is actually the exec graph ctx!
+    # node_result_obj = node_result.obj
+    #
+    # if node_result is None:
+    #     raise _ex.ETracInternal()  # TODO: msg
+    #
+    # if node_result.obj_type != node_id.result_type:
+    #     raise _ex.ETracInternal()  # TODO: msg
+    #
+    # return node_result_obj
+
+
+class NodeFunction(tp.Generic[_T_RESULT]):
 
     @abc.abstractmethod
-    def __call__(self, ctx: NodeContext) -> _T:
+    def __call__(self, ctx: NodeContext) -> NodeResult[_T_RESULT]:
         pass
 
 
@@ -60,16 +99,25 @@ class NoopFunc(NodeFunction[None]):
         return None
 
 
-class IdentityFunc(NodeFunction):
+class StaticValueFunc(NodeFunction[_T_RESULT]):
 
-    def __init__(self, node: IdentityNode):
+    def __init__(self, node: StaticValueNode[_T_RESULT]):
         self.node = node
 
-    def __call__(self, ctx: NodeContext) -> NodeResult:
+    def __call__(self, ctx: NodeContext) -> NodeResult[_T_RESULT]:
+        return NodeResult(self.node.value, type(self.node.value))
+
+
+class IdentityFunc(NodeFunction[_T_RESULT]):
+
+    def __init__(self, node: IdentityNode[_T_RESULT]):
+        self.node = node
+
+    def __call__(self, ctx: NodeContext) -> NodeResult[_T_RESULT]:
         return _ctx_lookup(self.node.src_id, ctx)
 
 
-class _ContextPushPopFunc(NodeFunction, abc.ABC):
+class _ContextPushPopFunc(NodeFunction[BundleResult[NodeResult[tp.Any]]], abc.ABC):
 
     # This approach to context push / pop assumes all the nodes to be mapped are already available
     # A better approach would be to map individual items as they become available
@@ -81,9 +129,9 @@ class _ContextPushPopFunc(NodeFunction, abc.ABC):
         self.node = node
         self.direction = direction
 
-    def __call__(self, ctx: NodeContext) -> NodeResult:
+    def __call__(self, ctx: NodeContext) -> BundleResult[NodeResult[tp.Any]]:
 
-        target_ctx = dict()
+        target_ctx: Bundle[NodeResult] = dict()
 
         for inner_id, outer_id in self.node.mapping.items():
 
@@ -102,7 +150,7 @@ class _ContextPushPopFunc(NodeFunction, abc.ABC):
 
             target_ctx[target_id] = source_item
 
-        return target_ctx
+        return BundleResult(target_ctx, Bundle[tp.Any], target_ctx, tp.Any)
 
 
 class ContextPushFunc(_ContextPushPopFunc):
@@ -125,7 +173,7 @@ class KeyedItemFunc(NodeFunction):
     def __call__(self, ctx: NodeContext) -> NodeResult:
         src_node_result = _ctx_lookup(self.node.src_id, ctx)
         src_item = src_node_result.get(self.node.src_item)
-        return src_item
+        return NodeResult(src_item, type(src_item))
 
 
 class BuildJobResultFunc(NodeFunction[_config.JobResult]):
@@ -198,24 +246,27 @@ class SaveJobResultFunc(NodeFunction[None]):
         return None
 
 
-class SetParametersFunc(NodeFunction[tp.Dict[str, tp.Any]]):
+class SetParametersFunc(NodeFunction[BundleResult[tp.Any]]):
 
     def __init__(self, node: SetParametersNode):
         super().__init__()
         self.node = node
 
-    def __call__(self, ctx: NodeContext) -> tp.Dict[str, tp.Any]:
+    def __call__(self, ctx: NodeContext) -> BundleResult[tp.Any]:
 
         log = _util.logger_for_object(self)
 
-        native_params = dict()
+        param_bundle = dict()
 
         for p_name, p_value in self.node.parameters.items():
+
             native_value = _types.MetadataCodec.decode_value(p_value)
-            native_params[p_name] = native_value
+            param_node = NodeResult(native_value, type(native_value))
+            param_bundle[p_name] = param_node
+
             log.info(f"Set parameter [{p_name}] = {native_value} ({p_value.type.basicType.name})")
 
-        return native_params
+        return BundleResult(param_bundle, Bundle[tp.Any], param_bundle, tp.Any)
 
 
 class DataViewFunc(NodeFunction[_data.DataView]):
@@ -223,13 +274,15 @@ class DataViewFunc(NodeFunction[_data.DataView]):
     def __init__(self, node: DataViewNode):
         self.node = node
 
-    def __call__(self, ctx: NodeContext) -> _data.DataView:
+    def __call__(self, ctx: NodeContext) -> NodeResult[_data.DataView]:
 
         root_item = _ctx_lookup(self.node.root_item, ctx)
         root_part_key = _data.DataPartKey.for_root()
 
-        empty_view = _data.DataView.for_trac_schema(self.node.schema)
-        return _data.DataMapping.add_item_to_view(empty_view, root_part_key, root_item)
+        data_view = _data.DataView.for_trac_schema(self.node.schema)
+        data_view = _data.DataMapping.add_item_to_view(data_view, root_part_key, root_item)
+
+        return NodeResult(data_view, _data.DataView)
 
 
 class DataItemFunc(NodeFunction[_data.DataItem]):
@@ -251,12 +304,12 @@ class DataItemFunc(NodeFunction[_data.DataItem]):
         return delta
 
 
-class DataResultFunc(NodeFunction[ObjectMap]):
+class DataResultFunc(NodeFunction[ObjectBundle]):
 
     def __init__(self, node: DataResultNode):
         self.node = node
 
-    def __call__(self, ctx: NodeContext) -> ObjectMap:
+    def __call__(self, ctx: NodeContext) -> BundleResult[meta.ObjectDefinition]:
 
         data_spec = _ctx_lookup(self.node.data_spec_id, ctx)
 
@@ -266,7 +319,11 @@ class DataResultFunc(NodeFunction[ObjectMap]):
         data_result = meta.ObjectDefinition(objectType=meta.ObjectType.DATA, data=data_spec.data_def)
         storage_result = meta.ObjectDefinition(objectType=meta.ObjectType.STORAGE, storage=data_spec.storage_def)
 
-        return {self.node.data_key: data_result, self.node.storage_key: storage_result}
+        bundle = {
+            self.node.data_key: data_result,
+            self.node.storage_key: storage_result}
+
+        return BundleResult(bundle, ObjectBundle, bundle, meta.ObjectDefinition)
 
 
 class StaticDataSpecFunc(NodeFunction[_data.DataItemSpec]):
@@ -274,8 +331,8 @@ class StaticDataSpecFunc(NodeFunction[_data.DataItemSpec]):
     def __init__(self, node: StaticDataSpecNode):
         self.node = node
 
-    def __call__(self, ctx: NodeContext) -> _data.DataItemSpec:
-        return self.node.data_spec
+    def __call__(self, ctx: NodeContext) -> NodeResult[_data.DataItemSpec]:
+        return NodeResult(self.node.data_spec, _data.DataItemSpec)
 
 
 class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
@@ -399,7 +456,7 @@ class LoadDataFunc(NodeFunction[_data.DataItem], _LoadSaveDataFunc):
         super().__init__(storage)
         self.node = node
 
-    def __call__(self, ctx: NodeContext) -> _data.DataItem:
+    def __call__(self, ctx: NodeContext) -> NodeResult[_data.DataItem]:
 
         data_spec = _ctx_lookup(self.node.spec_id, ctx)
         data_copy = self._choose_copy(data_spec.data_item, data_spec.storage_def)
@@ -414,16 +471,18 @@ class LoadDataFunc(NodeFunction[_data.DataItem], _LoadSaveDataFunc):
             arrow_schema,
             storage_options={})
 
-        return _data.DataItem(table.schema, table)
+        data_item = _data.DataItem(table.schema, table)
+
+        return NodeResult(data_item, _data.DataItem)
 
 
-class SaveDataFunc(NodeFunction, _LoadSaveDataFunc):
+class SaveDataFunc(NodeFunction[bool], _LoadSaveDataFunc):
 
     def __init__(self, node: SaveDataNode, storage: _storage.StorageManager):
         super().__init__(storage)
         self.node = node
 
-    def __call__(self, ctx: NodeContext) -> NodeResult:
+    def __call__(self, ctx: NodeContext) -> NodeResult[bool]:
 
         # This function assumes that metadata has already been generated as the data_spec
         # i.e. it is already known which incarnation / copy of the data will be created
@@ -447,7 +506,7 @@ class SaveDataFunc(NodeFunction, _LoadSaveDataFunc):
             data_item.table,
             storage_options={}, overwrite=False)
 
-        return True
+        return NodeResult(True, bool)
 
 
 class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
@@ -478,27 +537,34 @@ class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
         return meta.ObjectDefinition(meta.ObjectType.MODEL, model=model_def)
 
 
-class RunModelFunc(NodeFunction):
+class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
 
     def __init__(self, node: RunModelNode, model_class: _api.TracModel.__class__):
         super().__init__()
         self.node = node
         self.model_class = model_class
 
-    def __call__(self, ctx: NodeContext) -> NodeResult:
+    def __call__(self, ctx: NodeContext) -> NodeResult[Bundle[_data.DataView]]:
 
         model_def = self.node.model_def
 
         # Create a context containing only declared items in the current namespace, addressed by name
 
-        def filter_ctx(node_id: NodeId):
-            if node_id.namespace != self.node.id.namespace:
-                return False
-            if node_id.name in model_def.parameters or node_id.name in model_def.inputs:
-                return True
-            return False
+        # Filtering method:
+        # local_ctx = {nid.name: n.result.obj for nid, n in ctx.items() if filter_ctx(nid)}
 
-        local_ctx = {nid.name: n.result for nid, n in ctx.items() if filter_ctx(nid)}
+        local_ctx = {}
+
+        for param_name, param_def in model_def.parameters.items():
+            param_type = _types.TypeMapping.trac_to_python(param_def.paramType)
+            param_node_id = NodeId.of(param_name, self.node.id.namespace, param_type)
+            param_value = _ctx_lookup(param_node_id, ctx)
+            local_ctx[param_name] = param_value
+
+        for input_name in model_def.inputs:
+            input_node_id = NodeId.of(input_name, self.node.id.namespace, _data.DataView)
+            input_data = _ctx_lookup(input_node_id, ctx)
+            local_ctx[input_name] = input_data
 
         # Add empty data views to the local context to hold model outputs
         # Assuming outputs are all defined with static schemas
@@ -516,22 +582,22 @@ class RunModelFunc(NodeFunction):
         model.run_model(trac_ctx)
 
         # The node result is just the model outputs taken from the local context
-        model_outputs = {
+        model_outputs: Bundle[_data.DataView] = {
             name: obj for name, obj in local_ctx.items()
             if name in self.node.model_def.outputs}
 
-        return model_outputs
+        return NodeResult(model_outputs, Bundle[_data.DataView])
 
 
 class FunctionResolver:
 
-    __ResolveFunc = tp.Callable[['FunctionResolver', Node[_T]], NodeFunction[_T]]
+    __ResolveFunc = tp.Callable[['FunctionResolver', Node[_T_RESULT]], NodeFunction[_T_RESULT]]
 
     def __init__(self, models: _models.ModelLoader, storage: _storage.StorageManager):
         self._models = models
         self._storage = storage
 
-    def resolve_node(self, node: Node[_T]) -> NodeFunction[_T]:
+    def resolve_node(self, node: Node[_T_RESULT]) -> NodeFunction[_T_RESULT]:
 
         basic_node_class = self.__basic_node_mapping.get(node.__class__)
 
@@ -566,17 +632,18 @@ class FunctionResolver:
         return RunModelFunc(node, model_class)
 
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
+
         ContextPushNode: ContextPushFunc,
         ContextPopNode: ContextPopFunc,
         IdentityNode: IdentityFunc,
         KeyedItemNode: KeyedItemFunc,
-        SetParametersNode: SetParametersFunc,
         DataViewNode: DataViewFunc,
         DataItemNode: DataItemFunc,
         BuildJobResultNode: BuildJobResultFunc,
         SaveJobResultNode: SaveJobResultFunc,
-        StaticDataSpecNode: StaticDataSpecFunc,
-        DataResultNode: DataResultFunc}
+        DataResultNode: DataResultFunc,
+        StaticValueNode: StaticValueFunc
+    }
 
     __node_mapping: tp.Dict[Node.__class__, __ResolveFunc] = {
 
@@ -584,9 +651,5 @@ class FunctionResolver:
         SaveDataNode: resolve_save_data,
         DynamicDataSpecNode: resolve_dynamic_data_spec,
         RunModelNode: resolve_run_model_node,
-        ImportModelNode: resolve_import_model_node,
-
-        SaveJobResultNode: lambda s, n: NoopFunc(),
-        BuildJobResultNode: lambda s, n: NoopFunc(),
-        JobNode: lambda s, n: NoopFunc()
+        ImportModelNode: resolve_import_model_node
     }
