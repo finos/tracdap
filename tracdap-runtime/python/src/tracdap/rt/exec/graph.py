@@ -23,6 +23,12 @@ import tracdap.rt.metadata as meta
 import tracdap.rt.config as cfg
 
 
+_T = tp.TypeVar('_T')
+
+Bundle: tp.Generic[_T] = tp.Dict[str, _T]
+ObjectBundle = Bundle[meta.ObjectDefinition]
+
+
 @dc.dataclass(frozen=True)
 class NodeNamespace:
 
@@ -40,9 +46,6 @@ class NodeNamespace:
         while level is not None:
             yield level.name
             level = level.parent
-
-
-_T = tp.TypeVar('_T')
 
 
 @dc.dataclass(frozen=True)
@@ -85,12 +88,40 @@ class Node(tp.Generic[_T]):
     id: NodeId[_T]
     """ID of this node"""
 
-    dependencies: tp.Dict[NodeId, DependencyType] = dc.field(init=False)
+    dependencies: tp.Dict[NodeId, DependencyType] = dc.field(init=False, default_factory=dict)
     """Set of node IDs that are dependencies for this node"""
+
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        return {}
+
+
+def _node_type(node_class):
+
+    # One approach for class decorators is to create a dynamic wrapper class, e.g. class NodeWrapper(node_class)
+    # However, there are a *lot* of special variables that need to be copied across for everything to work
+    # Instead, this approach mutates the class being decorated by adding members directly
+    # So we guarantee all the special attributes of the original class are left in place
+    # The dataclasses module itself works the same way
+
+    class NodeBuilder(Node):
+
+        explicit_deps: dc.InitVar[tp.List[NodeId]] = None
+
+        def __post_init__(self, explicit_deps: tp.List[NodeId]):
+            dependencies = self._node_dependencies()
+            if explicit_deps:
+                dependencies.update({dep_id: DependencyType.HARD for dep_id in explicit_deps})
+            object.__setattr__(self, "dependencies", dependencies)
+
+    setattr(node_class, "explicit_deps", NodeBuilder.explicit_deps)
+    setattr(node_class, "__post_init__", NodeBuilder.__post_init__)
+
+    node_class.__annotations__.update(NodeBuilder.__annotations__)
+
+    return dc.dataclass(frozen=True)(node_class)
 
 
 NodeMap = tp.Dict[NodeId, Node]
-ObjectMap = tp.Dict[str, meta.ObjectDefinition]
 
 
 @dc.dataclass(frozen=True)
@@ -100,6 +131,16 @@ class Graph:
     root_id: NodeId
 
 
+@dc.dataclass(frozen=False)
+class GraphSection:
+
+    nodes: NodeMap
+    inputs: tp.Set[NodeId] = dc.field(default_factory=set)
+    outputs: tp.Set[NodeId] = dc.field(default_factory=set)
+    must_run: tp.List[NodeId] = dc.field(default_factory=list)
+
+
+# TODO: Where does this go?
 @dc.dataclass(frozen=True)
 class JobResultSpec:
 
@@ -108,74 +149,61 @@ class JobResultSpec:
     result_format: str = None
 
 
-@dc.dataclass(frozen=True)
-class IdentityNode(Node):
-
-    proxy_for: dc.InitVar[tp.Union[NodeId, tp.Dict[NodeId, DependencyType]]]
-
-    def __post_init__(self, proxy_for):
-        if isinstance(proxy_for, NodeId):
-            object.__setattr__(self, 'dependencies', {proxy_for: DependencyType.HARD})
-        else:
-            object.__setattr__(self, 'dependencies', proxy_for)
+# ----------------------------------------------------------------------------------------------------------------------
+#  NODE DEFINITIONS
+# ----------------------------------------------------------------------------------------------------------------------
 
 
-@dc.dataclass(frozen=True)
+@_node_type
 class ContextPushNode(Node):
 
     """Push a new execution context onto the stack"""
 
     namespace: NodeNamespace
+
     mapping: tp.Dict[NodeId, NodeId] = dc.field(default_factory=dict)
     """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being pushed)"""
 
-    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
-
-    def __post_init__(self, explicit_deps):
-
+    def _node_dependencies(self):
         # Since this is a context push, dependencies are the IDs from the outer context
-        mapping_dependencies = {src_id: DependencyType.HARD for src_id in self.mapping.values()}
-        object.__setattr__(self, 'dependencies', mapping_dependencies)
-
-        if explicit_deps:
-            self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
+        return {nid: DependencyType.HARD for nid in self.mapping.values()}
 
 
-@dc.dataclass(frozen=True)
+@_node_type
 class ContextPopNode(Node):
 
     namespace: NodeNamespace
+
     mapping: tp.Dict[NodeId, NodeId]
     """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being popped)"""
 
-    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
-
-    def __post_init__(self, explicit_deps):
+    def _node_dependencies(self):
         # Since this is a context pop, dependencies are the IDs from the inner context
-        mapping_dependencies = {src_id: DependencyType.HARD for src_id in self.mapping.keys()}
-        object.__setattr__(self, 'dependencies', mapping_dependencies)
-
-        if explicit_deps:
-            self.dependencies.update({dep: DependencyType.HARD for dep in explicit_deps})
+        return {nid: DependencyType.HARD for nid in self.mapping.keys()}
 
 
-@dc.dataclass(frozen=True)
+@_node_type
+class StaticValueNode(Node[_T]):
+
+    value: _T
+
+
 class MappingNode(Node[_T]):
     pass
 
 
-@dc.dataclass(frozen=True)
-class IdentityNode(MappingNode):
+@_node_type
+class IdentityNode(MappingNode[_T]):
 
     """Map one graph node directly from another (identity function)"""
 
-    src_id: NodeId
+    src_id: NodeId[_T]
 
-    def __post_init__(self):
-        object.__setattr__(self, 'dependencies', {self.src_id: DependencyType.HARD})
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        return {self.src_id: DependencyType.HARD}
 
 
-@dc.dataclass(frozen=True)
+@_node_type
 class KeyedItemNode(MappingNode):
 
     """Map a graph node from a keyed item in an existing node (dictionary lookup)"""
@@ -183,35 +211,11 @@ class KeyedItemNode(MappingNode):
     src_id: NodeId
     src_item: str
 
-    def __post_init__(self):
-        object.__setattr__(self, 'dependencies', {self.src_id: DependencyType.HARD})
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        return {self.src_id: DependencyType.HARD}
 
 
-@dc.dataclass(frozen=True)
-class SetParametersNode(Node):
-
-    parameters: tp.Dict[str, meta.Value]
-
-    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
-
-    def __post_init__(self, explicit_deps):
-        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
-        object.__setattr__(self, 'dependencies', dependencies)
-
-
-@dc.dataclass(frozen=True)
-class StaticDataSpecNode(Node[_data.DataItemSpec]):
-
-    data_spec: _data.DataItemSpec
-
-    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
-
-    def __post_init__(self, explicit_deps):
-        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
-        object.__setattr__(self, 'dependencies', dependencies)
-
-
-@dc.dataclass(frozen=True)
+@_node_type
 class DynamicDataSpecNode(Node[_data.DataItemSpec]):
 
     data_view_id: NodeId[_data.DataView]
@@ -221,36 +225,33 @@ class DynamicDataSpecNode(Node[_data.DataItemSpec]):
 
     prior_data_spec: tp.Optional[_data.DataItemSpec]
 
-    def __post_init__(self):
-        dependencies = {self.data_view_id: DependencyType.HARD}
-        object.__setattr__(self, 'dependencies', dependencies)
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        return {self.data_view_id: DependencyType.HARD}
 
 
-@dc.dataclass(frozen=True)
+@_node_type
 class DataViewNode(Node[_data.DataView]):
 
     schema: meta.SchemaDefinition
     root_item: NodeId[_data.DataItem]
 
-    def __post_init__(self):
-        dependencies = {self.root_item: DependencyType.HARD}
-        object.__setattr__(self, 'dependencies', dependencies)
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        return {self.root_item: DependencyType.HARD}
 
 
-@dc.dataclass(frozen=True)
+@_node_type
 class DataItemNode(MappingNode):
 
     """Map a data item out of an assembled data view"""
 
     data_view_id: NodeId[_data.DataView]
 
-    def __post_init__(self):
-        dependencies = {self.data_view_id: DependencyType.HARD}
-        object.__setattr__(self, 'dependencies', dependencies)
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        return {self.data_view_id: DependencyType.HARD}
 
 
-@dc.dataclass(frozen=True)
-class DataResultNode(Node[ObjectMap]):
+@_node_type
+class DataResultNode(Node[ObjectBundle]):
 
     output_name: str
     data_spec_id: NodeId[_data.DataItemSpec]
@@ -259,12 +260,14 @@ class DataResultNode(Node[ObjectMap]):
     data_key: str
     storage_key: str
 
-    def __post_init__(self):
-        dependencies = {self.data_spec_id: DependencyType.HARD, self.data_save_id: DependencyType.HARD}
-        object.__setattr__(self, 'dependencies', dependencies)
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+
+        return {
+            self.data_spec_id: DependencyType.HARD,
+            self.data_save_id: DependencyType.HARD}
 
 
-@dc.dataclass(frozen=True)
+@_node_type
 class LoadDataNode(Node[_data.DataItem]):
 
     """
@@ -274,15 +277,11 @@ class LoadDataNode(Node[_data.DataItem]):
 
     spec_id: NodeId[_data.DataItemSpec]
 
-    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
-
-    def __post_init__(self, explicit_deps):
-        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
-        dependencies[self.spec_id] = DependencyType.HARD
-        object.__setattr__(self, 'dependencies', dependencies)
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        return {self.spec_id: DependencyType.HARD}
 
 
-@dc.dataclass(frozen=True)
+@_node_type
 class SaveDataNode(Node):
 
     """
@@ -292,25 +291,18 @@ class SaveDataNode(Node):
     spec_id: NodeId[_data.DataItemSpec]
     data_item_id: NodeId[_data.DataItem]
 
-    def __post_init__(self):
-        dependencies = {self.spec_id: DependencyType.HARD, self.data_item_id: DependencyType.HARD}
-        object.__setattr__(self, 'dependencies', dependencies)
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        return {self.spec_id: DependencyType.HARD, self.data_item_id: DependencyType.HARD}
 
 
-@dc.dataclass(frozen=True)
+@_node_type
 class ImportModelNode(Node[meta.ObjectDefinition]):
 
     model_scope: str
     import_details: meta.ImportModelJob
 
-    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
 
-    def __post_init__(self, explicit_deps):
-        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
-        object.__setattr__(self, 'dependencies', dependencies)
-
-
-@dc.dataclass(frozen=True)
+@_node_type
 class RunModelNode(Node):
 
     model_scope: str
@@ -318,66 +310,28 @@ class RunModelNode(Node):
     parameter_ids: tp.FrozenSet[NodeId]
     input_ids: tp.FrozenSet[NodeId]
 
-    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
-
-    def __post_init__(self, explicit_deps):
-        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
-        dependencies.update({param_id: DependencyType.HARD for param_id in self.parameter_ids})
-        dependencies.update({input_id: DependencyType.HARD for input_id in self.input_ids})
-        object.__setattr__(self, 'dependencies', dependencies)
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        return {dep_id: DependencyType.HARD for dep_id in [*self.parameter_ids, *self.input_ids]}
 
 
-@dc.dataclass(frozen=True)
+@_node_type
 class BuildJobResultNode(Node[cfg.JobResult]):
 
     job_id: meta.TagHeader
 
     objects: tp.Dict[str, NodeId[meta.ObjectDefinition]] = dc.field(default_factory=dict)
-    bundles: tp.List[NodeId[ObjectMap]] = dc.field(default_factory=list)
+    bundles: tp.List[NodeId[ObjectBundle]] = dc.field(default_factory=list)
 
-    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
-
-    def __post_init__(self, explicit_deps):
-        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
-        dependencies.update({result_id: DependencyType.HARD for result_id in self.objects.values()})
-        dependencies.update({result_id: DependencyType.HARD for result_id in self.bundles})
-        object.__setattr__(self, 'dependencies', dependencies)
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        dep_ids = [*self.bundles, *self.objects.values()]
+        return {node_id: DependencyType.HARD for node_id in dep_ids}
 
 
-@dc.dataclass(frozen=True)
+@_node_type
 class SaveJobResultNode(Node[type(None)]):
 
     job_result_id: NodeId[cfg.JobResult]
     result_spec: JobResultSpec
 
-    def __post_init__(self):
-        dependencies = {self.job_result_id: DependencyType.HARD}
-        object.__setattr__(self, 'dependencies', dependencies)
-
-
-@dc.dataclass(frozen=True)
-class JobMetricsNode(Node):
-
-    pass
-
-
-@dc.dataclass(frozen=True)
-class JobLogsNode(Node):
-
-    pass
-
-
-@dc.dataclass(frozen=True)
-class JobNode(Node):
-
-    # job_def: meta.JobDefinition
-    target_node_id: NodeId
-    result_node_id: NodeId
-
-    explicit_deps: dc.InitVar[tp.Optional[tp.List[NodeId]]] = None
-
-    def __post_init__(self, explicit_deps):
-        dependencies = {dep: DependencyType.HARD for dep in explicit_deps} if explicit_deps else {}
-        dependencies[self.target_node_id] = DependencyType.HARD
-        dependencies[self.result_node_id] = DependencyType.HARD
-        object.__setattr__(self, 'dependencies', dependencies)
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        return {self.job_result_id: DependencyType.HARD}
