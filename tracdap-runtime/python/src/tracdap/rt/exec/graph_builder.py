@@ -86,7 +86,7 @@ class GraphBuilder:
         model_scope = _util.object_key(job_config.jobId)
         import_details = job_config.job.importModel
 
-        import_id = NodeId.of("trac_import_model", job_namespace, meta.ModelDefinition)
+        import_id = NodeId.of("trac_import_model", job_namespace, meta.ObjectDefinition)
         import_node = ImportModelNode(import_id, model_scope, import_details, explicit_deps=[job_push_id])
 
         main_section = GraphSection(nodes={import_id: import_node}, must_run=[import_id])

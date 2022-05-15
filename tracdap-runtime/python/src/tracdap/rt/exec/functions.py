@@ -22,11 +22,11 @@ import json
 import random
 import yaml
 import uuid
+import dataclasses as dc  # noqa
 
 import tracdap.rt.api as _api
 import tracdap.rt.config as _config
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.storage as _storage
 import tracdap.rt.impl.models as _models
@@ -86,7 +86,7 @@ def _ctx_lookup(node_id: NodeId[_T_RESULT], ctx: NodeContext) -> _T_RESULT:
     # return node_result_obj
 
 
-class NodeFunction(tp.Generic[_T_RESULT], tp.Callable[[NodeContext], NodeResult[_T_RESULT]]):
+class NodeFunction(tp.Generic[_T_RESULT]):
 
     def __call__(self, ctx: NodeContext) -> NodeResult[_T_RESULT]:
         return self._execute(ctx)
@@ -184,7 +184,7 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
     def __init__(self, node: BuildJobResultNode):
         self.node = node
 
-    def _execute(self, ctx: NodeContext) -> _config.JobResult:
+    def _execute(self, ctx: NodeContext) -> NodeResult[_config.JobResult]:
 
         job_result = _config.JobResult()
         job_result.jobId = self.node.job_id
@@ -200,7 +200,7 @@ class BuildJobResultFunc(NodeFunction[_config.JobResult]):
             bundle = _ctx_lookup(bundle_id, ctx)
             job_result.results.update(bundle.items())
 
-        return job_result
+        return NodeResult(job_result, _config.JobResult)
 
 
 class SaveJobResultFunc(NodeFunction[None]):
@@ -488,7 +488,7 @@ class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
 
         self._log = _util.logger_for_object(self)
 
-    def _execute(self, ctx: NodeContext) -> meta.ObjectDefinition:
+    def _execute(self, ctx: NodeContext) -> NodeResult[meta.ObjectDefinition]:
 
         stub_model_def = meta.ModelDefinition(
             language=self.node.import_details.language,
@@ -505,7 +505,9 @@ class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
         model_def.inputs = model_scan.inputs
         model_def.outputs = model_scan.outputs
 
-        return meta.ObjectDefinition(meta.ObjectType.MODEL, model=model_def)
+        model_obj = meta.ObjectDefinition(meta.ObjectType.MODEL, model=model_def)
+
+        return NodeResult(model_obj, meta.ObjectDefinition)
 
 
 class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
@@ -527,8 +529,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         local_ctx = {}
 
         for param_name, param_def in model_def.parameters.items():
-            param_type = _types.TypeMapping.trac_to_python(param_def.paramType)
-            param_node_id = NodeId.of(param_name, self.node.id.namespace, param_type)
+            param_node_id = NodeId.of(param_name, self.node.id.namespace, meta.Value)
             param_value = _ctx_lookup(param_node_id, ctx)
             local_ctx[param_name] = param_value
 
