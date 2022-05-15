@@ -282,7 +282,7 @@ class GraphBuilder:
                 output_storage_key = _util.object_key(storage_id)
 
             # Map one data item from each view, since outputs are single part/delta
-            data_item_id = NodeId(f"{output_name}:ITEM", job_namespace)
+            data_item_id = NodeId(f"{output_name}:ITEM", job_namespace, _data.DataItem)
             data_item_node = DataItemNode(data_item_id, data_view_id)
 
             # Create a physical save operation for the data item
@@ -397,13 +397,16 @@ class GraphBuilder:
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
-        def node_id_for(node_name):
-            return NodeId(node_name, namespace)
+        def param_id(node_name):
+            return NodeId(node_name, namespace, meta.Value)
+
+        def data_id(node_name):
+            return NodeId(node_name, namespace, _data.DataView)
 
         # Input data should already be mapped to named inputs in the model context
-        parameter_ids = set(map(node_id_for, model_def.parameters))
-        input_ids = set(map(node_id_for, model_def.inputs))
-        output_ids = set(map(node_id_for, model_def.outputs))
+        parameter_ids = set(map(param_id, model_def.parameters))
+        input_ids = set(map(data_id, model_def.inputs))
+        output_ids = set(map(data_id, model_def.outputs))
 
         # Create the model node
         # Always add the prior graph root ID as a dependency

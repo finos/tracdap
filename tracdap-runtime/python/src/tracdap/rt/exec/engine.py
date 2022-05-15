@@ -31,7 +31,7 @@ from tracdap.rt.exec.graph import NodeId
 
 
 @dataclass
-class GraphContextNode:
+class _EngineNode:
 
     """
     Represents the state of a single node in the execution graph for processing by the TRAC engine
@@ -49,13 +49,13 @@ class GraphContextNode:
 
 
 @dataclass
-class GraphContext:
+class _EngineContext:
 
     """
     Represents the state of an execution graph being processed by the TRAC engine
     """
 
-    nodes: tp.Dict[NodeId, GraphContextNode]
+    nodes: tp.Dict[NodeId, _EngineNode]
     pending_nodes: tp.Set[NodeId] = field(default_factory=set)
     active_nodes: tp.Set[NodeId] = field(default_factory=set)
     succeeded_nodes: tp.Set[NodeId] = field(default_factory=set)
@@ -66,7 +66,7 @@ class NodeFunctionContext(_func.NodeContext):
 
     __T = tp.TypeVar("__T")
 
-    def __init__(self, nodes: tp.Dict[NodeId, GraphContextNode]):
+    def __init__(self, nodes: tp.Dict[NodeId, _EngineNode]):
         self.__nodes = nodes
 
     def __getitem__(self, node_id: NodeId[__T]) -> __T:
@@ -115,7 +115,7 @@ class GraphBuilder(actors.Actor):
         super().__init__()
         self.job_config = job_config
         self.result_spec = result_spec
-        self.graph: tp.Optional[GraphContext] = None
+        self.graph: tp.Optional[_EngineContext] = None
 
         self._resolver = _func.FunctionResolver(models, storage)
         self._log = util.logger_for_object(self)
@@ -126,8 +126,8 @@ class GraphBuilder(actors.Actor):
 
         # TODO: Get sys config, or find a way to pass storage settings
         graph_data = _graph.GraphBuilder.build_job(self.job_config, self.result_spec)
-        graph_nodes = {node_id: GraphContextNode(node, {}) for node_id, node in graph_data.nodes.items()}
-        graph = GraphContext(graph_nodes, pending_nodes=set(graph_nodes.keys()))
+        graph_nodes = {node_id: _EngineNode(node, {}) for node_id, node in graph_data.nodes.items()}
+        graph = _EngineContext(graph_nodes, pending_nodes=set(graph_nodes.keys()))
 
         self._log.info("Resolving graph nodes to executable code")
 
@@ -156,7 +156,7 @@ class GraphProcessor(actors.Actor):
     Once all running nodes are stopped, an error is reported to the parent
     """
 
-    def __init__(self, graph: GraphContext):
+    def __init__(self, graph: _EngineContext):
         super().__init__()
         self.graph = graph
         self.processors: tp.Dict[NodeId, actors.ActorId] = dict()
@@ -172,7 +172,7 @@ class GraphProcessor(actors.Actor):
 
         node_processors = dict()
 
-        def process_graph(graph: GraphContext) -> GraphContext:
+        def process_graph(graph: _EngineContext) -> _EngineContext:
 
             pending_nodes = copy(graph.pending_nodes)
             active_nodes = copy(graph.active_nodes)
@@ -219,12 +219,12 @@ class GraphProcessor(actors.Actor):
         self.check_job_status(do_submit=False)
 
     @classmethod
-    def _is_viable_node(cls, node: GraphContextNode, graph: GraphContext):
+    def _is_viable_node(cls, node: _EngineNode, graph: _EngineContext):
 
         return all(dep in graph.succeeded_nodes for dep in node.dependencies)
 
     @classmethod
-    def _upstream_failure(cls, node: GraphContextNode, graph: GraphContext):
+    def _upstream_failure(cls, node: _EngineNode, graph: _EngineContext):
 
         return any(not dep_type.tolerant and dep in graph.failed_nodes
                    for dep, dep_type in node.dependencies.items())
@@ -247,7 +247,7 @@ class GraphProcessor(actors.Actor):
 
         self._node_complete(node_id, node, succeeded=False)
 
-    def _node_complete(self, node_id: NodeId, node: GraphContextNode, succeeded: bool):
+    def _node_complete(self, node_id: NodeId, node: _EngineNode, succeeded: bool):
 
         nodes = {**self.graph.nodes, node_id: node}
 
@@ -308,7 +308,7 @@ class NodeProcessor(actors.Actor):
     TODO: How to decide when to allocate an actors.Worker (long running, separate thread)
     """
 
-    def __init__(self, graph: GraphContext, node_id: str, node: GraphContextNode):
+    def __init__(self, graph: _EngineContext, node_id: str, node: _EngineNode):
         super().__init__()
         self.graph = graph
         self.node_id = node_id
@@ -411,7 +411,7 @@ class JobProcessor(actors.Actor):
         self._models.destroy_scope(self.job_key)
 
     @actors.Message
-    def job_graph(self, graph: GraphContext):
+    def job_graph(self, graph: _EngineContext):
         self.actors().spawn(GraphProcessor, graph)
         self.actors().stop(self.actors().sender)
 
