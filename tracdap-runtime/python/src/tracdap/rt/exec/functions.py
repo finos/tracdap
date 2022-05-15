@@ -318,7 +318,7 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
         self.node = node
         self.storage = storage
 
-    def _execute(self, ctx: NodeContext) -> _data.DataItemSpec:
+    def _execute(self, ctx: NodeContext) -> NodeResult[_data.DataItemSpec]:
 
         if self.node.prior_data_spec is not None:
             raise _ex.ETracInternal("Data updates not supported yet")
@@ -381,11 +381,13 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
         storage_def = meta.StorageDefinition()
         storage_def.dataItems[data_item] = storage_item
 
-        return _data.DataItemSpec(
+        data_spec = _data.DataItemSpec(
             data_item,
             data_def,
             storage_def,
             schema_def=None)
+
+        return NodeResult(data_spec, _data.DataItemSpec)
 
 
 class _LoadSaveDataFunc(abc.ABC):
