@@ -40,7 +40,7 @@ class _EngineNode:
     node: _graph.Node
     dependencies: tp.Dict[NodeId, _graph.DependencyType]
     function: tp.Optional[_func.NodeFunction] = None
-    result: tp.Optional[_func.NodeResult] = None
+    result: tp.Optional[tp.Any] = None
     error: tp.Optional[str] = None
 
     def __post_init__(self):
@@ -76,18 +76,14 @@ class NodeFunctionContext(_func.NodeContext):
         if graph_node is None:
             raise _ex.ETracInternal(f"Node ID [{node_id}] does not exist in the execution graph")  # todo
 
-        result: _func.NodeResult = graph_node.result
+        result = graph_node.result
 
         if result is None:
             raise _ex.ETracInternal(f"Node ID [{node_id}] does not have a result available")  # todo
 
-        if not isinstance(result, _func.NodeResult):
-            raise _ex.ETracInternal(f"Node ID [{node_id}] result is not a valid node result")  # todo
+        # todo: type check
 
-        if result.obj_type != graph_node.node.id.result_type:
-            raise _ex.ETracInternal(f"Node ID [{node_id}] result is the wrong type (expected {graph_node.node.id.result_type}, got {result.obj_type})")  # todo
-
-        return result.obj
+        return result
 
     def __getattr__(self, item):
         return getattr(self.__nodes, item)

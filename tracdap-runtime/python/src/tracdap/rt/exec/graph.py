@@ -204,11 +204,11 @@ class IdentityNode(MappingNode[_T]):
 
 
 @_node_type
-class KeyedItemNode(MappingNode):
+class KeyedItemNode(MappingNode[_T]):
 
     """Map a graph node from a keyed item in an existing node (dictionary lookup)"""
 
-    src_id: NodeId
+    src_id: NodeId[Bundle[_T]]
     src_item: str
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
