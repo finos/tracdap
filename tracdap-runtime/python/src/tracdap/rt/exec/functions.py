@@ -16,17 +16,14 @@ from __future__ import annotations
 
 import copy
 import datetime
-import enum
 import abc
-import json
 import random
-import yaml
-import uuid
 import dataclasses as dc  # noqa
 
 import tracdap.rt.api as _api
 import tracdap.rt.config as _config
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.impl.config_parser as _cfg_p
 import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.storage as _storage
 import tracdap.rt.impl.models as _models
@@ -185,25 +182,9 @@ class SaveJobResultFunc(NodeFunction[None]):
         if not self.node.result_spec.save_result:
             return None
 
-        # TODO: Full implementation
-        class Dumper(json.JSONEncoder):
-            def default(self, o: tp.Any) -> str:
-
-                if isinstance(o, enum.Enum):
-                    return o.name
-                if isinstance(o, uuid.UUID):
-                    return str(o)
-                elif type(o).__module__.startswith("tracdap."):
-                    return {**o.__dict__}  # noqa
-                else:
-                    return super().default(o)
-
-        if self.node.result_spec.result_format == "json":
-            job_result_bytes = bytes(json.dumps(job_result, cls=Dumper, indent=4), "utf-8")
-        elif self.node.result_spec.result_format == "yaml":
-            job_result_bytes = bytes(yaml.dump(job_result), "utf-8")
-        else:
-            raise _ex.EUnexpected(f"Unsupported result format [{self.node.result_spec.result_format}]")
+        job_result_format = self.node.result_spec.result_format
+        job_result_str = _cfg_p.ConfigQuoter.quote(job_result, job_result_format)
+        job_result_bytes = bytes(job_result_str, "utf-8")
 
         job_key = _util.object_key(job_result.jobId)
         job_result_file = f"job_result_{job_key}.{self.node.result_spec.result_format}"

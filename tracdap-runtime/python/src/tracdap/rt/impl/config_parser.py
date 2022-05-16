@@ -18,6 +18,7 @@ import re
 import typing as tp
 import decimal
 import enum
+import uuid
 import inspect
 import dataclasses as _dc
 
@@ -369,3 +370,44 @@ class ConfigParser(tp.Generic[_T]):
             return item
         else:
             return parent_location + "." + item
+
+
+class ConfigQuoter:
+
+    JSON_FORMAT = "json"
+    YAML_FORMAT = "yaml"
+
+    @classmethod
+    def quote(cls, obj: tp.Any, quote_format: str) -> str:
+
+        if quote_format.lower() == cls.JSON_FORMAT:
+            return cls.quote_json(obj)
+
+        if quote_format.lower() == cls.YAML_FORMAT:
+            return cls.quote_yaml(obj)
+
+        # TODO: This is probably an error in the user-supplied parameters
+        raise _ex.EUnexpected(f"Unsupported output format [{quote_format}]")
+
+    @classmethod
+    def quote_json(cls, obj: tp.Any) -> str:
+
+        return json.dumps(obj, cls=ConfigQuoter._JsonEncoder, indent=4)
+
+    @classmethod
+    def quote_yaml(cls, obj: tp.Any) -> str:
+
+        return yaml.dump(obj)
+
+    class _JsonEncoder(json.JSONEncoder):
+
+        def default(self, o: tp.Any) -> str:
+
+            if isinstance(o, enum.Enum):
+                return o.name
+            if isinstance(o, uuid.UUID):
+                return str(o)
+            elif type(o).__module__.startswith("tracdap."):
+                return {**o.__dict__}  # noqa
+            else:
+                return super().default(o)
