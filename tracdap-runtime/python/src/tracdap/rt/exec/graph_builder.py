@@ -145,17 +145,17 @@ class GraphBuilder:
 
         input_section = cls.build_job_inputs(
             job_config, job_namespace, inputs,
-            explicit_deps=[job_push_id])
+            explicit_deps=[job_push_id, *params_section.must_run])
 
         exec_obj = _util.get_job_resource(target, job_config)
 
         exec_section = cls.build_model_or_flow(
             job_config, job_namespace, exec_obj,
-            explicit_deps=[job_push_id])
+            explicit_deps=[job_push_id, *params_section.must_run, *input_section.must_run])
 
         output_section = cls.build_job_outputs(
             job_config, job_namespace, outputs,
-            explicit_deps=[job_push_id])
+            explicit_deps=[job_push_id, *exec_section.must_run])
 
         main_section = cls._join_sections(params_section, input_section, exec_section, output_section)
 
@@ -188,7 +188,7 @@ class GraphBuilder:
 
             nodes[param_id] = param_node
 
-        return GraphSection(nodes, outputs=set(nodes.keys()))
+        return GraphSection(nodes, outputs=set(nodes.keys()), must_run=list(nodes.keys()))
 
     @classmethod
     def build_job_inputs(
@@ -199,6 +199,7 @@ class GraphBuilder:
 
         nodes = dict()
         outputs = set()
+        must_run = list()
 
         for input_name, data_selector in inputs.items():
 
@@ -230,8 +231,9 @@ class GraphBuilder:
 
             # Job-level data view is an output of the load operation
             outputs.add(data_view_id)
+            must_run.append(data_spec_id)
 
-        return GraphSection(nodes, outputs=outputs)
+        return GraphSection(nodes, outputs=outputs, must_run=must_run)
 
     @classmethod
     def build_job_outputs(
@@ -276,7 +278,8 @@ class GraphBuilder:
                 data_spec_node = DynamicDataSpecNode(
                         data_spec_id, data_view_id,
                         data_id, storage_id,
-                        prior_data_spec=None)
+                        prior_data_spec=None,
+                        explicit_deps=explicit_deps)
 
                 output_data_key = _util.object_key(data_id)
                 output_storage_key = _util.object_key(storage_id)
@@ -434,7 +437,7 @@ class GraphBuilder:
             nodes[output_id] = KeyedItemNode(output_id, model_id, output_id.name)
 
         # Assemble a graph to include the model and its outputs
-        return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids)
+        return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids, must_run=[model_id])
 
     @classmethod
     def build_flow(
@@ -625,8 +628,9 @@ class GraphBuilder:
         first_section = sections[0]
         last_section = sections[-1]
 
-        inputs = set(first_section.inputs)
         nodes = {**first_section.nodes}
+        inputs = set(first_section.inputs)
+        must_run = list()
 
         for i in range(1, n_sections):
 
@@ -643,5 +647,6 @@ class GraphBuilder:
                     raise _ex.ETracInternal()  # todo inconsistent graph
 
             nodes.update(current_section.nodes)
+            must_run.extend(current_section.must_run)
 
-        return GraphSection(nodes, inputs, last_section.outputs, last_section.must_run)
+        return GraphSection(nodes, inputs, last_section.outputs, must_run)
