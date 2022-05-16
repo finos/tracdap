@@ -133,7 +133,9 @@ class TracRuntime:
             if self._dev_mode:
 
                 job_config, sys_config = _dev_mode.DevModeTranslator.translate_dev_mode_config(
-                    self._sys_config_dir, self._sys_config, self._job_config, self._model_class)
+                    self._sys_config, self._job_config,
+                    self._sys_config_path, self._job_config_path,
+                    self._model_class)
 
                 self._job_config = job_config
                 self._sys_config = sys_config
