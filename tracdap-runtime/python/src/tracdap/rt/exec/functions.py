@@ -276,7 +276,7 @@ class DataResultFunc(NodeFunction[ObjectBundle]):
         return bundle
 
 
-class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
+class DynamicDataSpecFunc(NodeFunction[_data.DataSpec]):
 
     DATA_ITEM_TEMPLATE = "data/{}/{}/{}/snap-{:d}/delta-{:d}"
     STORAGE_PATH_TEMPLATE = "data/{}/{}/{}/snap-{:d}/delta-{:d}-x{:0>6x}"
@@ -288,7 +288,7 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
         self.node = node
         self.storage = storage
 
-    def _execute(self, ctx: NodeContext) -> _data.DataItemSpec:
+    def _execute(self, ctx: NodeContext) -> _data.DataSpec:
 
         if self.node.prior_data_spec is not None:
             raise _ex.ETracInternal("Data updates not supported yet")
@@ -351,7 +351,7 @@ class DynamicDataSpecFunc(NodeFunction[_data.DataItemSpec]):
         storage_def = meta.StorageDefinition()
         storage_def.dataItems[data_item] = storage_item
 
-        return _data.DataItemSpec(
+        return _data.DataSpec(
             data_item,
             data_def,
             storage_def,

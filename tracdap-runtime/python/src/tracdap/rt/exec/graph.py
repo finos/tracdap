@@ -216,14 +216,14 @@ class KeyedItemNode(MappingNode[_T]):
 
 
 @_node_type
-class DynamicDataSpecNode(Node[_data.DataItemSpec]):
+class DynamicDataSpecNode(Node[_data.DataSpec]):
 
     data_view_id: NodeId[_data.DataView]
 
     data_obj_id: meta.TagHeader
     storage_obj_id: meta.TagHeader
 
-    prior_data_spec: tp.Optional[_data.DataItemSpec]
+    prior_data_spec: tp.Optional[_data.DataSpec]
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
         return {self.data_view_id: DependencyType.HARD}
@@ -254,7 +254,7 @@ class DataItemNode(MappingNode):
 class DataResultNode(Node[ObjectBundle]):
 
     output_name: str
-    data_spec_id: NodeId[_data.DataItemSpec]
+    data_spec_id: NodeId[_data.DataSpec]
     data_save_id: NodeId[type(None)]
 
     data_key: str
@@ -275,7 +275,7 @@ class LoadDataNode(Node[_data.DataItem]):
     The latest incarnation of the item will be loaded from any available copy
     """
 
-    spec_id: NodeId[_data.DataItemSpec]
+    spec_id: NodeId[_data.DataSpec]
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
         return {self.spec_id: DependencyType.HARD}
@@ -288,7 +288,7 @@ class SaveDataNode(Node):
     Save an individual data item to storage
     """
 
-    spec_id: NodeId[_data.DataItemSpec]
+    spec_id: NodeId[_data.DataSpec]
     data_item_id: NodeId[_data.DataItem]
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:

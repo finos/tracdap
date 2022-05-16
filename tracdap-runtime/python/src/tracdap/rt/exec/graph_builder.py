@@ -209,10 +209,10 @@ class GraphBuilder:
 
             root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
             data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
-            data_spec = _data.DataItemSpec(data_item, data_def, storage_def, schema_def=None)
+            data_spec = _data.DataSpec(data_item, data_def, storage_def, schema_def=None)
 
             # Data spec node is static, using the assembled data spec
-            data_spec_id = NodeId.of(f"{input_name}:SPEC", job_namespace, _data.DataItemSpec)
+            data_spec_id = NodeId.of(f"{input_name}:SPEC", job_namespace, _data.DataSpec)
             data_spec_node = StaticValueNode(data_spec_id, data_spec, explicit_deps=explicit_deps)
 
             # Physical load of data items from disk
@@ -247,7 +247,7 @@ class GraphBuilder:
 
             # Output data view must already exist in the namespace
             data_view_id = NodeId.of(output_name, job_namespace, _data.DataView)
-            data_spec_id = NodeId.of(f"{output_name}:SPEC", job_namespace, _data.DataItemSpec)
+            data_spec_id = NodeId.of(f"{output_name}:SPEC", job_namespace, _data.DataSpec)
 
             data_obj = _util.get_job_resource(data_selector, job_config, optional=True)
 
@@ -259,7 +259,7 @@ class GraphBuilder:
 
                 root_part_opaque_key = 'part-root'  # TODO: Central part names / constants
                 data_item = data_def.parts[root_part_opaque_key].snap.deltas[0].dataItem
-                data_spec = _data.DataItemSpec(data_item, data_def, storage_def, schema_def=None)
+                data_spec = _data.DataSpec(data_item, data_def, storage_def, schema_def=None)
 
                 data_spec_node = StaticValueNode(data_spec_id, data_spec, explicit_deps=explicit_deps)
 

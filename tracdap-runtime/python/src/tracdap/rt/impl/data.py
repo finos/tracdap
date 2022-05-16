@@ -30,7 +30,7 @@ import tracdap.rt.impl.util as _util
 
 
 @dc.dataclass(frozen=True)
-class DataItemSpec:
+class DataSpec:
 
     data_item: str
     data_def: _meta.DataDefinition
