@@ -2,7 +2,7 @@
 job:
   runFlow:
 
-    flow: ./chaining_flow.json
+    flow: ./chaining_flow.yaml
 
     parameters:
       eur_usd_rate: 1.2071

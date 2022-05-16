@@ -1,0 +1,29 @@
+
+nodes:
+
+  customer_loans:
+    nodeType: "INPUT_NODE"
+
+  currency_data:
+    nodeType: "INPUT_NODE"
+
+  sales_projection_model:
+    nodeType: "MODEL_NODE"
+    modelStub:
+      inputs: [customer_loans, currency_data]
+      outputs: [preprocessed_1, preprocessed_2]
+
+  aggregation_model_1:
+    nodeType: "MODEL_NODE"
+    modelStub:
+      inputs: [preprocessed_1, preprocessed_2]
+      outputs: [aggregate_1]
+
+  aggregation_model_2:
+    nodeType: "MODEL_NODE"
+    modelStub:
+      inputs: [aggregate_1]
+      outputs: [profit_by_region]
+
+  profit_by_region:
+    nodeType: "OUTPUT_NODE"
