@@ -56,6 +56,8 @@ class DevModeTranslator:
 
         cls._log.info(f"Applying dev mode config translation")
 
+        sys_config = cls._add_integrated_repo(sys_config)
+
         if not job_config.jobId:
             job_config = cls._process_job_id(job_config)
 
@@ -63,9 +65,19 @@ class DevModeTranslator:
             job_config = cls._process_job_type(job_config)
 
         if model_class is not None:
-            job_config, sys_config = cls._process_model_definition(job_config, sys_config, model_class)
+
+            model_id, model_obj = cls._generate_model_for_class(sys_config, model_class)
+            job_config = cls._add_job_resource(job_config, model_id, model_obj)
+            job_config.job.runModel.model = _util.selector_for(model_id)
 
         if job_config.job.jobType == _meta.JobType.RUN_FLOW:
+
+            original_models = job_config.job.runFlow.models.copy()
+            for model_key, model_detail in original_models.items():
+                model_id, model_obj = cls._generate_model_for_entry_point(sys_config, model_detail)
+                job_config = cls._add_job_resource(job_config, model_id, model_obj)
+                job_config.job.runFlow.models[model_key] = _util.selector_for(model_id)
+
             job_config, sys_config = cls._process_flow_definition(job_config, sys_config, job_config_path.parent)
 
         if job_config.job.jobType in [_meta.JobType.RUN_MODEL, _meta.JobType.RUN_FLOW]:
@@ -123,6 +135,26 @@ class DevModeTranslator:
         return job_config, sys_config
 
     @classmethod
+    def _add_integrated_repo(cls, sys_config: _cfg.RuntimeConfig) -> _cfg.RuntimeConfig:
+
+        # Add the integrated model repo trac_integrated
+
+        sys_config.repositories["trac_integrated"] = _cfg.RepositoryConfig("integrated")
+
+        return sys_config
+
+    @classmethod
+    def _add_job_resource(
+            cls, job_config: _cfg.JobConfig,
+            obj_id: _meta.TagHeader, obj: _meta.ObjectDefinition) \
+            -> _cfg.JobConfig:
+
+        obj_key = _util.object_key(obj_id)
+        job_config.resources[obj_key] = obj
+
+        return job_config
+
+    @classmethod
     def _process_job_id(cls, job_config: _cfg.JobConfig):
 
         job_id = _util.new_object_id(_meta.ObjectType.JOB)
@@ -161,33 +193,34 @@ class DevModeTranslator:
         return job_config
 
     @classmethod
-    def _process_model_definition(
-            cls, job_config: _cfg.JobConfig, sys_config: _cfg.RuntimeConfig,
-            model_class: _api.TracModel.__class__) \
-            -> (_cfg.JobConfig, _cfg.RuntimeConfig):
+    def _generate_model_for_class(
+            cls, sys_config: _cfg.RuntimeConfig, model_class: _api.TracModel.__class__) \
+            -> (_meta.TagHeader, _meta.ObjectDefinition):
 
-        # Add the integrated model repo trac_integrated
+        model_entry_point = f"{model_class.__module__}.{model_class.__name__}"
 
-        repos = copy.copy(sys_config.repositories)
-        repos["trac_integrated"] = _cfg.RepositoryConfig("integrated")
-        translated_sys_config = copy.copy(sys_config)
-        translated_sys_config.repositories = repos
+        return cls._generate_model_for_entry_point(sys_config, model_entry_point)
+
+    @classmethod
+    def _generate_model_for_entry_point(
+            cls, sys_config: _cfg.RuntimeConfig, model_entry_point: str) \
+            -> (_meta.TagHeader, _meta.ObjectDefinition):
 
         model_id = _util.new_object_id(_meta.ObjectType.MODEL)
         model_key = _util.object_key(model_id)
 
-        cls._log.info(f"Generating model definition for [{model_class.__name__}] with ID = [{model_key}]")
+        cls._log.info(f"Generating model definition for [{model_entry_point}] with ID = [{model_key}]")
 
         skeleton_modeL_def = _meta.ModelDefinition(  # noqa
             language="python",
             repository="trac_integrated",
-            entryPoint=f"{model_class.__module__}.{model_class.__name__}",
+            entryPoint=model_entry_point,
 
             parameters={},
             inputs={},
             outputs={})
 
-        loader = _models.ModelLoader(translated_sys_config)
+        loader = _models.ModelLoader(sys_config)
 
         try:
             loader.create_scope("DEV_MODE_TRANSLATION")
@@ -199,7 +232,7 @@ class DevModeTranslator:
         model_def = _meta.ModelDefinition(  # noqa
             language="python",
             repository="trac_integrated",
-            entryPoint=f"{model_class.__module__}.{model_class.__name__}",
+            entryPoint=model_entry_point,
 
             parameters=model_scan.parameters,
             inputs=model_scan.inputs,
@@ -209,12 +242,7 @@ class DevModeTranslator:
             objectType=_meta.ObjectType.MODEL,
             model=model_def)
 
-        translated_job_config = copy.copy(job_config)
-        translated_job_config.job.runModel.model = model_id
-        translated_job_config.resources = copy.copy(job_config.resources)
-        translated_job_config.resources[model_key] = model_object
-
-        return translated_job_config, translated_sys_config
+        return model_id, model_object
 
     @classmethod
     def _process_flow_definition(
@@ -247,6 +275,7 @@ class DevModeTranslator:
         flow_def = flow_parser.parse(flow_raw_data, flow_path.name)
 
         flow_def = cls._autowire_flow(flow_def)
+        flow_def = cls._generate_flow_parameters(flow_def, job_config)
 
         flow_json = _cfg_p.ConfigQuoter.quote(flow_def, _cfg_p.ConfigQuoter.JSON_FORMAT)
         print(flow_json)
@@ -319,6 +348,59 @@ class DevModeTranslator:
         autowired_flow.edges = list(edges.values())
 
         return autowired_flow
+
+    @classmethod
+    def _generate_flow_parameters(
+            cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig) \
+            -> _meta.FlowDefinition:
+
+        params: tp.Dict[str, _meta.ModelParameter] = dict()
+
+        for node_name, node in flow.nodes.items():
+
+            if node.nodeType != _meta.FlowNodeType.MODEL_NODE:
+                continue
+
+            if node_name not in job_config.job.runFlow.models:
+                err = f"No model supplied for flow model node [{node_name}]"
+                cls._log.error(err)
+                raise _ex.EConfigParse(err)
+
+            model_selector = job_config.job.runFlow.models[node_name]
+            model_obj = _util.get_job_resource(model_selector, job_config)
+
+            for param_name, param in model_obj.model.parameters.items():
+
+                if param_name not in params:
+                    params[param_name] = param
+
+                else:
+                    existing_param = params[param_name]
+
+                    if param.paramType != existing_param.paramType:
+                        err = f"Model parameter [{param_name}] has different types in different models"
+                        cls._log.error(err)
+                        raise _ex.EConfigParse(err)
+
+                    if param.defaultValue != existing_param.defaultValue:
+                        if existing_param.defaultValue is None:
+                            params[param_name] = param
+                        elif param.defaultValue is not None:
+                            warn = f"Model parameter [{param_name}] has different default values in different models" \
+                                 + f" (using [{_types.MetadataCodec.decode_value(existing_param.defaultValue)}])"
+                            cls._log.warning(warn)
+
+        flow.parameters = params
+
+        return flow
+
+    @classmethod
+    def _generate_flow_inputs(cls):
+        pass
+
+    @classmethod
+    def _generate_flow_outputs(cls):
+        pass
 
     @classmethod
     def _process_parameters(cls, job_config: _cfg.JobConfig) -> _cfg.JobConfig:

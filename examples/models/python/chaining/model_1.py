@@ -12,20 +12,25 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import datetime as dt
 import typing as tp
+
 import tracdap.rt.api as trac
 
 
 class FirstModel(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
-        pass
+
+        return trac.declare_parameters(
+            trac.P("param_1", trac.INTEGER, "First parameter"),
+            trac.P("param_2", trac.DATE, "Second parameter", default_value=dt.date(2001, 1, 1)))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
-        pass
+        return {}
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
-        pass
+        return {}
 
     def run_model(self, ctx: trac.TracContext):
         pass
