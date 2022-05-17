@@ -116,7 +116,7 @@ class _ContextPushPopFunc(NodeFunction[Bundle[tp.Any]], abc.ABC):
 
             # Should never happen, source items are dependencies in the graph
             if source_item is None:
-                raise _ex.EUnexpected()
+                raise _ex.EUnexpected(source_id)
 
             target_ctx[target_id] = source_item
 

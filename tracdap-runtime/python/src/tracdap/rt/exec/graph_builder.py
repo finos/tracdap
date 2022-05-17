@@ -352,15 +352,14 @@ class GraphBuilder:
     @classmethod
     def build_model_or_flow_with_context(
             cls, job_config: config.JobConfig, namespace: NodeNamespace,
-            model_or_flow: meta.ObjectDefinition,
+            model_or_flow_name: str, model_or_flow: meta.ObjectDefinition,
             input_mapping: tp.Dict[str, NodeId], output_mapping: tp.Dict[str, NodeId],
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
         # Generate a name for a new unique sub-context
 
-        model_or_flow_name = "trac_model"  # TODO: unique name
-        sub_namespace_name = f"{model_or_flow.objectType} = {model_or_flow_name}"
+        sub_namespace_name = f"{model_or_flow.objectType.name} = {model_or_flow_name}"
         sub_namespace = NodeNamespace(sub_namespace_name, namespace)
 
         # Execute in the sub-context by doing PUSH, EXEC, POP
@@ -417,7 +416,11 @@ class GraphBuilder:
         # Always add the prior graph root ID as a dependency
         # This is to ensure dependencies are still pulled in for models with no inputs!
 
-        model_scope = str(namespace)
+        job_namespace = namespace
+        while job_namespace.parent:
+            job_namespace = job_namespace.parent
+
+        model_scope = str(job_namespace)
         model_name = model_def.entryPoint.split(".")[-1]  # TODO: Check unique model name
         model_id = NodeId(model_name, namespace, Bundle[_data.DataView])
 
@@ -461,10 +464,13 @@ class GraphBuilder:
             remaining_edges_by_target[edge.target.node].append(edge)
             remaining_edges_by_source[edge.source.node].append(edge)
 
+        reachable_nodes = dict()
+
         # Initial set of reachable flow nodes is just the input nodes
-        reachable_nodes = dict(filter(
-            lambda kv: kv[1].nodeType == meta.FlowNodeType.INPUT_NODE,
-            remaining_nodes.items()))
+        for node_name, node in list(remaining_nodes.items()):
+            if node.nodeType == meta.FlowNodeType.INPUT_NODE:
+                reachable_nodes[node_name] = node
+                del remaining_nodes[node_name]
 
         target_edges = {socket_key(edge.target): edge for edge in flow_def.edges}
 
@@ -490,7 +496,10 @@ class GraphBuilder:
 
             graph_section.nodes.update(execution_nodes)
 
-            source_edges = remaining_edges_by_source.pop(node_name)
+            if node.nodeType != meta.FlowNodeType.OUTPUT_NODE:
+                source_edges = remaining_edges_by_source.pop(node_name)
+            else:
+                source_edges = []
 
             for edge in source_edges:
 
@@ -537,7 +546,15 @@ class GraphBuilder:
 
         if node.nodeType == meta.FlowNodeType.MODEL_NODE:
 
-            input_mappings_ = [target_mapping(node_name, input_name) for input_name in node.modelStub.inputs]
+            input_mappings_ = [
+                target_mapping(node_name, input_name)
+                for input_name in node.modelStub.inputs]
+
+            param_mappings_ = [
+                (NodeId(param_name, namespace), NodeId(f"{node_name}.{param_name}", namespace))
+                for param_name in job_config.job.runFlow.parameters]
+
+            input_mappings_.extend(param_mappings_)
 
             mapping_nodes = {
                 target_id: IdentityNode(target_id, source_id)
@@ -547,17 +564,17 @@ class GraphBuilder:
             model_selector = flow_job.models.get(node_name)
             model_obj = _util.get_job_resource(model_selector, job_config)
 
-            push_mapping = dict(
-                (NodeId(input_, model_namespace), socket_id(node_name, input_))
-                for input_ in model_obj.model.inputs)
+            push_mapping = {
+                input_: NodeId(f"{node_name}.{input_}", namespace)
+                for input_ in [*model_obj.model.inputs, *model_obj.model.parameters]}
 
-            pop_mapping = dict(
-                (NodeId(output_, model_namespace), socket_id(node_name, output_))
-                for output_ in model_obj.model.outputs)
+            pop_mapping = {
+                output_: NodeId(f"{node_name}.{output_}", namespace)
+                for output_ in model_obj.model.outputs}
 
             sub_graph = cls.build_model_or_flow_with_context(
-                job_config, namespace,
-                model_obj, push_mapping, pop_mapping)
+                job_config, namespace, node_name, model_obj,
+                push_mapping, pop_mapping)
 
             return {**sub_graph.nodes, **mapping_nodes}
 
@@ -588,8 +605,8 @@ class GraphBuilder:
 
         # Create an explicit marker for each data node pushed into the new context
 
-        for node_id in push_mapping.keys():
-            nodes[node_id] = IdentityNode(node_id, proxy_for=push_id)
+        for inner_id, outer_id in push_mapping.items():
+            nodes[inner_id] = IdentityNode(inner_id, outer_id, explicit_deps=[push_id])
 
         return GraphSection(
             nodes,
@@ -622,8 +639,11 @@ class GraphBuilder:
 
         # Create an explicit marker for each data node popped into the outer context
 
+        for inner_id, outer_id in pop_mapping.items():
+            nodes[outer_id] = IdentityNode(outer_id, inner_id, explicit_deps=[pop_id])
+
         for node_id in pop_mapping.values():
-            nodes[node_id] = IdentityNode(node_id, proxy_for=pop_id)
+            nodes[node_id] = IdentityNode(node_id, pop_id)
 
         return GraphSection(
             nodes,
@@ -654,9 +674,15 @@ class GraphBuilder:
                 if allow_partial_inputs:
                     inputs.update(requirements_not_met)
                 else:
-                    raise _ex.ETracInternal()  # todo inconsistent graph
+                    err = ', '.join(map(str, requirements_not_met))
+                    raise _ex.ETracInternal(err)  # todo inconsistent graph
 
-            nodes.update(current_section.nodes)
-            must_run.extend(current_section.must_run)
+            try:
+                nodes.update(current_section.nodes)
+                must_run.extend(current_section.must_run)
+            except AttributeError as e:
+                x = 1
+                y = 2
+                raise e
 
         return GraphSection(nodes, inputs, last_section.outputs, must_run)

@@ -105,9 +105,13 @@ class DevModeTranslator:
             data_id = _util.new_object_id(_meta.ObjectType.DATA)
             storage_id = _util.new_object_id(_meta.ObjectType.STORAGE)
 
-            if is_input and job_config.job.jobType == _meta.JobType.RUN_MODEL:
-                model_def = job_config.resources[_util.object_key(job_config.job.runModel.model)]
-                schema = model_def.model.inputs[data_key].schema
+            if is_input:
+                if job_config.job.jobType == _meta.JobType.RUN_MODEL:
+                    model_def = job_config.resources[_util.object_key(job_config.job.runModel.model)]
+                    schema = model_def.model.inputs[data_key].schema
+                else:
+                    flow_def = job_config.resources[_util.object_key(job_config.job.runFlow.flow)]
+                    schema = flow_def.flow.inputs[data_key].schema
             else:
                 schema = None
 

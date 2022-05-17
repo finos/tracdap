@@ -11,6 +11,7 @@ job:
 
     inputs:
       customer_loans: "inputs/loan_final313_100.csv"
+      currency_data: "inputs/currency_data_sample.csv"
 
     outputs:
       profit_by_region: "outputs/hello_pandas/profit_by_region.csv"
