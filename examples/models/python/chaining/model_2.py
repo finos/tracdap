@@ -27,10 +27,20 @@ class SecondModel(trac.TracModel):
             trac.P("param_3", trac.FLOAT, "A float parameter"))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
-        return {}
+
+        preprocessed = trac.declare_input_table(
+            trac.F("id", trac.BasicType.STRING, label="Customer account ID", business_key=True),
+            trac.F("some_quantity_x", trac.BasicType.DECIMAL, label="Some quantity X", format_code="CCY:EUR"))
+
+        return {"preprocessed_data": preprocessed}
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
-        return {}
+
+        profit_by_region = trac.declare_output_table(
+            trac.F("region", trac.BasicType.STRING, label="Customer home region", categorical=True),
+            trac.F("gross_profit", trac.BasicType.DECIMAL, label="Total gross profit", format_code="CCY:USD"))
+
+        return {"profit_by_region": profit_by_region}
 
     def run_model(self, ctx: trac.TracContext):
         pass

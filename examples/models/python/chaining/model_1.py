@@ -27,10 +27,28 @@ class FirstModel(trac.TracModel):
             trac.P("param_2", trac.DATE, "Second parameter", default_value=dt.date(2001, 1, 1)))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
-        return {}
+
+        customer_loans = trac.declare_input_table(
+            trac.F("id", trac.BasicType.STRING, label="Customer account ID", business_key=True),
+            trac.F("loan_amount", trac.BasicType.DECIMAL, label="Principal loan amount", format_code="CCY:EUR"),
+            trac.F("total_pymnt", trac.BasicType.DECIMAL, label="Total amount repaid", format_code="CCY:EUR"),
+            trac.F("region", trac.BasicType.STRING, label="Customer home region", categorical=True),
+            trac.F("loan_condition_cat", trac.BasicType.INTEGER, label="Loan condition category", categorical=True))
+
+        currency_data = trac.declare_input_table(
+            trac.F("ccy_code", trac.BasicType.STRING, label="Currency code", categorical=True),
+            trac.F("spot_date", trac.BasicType.DATE, label="Spot date for FX rate"),
+            trac.F("dollar_rate", trac.BasicType.DECIMAL, label="Dollar FX rate", format_code="CCY:USD"))
+
+        return {"customer_loans": customer_loans, "currency_data": currency_data}
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
-        return {}
+
+        preprocessed = trac.declare_output_table(
+            trac.F("id", trac.BasicType.STRING, label="Customer account ID", business_key=True),
+            trac.F("some_quantity_x", trac.BasicType.DECIMAL, label="Some quantity X", format_code="CCY:EUR"))
+
+        return {"preprocessed_data": preprocessed}
 
     def run_model(self, ctx: trac.TracContext):
         pass

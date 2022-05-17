@@ -5,9 +5,9 @@ job:
     flow: ./chaining_flow.yaml
 
     parameters:
-      eur_usd_rate: 1.2071
-      default_weighting: 1.5
-      filter_defaults: false
+      param_1: 42
+      param_2: "2015-01-01"
+      param_3: 1.5
 
     inputs:
       customer_loans: "inputs/loan_final313_100.csv"
