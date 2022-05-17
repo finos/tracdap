@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import collections
 import copy
 
 import tracdap.rt.config as config
@@ -41,6 +40,9 @@ class GraphBuilder:
 
         if job_config.job.jobType == meta.JobType.RUN_MODEL:
             return cls.build_standard_job(job_config, result_spec, cls.build_run_model_job)
+
+        if job_config.job.jobType == meta.JobType.RUN_FLOW:
+            return cls.build_standard_job(job_config, result_spec, cls.build_run_flow_job)
 
         raise _ex.EConfigParse(f"Job type [{job_config.job.jobType}] is not supported yet")
 
@@ -446,28 +448,32 @@ class GraphBuilder:
             explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
+        def socket_key(socket):
+            return f"{socket.node}.{socket.socket}" if socket.socket else socket.node
+
         # https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm
 
-        x = collections.defaultdict(list)
-
         remaining_nodes = copy.copy(flow_def.nodes)
-        remaining_edges_by_source = {edge.source.node: edge for edge in flow_def.edges}
-        remaining_edges_by_target = {edge.target.node: edge for edge in flow_def.edges}
+        remaining_edges_by_target = {edge.target.node: [] for edge in flow_def.edges}
+        remaining_edges_by_source = {edge.source.node: [] for edge in flow_def.edges}
+
+        for edge in flow_def.edges:
+            remaining_edges_by_target[edge.target.node].append(edge)
+            remaining_edges_by_source[edge.source.node].append(edge)
 
         # Initial set of reachable flow nodes is just the input nodes
         reachable_nodes = dict(filter(
-            lambda _, n: n.nodeType == meta.FlowNodeType.INPUT_NODE,
+            lambda kv: kv[1].nodeType == meta.FlowNodeType.INPUT_NODE,
             remaining_nodes.items()))
 
-        target_edges = {edge.target: edge for edge in flow_def.edges}
+        target_edges = {socket_key(edge.target): edge for edge in flow_def.edges}
 
         # Initial graph section for the flow is empty
         graph_section = GraphSection({})
 
         while any(reachable_nodes):
 
-            node_name = next(iter(reachable_nodes))
-            node = reachable_nodes.pop(node_name)
+            node_name, node = reachable_nodes.popitem()
 
             if node.nodeType == meta.FlowNodeType.INPUT_NODE:
                 graph_section.inputs.add(NodeId(node_name, namespace))
@@ -489,10 +495,10 @@ class GraphBuilder:
             for edge in source_edges:
 
                 target_node_name = edge.target.node
-                target_edges = remaining_edges_by_target[target_node_name]
-                target_edges.remove(edge)
+                target_edges_ = remaining_edges_by_target[target_node_name]
+                target_edges_.remove(edge)
 
-                if len(target_edges) == 0:
+                if len(target_edges_) == 0:
                     target_node = remaining_nodes.pop(target_node_name)
                     reachable_nodes[target_node_name] = target_node
 
@@ -510,13 +516,16 @@ class GraphBuilder:
 
         flow_job = job_config.job.runFlow
 
+        def socket_key(socket):
+            return f"{socket.node}.{socket.socket}" if socket.socket else socket.node
+
         def socket_id(node_: str, socket_: str = None):
             socket_name = f"{node_}.{socket_}" if socket_ else node_
             return NodeId(socket_name, namespace)
 
         def target_mapping(node_: str, socket_: str = None):
             socket = meta.FlowSocket(node_, socket_)
-            edge = target_edges.get(socket)  # todo: inconsistent if missing
+            edge = target_edges.get(socket_key(socket))  # todo: inconsistent if missing
             return socket_id(edge.source.node, edge.source.socket), socket_id(edge.target.node, edge.target.socket)
 
         if node.nodeType == meta.FlowNodeType.INPUT_NODE:
@@ -528,10 +537,11 @@ class GraphBuilder:
 
         if node.nodeType == meta.FlowNodeType.MODEL_NODE:
 
+            input_mappings_ = [target_mapping(node_name, input_name) for input_name in node.modelStub.inputs]
+
             mapping_nodes = {
                 target_id: IdentityNode(target_id, source_id)
-                for input_name in node.modelStub.inputs
-                for source_id, target_id in target_mapping(node_name, input_name)}
+                for source_id, target_id in input_mappings_}
 
             model_namespace = NodeNamespace(f"MODEL = {node_name}", namespace)
             model_selector = flow_job.models.get(node_name)

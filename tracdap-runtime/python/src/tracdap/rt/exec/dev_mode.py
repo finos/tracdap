@@ -78,16 +78,22 @@ class DevModeTranslator:
                 job_config = cls._add_job_resource(job_config, model_id, model_obj)
                 job_config.job.runFlow.models[model_key] = _util.selector_for(model_id)
 
-            job_config, sys_config = cls._process_flow_definition(job_config, sys_config, job_config_path.parent)
+            flow_id, flow_obj = cls._expand_flow_definition(job_config, sys_config, job_config_path.parent)
+            job_config = cls._add_job_resource(job_config, flow_id, flow_obj)
+            job_config.job.runFlow.flow = _util.selector_for(flow_id)
 
         if job_config.job.jobType in [_meta.JobType.RUN_MODEL, _meta.JobType.RUN_FLOW]:
             job_config = cls._process_parameters(job_config)
 
-        if job_config.job.jobType != _meta.JobType.RUN_MODEL:
+        if job_config.job.jobType not in [_meta.JobType.RUN_MODEL, _meta.JobType.RUN_FLOW]:
             return job_config, sys_config
 
-        original_inputs = job_config.job.runModel.inputs
-        original_outputs = job_config.job.runModel.outputs
+        runInfo = job_config.job.runModel \
+            if job_config.job.jobType == _meta.JobType.RUN_MODEL \
+            else job_config.job.runFlow
+
+        original_inputs = runInfo.inputs
+        original_outputs = runInfo.outputs
         original_resources = job_config.resources
 
         translated_inputs = copy.copy(original_inputs)
@@ -129,8 +135,8 @@ class DevModeTranslator:
 
         job_config = copy.copy(job_config)
         job_config.resources = translated_resources
-        job_config.job.runModel.inputs = translated_inputs
-        job_config.job.runModel.outputs = translated_outputs
+        runInfo.inputs = translated_inputs
+        runInfo.outputs = translated_outputs
 
         return job_config, sys_config
 
@@ -245,7 +251,7 @@ class DevModeTranslator:
         return model_id, model_object
 
     @classmethod
-    def _process_flow_definition(
+    def _expand_flow_definition(
             cls, job_config: _cfg.JobConfig, sys_config: _cfg.RuntimeConfig,
             job_config_dir: pathlib.Path) \
             -> (_cfg.JobConfig, _cfg.RuntimeConfig):
@@ -276,11 +282,14 @@ class DevModeTranslator:
 
         flow_def = cls._autowire_flow(flow_def)
         flow_def = cls._generate_flow_parameters(flow_def, job_config)
+        flow_def = cls._generate_flow_inputs(flow_def, job_config)
+        flow_def = cls._generate_flow_outputs(flow_def, job_config)
 
-        flow_json = _cfg_p.ConfigQuoter.quote(flow_def, _cfg_p.ConfigQuoter.JSON_FORMAT)
-        print(flow_json)
+        flow_object = _meta.ObjectDefinition(
+            objectType=_meta.ObjectType.FLOW,
+            flow=flow_def)
 
-        raise _ex.EUnexpected()
+        return flow_id, flow_object
 
     @classmethod
     def _autowire_flow(cls, flow: _meta.FlowDefinition):
@@ -350,9 +359,7 @@ class DevModeTranslator:
         return autowired_flow
 
     @classmethod
-    def _generate_flow_parameters(
-            cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig) \
-            -> _meta.FlowDefinition:
+    def _generate_flow_parameters(cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig) -> _meta.FlowDefinition:
 
         params: tp.Dict[str, _meta.ModelParameter] = dict()
 
@@ -395,12 +402,88 @@ class DevModeTranslator:
         return flow
 
     @classmethod
-    def _generate_flow_inputs(cls):
-        pass
+    def _generate_flow_inputs(cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig) -> _meta.FlowDefinition:
+
+        inputs: tp.Dict[str, _meta.ModelInputSchema] = dict()
+
+        def socket_key(socket):
+            return f"{socket.node}.{socket.socket}" if socket.socket else socket.node
+
+        # Build a map of edges by source socket, mapping to all edges flowing from that source
+        edges = {socket_key(edge.source): [] for edge in flow.edges}
+        for edge in flow.edges:
+            edges[socket_key(edge.source)].append(edge)
+
+        for node_name, node in flow.nodes.items():
+
+            if node.nodeType != _meta.FlowNodeType.INPUT_NODE:
+                continue
+
+            input_edges = edges.get(node_name)
+
+            if not input_edges:
+                err = f"Flow input [{node_name}] is not connected, so the input schema cannot be inferred" \
+                    + f" (either remove the input or connect it to a model)"
+                cls._log.error(err)
+                raise _ex.EConfigParse(err)
+
+            input_schemas = []
+
+            for edge in input_edges:
+
+                target_node = flow.nodes.get(edge.target.node) # or cls._report_error(cls._MISSING_FLOW_NODE, node_name)
+                # cls._require(target_node.nodeType == _meta.FlowNodeType.MODEL_NODE)
+
+                model_selector = job_config.job.runFlow.models.get(edge.target.node)
+                model_obj = _util.get_job_resource(model_selector, job_config)
+                model_input = model_obj.model.inputs[edge.target.socket]
+                input_schemas.append(model_input)
+
+            if len(input_schemas) == 1:
+                inputs[node_name] = input_schemas[0]
+            else:
+                raise _ex.EUnexpected()  # todo schema combination
+
+        flow.inputs = inputs
+
+        return flow
 
     @classmethod
-    def _generate_flow_outputs(cls):
-        pass
+    def _generate_flow_outputs(cls, flow: _meta.FlowDefinition, job_config: _cfg.JobConfig) -> _meta.FlowDefinition:
+
+        outputs: tp.Dict[str, _meta.ModelOutputSchema] = dict()
+
+        def socket_key(socket):
+            return f"{socket.node}.{socket.socket}" if socket.socket else socket.node
+
+        # Build a map of edges by target socket, there can only be one edge per target in a valid flow
+        edges = {socket_key(edge.target): edge for edge in flow.edges}
+
+        for node_name, node in flow.nodes.items():
+
+            if node.nodeType != _meta.FlowNodeType.OUTPUT_NODE:
+                continue
+
+            edge = edges.get(node_name)
+
+            if not edge:
+                err = f"Flow output [{node_name}] is not connected, so the output schema cannot be inferred" \
+                      + f" (either remove the output or connect it to a model)"
+                cls._log.error(err)
+                raise _ex.EConfigParse(err)
+
+            source_node = flow.nodes.get(edge.source.node) # or cls._report_error(cls._MISSING_FLOW_NODE, node_name)
+            # cls._require(target_node.nodeType == _meta.FlowNodeType.MODEL_NODE)
+
+            model_selector = job_config.job.runFlow.models.get(edge.source.node)
+            model_obj = _util.get_job_resource(model_selector, job_config)
+            model_output = model_obj.model.outputs[edge.source.socket]
+
+            outputs[node_name] = model_output
+
+        flow.outputs = outputs
+
+        return flow
 
     @classmethod
     def _process_parameters(cls, job_config: _cfg.JobConfig) -> _cfg.JobConfig:
