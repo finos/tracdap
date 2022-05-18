@@ -101,9 +101,14 @@ class _ContextPushPopFunc(NodeFunction[Bundle[tp.Any]], abc.ABC):
 
     def _execute(self, ctx: NodeContext) -> Bundle[tp.Any]:
 
+        print("push/pop exec")
+
         target_ctx: Bundle[tp.Any] = dict()
 
         for inner_id, outer_id in self.node.mapping.items():
+
+            print(f"Inner = {str(inner_id)}")
+            print(f"Outer = {str(outer_id)}")
 
             # Should never happen, push / pop nodes should always be in their own inner context
             if inner_id.namespace != self.node.namespace:

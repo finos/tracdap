@@ -528,30 +528,32 @@ class GraphBuilder:
         def socket_key(socket):
             return f"{socket.node}.{socket.socket}" if socket.socket else socket.node
 
-        def socket_id(node_: str, socket_: str = None):
+        def socket_id(node_: str, socket_: str = None, result_type=None):
             socket_name = f"{node_}.{socket_}" if socket_ else node_
-            return NodeId(socket_name, namespace)
+            return NodeId(socket_name, namespace, result_type)
 
-        def target_mapping(node_: str, socket_: str = None):
+        def edge_mapping(node_: str, socket_: str = None, result_type=None):
             socket = meta.FlowSocket(node_, socket_)
             edge = target_edges.get(socket_key(socket))  # todo: inconsistent if missing
-            return socket_id(edge.source.node, edge.source.socket), socket_id(edge.target.node, edge.target.socket)
+            source_id_ = socket_id(edge.source.node, edge.source.socket, result_type)
+            target_id_ = socket_id(edge.target.node, edge.target.socket, result_type)
+            return source_id_, target_id_
 
         if node.nodeType == meta.FlowNodeType.INPUT_NODE:
             return {}
 
         if node.nodeType == meta.FlowNodeType.OUTPUT_NODE:
-            source_id, target_id = target_mapping(node_name)
+            source_id, target_id = edge_mapping(node_name, None, _data.DataView)
             return {target_id: IdentityNode(target_id, source_id)}
 
         if node.nodeType == meta.FlowNodeType.MODEL_NODE:
 
             input_mappings_ = [
-                target_mapping(node_name, input_name)
+                edge_mapping(node_name, input_name, _data.DataView)
                 for input_name in node.modelStub.inputs]
 
             param_mappings_ = [
-                (NodeId(param_name, namespace), NodeId(f"{node_name}.{param_name}", namespace))
+                (NodeId(param_name, namespace, meta.Value), NodeId(f"{node_name}.{param_name}", namespace, meta.Value))
                 for param_name in job_config.job.runFlow.parameters]
 
             input_mappings_.extend(param_mappings_)

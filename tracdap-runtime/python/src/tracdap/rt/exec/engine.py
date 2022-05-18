@@ -440,6 +440,13 @@ class NodeProcessor(_actors.Actor):
             ctx = NodeFunctionContext(self.graph.nodes)
             result = self.node.function(ctx)
 
+            expected_type = self.node.node.id.result_type
+
+            if not self._type_matches(result, expected_type):
+                expected_type_name = expected_type.__name__ if expected_type is not None else str(type(None))
+                result_type_name = type(result).__name__ if result is not None else str(type(None))
+                self._log.warning(f"Result has wrong type, expected [{expected_type_name}], got [{result_type_name}]")
+
             self.actors().send_parent("node_succeeded", self.node_id, result)
 
             self._log_node_succeeded()
@@ -449,6 +456,19 @@ class NodeProcessor(_actors.Actor):
             self.actors().send_parent("node_failed", self.node_id, e)
 
             self._log_node_failed(e)
+
+    @classmethod
+    def _type_matches(cls, result, expected_type):
+
+        if expected_type is None:
+            return result is None
+
+        generic_type = tp.get_origin(expected_type)
+
+        if generic_type is None:
+            return isinstance(result, expected_type)
+
+        return isinstance(result, generic_type)
 
     def _log_node_start(self):
 
@@ -550,6 +570,22 @@ class NodeFunctionContext(_func.NodeContext):
 
     def __iter__(self):
         return self.__nodes.__iter__()
+
+    def get(self, node_id: NodeId[__T]) -> __T:
+
+        graph_node = self.__nodes.get(node_id)
+
+        if graph_node is None:
+            return None
+
+        result = graph_node.result
+
+        if result is None:
+            return None
+
+        # todo: type check
+
+        return result
 
     def items(self):
         return self.__nodes.items()
