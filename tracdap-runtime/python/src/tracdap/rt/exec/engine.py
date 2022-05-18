@@ -339,7 +339,22 @@ class GraphProcessor(_actors.Actor):
         node = cp.copy(old_node)
         node.result = result
 
-        self._node_complete(node_id, node, succeeded=True)
+        self._update_results({node_id: node})
+
+    @_actors.Message
+    def node_succeeded_bundle(self, bundle: tp.Dict[NodeId, tp.Any]):
+
+        node_updates = dict()
+
+        for node_id, result in bundle.items():
+
+            old_node = self.graph.nodes[node_id]
+            node = cp.copy(old_node)
+            node.result = result
+
+            node_updates[node_id] = node
+
+        self._update_results(node_updates)
 
     @_actors.Message
     def node_failed(self, node_id: NodeId, error):
@@ -348,31 +363,63 @@ class GraphProcessor(_actors.Actor):
         node = cp.copy(old_node)
         node.error = error
 
-        self._node_complete(node_id, node, succeeded=False)
+        self._update_results({node_id: node})
 
-    def _node_complete(self, node_id: NodeId, node: _EngineNode, succeeded: bool):
+    def _update_results(self, updates: tp.Dict[NodeId, _EngineNode]):
 
-        nodes = {**self.graph.nodes, node_id: node}
+        nodes = {**self.graph.nodes, **updates}
 
-        new_graph = cp.copy(self.graph)
-        new_graph.nodes = nodes
-
+        pending_nodes = cp.copy(self.graph.pending_nodes)
         active_nodes = cp.copy(self.graph.active_nodes)
-        active_nodes.remove(node_id)
-        new_graph.active_nodes = active_nodes
+        succeeded_nodes = cp.copy(self.graph.succeeded_nodes)
+        failed_nodes = cp.copy(self.graph.failed_nodes)
 
-        if succeeded:
-            succeeded_nodes = cp.copy(self.graph.succeeded_nodes)
-            succeeded_nodes.add(node_id)
-            new_graph.succeeded_nodes = succeeded_nodes
+        for node_id, node in updates.items():
 
-        else:
-            failed_nodes = cp.copy(self.graph.failed_nodes)
-            failed_nodes.add(node_id)
-            new_graph.failed_nodes = failed_nodes
+            if node_id in active_nodes:
+                active_nodes.remove(node_id)
+            elif node_id in pending_nodes:
+                pending_nodes.remove(node_id)
+            else:
+                raise _ex.ETracInternal()
 
-        self.graph = new_graph
+            if node.error:
+                failed_nodes.add(node_id)
+            else:
+                succeeded_nodes.add(node_id)
+
+            if node_id in self.processors:
+                node_ref = self.processors.pop(node_id)
+                self.actors().stop(node_ref)
+
+        graph = _EngineContext(nodes, pending_nodes, active_nodes, succeeded_nodes, failed_nodes)
+
+        self.graph = graph
         self.check_job_status()
+
+    # def _node_complete(self, node_id: NodeId, node: _EngineNode, succeeded: bool):
+    #
+    #     nodes = {**self.graph.nodes, node_id: node}
+    #
+    #     new_graph = cp.copy(self.graph)
+    #     new_graph.nodes = nodes
+    #
+    #     active_nodes = cp.copy(self.graph.active_nodes)
+    #     active_nodes.remove(node_id)
+    #     new_graph.active_nodes = active_nodes
+    #
+    #     if succeeded:
+    #         succeeded_nodes = cp.copy(self.graph.succeeded_nodes)
+    #         succeeded_nodes.add(node_id)
+    #         new_graph.succeeded_nodes = succeeded_nodes
+    #
+    #     else:
+    #         failed_nodes = cp.copy(self.graph.failed_nodes)
+    #         failed_nodes.add(node_id)
+    #         new_graph.failed_nodes = failed_nodes
+    #
+    #     self.graph = new_graph
+    #     self.check_job_status()
 
     def check_job_status(self, do_submit=True):
 
@@ -440,14 +487,12 @@ class NodeProcessor(_actors.Actor):
             ctx = NodeFunctionContext(self.graph.nodes)
             result = self.node.function(ctx)
 
-            expected_type = self.node.node.id.result_type
+            self._check_result(result)
 
-            if not self._type_matches(result, expected_type):
-                expected_type_name = expected_type.__name__ if expected_type is not None else str(type(None))
-                result_type_name = type(result).__name__ if result is not None else str(type(None))
-                self._log.warning(f"Result has wrong type, expected [{expected_type_name}], got [{result_type_name}]")
-
-            self.actors().send_parent("node_succeeded", self.node_id, result)
+            if self._is_bundle_node():
+                self.actors().send_parent("node_succeeded_bundle", result)
+            else:
+                self.actors().send_parent("node_succeeded", self.node_id, result)
 
             self._log_node_succeeded()
 
@@ -457,18 +502,33 @@ class NodeProcessor(_actors.Actor):
 
             self._log_node_failed(e)
 
+    def _check_result(self, result):
+
+        expected_type = self.node.node.id.result_type or type(None)
+        result_type = type(result) if result is not None else type(None)
+
+        if not self._type_matches(result, expected_type):
+            err = f"Result has wrong type, expected [{expected_type.__name__}], got [{result_type.__name__}]"
+            raise _ex.ETracInternal(err)
+
     @classmethod
     def _type_matches(cls, result, expected_type):
 
-        if expected_type is None:
-            return result is None
-
         generic_type = tp.get_origin(expected_type)
+        generic_args = tp.get_args(expected_type)
 
         if generic_type is None:
             return isinstance(result, expected_type)
 
         return isinstance(result, generic_type)
+
+    def _is_bundle_node(self):
+
+        result_type = self.node.node.id.result_type
+        generic_type = tp.get_origin(result_type)
+        generic_args = tp.get_args(result_type)
+
+        return generic_type == dict and generic_args[0] == NodeId
 
     def _log_node_start(self):
 

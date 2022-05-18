@@ -65,6 +65,9 @@ class NodeFunction(tp.Generic[_T]):
 
 class NoopFunc(NodeFunction[None]):
 
+    def __init__(self, node: NoopNode):
+        self.node = node
+
     def _execute(self, _: NodeContext) -> None:
         return None
 
@@ -103,29 +106,55 @@ class _ContextPushPopFunc(NodeFunction[Bundle[tp.Any]], abc.ABC):
 
         print("push/pop exec")
 
-        target_ctx: Bundle[tp.Any] = dict()
+        if len(self.node.mapping) == 0:
+            return dict()
 
-        for inner_id, outer_id in self.node.mapping.items():
+        # target_ctx: tp.Dict[str, tp.Any] = dict()
 
-            print(f"Inner = {str(inner_id)}")
-            print(f"Outer = {str(outer_id)}")
+        if self.direction == self._PUSH:
 
-            # Should never happen, push / pop nodes should always be in their own inner context
-            if inner_id.namespace != self.node.namespace:
-                raise _ex.EUnexpected()
+            target_mapping = {
+                NodeId(item, self.node.namespace, outer_id.result_type): ctx.get(outer_id)
+                for item, outer_id in self.node.mapping.items()
+            }
 
-            source_id = outer_id if self.direction == self._PUSH else inner_id
-            target_id = inner_id if self.direction == self._PUSH else outer_id
+        else:
 
-            source_item = ctx.get(source_id)
+            target_mapping = {
+                outer_id: ctx.get(NodeId(item, self.node.namespace, outer_id.result_type))
+                for item, outer_id in self.node.mapping.items()
+            }
 
-            # Should never happen, source items are dependencies in the graph
-            if source_item is None:
-                raise _ex.EUnexpected(source_id)
+        # for mapping in self.node.mapping:
+        #
+        #     inner_id = mapping
+        #     outer_id = self.node.mapping[inner_id]
+        #
+        #     print(f"Inner = {str(inner_id)}")
+        #     print(f"Outer = {str(outer_id)}")
+        #
+        #     # Should never happen, push / pop nodes should always be in their own inner context
+        #     if inner_id.namespace != self.node.namespace:
+        #         raise _ex.EUnexpected()
+        #
+        #     source_id = outer_id if self.direction == self._PUSH else inner_id
+        #     target_id = inner_id if self.direction == self._PUSH else outer_id
+        #
+        #     source_item = ctx.get(source_id)
+        #
+        #     # Should never happen, source items are dependencies in the graph
+        #     if source_item is None:
+        #         raise _ex.EUnexpected(source_id)
+        #
+        #     print("source ok")
+        #
+        #     # target_ctx[target_id.name] = source_item
+        #
+        #     print("update done")
 
-            target_ctx[target_id] = source_item
+        print("Mapping complete")
 
-        return target_ctx
+        return target_mapping
 
 
 class ContextPushFunc(_ContextPushPopFunc):
@@ -401,13 +430,13 @@ class LoadDataFunc(NodeFunction[_data.DataItem], _LoadSaveDataFunc):
         return _data.DataItem(table.schema, table)
 
 
-class SaveDataFunc(NodeFunction[bool], _LoadSaveDataFunc):
+class SaveDataFunc(NodeFunction[None], _LoadSaveDataFunc):
 
     def __init__(self, node: SaveDataNode, storage: _storage.StorageManager):
         super().__init__(storage)
         self.node = node
 
-    def _execute(self, ctx: NodeContext) -> bool:
+    def _execute(self, ctx: NodeContext):
 
         # This function assumes that metadata has already been generated as the data_spec
         # i.e. it is already known which incarnation / copy of the data will be created
@@ -430,8 +459,6 @@ class SaveDataFunc(NodeFunction[bool], _LoadSaveDataFunc):
             data_copy.storagePath, data_copy.storageFormat,
             data_item.table,
             storage_options={}, overwrite=False)
-
-        return True
 
 
 class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
@@ -566,7 +593,9 @@ class FunctionResolver:
         BuildJobResultNode: BuildJobResultFunc,
         SaveJobResultNode: SaveJobResultFunc,
         DataResultNode: DataResultFunc,
-        StaticValueNode: StaticValueFunc
+        StaticValueNode: StaticValueFunc,
+        BundleItemNode: NoopFunc,
+        NoopNode: NoopFunc
     }
 
     __node_mapping: tp.Dict[Node.__class__, __ResolveFunc] = {

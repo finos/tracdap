@@ -25,9 +25,6 @@ import tracdap.rt.config as cfg
 
 _T = tp.TypeVar('_T')
 
-Bundle: tp.Generic[_T] = tp.Dict[str, _T]
-ObjectBundle = Bundle[meta.ObjectDefinition]
-
 
 @dc.dataclass(frozen=True)
 class NodeNamespace:
@@ -59,6 +56,7 @@ class NodeId(tp.Generic[_T]):
     namespace: NodeNamespace
 
     result_type: tp.Type[_T] = dc.field(default=type(None), init=True, compare=False, hash=False)
+    bundle: bool = dc.field(default=False, init=True, compare=False, hash=False)
 
     def __str__(self):
         return f"{self.name} / {self.namespace}"
@@ -91,6 +89,9 @@ class Node(tp.Generic[_T]):
     dependencies: tp.Dict[NodeId, DependencyType] = dc.field(init=False, default_factory=dict)
     """Set of node IDs that are dependencies for this node"""
 
+    is_bundle: bool = dc.field(init=False)
+    """Flag indicating whether the result of this node is a bundle"""
+
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
         return {}
 
@@ -107,13 +108,17 @@ def _node_type(node_class):
 
         explicit_deps: dc.InitVar[tp.List[NodeId]] = None
 
-        def __post_init__(self, explicit_deps: tp.List[NodeId]):
+        bundle: dc.InitVar[bool] = False
+
+        def __post_init__(self, explicit_deps: tp.List[NodeId], bundle: bool):
             dependencies = self._node_dependencies()
             if explicit_deps:
                 dependencies.update({dep_id: DependencyType.HARD for dep_id in explicit_deps})
             object.__setattr__(self, "dependencies", dependencies)
+            object.__setattr__(self, "is_bundle", bundle)
 
     setattr(node_class, "explicit_deps", NodeBuilder.explicit_deps)
+    setattr(node_class, "bundle", NodeBuilder.bundle)
     setattr(node_class, "__post_init__", NodeBuilder.__post_init__)
 
     node_class.__annotations__.update(NodeBuilder.__annotations__)
@@ -154,14 +159,43 @@ class JobResultSpec:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+Bundle: tp.Generic[_T] = tp.Dict[str, _T]
+ObjectBundle = Bundle[meta.ObjectDefinition]
+
+
 @_node_type
-class ContextPushNode(Node):
+class NoopNode(Node):
+    pass
+
+
+@_node_type
+class StaticValueNode(Node[_T]):
+    value: _T
+
+
+class MappingNode(Node[_T]):
+    pass
+
+
+class BundleNode(Node[Bundle[_T]]):
+    pass
+
+
+@_node_type
+class BundleItemNode(MappingNode[_T]):
+
+    bundle_id: NodeId[Bundle[_T]]
+    bundle_item: NodeId
+
+
+@_node_type
+class ContextPushNode(BundleNode[tp.Any]):
 
     """Push a new execution context onto the stack"""
 
     namespace: NodeNamespace
 
-    mapping: tp.Dict[NodeId, NodeId] = dc.field(default_factory=dict)
+    mapping: tp.Dict[str, NodeId] = dc.field(default_factory=dict)
     """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being pushed)"""
 
     def _node_dependencies(self):
@@ -170,26 +204,16 @@ class ContextPushNode(Node):
 
 
 @_node_type
-class ContextPopNode(Node):
+class ContextPopNode(BundleNode[tp.Any]):
 
     namespace: NodeNamespace
 
-    mapping: tp.Dict[NodeId, NodeId]
+    mapping: tp.Dict[str, NodeId] = dc.field(default_factory=dict)
     """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being popped)"""
 
     def _node_dependencies(self):
         # Since this is a context pop, dependencies are the IDs from the inner context
         return {nid: DependencyType.HARD for nid in self.mapping.keys()}
-
-
-@_node_type
-class StaticValueNode(Node[_T]):
-
-    value: _T
-
-
-class MappingNode(Node[_T]):
-    pass
 
 
 @_node_type
@@ -282,7 +306,7 @@ class LoadDataNode(Node[_data.DataItem]):
 
 
 @_node_type
-class SaveDataNode(Node):
+class SaveDataNode(Node[None]):
 
     """
     Save an individual data item to storage

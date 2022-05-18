@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import copy
+import dataclasses  # noqa
 
 import tracdap.rt.config as config
 import tracdap.rt.exceptions as _ex
@@ -55,9 +56,9 @@ class GraphBuilder:
 
         job_namespace = NodeNamespace(_util.object_key(job_config.jobId))
 
-        job_push_id = NodeId("trac_job_push", job_namespace)
-        job_push_node = ContextPushNode(job_push_id, job_namespace, mapping={})
-        job_push_section = GraphSection({job_push_id: job_push_node}, inputs=set(), must_run=[job_push_id])
+        job_push_id = NodeId("trac_job_push", job_namespace, Bundle[tp.Any])
+        job_push_node = ContextPushNode(job_push_id, job_namespace)
+        job_push_section = GraphSection({job_push_id: job_push_node}, must_run=[job_push_id])
 
         # Build the execution graphs for the main job and results recording
 
@@ -65,9 +66,9 @@ class GraphBuilder:
 
         # Clean up the job context
 
-        job_pop_id = NodeId("trac_job_pop", job_namespace)
-        job_pop_node = ContextPopNode(job_pop_id, job_namespace, mapping={}, explicit_deps=main_section.must_run)
-        job_pop_section = GraphSection({job_pop_id: job_pop_node}, inputs=set(), must_run=[job_pop_id])
+        job_pop_id = NodeId("trac_job_pop", job_namespace, Bundle[tp.Any])
+        job_pop_node = ContextPopNode(job_pop_id, job_namespace, explicit_deps=main_section.must_run)
+        job_pop_section = GraphSection({job_pop_id: job_pop_node}, must_run=[job_pop_id])
 
         job = cls._join_sections(job_push_section, main_section, job_pop_section)
 
@@ -592,23 +593,20 @@ class GraphBuilder:
         Create a context push operation, all inputs are mapped by name
         """
 
-        def node_id_for(input_name, result_type):
-            return NodeId(input_name, namespace, result_type)
-
         push_mapping = {
-            node_id_for(input_name, input_id.result_type): input_id
-            for input_name, input_id
+            NodeId(input_name, namespace, outer_id.result_type): outer_id
+            for input_name, outer_id
             in input_mapping.items()}
 
-        push_id = NodeId("trac_ctx_push", namespace)
-        push_node = ContextPushNode(push_id, namespace, push_mapping, explicit_deps)
+        push_id = NodeId("trac_ctx_push", namespace, Bundle[tp.Any])
+        push_node = ContextPushNode(push_id, namespace, input_mapping, explicit_deps)
 
         nodes = {push_id: push_node}
 
         # Create an explicit marker for each data node pushed into the new context
-
-        for inner_id, outer_id in push_mapping.items():
-            nodes[inner_id] = IdentityNode(inner_id, outer_id, explicit_deps=[push_id])
+        for input_name, outer_id in input_mapping.items():
+            inner_id = NodeId(input_name, namespace, outer_id.result_type)
+            nodes[inner_id] = BundleItemNode(inner_id, push_id, input_name, explicit_deps=[push_id])
 
         return GraphSection(
             nodes,
@@ -640,12 +638,8 @@ class GraphBuilder:
         nodes = {pop_id: pop_node}
 
         # Create an explicit marker for each data node popped into the outer context
-
-        for inner_id, outer_id in pop_mapping.items():
-            nodes[outer_id] = IdentityNode(outer_id, inner_id, explicit_deps=[pop_id])
-
-        for node_id in pop_mapping.values():
-            nodes[node_id] = IdentityNode(node_id, pop_id)
+        for outer_id in pop_mapping.values():
+            nodes[outer_id] = NoopNode(outer_id, explicit_deps=[pop_id])
 
         return GraphSection(
             nodes,
