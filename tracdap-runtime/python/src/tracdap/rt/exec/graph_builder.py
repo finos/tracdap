@@ -476,7 +476,7 @@ class GraphBuilder:
         target_edges = {socket_key(edge.target): edge for edge in flow_def.edges}
 
         # Initial graph section for the flow is empty
-        graph_section = GraphSection({})
+        graph_section = GraphSection({}, must_run=explicit_deps)
 
         while any(reachable_nodes):
 
@@ -484,7 +484,7 @@ class GraphBuilder:
 
             sub_section = cls.build_flow_node(
                 job_config, namespace, target_edges,
-                node_name, node)
+                node_name, node, explicit_deps)
 
             graph_section = cls._join_sections(graph_section, sub_section, allow_partial_inputs=True)
 
@@ -511,7 +511,8 @@ class GraphBuilder:
     def build_flow_node(
             cls, job_config: config.JobConfig, namespace: NodeNamespace,
             target_edges: tp.Dict[meta.FlowSocket, meta.FlowEdge],
-            node_name: str, node: meta.FlowNode) \
+            node_name: str, node: meta.FlowNode,
+            explicit_deps: tp.Optional[tp.List[NodeId]] = None) \
             -> GraphSection:
 
         flow_job = job_config.job.runFlow
@@ -561,7 +562,7 @@ class GraphBuilder:
 
             return cls.build_model_or_flow_with_context(
                 job_config, namespace, node_name, model_obj,
-                push_mapping, pop_mapping)
+                push_mapping, pop_mapping, explicit_deps)
 
         raise _ex.ETracInternal()  # TODO: Invalid node type
 
@@ -634,7 +635,7 @@ class GraphBuilder:
 
         nodes = {**first_section.nodes}
         inputs = set(first_section.inputs)
-        must_run = list()
+        must_run = first_section.must_run or []
 
         for i in range(1, n_sections):
 
@@ -651,12 +652,7 @@ class GraphBuilder:
                     err = ', '.join(map(str, requirements_not_met))
                     raise _ex.ETracInternal(err)  # todo inconsistent graph
 
-            try:
-                nodes.update(current_section.nodes)
-                must_run.extend(current_section.must_run)
-            except AttributeError as e:
-                x = 1
-                y = 2
-                raise e
+            nodes.update(current_section.nodes)
+            must_run.extend(current_section.must_run)
 
         return GraphSection(nodes, inputs, last_section.outputs, must_run)
