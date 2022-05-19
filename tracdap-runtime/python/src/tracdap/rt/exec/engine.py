@@ -338,23 +338,23 @@ class GraphProcessor(_actors.Actor):
         old_node = self.graph.nodes[node_id]
         node = cp.copy(old_node)
         node.result = result
+        results = {node_id: node}
 
-        self._update_results({node_id: node})
+        if isinstance(node.node, _graph.BundleNode):
 
-    @_actors.Message
-    def node_succeeded_bundle(self, bundle: tp.Dict[NodeId, tp.Any]):
+            if isinstance(node.node, _graph.ContextPopNode):
+                bundle_namespace = node_id.namespace.parent
+            else:
+                bundle_namespace = node_id.namespace
 
-        node_updates = dict()
+            for node_name, result in result.items():
+                node_id = NodeId(node_name, bundle_namespace)
+                old_node = self.graph.nodes[node_id]
+                node = cp.copy(old_node)
+                node.result = result
+                results[node.node.id] = node
 
-        for node_id, result in bundle.items():
-
-            old_node = self.graph.nodes[node_id]
-            node = cp.copy(old_node)
-            node.result = result
-
-            node_updates[node_id] = node
-
-        self._update_results(node_updates)
+        self._update_results(results)
 
     @_actors.Message
     def node_failed(self, node_id: NodeId, error):
@@ -379,7 +379,7 @@ class GraphProcessor(_actors.Actor):
             if node_id in active_nodes:
                 active_nodes.remove(node_id)
             elif node_id in pending_nodes:
-                pending_nodes.remove(node_id)
+                pending_nodes.remove(node_id)  # TODO: check pending node ID is part of main node id bundle
             else:
                 raise _ex.ETracInternal()
 
@@ -488,11 +488,7 @@ class NodeProcessor(_actors.Actor):
             result = self.node.function(ctx)
 
             self._check_result(result)
-
-            if self._is_bundle_node():
-                self.actors().send_parent("node_succeeded_bundle", result)
-            else:
-                self.actors().send_parent("node_succeeded", self.node_id, result)
+            self.actors().send_parent("node_succeeded", self.node_id, result)
 
             self._log_node_succeeded()
 
@@ -524,13 +520,19 @@ class NodeProcessor(_actors.Actor):
 
     def _is_bundle_node(self):
 
-        result_type = self.node.node.id.result_type
-        generic_type = tp.get_origin(result_type)
-        generic_args = tp.get_args(result_type)
-
-        return generic_type == dict and generic_args[0] == NodeId
+        return isinstance(self.node.node, _graph.BundleNode)
+        #
+        # result_type = self.node.node.id.result_type
+        # generic_type = tp.get_origin(result_type)
+        # generic_args = tp.get_args(result_type)
+        #
+        # return generic_type == dict and generic_args[0] == NodeId
 
     def _log_node_start(self):
+
+        if self._has_special_logging(self.node.node):
+            self._log_special_node(self.node.node)
+            return
 
         node_name = self.node.node.id.name
         namespace = self.node.node.id.namespace
@@ -583,6 +585,26 @@ class NodeProcessor(_actors.Actor):
 
         func_type = type(self.node.function)
         return func_type.__name__[:-4]
+
+    __SPECIAL_LOGGING_NODES = [
+        _graph.StaticValueNode,
+        _graph.IdentityNode
+    ]
+
+    def _has_special_logging(self, node: _graph.Node):
+
+        return type(node) in self.__SPECIAL_LOGGING_NODES
+
+    def _log_special_node(self, node: _graph.Node):
+
+        node_name = node.id.name
+        namespace = node.id.namespace
+
+        if isinstance(node, _graph.StaticValueNode):
+            self._log.info(f"SET {self._log_value_type()} [{node_name}] / {namespace}")
+
+        elif isinstance(node, _graph.IdentityNode):
+            self._log.info(f"MAP {self._log_value_type()} [{node_name}] <- [{node.src_id.name}] / {namespace}")
 
     def _log_mapping_info(self, node: _graph.Node):
 

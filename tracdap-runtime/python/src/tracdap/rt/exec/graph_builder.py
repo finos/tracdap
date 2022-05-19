@@ -536,50 +536,44 @@ class GraphBuilder:
         def edge_mapping(node_: str, socket_: str = None, result_type=None):
             socket = meta.FlowSocket(node_, socket_)
             edge = target_edges.get(socket_key(socket))  # todo: inconsistent if missing
-            source_id_ = socket_id(edge.source.node, edge.source.socket, result_type)
-            target_id_ = socket_id(edge.target.node, edge.target.socket, result_type)
-            return source_id_, target_id_
+            return socket_id(edge.source.node, edge.source.socket, result_type)
 
         if node.nodeType == meta.FlowNodeType.INPUT_NODE:
             return {}
 
         if node.nodeType == meta.FlowNodeType.OUTPUT_NODE:
-            source_id, target_id = edge_mapping(node_name, None, _data.DataView)
+            target_id = NodeId(node_name, namespace, result_type=_data.DataView)
+            source_id = edge_mapping(node_name, None, _data.DataView)
             return {target_id: IdentityNode(target_id, source_id)}
 
         if node.nodeType == meta.FlowNodeType.MODEL_NODE:
 
-            input_mappings_ = [
-                edge_mapping(node_name, input_name, _data.DataView)
-                for input_name in node.modelStub.inputs]
-
-            param_mappings_ = [
-                (NodeId(param_name, namespace, meta.Value), NodeId(f"{node_name}.{param_name}", namespace, meta.Value))
-                for param_name in job_config.job.runFlow.parameters]
-
-            input_mappings_.extend(param_mappings_)
-
-            mapping_nodes = {
-                target_id: IdentityNode(target_id, source_id)
-                for source_id, target_id in input_mappings_}
-
-            model_namespace = NodeNamespace(f"MODEL = {node_name}", namespace)
             model_selector = flow_job.models.get(node_name)
             model_obj = _util.get_job_resource(model_selector, job_config)
 
-            push_mapping = {
-                input_: NodeId(f"{node_name}.{input_}", namespace)
-                for input_ in [*model_obj.model.inputs, *model_obj.model.parameters]}
+            # TODO: Whether to use flow node or model_obj to build the push mapping?
+
+            input_mapping_ = {
+                input_name: edge_mapping(node_name, input_name, _data.DataView)
+                for input_name in model_obj.model.inputs
+            }
+
+            param_mapping_ = {
+                param_name: NodeId(param_name, namespace, meta.Value)
+                for param_name in model_obj.model.parameters
+            }
+
+            push_mapping = {**input_mapping_, **param_mapping_}
 
             pop_mapping = {
-                output_: NodeId(f"{node_name}.{output_}", namespace)
+                output_: NodeId(f"{node_name}.{output_}", namespace, _data.DataView)
                 for output_ in model_obj.model.outputs}
 
             sub_graph = cls.build_model_or_flow_with_context(
                 job_config, namespace, node_name, model_obj,
                 push_mapping, pop_mapping)
 
-            return {**sub_graph.nodes, **mapping_nodes}
+            return {**sub_graph.nodes}
 
         raise _ex.ETracInternal()  # TODO: Invalid node type
 
@@ -599,14 +593,13 @@ class GraphBuilder:
             in input_mapping.items()}
 
         push_id = NodeId("trac_ctx_push", namespace, Bundle[tp.Any])
-        push_node = ContextPushNode(push_id, namespace, input_mapping, explicit_deps)
+        push_node = ContextPushNode(push_id, namespace, push_mapping, explicit_deps)
 
         nodes = {push_id: push_node}
 
         # Create an explicit marker for each data node pushed into the new context
-        for input_name, outer_id in input_mapping.items():
-            inner_id = NodeId(input_name, namespace, outer_id.result_type)
-            nodes[inner_id] = BundleItemNode(inner_id, push_id, input_name, explicit_deps=[push_id])
+        for inner_id, outer_id in push_mapping.items():
+            nodes[inner_id] = BundleItemNode(inner_id, push_id, inner_id.name, explicit_deps=[push_id])
 
         return GraphSection(
             nodes,
@@ -624,22 +617,19 @@ class GraphBuilder:
         Create a context pop operation, all outputs are mapped by name
         """
 
-        def node_id_for(input_name, result_type):
-            return NodeId(input_name, namespace, result_type)
-
         pop_mapping = {
-            node_id_for(output_name, output_id.result_type): output_id
-            for output_name, output_id
+            NodeId(output_name, namespace, outer_id.result_type): outer_id
+            for output_name, outer_id
             in output_mapping.items()}
 
-        pop_id = NodeId("trac_ctx_pop", namespace)
+        pop_id = NodeId("trac_ctx_pop", namespace, Bundle[tp.Any])
         pop_node = ContextPopNode(pop_id, namespace, pop_mapping, explicit_deps)
 
         nodes = {pop_id: pop_node}
 
         # Create an explicit marker for each data node popped into the outer context
-        for outer_id in pop_mapping.values():
-            nodes[outer_id] = NoopNode(outer_id, explicit_deps=[pop_id])
+        for inner_id, outer_id in pop_mapping.items():
+            nodes[outer_id] = BundleItemNode(outer_id, pop_id, outer_id.name, explicit_deps=[pop_id])
 
         return GraphSection(
             nodes,

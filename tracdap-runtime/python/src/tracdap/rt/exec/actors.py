@@ -620,6 +620,8 @@ class ActorSystem:
 
             type_hint = type_hints.get(pos_param.name)
 
+            # todo: support generics
+
             # If no type hint is available, allow anything through
             if type_hint is not None and not isinstance(pos_arg, type_hint):
                 error = f"Invalid message: [{message}] -> {target_id} (wrong parameter type for '{pos_param.name}')"

@@ -61,6 +61,9 @@ class NodeId(tp.Generic[_T]):
     def __str__(self):
         return f"{self.name} / {self.namespace}"
 
+    def __repr__(self):
+        return f"{self.name} / {repr(self.namespace)}"
+
 
 @dc.dataclass(frozen=True)
 class DependencyType:
@@ -195,7 +198,7 @@ class ContextPushNode(BundleNode[tp.Any]):
 
     namespace: NodeNamespace
 
-    mapping: tp.Dict[str, NodeId] = dc.field(default_factory=dict)
+    mapping: tp.Dict[NodeId, NodeId] = dc.field(default_factory=dict)
     """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being pushed)"""
 
     def _node_dependencies(self):
@@ -208,7 +211,7 @@ class ContextPopNode(BundleNode[tp.Any]):
 
     namespace: NodeNamespace
 
-    mapping: tp.Dict[str, NodeId] = dc.field(default_factory=dict)
+    mapping: tp.Dict[NodeId, NodeId] = dc.field(default_factory=dict)
     """Mapping of node IDs from the inner to the outer context (i.e. keys are in the context being popped)"""
 
     def _node_dependencies(self):

@@ -104,57 +104,22 @@ class _ContextPushPopFunc(NodeFunction[Bundle[tp.Any]], abc.ABC):
 
     def _execute(self, ctx: NodeContext) -> Bundle[tp.Any]:
 
-        print("push/pop exec")
-
         if len(self.node.mapping) == 0:
             return dict()
 
-        # target_ctx: tp.Dict[str, tp.Any] = dict()
-
         if self.direction == self._PUSH:
-
-            target_mapping = {
-                NodeId(item, self.node.namespace, outer_id.result_type): ctx.get(outer_id)
-                for item, outer_id in self.node.mapping.items()
-            }
-
+            bundle_mapping = {inner_id.name: outer_id for inner_id, outer_id in self.node.mapping.items()}
         else:
+            bundle_mapping = {outer_id.name: inner_id for inner_id, outer_id in self.node.mapping.items()}
 
-            target_mapping = {
-                outer_id: ctx.get(NodeId(item, self.node.namespace, outer_id.result_type))
-                for item, outer_id in self.node.mapping.items()
-            }
+        bundle: Bundle[tp.Any] = dict()
 
-        # for mapping in self.node.mapping:
-        #
-        #     inner_id = mapping
-        #     outer_id = self.node.mapping[inner_id]
-        #
-        #     print(f"Inner = {str(inner_id)}")
-        #     print(f"Outer = {str(outer_id)}")
-        #
-        #     # Should never happen, push / pop nodes should always be in their own inner context
-        #     if inner_id.namespace != self.node.namespace:
-        #         raise _ex.EUnexpected()
-        #
-        #     source_id = outer_id if self.direction == self._PUSH else inner_id
-        #     target_id = inner_id if self.direction == self._PUSH else outer_id
-        #
-        #     source_item = ctx.get(source_id)
-        #
-        #     # Should never happen, source items are dependencies in the graph
-        #     if source_item is None:
-        #         raise _ex.EUnexpected(source_id)
-        #
-        #     print("source ok")
-        #
-        #     # target_ctx[target_id.name] = source_item
-        #
-        #     print("update done")
+        for item_name, source_id in bundle_mapping.items():
 
-        print("Mapping complete")
+            bundle_item = ctx.get(source_id)
+            bundle[item_name] = bundle_item
 
-        return target_mapping
+        return bundle
 
 
 class ContextPushFunc(_ContextPushPopFunc):
