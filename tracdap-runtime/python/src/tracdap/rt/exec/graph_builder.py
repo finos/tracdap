@@ -482,35 +482,25 @@ class GraphBuilder:
 
             node_name, node = reachable_nodes.popitem()
 
-            if node.nodeType == meta.FlowNodeType.INPUT_NODE:
-                graph_section.inputs.add(NodeId(node_name, namespace))
-
-            if node.nodeType == meta.FlowNodeType.OUTPUT_NODE:
-                graph_section.outputs.add(NodeId(node_name, namespace))
-
-            if node.nodeType == meta.FlowNodeType.MODEL_NODE:
-                graph_section.must_run.append(NodeId(node_name, namespace))
-
-            execution_nodes = cls.build_flow_node(
+            sub_section = cls.build_flow_node(
                 job_config, namespace, target_edges,
                 node_name, node)
 
-            graph_section.nodes.update(execution_nodes)
+            graph_section = cls._join_sections(graph_section, sub_section, allow_partial_inputs=True)
 
             if node.nodeType != meta.FlowNodeType.OUTPUT_NODE:
+
                 source_edges = remaining_edges_by_source.pop(node_name)
-            else:
-                source_edges = []
 
-            for edge in source_edges:
+                for edge in source_edges:
 
-                target_node_name = edge.target.node
-                target_edges_ = remaining_edges_by_target[target_node_name]
-                target_edges_.remove(edge)
+                    target_node_name = edge.target.node
+                    target_edges_ = remaining_edges_by_target[target_node_name]
+                    target_edges_.remove(edge)
 
-                if len(target_edges_) == 0:
-                    target_node = remaining_nodes.pop(target_node_name)
-                    reachable_nodes[target_node_name] = target_node
+                    if len(target_edges_) == 0:
+                        target_node = remaining_nodes.pop(target_node_name)
+                        reachable_nodes[target_node_name] = target_node
 
         if any(remaining_nodes):
             raise _ex.ETracInternal()  # todo: cyclic / unmet dependencies
@@ -522,7 +512,7 @@ class GraphBuilder:
             cls, job_config: config.JobConfig, namespace: NodeNamespace,
             target_edges: tp.Dict[meta.FlowSocket, meta.FlowEdge],
             node_name: str, node: meta.FlowNode) \
-            -> NodeMap:
+            -> GraphSection:
 
         flow_job = job_config.job.runFlow
 
@@ -539,12 +529,12 @@ class GraphBuilder:
             return socket_id(edge.source.node, edge.source.socket, result_type)
 
         if node.nodeType == meta.FlowNodeType.INPUT_NODE:
-            return {}
+            return GraphSection({}, inputs={NodeId(node_name, namespace, result_type=_data.DataView)})
 
         if node.nodeType == meta.FlowNodeType.OUTPUT_NODE:
             target_id = NodeId(node_name, namespace, result_type=_data.DataView)
             source_id = edge_mapping(node_name, None, _data.DataView)
-            return {target_id: IdentityNode(target_id, source_id)}
+            return GraphSection({target_id: IdentityNode(target_id, source_id)}, outputs={target_id})
 
         if node.nodeType == meta.FlowNodeType.MODEL_NODE:
 
@@ -569,11 +559,9 @@ class GraphBuilder:
                 output_: NodeId(f"{node_name}.{output_}", namespace, _data.DataView)
                 for output_ in model_obj.model.outputs}
 
-            sub_graph = cls.build_model_or_flow_with_context(
+            return cls.build_model_or_flow_with_context(
                 job_config, namespace, node_name, model_obj,
                 push_mapping, pop_mapping)
-
-            return {**sub_graph.nodes}
 
         raise _ex.ETracInternal()  # TODO: Invalid node type
 

@@ -190,6 +190,9 @@ class BundleItemNode(MappingNode[_T]):
     bundle_id: NodeId[Bundle[_T]]
     bundle_item: NodeId
 
+    def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
+        return {self.bundle_id: DependencyType.HARD}
+
 
 @_node_type
 class ContextPushNode(BundleNode[tp.Any]):

@@ -51,4 +51,12 @@ class FirstModel(trac.TracModel):
         return {"preprocessed_data": preprocessed}
 
     def run_model(self, ctx: trac.TracContext):
-        pass
+
+        loans = ctx.get_pandas_table("customer_loans")
+        currencies = ctx.get_pandas_table("currency_data")
+
+        loans["some_quantity_x"] = loans["loan_amount"] - loans["total_pymnt"]
+
+        preproc = loans[["id", "some_quantity_x"]]
+
+        ctx.put_pandas_table("preprocessed_data", preproc)

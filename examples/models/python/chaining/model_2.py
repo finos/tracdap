@@ -13,7 +13,10 @@
 #  limitations under the License.
 
 import datetime as dt
+import decimal
 import typing as tp
+
+import pandas as pd
 
 import tracdap.rt.api as trac
 
@@ -43,4 +46,11 @@ class SecondModel(trac.TracModel):
         return {"profit_by_region": profit_by_region}
 
     def run_model(self, ctx: trac.TracContext):
-        pass
+
+        preproc = ctx.get_pandas_table("preprocessed_data")
+
+        profit_by_region = pd.DataFrame(data={
+            "region": ["uk", "us"],
+            "gross_profit": [decimal.Decimal(24000000), decimal.Decimal(13000000)]})
+
+        ctx.put_pandas_table("profit_by_region", profit_by_region)
