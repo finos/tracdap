@@ -453,6 +453,8 @@ class GraphProcessor(_actors.Actor):
 
 class NodeProcessor(_actors.Actor):
 
+    __NONE_TYPE = type(None)
+
     """
     Processor responsible for running individual nodes in an execution graph
     TODO: How to decide when to allocate an actors.Worker (long running, separate thread)
@@ -500,8 +502,8 @@ class NodeProcessor(_actors.Actor):
 
     def _check_result(self, result):
 
-        expected_type = self.node.node.id.result_type or type(None)
-        result_type = type(result) if result is not None else type(None)
+        expected_type = self.node.node.id.result_type or self.__NONE_TYPE
+        result_type = type(result)
 
         if not self._type_matches(result, expected_type):
             err = f"Result has wrong type, expected [{expected_type.__name__}], got [{result_type.__name__}]"
@@ -510,13 +512,17 @@ class NodeProcessor(_actors.Actor):
     @classmethod
     def _type_matches(cls, result, expected_type):
 
-        generic_type = tp.get_origin(expected_type)
-        generic_args = tp.get_args(expected_type)
+        if expected_type == cls.__NONE_TYPE:
+            return result is None
+
+        # Minimum supported Python is 3.7, which does not provide get_origin and get_args
+        generic_type = tp.get_origin(expected_type) if 'get_origin' in tp.__dict__ else expected_type.__origin__
+        generic_args = tp.get_args(expected_type) if 'get_args' in tp.__dict__ else expected_type.__args__
 
         if generic_type is None:
             return isinstance(result, expected_type)
-
-        return isinstance(result, generic_type)
+        else:
+            return isinstance(result, generic_type)
 
     def _is_bundle_node(self):
 
