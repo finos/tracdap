@@ -516,8 +516,15 @@ class NodeProcessor(_actors.Actor):
             return result is None
 
         # Minimum supported Python is 3.7, which does not provide get_origin and get_args
-        generic_type = tp.get_origin(expected_type) if 'get_origin' in tp.__dict__ else expected_type.__origin__
-        generic_args = tp.get_args(expected_type) if 'get_args' in tp.__dict__ else expected_type.__args__
+        if "get_origin" in tp.__dict__:
+            generic_type = tp.get_origin(expected_type)
+            generic_args = tp.get_args(expected_type)
+        elif "__origin__" in expected_type.__dict__:
+            generic_type = expected_type.__origin__
+            generic_args = expected_type.__args__
+        else:
+            generic_type = None
+            generic_args = None
 
         if generic_type is None:
             return isinstance(result, expected_type)
