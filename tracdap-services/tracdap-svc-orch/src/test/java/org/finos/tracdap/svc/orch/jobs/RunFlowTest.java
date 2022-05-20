@@ -21,6 +21,7 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.metadata.ImportModelJob;
+import org.finos.tracdap.metadata.RunFlowJob;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import com.google.protobuf.ByteString;
@@ -30,8 +31,12 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.finos.tracdap.svc.orch.jobs.Helpers.runJob;
 
@@ -275,9 +280,9 @@ public class RunFlowTest {
 
         var runFlow = RunFlowJob.newBuilder()
                 .setFlow(MetadataUtil.selectorFor(flowId))
-                .putParameters("eur_usd_rate", MetadataCodec.encodeValue(1.3785))
-                .putParameters("default_weighting", MetadataCodec.encodeValue(1.5))
-                .putParameters("filter_defaults", MetadataCodec.encodeValue(true))
+                .putParameters("param_1", MetadataCodec.encodeValue(2))
+                .putParameters("param_2", MetadataCodec.encodeValue(LocalDate.now()))
+                .putParameters("param_3", MetadataCodec.encodeValue(1.2345))
                 .putInputs("customer_loans", MetadataUtil.selectorFor(loansDataId))
                 .putInputs("currency_data", MetadataUtil.selectorFor(currencyDataId))
                 .putModels("model_1", MetadataUtil.selectorFor(model1Id))
@@ -334,33 +339,31 @@ public class RunFlowTest {
         outputDataId = dataTag.getHeader();
     }
 
-//    @Test @Order(4)
-//    void checkOutputData() {
-//
-//        log.info("Checking output data...");
-//
-//        var dataClient = platform.dataClientBlocking();
-//
-//        var EXPECTED_REGIONS = 5;  // based on the sample dataset
-//
-//        var readRequest = DataReadRequest.newBuilder()
-//                .setTenant(TEST_TENANT)
-//                .setSelector(MetadataUtil.selectorFor(outputDataId))
-//                .setFormat("text/csv")
-//                .build();
-//
-//
-//        var readResponse = dataClient.readSmallDataset(readRequest);
-//
-//        var csvText = readResponse.getContent().toString(StandardCharsets.UTF_8);
-//        var csvLines = csvText.split("\n");
-//
-//        var csvHeaders = Arrays.stream(csvLines[0].split(","))
-//                .map(String::trim)
-//                .collect(Collectors.toList());
-//
-//        Assertions.assertEquals(List.of("region", "gross_profit"), csvHeaders);
-//        Assertions.assertEquals(EXPECTED_REGIONS + 1, csvLines.length);
-//    }
+    @Test @Order(5)
+    void checkOutputData() {
 
+        log.info("Checking output data...");
+
+        var dataClient = platform.dataClientBlocking();
+
+        var EXPECTED_REGIONS = 2;  // based on the chaining example models
+
+        var readRequest = DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(outputDataId))
+                .setFormat("text/csv")
+                .build();
+
+        var readResponse = dataClient.readSmallDataset(readRequest);
+
+        var csvText = readResponse.getContent().toString(StandardCharsets.UTF_8);
+        var csvLines = csvText.split("\n");
+
+        var csvHeaders = Arrays.stream(csvLines[0].split(","))
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        Assertions.assertEquals(List.of("region", "gross_profit"), csvHeaders);
+        Assertions.assertEquals(EXPECTED_REGIONS + 1, csvLines.length);
+    }
 }

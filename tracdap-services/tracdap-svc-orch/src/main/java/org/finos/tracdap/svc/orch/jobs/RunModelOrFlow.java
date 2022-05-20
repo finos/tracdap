@@ -21,7 +21,6 @@ import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
@@ -29,24 +28,8 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import java.util.*;
 
 
-public class RunModelOrFlow implements IJobLogic {
+public abstract class RunModelOrFlow {
 
-    @Override
-    public List<TagSelector> requiredMetadata(JobDefinition job) {
-
-        if (job.getJobType() != JobType.RUN_MODEL)
-            throw new EUnexpected();
-
-        var runModel = job.getRunModel();
-
-        var resources = new ArrayList<TagSelector>(runModel.getInputsCount() + 1);
-        resources.add(runModel.getModel());
-        resources.addAll(runModel.getInputsMap().values());
-
-        return resources;
-    }
-
-    @Override
     public List<TagSelector> requiredMetadata(Map<String, ObjectDefinition> newResources) {
 
         var resources = new ArrayList<TagSelector>();
@@ -66,26 +49,19 @@ public class RunModelOrFlow implements IJobLogic {
         return resources;
     }
 
-    @Override
     public Map<String, MetadataWriteRequest> newResultIds(
-            String tenant, JobDefinition job,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping) {
+            String tenant, Set<String> outputKeys,
+            Map<String, TagSelector> priorOutputsMap) {
 
-        var runModel = job.getRunModel();
         var resultMapping = new HashMap<String, MetadataWriteRequest>();
 
-        var modelKey = MetadataUtil.objectKey(runModel.getModel());
-        var modelId = resourceMapping.get(modelKey);
-        var modelDef = resources.get(MetadataUtil.objectKey(modelId)).getModel();
+        for (var outputKey : outputKeys) {
 
-        for (var output : modelDef.getOutputsMap().entrySet()) {
-
-            if (runModel.containsPriorOutputs(output.getKey()))
+            if (priorOutputsMap.containsKey(outputKey))
                 continue;
 
-            var dataKey = String.format("%s:%s", output.getKey(), ObjectType.DATA);
-            var storageKey = String.format("%s:%s", output.getKey(), ObjectType.STORAGE);
+            var dataKey = String.format("%s:%s", outputKey, ObjectType.DATA);
+            var storageKey = String.format("%s:%s", outputKey, ObjectType.STORAGE);
 
             var dataReq = MetadataWriteRequest.newBuilder()
                     .setTenant(tenant)
@@ -104,22 +80,15 @@ public class RunModelOrFlow implements IJobLogic {
         return resultMapping;
     }
 
-    @Override
     public Map<String, TagHeader> priorResultIds(
-            JobDefinition job,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping) {
+            Set<String> outputKeys, Map<String, TagSelector> priorOutputsMap,
+            Map<String, ObjectDefinition> resources, Map<String, TagHeader> resourceMapping) {
 
-        var runModel = job.getRunModel();
         var resultMapping = new HashMap<String, TagHeader>();
 
-        var modelKey = MetadataUtil.objectKey(runModel.getModel());
-        var modelId = resourceMapping.get(modelKey);
-        var modelDef = resources.get(MetadataUtil.objectKey(modelId)).getModel();
+        for (var outputKey : outputKeys) {
 
-        for (var output : modelDef.getOutputsMap().entrySet()) {
-
-            var priorOutput = runModel.getPriorOutputsOrDefault(output.getKey(), null);
+            var priorOutput = priorOutputsMap.getOrDefault(outputKey, null);
 
             if (priorOutput == null)
                 continue;
@@ -131,8 +100,8 @@ public class RunModelOrFlow implements IJobLogic {
             var priorStorageKey = MetadataUtil.objectKey(priorDataDef.getStorageId());
             var priorStorageId = resourceMapping.get(priorStorageKey);
 
-            var dataKey = String.format("%s:%s", output.getKey(), ObjectType.DATA);
-            var storageKey = String.format("%s:%s", output.getKey(), ObjectType.STORAGE);
+            var dataKey = String.format("%s:%s", outputKey, ObjectType.DATA);
+            var storageKey = String.format("%s:%s", outputKey, ObjectType.STORAGE);
 
             resultMapping.put(dataKey, priorDataId);
             resultMapping.put(storageKey, priorStorageId);
@@ -141,40 +110,30 @@ public class RunModelOrFlow implements IJobLogic {
         return resultMapping;
     }
 
-    @Override
-    public JobDefinition setResultIds(
-            JobDefinition job, Map<String, TagHeader> resultMapping,
-            Map<String, ObjectDefinition> resources,
-            Map<String, TagHeader> resourceMapping) {
+    public Map<String, TagSelector> setResultIds(
+            Set<String> outputKeys,
+            Map<String, TagHeader> resultMapping) {
 
-        var runModel = job.getRunModel().toBuilder();
-        runModel.clearOutputs();
+        var outputSelectors = new HashMap<String, TagSelector>();
 
-        var modelKey = MetadataUtil.objectKey(runModel.getModel());
-        var modelId = resourceMapping.get(modelKey);
-        var modelDef = resources.get(MetadataUtil.objectKey(modelId)).getModel();
+        for (var outputKey : outputKeys) {
 
-        for (var output : modelDef.getOutputsMap().keySet()) {
-
-            var dataKey = String.format("%s:%s", output, ObjectType.DATA);
+            var dataKey = String.format("%s:%s", outputKey, ObjectType.DATA);
             var dataId = resultMapping.get(dataKey);
             var dataSelector = MetadataUtil.selectorFor(dataId);
-            runModel.putOutputs(output, dataSelector);
+            outputSelectors.put(outputKey, dataSelector);
         }
 
-        return job.toBuilder()
-                .setRunModel(runModel)
-                .build();
+        return outputSelectors;
     }
 
-    @Override
-    public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, JobResult jobResult) {
+    public List<MetadataWriteRequest> buildResultMetadata(
+            String tenant, Map<String, TagSelector> outputs, Map<String, TagSelector> priorOutputs,
+            List<TagUpdate> outputAttrs, JobConfig jobConfig, JobResult jobResult) {
 
         var updates = new ArrayList<MetadataWriteRequest>();
 
-        var runModel = jobConfig.getJob().getRunModel();
-
-        for (var output: runModel.getOutputsMap().entrySet()) {
+        for (var output: outputs.entrySet()) {
 
             var outputName = output.getKey();
 
@@ -190,11 +149,11 @@ public class RunModelOrFlow implements IJobLogic {
             var storageKey = MetadataUtil.objectKey(storageId);
             var storageObj = jobResult.getResultsOrThrow(storageKey);
 
-            var priorDataSelector = runModel.containsPriorOutputs(outputName)
-                    ? runModel.getPriorOutputsOrThrow(outputName)
-                    : MetadataUtil.preallocated(runModel.getOutputsOrThrow(outputName));
+            var priorDataSelector = priorOutputs.containsKey(outputName)
+                    ? priorOutputs.get(outputName)
+                    : MetadataUtil.preallocated(outputs.get(outputName));
 
-            var priorStorageSelector = runModel.containsPriorOutputs(outputName)
+            var priorStorageSelector = priorOutputs.containsKey(outputName)
                     ? priorStorageSelector(priorDataSelector, jobConfig)
                     : MetadataUtil.preallocated(dataObj.getData().getStorageId());
 
@@ -204,17 +163,13 @@ public class RunModelOrFlow implements IJobLogic {
                     .setValue(MetadataCodec.encodeValue(outputName))
                     .build());
 
-            var suppliedAttrs = jobConfig.getJob()
-                    .getRunModel()
-                    .getOutputAttrsList();
-
             var dataUpdate = MetadataWriteRequest.newBuilder()
                     .setTenant(tenant)
                     .setObjectType(ObjectType.DATA)
                     .setPriorVersion(priorDataSelector)
                     .setDefinition(dataObj)
                     .addAllTagUpdates(controlledAttrs)
-                    .addAllTagUpdates(suppliedAttrs)
+                    .addAllTagUpdates(outputAttrs)
                     .build();
 
             updates.add(dataUpdate);
