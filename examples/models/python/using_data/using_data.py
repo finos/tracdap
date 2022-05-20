@@ -64,17 +64,17 @@ class UsingDataModel(trac.TracModel):
         if filter_defaults:
             customer_loans = customer_loans[customer_loans["loan_condition_cat"] == 0]
 
-        customer_loans.loc[:, "gross_profit_unweighted"] = \
+        customer_loans["gross_profit_unweighted"] = \
             customer_loans["total_pymnt"] - \
             customer_loans["loan_amount"]
 
         condition_weighting = customer_loans["loan_condition_cat"] \
             .apply(lambda c: decimal.Decimal(default_weighting) if c > 0 else decimal.Decimal(1))
 
-        customer_loans.loc[:, "gross_profit_weighted"] = \
+        customer_loans["gross_profit_weighted"] = \
             customer_loans["gross_profit_unweighted"] * condition_weighting
 
-        customer_loans.loc[:, "gross_profit"] = \
+        customer_loans["gross_profit"] = \
             customer_loans["gross_profit_weighted"] \
             .apply(lambda x: x * decimal.Decimal.from_float(eur_usd_rate))
 
