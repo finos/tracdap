@@ -29,7 +29,7 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import java.util.*;
 
 
-public class RunModelJob implements IJobLogic {
+public class RunModelOrFlow implements IJobLogic {
 
     @Override
     public List<TagSelector> requiredMetadata(JobDefinition job) {
