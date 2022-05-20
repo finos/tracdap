@@ -221,3 +221,27 @@ class __LogClose(tp.Generic[__T]):
 def log_close(ctx_mgg: __T, log: logging.Logger, msg: str) -> __T:
 
     return __LogClose(ctx_mgg, log, msg)
+
+
+def get_origin(metaclass: type):
+
+    # Minimum supported Python is 3.7, which does not provide get_origin and get_args
+
+    if "get_origin" in tp.__dict__:
+        return tp.get_origin(metaclass)
+    elif "__origin__" in metaclass.__dict__:
+        return metaclass.__origin__  # noqa
+    else:
+        return None
+
+
+def get_args(metaclass: type):
+
+    # Minimum supported Python is 3.7, which does not provide get_origin and get_args
+
+    if "get_args" in tp.__dict__:
+        return tp.get_args(metaclass)
+    elif "__args__" in metaclass.__dict__:
+        return metaclass.__args__  # noqa
+    else:
+        return None

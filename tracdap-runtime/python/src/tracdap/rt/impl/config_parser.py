@@ -321,9 +321,8 @@ class ConfigParser(tp.Generic[_T]):
 
     def _parse_generic_class(self, location: str, raw_value: tp.Any, metaclass:  __generic_metaclass):
 
-        # Minimum supported Python is 3.7, which does not provide get_origin and get_args
-        origin = tp.get_origin(metaclass) if 'get_origin' in tp.__dict__ else metaclass.__origin__
-        args = tp.get_args(metaclass) if 'get_args' in tp.__dict__ else metaclass.__args__
+        origin = _util.get_origin(metaclass)
+        args = _util.get_args(metaclass)
 
         if origin == tp.List or origin == list:
 
