@@ -483,14 +483,36 @@ class NodeProcessor(_actors.Actor):
         if expected_type is None or expected_type == cls.__NONE_TYPE:
             return result is None
 
+        if expected_type == tp.Any:
+            return True
+
         generic_type = _util.get_origin(expected_type)
 
         if generic_type is None:
             return isinstance(result, expected_type)
-        else:
-            return isinstance(result, generic_type)
 
-        # TODO: Bundle type checking (cover all dict/list generics)
+        if generic_type == list:
+
+            list_type = _util.get_args(expected_type)[0]
+
+            def list_type_check(item):
+                return cls.result_matches_type(item, list_type)
+
+            return isinstance(result, generic_type) and all(map(list_type_check, result))
+
+        if generic_type == dict:
+
+            dict_type_args = _util.get_args(expected_type)
+            key_type = dict_type_args[0]
+            value_type = dict_type_args[1]
+
+            def dict_type_check(entry):
+                key, value = entry
+                return isinstance(key, key_type) and cls.result_matches_type(value, value_type)
+
+            return isinstance(result, generic_type) and all(map(dict_type_check, result.items()))
+
+        raise _ex.ETracInternal(f"Cannot enforce type check for generic type [{str(generic_type)}]")
 
     def _check_result_type(self, result):
 
