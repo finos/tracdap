@@ -34,26 +34,60 @@ from tracdap.rt.exec.graph import *
 from tracdap.rt.exec.graph import _T
 
 
-NodeContext = tp.Dict[NodeId, tp.Any]  # Available prior node results when a node function is called
+class NodeContext:
 
+    """
+    A NodeContext is a map of node results available to an individual node during execution.
+
+    Looking up a missing item or an item with the wrong result type will result in a meaningful error.
+    The context is immutable and should not be modified by node functions.
+
+    The engine will supply a NodeContext for each invocation of a NodeFunction.
+    The NodeContext interface abstracts away the engine structures used to represent execution state
+    and should help avoid any temptation for node functions to modify the context directly.
+
+    .. seealso::
+        :py:class:`NodeFunction <NodeFunction>`
+    """
+
+    @abc.abstractmethod
+    def lookup(self, node_id: NodeId[_T]) -> _T:
+        pass
+
+    @abc.abstractmethod
+    def iter_items(self) -> tp.Iterator[tp.Tuple[NodeId, tp.Any]]:
+        pass
+
+
+# Helper functions to access the node context (in case the NodeContext interface needs to change)
 
 def _ctx_lookup(node_id: NodeId[_T], ctx: NodeContext) -> _T:
 
-    return ctx[node_id]
+    return ctx.lookup(node_id)
 
-    # node_result = ctx.get(node_id).result   # todo: this ctx is actually the exec graph ctx!
-    # node_result_obj = node_result.obj
-    #
-    # if node_result is None:
-    #     raise _ex.ETracInternal()  # TODO: msg
-    #
-    # if node_result.obj_type != node_id.result_type:
-    #     raise _ex.ETracInternal()  # TODO: msg
-    #
-    # return node_result_obj
+
+def _ctx_iter_items(ctx: NodeContext) -> tp.Iterator[tp.Tuple[NodeId, tp.Any]]:
+
+    return ctx.iter_items()
 
 
 class NodeFunction(tp.Generic[_T]):
+
+    """
+    A NodeFunction is a unit of executable code to evaluate a single node in the execution graph
+
+    Node functions are stateless and are executed with a NodeContext of available results from other nodes
+    Each node function returns a single result, which must match the result type of its node ID
+
+    Node functions are intended to be short wrapper functions around core capabilities of the runtime,
+    that allows those capabilities to be called in a uniform way by the engine. They should contain
+    minimal logic, mostly related to mapping context items. Long node functions include lower-level logic
+    are generally a sign there is a missing/incomplete component in the impl package.
+
+    .. seealso::
+        :py:class:`Node <_graph.Node>`
+        :py:class:`NodeContext <NodeContext>`
+    """
 
     def __call__(self, ctx: NodeContext) -> _T:
         return self._execute(ctx)
@@ -61,6 +95,11 @@ class NodeFunction(tp.Generic[_T]):
     @abc.abstractmethod
     def _execute(self, ctx: NodeContext) -> _T:
         pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# NODE FUNCTION IMPLEMENTATIONS
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class NoopFunc(NodeFunction[None]):
@@ -116,7 +155,7 @@ class _ContextPushPopFunc(NodeFunction[Bundle[tp.Any]], abc.ABC):
 
         for item_name, source_id in bundle_mapping.items():
 
-            bundle_item = ctx.get(source_id)
+            bundle_item = _ctx_lookup(source_id, ctx)
             bundle[item_name] = bundle_item
 
         return bundle
@@ -466,21 +505,23 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         model_def = self.node.model_def
 
         # Create a context containing only declared items in the current namespace, addressed by name
-
-        # Filtering method:
-        # local_ctx = {nid.name: n.result.obj for nid, n in ctx.items() if filter_ctx(nid)}
+        # The engine guarantees all required nodes are present and have type matching their node ID
+        # Still, if any nodes are missing or have the wrong type TracContextImpl will raise ERuntimeValidation
 
         local_ctx = {}
 
-        for param_name, param_def in model_def.parameters.items():
-            param_node_id = NodeId.of(param_name, self.node.id.namespace, meta.Value)
-            param_value = _ctx_lookup(param_node_id, ctx)
-            local_ctx[param_name] = param_value
+        for node_id, node_result in _ctx_iter_items(ctx):
 
-        for input_name in model_def.inputs:
-            input_node_id = NodeId.of(input_name, self.node.id.namespace, _data.DataView)
-            input_data = _ctx_lookup(input_node_id, ctx)
-            local_ctx[input_name] = input_data
+            if node_id.namespace != self.node.id.namespace:
+                continue
+
+            if node_id.name in model_def.parameters:
+                param_name = node_id.name
+                local_ctx[param_name] = node_result
+
+            if node_id.name in model_def.inputs:
+                input_name = node_id.name
+                local_ctx[input_name] = node_result
 
         # Add empty data views to the local context to hold model outputs
         # Assuming outputs are all defined with static schemas
@@ -505,7 +546,25 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         return model_outputs
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# FUNCTION RESOLUTION
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 class FunctionResolver:
+
+    """
+    The function resolver maps graph nodes (data-only representations) to executable functions
+
+    Most functions can be resolved with just the graph node (these are the "basic nodes")
+    Some functions need other resources, such as access to data or models
+    These resources are available in the context of a job,
+    so a FunctionResolve instances is constructed per job and initialised with the job resources
+
+    .. seealso::
+        :py:class:`Node <tracdap.rt.exec.graph.Node>`,
+        :py:class:`NodeFunction <NodeFunction>`
+    """
 
     __ResolveFunc = tp.Callable[['FunctionResolver', Node[_T]], NodeFunction[_T]]
 

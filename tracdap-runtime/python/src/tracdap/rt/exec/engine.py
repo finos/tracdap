@@ -486,7 +486,7 @@ class NodeProcessor(_actors.Actor):
 
             self._log_node_start()
 
-            ctx = NodeFunctionContext(self.graph.nodes)
+            ctx = NodeContextImpl(self.graph.nodes)
             result = self.node.function(ctx)
 
             self._check_result(result)
@@ -628,14 +628,14 @@ class NodeProcessor(_actors.Actor):
             self._log.warning("  (mapping info cannot be displayed)")
 
 
-class NodeFunctionContext(_func.NodeContext):
+class NodeContextImpl(_func.NodeContext):
 
     __T = tp.TypeVar("__T")
 
     def __init__(self, nodes: tp.Dict[NodeId, _EngineNode]):
         self.__nodes = nodes
 
-    def __getitem__(self, node_id: NodeId[__T]) -> __T:
+    def lookup(self, node_id: NodeId[__T]) -> __T:
 
         graph_node = self.__nodes.get(node_id)
 
@@ -651,27 +651,7 @@ class NodeFunctionContext(_func.NodeContext):
 
         return result
 
-    def __getattr__(self, item):
-        return getattr(self.__nodes, item)
+    def iter_items(self) -> tp.Iterator[tp.Tuple[NodeId, tp.Any]]:
 
-    def __iter__(self):
-        return self.__nodes.__iter__()
-
-    def get(self, node_id: NodeId[__T]) -> __T:
-
-        graph_node = self.__nodes.get(node_id)
-
-        if graph_node is None:
-            return None
-
-        result = graph_node.result
-
-        if result is None:
-            return None
-
-        # todo: type check
-
-        return result
-
-    def items(self):
-        return self.__nodes.items()
+        for node_id, node in self.__nodes.items():
+            yield node_id, node.result
