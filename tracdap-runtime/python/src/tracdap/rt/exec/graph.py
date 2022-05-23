@@ -270,7 +270,7 @@ class DataViewNode(Node[_data.DataView]):
 
 
 @_node_type
-class DataItemNode(MappingNode):
+class DataItemNode(MappingNode[_data.DataItem]):
 
     """Map a data item out of an assembled data view"""
 
@@ -333,7 +333,7 @@ class ImportModelNode(Node[meta.ObjectDefinition]):
 
 
 @_node_type
-class RunModelNode(Node):
+class RunModelNode(Node[Bundle[_data.DataView]]):
 
     model_scope: str
     model_def: meta.ModelDefinition
@@ -358,7 +358,7 @@ class BuildJobResultNode(Node[cfg.JobResult]):
 
 
 @_node_type
-class SaveJobResultNode(Node[type(None)]):
+class SaveJobResultNode(Node[None]):
 
     job_result_id: NodeId[cfg.JobResult]
     result_spec: JobResultSpec
