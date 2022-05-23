@@ -62,14 +62,6 @@ class _EngineContext:
     failed_nodes: tp.Set[NodeId] = dc.field(default_factory=set)
 
 
-# TODO: Naming for context classes, or do we need both?
-@dc.dataclass
-class EngineContext:
-
-    jobs: tp.Dict
-    data: tp.Dict
-
-
 class TracEngine(_actors.Actor):
 
     """
@@ -85,13 +77,14 @@ class TracEngine(_actors.Actor):
 
         super().__init__()
 
-        self.engine_ctx = EngineContext(jobs={}, data={})
-
         self._log = _util.logger_for_object(self)
+
         self._sys_config = sys_config
         self._models = models
         self._storage = storage
         self._batch_mode = batch_mode
+
+        self._job_actors = dict()
 
     def on_start(self):
 
@@ -119,8 +112,8 @@ class TracEngine(_actors.Actor):
             job_config, result_spec,
             self._models, self._storage)
 
-        jobs = {**self.engine_ctx.jobs, job_key: job_actor_id}
-        self.engine_ctx = EngineContext(jobs, self.engine_ctx.data)
+        job_actors = {**self._job_actors, job_key: job_actor_id}
+        self._job_actors = job_actors
 
     @_actors.Message
     def job_succeeded(self, job_id: str):
@@ -134,10 +127,10 @@ class TracEngine(_actors.Actor):
         self._log.error(f"Recording job as failed: {job_id}")
         self._clean_up_job(job_id, error)
 
-    def _clean_up_job(self, job_id: str, error: tp.Optional[Exception] = None):
+    def _clean_up_job(self, job_key: str, error: tp.Optional[Exception] = None):
 
-        jobs = cp.copy(self.engine_ctx.jobs)
-        job_actor_id = jobs.pop(job_id)
+        job_actors = self._job_actors
+        job_actor_id = job_actors.pop(job_key)
 
         if self._batch_mode:
 
@@ -154,6 +147,7 @@ class TracEngine(_actors.Actor):
         else:
             # Otherwise, just stop the individual job actor for the job that has completed
             self.actors().stop(job_actor_id)
+            self._job_actors = job_actors
 
 
 class JobProcessor(_actors.Actor):
