@@ -338,20 +338,20 @@ class GraphProcessor(_actors.Actor):
         node.result = result
         results = {node_id: node}
 
-        if isinstance(node.node, _graph.BundleNode):
+        # For bundle nodes, add the individual bundle items to the result update
 
-            if isinstance(node.node, _graph.ContextPopNode):
-                bundle_namespace = node_id.namespace.parent
-            else:
-                bundle_namespace = node_id.namespace
+        if node.node.bundle_result:
+            for item_name, item_result in result.items():
 
-            for node_name, result in result.items():
-                node_id = NodeId(node_name, bundle_namespace)
-                old_node = self.graph.nodes[node_id]
-                node = cp.copy(old_node)
-                node.complete = True
-                node.result = result
-                results[node.node.id] = node
+                item_id = NodeId(item_name, node.node.bundle_namespace)
+
+                item_old_node = self.graph.nodes[item_id]
+                item_node = cp.copy(item_old_node)
+                item_node.complete = True
+                item_node.result = item_result
+
+                # Use the original node ID, to avoid overwriting the result type
+                results[item_node.node.id] = item_node
 
         self._update_results(results)
 
@@ -396,30 +396,6 @@ class GraphProcessor(_actors.Actor):
 
         self.graph = graph
         self.check_job_status()
-
-    # def _node_complete(self, node_id: NodeId, node: _EngineNode, succeeded: bool):
-    #
-    #     nodes = {**self.graph.nodes, node_id: node}
-    #
-    #     new_graph = cp.copy(self.graph)
-    #     new_graph.nodes = nodes
-    #
-    #     active_nodes = cp.copy(self.graph.active_nodes)
-    #     active_nodes.remove(node_id)
-    #     new_graph.active_nodes = active_nodes
-    #
-    #     if succeeded:
-    #         succeeded_nodes = cp.copy(self.graph.succeeded_nodes)
-    #         succeeded_nodes.add(node_id)
-    #         new_graph.succeeded_nodes = succeeded_nodes
-    #
-    #     else:
-    #         failed_nodes = cp.copy(self.graph.failed_nodes)
-    #         failed_nodes.add(node_id)
-    #         new_graph.failed_nodes = failed_nodes
-    #
-    #     self.graph = new_graph
-    #     self.check_job_status()
 
     def check_job_status(self, do_submit=True):
 
@@ -514,6 +490,8 @@ class NodeProcessor(_actors.Actor):
         else:
             return isinstance(result, generic_type)
 
+        # TODO: Bundle type checking (cover all dict/list generics)
+
     def _check_result_type(self, result):
 
         # Use an internal error if the result is the wrong type
@@ -526,17 +504,9 @@ class NodeProcessor(_actors.Actor):
             err = f"Node result is the wrong type, expected [{expected_type.__name__}], got [{result_type.__name__}]"
             raise _ex.ETracInternal(err)
 
-    def _is_bundle_node(self):
-
-        return isinstance(self.node.node, _graph.BundleNode)
-        #
-        # result_type = self.node.node.id.result_type
-        # generic_type = tp.get_origin(result_type)
-        # generic_args = tp.get_args(result_type)
-        #
-        # return generic_type == dict and generic_args[0] == NodeId
-
     def _log_node_start(self):
+
+        # TODO: Simplify node logging, also proper logging for bundles
 
         if self._has_special_logging(self.node.node):
             self._log_special_node(self.node.node)

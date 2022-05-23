@@ -428,7 +428,7 @@ class GraphBuilder:
         model_node = RunModelNode(
             model_id, model_scope, model_def,
             frozenset(parameter_ids), frozenset(input_ids),
-            explicit_deps=explicit_deps)
+            explicit_deps=explicit_deps, bundle=model_id.namespace)
 
         nodes = {model_id: model_node}
 
@@ -440,7 +440,7 @@ class GraphBuilder:
         # In the future, we may want models to emit individual outputs before the whole model is complete
 
         for output_id in output_ids:
-            nodes[output_id] = KeyedItemNode(output_id, model_id, output_id.name)
+            nodes[output_id] = BundleItemNode(output_id, model_id, output_id.name)
 
         # Assemble a graph to include the model and its outputs
         return GraphSection(nodes, inputs={*parameter_ids, *input_ids}, outputs=output_ids, must_run=[model_id])
@@ -582,7 +582,7 @@ class GraphBuilder:
             in input_mapping.items()}
 
         push_id = NodeId("trac_ctx_push", namespace, Bundle[tp.Any])
-        push_node = ContextPushNode(push_id, namespace, push_mapping, explicit_deps)
+        push_node = ContextPushNode(push_id, namespace, push_mapping, explicit_deps, bundle=push_id.namespace)
 
         nodes = {push_id: push_node}
 
@@ -612,7 +612,7 @@ class GraphBuilder:
             in output_mapping.items()}
 
         pop_id = NodeId("trac_ctx_pop", namespace, Bundle[tp.Any])
-        pop_node = ContextPopNode(pop_id, namespace, pop_mapping, explicit_deps)
+        pop_node = ContextPopNode(pop_id, namespace, pop_mapping, explicit_deps, bundle=pop_id.namespace.parent)
 
         nodes = {pop_id: pop_node}
 

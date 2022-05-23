@@ -56,7 +56,6 @@ class NodeId(tp.Generic[_T]):
     namespace: NodeNamespace
 
     result_type: tp.Type[_T] = dc.field(default=type(None), init=True, compare=False, hash=False)
-    bundle: bool = dc.field(default=False, init=True, compare=False, hash=False)
 
     def __str__(self):
         return f"{self.name} / {self.namespace}"
@@ -92,8 +91,11 @@ class Node(tp.Generic[_T]):
     dependencies: tp.Dict[NodeId, DependencyType] = dc.field(init=False, default_factory=dict)
     """Set of node IDs that are dependencies for this node"""
 
-    is_bundle: bool = dc.field(init=False)
+    bundle_result: bool = dc.field(init=False, default=False)
     """Flag indicating whether the result of this node is a bundle"""
+
+    bundle_namespace: tp.Optional[NodeNamespace] = dc.field(init=False, default=None)
+    """If the result is a bundle, indicates the namespace that the bundle will be unpacked into"""
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
         return {}
@@ -111,14 +113,16 @@ def _node_type(node_class):
 
         explicit_deps: dc.InitVar[tp.List[NodeId]] = None
 
-        bundle: dc.InitVar[bool] = False
+        bundle: dc.InitVar[NodeNamespace] = None
 
-        def __post_init__(self, explicit_deps: tp.List[NodeId], bundle: bool):
+        def __post_init__(self, explicit_deps: tp.List[NodeId], bundle: NodeNamespace):
             dependencies = self._node_dependencies()
             if explicit_deps:
                 dependencies.update({dep_id: DependencyType.HARD for dep_id in explicit_deps})
             object.__setattr__(self, "dependencies", dependencies)
-            object.__setattr__(self, "is_bundle", bundle)
+            if bundle:
+                object.__setattr__(self, "bundle_result", True)
+                object.__setattr__(self, "bundle_namespace", bundle)
 
     setattr(node_class, "explicit_deps", NodeBuilder.explicit_deps)
     setattr(node_class, "bundle", NodeBuilder.bundle)
@@ -180,22 +184,18 @@ class MappingNode(Node[_T]):
     pass
 
 
-class BundleNode(Node[Bundle[_T]]):
-    pass
-
-
 @_node_type
 class BundleItemNode(MappingNode[_T]):
 
     bundle_id: NodeId[Bundle[_T]]
-    bundle_item: NodeId
+    bundle_item: str
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
         return {self.bundle_id: DependencyType.HARD}
 
 
 @_node_type
-class ContextPushNode(BundleNode[tp.Any]):
+class ContextPushNode(Node[Bundle[tp.Any]]):
 
     """Push a new execution context onto the stack"""
 
@@ -210,7 +210,7 @@ class ContextPushNode(BundleNode[tp.Any]):
 
 
 @_node_type
-class ContextPopNode(BundleNode[tp.Any]):
+class ContextPopNode(Node[Bundle[tp.Any]]):
 
     namespace: NodeNamespace
 
