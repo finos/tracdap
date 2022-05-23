@@ -40,6 +40,7 @@ class _EngineNode:
     node: _graph.Node
     dependencies: tp.Dict[NodeId, _graph.DependencyType]
     function: tp.Optional[_func.NodeFunction] = None
+    complete: bool = False
     result: tp.Optional[tp.Any] = None
     error: tp.Optional[str] = None
 
@@ -116,18 +117,20 @@ class TracEngine(_actors.Actor):
         self._job_actors = job_actors
 
     @_actors.Message
-    def job_succeeded(self, job_id: str):
+    def job_succeeded(self, job_key: str):
 
-        self._log.info(f"Recording job as successful: {job_id}")
-        self._clean_up_job(job_id)
+        self._log.info(f"Recording job as successful: {job_key}")
+        self._finalize_job(job_key)
 
     @_actors.Message
-    def job_failed(self, job_id: str, error: Exception):
+    def job_failed(self, job_key: str, error: Exception):
 
-        self._log.error(f"Recording job as failed: {job_id}")
-        self._clean_up_job(job_id, error)
+        self._log.error(f"Recording job as failed: {job_key}")
+        self._finalize_job(job_key, error)
 
-    def _clean_up_job(self, job_key: str, error: tp.Optional[Exception] = None):
+    def _finalize_job(self, job_key: str, error: tp.Optional[Exception] = None):
+
+        # TODO: How should the engine respond when attempting to finalize an unknown job?
 
         job_actors = self._job_actors
         job_actor_id = job_actors.pop(job_key)
@@ -331,6 +334,7 @@ class GraphProcessor(_actors.Actor):
 
         old_node = self.graph.nodes[node_id]
         node = cp.copy(old_node)
+        node.complete = True
         node.result = result
         results = {node_id: node}
 
@@ -345,6 +349,7 @@ class GraphProcessor(_actors.Actor):
                 node_id = NodeId(node_name, bundle_namespace)
                 old_node = self.graph.nodes[node_id]
                 node = cp.copy(old_node)
+                node.complete = True
                 node.result = result
                 results[node.node.id] = node
 
@@ -355,6 +360,7 @@ class GraphProcessor(_actors.Actor):
 
         old_node = self.graph.nodes[node_id]
         node = cp.copy(old_node)
+        node.complete = True
         node.error = error
 
         self._update_results({node_id: node})
@@ -447,12 +453,13 @@ class GraphProcessor(_actors.Actor):
 
 class NodeProcessor(_actors.Actor):
 
-    __NONE_TYPE = type(None)
-
     """
     Processor responsible for running individual nodes in an execution graph
-    TODO: How to decide when to allocate an actors.Worker (long running, separate thread)
     """
+
+    # TODO: How to decide when to allocate an actors.Worker (long running, separate thread)
+
+    __NONE_TYPE = type(None)
 
     def __init__(self, graph: _EngineContext, node_id: str, node: _EngineNode):
         super().__init__()
@@ -483,7 +490,7 @@ class NodeProcessor(_actors.Actor):
             ctx = NodeContextImpl(self.graph.nodes)
             result = self.node.function(ctx)
 
-            self._check_result(result)
+            self._check_result_type(result)
             self.actors().send_parent("node_succeeded", self.node_id, result)
 
             self._log_node_succeeded()
@@ -494,19 +501,10 @@ class NodeProcessor(_actors.Actor):
 
             self._log_node_failed(e)
 
-    def _check_result(self, result):
-
-        expected_type = self.node.node.id.result_type or self.__NONE_TYPE
-        result_type = type(result)
-
-        if not self._type_matches(result, expected_type):
-            err = f"Result has wrong type, expected [{expected_type.__name__}], got [{result_type.__name__}]"
-            raise _ex.ETracInternal(err)
-
     @classmethod
-    def _type_matches(cls, result, expected_type):
+    def result_matches_type(cls, result, expected_type) -> bool:
 
-        if expected_type == cls.__NONE_TYPE:
+        if expected_type is None or expected_type == cls.__NONE_TYPE:
             return result is None
 
         generic_type = _util.get_origin(expected_type)
@@ -515,6 +513,18 @@ class NodeProcessor(_actors.Actor):
             return isinstance(result, expected_type)
         else:
             return isinstance(result, generic_type)
+
+    def _check_result_type(self, result):
+
+        # Use an internal error if the result is the wrong type
+        # Node functions should only ever return the expected type
+
+        expected_type = self.node.node.id.result_type or self.__NONE_TYPE
+        result_type = type(result)
+
+        if not self.result_matches_type(result, expected_type):
+            err = f"Node result is the wrong type, expected [{expected_type.__name__}], got [{result_type.__name__}]"
+            raise _ex.ETracInternal(err)
 
     def _is_bundle_node(self):
 
@@ -631,21 +641,34 @@ class NodeContextImpl(_func.NodeContext):
 
     def lookup(self, node_id: NodeId[__T]) -> __T:
 
-        graph_node = self.__nodes.get(node_id)
+        engine_node = self.__nodes.get(node_id)
 
-        if graph_node is None:
-            raise _ex.ETracInternal(f"Node ID [{node_id}] does not exist in the execution graph")  # todo
+        # Use internal errors if any of the checks fail on a result lookup
+        # The engine should guarantee that all these conditions are met before a node is executed
 
-        result = graph_node.result
+        if engine_node is None:
+            raise _ex.ETracInternal(f"Node [{node_id.name}] does not exist in execution context [{node_id.namespace}]")
 
-        if result is None:
-            raise _ex.ETracInternal(f"Node ID [{node_id}] does not have a result available")  # todo
+        if not engine_node.complete:
+            raise _ex.ETracInternal(f"Node [{node_id.name}] still pending in execution context [{node_id.namespace}]")
 
-        # todo: type check
+        if engine_node.error:
+            raise _ex.ETracInternal(f"Node [{node_id.name}] failed in execution context [{node_id.namespace}]")
 
-        return result
+        if not NodeProcessor.result_matches_type(engine_node.result, node_id.result_type):
+
+            expected_type = node_id.result_type or type(None)
+            result_type = type(engine_node.result)
+
+            err = f"Wrong type for node [{node_id.name}] in execution context [{node_id.namespace}]" \
+                + f" (expected [{expected_type}], got [{result_type}])"
+
+            raise _ex.ETracInternal(err)
+
+        return engine_node.result
 
     def iter_items(self) -> tp.Iterator[tp.Tuple[NodeId, tp.Any]]:
 
         for node_id, node in self.__nodes.items():
-            yield node_id, node.result
+            if node.complete and not node.error:
+                yield node_id, node.result
