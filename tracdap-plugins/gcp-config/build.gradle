@@ -30,7 +30,11 @@ dependencies {
     // To work around this limitation, TRAC provides a version of just this one annotation class
     implementation project(':tracdap-lib-annotations')
 
-    implementation group: 'com.google.cloud', name: 'google-cloud-storage', version: "$gcp_sdk_version"
+    implementation (group: 'com.google.cloud', name: 'google-cloud-storage', version: "$gcp_sdk_version") {
+
+        // Do not pull in the JavaX annotation JAR, which is licensed under CDDL
+        exclude group: 'javax.annotation', module: 'javax.annotation-api'
+    }
 
     // Google HTTP client components are failing compliance on the latest version
     // Force these versions until the main GCP SDK updates this dependency
