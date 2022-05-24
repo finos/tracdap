@@ -48,6 +48,69 @@ jobs:
       - name: Slow tests
         run: ./gradlew integration -DintegrationTags="slow"
 
+      # If the tests fail, make the output available for download
+      - name: Store failed test results
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: junit-test-results
+          path: build/modules/*/reports/**
+          retention-days: 7
+
+
+  end-to-end:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Java - Setup
+        uses: actions/setup-java@v2
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+
+          # Turn on Gradle dependency caching
+          cache: gradle
+
+      - name: Java - Build platform
+        run: ./gradlew build -x test
+
+      - name: Python - setup
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Python - PIP
+        run: python -m pip install --upgrade pip
+
+      - name: Python - Install build dependencies
+        run: |
+          pip install -r tracdap-runtime/python/requirements.txt
+
+      - name: Python - Build runtime package
+        run: python tracdap-runtime/python/build_runtime.py --target codegen dist
+
+      - name: Run end to end tests
+        run: ./gradlew integration -DintegrationTags="int-e2e"
+
+      # If the tests fail, make the output available for download
+      - name: Store failed test results
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: junit-test-results
+          path: build/modules/*/reports/**
+          retention-days: 7
+
+
   int-metadb:
 
     runs-on: ubuntu-latest
@@ -145,3 +208,12 @@ jobs:
 
       - name: Integration Tests
         run: ./gradlew integration -DintegrationTags="int-metadb"
+
+      # If the tests fail, make the output available for download
+      - name: Store failed test results
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: junit-test-results
+          path: build/modules/*/reports/**
+          retention-days: 7

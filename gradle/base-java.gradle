@@ -31,6 +31,16 @@ dependencies {
     testImplementation group: 'org.mockito', name: 'mockito-core', version: "$mockito_version"
 }
 
+java {
+
+    // We want to allow compiling with higher versions of Java as well
+    // Setting toolchain.languageVersion does not make it easy to do this
+    // So, stick to the old source/target compatibility settings for now
+
+    sourceCompatibility = "$java_min_version"
+    targetCompatibility = "$java_min_version"
+}
+
 compileJava {
     options.compilerArgs << '-parameters'
 }

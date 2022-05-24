@@ -3,7 +3,7 @@ storage:
 
   example_data:
     instances:
-      - storageType: LOCAL_STORAGE
+      - storageType: LOCAL
         storageProps:
           rootPath: ./data
 

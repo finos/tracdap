@@ -94,10 +94,10 @@ class DocGen:
         codegen_exe = "python"
         codegen_args = [
             str(CODEGEN_SCRIPT), "api_doc",
-            "--proto_path", "trac-api/trac-services/src/main/proto",
-            "--proto_path", "trac-api/trac-metadata/src/main/proto",
+            "--proto_path", "tracdap-api/tracdap-services/src/main/proto",
+            "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
             "--out", "build/doc/code/platform_api",
-            "--package", "trac"]
+            "--package", "tracdap"]
 
         self._run_subprocess(codegen_exe, codegen_args)
 
@@ -119,20 +119,20 @@ class DocGen:
 
         self._log_target()
 
-        runtime_src = ROOT_DIR.joinpath('trac-runtime/python/src')
+        runtime_src = ROOT_DIR.joinpath('tracdap-runtime/python/src')
         doc_src = BUILD_DIR.joinpath("code/runtime_python")
 
-        # Set up the trac.rt package
-        self._mkdir(doc_src.joinpath("trac"))
-        self._touch(doc_src.joinpath("trac/__init__.py"))
-        self._mkdir(doc_src.joinpath("trac/rt"))
-        self._touch(doc_src.joinpath("trac/rt/__init__.py"))
+        # Set up the tracdap.rt package
+        self._mkdir(doc_src.joinpath("tracdap"))
+        self._touch(doc_src.joinpath("tracdap/__init__.py"))
+        self._mkdir(doc_src.joinpath("tracdap/rt"))
+        self._touch(doc_src.joinpath("tracdap/rt/__init__.py"))
 
         # Copy only API packages / modules from the runtime library
         api_modules = [
-            "trac/rt/api/",
-            "trac/rt/launch/",
-            "trac/rt/exceptions.py"]
+            "tracdap/rt/api/",
+            "tracdap/rt/launch/",
+            "tracdap/rt/exceptions.py"]
 
         for module in api_modules:
 
@@ -151,7 +151,7 @@ class DocGen:
         # So, remove those imports from the API package before running Sphinx
         self._log.info("* fix docgen imports")
 
-        for line in fileinput.input(doc_src.joinpath('trac/rt/api/__init__.py'), inplace=True):
+        for line in fileinput.input(doc_src.joinpath('tracdap/rt/api/__init__.py'), inplace=True):
             if "DOCGEN_REMOVE" not in line:
                 print(line, end="")
 
@@ -161,11 +161,11 @@ class DocGen:
         codegen_exe = "python"
         codegen_args = [
             str(CODEGEN_SCRIPT), "python_runtime",
-            "--proto_path", "trac-api/trac-metadata/src/main/proto",
+            "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
             "--out", "build/doc/code/runtime_python"]
 
         self._run_subprocess(codegen_exe, codegen_args)
-        self._mv(doc_src.joinpath('trac/metadata'), doc_src.joinpath('trac/rt/metadata'))
+        self._mv(doc_src.joinpath('tracdap/metadata'), doc_src.joinpath('tracdap/rt/metadata'))
 
     def get_version_and_release(self):
 
@@ -195,8 +195,8 @@ class DocGen:
         version = re.sub(r"[+-].+$", "", version_output)
         release = re.sub(r".*\+.+$", "(latest dev)", version_output)
 
-        self._log.info(f"TRAC version: {version}")
-        self._log.info(f"TRAC release: {release}")
+        self._log.info(f"TRAC D.A.P. version: {version}")
+        self._log.info(f"TRAC D.A.P. release: {release}")
 
         self._version = version  # noqa
         self._release = release  # noqa

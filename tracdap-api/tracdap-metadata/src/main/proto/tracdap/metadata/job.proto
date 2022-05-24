@@ -1,0 +1,97 @@
+/*
+ * Copyright 2020 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = 'proto3';
+package tracdap.metadata;
+
+option java_package = "org.finos.tracdap.metadata";
+option java_multiple_files = true;
+
+import "tracdap/metadata/type.proto";
+import "tracdap/metadata/object_id.proto";
+import "tracdap/metadata/tag_update.proto";
+
+
+enum JobType {
+  JOB_TYPE_NOT_SET = 0;
+  RUN_MODEL = 1;
+  RUN_FLOW = 2;
+  IMPORT_MODEL = 3;
+  IMPORT_DATA = 4;
+}
+
+enum JobStatusCode {
+
+  JOB_STATUS_CODE_NOT_SET = 0;
+  PREPARING = 1;
+  VALIDATED = 2;
+  PENDING = 3;
+  QUEUED = 4;
+  SUBMITTED = 5;
+  RUNNING = 6;
+  FINISHING = 7;
+  SUCCEEDED = 8;
+  FAILED = 9;
+  CANCELLED = 10;
+}
+
+
+message JobDefinition {
+
+  JobType jobType = 1;
+
+  oneof jobDetails {
+    RunModelJob runModel = 2;
+    RunFlowJob runFlow = 3;
+    ImportModelJob importModel = 4;
+  }
+}
+
+message RunModelJob {
+
+  TagSelector model = 1;
+
+  map<string, Value> parameters = 2;
+  map<string, TagSelector> inputs = 3;
+  map<string, TagSelector> outputs = 4;
+  map<string, TagSelector> priorOutputs = 5;
+
+  repeated TagUpdate outputAttrs = 6;
+}
+
+message RunFlowJob {
+
+  TagSelector flow = 1;
+
+  map<string, Value> parameters = 2;
+  map<string, TagSelector> inputs = 3;
+  map<string, TagSelector> outputs = 4;
+  map<string, TagSelector> priorOutputs = 5;
+  map<string, TagSelector> models = 6;
+
+  repeated TagUpdate outputAttrs = 7;
+}
+
+message ImportModelJob {
+
+  string language = 1;
+  string repository = 2;
+  string path = 3;
+  string entryPoint = 4;
+  string version = 5;
+
+  repeated TagUpdate modelAttrs = 6;
+}

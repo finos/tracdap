@@ -1,7 +1,7 @@
 
-###########################
-TRAC Platform Documentation
-###########################
+##############################
+TRAC Data & Analytics Platform
+##############################
 
 .. centered::
     *A next-generation data and analytics platform for use in highly regulated environments*
@@ -13,9 +13,9 @@ TRAC Platform Documentation
     it will be useful before it is complete!
 
     You can see the current development status and roadmap for the platform on the
-    `roadmap page <https://github.com/Accenture/trac/wiki/Development-Roadmap>`_.
+    `roadmap page <https://github.com/finos/tracdap/wiki/Development-Roadmap>`_.
     If you have particular questions or issues, please raise a ticket on our
-    `issue tracker <https://github.com/Accenture/trac/issues>`_.
+    `issue tracker <https://github.com/finos/tracdap/issues>`_.
 
 
 .. toctree::

@@ -36,6 +36,13 @@ services:
       host: localhost
       port: 8082
 
+  orch:
+    protocols: [GRPC_WEB, REST]
+    target:
+      scheme: http
+      host: localhost
+      port: 8083
+
 
 routes:
 

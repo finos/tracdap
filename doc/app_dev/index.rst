@@ -5,7 +5,7 @@ App Development
 
 .. note::
 
-    The `TRAC Web API Package <https://www.npmjs.com/package/trac-web-api/>`_
+    The `TRAC Web API Package <https://www.npmjs.com/package/@finos/tracdap-web-api/>`_
     is available to download and install from `npmjs.com <https://www.npmjs.com/>`_.
 
 
@@ -14,4 +14,4 @@ App Development
 
     tutorial/index
     ./rest_examples
-    Platform API Listing </autoapi/trac/api/index>
+    Platform API Listing </autoapi/tracdap/api/index>

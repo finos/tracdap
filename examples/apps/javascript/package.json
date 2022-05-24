@@ -1,7 +1,7 @@
 {
-  "name": "trac-web-examples",
+  "name": "tracdap-web-examples",
   "version": "0.0.0-DEVELOPMENT",
-  "description": "Example code for building TRAC web applications",
+  "description": "Example code for building TRAC d.a.p. web applications",
   "license": "Apache-2.0",
   "licenses": [
     {
@@ -9,18 +9,18 @@
       "url": "https://www.apache.org/licenses/LICENSE-2.0"
     }
   ],
-  "homepage": "https://github.com/accenture/trac",
+  "homepage": "https://tracdap.finos.org/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/accenture/trac"
+    "url": "https://github.com/finos/tracdap"
   },
   "bugs": {
-    "url": "https://github.com/accenture/trac/issues"
+    "url": "https://github.com/finos/tracdap/issues"
   },
   "type": "module",
   "dependencies": {
     "apache-arrow": "^6.0.1",
-    "trac-web-api": "file:../../../trac-api/packages/web",
+    "tracdap-web-api": "file:../../../tracdap-api/packages/web",
     "xhr2": "^0.2.1"
   },
   "scripts": {

@@ -1,0 +1,96 @@
+/*
+ * Copyright 2020 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+plugins {
+    id "application"
+    id "idea"
+}
+
+apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
+apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
+
+ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Deploy Meta DB")
+
+
+application {
+    mainClass.set("org.finos.tracdap.deploy.metadb.DeployMetaDB")
+    tasks.run.workingDir = rootProject.projectDir
+}
+
+dependencies {
+
+    implementation project(':tracdap-api-config')
+    implementation project(':tracdap-lib-common')
+    implementation project(':tracdap-lib-db')
+
+    // Add runtime dependencies for SQL drivers
+    // Individual drivers can be enabled/disabled via gradle/plugins.gradle
+    // There may be licensing implications to enabling certain JDBC drivers
+    // See the NOTICE file for more information on licensing restrictions
+    implementation project(':sql-drivers')
+
+    implementation group: 'org.flywaydb', name: 'flyway-core', version: "$flyway_version"
+}
+
+// Bring DDL files into main JAR as resources
+processResources {
+
+    from "${project(':tracdap-svc-meta').projectDir.path}/src/schema"
+}
+
+
+// As of version 8, Flyway requires some databases are supported by specific Flyway modules
+
+sourceSets {
+
+    h2 {}
+    mysql {}
+    mariadb {}
+    postgresql {}
+    sqlserver {}
+    oracle {}
+}
+
+dependencies {
+
+    // MySQL, Maria and SQL Server have support modules maintained by Flyway
+    mysqlRuntimeOnly group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version"
+    mariadbRuntimeOnly group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version"
+    sqlserverRuntimeOnly group: 'org.flywaydb', name: 'flyway-sqlserver', version: "$flyway_version"
+
+    // Other DBs just require the database driver JAR on the runtime classpath
+    h2RuntimeOnly group: 'com.h2database', name: 'h2', version: "$h2_version"
+    postgresqlRuntimeOnly group: 'org.postgresql', name: 'postgresql', version: "$postgresql_version"
+    oracleRuntimeOnly group: 'com.oracle.database.jdbc', name: 'ojdbc10', version: "$oracle_version"
+}
+
+sourceSets.each { dialect ->
+
+    if (dialect.name != "main" && dialect.name != "test") {
+
+        def key = (String) "sql_${dialect.name}"
+        def buildDriver = isFeatureEnabled(key)
+
+        if (buildDriver) {
+
+            println("Enabling Flyway support for SQL driver: ${dialect.name}")
+
+            dependencies {
+                runtimeOnly dialect.runtimeClasspath
+            }
+        }
+    }
+}

@@ -26,7 +26,7 @@ import generator as gen
 class TracPlugin:
 
     # TODO: Pass this in as an option
-    TARGET_PACKAGE = "trac.rt"
+    TARGET_PACKAGE = "tracdap.rt"
 
     def __init__(self, pb_request: pb_plugin.CodeGeneratorRequest):
 
@@ -54,19 +54,22 @@ class TracPlugin:
 
         try:
 
-            generator = gen.TracGenerator(self._options)
-
-            # Build a static type map in a separate first pass
-            type_map = generator.build_type_map(self._request.proto_file)
-
+            # Make sure to enable optional fields
             generated_response = pb_plugin.CodeGeneratorResponse()
-
-            # Enable optional fields
             generated_response.supported_features = pb_plugin.CodeGeneratorResponse.FEATURE_PROTO3_OPTIONAL
 
             input_files = self._request.proto_file
             input_files = filter(lambda f: f.name in self._request.file_to_generate, input_files)
             input_files = filter(lambda f: f.source_code_info.ByteSize() > 0, input_files)
+            input_files = list(input_files)
+
+            if len(input_files) == 0:
+                return generated_response
+
+            generator = gen.TracGenerator(self._options)
+
+            # Build a static type map in a separate first pass
+            type_map = generator.build_type_map(self._request.proto_file)
 
             sorted_files = input_files  # sorted(input_files, key=lambda f: f.package)
             packages = it.groupby(sorted_files, lambda f: f.package)

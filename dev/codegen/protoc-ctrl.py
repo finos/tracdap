@@ -130,8 +130,13 @@ def platform_args(base_args, proto_files):
 
 def build_protoc_args(generator, proto_paths, output_location, packages):
 
+    # Protoc will call the plugin directly as an executable
+    # On Windows, executing Python scripts directly requires the "py" launcher and an entry in PATHEXT
+    # This might not always be available, particularly in CI
+    # Using a one-line batch script avoids these complications
+
     if platform.system().lower().startswith("win"):
-        trac_plugin = "protoc-gen-trac.py"
+        trac_plugin = "protoc-gen-trac.bat"
     else:
         trac_plugin = "protoc-gen-trac=./protoc-gen-trac.py"
 
@@ -148,7 +153,7 @@ def build_protoc_args(generator, proto_paths, output_location, packages):
 
     elif generator == "python_runtime":
 
-        options = "--trac_opt=target_package=trac.rt"
+        options = "--trac_opt=target_package=tracdap.rt"
 
         if packages_option:
             options += f";{packages_option}"

@@ -1,0 +1,79 @@
+/*
+ * Copyright 2020 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = 'proto3';
+package tracdap.metadata;
+
+option java_package = "org.finos.tracdap.metadata";
+option java_multiple_files = true;
+option java_outer_classname = "ObjectProtoWrapper";  // Do not create a Java class called "Object"!
+
+import "tracdap/metadata/object_id.proto";
+import "tracdap/metadata/data.proto";
+import "tracdap/metadata/model.proto";
+import "tracdap/metadata/flow.proto";
+import "tracdap/metadata/job.proto";
+import "tracdap/metadata/file.proto";
+import "tracdap/metadata/custom.proto";
+import "tracdap/metadata/stoarge.proto";
+
+
+/**
+ * Object definitions are the core structural element of TRAC's metadata model
+ *
+ * Definitions describe every object that is stored in the TRAC platform and there
+ * is a one-to-one relation between definitions and objects. I.e. every dataset
+ * has its own data definition, every model has its own model definition and so
+ * on. Definitions also describe actions that take place on the platform by way of
+ * job definitions, so a "job" is just another type of object. Each type of object
+ * has its own definition and definitions can be added or extended as the platform
+ * evolves.
+ *
+ * The object definition container class allows different types of objects to be
+ * stored, indexed and accessed in the same way. Every object has a standard
+ * object header which contains enough information to identify the object.
+ *
+ * TRAC object definitions can be versioned. In order to use versioning the
+ * semantics of versioning must be defined and those vary depending on the object
+ * type. Currently these semantics are defined for DATA objects, see
+ * DataDefinition for details. Versioning is also allowed for CUSTOM objects, in
+ * this case it is the responsibility of the application to define versioning
+ * semantics. Versioning is not currently permitted for other object types.
+ *
+ * Object definitions are intended for storing structural data necessary to access
+ * data and run jobs on the TRAC platform. Informational data to catalogue and
+ * describe objects is stored in tags. Tags are a lot more flexible than object
+ * definitions, so applications built on the TRAC platform may choose to store
+ * structural information in tags where their required structure is not supported
+ * by TRAC's core object definitions.
+ *
+ * @see Tag
+ */
+message ObjectDefinition {
+
+    ObjectType objectType = 1;
+
+    oneof definition {
+        DataDefinition data = 2;
+        ModelDefinition model = 3;
+        FlowDefinition flow = 4;
+        JobDefinition job = 5;
+        FileDefinition file = 6;
+        CustomDefinition custom = 7;
+        StorageDefinition storage = 8;
+        SchemaDefinition schema = 9;
+    }
+}

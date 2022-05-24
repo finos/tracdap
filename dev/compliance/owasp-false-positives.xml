@@ -47,4 +47,15 @@
         <cpe>cpe:/a:mysql:mysql</cpe>
     </suppress>
 
+    <!-- MariaDB versioning schema is different for the database server and the client connector -->
+    <!-- DB server is on 10.x and has vulnerabilities affecting versions in the 10.x series -->
+    <!-- Client connector 2.7.5 was released Jan '22, but is detected as an "old" version of MariaDB -->
+    <suppress>
+        <notes><![CDATA[
+            file name: mariadb-java-client-2.7.5.jar
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.mariadb\.jdbc/mariadb\-java\-client@.*$</packageUrl>
+        <cpe>cpe:/a:mariadb:mariadb</cpe>
+    </suppress>
+
 </suppressions>

@@ -14,42 +14,42 @@
  * limitations under the License.
  */
 
-import {trac} from 'trac-web-api';
+import {tracdap} from 'tracdap-web-api';
 
-// Use trac.setup to create an RPC connector pointed at your TRAC server
+// Use tracdap.setup to create an RPC connector pointed at your TRAC server
 // For code that will run in the browser, use rpcImplForBrowser to direct requests to the origin server
-const metaApiRpcImpl = trac.setup.rpcImplForTarget(trac.api.TracMetadataApi, "http", "localhost", 8080);
+const metaApiRpcImpl = tracdap.setup.rpcImplForTarget(tracdap.api.TracMetadataApi, "http", "localhost", 8080);
 
 // Create a TRAC API instance for the Metadata API
-const metaApi = new trac.api.TracMetadataApi(metaApiRpcImpl);
+const metaApi = new tracdap.api.TracMetadataApi(metaApiRpcImpl);
 
 
 export function createSchema() {
 
     // Build the schema definition we want to save
-    const schema = trac.metadata.SchemaDefinition.create({
+    const schema = tracdap.metadata.SchemaDefinition.create({
 
-        schemaType: trac.SchemaType.TABLE,
+        schemaType: tracdap.SchemaType.TABLE,
         table: {
             fields: [
                 {
-                    fieldName: "customer_id", fieldType: trac.STRING, businessKey: true,
+                    fieldName: "customer_id", fieldType: tracdap.STRING, businessKey: true,
                     label: "Unique customer account number"
                 },
                 {
-                    fieldName: "customer_type", fieldType: trac.STRING, categorical: true,
+                    fieldName: "customer_type", fieldType: tracdap.STRING, categorical: true,
                     label: "Is the customer an individual, company, govt agency or something else"
                 },
                 {
-                    fieldName: "customer_name", fieldType: trac.STRING,
+                    fieldName: "customer_name", fieldType: tracdap.STRING,
                     label: "Customer's common name"
                 },
                 {
-                    fieldName: "account_open_date", fieldType: trac.DATE,
+                    fieldName: "account_open_date", fieldType: tracdap.DATE,
                     label: "Date the customer account was opened"
                 },
                 {
-                    fieldName: "credit_limit", fieldType: trac.DECIMAL,
+                    fieldName: "credit_limit", fieldType: tracdap.DECIMAL,
                     label: "Ordinary credit limit on the customer account, in USD"
                 }
             ]
@@ -57,13 +57,13 @@ export function createSchema() {
     });
 
     // Set up a metadata write request, to save the schema with some informational tags
-    const request = trac.api.MetadataWriteRequest.create({
+    const request = tracdap.api.MetadataWriteRequest.create({
 
         tenant: "ACME_CORP",
-        objectType: trac.ObjectType.SCHEMA,
+        objectType: tracdap.ObjectType.SCHEMA,
 
         definition: {
-            objectType: trac.ObjectType.SCHEMA,
+            objectType: tracdap.ObjectType.SCHEMA,
             schema: schema
         },
 
@@ -85,7 +85,7 @@ export function createSchema() {
 
 export function loadTag(tagHeader) {
 
-    const request = trac.api.MetadataReadRequest.create({
+    const request = tracdap.api.MetadataReadRequest.create({
 
         tenant: "ACME_CORP",
         selector: tagHeader

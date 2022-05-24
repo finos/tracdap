@@ -17,7 +17,7 @@
 REPO_DIR=$(cd "$(dirname "$0")/../.." && pwd)
 
 BUILD_IMAGE=python:3.10
-TRAC_IMAGE=trac/runtime-python
+TRAC_IMAGE=tracdap/runtime-python
 
 
 # Look up TRAC version
@@ -39,5 +39,5 @@ echo TRAC version = ${TRAC_VERSION}
 
 
 set -x
-docker run --mount "type=bind,source=${REPO_DIR},target=/mnt/trac" ${BUILD_IMAGE} /mnt/trac/dev/containers/build_runtime_inner.sh
-docker build -t "${TRAC_IMAGE}:${TRAC_VERSION}" "${REPO_DIR}/trac-runtime/python"
+docker run --mount "type=bind,source=${REPO_DIR},target=/mnt/tracdap" ${BUILD_IMAGE} /mnt/tracdap/dev/containers/build_runtime_inner.sh
+docker build -t "${TRAC_IMAGE}:${TRAC_VERSION}" "${REPO_DIR}/tracdap-runtime/python"

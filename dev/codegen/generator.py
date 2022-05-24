@@ -413,7 +413,7 @@ class TracGenerator:
 
     def generate_module_imports(self, descriptor: pb_desc.FileDescriptorProto, api_package: str):
 
-        import_proto_pattern = re.compile(r"^(trac/.+)/([^/]+)\.proto$")
+        import_proto_pattern = re.compile(r"^(tracdap/.+)/([^/]+)\.proto$")
 
         import_stmts = []
         prior_imports = set()
@@ -445,7 +445,7 @@ class TracGenerator:
                         if "target_package" in self._options \
                         else "trac"
 
-                    sub_package = import_package.replace("trac.", "")
+                    sub_package = import_package.replace("tracdap.", "")
                     qualified_package = target_package + "." + sub_package
                     alias = import_package[import_package.rfind(".") + 1:]
 
@@ -727,8 +727,8 @@ class TracGenerator:
         # For TRAC generated types, imports are aliased for each sub package
         # E.g.: trac.metadata in the API becomes trac.rt.metadata (domain objects) or trac.rt.proto.metadata (proto)
         # Then import trac.rt.metadata as metadata
-        if alias and type_name.startswith("trac."):
-            type_name = type_name[len("trac."):]
+        if alias and type_name.startswith("tracdap."):
+            type_name = type_name[len("tracdap."):]
 
         # We are using deferred annotations, with from __future__ import annotations
         # Type names no longer need to be quoted!
@@ -772,7 +772,8 @@ class TracGenerator:
         # Enum fields are always set to a value (the enum' zero value)
         elif field.type == field.Type.TYPE_ENUM:
             enum_type = type_info.enum
-            return f"{enum_type.name}.{enum_type.value[0].name}"
+            enum_type_name = self.python_base_type(package, field, make_relative=True, alias=True)
+            return f"{enum_type_name}.{enum_type.value[0].name}"
 
         # Assume everything else is a primitive
         else:

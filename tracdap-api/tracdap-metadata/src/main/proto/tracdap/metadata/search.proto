@@ -1,0 +1,289 @@
+/*
+ * Copyright 2020 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = 'proto3';
+package tracdap.metadata;
+
+option java_package = "org.finos.tracdap.metadata";
+option java_multiple_files = true;
+
+import "tracdap/metadata/type.proto";
+import "tracdap/metadata/object_id.proto";
+
+
+/**
+ * Metadata search term operator, used as part of a SearchTerm
+ *
+ * @see SearchTerm
+ */
+enum SearchOperator {
+
+  SEARCH_OPERATOR_NOT_SET = 0;
+
+  /**
+   * EQUALS
+   *
+   * The EQ operator matches a tag when the tag has an attribute that matches the
+   * search term exactly, i.e. attribute name, type and value all match. For
+   * multi-valued attributes, the EQ operator will match if any of the attribute
+   * values match the search term. The search value for the EQ operator must be a
+   * primitive value.
+   *
+   * Exact matches may behave erratically for FLOAT values due to rounding errors,
+   * for this reason it is not recommended to use the EQ operator with FLOAT values.
+   */
+  EQ = 1;
+
+  /**
+   * DOES NOT EQUAL
+   *
+   * The NE operator matches a tag precisely when the EQ operator does not match it.
+   * This could be because the tag attribute does not match the search term, or because
+   * the tag does not define the search attribute at all or defines it with a different
+   * type. For multi-valued attributes, the NE operator will only match if none of the
+   * attribute values match the search term. The search value for the NE operator must
+   * be a primitive value.
+   *
+   * The NE operator is exactly equivalent to using the EQ operator inside a logical NOT
+   * operation. This equivalence holds for both single- and multi-valued attributes.
+   *
+   * Exact matches may behave erratically for FLOAT values due to rounding errors,
+   * for this reason it is not recommended to use the NE operator with FLOAT values.
+   */
+  NE = 2;
+
+  /**
+   * LESS THAN
+   *
+   * The LT operator matches a tag when the tag has an attribute with a value less than
+   * the search parameter. The LT operator will only match single-valued attributes.
+   *
+   * The LT operator can only apply to ordered primitive values, it cannot be used with
+   * string or boolean values. The LT operator will never match a multi-valued attribute,
+   * even if one or more of the individual values matches the search term.
+   */
+  LT = 3;
+
+  /**
+   * LESS THAN OR EQUAL TO
+   *
+   * The LE operator matches a tag when the tag has an attribute with a value less than
+   * or equal to the search parameter. The LE operator will only match single-valued
+   * attributes.
+   *
+   * The LE operator can only apply to ordered primitive values, it cannot be used with
+   * string or boolean values. The LE operator will never match a multi-valued attribute,
+   * even if one or more of the individual values matches the search term.
+   */
+  LE = 4;
+
+  /**
+   * GREATER THAN
+   *
+   * The GT operator matches a tag when the tag has an attribute with a value greater than
+   * the search parameter. The GT operator will only match single-valued attributes.
+   *
+   * The GT operator can only apply to ordered primitive values, it cannot be used with
+   * string or boolean values. The GT operator will never match a multi-valued attribute,
+   * even if one or more of the individual values matches the search term.
+   */
+  GT = 5;
+
+  /**
+   * GREATER THAN OR EQUAL TO
+   *
+   * The GE operator matches a tag when the tag has an attribute with a value greater than
+   * or equal to the search parameter. The GE operator will only match single-valued
+   * attributes.
+   *
+   * The GE operator can only apply to ordered primitive values, it cannot be used with
+   * string or boolean values. The GE operator will never match a multi-valued attribute,
+   * even if one or more of the individual values matches the search term.
+   */
+  GE = 6;
+
+  /**
+   * IN
+   *
+   * The IN operator matches a tag when the tag has an attribute whose value is matched
+   * exactly by an item in the list of values provided. For multi-valued attributes, the
+   * IN operator will match if any of the attribute values match the search term. The
+   * search value for the IN operator must be an array value whose array items are a
+   * primitive type. Arrays of BOOLEAN values are not supported, use EQ to match boolean
+   * attributes.
+   *
+   * Exact matches may behave erratically for FLOAT values due to rounding errors,
+   * for this reason it is not recommended to use the IN operator with FLOAT values.
+   */
+  IN = 7;
+}
+
+
+/**
+ * Metadata search logical operator, used as part of a LogicalExpression.
+ *
+ * @see LogicalExpression
+ */
+enum LogicalOperator {
+
+  LOGICAL_OPERATOR_NOT_SET = 0;
+
+  /**
+   * LOGICAL AND
+   *
+   * The AND operator combines two or more search expressions, the logical expression
+   * will match only when all sub-expressions match. The order of sub-expressions is
+   * not important.
+   */
+  AND = 1;
+
+  /**
+   * LOGICAL OR
+   *
+   * The OR operator combines two or more search expressions, the logical expression
+   * will match when any of the sub-expressions match. The order of sub-expressions
+   * is not important.
+   */
+  OR = 2;
+
+  /**
+   * LOGICAL NOT
+   *
+   * The NOT operator applies to a single sub-expression, the logical expression will
+   * match precisely when the sub-expression does not match.
+   */
+  NOT = 3;
+}
+
+/**
+ * Individual search term for a search of the TRAC metadata store.
+ *
+ * Applies a search operator against an individual tag attribute.
+ */
+message SearchTerm {
+
+  /// The name of the attribute to search for
+  string attrName = 1;
+
+  /// The primitive type of the attribute being searched for
+  BasicType attrType = 2;
+
+  /// The search operator to apply
+  SearchOperator operator = 3;
+
+  /// The search value to look for
+  Value searchValue = 4;
+}
+
+/**
+ * Logical expression for a search of the TRAC metadata store.
+ *
+ * Applies a logical operator to one or more sub-expressions.
+ */
+message LogicalExpression {
+
+  /// The logical operator to apply to sub-expressions
+  LogicalOperator operator = 1;
+
+  /**
+   * A set of sub-expressions.
+   *
+   * For AND or OR operations, there must be two or more sub-expressions. For NOT
+   * operations, there must be precisely one sub-expression.
+   */
+  repeated SearchExpression expr = 2;
+}
+
+/**
+ * Search expression for a search of the TRAC metadata store.
+ *
+ * A search expression is either a single search term or a logical combination of
+ * other expressions. Search expressions can be built up to express complex logical
+ * conditions.
+ */
+message SearchExpression {
+
+  oneof expr {
+
+    /// Set if this search expression is a single term
+    SearchTerm term = 1;
+
+    /// Set if this search expression is a logical expression
+    LogicalExpression logical = 2;
+  }
+}
+
+
+/// Parameters to define a metadata search.
+message SearchParameters {
+
+  /// The type of object to search for
+  ObjectType objectType = 1;
+
+  /// A search expression based on tag attributes
+  SearchExpression search = 2;
+
+  /**
+   * Perform the search as of a specific date/time.
+   *
+   * Supplying this field will cause TRAC to ignore all metadata changes from
+   * the specified time onwards. The result will be the same as if a search was
+   * performed at the specified time with this field left blank.
+   *
+   * If a zone offset is supplied as part of the timestamp, TRAC will apply the
+   * offset to search across all metadata items in UTC.
+   *
+   * If this parameter is not supplied, the search will be executed as of the
+   * current time.
+   */
+  optional DatetimeValue searchAsOf = 3;
+
+  /**
+   * Include prior versions of objects in the search.
+   *
+   * By default, only the latest version of each object is considered in a
+   * search. If the as-of parameter is specified, latest versions are
+   * considered as of that time.
+   *
+   * Setting this flag to true will cause TRAC to consider superseded object
+   * versions in the search. If the as-of parameter is specified as well then
+   * all object versions up to that time are considered. Only the latest
+   * matching version will be included in the search result.
+   *
+   * This flag can be combined with priorTags to search across all tags and
+   * object versions. If neither flag is specified, only the latest version and
+   * latest tag is considered for each object.
+   */
+   bool priorVersions = 4;
+
+  /**
+   * Include prior tags in the search.
+   *
+   * By default, only the latest tag for each object version is considered in a
+   * search. If the as-of parameter is specified, latest tags are considered as
+   * of that time.
+   *
+   * Setting this flag to true will cause TRAC to consider superseded tags in
+   * the search. If the as-of parameter is specified as well then all tags up to
+   * that time are considered. Only the latest matching tag will be included in
+   * the search result.
+   *
+   * This flag can be combined with priorVersions to search across all tags and
+   * object versions. If neither flag is specified, only the latest version and
+   * latest tag is considered for each object.
+   */
+   bool priorTags = 5;
+}

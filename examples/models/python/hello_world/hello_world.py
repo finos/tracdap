@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 import typing as tp
-import trac.rt.api as trac
+import tracdap.rt.api as trac
 
 
 class HelloWorldModel(trac.TracModel):
@@ -40,5 +40,5 @@ class HelloWorldModel(trac.TracModel):
 
 
 if __name__ == "__main__":
-    import trac.rt.launch as launch
+    import tracdap.rt.launch as launch
     launch.launch_model(HelloWorldModel, "hello_world.yaml", "../sys_config.yaml")
