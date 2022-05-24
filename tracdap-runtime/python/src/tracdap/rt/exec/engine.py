@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import copy as cp
 import dataclasses as dc
+import enum
 import typing as tp
 
 import tracdap.rt.config as _cfg
@@ -442,7 +443,6 @@ class NodeProcessor(_actors.Actor):
         self.graph = graph
         self.node_id = node_id
         self.node = node
-        self._log = _util.logger_for_object(self)
 
     def on_start(self):
 
@@ -461,7 +461,7 @@ class NodeProcessor(_actors.Actor):
 
         try:
 
-            self._log_node_start()
+            NodeLogger.log_node_start(self.node)
 
             ctx = NodeContextImpl(self.graph.nodes)
             result = self.node.function(ctx)
@@ -469,13 +469,13 @@ class NodeProcessor(_actors.Actor):
             self._check_result_type(result)
             self.actors().send_parent("node_succeeded", self.node_id, result)
 
-            self._log_node_succeeded()
+            NodeLogger.log_node_succeeded(self.node)
 
         except Exception as e:
 
             self.actors().send_parent("node_failed", self.node_id, e)
 
-            self._log_node_failed(e)
+            NodeLogger.log_node_failed(self.node, e)
 
     @classmethod
     def result_matches_type(cls, result, expected_type) -> bool:
@@ -526,102 +526,132 @@ class NodeProcessor(_actors.Actor):
             err = f"Node result is the wrong type, expected [{expected_type.__name__}], got [{result_type.__name__}]"
             raise _ex.ETracInternal(err)
 
-    def _log_node_start(self):
 
-        # TODO: Simplify node logging, also proper logging for bundles
+class NodeLogger:
 
-        if self._has_special_logging(self.node.node):
-            self._log_special_node(self.node.node)
-            return
+    """
+    Log the activity of the NodeProcessor
+    """
 
-        node_name = self.node.node.id.name
-        namespace = self.node.node.id.namespace
+    # Separate out the logic for logging nodes, so the NodeProcessor itself stays a bit cleaner
 
-        is_static_node = isinstance(self.node.node, _graph.StaticValueNode)
-        is_mapping_node = isinstance(self.node.node, _graph.MappingNode)
+    _log = _util.logger_for_class(NodeProcessor)
 
-        if is_static_node:
-            self._log.info(f"SET {self._log_value_type()} [{node_name}] / {namespace}")
+    class LoggingType(enum.Enum):
+        DEFAULT = 0
+        STATIC_VALUE = 1
+        PUSH_POP = 2
+        SIMPLE_MAPPING = 3
+        MODEL = 4
 
-        elif is_mapping_node:
-            self._log.info(f"MAP {self._log_value_type()} [{node_name}] / {namespace}")
-            self._log_mapping_info(self.node.node)
+    @classmethod
+    def log_node_start(cls, node: _EngineNode):
+
+        logging_type = cls._logging_type(node)
+        node_name = node.node.id.name
+        namespace = node.node.id.namespace
+
+        if logging_type == cls.LoggingType.STATIC_VALUE:
+            cls._log.info(f"SET {cls._value_type(node)} [{node_name}] / {namespace}")
+
+        elif logging_type in [cls.LoggingType.SIMPLE_MAPPING]:
+            cls._log.info(f"MAP {cls._value_type(node)} [{cls._mapping_source(node)}] -> [{node_name}] / {namespace}")
 
         else:
-            self._log.info(f"START {self._log_func_type()} [{node_name}] / {namespace}")
+            cls._log.info(f"START {cls._func_type(node)} [{node_name}] / {namespace}")
 
-    def _log_node_succeeded(self):
+    @classmethod
+    def log_node_succeeded(cls, node: _EngineNode):
 
-        node_name = self.node.node.id.name
-        namespace = self.node.node.id.namespace
+        logging_type = cls._logging_type(node)
+        node_name = node.node.id.name
+        namespace = node.node.id.namespace
 
-        is_mapping_node = isinstance(self.node.node, _graph.MappingNode)
-        is_static_node = isinstance(self.node.node, _graph.StaticValueNode)
+        if logging_type in [cls.LoggingType.STATIC_VALUE, cls.LoggingType.SIMPLE_MAPPING]:
+            return
 
-        if not is_mapping_node and not is_static_node:
-            self._log.info(f"DONE {self._log_func_type()} [{node_name}] / {namespace}")
+        if logging_type == cls.LoggingType.PUSH_POP:
+            cls._log_push_pop_node_details(node.node)  # noqa
 
-    def _log_node_failed(self, e: Exception):
+        if logging_type == cls.LoggingType.MODEL:
+            cls._log_model_node_details(node.node)  # noqa
 
-        node_name = self.node.node.id.name
-        namespace = self.node.node.id.namespace
+        cls._log.info(f"DONE {cls._func_type(node)} [{node_name}] / {namespace}")
 
-        self._log.error(f"FAILED {self._log_func_type()} [{node_name}] / {namespace}")
-        self._log.exception(e)
+    @classmethod
+    def log_node_failed(cls, node: _EngineNode, e: Exception):
 
-    def _log_value_type(self) -> str:
+        node_name = node.node.id.name
+        namespace = node.node.id.namespace
 
-        graph_node = self.node.node
-        result_type = graph_node.id.result_type
+        cls._log.error(f"FAILED {cls._func_type(node)} [{node_name}] / {namespace}")
+        cls._log.exception(e)
+
+    @classmethod
+    def _log_push_pop_node_details(cls, node: tp.Union[_graph.ContextPushNode, _graph.ContextPopNode]):
+
+        push_or_pop = "PUSH" if isinstance(node, _graph.ContextPushNode) else "POP"
+        direction = "->" if isinstance(node, _graph.ContextPushNode) else "<-"
+
+        for inner_id, outer_id in node.mapping.items():
+            item_type = cls._type_str(inner_id.result_type)
+            msg = f"{push_or_pop} {item_type} [{outer_id.name}] {direction} [{inner_id.name}] / {node.id.namespace}"
+            cls._log.info(msg)
+
+    @classmethod
+    def _log_model_node_details(cls, node: _graph.RunModelNode):
+
+        for output in node.model_def.outputs:
+            msg = f"RESULT DataView [{output}] / {node.bundle_namespace}"  # todo
+            cls._log.info(msg)
+
+    @classmethod
+    def _logging_type(cls, node: _EngineNode) -> LoggingType:
+
+        if isinstance(node.node, _graph.StaticValueNode):
+            return cls.LoggingType.STATIC_VALUE
+
+        if isinstance(node.node, _graph.ContextPushNode) or isinstance(node.node, _graph.ContextPopNode):
+            return cls.LoggingType.PUSH_POP
+
+        if isinstance(node.node, _graph.IdentityNode):
+            return cls.LoggingType.SIMPLE_MAPPING
+
+        if isinstance(node.node, _graph.RunModelNode):
+            return cls.LoggingType.MODEL
+
+        return cls.LoggingType.DEFAULT
+
+    @classmethod
+    def _value_type(cls, node: _EngineNode) -> str:
+
+        return cls._type_str(node.node.id.result_type)
+
+    @classmethod
+    def _type_str(cls, result_type: type) -> str:
 
         if result_type is not None:
             return result_type.__name__
         else:
             return str(None)
 
-    def _log_func_type(self):
+    @classmethod
+    def _func_type(cls, node: _EngineNode) -> str:
 
         # Remove "Func" from "xxxFunc"
 
-        func_type = type(self.node.function)
+        func_type = type(node.function)
         return func_type.__name__[:-4]
 
-    __SPECIAL_LOGGING_NODES = [
-        _graph.StaticValueNode,
-        _graph.IdentityNode
-    ]
+    @classmethod
+    def _mapping_source(cls, node: _EngineNode) -> str:
 
-    def _has_special_logging(self, node: _graph.Node):
+        graph_node = node.node
 
-        return type(node) in self.__SPECIAL_LOGGING_NODES
+        if isinstance(graph_node, _graph.IdentityNode):
+            return graph_node.src_id.name
 
-    def _log_special_node(self, node: _graph.Node):
-
-        node_name = node.id.name
-        namespace = node.id.namespace
-
-        if isinstance(node, _graph.StaticValueNode):
-            self._log.info(f"SET {self._log_value_type()} [{node_name}] / {namespace}")
-
-        elif isinstance(node, _graph.IdentityNode):
-            self._log.info(f"MAP {self._log_value_type()} [{node_name}] <- [{node.src_id.name}] / {namespace}")
-
-    def _log_mapping_info(self, node: _graph.Node):
-
-        if isinstance(node, _graph.IdentityNode):
-            self._log.info(f"  * <- {str(node.src_id)}")
-
-        elif isinstance(node, _graph.KeyedItemNode):
-            self._log.info(f"  * <- {node.src_item} | {str(node.src_id)}")
-
-        elif isinstance(node, _graph.DataItemNode):
-            self._log.info(f"  * <- part-root | {str(node.data_view_id)}")
-
-        elif isinstance(node, _graph.DataViewNode):
-            self._log.info(f"  part-root <- {str(node.root_item)}")
-
-        else:
-            self._log.warning("  (mapping info cannot be displayed)")
+        return "(unknown)"
 
 
 class NodeContextImpl(_func.NodeContext):
