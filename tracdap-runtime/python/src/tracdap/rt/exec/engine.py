@@ -25,6 +25,7 @@ import tracdap.rt.exec.actors as _actors
 import tracdap.rt.exec.graph_builder as _graph
 import tracdap.rt.exec.functions as _func
 import tracdap.rt.impl.models as _models
+import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.storage as _storage
 import tracdap.rt.impl.util as _util
 
@@ -601,8 +602,11 @@ class NodeLogger:
     @classmethod
     def _log_model_node_details(cls, node: _graph.RunModelNode):
 
+        cls._type_str(_data.DataView)
+
         for output in node.model_def.outputs:
-            msg = f"RESULT DataView [{output}] / {node.bundle_namespace}"  # todo
+            result_type = cls._type_str(_data.DataView)
+            msg = f"RESULT {result_type} [{output}] / {node.bundle_namespace}"
             cls._log.info(msg)
 
     @classmethod
