@@ -660,12 +660,12 @@ class _CsvStorageFormat(IDataFormat):
             missing_columns = list(filter(lambda col_: col_.lower() not in header_lower, schema.names))
 
             if any(missing_columns):
-                msg = f"CSV data is missing one of more columns: [{', '.join(missing_columns)}]"
+                msg = f"CSV data is missing one or more columns: [{', '.join(missing_columns)}]"
                 self._log.error(msg)
                 raise _ex.EDataConformance(msg)
 
             schema_columns = {col.lower(): index for index, col in enumerate(schema.names)}
-            col_mapping = [schema_columns.get(col.lower()) for col in header]
+            col_mapping = [schema_columns.get(col) for col in header_lower]
             python_types = list(map(_data.DataMapping.arrow_to_python_type, schema.types))
 
             data = [[] for _ in range(len(schema.names))]
@@ -678,13 +678,10 @@ class _CsvStorageFormat(IDataFormat):
 
                     output_col = col_mapping[csv_col]
 
-                    if output_col is None:
-                        continue
-
-                    python_type = python_types[output_col]
-                    python_value = self._convert_python_value(raw_value, python_type, csv_row, csv_col)
-
-                    data[output_col].append(python_value)
+                    if output_col is not None:
+                        python_type = python_types[output_col]
+                        python_value = self._convert_python_value(raw_value, python_type, csv_row, csv_col)
+                        data[output_col].append(python_value)
 
                     csv_col += 1
 
