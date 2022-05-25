@@ -17,55 +17,27 @@
 
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
 
-    <!-- Here "trac" relates to a different project with the same name -->
-    <suppress>
-        <cpe>cpe:/a:trac:trac</cpe>
-    </suppress>
-
     <!-- The sql-drivers module is falsely recognized as www-sql -->
     <suppress>
         <cpe>cpe:/a:www-sql_project:www-sql</cpe>
     </suppress>
 
-    <!-- Netty's Tomcat native classes JAR uses a different versioning scheme to the rest of Netty -->
-    <!-- This confuses Dependency Check into thinking an older version of Netty is being used -->
+    <!-- flyway-mysql driver is detected as part of MySQL -->
     <suppress>
-        <notes><![CDATA[
-           file name: netty-tcnative-classes-2.0.46.Final.jar
-        ]]></notes>
-        <packageUrl regex="true">^pkg:maven/io\.netty/netty\-tcnative\-classes@.*$</packageUrl>
-        <cpe>cpe:/a:netty:netty</cpe>
-    </suppress>
-
-    <!-- Flyway mysql support JAR is detected as being part of MySQL -->
-    <!-- Triggers alerts based on the MySQL version, not the Flyway version -->
-    <suppress>
-        <notes><![CDATA[
-            file name: flyway-mysql-8.2.2.jar
-        ]]></notes>
         <packageUrl regex="true">^pkg:maven/org\.flywaydb/flyway\-mysql@.*$</packageUrl>
         <cpe>cpe:/a:mysql:mysql</cpe>
     </suppress>
 
-    <!-- MariaDB versioning schema is different for the database server and the client connector -->
-    <!-- DB server is on 10.x and has vulnerabilities affecting versions in the 10.x series -->
-    <!-- Client connector 2.7.5 was released Jan '22, but is detected as an "old" version of MariaDB -->
-    <suppress>
-        <notes><![CDATA[
-            file name: mariadb-java-client-2.7.5.jar
-        ]]></notes>
-        <packageUrl regex="true">^pkg:maven/org\.mariadb\.jdbc/mariadb\-java\-client@.*$</packageUrl>
-        <cpe>cpe:/a:mariadb:mariadb</cpe>
-    </suppress>
-
     <!-- google-http-client-gson is detected as google:gson -->
-    <!-- In fact the version of the core gson library pulled in is 2.9, which is the patched version -->
     <suppress>
-        <notes><![CDATA[
-           file name: google-http-client-gson-1.41.8.jar
-        ]]></notes>
         <packageUrl regex="true">^pkg:maven/com\.google\.http\-client/google\-http\-client\-gson@.*$</packageUrl>
         <cpe>cpe:/a:google:gson</cpe>
+    </suppress>
+
+    <!-- trac-api-services is detected as services_project:services -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/org\.finos\.tracdap/tracdap\-api\-services@.*$</packageUrl>
+        <cpe>cpe:/a:services_project:services</cpe>
     </suppress>
 
 </suppressions>
