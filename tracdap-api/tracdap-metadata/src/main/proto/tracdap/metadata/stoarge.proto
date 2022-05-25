@@ -43,6 +43,8 @@ message StorageCopy {
 
   CopyStatus copyStatus = 4;
   DatetimeValue copyTimestamp = 5;
+
+  map<string, Value> storageOptions = 6;
 }
 
 message StorageIncarnation {
@@ -62,4 +64,10 @@ message StorageItem {
 message StorageDefinition {
 
   map<string, StorageItem> dataItems = 1;
+
+  // TODO: Breaking change for 0.5, Lift storageFormat up so each dataset has a single format
+  reserved "storageFormat";
+  reserved 2;
+
+  map<string, Value> storageOptions = 3;
 }

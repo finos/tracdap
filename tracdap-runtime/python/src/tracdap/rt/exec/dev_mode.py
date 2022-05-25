@@ -679,6 +679,9 @@ class DevModeTranslator:
         storage_def = _meta.StorageDefinition(dataItems={})
         storage_def.dataItems[delta.dataItem] = storage_item
 
+        if storage_format.lower() == "csv":
+            storage_def.storageOptions["lenient_csv_parser"] = _types.MetadataCodec.encode_value(True)
+
         data_obj = _meta.ObjectDefinition(objectType=_meta.ObjectType.DATA, data=data_def)
         storage_obj = _meta.ObjectDefinition(objectType=_meta.ObjectType.STORAGE, storage=storage_def)
 
