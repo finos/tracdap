@@ -52,6 +52,16 @@ dependencyCheck {
     data {
         directory = rootProject.buildDir.path + '/compliance-cache/nvd_platform/'
     }
+
+    // May 2022: SonarType have updated the OSS index API, which has broken the analyzer in dependencyCheck
+    // Notice from SonarType: https://ossindex.sonatype.org/updates-notice
+    // GitHub issue for dependency checker: https://github.com/jeremylong/DependencyCheck/issues/4539
+    // Once this issue is addressed, the analyzer can be turned back on
+    analyzers {
+        ossIndex {
+            enabled=false
+        }
+    }
 }
 
 licenseReport {
