@@ -24,6 +24,7 @@ import tracdap.rt.api as _api
 import tracdap.rt.config as _config
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.impl.config_parser as _cfg_p
+import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.storage as _storage
 import tracdap.rt.impl.models as _models
@@ -425,11 +426,16 @@ class LoadDataFunc(NodeFunction[_data.DataItem], _LoadSaveDataFunc):
         trac_schema = data_spec.schema_def if data_spec.schema_def else data_spec.data_def.schema
         arrow_schema = _data.DataMapping.trac_to_arrow_schema(trac_schema) if trac_schema else None
 
+        # Decode options (metadata values) from the storage definition
+        options = dict()
+        for opt_key, opt_value in data_spec.storage_def.storageOptions.items():
+            options[opt_key] = _types.MetadataCodec.decode_value(opt_value)
+
         table = data_storage.read_table(
             data_copy.storagePath,
             data_copy.storageFormat,
             arrow_schema,
-            storage_options={})
+            storage_options=options)
 
         return _data.DataItem(table.schema, table)
 
@@ -459,10 +465,15 @@ class SaveDataFunc(NodeFunction[None], _LoadSaveDataFunc):
         if data_item.table is None:
             raise _ex.EUnexpected()
 
+        # Decode options (metadata values) from the storage definition
+        options = dict()
+        for opt_key, opt_value in data_spec.storage_def.storageOptions.items():
+            options[opt_key] = _types.MetadataCodec.decode_value(opt_value)
+
         data_storage.write_table(
             data_copy.storagePath, data_copy.storageFormat,
             data_item.table,
-            storage_options={}, overwrite=False)
+            storage_options=options, overwrite=False)
 
 
 class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
