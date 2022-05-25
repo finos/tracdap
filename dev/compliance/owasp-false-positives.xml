@@ -58,4 +58,14 @@
         <cpe>cpe:/a:mariadb:mariadb</cpe>
     </suppress>
 
+    <!-- google-http-client-gson is detected as google:gson -->
+    <!-- In fact the version of the core gson library pulled in is 2.9, which is the patched version -->
+    <suppress>
+        <notes><![CDATA[
+           file name: google-http-client-gson-1.41.8.jar
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/com\.google\.http\-client/google\-http\-client\-gson@.*$</packageUrl>
+        <cpe>cpe:/a:google:gson</cpe>
+    </suppress>
+
 </suppressions>

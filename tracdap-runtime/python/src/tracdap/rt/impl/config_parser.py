@@ -11,18 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
 
 from __future__ import annotations
 
@@ -30,6 +18,7 @@ import re
 import typing as tp
 import decimal
 import enum
+import uuid
 import inspect
 import dataclasses as _dc
 
@@ -332,9 +321,8 @@ class ConfigParser(tp.Generic[_T]):
 
     def _parse_generic_class(self, location: str, raw_value: tp.Any, metaclass:  __generic_metaclass):
 
-        # Minimum supported Python is 3.7, which does not provide get_origin and get_args
-        origin = tp.get_origin(metaclass) if 'get_origin' in tp.__dict__ else metaclass.__origin__
-        args = tp.get_args(metaclass) if 'get_args' in tp.__dict__ else metaclass.__args__
+        origin = _util.get_origin(metaclass)
+        args = _util.get_args(metaclass)
 
         if origin == tp.List or origin == list:
 
@@ -381,3 +369,44 @@ class ConfigParser(tp.Generic[_T]):
             return item
         else:
             return parent_location + "." + item
+
+
+class ConfigQuoter:
+
+    JSON_FORMAT = "json"
+    YAML_FORMAT = "yaml"
+
+    @classmethod
+    def quote(cls, obj: tp.Any, quote_format: str) -> str:
+
+        if quote_format.lower() == cls.JSON_FORMAT:
+            return cls.quote_json(obj)
+
+        if quote_format.lower() == cls.YAML_FORMAT:
+            return cls.quote_yaml(obj)
+
+        # TODO: This is probably an error in the user-supplied parameters
+        raise _ex.EUnexpected(f"Unsupported output format [{quote_format}]")
+
+    @classmethod
+    def quote_json(cls, obj: tp.Any) -> str:
+
+        return json.dumps(obj, cls=ConfigQuoter._JsonEncoder, indent=4)
+
+    @classmethod
+    def quote_yaml(cls, obj: tp.Any) -> str:
+
+        return yaml.dump(obj)
+
+    class _JsonEncoder(json.JSONEncoder):
+
+        def default(self, o: tp.Any) -> str:
+
+            if isinstance(o, enum.Enum):
+                return o.name
+            if isinstance(o, uuid.UUID):
+                return str(o)
+            elif type(o).__module__.startswith("tracdap."):
+                return {**o.__dict__}  # noqa
+            else:
+                return super().default(o)

@@ -1,0 +1,23 @@
+
+nodes:
+
+  customer_loans:
+    nodeType: "INPUT_NODE"
+
+  currency_data:
+    nodeType: "INPUT_NODE"
+
+  model_1:
+    nodeType: "MODEL_NODE"
+    modelStub:
+      inputs: [customer_loans, currency_data]
+      outputs: [preprocessed_data]
+
+  model_2:
+    nodeType: "MODEL_NODE"
+    modelStub:
+      inputs: [preprocessed_data]
+      outputs: [profit_by_region]
+
+  profit_by_region:
+    nodeType: "OUTPUT_NODE"

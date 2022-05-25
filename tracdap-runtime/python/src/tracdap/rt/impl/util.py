@@ -11,18 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
 
 from __future__ import annotations
 
@@ -157,7 +145,7 @@ def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
         tagTimestamp=meta.DatetimeValue(timestamp.isoformat()))
 
 
-def object_key(object_id: tp.Union[meta.TagHeader, meta.TagSelector]):
+def object_key(object_id: tp.Union[meta.TagHeader, meta.TagSelector]) -> str:
 
     if isinstance(object_id, meta.TagHeader):
         return f"{object_id.objectType.name}-{object_id.objectId}-v{object_id.objectVersion}"
@@ -233,3 +221,27 @@ class __LogClose(tp.Generic[__T]):
 def log_close(ctx_mgg: __T, log: logging.Logger, msg: str) -> __T:
 
     return __LogClose(ctx_mgg, log, msg)
+
+
+def get_origin(metaclass: type):
+
+    # Minimum supported Python is 3.7, which does not provide get_origin and get_args
+
+    if "get_origin" in tp.__dict__:
+        return tp.get_origin(metaclass)
+    elif "__origin__" in metaclass.__dict__:
+        return metaclass.__origin__  # noqa
+    else:
+        return None
+
+
+def get_args(metaclass: type):
+
+    # Minimum supported Python is 3.7, which does not provide get_origin and get_args
+
+    if "get_args" in tp.__dict__:
+        return tp.get_args(metaclass)
+    elif "__args__" in metaclass.__dict__:
+        return metaclass.__args__  # noqa
+    else:
+        return None

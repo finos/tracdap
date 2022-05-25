@@ -26,21 +26,24 @@ import org.finos.tracdap.metadata.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 
-public class RunModelJob extends RunModelOrFlow implements IJobLogic {
+public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
 
     @Override
     public List<TagSelector> requiredMetadata(JobDefinition job) {
 
-        if (job.getJobType() != JobType.RUN_MODEL)
+        if (job.getJobType() != JobType.RUN_FLOW)
             throw new EUnexpected();
 
-        var runModel = job.getRunModel();
+        var runFlow = job.getRunFlow();
 
-        var resources = new ArrayList<TagSelector>(runModel.getInputsCount() + 1);
-        resources.add(runModel.getModel());
-        resources.addAll(runModel.getInputsMap().values());
+        var resources = new ArrayList<TagSelector>(runFlow.getInputsCount() + runFlow.getModelsCount() + 1);
+        resources.add(runFlow.getFlow());
+        resources.addAll(runFlow.getInputsMap().values());
+        resources.addAll(runFlow.getModelsMap().values());
 
         return resources;
     }
@@ -51,15 +54,11 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
             Map<String, ObjectDefinition> resources,
             Map<String, TagHeader> resourceMapping) {
 
-        var runModel = job.getRunModel();
+        var runFlow = job.getRunFlow();
 
-        var modelKey = MetadataUtil.objectKey(runModel.getModel());
-        var modelId = resourceMapping.get(modelKey);
-        var modelDef = resources.get(MetadataUtil.objectKey(modelId)).getModel();
+        var outputs = flowOutputs(runFlow.getFlow(), resources, resourceMapping);
 
-        return newResultIds(
-                tenant, modelDef.getOutputsMap().keySet(),
-                runModel.getPriorOutputsMap());
+        return newResultIds(tenant, outputs, runFlow.getPriorOutputsMap());
     }
 
     @Override
@@ -68,15 +67,26 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
             Map<String, ObjectDefinition> resources,
             Map<String, TagHeader> resourceMapping) {
 
-        var runModel = job.getRunModel();
+        var runFlow = job.getRunFlow();
 
-        var modelKey = MetadataUtil.objectKey(runModel.getModel());
-        var modelId = resourceMapping.get(modelKey);
-        var modelDef = resources.get(MetadataUtil.objectKey(modelId)).getModel();
+        var outputs = flowOutputs(runFlow.getFlow(), resources, resourceMapping);
 
-        return priorResultIds(
-                modelDef.getOutputsMap().keySet(), runModel.getPriorOutputsMap(),
-                resources, resourceMapping);
+        return priorResultIds(outputs, runFlow.getPriorOutputsMap(), resources, resourceMapping);
+    }
+
+    private Set<String> flowOutputs(
+            TagSelector flowSelector,
+            Map<String, ObjectDefinition> resources,
+            Map<String, TagHeader> resourceMapping) {
+
+        var flowKey = MetadataUtil.objectKey(flowSelector);
+        var flowId = resourceMapping.get(flowKey);
+        var flowDef = resources.get(MetadataUtil.objectKey(flowId)).getFlow();
+
+        return flowDef.getNodesMap().entrySet().stream()
+                .filter(nodeEntry -> nodeEntry.getValue().getNodeType() == FlowNodeType.OUTPUT_NODE)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -85,28 +95,26 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
             Map<String, ObjectDefinition> resources,
             Map<String, TagHeader> resourceMapping) {
 
-        var modelKey = MetadataUtil.objectKey(job.getRunModel().getModel());
-        var modelId = resourceMapping.get(modelKey);
-        var modelDef = resources.get(MetadataUtil.objectKey(modelId)).getModel();
+        var flowOutputNames = flowOutputs(job.getRunFlow().getFlow(), resources, resourceMapping);
 
-        var modelOutputs = setResultIds(modelDef.getOutputsMap().keySet(), resultMapping);
+        var flowOutputSelectors = setResultIds(flowOutputNames, resultMapping);
 
-        var runModel = job.getRunModel().toBuilder()
+        var runFlow = job.getRunFlow().toBuilder()
                 .clearOutputs()
-                .putAllOutputs(modelOutputs);
+                .putAllOutputs(flowOutputSelectors);
 
         return job.toBuilder()
-                .setRunModel(runModel)
+                .setRunFlow(runFlow)
                 .build();
     }
 
     @Override
     public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, JobResult jobResult) {
 
-        var runModel = jobConfig.getJob().getRunModel();
+        var runFlow = jobConfig.getJob().getRunFlow();
 
         return buildResultMetadata(
-                tenant, runModel.getOutputsMap(), runModel.getPriorOutputsMap(),
-                runModel.getOutputAttrsList(), jobConfig, jobResult);
+                tenant, runFlow.getOutputsMap(), runFlow.getPriorOutputsMap(),
+                runFlow.getOutputAttrsList(), jobConfig, jobResult);
     }
 }
