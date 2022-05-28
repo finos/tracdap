@@ -13,6 +13,8 @@
 #  limitations under the License.
 
 import tracdap.rt.api as trac
+import tracdap.rt.impl.api_hook as api_hook
+
 import typing as tp
 
 import unittest
@@ -49,7 +51,7 @@ class SampleModel(trac.TracModel):
 class ModelApiTest(unittest.TestCase):
 
     def setUp(self):
-
+        api_hook.RuntimeHookImpl.register_impl()
         self.sample_model = SampleModel()
 
     def test_sample_model(self):

@@ -20,6 +20,7 @@ import subprocess as sp
 import tracdap.rt.api as api
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
+import tracdap.rt.impl.api_hook as api_hook
 import tracdap.rt.impl.models as models
 import tracdap.rt.impl.util as util
 
@@ -59,6 +60,7 @@ class ImportModelTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        api_hook.RuntimeHookImpl.register_impl()
         util.configure_logging()
 
     def setUp(self) -> None:
