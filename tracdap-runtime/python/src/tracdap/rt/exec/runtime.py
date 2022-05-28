@@ -27,6 +27,7 @@ import tracdap.rt.impl.config_parser as _cparse
 import tracdap.rt.impl.util as util
 import tracdap.rt.impl.models as _models
 import tracdap.rt.impl.storage as _storage
+import tracdap.rt.impl.api_hook as _hook
 
 import tracdap.rt.exec.actors as _actors
 import tracdap.rt.exec.engine as _engine
@@ -108,6 +109,8 @@ class TracRuntime:
             self._log.info(f"Beginning pre-start sequence...")
 
             # Plugins will be loaded here, before config
+
+            _hook.RuntimeHookImpl.register_impl()
 
             # Load sys and job config (or use embedded)
 

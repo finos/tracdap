@@ -18,11 +18,13 @@ import abc as _abc
 import typing as _tp
 import logging as _logging
 
-import tracdap.rt.metadata as _meta
-
 import pandas as _pd
 import pyspark as _pys
 import pyspark.sql as _pyss
+
+# Import metadata domain objects into the API namespace
+# This significantly improves type hinting, inline documentation and auto-complete in JetBrains IDEs
+from tracdap.rt.metadata import *  # DOCGEN_REMOVE
 
 
 class TracContext:
@@ -59,7 +61,7 @@ class TracContext:
         Get the value of a model parameter
 
         Model parameters defined in :py:meth:`TracModel.define_parameters` can be retrieved at runtime
-        by this method. Values are returned as native Python types. Parameter names are case sensitive.
+        by this method. Values are returned as native Python types. Parameter names are case-sensitive.
 
         Attempting to retrieve parameters not defined by the model will result in a runtime validation
         error, even if those parameters are supplied in the job config and used by other models.
@@ -72,7 +74,7 @@ class TracContext:
         pass
 
     @_abc.abstractmethod
-    def get_schema(self, dataset_name: str) -> _meta.SchemaDefinition:
+    def get_schema(self, dataset_name: str) -> SchemaDefinition:
 
         """
         Get the schema of a model input or output
@@ -80,7 +82,7 @@ class TracContext:
         The schema of an input or output can be retrieved and examined at runtime using this method.
         Inputs must be defined in :py:meth:`TracModel.define_inputs`
         and outputs in :py:meth:`TracModel.define_outputs`.
-        Input and output names are case sensitive.
+        Input and output names are case-sensitive.
 
         In the current version of the runtime all model inputs and outputs are defined statically,
         :py:meth:`get_schema` will return the schema as it was defined.
@@ -91,7 +93,7 @@ class TracContext:
 
         :param dataset_name: The name of the input or output to get the schema for
         :return: The schema definition for the named dataset
-        :rtype: :py:class:`SchemaDefinition<trac.rt.metadata.SchemaDefinition>`
+        :rtype: :py:class:`SchemaDefinition <trac.rt.metadata.SchemaDefinition>`
         :raises: :py:class:`ERuntimeValidation<trac.rt.exceptions.ERuntimeValidation>`
         """
 
@@ -106,7 +108,7 @@ class TracContext:
         The data for both inputs and outputs can be retrieved as a Pandas dataframe using this method.
         Inputs must be defined in :py:meth:`TracModel.define_inputs`
         and outputs in :py:meth:`TracModel.define_outputs`.
-        Input and output names are case sensitive.
+        Input and output names are case-sensitive.
 
         The TRAC runtime will handle loading the data and assembling it into a Pandas dataframe.
         This may happen before the model runs or when a dataset is requested. Models should take
@@ -150,7 +152,7 @@ class TracContext:
 
         The data for model outputs can be saved as a Pandas dataframe using this method.
         Outputs must be defined in :py:meth:`TracModel.define_outputs`.
-        Output names are case sensitive.
+        Output names are case-sensitive.
 
         The supplied data must match the schema of the named output. Missing fields or fields
         of the wrong type will result in a data validation error. Extra fields will be discarded
@@ -248,7 +250,7 @@ class TracModel:
     """
 
     @_abc.abstractmethod
-    def define_parameters(self) -> _tp.Dict[str, _meta.ModelParameter]:
+    def define_parameters(self) -> _tp.Dict[str, ModelParameter]:
 
         """
         Define parameters that will be available to the model at runtime
@@ -262,13 +264,13 @@ class TracModel:
         Parameters that are defined in the wrong format or with required fields missing
         will result in a model validation failure.
 
-        :return: The full set of parameters that will be available to the model at runtime
+        :return: The full set of parameters that will be available to the model at
         """
 
         pass
 
     @_abc.abstractmethod
-    def define_inputs(self) -> _tp.Dict[str, _meta.ModelInputSchema]:
+    def define_inputs(self) -> _tp.Dict[str, ModelInputSchema]:
 
         """
         Define data inputs that will be available to the model at runtime
@@ -288,7 +290,7 @@ class TracModel:
         pass
 
     @_abc.abstractmethod
-    def define_outputs(self) -> _tp.Dict[str, _meta.ModelOutputSchema]:
+    def define_outputs(self) -> _tp.Dict[str, ModelOutputSchema]:
 
         """
         Define data outputs that will be produced by the model at runtime
