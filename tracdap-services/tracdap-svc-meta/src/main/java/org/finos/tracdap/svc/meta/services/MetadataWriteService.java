@@ -197,6 +197,10 @@ public class MetadataWriteService {
 
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
 
+        // Apply the common controlled trac_ tags for newly created objects
+        var commonAttrs = commonCreateAttrs(timestamp, GUEST_USER_ID, GUEST_USER_NAME);
+        newTag = TagUpdateService.applyTagUpdates(newTag, commonAttrs);
+
         return dal.savePreallocatedObject(tenant, newTag)
                 .thenApply(_ok -> newHeader);
     }

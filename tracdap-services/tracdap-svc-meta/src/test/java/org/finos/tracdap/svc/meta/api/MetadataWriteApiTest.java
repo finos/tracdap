@@ -1261,7 +1261,18 @@ abstract class MetadataWriteApiTest {
 
         var savedTag = readApi.readObject(readRequest);
 
-        assertEquals(expectedTag, savedTag);
+        assertEquals(expectedTag.getHeader(), savedTag.getHeader());
+        assertEquals(expectedTag.getDefinition(), savedTag.getDefinition());
+
+        for (var attr : expectedTag.getAttrsMap().keySet())
+            assertEquals(expectedTag.getAttrsOrThrow(attr), savedTag.getAttrsOrThrow(attr));
+
+        assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));
+        assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_CREATE_USER_ID));
+        assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_CREATE_USER_NAME));
+        assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_UPDATE_TIME));
+        assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_ID));
+        assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_NAME));
     }
 
     @Test
