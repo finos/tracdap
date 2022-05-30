@@ -144,14 +144,8 @@ abstract class MetadataSearchApiTest {
 
         var searchResult = searchApi.search(searchRequest);
 
-        // Search results do not include the definition body
-        var t1 = tag1.toBuilder()
-                .setHeader(id1)
-                .clearDefinition()
-                .build();
-
         assertEquals(1, searchResult.getSearchResultCount());
-        assertEquals(t1, searchResult.getSearchResult(0));
+        assertEquals(id1, searchResult.getSearchResult(0).getHeader());
     }
 
     @Test
@@ -217,14 +211,8 @@ abstract class MetadataSearchApiTest {
 
         var searchResult = searchApi.search(searchRequest);
 
-        // Search results do not include the definition body
-        var t1 = tag1.toBuilder()
-                .setHeader(id1)
-                .clearDefinition()
-                .build();
-
         assertEquals(1, searchResult.getSearchResultCount());
-        assertEquals(t1, searchResult.getSearchResult(0));
+        assertEquals(id1, searchResult.getSearchResult(0).getHeader());
     }
 
     @ParameterizedTest
@@ -280,14 +268,8 @@ abstract class MetadataSearchApiTest {
 
         var searchResult = searchApi.search(searchRequest);
 
-        // Search results do not include the definition body
-        var t1 = tag1.toBuilder()
-                .setHeader(id1)
-                .clearDefinition()
-                .build();
-
         assertEquals(1, searchResult.getSearchResultCount());
-        assertEquals(t1, searchResult.getSearchResult(0));
+        assertEquals(id1, searchResult.getSearchResult(0).getHeader());
     }
 
     @ParameterizedTest
@@ -345,14 +327,8 @@ abstract class MetadataSearchApiTest {
 
         var searchResult = searchApi.search(searchRequest);
 
-        // Search results do not include the definition body
-        var t1 = tag1.toBuilder()
-                .setHeader(id1)
-                .clearDefinition()
-                .build();
-
         assertEquals(1, searchResult.getSearchResultCount());
-        assertEquals(t1, searchResult.getSearchResult(0));
+        assertEquals(id1, searchResult.getSearchResult(0).getHeader());
     }
 
     @ParameterizedTest
@@ -415,14 +391,8 @@ abstract class MetadataSearchApiTest {
 
         var searchResult = searchApi.search(searchRequest);
 
-        // Search results do not include the definition body
-        var t1 = tag1.toBuilder()
-                .setHeader(id1)
-                .clearDefinition()
-                .build();
-
         assertEquals(1, searchResult.getSearchResultCount());
-        assertEquals(t1, searchResult.getSearchResult(0));
+        assertEquals(id1, searchResult.getSearchResult(0).getHeader());
     }
 
     @Test

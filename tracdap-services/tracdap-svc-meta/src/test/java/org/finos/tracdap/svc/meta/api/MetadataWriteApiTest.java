@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.meta.api;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.test.helpers.PlatformTest;
@@ -164,7 +165,18 @@ abstract class MetadataWriteApiTest {
 
         var tagFromStore = readApi.readObject(readRequest);
 
-        assertEquals(expectedTag, tagFromStore);
+        assertEquals(expectedTag.getHeader(), tagFromStore.getHeader());
+        assertEquals(expectedTag.getDefinition(), tagFromStore.getDefinition());
+
+        for (var attr : expectedTag.getAttrsMap().keySet())
+            assertEquals(expectedTag.getAttrsOrThrow(attr), tagFromStore.getAttrsOrThrow(attr));
+
+        assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));
+        assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_USER_ID));
+        assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_USER_NAME));
+        assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_UPDATE_TIME));
+        assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_ID));
+        assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_NAME));
     }
 
     @Test
@@ -419,7 +431,24 @@ abstract class MetadataWriteApiTest {
 
         var tagFromStore = readApi.readObject(readRequest);
 
-        assertEquals(expectedTag, tagFromStore);
+        assertEquals(expectedTag.getHeader(), tagFromStore.getHeader());
+        assertEquals(expectedTag.getDefinition(), tagFromStore.getDefinition());
+
+        for (var attr : expectedTag.getAttrsMap().keySet()) {
+
+            // trac_update_  attrs are set on the original tag and changed by the update operation
+            if (attr.startsWith("trac_update_"))
+                continue;
+
+            assertEquals(expectedTag.getAttrsOrThrow(attr), tagFromStore.getAttrsOrThrow(attr));
+        }
+
+        assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));
+        assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_USER_ID));
+        assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_USER_NAME));
+        assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_UPDATE_TIME));
+        assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_ID));
+        assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_NAME));
     }
 
     Tag updateObject_prepareV1(ObjectType objectType) {
@@ -1232,7 +1261,18 @@ abstract class MetadataWriteApiTest {
 
         var savedTag = readApi.readObject(readRequest);
 
-        assertEquals(expectedTag, savedTag);
+        assertEquals(expectedTag.getHeader(), savedTag.getHeader());
+        assertEquals(expectedTag.getDefinition(), savedTag.getDefinition());
+
+        for (var attr : expectedTag.getAttrsMap().keySet())
+            assertEquals(expectedTag.getAttrsOrThrow(attr), savedTag.getAttrsOrThrow(attr));
+
+        assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));
+        assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_CREATE_USER_ID));
+        assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_CREATE_USER_NAME));
+        assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_UPDATE_TIME));
+        assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_ID));
+        assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_NAME));
     }
 
     @Test
