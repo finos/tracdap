@@ -1,4 +1,16 @@
-#  Copyright 2020 Accenture Global Solutions Limited
+#  Copyright 2022 Accenture Global Solutions Limited
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -12,12 +24,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import trac.rt.api as trac
-import pyspark.sql.functions as f
+import decimal
 import typing as tp
 
+import tracdap.rt.api as trac
 
-class PysparkExampleModel(trac.TracModel):
+
+class UsingDataModel(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
@@ -58,31 +71,32 @@ class PysparkExampleModel(trac.TracModel):
         default_weighting = ctx.get_parameter("default_weighting")
         filter_defaults = ctx.get_parameter("filter_defaults")
 
-        customer_loans = ctx.get_spark_table("customer_loans")
+        customer_loans = ctx.get_pandas_table("customer_loans")
 
         if filter_defaults:
-            customer_loans = customer_loans.filter(f.col("loan_condition_cat") == 0)
+            customer_loans = customer_loans[customer_loans["loan_condition_cat"] == 0]
 
-        customer_loans = customer_loans.withColumn(
-            "gross_profit_unweighted",
-            f.col("total_pymnt") - f.col("loan_amount"))
+        customer_loans["gross_profit_unweighted"] = \
+            customer_loans["total_pymnt"] - \
+            customer_loans["loan_amount"]
 
-        customer_loans = customer_loans.withColumn(
-            "gross_profit_weighted",
-            f.col("gross_profit_unweighted") *
-            f.when(f.col("loan_condition_cat") > 0, default_weighting).otherwise(1.0))
+        condition_weighting = customer_loans["loan_condition_cat"] \
+            .apply(lambda c: decimal.Decimal(default_weighting) if c > 0 else decimal.Decimal(1))
 
-        customer_loans = customer_loans.withColumn(
-            "gross_profit",
-            f.col("gross_profit_weighted") * eur_usd_rate)
+        customer_loans["gross_profit_weighted"] = \
+            customer_loans["gross_profit_unweighted"] * condition_weighting
+
+        customer_loans["gross_profit"] = \
+            customer_loans["gross_profit_weighted"] \
+            .apply(lambda x: x * decimal.Decimal.from_float(eur_usd_rate))
 
         profit_by_region = customer_loans \
-            .groupBy("region") \
-            .agg(f.col("region"), f.sum(f.col("gross_profit")).alias("gross_profit"))
+            .groupby("region", as_index=False) \
+            .aggregate({"gross_profit": "sum"})
 
-        ctx.put_spark_table("profit_by_region", profit_by_region)
+        ctx.put_pandas_table("profit_by_region", profit_by_region)
 
 
 if __name__ == "__main__":
-    import trac.rt.launch as launch
-    launch.launch_model(PysparkExampleModel, "pyspark_example.yaml", "../sys_config.yaml")
+    import tracdap.rt.launch as launch
+    launch.launch_model(UsingDataModel, "config/using_data.yaml", "config/sys_config.yaml")
