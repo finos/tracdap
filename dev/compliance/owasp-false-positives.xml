@@ -40,4 +40,12 @@
         <cpe>cpe:/a:services_project:services</cpe>
     </suppress>
 
+    <!-- The H2 developers maintain this CVE is not a security vulnerability and have not issued a fix -->
+    <!-- The vulnerability only applies when an H2 web console service is running -->
+    <!-- https://github.com/h2database/h2database/issues/3175 -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.h2database/h2@.*$</packageUrl>
+        <vulnerabilityName>CVE-2018-14335</vulnerabilityName>
+    </suppress>
+
 </suppressions>
