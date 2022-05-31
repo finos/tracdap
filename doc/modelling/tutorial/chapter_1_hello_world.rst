@@ -31,58 +31,58 @@ Writing a model
 ---------------
 
 To write a model, start by importing the TRAC API package and inheriting from the
-:py:class:`TracModel<trac.rt.api.TracModel>` base class. This class is the entry point
+:py:class:`TracModel <tracdap.rt.api.TracModel>` base class. This class is the entry point
 for running code in TRAC, both on the platform and using the local development sandbox.
 
-.. literalinclude:: ../../../examples/models/python/hello_world/hello_world.py
-    :caption: examples/models/python/hello_world/hello_world.py
+.. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
+    :caption: examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_1
     :lines: 15 - 20
     :linenos:
-    :lineno-start: 1
+    :lineno-start: 15
 
 The model can define any parameters it is going to need. In this example there is only a
 single parameter so it can be declared in code (more complex models may wish to manage
 parameters in a parameters file). TRAC provides helper functions to ensure parameters
 are defined in the correct format.
 
-.. literalinclude:: ../../../examples/models/python/hello_world/hello_world.py
+.. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_2
     :lines: 21 - 27
     :linenos:
-    :lineno-start: 7
+    :lineno-start: 21
 
 The model can also define inputs and outputs. In this case since all we are going to do
 is write a message in the log, no inputs and outputs are needed. Still, these methods are
 required in order for the model to be valid.
 
-.. literalinclude:: ../../../examples/models/python/hello_world/hello_world.py
+.. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_3
     :lines: 28 - 33
     :linenos:
-    :lineno-start: 14
+    :lineno-start: 28
 
-To write the model logic, implement the :py:meth:`run_model()<trac.rt.api.TracModel.run_model>` method.
-When :py:meth:`run_model()<trac.rt.api.TracModel.run_model>` is called it receives a
-:py:class:`TracContext<trac.rt.api.TracContext>` object which allows models to interact with the
+To write the model logic, implement the :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>` method.
+When :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>` is called it receives a
+:py:class:`TracContext <tracdap.rt.api.TracContext>` object which allows models to interact with the
 TRAC platform.
 
-.. literalinclude:: ../../../examples/models/python/hello_world/hello_world.py
+.. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_4
     :lines: 34 - 40
     :linenos:
-    :lineno-start: 20
+    :lineno-start: 34
 
-There are two useful features of :py:class:`TracContext<trac.rt.api.TracContext>`
+There are two useful features of :py:class:`TracContext <tracdap.rt.api.TracContext>`
 that can be seen in this example:
 
-    *   The :py:meth:`log()<trac.rt.api.TracContext.log>` method returns a standard Python logger
+    *   The :py:meth:`log() <tracdap.rt.api.TracContext.log>` method returns a standard Python logger
         that can be used for writing model logs. When models run on the platform, TRAC will capture
         any logs written to this logger and make them available with the job outputs as searchable
         datasets. Log outputs are available even if a job fails so they can be used for debugging.
 
-    *   :py:meth:`get_parameter()<trac.rt.api.TracContext.get_parameter>` allows models to access any
-        parameters defined in the :py:meth:`define_parameters()<trac.rt.api.TracModel.define_parameters>`
+    *   :py:meth:`get_parameter() <tracdap.rt.api.TracContext.get_parameter>` allows models to access any
+        parameters defined in the :py:meth:`define_parameters()<tracdap.rt.api.TracModel.define_parameters>`
         method. They are returned as native Python objects, so integers use the Python integer type,
         date and time values use the Python datetime classes and so on.
 
@@ -105,8 +105,8 @@ configuration can be inferred, so the config needed to run models is kept short 
 
 For our Hello World model, we only need to supply a single parameter in the job configuration:
 
-.. literalinclude:: ../../../examples/models/python/hello_world/hello_world.yaml
-    :caption: examples/models/python/hello_world/hello_world.yaml
+.. literalinclude:: ../../../examples/models/python/config/hello_world.yaml
+    :caption: examples/models/python/config/hello_world.yaml
     :name: hello_world_job_config
     :lines: 2-
 
@@ -124,17 +124,17 @@ Run the model
 -------------
 
 The easiest way to launch a model during development is to call
-:py:meth:`launch_model()<trac.rt.launch.launch_model>`
+:py:meth:`launch_model() <tracdap.rt.launch.launch_model>`
 from the TRAC launch package. Make sure to guard the launch by checking __name__ == "__main__", to
 prevent launching a local config when the model is deployed to the platform (TRAC will not allow
 this, but the model will fail to deploy)!
 
-.. literalinclude:: ../../../examples/models/python/hello_world/hello_world.py
-    :caption: examples/models/python/hello_world/hello_world.py
+.. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
+    :caption: examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_launch
     :lines: 42-
     :linenos:
-    :lineno-start: 28
+    :lineno-start: 42
 
 Paths for the system and job config files are resolved in the following order:
 
@@ -147,12 +147,12 @@ Now you should be able to run your model script and see the model output in the 
 .. code-block:: text
     :name: hello_world_log_output
 
-    2021-09-08 12:36:37,715 [engine] INFO trac.rt.exec.engine.NodeProcessor - START [Model]: HelloWorldModel / job=26ba932d-2904-4ac7-af45-a99b6d7e41fd
-    2021-09-08 12:36:37,715 [engine] INFO __main__.HelloWorldModel - Hello world model is running
-    2021-09-08 12:36:37,715 [engine] INFO __main__.HelloWorldModel - The meaning of life is 42
-    2021-09-08 12:36:37,715 [engine] INFO trac.rt.exec.engine.NodeProcessor - DONE [Model]: HelloWorldModel / job=26ba932d-2904-4ac7-af45-a99b6d7e41fd
+    2022-05-31 12:19:36,104 [engine] INFO tracdap.rt.exec.engine.NodeProcessor - START RunModel [HelloWorldModel] / JOB-92df0bd5-50bd-4885-bc7a-3d4d95029360-v1
+    2022-05-31 12:19:36,104 [engine] INFO __main__.HelloWorldModel - Hello world model is running
+    2022-05-31 12:19:36,104 [engine] INFO __main__.HelloWorldModel - The meaning of life is 42
+    2022-05-31 12:19:36,104 [engine] INFO tracdap.rt.exec.engine.NodeProcessor - DONE RunModel [HelloWorldModel] / JOB-92df0bd5-50bd-4885-bc7a-3d4d95029360-v1
 
 
 .. seealso::
     The full source code for this example is
-    `available on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/hello_world>`_
+    `available on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/hello_world.py>`_
