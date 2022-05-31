@@ -17,5 +17,5 @@ job:
       profit_by_region: "outputs/hello_pandas/profit_by_region.csv"
 
     models:
-      model_1: model_1.FirstModel
-      model_2: model_2.SecondModel
+      model_1: tutorial.model_1.FirstModel
+      model_2: tutorial.model_2.SecondModel
