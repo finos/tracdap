@@ -66,7 +66,7 @@ def declare_parameter(
     """
     Alias for :py:func:`define_parameter` (deprecated)
 
-    .. deprecated::
+    .. deprecated:: 0.5
        Use :py:func:`define_parameter` or :py:func:`P` instead.
     """
 
@@ -113,7 +113,7 @@ def declare_parameters(
     """
     Alias for :py:func:`define_parameters` (deprecated)
 
-    .. deprecated::
+    .. deprecated:: 0.5
        Use :py:func:`define_parameters` instead.
     """
 
@@ -177,7 +177,7 @@ def declare_field(
     """
     Alias for :py:func:`define_field` (deprecated)
 
-    .. deprecated::
+    .. deprecated:: 0.5
        Use :py:func:`define_field` or :py:func:`F` instead.
     """
 
