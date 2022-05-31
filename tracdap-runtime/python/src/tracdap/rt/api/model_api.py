@@ -18,13 +18,14 @@ import abc as _abc
 import typing as _tp
 import logging as _logging
 
-import pandas as _pd
-import pyspark as _pys
-import pyspark.sql as _pyss
-
 # Import metadata domain objects into the API namespace
 # This significantly improves type hinting, inline documentation and auto-complete in JetBrains IDEs
 from tracdap.rt.metadata import *  # DOCGEN_REMOVE
+
+if _tp.TYPE_CHECKING:
+    import pandas
+    import pyspark
+    import pyspark.sql
 
 
 class TracContext:
@@ -100,7 +101,7 @@ class TracContext:
         pass
 
     @_abc.abstractmethod
-    def get_pandas_table(self, dataset_name: str) -> _pd.DataFrame:
+    def get_pandas_table(self, dataset_name: str) -> pandas.DataFrame:
 
         """
         Get the data for a model input or output as a Pandas dataframe
@@ -131,21 +132,21 @@ class TracContext:
         pass
 
     @_abc.abstractmethod
-    def get_spark_table(self, dataset_name: str) -> _pyss.DataFrame:
+    def get_spark_table(self, dataset_name: str) -> pyspark.sql.DataFrame:
 
         """Spark support is not available in the current version of the runtime"""
 
         pass
 
     @_abc.abstractmethod
-    def get_spark_table_rdd(self, dataset_name: str) -> _pys.RDD:
+    def get_spark_table_rdd(self, dataset_name: str) -> pyspark.RDD:
 
         """Spark support is not available in the current version of the runtime"""
 
         pass
 
     @_abc.abstractmethod
-    def put_pandas_table(self, dataset_name: str, dataset: _pd.DataFrame):
+    def put_pandas_table(self, dataset_name: str, dataset: pandas.DataFrame):
 
         """
         Save the data for a model output as a Pandas dataframe
@@ -172,28 +173,28 @@ class TracContext:
         pass
 
     @_abc.abstractmethod
-    def put_spark_table(self, dataset_name: str, dataset: _pyss.DataFrame):
+    def put_spark_table(self, dataset_name: str, dataset: pyspark.sql.DataFrame):
 
         """Spark support is not available in the current version of the runtime"""
 
         pass
 
     @_abc.abstractmethod
-    def put_spark_table_rdd(self, dataset_name: str, dataset: _pys.RDD):
+    def put_spark_table_rdd(self, dataset_name: str, dataset: pyspark.RDD):
 
         """Spark support is not available in the current version of the runtime"""
 
         pass
 
     @_abc.abstractmethod
-    def get_spark_context(self) -> _pys.SparkContext:
+    def get_spark_context(self) -> pyspark.SparkContext:
 
         """Spark support is not available in the current version of the runtime"""
 
         pass
 
     @_abc.abstractmethod
-    def get_spark_sql_context(self) -> _pyss.SQLContext:
+    def get_spark_sql_context(self) -> pyspark.sql.SQLContext:
 
         """Spark support is not available in the current version of the runtime"""
 
