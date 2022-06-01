@@ -11,10 +11,15 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import importlib
+import importlib.resources as resources
 import typing as _tp
+import types as _ts
+import pathlib as _path
 
 import tracdap.rt.metadata as _meta
+import tracdap.rt.exceptions as _ex
+import tracdap.rt.impl.schemas as _schemas
 import tracdap.rt.impl.util as _util
 
 # Import hook interfaces into this module namespace
@@ -73,22 +78,37 @@ class RuntimeHookImpl(RuntimeHook):  # noqa
             categorical=categorical,
             formatCode=format_code)
 
+    def define_schema(
+            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
+            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
+            -> _meta.SchemaDefinition:
+
+        if schema_type == _meta.SchemaType.TABLE:
+
+            table_schema = self._build_table_schema(*fields)
+            return _meta.SchemaDefinition(_meta.SchemaType.TABLE, table=table_schema)
+
+        raise _ex.ERuntimeValidation(f"Invalid schema type [{schema_type.name}]")
+
+    def load_schema(
+            self, package: _tp.Union[_ts.ModuleType, str], schema_file: _tp.Union[str, _path.Path],
+            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
+            -> _meta.SchemaDefinition:
+
+        return _schemas.SchemaLoader.load_schema(package, schema_file)
+
     def define_input_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]]) \
             -> _meta.ModelInputSchema:
 
-        table_schema = self._build_table_schema(*fields)
-        schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE, table=table_schema)
-
+        schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
         return _meta.ModelInputSchema(schema=schema_def)
 
     def define_output_table(
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]]) \
             -> _meta.ModelOutputSchema:
 
-        table_schema = self._build_table_schema(*fields)
-        schema_def = _meta.SchemaDefinition(_meta.SchemaType.TABLE, table=table_schema)
-
+        schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
         return _meta.ModelOutputSchema(schema=schema_def)
 
     @staticmethod
