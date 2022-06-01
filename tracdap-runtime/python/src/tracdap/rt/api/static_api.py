@@ -16,6 +16,10 @@ from __future__ import annotations
 
 import typing as _tp
 
+if _tp.TYPE_CHECKING:
+    import pathlib as _path
+    import types as _ts
+
 from .hook import RuntimeHook as _RuntimeHook
 from .hook import Named as _Named
 
@@ -203,6 +207,28 @@ def F(  # noqa
         field_name, field_type, label,
         business_key, categorical,
         format_code, field_order)
+
+
+def define_schema(
+        *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]],
+        schema_type: SchemaType = SchemaType.TABLE) \
+        -> SchemaDefinition:
+
+    # TODO: Doc comment
+
+    rh = _RuntimeHook.runtime()
+    return rh.define_schema(*fields, schema_type=schema_type)
+
+
+def load_schema(
+        package: _tp.Union[_ts.ModuleType, str], schema_file: _tp.Union[str, _path.Path],
+        schema_type: SchemaType = SchemaType.TABLE) \
+        -> SchemaDefinition:
+
+    # TODO: Doc comment
+
+    rh = _RuntimeHook.runtime()
+    return rh.load_schema(package, schema_file, schema_type=schema_type)
 
 
 def define_input_table(

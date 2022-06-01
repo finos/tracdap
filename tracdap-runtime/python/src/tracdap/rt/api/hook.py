@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import abc as _abc
 import dataclasses as _dc
+import pathlib as _path
 import typing as _tp
+import types as _ts
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
@@ -78,6 +80,22 @@ class RuntimeHook:
             business_key: bool = False, categorical: bool = False,
             format_code: _tp.Optional[str] = None, field_order: _tp.Optional[int] = None) \
             -> _meta.FieldSchema:
+
+        pass
+
+    @_abc.abstractmethod
+    def define_schema(
+            self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]],
+            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
+            -> _meta.SchemaDefinition:
+
+        pass
+
+    @_abc.abstractmethod
+    def load_schema(
+            self, package: _tp.Union[_ts.ModuleType, str], schema_file: _tp.Union[str, _path.Path],
+            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
+            -> _meta.SchemaDefinition:
 
         pass
 
