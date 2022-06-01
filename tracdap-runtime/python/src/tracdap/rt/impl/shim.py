@@ -25,6 +25,7 @@ import contextlib
 import importlib as _il
 import importlib.abc as _ila
 import importlib.machinery as _ilm
+import importlib.resources as _ilr
 
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.impl.util as _util
@@ -263,11 +264,44 @@ class ShimLoader:
             raise _ex.EModelRepoRequest(error_msg)
 
         if not isinstance(class_, class_type.__class__):
-            error_msg = f"Class [{class_name}] is the wrong type (expected [{class_type.__name__}], got [{type(class_)}]"
+
+            error_msg = f"Class [{class_name}] is the wrong type" \
+                      + f" (expected [{class_type.__name__}], got [{type(class_)}]"
+
             cls._log.error(error_msg)
             raise _ex.EModelRepoRequest(error_msg)
 
         return class_
+
+    @classmethod
+    def load_resource(
+            cls, module: tp.Union[types.ModuleType, str],
+            resource_name: str) -> bytes:
+
+        if isinstance(module, str):
+            module_name = module
+            module = _il.import_module(module_name)
+        else:
+            module_name = module.__name__
+
+        cls._log.info(f"Loading [{resource_name}] from [{module_name}]")
+
+        return _ilr.read_binary(module, resource_name)
+
+    @classmethod
+    def open_resource(
+            cls, module: tp.Union[types.ModuleType, str],
+            resource_name: str) -> tp.BinaryIO:
+
+        if isinstance(module, str):
+            module_name = module
+            module = _il.import_module(module_name)
+        else:
+            module_name = module.__name__
+
+        cls._log.info(f"Loading [{resource_name}] from [{module_name}]")
+
+        return _ilr.open_binary(module, resource_name)
 
 
 ShimLoader._log = _util.logger_for_class(ShimLoader)
