@@ -62,6 +62,15 @@ class TutorialModelsTest(unittest.TestCase):
 
         launch.launch_model(UsingDataModel, job_config, sys_config)
 
+    def test_schema_resources(self):
+
+        from tutorial.schema_resources import SchemaResourcesModel  # noqa
+
+        job_config = self.examples_root.joinpath("config/using_data.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(SchemaResourcesModel, job_config, sys_config)
+
     def test_chaining(self):
 
         job_config = self.examples_root.joinpath("config/chaining.yaml")
