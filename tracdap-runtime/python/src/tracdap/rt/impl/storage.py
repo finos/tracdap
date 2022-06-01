@@ -685,6 +685,12 @@ class _CsvStorageFormat(IDataFormat):
 
                     csv_col += 1
 
+                # Allow for trailing null columns
+                # TODO: What is the right behavior here? Use a flag to control?
+                for blank_col in range(csv_col, len(header)):
+                    output_col = col_mapping[blank_col]
+                    data[output_col].append(None)
+
                 csv_col = 0
                 csv_row += 1
 
