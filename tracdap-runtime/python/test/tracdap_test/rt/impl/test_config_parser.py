@@ -42,7 +42,7 @@ class ConfigParserTest(unittest.TestCase):
 
         parser = cfg_p.ConfigParser(cfg.RuntimeConfig)
 
-        raw_config_path = PYTHON_EXAMPLES_DIR.joinpath("sys_config.yaml")
+        raw_config_path = PYTHON_EXAMPLES_DIR.joinpath("config/sys_config.yaml")
         raw_config = parser.load_raw_config(raw_config_path, "system")
         sys_config = parser.parse(raw_config, raw_config_path.name)
 
@@ -54,7 +54,7 @@ class ConfigParserTest(unittest.TestCase):
 
         parser = cfg_p.ConfigParser(cfg.JobConfig, dev_mode.DEV_MODE_JOB_CONFIG)
 
-        raw_config_path = PYTHON_EXAMPLES_DIR.joinpath("using_data/using_data.yaml")
+        raw_config_path = PYTHON_EXAMPLES_DIR.joinpath("config/using_data.yaml")
         raw_config = parser.load_raw_config(raw_config_path, "job")
         job_config = parser.parse(raw_config, raw_config_path.name)
 
