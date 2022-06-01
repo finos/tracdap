@@ -33,7 +33,7 @@ import tutorial.schemas as schemas
 from tracdap.rt.api import TracContext
 
 
-class ExternalSchemaModel(trac.TracModel):
+class SchemaResourcesModel(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
@@ -68,4 +68,4 @@ class ExternalSchemaModel(trac.TracModel):
 
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
-    launch.launch_model(ExternalSchemaModel, "config/using_data.yaml", "config/sys_config.yaml")
+    launch.launch_model(SchemaResourcesModel, "config/using_data.yaml", "config/sys_config.yaml")
