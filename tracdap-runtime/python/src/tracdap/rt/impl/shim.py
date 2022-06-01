@@ -23,13 +23,14 @@ import sys
 import contextlib
 
 import importlib as _il
+import importlib.abc as _ila
 import importlib.machinery as _ilm
 
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.impl.util as _util
 
 
-class _NamespaceShimFinder(_il.abc.MetaPathFinder):
+class _NamespaceShimFinder(_ila.MetaPathFinder):
 
     def __init__(self, shim_map: tp.Dict[str, pathlib.Path]):
         self.__shim_map = shim_map
@@ -77,7 +78,7 @@ class _NamespaceShimFinder(_il.abc.MetaPathFinder):
         pass
 
 
-class _ActiveShimFinder(_il.abc.MetaPathFinder):
+class _ActiveShimFinder(_ila.MetaPathFinder):
 
     def __init__(self, shim_map: tp.Dict[str, pathlib.Path], active_shim: tp.Optional[str] = None):
         self.__shim_map = shim_map
