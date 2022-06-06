@@ -29,8 +29,8 @@
 import typing as tp
 import tracdap.rt.api as trac
 
+import tutorial.using_data as using_data
 import tutorial.schemas as schemas
-from tracdap.rt.api import TracContext
 
 
 class SchemaResourcesModel(trac.TracModel):
@@ -61,9 +61,19 @@ class SchemaResourcesModel(trac.TracModel):
 
         return {"profit_by_region": trac.ModelOutputSchema(profit_by_region)}
 
-    def run_model(self, ctx: TracContext):
+    def run_model(self, ctx: trac.TracContext):
 
-        pass
+        eur_usd_rate = ctx.get_parameter("eur_usd_rate")
+        default_weighting = ctx.get_parameter("default_weighting")
+        filter_defaults = ctx.get_parameter("filter_defaults")
+
+        customer_loans = ctx.get_pandas_table("customer_loans")
+
+        profit_by_region = using_data.calculate_profit_by_region(
+            customer_loans, filter_defaults,
+            default_weighting, eur_usd_rate)
+
+        ctx.put_pandas_table("profit_by_region", profit_by_region)
 
 
 if __name__ == "__main__":
