@@ -22,6 +22,7 @@ import pathlib
 import sys
 import contextlib
 
+import inspect
 import importlib as _il
 import importlib.abc as _ila
 import importlib.machinery as _ilm
@@ -250,6 +251,8 @@ class ShimLoader:
             cls, module: tp.Union[types.ModuleType, str],
             class_name: str, class_type: tp.Type[_T]) -> tp.Type[_T]:
 
+        cls._run_model_guard()
+
         if isinstance(module, str):
             module_name = module
             module = _il.import_module(module_name)
@@ -278,6 +281,8 @@ class ShimLoader:
             cls, module: tp.Union[types.ModuleType, str],
             resource_name: str) -> bytes:
 
+        cls._run_model_guard()
+
         if isinstance(module, str):
             module_name = module
             module = _il.import_module(module_name)
@@ -293,6 +298,8 @@ class ShimLoader:
             cls, module: tp.Union[types.ModuleType, str],
             resource_name: str) -> tp.BinaryIO:
 
+        cls._run_model_guard()
+
         if isinstance(module, str):
             module_name = module
             module = _il.import_module(module_name)
@@ -302,6 +309,21 @@ class ShimLoader:
         cls._log.info(f"Loading [{resource_name}] from [{module_name}]")
 
         return _ilr.open_binary(module, resource_name)
+
+    @classmethod
+    def _run_model_guard(cls):
+
+        stack = inspect.stack()
+        frame = stack[-1]
+
+        for frame_index in range(len(stack) - 2, 0, -1):
+
+            parent_frame = frame
+            frame = stack[frame_index]
+
+            # TODO: Is this the right error to raise?
+            if frame.function == "run_model" and parent_frame.function == "_execute":
+                raise _ex.ERuntimeValidation(f"Loading resources is not allowed inside run_model()")
 
 
 ShimLoader._log = _util.logger_for_class(ShimLoader)
