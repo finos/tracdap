@@ -140,7 +140,7 @@ class ApiGuard:
 
                 return False
 
-            if origin is _tp.List:
+            if origin is list:
 
                 list_type = args[0]
                 return isinstance(value, list) and all(map(lambda v: isinstance(v, list_type), value))
@@ -166,7 +166,7 @@ class ApiGuard:
             if origin is _tp.Union:
                 return "|".join(map(cls._type_name, args))
 
-            if origin is _tp.List:
+            if origin is list:
                 list_type = cls._type_name(args[0])
                 return f"List[{list_type}]"
 
@@ -260,7 +260,7 @@ class RuntimeHookImpl(RuntimeHook):  # noqa
 
         ApiGuard.validate_signature(
             self.define_schema.__name__, self.__define_schema_signature,
-            *fields, schema_type)
+            *fields, schema_type=schema_type)
 
         if schema_type == _meta.SchemaType.TABLE:
 
