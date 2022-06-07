@@ -127,6 +127,7 @@ class ApiGuard:
             # The generic type "Named" is defined in the TRAC API so needs to be supported
             # This type is used for passing named intermediate values between the define_ methods
             if origin is Named:
+
                 named_type = args[0]
                 return isinstance(value, Named) and isinstance(value.item, named_type)
 
@@ -138,6 +139,11 @@ class ApiGuard:
                         return True
 
                 return False
+
+            if origin is _tp.List:
+
+                list_type = args[0]
+                return isinstance(value, list) and all(map(lambda v: isinstance(v, list_type), value))
 
             raise _ex.ETracInternal(f"Validation of [{origin.__name__}] generic parameters is not supported yet")
 
@@ -159,6 +165,10 @@ class ApiGuard:
 
             if origin is _tp.Union:
                 return "|".join(map(cls._type_name, args))
+
+            if origin is _tp.List:
+                list_type = cls._type_name(args[0])
+                return f"List[{list_type}]"
 
             raise _ex.ETracInternal(f"Validation of [{origin.__name__}] generic parameters is not supported yet")
 
