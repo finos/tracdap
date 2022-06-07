@@ -15,10 +15,7 @@
 from __future__ import annotations
 
 import typing as _tp
-
-if _tp.TYPE_CHECKING:
-    import pathlib as _path
-    import types as _ts
+import types as _ts
 
 from .hook import RuntimeHook as _RuntimeHook
 from .hook import Named as _Named
@@ -221,7 +218,7 @@ def define_schema(
 
 
 def load_schema(
-        package: _tp.Union[_ts.ModuleType, str], schema_file: _tp.Union[str, _path.Path],
+        package: _tp.Union[_ts.ModuleType, str], schema_file: str,
         schema_type: SchemaType = SchemaType.TABLE) \
         -> SchemaDefinition:
 

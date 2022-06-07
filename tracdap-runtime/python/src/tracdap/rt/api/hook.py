@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import abc as _abc
 import dataclasses as _dc
-import pathlib as _path
 import typing as _tp
 import types as _ts
 
@@ -93,7 +92,7 @@ class RuntimeHook:
 
     @_abc.abstractmethod
     def load_schema(
-            self, package: _tp.Union[_ts.ModuleType, str], schema_file: _tp.Union[str, _path.Path],
+            self, package: _tp.Union[_ts.ModuleType, str], schema_file: str,
             schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
             -> _meta.SchemaDefinition:
 

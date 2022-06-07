@@ -16,7 +16,6 @@ import inspect
 import logging
 import typing as _tp
 import types as _ts
-import pathlib as _path
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
@@ -270,7 +269,7 @@ class RuntimeHookImpl(RuntimeHook):  # noqa
         raise _ex.ERuntimeValidation(f"Invalid schema type [{schema_type.name}]")
 
     def load_schema(
-            self, package: _tp.Union[_ts.ModuleType, str], schema_file: _tp.Union[str, _path.Path],
+            self, package: _tp.Union[_ts.ModuleType, str], schema_file: str,
             schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
             -> _meta.SchemaDefinition:
 
