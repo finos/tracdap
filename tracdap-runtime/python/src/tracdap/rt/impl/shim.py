@@ -281,37 +281,52 @@ class ShimLoader:
             cls, module: tp.Union[types.ModuleType, str],
             resource_name: str) -> bytes:
 
-        cls._run_model_guard()
-
-        if isinstance(module, str):
-            module_name = module
-            module = _il.import_module(module_name)
-        else:
-            module_name = module.__name__
-
-        cls._log.info(f"Loading [{resource_name}] from [{module_name}]")
-
-        return _ilr.read_binary(module, resource_name)
+        return cls._load_or_open_resource(module, resource_name, _ilr.read_binary)
 
     @classmethod
     def open_resource(
             cls, module: tp.Union[types.ModuleType, str],
             resource_name: str) -> tp.BinaryIO:
 
+        return cls._load_or_open_resource(module, resource_name, _ilr.open_binary)
+
+    @classmethod
+    def _load_or_open_resource(
+            cls, module: tp.Union[types.ModuleType, str], resource_name: str,
+            load_func: tp.Callable[[types.ModuleType, str], tp.Union[bytes, tp.BinaryIO]]) \
+            -> tp.Union[bytes, tp.BinaryIO]:
+
         cls._run_model_guard()
 
-        if isinstance(module, str):
-            module_name = module
-            module = _il.import_module(module_name)
-        else:
+        if isinstance(module, types.ModuleType):
             module_name = module.__name__
+        else:
+            module_name = module
 
-        cls._log.info(f"Loading [{resource_name}] from [{module_name}]")
+        try:
 
-        return _ilr.open_binary(module, resource_name)
+            cls._log.info(f"Loading [{resource_name}] from [{module_name}]")
+
+            if isinstance(module, str):
+                module = _il.import_module(module_name)
+
+            return load_func(module, resource_name)
+
+        except ModuleNotFoundError:
+            err = f"Loading resources failed: Module not found for [{module_name}]"
+            cls._log.error(err)
+            raise _ex.EModelRepoResource(err)
+
+        except FileNotFoundError:
+            err = f"Loading resources failed: Resource not found for [{resource_name}] in [{module_name}]"
+            cls._log.error(err)
+            raise _ex.EModelRepoResource(err)
 
     @classmethod
     def _run_model_guard(cls):
+
+        # Loading resources from inside run_model is an invalid use of the runtime API
+        # If a model attempts this, throw back a runtime validation error
 
         stack = inspect.stack()
         frame = stack[-1]
@@ -321,9 +336,10 @@ class ShimLoader:
             parent_frame = frame
             frame = stack[frame_index]
 
-            # TODO: Is this the right error to raise?
             if frame.function == "run_model" and parent_frame.function == "_execute":
-                raise _ex.ERuntimeValidation(f"Loading resources is not allowed inside run_model()")
+                err = f"Loading resources is not allowed inside run_model()"
+                cls._log.error(err)
+                raise _ex.ERuntimeValidation(err)
 
 
 ShimLoader._log = _util.logger_for_class(ShimLoader)
