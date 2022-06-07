@@ -1,0 +1,3 @@
+field_name, label, categorical, business_key, format_code
+region, Customer home region, true, false
+gross_profit, Total gross profit, false, false, CCY:USD

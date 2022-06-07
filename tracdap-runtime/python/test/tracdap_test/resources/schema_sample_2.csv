@@ -1,0 +1,3 @@
+business_key, field_name, field_tYPe, label, CATEGORICAL, format_CODE
+false, REGION, sTriNg, Customer home region
+fALSe, GROSS_PROFIT, deCIMal, Total gross profit
