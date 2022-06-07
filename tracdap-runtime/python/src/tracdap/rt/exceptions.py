@@ -262,6 +262,15 @@ class EModelRepoRequest(EModelRepo):
     pass
 
 
+class EModelRepoResource(ETrac):
+
+    """
+    Attempt to load a non-existent resource from the model repo
+    """
+
+    pass
+
+
 class ETracInternal(ETrac):
 
     """
