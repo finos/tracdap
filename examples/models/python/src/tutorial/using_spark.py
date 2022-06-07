@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import trac.rt.api as trac
+import tracdap.rt.api as trac
 import pyspark.sql.functions as f
 import typing as tp
 
@@ -84,5 +84,5 @@ class PysparkExampleModel(trac.TracModel):
 
 
 if __name__ == "__main__":
-    import trac.rt.launch as launch
-    launch.launch_model(PysparkExampleModel, "pyspark_example.yaml", "../sys_config.yaml")
+    import tracdap.rt.launch as launch
+    launch.launch_model(PysparkExampleModel, "config/pyspark.yaml", "config/sys_config.yaml")

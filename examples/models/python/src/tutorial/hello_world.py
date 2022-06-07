@@ -1,4 +1,4 @@
-#  Copyright 2021 Accenture Global Solutions Limited
+#  Copyright 2022 Accenture Global Solutions Limited
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -41,4 +41,4 @@ class HelloWorldModel(trac.TracModel):
 
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
-    launch.launch_model(HelloWorldModel, "hello_world.yaml", "../sys_config.yaml")
+    launch.launch_model(HelloWorldModel, "config/hello_world.yaml", "config/sys_config.yaml")

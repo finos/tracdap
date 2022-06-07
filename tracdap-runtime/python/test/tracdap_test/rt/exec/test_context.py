@@ -21,6 +21,7 @@ import pandas as pd
 
 import tracdap.rt.api as _api
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.impl.api_hook as _api_hook
 import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.data as _data
 
@@ -84,7 +85,8 @@ class _TestModel(_api.TracModel):
         pass
 
 
-_test_model_def = _api.ModelDefinition(  # noqa
+_api_hook.RuntimeHookImpl.register_impl()
+_test_model_def = _api.ModelDefinition(
 
     language="python",
     repository="trac_integrated",
