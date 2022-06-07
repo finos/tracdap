@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import pathlib
+import logging
 import typing as tp
 import types as ts
 
@@ -23,9 +23,12 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.storage as _storage
 import tracdap.rt.impl.shim as _shim
+import tracdap.rt.impl.util as _util
 
 
 class SchemaLoader:
+
+    _log: logging.Logger
 
     __SCHEMA_OF_SCHEMA = _meta.SchemaDefinition(
         schemaType=_meta.SchemaType.TABLE,
@@ -40,20 +43,29 @@ class SchemaLoader:
     )
 
     @classmethod
-    def load_schema(cls, package: tp.Union[ts.ModuleType, str], schema_file: tp.Union[str, pathlib.Path]) \
+    def load_schema(cls, package: tp.Union[ts.ModuleType, str], schema_file: str) \
             -> _meta.SchemaDefinition:
 
-        csv_format = _storage.FormatManager.get_data_format("text/csv", {"lenient_csv_parser": True})
+        try:
 
-        with _shim.ShimLoader.open_resource(package, schema_file) as schema_io:  # TODO: err not found
+            csv_format = _storage.FormatManager.get_data_format("text/csv", {"lenient_csv_parser": True})
 
-            schema_of_schema = _data.DataMapping.trac_to_arrow_schema(cls.__SCHEMA_OF_SCHEMA)
-            schema_data = csv_format.read_table(schema_io, schema_of_schema)
+            # Any resource loading failure will raise EModelRepoResource
+            with _shim.ShimLoader.open_resource(package, schema_file) as schema_io:
 
-        return cls.decode_schema_data(schema_data)
+                schema_of_schema = _data.DataMapping.trac_to_arrow_schema(cls.__SCHEMA_OF_SCHEMA)
+                schema_data = csv_format.read_table(schema_io, schema_of_schema)
+
+            return cls._decode_schema_data(schema_data)
+
+        except _ex.EData as e:
+
+            err = f"Invalid schema file [{schema_file}]: {str(e)}"
+            cls._log.exception(err)
+            raise _ex.ERuntimeValidation(err) from e
 
     @classmethod
-    def decode_schema_data(cls, schema_data: pa.Table) -> _meta.SchemaDefinition:
+    def _decode_schema_data(cls, schema_data: pa.Table) -> _meta.SchemaDefinition:
 
         name_vec: pa.StringArray = schema_data.column(0)
         type_vec: pa.StringArray = schema_data.column(1)
@@ -73,12 +85,22 @@ class SchemaLoader:
             categorical_val = categorical_vec[field_index]
             format_code_val = format_code_vec[field_index]
 
-            field_name = cls.arrow_to_py_string(field_name_val, required=True)
-            type_name = cls.arrow_to_py_string(type_name_val, required=True)
-            label = cls.arrow_to_py_string(label_val, required=True)
-            business_key = cls.arrow_to_py_boolean(business_key_val, default=False)
-            categorical = cls.arrow_to_py_boolean(categorical_val, default=False)
-            format_code = cls.arrow_to_py_string(format_code_val)
+            field_name = cls._arrow_to_py_string("field_name", None, field_index, field_name_val, required=True)
+            type_name = cls._arrow_to_py_string("field_type", field_name, field_index, type_name_val, required=True)
+            label = cls._arrow_to_py_string("label", field_name, field_index, label_val, required=True)
+            business_key = cls._arrow_to_py_boolean("business_key", field_name, field_index, business_key_val, default=False)  # noqa
+            categorical = cls._arrow_to_py_boolean("categorical", field_name, field_index, categorical_val, default=False)  # noqa
+            format_code = cls._arrow_to_py_string("format_code", field_name, field_index, format_code_val)
+
+            if len(field_name.strip()) == 0:
+                err = f"Field name cannot be blank for field at index [{field_index}]"
+                cls._log.error(err)
+                raise _ex.EDataConformance(err)
+
+            if len(label.strip()) == 0:
+                err = f"Label cannot be blank for field [{field_name}] at index [{field_index}]"
+                cls._log.error(err)
+                raise _ex.EDataConformance(err)
 
             try:
                 if type_name:
@@ -87,6 +109,12 @@ class SchemaLoader:
                     field_type = _meta.BasicType.BASIC_TYPE_NOT_SET
             except KeyError:
                 field_type = _meta.BasicType.BASIC_TYPE_NOT_SET
+
+            if field_type == _meta.BasicType.BASIC_TYPE_NOT_SET:
+                display_type_name = type_name or str(None)
+                err = f"Unknown field type [{display_type_name}] for field [{field_name}] at index [{field_index}]"
+                cls._log.error(err)
+                raise _ex.EDataConformance(err)
 
             field_schema = _meta.FieldSchema(
                 field_name, field_index, field_type, label,
@@ -98,8 +126,10 @@ class SchemaLoader:
             schemaType=_meta.SchemaType.TABLE,
             table=_meta.TableSchema(field_list))
 
-    @staticmethod
-    def arrow_to_py_string(arrow_value: pa.StringScalar, required: bool = False):
+    @classmethod
+    def _arrow_to_py_string(
+            cls, schema_field_name: str, field_name: tp.Optional[str], field_index: int,
+            arrow_value: pa.StringScalar, required: bool = False):
 
         if arrow_value is not None:
             return arrow_value.as_py()
@@ -107,10 +137,19 @@ class SchemaLoader:
         if not required:
             return None
 
-        raise _ex.ETrac("Missing required field")  # todo err
+        if field_name:
+            err_suffix = f" for field [{field_name}] at index [{field_index}]"
+        else:
+            err_suffix = f" for field at index [{field_index}]"
 
-    @staticmethod
-    def arrow_to_py_boolean(arrow_value: pa.BooleanValue, required: bool = False, default: tp.Optional[bool] = None):
+        err = f"Missing required value {schema_field_name}" + err_suffix
+        cls._log.error(err)
+        raise _ex.EDataConformance(err)
+
+    @classmethod
+    def _arrow_to_py_boolean(
+            cls, schema_field_name: str, field_name: str, field_index: int,
+            arrow_value: pa.BooleanValue, required: bool = False, default: tp.Optional[bool] = None):
 
         if arrow_value is not None:
             return arrow_value.as_py()
@@ -118,4 +157,9 @@ class SchemaLoader:
         if not required:
             return default
 
-        raise _ex.ETrac("Missing required field")  # todo err
+        err = f"Missing required value {schema_field_name} for field [{field_name}] at index [{field_index}]"
+        cls._log.error(err)
+        raise _ex.EDataConformance(err)
+
+
+SchemaLoader._log = _util.logger_for_class(SchemaLoader)

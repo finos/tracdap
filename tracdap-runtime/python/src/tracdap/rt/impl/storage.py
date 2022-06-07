@@ -762,20 +762,22 @@ class _CsvStorageFormat(IDataFormat):
                 if isinstance(raw_value, str):
                     return dt.datetime.fromisoformat(raw_value)
 
-            msg = f"CSV data does not match the schema and cannot be converted" \
-                + f" (row = {row}, col = {col}, expected type = {python_type}, value = [{str(raw_value)}])"
-
-            self._log.error(msg)
-            raise _ex.EDataConformance(msg)
-
         except Exception as e:
 
             msg = f"CSV data does not match the schema and cannot be converted" \
-                + f" (row = {row}, col = {col}, expected type = {python_type}, value = [{str(raw_value)}])" \
+                + f" (row = {row}, col = {col}, expected type = [{python_type.__name__}], value = [{str(raw_value)}])" \
                 + f": {str(e)}"
 
             self._log.exception(msg)
             raise _ex.EDataConformance(msg) from e
+
+        # Default case: unrecognized python_type
+
+        msg = f"CSV data does not match the schema and cannot be converted" \
+              + f" (row = {row}, col = {col}, expected type = [{python_type.__name__}], value = [{str(raw_value)}])"
+
+        self._log.error(msg)
+        raise _ex.EDataConformance(msg)
 
 
 FormatManager.register_data_format("ARROW_FILE", _ArrowFileFormat)
