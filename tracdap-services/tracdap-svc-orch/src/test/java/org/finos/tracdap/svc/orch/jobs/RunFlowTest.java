@@ -192,10 +192,10 @@ public class RunFlowTest {
 
         log.info("Running IMPORT_MODEL job...");
 
-        var modelsPath = "examples/models/python/chaining";
+        var modelsPath = "examples/models/python/src";
         var modelsVersion = "main";
 
-        var model1EntryPoint = "model_1.FirstModel";
+        var model1EntryPoint = "tutorial.model_1.FirstModel";
         var model1Attrs = List.of(TagUpdate.newBuilder()
                 .setAttrName("e2e_test_model")
                 .setValue(MetadataCodec.encodeValue("run_flow:chaining:model_1"))
@@ -205,7 +205,7 @@ public class RunFlowTest {
                 .setValue(MetadataCodec.encodeValue("run_flow:import_model:model_1"))
                 .build());
 
-        var model2EntryPoint = "model_2.SecondModel";
+        var model2EntryPoint = "tutorial.model_2.SecondModel";
         var model2Attrs = List.of(TagUpdate.newBuilder()
                 .setAttrName("e2e_test_model")
                 .setValue(MetadataCodec.encodeValue("run_flow:chaining:model_2"))

@@ -139,8 +139,8 @@ public class RunModelTest {
         var importModel = ImportModelJob.newBuilder()
                 .setLanguage("python")
                 .setRepository("UNIT_TEST_REPO")
-                .setPath("examples/models/python/using_data")
-                .setEntryPoint("using_data.UsingDataModel")
+                .setPath("examples/models/python/src")
+                .setEntryPoint("tutorial.using_data.UsingDataModel")
                 .setVersion(modelVersion)
                 .addModelAttrs(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_model")
@@ -189,7 +189,7 @@ public class RunModelTest {
         var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
 
         Assertions.assertEquals("run_model:using_data", MetadataCodec.decodeStringValue(modelAttr));
-        Assertions.assertEquals("using_data.UsingDataModel", modelDef.getEntryPoint());
+        Assertions.assertEquals("tutorial.using_data.UsingDataModel", modelDef.getEntryPoint());
         Assertions.assertTrue(modelDef.getParametersMap().containsKey("eur_usd_rate"));
         Assertions.assertTrue(modelDef.getInputsMap().containsKey("customer_loans"));
         Assertions.assertTrue(modelDef.getOutputsMap().containsKey("profit_by_region"));
