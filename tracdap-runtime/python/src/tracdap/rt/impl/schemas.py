@@ -43,9 +43,6 @@ class SchemaLoader:
     def load_schema(cls, package: tp.Union[ts.ModuleType, str], schema_file: tp.Union[str, pathlib.Path]) \
             -> _meta.SchemaDefinition:
 
-        if not isinstance(package, ts.ModuleType) and not isinstance(package, str):
-            raise RuntimeError()  # TODO package not a module
-
         csv_format = _storage.FormatManager.get_data_format("text/csv", {"lenient_csv_parser": True})
 
         with _shim.ShimLoader.open_resource(package, schema_file) as schema_io:  # TODO: err not found
