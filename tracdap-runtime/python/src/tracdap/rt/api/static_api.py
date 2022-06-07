@@ -211,7 +211,23 @@ def define_schema(
         schema_type: SchemaType = SchemaType.TABLE) \
         -> SchemaDefinition:
 
-    # TODO: Doc comment
+    """
+    Create a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` from a list of fields.
+
+    Fields can be supplied either as individual arguments to this function or as a list.
+    Individual fields should be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
+    Schema type can be specified using the schema_type parameter, currently only TABLE schemas are supported.
+
+    Model inputs and outputs must be specified as :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
+    and :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>` respectively. The input/output schema
+    classes both require a schema definition than can be created with this method. Alternatively, you can use
+    :py:func:`define_input_table` or :py:func:`define_output_table` to create the input/output schema classes directly.
+
+
+    :param fields: The list of fields to include in the schema
+    :param schema_type: The type of schema to create (currently only TABLE schemas are supported)
+    :return: A schema definition built from the supplied fields and schema type
+    """
 
     rh = _RuntimeHook.runtime()
     return rh.define_schema(*fields, schema_type=schema_type)
@@ -222,7 +238,31 @@ def load_schema(
         schema_type: SchemaType = SchemaType.TABLE) \
         -> SchemaDefinition:
 
-    # TODO: Doc comment
+    """
+    Create a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
+    by loading the schema from a CSV file included in the model repository.
+
+    The schema CSV file must contain the following columns:
+
+    * field_name (string, required)
+    * field_type (:py:class:`BasicType <tracdap.rt.metadata.BasicType>`, required)
+    * label (string, required)
+    * business_key (boolean, optional)
+    * categorical (boolean, optional)
+    * format_code (string, optional)
+
+    Field order is taken from the order in which the fields are listed.
+    Schema type can be specified using the schema_type parameter, currently only TABLE schemas are supported.
+
+    Model inputs and outputs must be specified as :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
+    and :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>` respectively. The input/output schema
+    classes both require a schema definition than can be created with this method.
+
+    :param package: Package (or package name) in the model repository that contains the schema file
+    :param schema_file: Name of the schema file to load, which must be in the specified package
+    :param schema_type: The type of schema to create (currently only TABLE schemas are supported)
+    :return: A schema definition loaded from the schema file
+    """
 
     rh = _RuntimeHook.runtime()
     return rh.load_schema(package, schema_file, schema_type=schema_type)
