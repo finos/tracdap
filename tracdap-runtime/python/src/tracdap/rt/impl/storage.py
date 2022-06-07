@@ -689,7 +689,7 @@ class _CsvStorageFormat(IDataFormat):
                 # TODO: What is the right behavior here? Use a flag to control?
                 for blank_col in range(csv_col, len(header)):
                     output_col = col_mapping[blank_col]
-                    data[output_col].append(None)
+                    data[output_col].append(None)  # noqa
 
                 csv_col = 0
                 csv_row += 1
@@ -698,6 +698,11 @@ class _CsvStorageFormat(IDataFormat):
             table = pa.Table.from_pydict(data_dict, schema)  # noqa
 
             return table
+
+        except StopIteration as e:
+            err = f"CSV decoding failed, no readable content"
+            self._log.exception(err)
+            raise _ex.EDataCorruption(err) from e
 
         except UnicodeDecodeError as e:
             err = f"CSV decoding failed, content is garbled"
