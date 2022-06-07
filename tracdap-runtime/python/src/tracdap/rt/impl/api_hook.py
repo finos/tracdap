@@ -23,7 +23,8 @@ import tracdap.rt.impl.schemas as _schemas
 import tracdap.rt.impl.util as _util
 
 # Import hook interfaces into this module namespace
-from tracdap.rt.api.hook import *
+from tracdap.rt.api.hook import _RuntimeHook  # noqa
+from tracdap.rt.api.hook import _Named  # noqa
 
 
 class ApiGuard:
@@ -123,12 +124,12 @@ class ApiGuard:
             origin = _util.get_origin(param_type)
             args = _util.get_args(param_type)
 
-            # The generic type "Named" is defined in the TRAC API so needs to be supported
+            # The generic type "_Named" is defined in the TRAC API so needs to be supported
             # This type is used for passing named intermediate values between the define_ methods
-            if origin is Named:
+            if origin is _Named:
 
                 named_type = args[0]
-                return isinstance(value, Named) and isinstance(value.item, named_type)
+                return isinstance(value, _Named) and isinstance(value.item, named_type)
 
             # _tp.Union also covers _tp.Optional, which is shorthand for _tp.Union[_type, None]
             if origin is _tp.Union:
@@ -158,7 +159,7 @@ class ApiGuard:
             origin = _util.get_origin(type_var)
             args = _util.get_args(type_var)
 
-            if origin is Named:
+            if origin is _Named:
                 named_type = cls._type_name(args[0])
                 return f"Named[{named_type}]"
 
@@ -177,7 +178,7 @@ class ApiGuard:
 ApiGuard._log = _util.logger_for_class(ApiGuard)
 
 
-class RuntimeHookImpl(RuntimeHook):  # noqa
+class RuntimeHookImpl(_RuntimeHook):
 
     __define_parameter_signature: inspect.Signature
     __define_parameters_signature: inspect.Signature
@@ -195,10 +196,10 @@ class RuntimeHookImpl(RuntimeHook):  # noqa
 
         log = _util.logger_for_class(cls)
 
-        if not RuntimeHook._is_registered():
+        if not _RuntimeHook._is_registered():
 
             log.info("Registering runtime API hook...")
-            RuntimeHook._register(RuntimeHookImpl())
+            _RuntimeHook._register(RuntimeHookImpl())
 
         else:
 
@@ -207,7 +208,7 @@ class RuntimeHookImpl(RuntimeHook):  # noqa
     def define_parameter(
             self, param_name: str, param_type: _tp.Union[_meta.TypeDescriptor, _meta.BasicType],
             label: str, default_value: _tp.Optional[_tp.Any] = None) \
-            -> Named[_meta.ModelParameter]:
+            -> _Named[_meta.ModelParameter]:
 
         ApiGuard.validate_signature(
             self.define_parameter.__name__, self.__define_parameter_signature,
@@ -218,10 +219,10 @@ class RuntimeHookImpl(RuntimeHook):  # noqa
         else:
             param_type_descriptor = _meta.TypeDescriptor(param_type, None, None)
 
-        return Named(param_name, _meta.ModelParameter(param_type_descriptor, label, default_value))
+        return _Named(param_name, _meta.ModelParameter(param_type_descriptor, label, default_value))
 
     def define_parameters(
-            self, *params: _tp.Union[Named[_meta.ModelParameter], _tp.List[Named[_meta.ModelParameter]]]) \
+            self, *params: _tp.Union[_Named[_meta.ModelParameter], _tp.List[_Named[_meta.ModelParameter]]]) \
             -> _tp.Dict[str, _meta.ModelParameter]:
 
         ApiGuard.validate_signature(
@@ -229,9 +230,9 @@ class RuntimeHookImpl(RuntimeHook):  # noqa
             *params)
 
         if len(params) == 1 and isinstance(params[0], list):
-            return {p.itemName: p.item for p in params[0]}
+            return {p.item_name: p.item for p in params[0]}
         else:
-            return {p.itemName: p.item for p in params}
+            return {p.item_name: p.item for p in params}
 
     def define_field(
             self, field_name: str, field_type: _meta.BasicType, label: str,

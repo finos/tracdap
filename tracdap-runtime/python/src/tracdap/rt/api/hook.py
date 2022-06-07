@@ -22,28 +22,31 @@ import types as _ts
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 
+# This module contains hooks for connecting the static API to the runtime implementation
+# To avoid noise in the API package, everything in this package is named with an underscore
+
 
 _T = _tp.TypeVar("_T")
 
 
 # Utility class for passing named items between define_ funcs
 @_dc.dataclass
-class Named(_tp.Generic[_T]):
+class _Named(_tp.Generic[_T]):
 
-    itemName: str
+    item_name: str
     item: _T
 
 
-class RuntimeHook:
+class _RuntimeHook:
 
-    __runtime_hook: RuntimeHook = None
+    __runtime_hook: _RuntimeHook = None
 
     @classmethod
     def _is_registered(cls) -> bool:
         return cls.__runtime_hook is not None
 
     @classmethod
-    def _register(cls, hook: RuntimeHook):
+    def _register(cls, hook: _RuntimeHook):
 
         if cls._is_registered():
             raise _ex.ETracInternal(f"TRAC runtime API initialized twice")
@@ -51,7 +54,7 @@ class RuntimeHook:
         cls.__runtime_hook = hook
 
     @classmethod
-    def runtime(cls) -> RuntimeHook:
+    def runtime(cls) -> _RuntimeHook:
 
         if not cls._is_registered():
             raise _ex.ETracInternal(f"TRAC runtime API is not initialized")
@@ -62,13 +65,13 @@ class RuntimeHook:
     def define_parameter(
             self, param_name: str, param_type: _tp.Union[_meta.TypeDescriptor, _meta.BasicType],
             label: str, default_value: _tp.Optional[_tp.Any] = None) \
-            -> Named[_meta.ModelParameter]:
+            -> _Named[_meta.ModelParameter]:
 
         pass
 
     @_abc.abstractmethod
     def define_parameters(
-            self, *params: _tp.Union[Named[_meta.ModelParameter], _tp.List[Named[_meta.ModelParameter]]]) \
+            self, *params: _tp.Union[_Named[_meta.ModelParameter], _tp.List[_Named[_meta.ModelParameter]]]) \
             -> _tp.Dict[str, _meta.ModelParameter]:
 
         pass

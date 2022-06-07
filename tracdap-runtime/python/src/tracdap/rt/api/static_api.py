@@ -17,8 +17,8 @@ from __future__ import annotations
 import typing as _tp
 import types as _ts
 
-from .hook import RuntimeHook as _RuntimeHook
-from .hook import Named as _Named
+from .hook import _RuntimeHook
+from .hook import _Named
 
 # Import metadata domain objects into the API namespace
 # This significantly improves type hinting, inline documentation and auto-complete in JetBrains IDEs
@@ -51,6 +51,8 @@ def define_parameter(
     :param label: A descriptive label for the parameter (required)
     :param default_value: A default value to use if no explicit value is supplied (optional)
     :return: A named model parameter, suitable for passing to :py:func:`define_parameters`
+
+    :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
     rh = _RuntimeHook.runtime()
@@ -101,6 +103,10 @@ def define_parameters(
 
     :param params: The parameters that will be defined, either as individual arguments or as a list
     :return: A set of model parameters, in the correct format to return from :py:meth:TracModel.define_parameters
+
+    :type params: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`] |
+                  List[_Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]]
+
     """
 
     rh = _RuntimeHook.runtime()
