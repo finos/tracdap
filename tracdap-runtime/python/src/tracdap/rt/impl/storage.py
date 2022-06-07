@@ -426,7 +426,7 @@ class CommonDataStorage(IDataStorage):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class _ArrowFileFormat(IDataFormat):
+class ArrowFileFormat(IDataFormat):
 
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
         self._format_options = format_options
@@ -451,7 +451,7 @@ class _ArrowFileFormat(IDataFormat):
         pa_ft.write_feather(table, target, compression="uncompressed")  # noqa
 
 
-class _ParquetStorageFormat(IDataFormat):
+class ParquetStorageFormat(IDataFormat):
 
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
         self._format_options = format_options
@@ -473,7 +473,7 @@ class _ParquetStorageFormat(IDataFormat):
         pa_pq.write_table(table, target)
 
 
-class _CsvStorageFormat(IDataFormat):
+class CsvStorageFormat(IDataFormat):
 
     __LENIENT_CSV_PARSER = "lenient_csv_parser"
 
@@ -780,20 +780,20 @@ class _CsvStorageFormat(IDataFormat):
         raise _ex.EDataConformance(msg)
 
 
-FormatManager.register_data_format("ARROW_FILE", _ArrowFileFormat)
-FormatManager.register_data_format("application/vnd.apache.arrow.file", _ArrowFileFormat)
-FormatManager.register_data_format("application/x-apache-arrow-file", _ArrowFileFormat)
-FormatManager.register_extension(".arrow", _ArrowFileFormat)
+FormatManager.register_data_format("ARROW_FILE", ArrowFileFormat)
+FormatManager.register_data_format("application/vnd.apache.arrow.file", ArrowFileFormat)
+FormatManager.register_data_format("application/x-apache-arrow-file", ArrowFileFormat)
+FormatManager.register_extension(".arrow", ArrowFileFormat)
 
 # Mime type for Parquet is not registered yet! But there is an issue open to register one:
 # https://issues.apache.org/jira/browse/PARQUET-1889
-FormatManager.register_data_format("PARQUET", _ParquetStorageFormat)
-FormatManager.register_data_format("application/vnd.apache.parquet", _ParquetStorageFormat)
-FormatManager.register_extension(".parquet", _ParquetStorageFormat)
+FormatManager.register_data_format("PARQUET", ParquetStorageFormat)
+FormatManager.register_data_format("application/vnd.apache.parquet", ParquetStorageFormat)
+FormatManager.register_extension(".parquet", ParquetStorageFormat)
 
-FormatManager.register_data_format("CSV", _CsvStorageFormat)
-FormatManager.register_data_format("text/csv", _CsvStorageFormat)
-FormatManager.register_extension(".csv", _CsvStorageFormat)
+FormatManager.register_data_format("CSV", CsvStorageFormat)
+FormatManager.register_data_format("text/csv", CsvStorageFormat)
+FormatManager.register_extension(".csv", CsvStorageFormat)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
