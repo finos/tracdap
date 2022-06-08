@@ -70,8 +70,10 @@ public class MetadataWriteService {
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
 
         // Apply the common controlled trac_ tags for newly created objects
-        var commonAttrs = commonCreateAttrs(timestamp, GUEST_USER_ID, GUEST_USER_NAME);
-        newTag = TagUpdateService.applyTagUpdates(newTag, commonAttrs);
+        var createAttrs = commonCreateAttrs(timestamp, GUEST_USER_ID, GUEST_USER_NAME);
+        var updateAttrs = commonUpdateAttrs(timestamp, GUEST_USER_ID, GUEST_USER_NAME);
+        newTag = TagUpdateService.applyTagUpdates(newTag, createAttrs);
+        newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
 
         return dal.saveNewObject(tenant, newTag)
                 .thenApply(_ok -> newHeader);
@@ -198,8 +200,10 @@ public class MetadataWriteService {
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
 
         // Apply the common controlled trac_ tags for newly created objects
-        var commonAttrs = commonCreateAttrs(timestamp, GUEST_USER_ID, GUEST_USER_NAME);
-        newTag = TagUpdateService.applyTagUpdates(newTag, commonAttrs);
+        var createAttrs = commonCreateAttrs(timestamp, GUEST_USER_ID, GUEST_USER_NAME);
+        var updateAttrs = commonUpdateAttrs(timestamp, GUEST_USER_ID, GUEST_USER_NAME);
+        newTag = TagUpdateService.applyTagUpdates(newTag, createAttrs);
+        newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
 
         return dal.savePreallocatedObject(tenant, newTag)
                 .thenApply(_ok -> newHeader);
@@ -212,43 +216,20 @@ public class MetadataWriteService {
 
         var createTimeAttr = TagUpdate.newBuilder()
                 .setAttrName(MetadataConstants.TRAC_CREATE_TIME)
-                .setOperation(TagOperation.CREATE_ATTR)
                 .setValue(MetadataCodec.encodeValue(createTime))
                 .build();
 
         var createUserIdAttr = TagUpdate.newBuilder()
                 .setAttrName(MetadataConstants.TRAC_CREATE_USER_ID)
-                .setOperation(TagOperation.CREATE_ATTR)
                 .setValue(MetadataCodec.encodeValue(createUserId))
                 .build();
 
         var createUserNameAttr = TagUpdate.newBuilder()
                 .setAttrName(MetadataConstants.TRAC_CREATE_USER_NAME)
-                .setOperation(TagOperation.CREATE_ATTR)
                 .setValue(MetadataCodec.encodeValue(createUserName))
                 .build();
 
-        var updateTimeAttr = TagUpdate.newBuilder()
-                .setAttrName(MetadataConstants.TRAC_UPDATE_TIME)
-                .setOperation(TagOperation.CREATE_ATTR)
-                .setValue(MetadataCodec.encodeValue(createTime))
-                .build();
-
-        var updateUserIdAttr = TagUpdate.newBuilder()
-                .setAttrName(MetadataConstants.TRAC_UPDATE_USER_ID)
-                .setOperation(TagOperation.CREATE_ATTR)
-                .setValue(MetadataCodec.encodeValue(createUserId))
-                .build();
-
-        var updateUserNameAttr = TagUpdate.newBuilder()
-                .setAttrName(MetadataConstants.TRAC_UPDATE_USER_NAME)
-                .setOperation(TagOperation.CREATE_ATTR)
-                .setValue(MetadataCodec.encodeValue(createUserName))
-                .build();
-
-        return List.of(
-                createTimeAttr, createUserIdAttr, createUserNameAttr,
-                updateTimeAttr, updateUserIdAttr, updateUserNameAttr);
+        return List.of(createTimeAttr, createUserIdAttr, createUserNameAttr);
     }
 
     private List<TagUpdate> commonUpdateAttrs(
@@ -258,19 +239,16 @@ public class MetadataWriteService {
 
         var updateTimeAttr = TagUpdate.newBuilder()
                 .setAttrName(MetadataConstants.TRAC_UPDATE_TIME)
-                .setOperation(TagOperation.REPLACE_ATTR)
                 .setValue(MetadataCodec.encodeValue(createTime))
                 .build();
 
         var updateUserIdAttr = TagUpdate.newBuilder()
                 .setAttrName(MetadataConstants.TRAC_UPDATE_USER_ID)
-                .setOperation(TagOperation.REPLACE_ATTR)
                 .setValue(MetadataCodec.encodeValue(createUserId))
                 .build();
 
         var updateUserNameAttr = TagUpdate.newBuilder()
                 .setAttrName(MetadataConstants.TRAC_UPDATE_USER_NAME)
-                .setOperation(TagOperation.REPLACE_ATTR)
                 .setValue(MetadataCodec.encodeValue(createUserName))
                 .build();
 
