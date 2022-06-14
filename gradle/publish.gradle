@@ -39,6 +39,10 @@ def publishModule(Project project) {
 
         }
     }
+
+    signing {
+        sign "publishing.publications.${project.name}"
+    }
 }
 
 ext {
