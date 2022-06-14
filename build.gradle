@@ -17,6 +17,7 @@
 plugins {
     id "org.owasp.dependencycheck" version "7.1.0.1"
     id 'com.github.jk1.dependency-license-report' version '2.0'
+    id 'maven-publish'
     id 'idea'
 }
 
@@ -24,6 +25,7 @@ import com.github.jk1.license.filter.*
 
 apply from: 'gradle/versions.gradle'
 apply from: 'gradle/functions.gradle'
+apply from: 'gradle/publish.gradle'
 
 def versionNumber = ext.getVersionFromGit()
 
@@ -36,6 +38,9 @@ allprojects {
 subprojects {
 
     buildDir = rootProject.buildDir.path + '/modules/' + project.name
+
+    // Publishing setup is defined in gradle/publish.gradle
+    project.afterEvaluate(publishModule)
 }
 
 dependencyCheck {

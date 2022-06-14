@@ -1,0 +1,46 @@
+
+def publishModule(Project project) {
+
+    publishing {
+        publications {
+
+            "$project.name" (MavenPublication) {
+
+                groupId project.group
+                artifactId project.name
+                version project.version
+                from project.components.java
+
+                pom {
+
+                    name = project.name
+                    description = project.description
+                    url = 'https://tracdap.finos.org'
+
+                    licenses {
+                        license {
+                            name = 'Apache License, Version 2.0'
+                            url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                        }
+                    }
+
+                    scm {
+                        connection = 'scm:git:git://github.com/finos/tracdap.git'
+                        developerConnection = 'scm:git:ssh://github.com/finos/tracdap.git'
+                        url = 'https://github.com/finos/tracdap'
+                    }
+
+                    issueManagement {
+                        system = "GitHub Issues"
+                        url = "https://github.com/finos/tracdap/issues"
+                    }
+                }
+            }
+
+        }
+    }
+}
+
+ext {
+    publishModule = { Project project -> publishModule(project) }
+}
