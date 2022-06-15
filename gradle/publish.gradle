@@ -34,6 +34,15 @@ def publishModule(Project project) {
                         system = "GitHub Issues"
                         url = "https://github.com/finos/tracdap/issues"
                     }
+
+                    developers {
+                        developer {
+                            name = 'Martin Traverse'
+                            email = 'martin.traverse@accenture.com'
+                            organization = 'Accenture'
+                            organizationUrl = 'https://accenture.com'
+                        }
+                    }
                 }
             }
 
