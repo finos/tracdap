@@ -1,6 +1,6 @@
 # TRAC *d.a.p.* - Contribution and Governance Policies
 
-This document describes the contribution process and governance policies of the FINOS TRAC project. The project is also governed by the [Linux Foundation Antitrust Policy](https://www.linuxfoundation.org/antitrust-policy/), and the FINOS [IP Policy](https://github.com/finos/community/blob/master/governance/IP-Policy.pdf), [Code of Conduct](https://github.com/finos/community/blob/master/governance/Code-of-Conduct.md), [Collaborative Principles](https://github.com/finos/community/blob/master/governance/Collaborative-Principles.md), and [Meeting Procedures](https://github.com/finos/community/blob/master/governance/Meeting-Procedures.md).
+This document describes the contribution process and governance policies of the FINOS TRAC project. The project is also governed by the [Linux Foundation Antitrust Policy](https://www.linuxfoundation.org/antitrust-policy/), and the FINOS [IP Policy](https://community.finos.org/assets/files/IP-Policy-9b1cd5f6c1d682e073c3c15224fc6d86.pdf), [Code of Conduct](https://community.finos.org/docs/governance/code-of-conduct), [Collaborative Principles](https://community.finos.org/docs/governance/collaborative-principles/), and [Meeting Procedures](https://community.finos.org/docs/governance/meeting-procedures/).
 
 ## Contribution Process
 
