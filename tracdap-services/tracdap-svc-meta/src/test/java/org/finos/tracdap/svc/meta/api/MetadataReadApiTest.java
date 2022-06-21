@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.meta.api;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.test.helpers.PlatformTest;
@@ -119,7 +120,7 @@ abstract class MetadataReadApiTest {
                 .build();
 
         assertEquals(objectId, UUID.fromString(savedTag.getHeader().getObjectId()));
-        assertEquals(expectedTag, savedTag);
+        assertTagEquals(expectedTag, savedTag);
     }
 
     @ParameterizedTest
@@ -170,8 +171,9 @@ abstract class MetadataReadApiTest {
         assertEquals(2, savedTags.getTagCount());
         assertEquals(objectId, UUID.fromString(savedTags.getTag(0).getHeader().getObjectId()));
         assertEquals(objectId2, UUID.fromString(savedTags.getTag(1).getHeader().getObjectId()));
-        assertEquals(expectedTag, savedTags.getTag(0));
-        assertEquals(expectedTag2, savedTags.getTag(1));
+
+        assertTagEquals(expectedTag, savedTags.getTag(0));
+        assertTagEquals(expectedTag2, savedTags.getTag(1));
     }
 
     @Test
@@ -257,9 +259,9 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        assertEquals(v1TagExpected, v1TagSaved);
-        assertEquals(v2TagExpected, v2TagSaved);
-        assertEquals(t2TagExpected, t2TagSaved);
+        assertTagEquals(v1TagExpected, v1TagSaved);
+        assertTagEquals(v2TagExpected, v2TagSaved);
+        assertTagEquals(t2TagExpected, t2TagSaved);
     }
 
     @Test
@@ -338,9 +340,9 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        assertEquals(v1TagExpected, v1TagSaved);
-        assertEquals(v2TagExpected, v2TagSaved);
-        assertEquals(t2TagExpected, t2TagSaved);
+        assertTagEquals(v1TagExpected, v1TagSaved);
+        assertTagEquals(v2TagExpected, v2TagSaved);
+        assertTagEquals(t2TagExpected, t2TagSaved);
     }
 
     @Test
@@ -448,9 +450,9 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        assertEquals(v1TagExpected, v1TagSaved);
-        assertEquals(v2TagExpected, v2TagSaved);
-        assertEquals(t2TagExpected, t2TagSaved);
+        assertTagEquals(v1TagExpected, v1TagSaved);
+        assertTagEquals(v2TagExpected, v2TagSaved);
+        assertTagEquals(t2TagExpected, t2TagSaved);
     }
 
     @Test
@@ -557,9 +559,9 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        assertEquals(v1TagExpected, v1TagSaved);
-        assertEquals(v2TagExpected, v2TagSaved);
-        assertEquals(t2TagExpected, t2TagSaved);
+        assertTagEquals(v1TagExpected, v1TagSaved);
+        assertTagEquals(v2TagExpected, v2TagSaved);
+        assertTagEquals(t2TagExpected, t2TagSaved);
     }
 
     @Test
@@ -606,7 +608,7 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(v1Attrs)
                 .build();
 
-        assertEquals(v1TagExpected, v1TagSaved);
+        assertTagEquals(v1TagExpected, v1TagSaved);
 
         // Save V2 object
 
@@ -631,7 +633,7 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(v1Attrs)
                 .build();
 
-        assertEquals(v2TagExpected, v2TagSaved);
+        assertTagEquals(v2TagExpected, v2TagSaved);
 
         // Save T2 tag on V1 object
 
@@ -656,7 +658,7 @@ abstract class MetadataReadApiTest {
         // Read request using latest / latest - should still return V2 object
 
         v2TagSaved = readApi.readObject(latestMetadataReadRequest);
-        assertEquals(v2TagExpected, v2TagSaved);
+        assertTagEquals(v2TagExpected, v2TagSaved);
 
         // Read request for object V1 / latest tag
 
@@ -677,7 +679,7 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        assertEquals(t2TagExpected, t2TagSaved);
+        assertTagEquals(t2TagExpected, t2TagSaved);
     }
 
     @Test
@@ -742,7 +744,7 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(v1Attrs)
                 .build();
 
-        assertEquals(v1TagExpected, v1TagSaved);
+        assertTagEquals(v1TagExpected, v1TagSaved);
 
         // Save V2 object
 
@@ -768,7 +770,7 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(v1Attrs)
                 .build();
 
-        assertEquals(v2TagExpected, v2TagSaved);
+        assertTagEquals(v2TagExpected, v2TagSaved);
 
         // Save T2 tag on V1 object
 
@@ -794,7 +796,7 @@ abstract class MetadataReadApiTest {
 
         batch = readApi.readBatch(latestMetadataReadRequest);
         v2TagSaved = batch.getTag(0);
-        assertEquals(v2TagExpected, v2TagSaved);
+        assertTagEquals(v2TagExpected, v2TagSaved);
 
         // Read request for object V1 / latest tag
 
@@ -817,7 +819,7 @@ abstract class MetadataReadApiTest {
                 .putAllAttrs(t2Attrs)
                 .build();
 
-        assertEquals(t2TagExpected, t2TagSaved);
+        assertTagEquals(t2TagExpected, t2TagSaved);
     }
 
     @Test
@@ -1006,5 +1008,27 @@ abstract class MetadataReadApiTest {
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> readApi.readBatch(readRequest));
         assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
+    }
+
+    private void assertTagEquals(org.finos.tracdap.metadata.Tag expected, org.finos.tracdap.metadata.Tag actual) {
+
+        assertEquals(expected.getHeader(), actual.getHeader());
+        assertEquals(expected.getDefinition(), actual.getDefinition());
+
+        for (var attr : expected.getAttrsMap().keySet()) {
+
+            // trac_update_ attrs may be present in an original tag and changed in an update operation
+            if (attr.startsWith("trac_update_"))
+                continue;
+
+            assertEquals(expected.getAttrsOrThrow(attr), actual.getAttrsOrThrow(attr));
+        }
+
+        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));
+        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_CREATE_USER_ID));
+        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_CREATE_USER_NAME));
+        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_UPDATE_TIME));
+        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_ID));
+        assertTrue(actual.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_NAME));
     }
 }

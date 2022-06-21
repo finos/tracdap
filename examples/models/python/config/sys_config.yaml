@@ -5,7 +5,7 @@ storage:
     instances:
       - storageType: LOCAL
         storageProps:
-          rootPath: ./data
+          rootPath: ../data
 
 storageSettings:
   defaultStorage: example_data

@@ -58,11 +58,13 @@ public class MetadataConstants {
     public static final Pattern TRAC_RESERVED_IDENTIFIER = Pattern.compile("\\A(trac_|_).*", Pattern.CASE_INSENSITIVE);
 
     public static final String TRAC_CREATE_TIME = "trac_create_time";
-    public static final String TRAC_CREATE_USER = "trac_create_user";
+    public static final String TRAC_CREATE_USER_ID = "trac_create_user_id";
+    public static final String TRAC_CREATE_USER_NAME = "trac_create_user_name";
     public static final String TRAC_CREATE_JOB = "trac_create_job";
 
     public static final String TRAC_UPDATE_TIME = "trac_update_time";
-    public static final String TRAC_UPDATE_USER = "trac_update_user";
+    public static final String TRAC_UPDATE_USER_ID = "trac_update_user_id";
+    public static final String TRAC_UPDATE_USER_NAME = "trac_update_user_name";
     public static final String TRAC_UPDATE_JOB = "trac_update_job";
 
     public static final String TRAC_JOB_TYPE_ATTR = "trac_job_type";

@@ -11,18 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
 
 from __future__ import annotations
 
@@ -38,6 +26,7 @@ import pyspark.sql as pyss
 import tracdap.rt.api as _api
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.util as _util
 
@@ -92,7 +81,9 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_param_valid_identifier(parameter_name)
         self.__val.check_param_exists(parameter_name)
 
-        return self.__parameters[parameter_name]
+        value: _meta.Value = self.__parameters[parameter_name]  # noqa
+
+        return _types.MetadataCodec.decode_value(value)
 
     def get_schema(self, dataset_name: str) -> _meta.SchemaDefinition:
 

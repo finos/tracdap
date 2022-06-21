@@ -20,6 +20,7 @@ import subprocess as sp
 import tracdap.rt.api as api
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
+import tracdap.rt.impl.api_hook as api_hook
 import tracdap.rt.impl.models as models
 import tracdap.rt.impl.util as util
 
@@ -59,6 +60,7 @@ class ImportModelTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        api_hook.RuntimeHookImpl.register_impl()
         util.configure_logging()
 
     def setUp(self) -> None:
@@ -99,8 +101,8 @@ class ImportModelTest(unittest.TestCase):
     def test_load_local_ok(self):
 
         example_repo_url = pathlib.Path(__file__) \
-            .joinpath("../../../../../../..") \
-            .joinpath("examples/models/python") \
+            .parent \
+            .joinpath("../../../../../..") \
             .resolve()
 
         example_repo_config = config.RepositoryConfig(repoType="local", repoUrl=str(example_repo_url))
@@ -111,8 +113,8 @@ class ImportModelTest(unittest.TestCase):
         stub_model_def = meta.ModelDefinition(
             language="python",
             repository="example_repo",
-            path="hello_world",
-            entryPoint="hello_world.HelloWorldModel"
+            path="examples/models/python/src",
+            entryPoint="tutorial.hello_world.HelloWorldModel"
         )
 
         loader = models.ModelLoader(sys_config)
@@ -139,8 +141,8 @@ class ImportModelTest(unittest.TestCase):
         stub_model_def = meta.ModelDefinition(
             language="python",
             repository="example_repo",
-            path="examples/models/python/hello_world",
-            entryPoint="hello_world.HelloWorldModel",
+            path="examples/models/python/src",
+            entryPoint="tutorial.hello_world.HelloWorldModel",
             version=self.commit_hash
         )
 

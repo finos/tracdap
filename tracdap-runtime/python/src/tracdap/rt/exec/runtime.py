@@ -11,18 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
 
 from __future__ import annotations
 
@@ -39,6 +27,7 @@ import tracdap.rt.impl.config_parser as _cparse
 import tracdap.rt.impl.util as util
 import tracdap.rt.impl.models as _models
 import tracdap.rt.impl.storage as _storage
+import tracdap.rt.impl.api_hook as _hook
 
 import tracdap.rt.exec.actors as _actors
 import tracdap.rt.exec.engine as _engine
@@ -121,6 +110,8 @@ class TracRuntime:
 
             # Plugins will be loaded here, before config
 
+            _hook.RuntimeHookImpl.register_impl()
+
             # Load sys and job config (or use embedded)
 
             if self._sys_config is None:
@@ -145,7 +136,9 @@ class TracRuntime:
             if self._dev_mode:
 
                 job_config, sys_config = _dev_mode.DevModeTranslator.translate_dev_mode_config(
-                    self._sys_config_dir, self._sys_config, self._job_config, self._model_class)
+                    self._sys_config, self._job_config,
+                    self._sys_config_path, self._job_config_path,
+                    self._model_class)
 
                 self._job_config = job_config
                 self._sys_config = sys_config

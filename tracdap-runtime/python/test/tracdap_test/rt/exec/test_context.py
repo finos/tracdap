@@ -21,6 +21,8 @@ import pandas as pd
 
 import tracdap.rt.api as _api
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.impl.api_hook as _api_hook
+import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.data as _data
 
 from tracdap.rt.exec.context import TracContextImpl
@@ -83,7 +85,8 @@ class _TestModel(_api.TracModel):
         pass
 
 
-_test_model_def = _api.ModelDefinition(  # noqa
+_api_hook.RuntimeHookImpl.register_impl()
+_test_model_def = _api.ModelDefinition(
 
     language="python",
     repository="trac_integrated",
@@ -128,7 +131,7 @@ class TracContextTest(unittest.TestCase):
 
     def setUp(self):
 
-        params = {
+        native_params = {
             "boolean_param": self.BOOLEAN_PARAM_VALUE,
             "integer_param": self.INTEGER_PARAM_VALUE,
             "float_param": self.FLOAT_PARAM_VALUE,
@@ -137,6 +140,10 @@ class TracContextTest(unittest.TestCase):
             "date_param": self.DATE_PARAM_VALUE,
             "datetime_param": self.DATETIME_PARAM_VALUE
         }
+
+        params = {
+            k: _types.MetadataCodec.encode_value(v)
+            for k, v in native_params.items()}
 
         customer_loans_schema = _test_model_def.inputs.get("customer_loans").schema
         customer_loans_view = _data.DataView.for_trac_schema(customer_loans_schema)

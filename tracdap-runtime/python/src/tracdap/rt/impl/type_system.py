@@ -146,20 +146,21 @@ class MetadataCodec:
             return _meta.Value(type_desc, floatValue=value)
 
         if isinstance(value, decimal.Decimal):
-            type_desc = _meta.TypeDescriptor(_meta.BasicType.BOOLEAN)
+            type_desc = _meta.TypeDescriptor(_meta.BasicType.DECIMAL)
             return _meta.Value(type_desc, decimalValue=_meta.DecimalValue(str(value)))
 
         if isinstance(value, str):
             type_desc = _meta.TypeDescriptor(_meta.BasicType.STRING)
             return _meta.Value(type_desc, stringValue=value)
 
-        if isinstance(value, dt.date):
-            type_desc = _meta.TypeDescriptor(_meta.BasicType.DATE)
-            return _meta.Value(type_desc, dateValue=_meta.DateValue(value.isoformat()))
-
+        # dt.datetime inherits dt.date, so check datetime first to avoid encoding datetime as a date
         if isinstance(value, dt.datetime):
             type_desc = _meta.TypeDescriptor(_meta.BasicType.DATETIME)
             return _meta.Value(type_desc, datetimeValue=_meta.DatetimeValue(value.isoformat()))
+
+        if isinstance(value, dt.date):
+            type_desc = _meta.TypeDescriptor(_meta.BasicType.DATE)
+            return _meta.Value(type_desc, dateValue=_meta.DateValue(value.isoformat()))
 
         raise _ex.ETracInternal(f"Encoding value type [{type(value)}] is not supported yet")
 

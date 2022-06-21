@@ -11,18 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
 
 import abc
 import decimal
@@ -438,7 +426,7 @@ class CommonDataStorage(IDataStorage):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class _ArrowFileFormat(IDataFormat):
+class ArrowFileFormat(IDataFormat):
 
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
         self._format_options = format_options
@@ -463,7 +451,7 @@ class _ArrowFileFormat(IDataFormat):
         pa_ft.write_feather(table, target, compression="uncompressed")  # noqa
 
 
-class _ParquetStorageFormat(IDataFormat):
+class ParquetStorageFormat(IDataFormat):
 
     def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
         self._format_options = format_options
@@ -485,7 +473,7 @@ class _ParquetStorageFormat(IDataFormat):
         pa_pq.write_table(table, target)
 
 
-class _CsvStorageFormat(IDataFormat):
+class CsvStorageFormat(IDataFormat):
 
     __LENIENT_CSV_PARSER = "lenient_csv_parser"
 
@@ -672,12 +660,12 @@ class _CsvStorageFormat(IDataFormat):
             missing_columns = list(filter(lambda col_: col_.lower() not in header_lower, schema.names))
 
             if any(missing_columns):
-                msg = f"CSV data is missing one of more columns: [{', '.join(missing_columns)}]"
+                msg = f"CSV data is missing one or more columns: [{', '.join(missing_columns)}]"
                 self._log.error(msg)
                 raise _ex.EDataConformance(msg)
 
             schema_columns = {col.lower(): index for index, col in enumerate(schema.names)}
-            col_mapping = [schema_columns.get(col.lower()) for col in header]
+            col_mapping = [schema_columns.get(col) for col in header_lower]
             python_types = list(map(_data.DataMapping.arrow_to_python_type, schema.types))
 
             data = [[] for _ in range(len(schema.names))]
@@ -690,15 +678,18 @@ class _CsvStorageFormat(IDataFormat):
 
                     output_col = col_mapping[csv_col]
 
-                    if output_col is None:
-                        continue
-
-                    python_type = python_types[output_col]
-                    python_value = self._convert_python_value(raw_value, python_type, csv_row, csv_col)
-
-                    data[output_col].append(python_value)
+                    if output_col is not None:
+                        python_type = python_types[output_col]
+                        python_value = self._convert_python_value(raw_value, python_type, csv_row, csv_col)
+                        data[output_col].append(python_value)
 
                     csv_col += 1
+
+                # Allow for trailing null columns
+                # TODO: What is the right behavior here? Use a flag to control?
+                for blank_col in range(csv_col, len(header)):
+                    output_col = col_mapping[blank_col]
+                    data[output_col].append(None)  # noqa
 
                 csv_col = 0
                 csv_row += 1
@@ -707,6 +698,11 @@ class _CsvStorageFormat(IDataFormat):
             table = pa.Table.from_pydict(data_dict, schema)  # noqa
 
             return table
+
+        except StopIteration as e:
+            err = f"CSV decoding failed, no readable content"
+            self._log.exception(err)
+            raise _ex.EDataCorruption(err) from e
 
         except UnicodeDecodeError as e:
             err = f"CSV decoding failed, content is garbled"
@@ -766,36 +762,38 @@ class _CsvStorageFormat(IDataFormat):
                 if isinstance(raw_value, str):
                     return dt.datetime.fromisoformat(raw_value)
 
-            msg = f"CSV data does not match the schema and cannot be converted" \
-                + f" (row = {row}, col = {col}, expected type = {python_type}, value = [{str(raw_value)}])"
-
-            self._log.error(msg)
-            raise _ex.EDataConformance(msg)
-
         except Exception as e:
 
             msg = f"CSV data does not match the schema and cannot be converted" \
-                + f" (row = {row}, col = {col}, expected type = {python_type}, value = [{str(raw_value)}])" \
+                + f" (row = {row}, col = {col}, expected type = [{python_type.__name__}], value = [{str(raw_value)}])" \
                 + f": {str(e)}"
 
             self._log.exception(msg)
             raise _ex.EDataConformance(msg) from e
 
+        # Default case: unrecognized python_type
 
-FormatManager.register_data_format("ARROW_FILE", _ArrowFileFormat)
-FormatManager.register_data_format("application/vnd.apache.arrow.file", _ArrowFileFormat)
-FormatManager.register_data_format("application/x-apache-arrow-file", _ArrowFileFormat)
-FormatManager.register_extension(".arrow", _ArrowFileFormat)
+        msg = f"CSV data does not match the schema and cannot be converted" \
+              + f" (row = {row}, col = {col}, expected type = [{python_type.__name__}], value = [{str(raw_value)}])"
+
+        self._log.error(msg)
+        raise _ex.EDataConformance(msg)
+
+
+FormatManager.register_data_format("ARROW_FILE", ArrowFileFormat)
+FormatManager.register_data_format("application/vnd.apache.arrow.file", ArrowFileFormat)
+FormatManager.register_data_format("application/x-apache-arrow-file", ArrowFileFormat)
+FormatManager.register_extension(".arrow", ArrowFileFormat)
 
 # Mime type for Parquet is not registered yet! But there is an issue open to register one:
 # https://issues.apache.org/jira/browse/PARQUET-1889
-FormatManager.register_data_format("PARQUET", _ParquetStorageFormat)
-FormatManager.register_data_format("application/vnd.apache.parquet", _ParquetStorageFormat)
-FormatManager.register_extension(".parquet", _ParquetStorageFormat)
+FormatManager.register_data_format("PARQUET", ParquetStorageFormat)
+FormatManager.register_data_format("application/vnd.apache.parquet", ParquetStorageFormat)
+FormatManager.register_extension(".parquet", ParquetStorageFormat)
 
-FormatManager.register_data_format("CSV", _CsvStorageFormat)
-FormatManager.register_data_format("text/csv", _CsvStorageFormat)
-FormatManager.register_extension(".csv", _CsvStorageFormat)
+FormatManager.register_data_format("CSV", CsvStorageFormat)
+FormatManager.register_data_format("text/csv", CsvStorageFormat)
+FormatManager.register_extension(".csv", CsvStorageFormat)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

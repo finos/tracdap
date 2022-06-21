@@ -11,38 +11,29 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
 
 from __future__ import annotations
 
+import copy as cp
+import dataclasses as dc
+import enum
 import typing as tp
-from copy import copy
-from dataclasses import dataclass, field
 
-import tracdap.rt.config as config
-import tracdap.rt.impl.util as util
-import tracdap.rt.impl.models as _models
-import tracdap.rt.impl.storage as _storage
-
-import tracdap.rt.exec.actors as actors
+import tracdap.rt.config as _cfg
+import tracdap.rt.exceptions as _ex
+import tracdap.rt.exec.actors as _actors
 import tracdap.rt.exec.graph_builder as _graph
 import tracdap.rt.exec.functions as _func
+import tracdap.rt.impl.models as _models
+import tracdap.rt.impl.data as _data
+import tracdap.rt.impl.storage as _storage
+import tracdap.rt.impl.util as _util
+
 from tracdap.rt.exec.graph import NodeId
 
 
-@dataclass
-class GraphContextNode:
+@dc.dataclass
+class _EngineNode:
 
     """
     Represents the state of a single node in the execution graph for processing by the TRAC engine
@@ -51,29 +42,166 @@ class GraphContextNode:
     node: _graph.Node
     dependencies: tp.Dict[NodeId, _graph.DependencyType]
     function: tp.Optional[_func.NodeFunction] = None
+    complete: bool = False
     result: tp.Optional[tp.Any] = None
     error: tp.Optional[str] = None
 
     def __post_init__(self):
         if not self.dependencies:
-            self.dependencies = copy(self.node.dependencies)
+            self.dependencies = cp.copy(self.node.dependencies)
 
 
-@dataclass
-class GraphContext:
+@dc.dataclass
+class _EngineContext:
 
     """
     Represents the state of an execution graph being processed by the TRAC engine
     """
 
-    nodes: tp.Dict[NodeId, GraphContextNode]
-    pending_nodes: tp.Set[NodeId] = field(default_factory=set)
-    active_nodes: tp.Set[NodeId] = field(default_factory=set)
-    succeeded_nodes: tp.Set[NodeId] = field(default_factory=set)
-    failed_nodes: tp.Set[NodeId] = field(default_factory=set)
+    nodes: tp.Dict[NodeId, _EngineNode]
+    pending_nodes: tp.Set[NodeId] = dc.field(default_factory=set)
+    active_nodes: tp.Set[NodeId] = dc.field(default_factory=set)
+    succeeded_nodes: tp.Set[NodeId] = dc.field(default_factory=set)
+    failed_nodes: tp.Set[NodeId] = dc.field(default_factory=set)
 
 
-class GraphBuilder(actors.Actor):
+class TracEngine(_actors.Actor):
+
+    """
+    TracEngine is the main actor that controls all operations in the TRAC runtime
+    Messages may be passed in externally via ActorSystem, e.g. commands to launch jobs
+    """
+
+    def __init__(
+            self, sys_config: _cfg.RuntimeConfig,
+            models: _models.ModelLoader,
+            storage: _storage.StorageManager,
+            batch_mode=False):
+
+        super().__init__()
+
+        self._log = _util.logger_for_object(self)
+
+        self._sys_config = sys_config
+        self._models = models
+        self._storage = storage
+        self._batch_mode = batch_mode
+
+        self._job_actors = dict()
+
+    def on_start(self):
+
+        self._log.info("Engine is up and running")
+
+    def on_stop(self):
+
+        self._log.info("Engine shutdown complete")
+
+    @_actors.Message
+    def submit_job(
+            self, job_config: _cfg.JobConfig,
+            job_result_dir: str,
+            job_result_format: str):
+
+        job_key = _util.object_key(job_config.jobId)
+
+        result_needed = bool(job_result_dir)
+        result_spec = _graph.JobResultSpec(result_needed, job_result_dir, job_result_format)
+
+        self._log.info(f"Job submitted: [{job_key}]")
+
+        job_actor_id = self.actors().spawn(
+            JobProcessor, job_key,
+            job_config, result_spec,
+            self._models, self._storage)
+
+        job_actors = {**self._job_actors, job_key: job_actor_id}
+        self._job_actors = job_actors
+
+    @_actors.Message
+    def job_succeeded(self, job_key: str):
+
+        self._log.info(f"Recording job as successful: {job_key}")
+        self._finalize_job(job_key)
+
+    @_actors.Message
+    def job_failed(self, job_key: str, error: Exception):
+
+        self._log.error(f"Recording job as failed: {job_key}")
+        self._finalize_job(job_key, error)
+
+    def _finalize_job(self, job_key: str, error: tp.Optional[Exception] = None):
+
+        # TODO: How should the engine respond when attempting to finalize an unknown job?
+
+        job_actors = self._job_actors
+        job_actor_id = job_actors.pop(job_key)
+
+        if self._batch_mode:
+
+            # If the engine is in batch mode, shut down the whole engine once the first job completes
+            if error:
+                self._log.error("Batch run failed, shutting down the engine")
+                engine_error = RuntimeError("Batch job failed")
+                self.actors().fail(engine_error, cause=error)
+
+            else:
+                self._log.info("Batch run complete, shutting down the engine")
+                self.actors().stop()
+
+        else:
+            # Otherwise, just stop the individual job actor for the job that has completed
+            self.actors().stop(job_actor_id)
+            self._job_actors = job_actors
+
+
+class JobProcessor(_actors.Actor):
+
+    """
+    JobProcessor oversees the whole lifecycle of a job
+    This includes setup (GraphBuilder), execution (GraphProcessor) and reporting results
+    """
+
+    def __init__(
+            self, job_key, job_config: _cfg.JobConfig,
+            result_spec: _graph.JobResultSpec,
+            models: _models.ModelLoader,
+            storage: _storage.StorageManager):
+
+        super().__init__()
+        self.job_key = job_key
+        self.job_config = job_config
+        self.result_spec = result_spec
+        self._models = models
+        self._storage = storage
+        self._log = _util.logger_for_object(self)
+
+    def on_start(self):
+        self._log.info(f"Starting job [{self.job_key}]")
+        self._models.create_scope(self.job_key)
+        self.actors().spawn(GraphBuilder, self.job_config, self.result_spec, self._models, self._storage)
+
+    def on_stop(self):
+        self._log.info(f"Cleaning up job [{self.job_key}]")
+        self._models.destroy_scope(self.job_key)
+
+    @_actors.Message
+    def job_graph(self, graph: _EngineContext):
+        self.actors().spawn(GraphProcessor, graph)
+        self.actors().stop(self.actors().sender)
+
+    @_actors.Message
+    def job_succeeded(self):
+        self._log.info(f"Job succeeded {self.job_key}")
+        self.actors().send_parent("job_succeeded", self.job_key)
+
+    @_actors.Message
+    def job_failed(self, error: Exception):
+        self._log.error(f"Job failed {self.job_key}")
+        self.actors().send_parent("job_failed", self.job_key, error)
+
+
+class GraphBuilder(_actors.Actor):
 
     """
     GraphBuilder is a worker (actors.Worker) responsible for building the execution graph for a job
@@ -81,7 +209,7 @@ class GraphBuilder(actors.Actor):
     """
 
     def __init__(
-            self, job_config: config.JobConfig,
+            self, job_config: _cfg.JobConfig,
             result_spec: _graph.JobResultSpec,
             models: _models.ModelLoader,
             storage: _storage.StorageManager):
@@ -89,10 +217,10 @@ class GraphBuilder(actors.Actor):
         super().__init__()
         self.job_config = job_config
         self.result_spec = result_spec
-        self.graph: tp.Optional[GraphContext] = None
+        self.graph: tp.Optional[_EngineContext] = None
 
         self._resolver = _func.FunctionResolver(models, storage)
-        self._log = util.logger_for_object(self)
+        self._log = _util.logger_for_object(self)
 
     def on_start(self):
 
@@ -100,8 +228,8 @@ class GraphBuilder(actors.Actor):
 
         # TODO: Get sys config, or find a way to pass storage settings
         graph_data = _graph.GraphBuilder.build_job(self.job_config, self.result_spec)
-        graph_nodes = {node_id: GraphContextNode(node, {}) for node_id, node in graph_data.nodes.items()}
-        graph = GraphContext(graph_nodes, pending_nodes=set(graph_nodes.keys()))
+        graph_nodes = {node_id: _EngineNode(node, {}) for node_id, node in graph_data.nodes.items()}
+        graph = _EngineContext(graph_nodes, pending_nodes=set(graph_nodes.keys()))
 
         self._log.info("Resolving graph nodes to executable code")
 
@@ -111,13 +239,13 @@ class GraphBuilder(actors.Actor):
         self.graph = graph
         self.actors().send_parent("job_graph", self.graph)
 
-    @actors.Message
+    @_actors.Message
     def get_execution_graph(self):
 
         self.actors().send(self.actors().sender, "job_graph", self.graph)
 
 
-class GraphProcessor(actors.Actor):
+class GraphProcessor(_actors.Actor):
 
     """
     GraphProcessor is the actor that runs the execution graph for a job
@@ -130,27 +258,27 @@ class GraphProcessor(actors.Actor):
     Once all running nodes are stopped, an error is reported to the parent
     """
 
-    def __init__(self, graph: GraphContext):
+    def __init__(self, graph: _EngineContext):
         super().__init__()
         self.graph = graph
-        self.processors: tp.Dict[NodeId, actors.ActorId] = dict()
-        self._log = util.logger_for_object(self)
+        self.processors: tp.Dict[NodeId, _actors.ActorId] = dict()
+        self._log = _util.logger_for_object(self)
 
     def on_start(self):
 
         self._log.info("Begin processing graph")
         self.actors().send(self.actors().id, "submit_viable_nodes")
 
-    @actors.Message
+    @_actors.Message
     def submit_viable_nodes(self):
 
         node_processors = dict()
 
-        def process_graph(graph: GraphContext) -> GraphContext:
+        def process_graph(graph: _EngineContext) -> _EngineContext:
 
-            pending_nodes = copy(graph.pending_nodes)
-            active_nodes = copy(graph.active_nodes)
-            failed_nodes = copy(graph.failed_nodes)
+            pending_nodes = cp.copy(graph.pending_nodes)
+            active_nodes = cp.copy(graph.active_nodes)
+            failed_nodes = cp.copy(graph.failed_nodes)
 
             for node_id in graph.pending_nodes:
 
@@ -171,7 +299,7 @@ class GraphProcessor(actors.Actor):
                     pending_nodes.discard(node_id)
                     active_nodes.add(node_id)
 
-            processed_graph = copy(self.graph)
+            processed_graph = cp.copy(self.graph)
             processed_graph.pending_nodes = pending_nodes
             processed_graph.active_nodes = active_nodes
             processed_graph.failed_nodes = failed_nodes
@@ -193,56 +321,82 @@ class GraphProcessor(actors.Actor):
         self.check_job_status(do_submit=False)
 
     @classmethod
-    def _is_viable_node(cls, node: GraphContextNode, graph: GraphContext):
+    def _is_viable_node(cls, node: _EngineNode, graph: _EngineContext):
 
         return all(dep in graph.succeeded_nodes for dep in node.dependencies)
 
     @classmethod
-    def _upstream_failure(cls, node: GraphContextNode, graph: GraphContext):
+    def _upstream_failure(cls, node: _EngineNode, graph: _EngineContext):
 
         return any(not dep_type.tolerant and dep in graph.failed_nodes
                    for dep, dep_type in node.dependencies.items())
 
-    @actors.Message
+    @_actors.Message
     def node_succeeded(self, node_id: NodeId, result):
 
         old_node = self.graph.nodes[node_id]
-        node = copy(old_node)
+        node = cp.copy(old_node)
+        node.complete = True
         node.result = result
+        results = {node_id: node}
 
-        self._node_complete(node_id, node, succeeded=True)
+        # For bundle nodes, add the individual bundle items to the result update
 
-    @actors.Message
+        if node.node.bundle_result:
+            for item_name, item_result in result.items():
+
+                item_id = NodeId(item_name, node.node.bundle_namespace)
+
+                item_old_node = self.graph.nodes[item_id]
+                item_node = cp.copy(item_old_node)
+                item_node.complete = True
+                item_node.result = item_result
+
+                # Use the original node ID, to avoid overwriting the result type
+                results[item_node.node.id] = item_node
+
+        self._update_results(results)
+
+    @_actors.Message
     def node_failed(self, node_id: NodeId, error):
 
         old_node = self.graph.nodes[node_id]
-        node = copy(old_node)
+        node = cp.copy(old_node)
+        node.complete = True
         node.error = error
 
-        self._node_complete(node_id, node, succeeded=False)
+        self._update_results({node_id: node})
 
-    def _node_complete(self, node_id: NodeId, node: GraphContextNode, succeeded: bool):
+    def _update_results(self, updates: tp.Dict[NodeId, _EngineNode]):
 
-        nodes = {**self.graph.nodes, node_id: node}
+        nodes = {**self.graph.nodes, **updates}
 
-        new_graph = copy(self.graph)
-        new_graph.nodes = nodes
+        pending_nodes = cp.copy(self.graph.pending_nodes)
+        active_nodes = cp.copy(self.graph.active_nodes)
+        succeeded_nodes = cp.copy(self.graph.succeeded_nodes)
+        failed_nodes = cp.copy(self.graph.failed_nodes)
 
-        active_nodes = copy(self.graph.active_nodes)
-        active_nodes.remove(node_id)
-        new_graph.active_nodes = active_nodes
+        for node_id, node in updates.items():
 
-        if succeeded:
-            succeeded_nodes = copy(self.graph.succeeded_nodes)
-            succeeded_nodes.add(node_id)
-            new_graph.succeeded_nodes = succeeded_nodes
+            if node_id in active_nodes:
+                active_nodes.remove(node_id)
+            elif node_id in pending_nodes:
+                pending_nodes.remove(node_id)  # TODO: check pending node ID is part of main node id bundle
+            else:
+                raise _ex.ETracInternal()
 
-        else:
-            failed_nodes = copy(self.graph.failed_nodes)
-            failed_nodes.add(node_id)
-            new_graph.failed_nodes = failed_nodes
+            if node.error:
+                failed_nodes.add(node_id)
+            else:
+                succeeded_nodes.add(node_id)
 
-        self.graph = new_graph
+            if node_id in self.processors:
+                node_ref = self.processors.pop(node_id)
+                self.actors().stop(node_ref)
+
+        graph = _EngineContext(nodes, pending_nodes, active_nodes, succeeded_nodes, failed_nodes)
+
+        self.graph = graph
         self.check_job_status()
 
     def check_job_status(self, do_submit=True):
@@ -275,214 +429,272 @@ class GraphProcessor(actors.Actor):
                 self.actors().send_parent("job_succeeded")
 
 
-class NodeProcessor(actors.Actor):
+class NodeProcessor(_actors.Actor):
 
     """
     Processor responsible for running individual nodes in an execution graph
-    TODO: How to decide when to allocate an actors.Worker (long running, separate thread)
     """
 
-    def __init__(self, graph: GraphContext, node_id: str, node: GraphContextNode):
+    # TODO: How to decide when to allocate an actors.Worker (long running, separate thread)
+
+    __NONE_TYPE = type(None)
+
+    def __init__(self, graph: _EngineContext, node_id: str, node: _EngineNode):
         super().__init__()
         self.graph = graph
         self.node_id = node_id
         self.node = node
-        self._log = util.logger_for_object(self)
 
     def on_start(self):
 
         self.actors().send(self.actors().id, "evaluate_node")
 
-    @actors.Message
+    @_actors.Message
     def graph_event(self):
         pass
 
-    @actors.Message
+    @_actors.Message
     def stream_event(self):
         pass
 
-    @actors.Message
+    @_actors.Message
     def evaluate_node(self):
-
-        node_type = self._display_node_type()
-        is_mapping_node = isinstance(self.node.node, _graph.MappingNode)
 
         try:
 
-            if is_mapping_node:
-                self._log.info(f"MAPPING [{node_type}]: {str(self.node_id)}")
-                self._log_mapping_info(self.node.node)
-            else:
-                self._log.info(f"START [{node_type}]: {str(self.node_id)}")
+            NodeLogger.log_node_start(self.node)
 
-            result = self.node.function(self.graph.nodes)
+            ctx = NodeContextImpl(self.graph.nodes)
+            result = self.node.function(ctx)
+
+            self._check_result_type(result)
             self.actors().send_parent("node_succeeded", self.node_id, result)
 
-            if not is_mapping_node:
-                self._log.info(f"DONE [{node_type}]: {str(self.node_id)}")
+            NodeLogger.log_node_succeeded(self.node)
 
         except Exception as e:
+
             self.actors().send_parent("node_failed", self.node_id, e)
-            self._log.error(f"FAILED [{node_type}]: {str(self.node_id)}")
-            self._log.exception(e)
 
-    def _display_node_type(self):
+            NodeLogger.log_node_failed(self.node, e)
 
-        # Just remove "Node" from "xxxNode"
-        return type(self.node.node).__name__[:-4]
+    @classmethod
+    def result_matches_type(cls, result, expected_type) -> bool:
 
-    def _log_mapping_info(self, node: _graph.Node):
+        if expected_type is None or expected_type == cls.__NONE_TYPE:
+            return result is None
 
-        if isinstance(node, _graph.IdentityNode):
-            self._log.info(f"  * <- {str(node.src_id)}")
+        if expected_type == tp.Any:
+            return True
 
-        elif isinstance(node, _graph.KeyedItemNode):
-            self._log.info(f"  * <- {node.src_item} | {str(node.src_id)}")
+        generic_type = _util.get_origin(expected_type)
 
-        elif isinstance(node, _graph.DataItemNode):
-            self._log.info(f"  * <- part-root | {str(node.data_view_id)}")
+        if generic_type is None:
+            return isinstance(result, expected_type)
 
-        elif isinstance(node, _graph.DataViewNode):
-            self._log.info(f"  part-root <- {str(node.root_item)}")
+        if generic_type == list:
+
+            list_type = _util.get_args(expected_type)[0]
+
+            def list_type_check(item):
+                return cls.result_matches_type(item, list_type)
+
+            return isinstance(result, generic_type) and all(map(list_type_check, result))
+
+        if generic_type == dict:
+
+            dict_type_args = _util.get_args(expected_type)
+            key_type = dict_type_args[0]
+            value_type = dict_type_args[1]
+
+            def dict_type_check(entry):
+                key, value = entry
+                return isinstance(key, key_type) and cls.result_matches_type(value, value_type)
+
+            return isinstance(result, generic_type) and all(map(dict_type_check, result.items()))
+
+        raise _ex.ETracInternal(f"Cannot enforce type check for generic type [{str(generic_type)}]")
+
+    def _check_result_type(self, result):
+
+        # Use an internal error if the result is the wrong type
+        # Node functions should only ever return the expected type
+
+        expected_type = self.node.node.id.result_type or self.__NONE_TYPE
+        result_type = type(result)
+
+        if not self.result_matches_type(result, expected_type):
+            err = f"Node result is the wrong type, expected [{expected_type.__name__}], got [{result_type.__name__}]"
+            raise _ex.ETracInternal(err)
+
+
+class NodeLogger:
+
+    """
+    Log the activity of the NodeProcessor
+    """
+
+    # Separate out the logic for logging nodes, so the NodeProcessor itself stays a bit cleaner
+
+    _log = _util.logger_for_class(NodeProcessor)
+
+    class LoggingType(enum.Enum):
+        DEFAULT = 0
+        STATIC_VALUE = 1
+        PUSH_POP = 2
+        SIMPLE_MAPPING = 3
+        MODEL = 4
+
+    @classmethod
+    def log_node_start(cls, node: _EngineNode):
+
+        logging_type = cls._logging_type(node)
+        node_name = node.node.id.name
+        namespace = node.node.id.namespace
+
+        if logging_type == cls.LoggingType.STATIC_VALUE:
+            cls._log.info(f"SET {cls._value_type(node)} [{node_name}] / {namespace}")
+
+        elif logging_type in [cls.LoggingType.SIMPLE_MAPPING]:
+            cls._log.info(f"MAP {cls._value_type(node)} [{cls._mapping_source(node)}] -> [{node_name}] / {namespace}")
 
         else:
-            self._log.warning("  (mapping info cannot be displayed)")
+            cls._log.info(f"START {cls._func_type(node)} [{node_name}] / {namespace}")
 
+    @classmethod
+    def log_node_succeeded(cls, node: _EngineNode):
 
-class JobProcessor(actors.Actor):
+        logging_type = cls._logging_type(node)
+        node_name = node.node.id.name
+        namespace = node.node.id.namespace
 
-    """
-    JobProcessor oversees the whole lifecycle of a job
-    This includes setup (GraphBuilder), execution (GraphProcessor) and reporting results
-    """
+        if logging_type in [cls.LoggingType.STATIC_VALUE, cls.LoggingType.SIMPLE_MAPPING]:
+            return
 
-    def __init__(
-            self, job_key, job_config: config.JobConfig,
-            result_spec: _graph.JobResultSpec,
-            models: _models.ModelLoader,
-            storage: _storage.StorageManager):
+        if logging_type == cls.LoggingType.PUSH_POP:
+            cls._log_push_pop_node_details(node.node)  # noqa
 
-        super().__init__()
-        self.job_key = job_key
-        self.job_config = job_config
-        self.result_spec = result_spec
-        self._models = models
-        self._storage = storage
-        self._log = util.logger_for_object(self)
+        if logging_type == cls.LoggingType.MODEL:
+            cls._log_model_node_details(node.node)  # noqa
 
-    def on_start(self):
-        self._log.info(f"Starting job [{self.job_key}]")
-        self._models.create_scope(self.job_key)
-        self.actors().spawn(GraphBuilder, self.job_config, self.result_spec, self._models, self._storage)
+        cls._log.info(f"DONE {cls._func_type(node)} [{node_name}] / {namespace}")
 
-    def on_stop(self):
-        self._log.info(f"Cleaning up job [{self.job_key}]")
-        self._models.destroy_scope(self.job_key)
+    @classmethod
+    def log_node_failed(cls, node: _EngineNode, e: Exception):
 
-    @actors.Message
-    def job_graph(self, graph: GraphContext):
-        self.actors().spawn(GraphProcessor, graph)
-        self.actors().stop(self.actors().sender)
+        node_name = node.node.id.name
+        namespace = node.node.id.namespace
 
-    @actors.Message
-    def job_succeeded(self):
-        self._log.info(f"Job succeeded {self.job_key}")
-        self.actors().send_parent("job_succeeded", self.job_key)
+        cls._log.error(f"FAILED {cls._func_type(node)} [{node_name}] / {namespace}")
+        cls._log.exception(e)
 
-    @actors.Message
-    def job_failed(self, error: Exception):
-        self._log.error(f"Job failed {self.job_key}")
-        self.actors().send_parent("job_failed", self.job_key, error)
+    @classmethod
+    def _log_push_pop_node_details(cls, node: tp.Union[_graph.ContextPushNode, _graph.ContextPopNode]):
 
+        push_or_pop = "PUSH" if isinstance(node, _graph.ContextPushNode) else "POP"
+        direction = "->" if isinstance(node, _graph.ContextPushNode) else "<-"
 
-@dataclass
-class EngineContext:
+        for inner_id, outer_id in node.mapping.items():
+            item_type = cls._type_str(inner_id.result_type)
+            msg = f"{push_or_pop} {item_type} [{outer_id.name}] {direction} [{inner_id.name}] / {node.id.namespace}"
+            cls._log.info(msg)
 
-    jobs: tp.Dict
-    data: tp.Dict
+    @classmethod
+    def _log_model_node_details(cls, node: _graph.RunModelNode):
 
+        cls._type_str(_data.DataView)
 
-class TracEngine(actors.Actor):
+        for output in node.model_def.outputs:
+            result_type = cls._type_str(_data.DataView)
+            msg = f"RESULT {result_type} [{output}] / {node.bundle_namespace}"
+            cls._log.info(msg)
 
-    """
-    TracEngine is the main actor that controls all operations in the TRAC runtime
-    Messages may be passed in externally via ActorSystem, e.g. commands to launch jobs
-    """
+    @classmethod
+    def _logging_type(cls, node: _EngineNode) -> LoggingType:
 
-    def __init__(
-            self, sys_config: config.RuntimeConfig,
-            models: _models.ModelLoader,
-            storage: _storage.StorageManager,
-            batch_mode=False):
+        if isinstance(node.node, _graph.StaticValueNode):
+            return cls.LoggingType.STATIC_VALUE
 
-        super().__init__()
+        if isinstance(node.node, _graph.ContextPushNode) or isinstance(node.node, _graph.ContextPopNode):
+            return cls.LoggingType.PUSH_POP
 
-        self.engine_ctx = EngineContext(jobs={}, data={})
+        if isinstance(node.node, _graph.IdentityNode):
+            return cls.LoggingType.SIMPLE_MAPPING
 
-        self._log = util.logger_for_object(self)
-        self._sys_config = sys_config
-        self._models = models
-        self._storage = storage
-        self._batch_mode = batch_mode
+        if isinstance(node.node, _graph.RunModelNode):
+            return cls.LoggingType.MODEL
 
-    def on_start(self):
+        return cls.LoggingType.DEFAULT
 
-        self._log.info("Engine is up and running")
+    @classmethod
+    def _value_type(cls, node: _EngineNode) -> str:
 
-    def on_stop(self):
+        return cls._type_str(node.node.id.result_type)
 
-        self._log.info("Engine shutdown complete")
+    @classmethod
+    def _type_str(cls, result_type: type) -> str:
 
-    @actors.Message
-    def submit_job(
-            self, job_config: config.JobConfig,
-            job_result_dir: str,
-            job_result_format: str):
-
-        job_key = util.object_key(job_config.jobId)
-
-        result_needed = bool(job_result_dir)
-        result_spec = _graph.JobResultSpec(result_needed, job_result_dir, job_result_format)
-
-        self._log.info(f"Job submitted: [{job_key}]")
-
-        job_actor_id = self.actors().spawn(
-            JobProcessor, job_key,
-            job_config, result_spec,
-            self._models, self._storage)
-
-        jobs = {**self.engine_ctx.jobs, job_key: job_actor_id}
-        self.engine_ctx = EngineContext(jobs, self.engine_ctx.data)
-
-    @actors.Message
-    def job_succeeded(self, job_id: str):
-
-        self._log.info(f"Recording job as successful: {job_id}")
-        self._clean_up_job(job_id)
-
-    @actors.Message
-    def job_failed(self, job_id: str, error: Exception):
-
-        self._log.error(f"Recording job as failed: {job_id}")
-        self._clean_up_job(job_id, error)
-
-    def _clean_up_job(self, job_id: str, error: tp.Optional[Exception] = None):
-
-        jobs = copy(self.engine_ctx.jobs)
-        job_actor_id = jobs.pop(job_id)
-
-        if self._batch_mode:
-
-            # If the engine is in batch mode, shut down the whole engine once the first job completes
-            if error:
-                self._log.error("Batch run failed, shutting down the engine")
-                engine_error = RuntimeError("Batch job failed")
-                self.actors().fail(engine_error, cause=error)
-
-            else:
-                self._log.info("Batch run complete, shutting down the engine")
-                self.actors().stop()
-
+        if result_type is not None:
+            return result_type.__name__
         else:
-            # Otherwise, just stop the individual job actor for the job that has completed
-            self.actors().stop(job_actor_id)
+            return str(None)
+
+    @classmethod
+    def _func_type(cls, node: _EngineNode) -> str:
+
+        # Remove "Func" from "xxxFunc"
+
+        func_type = type(node.function)
+        return func_type.__name__[:-4]
+
+    @classmethod
+    def _mapping_source(cls, node: _EngineNode) -> str:
+
+        graph_node = node.node
+
+        if isinstance(graph_node, _graph.IdentityNode):
+            return graph_node.src_id.name
+
+        return "(unknown)"
+
+
+class NodeContextImpl(_func.NodeContext):
+
+    __T = tp.TypeVar("__T")
+
+    def __init__(self, nodes: tp.Dict[NodeId, _EngineNode]):
+        self.__nodes = nodes
+
+    def lookup(self, node_id: NodeId[__T]) -> __T:
+
+        engine_node = self.__nodes.get(node_id)
+
+        # Use internal errors if any of the checks fail on a result lookup
+        # The engine should guarantee that all these conditions are met before a node is executed
+
+        if engine_node is None:
+            raise _ex.ETracInternal(f"Node [{node_id.name}] does not exist in execution context [{node_id.namespace}]")
+
+        if not engine_node.complete:
+            raise _ex.ETracInternal(f"Node [{node_id.name}] still pending in execution context [{node_id.namespace}]")
+
+        if engine_node.error:
+            raise _ex.ETracInternal(f"Node [{node_id.name}] failed in execution context [{node_id.namespace}]")
+
+        if not NodeProcessor.result_matches_type(engine_node.result, node_id.result_type):
+
+            expected_type = node_id.result_type or type(None)
+            result_type = type(engine_node.result)
+
+            err = f"Wrong type for node [{node_id.name}] in execution context [{node_id.namespace}]" \
+                + f" (expected [{expected_type}], got [{result_type}])"
+
+            raise _ex.ETracInternal(err)
+
+        return engine_node.result
+
+    def iter_items(self) -> tp.Iterator[tp.Tuple[NodeId, tp.Any]]:
+
+        for node_id, node in self.__nodes.items():
+            if node.complete and not node.error:
+                yield node_id, node.result

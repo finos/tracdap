@@ -1,4 +1,4 @@
-#  Copyright 2020 Accenture Global Solutions Limited
+#  Copyright 2022 Accenture Global Solutions Limited
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -15,7 +15,39 @@
 import decimal
 import typing as tp
 
+import pandas as pd
+
 import tracdap.rt.api as trac
+
+
+def calculate_profit_by_region(
+        customer_loans: pd.DataFrame,
+        filter_defaults: bool,
+        default_weighting: float,
+        eur_usd_rate: float):
+
+    if filter_defaults:
+        customer_loans = customer_loans[customer_loans["loan_condition_cat"] == 0]
+
+    customer_loans["gross_profit_unweighted"] = \
+        customer_loans["total_pymnt"] - \
+        customer_loans["loan_amount"]
+
+    condition_weighting = customer_loans["loan_condition_cat"] \
+        .apply(lambda c: decimal.Decimal(default_weighting) if c > 0 else decimal.Decimal(1))
+
+    customer_loans["gross_profit_weighted"] = \
+        customer_loans["gross_profit_unweighted"] * condition_weighting
+
+    customer_loans["gross_profit"] = \
+        customer_loans["gross_profit_weighted"] \
+            .apply(lambda x: x * decimal.Decimal.from_float(eur_usd_rate))
+
+    profit_by_region = customer_loans \
+        .groupby("region", as_index=False) \
+        .aggregate({"gross_profit": "sum"})
+
+    return profit_by_region
 
 
 class UsingDataModel(trac.TracModel):
@@ -61,30 +93,13 @@ class UsingDataModel(trac.TracModel):
 
         customer_loans = ctx.get_pandas_table("customer_loans")
 
-        if filter_defaults:
-            customer_loans = customer_loans[customer_loans["loan_condition_cat"] == 0]
-
-        customer_loans.loc[:, "gross_profit_unweighted"] = \
-            customer_loans["total_pymnt"] - \
-            customer_loans["loan_amount"]
-
-        condition_weighting = customer_loans["loan_condition_cat"] \
-            .apply(lambda c: decimal.Decimal(default_weighting) if c > 0 else decimal.Decimal(1))
-
-        customer_loans.loc[:, "gross_profit_weighted"] = \
-            customer_loans["gross_profit_unweighted"] * condition_weighting
-
-        customer_loans.loc[:, "gross_profit"] = \
-            customer_loans["gross_profit_weighted"] \
-            .apply(lambda x: x * decimal.Decimal.from_float(eur_usd_rate))
-
-        profit_by_region = customer_loans \
-            .groupby("region", as_index=False) \
-            .aggregate({"gross_profit": "sum"})
+        profit_by_region = calculate_profit_by_region(
+            customer_loans, filter_defaults,
+            default_weighting, eur_usd_rate)
 
         ctx.put_pandas_table("profit_by_region", profit_by_region)
 
 
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
-    launch.launch_model(UsingDataModel, "using_data.yaml", "../sys_config.yaml")
+    launch.launch_model(UsingDataModel, "config/using_data.yaml", "config/sys_config.yaml")
