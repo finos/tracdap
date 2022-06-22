@@ -36,6 +36,6 @@
     "buildApi": "node api_builder.js",
     "compliance-owasp": "owasp-dependency-check --project \"tracdap-web-api\" --failOnCVSS 4 --data ../../../build/compliance-cache/nvd_web_api --out ../../../build/compliance/web-api-owasp/",
     "compliance-licenses": "license-checker-rseidelsohn --onlyAllow \"MIT; Apache-2.0; BSD; BSD-3-Clause; ISC; BSD-2-Clause; Unlicense\" --excludePackages \"spdx-exceptions;spdx-license-ids\" --json --out ../../../build/compliance/web-api-licenses/license-report.json",
-    "compliance-audit": "npm audit > ../../../build/compliance/web-api-npm-audit/npm-audit.txt"
+    "compliance-audit": "npm audit --omit dev > ../../../build/compliance/web-api-npm-audit/npm-audit.txt"
   }
 }
