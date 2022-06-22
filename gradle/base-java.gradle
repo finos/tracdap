@@ -39,6 +39,14 @@ java {
 
     sourceCompatibility = "$java_min_version"
     targetCompatibility = "$java_min_version"
+
+    // Gradle property to control Javadoc - turned on by default
+    if (!project.hasProperty("includeJavadoc") || project.property("includeJavadoc"))
+        withJavadocJar()
+
+    // Gradle property to control source Jar output - turned off by default
+    if (project.hasProperty("includeSources") && project.property("includeSources"))
+        withSourcesJar()
 }
 
 compileJava {
