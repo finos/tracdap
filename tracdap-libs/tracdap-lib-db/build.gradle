@@ -16,11 +16,12 @@
 
 plugins {
     id "java-library"
-    id "idea"
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
+
+description = "TRAC D.A.P. library for working with SQL databases"
 
 dependencies {
 

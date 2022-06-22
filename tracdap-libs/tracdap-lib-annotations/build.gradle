@@ -19,3 +19,6 @@ plugins {
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
+
+
+description = "Common annotations from the javax namespace"

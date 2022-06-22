@@ -16,11 +16,12 @@
 
 plugins {
     id "java-library"
-    id "idea"
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
+
+description = "TRAC D.A.P. test library, pulls in everything needed to run tests across the TRAC platform services"
 
 dependencies {
 

@@ -16,14 +16,15 @@
 
 plugins {
     id "application"
-    id "idea"
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
-ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Metadata Service")
 
+description = "TRAC D.A.P. metadata service, stateless service component to answer the TRAC metadata API"
+
+ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Metadata Service")
 
 application {
 
