@@ -22,11 +22,11 @@
   ],
   "main": "tracdap.js",
   "dependencies": {
-    "grpc-web": "~1.2.1",
-    "protobufjs": "~6.11.2"
+    "grpc-web": "~1.3.1",
+    "protobufjs": "~6.11.3"
   },
   "devDependencies": {
-    "license-checker-rseidelsohn": "^2.2.0",
+    "license-checker-rseidelsohn": "^3.1.0",
     "owasp-dependency-check": "0.0.18",
     "node-fetch": "^3.2.0"
   },
