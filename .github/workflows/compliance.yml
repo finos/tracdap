@@ -22,10 +22,10 @@ on:
 
 # Use baseline language versions for compliance builds
 env:
-  JAVA_VERSION: 11
-  JAVA_DISTRIBUTION: zulu
-  NODE_VERSION: 14.x
-  PYTHON_VERSION: 3.9
+  JAVA_VERSION: "11"
+  JAVA_DISTRIBUTION: "zulu"
+  NODE_VERSION: "16.x"
+  PYTHON_VERSION: "3.10"
 
 
 jobs:
