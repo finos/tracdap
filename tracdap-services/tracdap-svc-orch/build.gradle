@@ -29,7 +29,7 @@ ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Orchestrator Service")
 application {
     mainClass.set("org.finos.tracdap.svc.orch.TracOrchestratorService")
     tasks.run.workingDir = rootProject.projectDir
-}wou
+}
 
 dependencies {
 
@@ -38,7 +38,7 @@ dependencies {
     implementation project(':tracdap-api-services')
     implementation project(':tracdap-lib-common')
     implementation project(':tracdap-lib-validation')
-    implementation project(':tracdap-lib-exec')
+    implementation project(':tracdap-lib-orch')
 
     // Core framework - gRPC on Netty
     implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"
