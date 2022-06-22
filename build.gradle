@@ -15,20 +15,23 @@
  */
 
 plugins {
+
     id "org.owasp.dependencycheck" version "7.1.0.1"
     id 'com.github.jk1.dependency-license-report' version '2.0'
+
     id 'maven-publish'
     id 'signing'
-    id 'idea'
+    id "io.github.gradle-nexus.publish-plugin" version "1.1.0"
 }
-
-import com.github.jk1.license.filter.*
 
 apply from: 'gradle/versions.gradle'
 apply from: 'gradle/functions.gradle'
 apply from: 'gradle/publish.gradle'
 
+import com.github.jk1.license.filter.*
+
 def versionNumber = ext.getVersionFromGit()
+
 
 allprojects {
 
@@ -43,6 +46,7 @@ subprojects {
     // Publishing setup is defined in gradle/publish.gradle
     project.afterEvaluate(publishModule)
 }
+
 
 dependencyCheck {
 
@@ -69,4 +73,18 @@ licenseReport {
     filters = [
             new LicenseBundleNormalizer(createDefaultTransformationRules: true),
             new LicenseBundleNormalizer(bundlePath: "$projectDir/dev/compliance/license-normalization.json")]
+}
+
+nexusPublishing {
+    repositories {
+        sonatype {
+
+            // org.finos was provisioned before the 2021 switch to the new s01 repo
+            // So, there is no need to specify the repo addresses explicitly
+            // https://central.sonatype.org/publish/publish-gradle/#metadata-definition-and-upload
+
+            username = project.property("sonartypeUsername")
+            password = project.property("sonartypePassword")
+        }
+    }
 }
