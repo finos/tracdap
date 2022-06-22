@@ -60,7 +60,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: java_artifacts
-          path: build/modules
+          path: build/modules/*/libs/*.jar
           retention-days: 7
 
   python_runtime_package:
