@@ -39,6 +39,9 @@ apply from: "${rootProject.projectDir.path}/gradle/plugins.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
 
+description = "Stub library to hang dependencies for SQL drivers"
+
+
 // Set up source sets and dependencies for all supported SQL dialects
 
 sourceSets {
