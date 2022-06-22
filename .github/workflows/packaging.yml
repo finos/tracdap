@@ -166,7 +166,8 @@ jobs:
 
   publish_to_maven_central:
 
-    if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+    # Removed condition for testing
+    # if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
 
     runs-on: ubuntu-latest
 
@@ -192,12 +193,14 @@ jobs:
           mkdir -p ~/.gnupg/
           printf "$GPG_KEY_BASE64" | base64 --decode > ~/.gnupg/keyring.gpg
           ./gradlew \
-            -PmavenRepoUsername=$MAVEN_USERNAME \
-            -PmavenRepoPassword=$MAVEN_PASSWORD \
-            -Psigning.secretKeyRingFile=$HOME/.gnupg/keyring.gpg \
-            -Psigning.keyId=$GPG_KEY_ID \
-            -Psigning.password=$GPG_KEY_PASSPHRASE \
-            publish
+            publishToSonatype closeSonatypeStagingRepository \
+            -PincludeJavadoc=true \
+            -PincludeSources=true \
+            -PsonatypeUsername=$MAVEN_USERNAME \
+            -PsonatypePassword=$MAVEN_PASSWORD
+#            -Psigning.secretKeyRingFile=$HOME/.gnupg/keyring.gpg \
+#            -Psigning.keyId=$GPG_KEY_ID \
+#            -Psigning.password=$GPG_KEY_PASSPHRASE
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
