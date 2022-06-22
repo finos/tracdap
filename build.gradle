@@ -77,14 +77,9 @@ licenseReport {
 
 nexusPublishing {
     repositories {
-        sonatype {
 
-            // org.finos was provisioned before the 2021 switch to the new s01 repo
-            // So, there is no need to specify the repo addresses explicitly
-            // https://central.sonatype.org/publish/publish-gradle/#metadata-definition-and-upload
+        // Publishing via Sonatype OSSRH -> Maven Central
+        sonatype()
 
-            username = project.property("sonartypeUsername")
-            password = project.property("sonartypePassword")
-        }
     }
 }
