@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.deploy.metadb;
+package org.finos.tracdap.tools.deploy.metadb;
 
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.ETracPublic;

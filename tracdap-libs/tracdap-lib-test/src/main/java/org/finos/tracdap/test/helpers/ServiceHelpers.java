@@ -22,7 +22,7 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
-import org.finos.tracdap.deploy.metadb.DeployMetaDB;
+import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 
 import java.lang.reflect.InvocationTargetException;

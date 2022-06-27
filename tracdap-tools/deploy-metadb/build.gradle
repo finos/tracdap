@@ -24,10 +24,13 @@ apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
 description = "Deploy tool for the TRAC D.A.P. metadata store (SQL backend)"
 
+// Put tools into a separate package group
+group = "org.finos.tracdap.tools"
+
 ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Deploy Meta DB")
 
 application {
-    mainClass.set("org.finos.tracdap.deploy.metadb.DeployMetaDB")
+    mainClass.set("org.finos.tracdap.tools.deploy.metadb.DeployMetaDB")
     tasks.run.workingDir = rootProject.projectDir
 }
 
