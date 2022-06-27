@@ -56,13 +56,13 @@ jobs:
           # Turn on Gradle dependency caching
           cache: gradle
 
-      - name: Build JARs
-        run: ./gradlew jar javadocJar sourcesJar -PincludeJavadoc=true -PincludeSources=true
-
       - name: Setup GPG
         run: |
           mkdir -p ~/.gnupg/
           printf "$GPG_KEY_BASE64" | base64 --decode > ~/.gnupg/keyring.gpg
+
+      - name: Build JARs
+        run: ./gradlew jar javadocJar sourcesJar -PincludeJavadoc=true -PincludeSources=true
 
       - name: Build publication artifacts
         run: |
@@ -72,6 +72,10 @@ jobs:
             -Psigning.secretKeyRingFile=$HOME/.gnupg/keyring.gpg \
             -Psigning.keyId=$GPG_KEY_ID \
             -Psigning.password=$GPG_KEY_PASSPHRASE
+        env:
+          GPG_KEY_BASE64: ${{ secrets.GPG_KEY_BASE64 }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_KEY_PASSPHRASE: ${{ secrets.GPG_KEY_PASSPHRASE }}
 
       - name: Save publication artifacts
         uses: actions/upload-artifact@v2
