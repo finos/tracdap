@@ -78,7 +78,9 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: java_artifacts
-          path: ~/.m2/repository/org/finos/tracdap/*/*/**
+          path: |
+            ~/.m2/repository/org/finos/tracdap/**
+            !~/.m2/repository/org/finos/tracdap/*/maven-metadata-local.xml
           retention-days: 7
 
       - name: Publish to Maven Central
