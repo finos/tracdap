@@ -31,37 +31,37 @@ env:
 
 jobs:
 
-  build_java_artifacts:
-
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-
-      # fetch-depth = 0 is needed to get tags for version info
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
-      - name: Set up Java
-        uses: actions/setup-java@v2
-        with:
-          distribution: ${{ env.JAVA_DISTRIBUTION }}
-          java-version: ${{ env.JAVA_VERSION }}
-
-          # Turn on Gradle dependency caching
-          cache: gradle
-
-      - name: Build JARs
-        run: ./gradlew jar javadocJar sourcesJar -PincludeJavadoc=true -PincludeSources=true
-
-      - name: Save artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: java_artifacts
-          path: build/modules/*/libs/*.jar
-          retention-days: 7
+#  build_java_artifacts:
+#
+#    runs-on: ubuntu-latest
+#    timeout-minutes: 20
+#
+#    steps:
+#
+#      # fetch-depth = 0 is needed to get tags for version info
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#        with:
+#          fetch-depth: 0
+#
+#      - name: Set up Java
+#        uses: actions/setup-java@v2
+#        with:
+#          distribution: ${{ env.JAVA_DISTRIBUTION }}
+#          java-version: ${{ env.JAVA_VERSION }}
+#
+#          # Turn on Gradle dependency caching
+#          cache: gradle
+#
+#      - name: Build JARs
+#        run: ./gradlew jar javadocJar sourcesJar -PincludeJavadoc=true -PincludeSources=true
+#
+#      - name: Save artifacts
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: java_artifacts
+#          path: build/modules/*/libs/*.jar
+#          retention-days: 7
 
   python_runtime_package:
 
@@ -224,11 +224,11 @@ jobs:
           # Turn on Gradle dependency caching
           cache: gradle
 
-      - name: Fetch Java artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: java_artifacts
-          path: build/modules
+#      - name: Fetch Java artifacts
+#        uses: actions/download-artifact@v2
+#        with:
+#          name: java_artifacts
+#          path: build/modules
 
       - name: Publish
         run: |
@@ -240,9 +240,9 @@ jobs:
             -PincludeSources=true \
             -PsonatypeUsername=$MAVEN_USERNAME \
             -PsonatypePassword=$MAVEN_PASSWORD
-#            -Psigning.secretKeyRingFile=$HOME/.gnupg/keyring.gpg \
-#            -Psigning.keyId=$GPG_KEY_ID \
-#            -Psigning.password=$GPG_KEY_PASSPHRASE
+            -Psigning.secretKeyRingFile=$HOME/.gnupg/keyring.gpg \
+            -Psigning.keyId=$GPG_KEY_ID \
+            -Psigning.password=$GPG_KEY_PASSPHRASE
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
