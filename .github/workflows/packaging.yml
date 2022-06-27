@@ -65,7 +65,7 @@ jobs:
           printf "$GPG_KEY_BASE64" | base64 --decode > ~/.gnupg/keyring.gpg
 
       - name: Build publication artifacts
-        run:
+        run: |
           ./gradlew publishToMavenLocal \
             -PincludeJavadoc=true \
             -PincludeSources=true \
