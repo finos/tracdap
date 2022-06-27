@@ -56,16 +56,13 @@ jobs:
           # Turn on Gradle dependency caching
           cache: gradle
 
-      - name: Setup GPG
-        run: |
-          mkdir -p ~/.gnupg/
-          printf "$GPG_KEY_BASE64" | base64 --decode > ~/.gnupg/keyring.gpg
-
       - name: Build JARs
         run: ./gradlew jar javadocJar sourcesJar -PincludeJavadoc=true -PincludeSources=true
 
       - name: Build publication artifacts
         run: |
+          mkdir -p ~/.gnupg/
+          printf "$GPG_KEY_BASE64" | base64 --decode > ~/.gnupg/keyring.gpg
           ./gradlew publishToMavenLocal \
             -PincludeJavadoc=true \
             -PincludeSources=true \
@@ -87,6 +84,8 @@ jobs:
       - name: Publish to Maven Central
         if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
         run: |
+          mkdir -p ~/.gnupg/
+          printf "$GPG_KEY_BASE64" | base64 --decode > ~/.gnupg/keyring.gpg
           ./gradlew \
             publishToSonatype closeSonatypeStagingRepository \
             -PincludeJavadoc=true \
