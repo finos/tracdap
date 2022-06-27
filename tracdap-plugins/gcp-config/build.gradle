@@ -23,6 +23,9 @@ apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
 description = "GCP config plugin, load config from GCP cloud storage and secret manager"
 
+// Put plugins into a separate package group
+group = "org.finos.tracdap.plugins"
+
 dependencies {
 
     api project(':tracdap-lib-common')
