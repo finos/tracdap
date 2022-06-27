@@ -84,12 +84,12 @@ jobs:
           retention-days: 7
 
       - name: Publish to Maven Central
-        # if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+        if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
         run: |
           mkdir -p ~/.gnupg/
           printf "$GPG_KEY_BASE64" | base64 --decode > ~/.gnupg/keyring.gpg
           ./gradlew \
-            publishToSonatype closeSonatypeStagingRepository \
+            publishToSonatype closeAndReleaseSonatypeStagingRepository \
             -PincludeJavadoc=true \
             -PincludeSources=true \
             -PsonatypeUsername=$MAVEN_USERNAME \
@@ -189,7 +189,7 @@ jobs:
 
   publish_to_github:
 
-    # if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+    if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
 
     runs-on: ubuntu-latest
 
@@ -231,25 +231,18 @@ jobs:
           name: web_api_package
           path: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/web_api_package
 
-      - name: Save artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: tracdap-dist-packages
-          path: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}
-          retention-days: 7
+      - name: Build dist tarball
+        run: tar -cvzf tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/
 
-#      - name: Build dist tarball
-#        run: tar -cvzf tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/
-#
-#      - name: Publish release assets
-#        uses: actions/upload-release-asset@v1.0.1
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#        with:
-#          upload_url: ${{ github.event.release.upload_url }}
-#          asset_path: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
-#          asset_name: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
-#          asset_content_type: application/gzip
+      - name: Publish release assets
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
+          asset_name: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
+          asset_content_type: application/gzip
 
   publish_to_pypi:
 
