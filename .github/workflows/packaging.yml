@@ -239,7 +239,7 @@ jobs:
             -PincludeJavadoc=true \
             -PincludeSources=true \
             -PsonatypeUsername=$MAVEN_USERNAME \
-            -PsonatypePassword=$MAVEN_PASSWORD
+            -PsonatypePassword=$MAVEN_PASSWORD \
             -Psigning.secretKeyRingFile=$HOME/.gnupg/keyring.gpg \
             -Psigning.keyId=$GPG_KEY_ID \
             -Psigning.password=$GPG_KEY_PASSPHRASE
