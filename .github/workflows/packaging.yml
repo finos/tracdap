@@ -59,7 +59,13 @@ jobs:
       - name: Build JARs
         run: ./gradlew jar javadocJar sourcesJar -PincludeJavadoc=true -PincludeSources=true
 
+      # GitHub Secrets are not available in pull request builds, to prevent forked repos stealing secrets.
+      # Secrets are needed to build the Java artifacts, which use GPG signing
+      # Solution is to disable the artifact build on PRs (it will still run on merge to main)
+      # It is possible to work around this, but doing so would open up the secret-stealing vulnerability
+
       - name: Build publication artifacts
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           mkdir -p ~/.gnupg/
           printf "$GPG_KEY_BASE64" | base64 --decode > ~/.gnupg/keyring.gpg
@@ -75,6 +81,7 @@ jobs:
           GPG_KEY_PASSPHRASE: ${{ secrets.GPG_KEY_PASSPHRASE }}
 
       - name: Save publication artifacts
+        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@v2
         with:
           name: java_artifacts
