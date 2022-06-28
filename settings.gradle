@@ -41,7 +41,6 @@ include 'tracdap-lib-db'
 include 'tracdap-lib-data'
 include 'tracdap-lib-orch'
 include 'tracdap-lib-test'
-include 'sql-drivers'
 
 project(":tracdap-lib-annotations").projectDir = file("tracdap-libs/tracdap-lib-annotations")
 project(":tracdap-lib-common").projectDir = file("tracdap-libs/tracdap-lib-common")
@@ -50,7 +49,6 @@ project(":tracdap-lib-db").projectDir = file("tracdap-libs/tracdap-lib-db")
 project(":tracdap-lib-data").projectDir = file("tracdap-libs/tracdap-lib-data")
 project(":tracdap-lib-orch").projectDir = file("tracdap-libs/tracdap-lib-orch")
 project(":tracdap-lib-test").projectDir = file("tracdap-libs/tracdap-lib-test")
-project(":sql-drivers").projectDir = file("tracdap-libs/sql-drivers")
 
 
 // Java services

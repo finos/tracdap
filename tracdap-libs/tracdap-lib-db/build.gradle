@@ -19,6 +19,8 @@ plugins {
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
+apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
+apply from: "${rootProject.projectDir.path}/gradle/plugins.gradle"
 
 
 description = "TRAC D.A.P. library for working with SQL databases"
@@ -31,5 +33,84 @@ dependencies {
     implementation (group: 'com.zaxxer', name: 'HikariCP', version: "$hikari_cp_version") {
         // Use the provided version of SLF4J, do not pull in the version from Hikari
         exclude group: 'org.slf4j', module: 'slf4j-api'
+    }
+}
+
+
+
+// Set up source sets and dependencies for all supported SQL dialects
+
+sourceSets {
+
+    h2 {}
+    mysql {}
+    mariadb {}
+    postgresql {}
+    sqlserver {}
+    oracle {}
+}
+
+dependencies {
+
+    h2RuntimeOnly group: 'com.h2database', name: 'h2', version: "$h2_version"
+
+    // Do not let MySQL pull in protobuf! We want to use the version from the core TRAC libs
+    mysqlRuntimeOnly (group: 'mysql', name: 'mysql-connector-java', version: "$mysql_version") {
+        exclude group: 'com.google.protobuf', module: 'protobuf-java'
+    }
+
+    mariadbRuntimeOnly group: 'org.mariadb.jdbc', name: 'mariadb-java-client', version: "$mariadb_version"
+    postgresqlRuntimeOnly group: 'org.postgresql', name: 'postgresql', version: "$postgresql_version"
+    sqlserverRuntimeOnly group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: "$sqlserver_version"
+    oracleRuntimeOnly group: 'com.oracle.database.jdbc', name: 'ojdbc10', version: "$oracle_version"
+}
+
+
+// Skeleton tasks for packing plugins
+
+configurations {
+    packPlugins
+}
+
+task packPlugins {
+
+}
+
+def packPlugin(SourceSet dialect) {
+
+    def pluginDir = "${rootProject.buildDir.path}/plugins/sql.${dialect.name}"
+    mkdir(pluginDir)
+
+    copy {
+        from dialect.runtimeClasspath
+        into pluginDir
+    }
+}
+
+
+// Lock for the enabled driver plugins and switch them on
+
+sourceSets.each { dialect ->
+
+    if (dialect.name != "main" && dialect.name != "test") {
+
+        // Only build drivers that are enabled in gradle/plugins.gradle or using the matching env variable
+
+        def key = (String) "sql_${dialect.name}"
+        def buildDriver = isFeatureEnabled(key)
+
+        if (buildDriver) {
+
+            println("Enabling SQL driver: ${dialect.name}")
+
+            // API dependency allows drivers to be used by linking the sql-drivers project
+            dependencies {
+                runtimeOnly dialect.runtimeClasspath
+            }
+
+            // packPlugin task is used to build plugins for deployment or distribution
+            tasks.create("packPlugin_sql.${dialect.name}", { -> packPlugin(dialect) })
+            tasks.packPlugins.dependsOn("packPlugin_sql.${dialect.name}")
+        }
     }
 }
