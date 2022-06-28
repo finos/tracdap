@@ -35,6 +35,14 @@ ext {
      * Please see the NOTICE file for legal information on the use of these drivers
      */
 
+    /**
+     * Note: BUILD_sql_h2 is turned on by default, for easy setup using the H2 SQL driver
+     * However to publish packages, we do not want to include any SQL drivers by default
+     * So this setting is turned off explicitly in the packaging.yml CI workflow
+     * Consumers of the platform must decide which SQL drivers to include as part of the installation
+     * Later we may create quick-start / sandbox images, in which case a default SQL driver could be included
+     */
+
     // SQL drivers can be enabled using these flags, or by setting a corresponding
     // environment variable before calling Gradle
 

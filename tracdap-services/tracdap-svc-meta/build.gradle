@@ -16,14 +16,15 @@
 
 plugins {
     id "application"
-    id "idea"
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
-ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Metadata Service")
 
+description = "TRAC D.A.P. metadata service, stateless service component to answer the TRAC metadata API"
+
+ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Metadata Service")
 
 application {
 
@@ -42,14 +43,15 @@ dependencies {
     implementation project(':tracdap-api-config')
     implementation project(':tracdap-api-services')
     implementation project(':tracdap-lib-common')
-    implementation project(':tracdap-lib-db')
     implementation project(':tracdap-lib-validation')
 
-    // Add runtime dependencies for SQL drivers
+    // The DB library can pull in runtime dependencies for SQL drivers
     // Individual drivers can be enabled/disabled via gradle/plugins.gradle
+    // JARs published to Maven do not have any SQL dependencies
     // There may be licensing implications to enabling certain JDBC drivers
     // See the NOTICE file for more information on licensing restrictions
-    runtimeOnly project(':sql-drivers')
+
+    implementation project(':tracdap-lib-db')
 
     // Core framework - gRPC on Netty
     implementation group: 'io.netty', name: 'netty-common', version: "$netty_version"

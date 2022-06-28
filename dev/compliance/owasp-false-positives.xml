@@ -17,11 +17,6 @@
 
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
 
-    <!-- The sql-drivers module is falsely recognized as www-sql -->
-    <suppress>
-        <cpe>cpe:/a:www-sql_project:www-sql</cpe>
-    </suppress>
-
     <!-- flyway-mysql driver is detected as part of MySQL -->
     <suppress>
         <packageUrl regex="true">^pkg:maven/org\.flywaydb/flyway\-mysql@.*$</packageUrl>

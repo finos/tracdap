@@ -21,6 +21,8 @@ plugins {
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
 
+description = "TRAC D.A.P. orchestration library, interfaces and core functionality for job orchestration"
+
 dependencies {
 
     api project(':tracdap-api-metadata')

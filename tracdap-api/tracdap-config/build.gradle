@@ -17,11 +17,12 @@
 plugins {
     id "com.google.protobuf"
     id "java-library"
-    id "idea"
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
+
+description = "TRAC D.A.P. config library, contains data structures used for config files (and other config sources)"
 
 protobuf {
 
@@ -40,6 +41,14 @@ protobuf {
         }}
 }
 
+sourceSets {
+    main {
+        java {
+            // Include generated code from protoc
+            srcDirs "${project.buildDir}/generated-sources/main/java"
+        }
+    }
+}
 
 dependencies {
 

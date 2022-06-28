@@ -16,11 +16,15 @@
 
 plugins {
     id "java-library"
-    id "idea"
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 
+
+description = "AWS config plugin, load config from S3 buckets and secrets manager"
+
+// Put plugins into a separate package group
+group = "org.finos.tracdap.plugins"
 
 dependencies {
 

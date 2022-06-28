@@ -16,17 +16,21 @@
 
 plugins {
     id "application"
-    id "idea"
 }
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
+
+description = "Deploy tool for the TRAC D.A.P. metadata store (SQL backend)"
+
+// Put tools into a separate package group
+group = "org.finos.tracdap.tools"
+
 ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Deploy Meta DB")
 
-
 application {
-    mainClass.set("org.finos.tracdap.deploy.metadb.DeployMetaDB")
+    mainClass.set("org.finos.tracdap.tools.deploy.metadb.DeployMetaDB")
     tasks.run.workingDir = rootProject.projectDir
 }
 
@@ -34,13 +38,14 @@ dependencies {
 
     implementation project(':tracdap-api-config')
     implementation project(':tracdap-lib-common')
-    implementation project(':tracdap-lib-db')
 
-    // Add runtime dependencies for SQL drivers
+    // The DB library can pull in runtime dependencies for SQL drivers
     // Individual drivers can be enabled/disabled via gradle/plugins.gradle
+    // JARs published to Maven do not have any SQL dependencies
     // There may be licensing implications to enabling certain JDBC drivers
     // See the NOTICE file for more information on licensing restrictions
-    implementation project(':sql-drivers')
+
+    implementation project(':tracdap-lib-db')
 
     implementation group: 'org.flywaydb', name: 'flyway-core', version: "$flyway_version"
 }
@@ -71,10 +76,7 @@ dependencies {
     mariadbRuntimeOnly group: 'org.flywaydb', name: 'flyway-mysql', version: "$flyway_version"
     sqlserverRuntimeOnly group: 'org.flywaydb', name: 'flyway-sqlserver', version: "$flyway_version"
 
-    // Other DBs just require the database driver JAR on the runtime classpath
-    h2RuntimeOnly group: 'com.h2database', name: 'h2', version: "$h2_version"
-    postgresqlRuntimeOnly group: 'org.postgresql', name: 'postgresql', version: "$postgresql_version"
-    oracleRuntimeOnly group: 'com.oracle.database.jdbc', name: 'ojdbc10', version: "$oracle_version"
+    // Other DBs just require the database driver JAR, which will be pulled in by -lib-db
 }
 
 sourceSets.each { dialect ->
