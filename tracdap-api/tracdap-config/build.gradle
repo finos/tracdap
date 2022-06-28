@@ -41,6 +41,15 @@ protobuf {
         }}
 }
 
+sourceSets {
+    main {
+        java {
+            // Include generated code from protoc
+            srcDirs "${project.buildDir}/generated-sources/main/java"
+        }
+    }
+}
+
 dependencies {
 
     api project(":tracdap-api-metadata")

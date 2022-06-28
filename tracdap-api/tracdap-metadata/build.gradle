@@ -41,6 +41,15 @@ protobuf {
         }}
 }
 
+sourceSets {
+    main {
+        java {
+            // Include generated code from protoc
+            srcDirs "${project.buildDir}/generated-sources/main/java"
+        }
+    }
+}
+
 dependencies {
 
     // Core protobuf for Java
