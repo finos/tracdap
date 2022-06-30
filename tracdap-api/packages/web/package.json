@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "license-checker-rseidelsohn": "^3.1.0",
-    "owasp-dependency-check": "0.0.18",
+    "owasp-dependency-check": "0.0.19",
     "node-fetch": "^3.2.0"
   },
   "scripts": {
