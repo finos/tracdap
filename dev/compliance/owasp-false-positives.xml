@@ -17,6 +17,9 @@
 
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
 
+
+    <!-- Java platform false positives -->
+
     <!-- flyway-mysql driver is detected as part of MySQL -->
     <suppress>
         <packageUrl regex="true">^pkg:maven/org\.flywaydb/flyway\-mysql@.*$</packageUrl>
@@ -41,6 +44,17 @@
     <suppress>
         <packageUrl regex="true">^pkg:maven/com\.h2database/h2@.*$</packageUrl>
         <vulnerabilityName>CVE-2018-14335</vulnerabilityName>
+    </suppress>
+
+
+    <!-- Web API false positives -->
+
+    <!-- Vulnerability is fixed in 11.6.3, but still recorded as a vulnerability in Sonatype -->
+    <!-- https://github.com/OSSIndex/vulns/issues/305 -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:npm/protobufjs@6\.11\.3$</packageUrl>
+        <vulnerabilityName>CVE-2022-25878</vulnerabilityName>
     </suppress>
 
 </suppressions>
