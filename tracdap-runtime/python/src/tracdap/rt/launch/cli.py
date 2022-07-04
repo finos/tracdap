@@ -19,8 +19,8 @@ import pathlib
 def cli_args():
 
     parser = argparse.ArgumentParser(
-        prog="python -m trac.rt.launch",
-        description="TRAC Runtime for Python")
+        prog="python -m tracdap.rt.launch",
+        description="TRAC D.A.P. Runtime for Python")
 
     parser.add_argument(
         "--sys-config", dest="sys_config", type=pathlib.Path, required=True,
@@ -41,5 +41,17 @@ def cli_args():
     parser.add_argument(
         "--job-result-format", dest="job_result_format", choices=["json", "yaml", "proto"], default="json",
         help="Output format for the result metadata (only meaningful if --job-result-dir is set)")
+
+    parser.add_argument(
+        "--scratch-dir", dest="scratch_dir", type=pathlib.Path, required=False,
+        help="Scratch directory for working files" +
+             " (if not supplied the system's temp location will be used)"
+    )
+
+    parser.add_argument(
+        "--scratch-dir-debug", dest="scratch_dir_debug", default=False, action="store_true",
+        help="Do not clean up the scratch location on exit" +
+             " (only available in dev mode)"
+    )
 
     return parser.parse_args()

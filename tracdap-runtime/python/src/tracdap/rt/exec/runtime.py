@@ -42,6 +42,8 @@ class TracRuntime:
             job_config: tp.Union[str, pathlib.Path, _cfg.JobConfig, None] = None,
             job_result_dir: tp.Union[str, pathlib.Path, None] = None,
             job_result_format: tp.Optional[str] = None,
+            scratch_dir: tp.Optional[tp.Union, str, pathlib.Path, None] = None,
+            scratch_dir_debug: bool = False,
             dev_mode: bool = False,
             model_class: tp.Optional[_api.TracModel.__class__] = None):
 
@@ -52,7 +54,7 @@ class TracRuntime:
         sys_config_path = "[embedded]" if isinstance(sys_config, _cfg.RuntimeConfig) else sys_config
         job_config_path = "[embedded]" if isinstance(job_config, _cfg.JobConfig) else job_config
 
-        print(f">>> TRAC Python Runtime {trac_version} starting in {mode} mode at {dt.datetime.now()}")
+        print(f">>> TRAC D.A.P. Python Runtime {trac_version} starting in {mode} mode at {dt.datetime.now()}")
         print(f">>> Python installation: {python_version} ({sys.exec_prefix})")
         print(f">>> System config: {sys_config_path}")
 
@@ -64,13 +66,15 @@ class TracRuntime:
 
         util.configure_logging()
         self._log = util.logger_for_object(self)
-        self._log.info(f"TRAC Python Runtime {trac_version}")
+        self._log.info(f"TRAC D.A.P. Python Runtime {trac_version}")
 
         self._sys_config_dir = pathlib.Path(sys_config_path).parent
         self._sys_config_path = sys_config_path
         self._job_config_path = job_config_path
         self._job_result_dir = job_result_dir
         self._job_result_format = job_result_format
+        self._scratch_dir = scratch_dir
+        self._scratch_dir_debug = scratch_dir_debug
         self._batch_mode = bool(job_config is not None)
         self._dev_mode = dev_mode
         self._model_class = model_class
