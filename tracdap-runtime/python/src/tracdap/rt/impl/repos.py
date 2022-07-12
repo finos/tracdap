@@ -15,8 +15,10 @@
 from __future__ import annotations
 
 import abc
+import subprocess
 import typing as tp
 import pathlib
+import platform
 import subprocess as sp
 import time
 
@@ -99,6 +101,21 @@ class GitRepository(IModelRepository):
             ["remote", "add", "origin", self._repo_config.repoUrl],
             ["fetch", "--depth=1", "origin", model_def.version],
             ["reset", "--hard", "FETCH_HEAD"]]
+
+        # Work around Windows issues
+        if "win" in platform.system().lower():
+
+            # Some machines may still be setup without long path support in Windows and/or the Git client
+            # Workaround: Enable the core.longpaths flag for each individual Git command (do not rely on system config)
+            git_cli += ["-c", "core.longpaths=true"]
+
+            # On some systems, directories created by the TRAC runtime process may not be owned by the process owner
+            # This will cause Git to report an unsafe repo directory
+            # Workaround: Explicitly take ownership of the repo directory before starting the checkout
+            try:
+                subprocess.run(f"takeown /f \"{repo_dir}\"")
+            except Exception:  # noqa
+                pass
 
         for git_cmd in git_cmds:
 
