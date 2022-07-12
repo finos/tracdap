@@ -35,8 +35,9 @@ import java.util.stream.Collectors;
 public class LocalBatchExecutor implements IBatchExecutor {
 
     public static final String CONFIG_VENV_PATH = "venvPath";
+    public static final String PROCESS_USERNAME_PROPERTY = "user.name";
 
-    private static final String JOB_DIR_TEMPLATE = "trac-job-%s";
+    private static final String JOB_DIR_TEMPLATE = "tracdap_%s_";
     private static final String JOB_LOG_SUBDIR = "log";
 
     private static final boolean IS_WINDOWS = System.getProperty("os.name").toLowerCase().contains("windows");
@@ -49,6 +50,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
     private final Path tracRuntimeVenv;
     private final Path batchRootDir;
+    private final String batchUser;
 
     private final Map<Long, Process> processMap = new HashMap<>();
 
@@ -74,6 +76,19 @@ public class LocalBatchExecutor implements IBatchExecutor {
         }
 
         this.batchRootDir = null;
+        this.batchUser = lookupBatchUser();
+    }
+
+    private String lookupBatchUser() {
+
+        var processUser = System.getProperty(PROCESS_USERNAME_PROPERTY);
+
+        if (processUser == null || processUser.isBlank()) {
+            log.warn("Local executor batch user could not be determined: Process property [{}] is not set", PROCESS_USERNAME_PROPERTY);
+            return null;
+        }
+
+        return processUser;
     }
 
     private LocalBatchState validState(ExecutorState jobState) {
@@ -94,28 +109,25 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
         try {
 
-            var batchDirPrefix = String.format(JOB_DIR_TEMPLATE, jobKey);
+            var batchDirPrefix = String.format(JOB_DIR_TEMPLATE, jobKey.toLowerCase());
             var batchDir = (batchRootDir != null)
                     ? Files.createTempDirectory(batchRootDir, batchDirPrefix)
                     : Files.createTempDirectory(batchDirPrefix);
 
+            var batchDirOwner = Files.getOwner(batchDir);
+
+            if (batchUser != null && batchDirOwner != null && !batchUser.equals(batchDirOwner.getName())) {
+
+                fixSandboxPermissions(batchDir);
+                batchDirOwner = Files.getOwner(batchDir);
+            }
+
             var batchState = new LocalBatchState(jobKey);
             batchState.setBatchDir(batchDir.toString());
 
-            log.info("Job [{}] sandbox directory created: [{}]", jobKey, batchDir);
+            log.info("Job [{}] sandbox directory created: [{}], owner = [{}]", jobKey, batchDir, batchDirOwner);
 
             return batchState;
-        }
-        catch (AccessDeniedException e) {
-
-            // Permissions errors reported as executor access error
-
-            var errorMessage = String.format(
-                    "Job [%s] failed to create sandbox directory: %s",
-                    jobKey, e.getMessage());
-
-            log.error(errorMessage, e);
-            throw new EExecutorAccess(errorMessage, e);
         }
         catch (IOException e) {
 
@@ -125,6 +137,27 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
             log.error(errorMessage, e);
             throw new EExecutorFailure(errorMessage, e);
+        }
+    }
+
+    private void fixSandboxPermissions(Path batchDir) {
+
+        try {
+
+            log.info("Sandbox directory [{}] has the wrong owner, attempting to fix...", batchDir.getFileName());
+
+            var fs = FileSystems.getDefault();
+            var userLookup = fs.getUserPrincipalLookupService();
+            var batchUserPrincipal = userLookup.lookupPrincipalByName(batchUser);
+
+            Files.setOwner(batchDir, batchUserPrincipal);
+
+            log.info("Sandbox directory [{}] permissions have been repaired", batchDir.getFileName());
+        }
+        catch (IOException | UnsupportedOperationException e) {
+
+            log.warn("Sandbox directory [{}] permissions could not be repaired: {}",
+                    batchDir.getFileName(), e.getMessage(), e);
         }
     }
 
@@ -237,12 +270,9 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
             return batchState;
         }
-        catch (FileAlreadyExistsException e) {
-
-            // TODO
-            throw new RuntimeException("TODO", e);
-        }
         catch (IOException e) {
+
+            // Includes FileAlreadyExistsException
 
             // TODO
             throw new RuntimeException("TODO", e);
@@ -274,12 +304,9 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
             return Files.readAllBytes(filePath);
         }
-        catch (NoSuchFileException e) {
-
-            // TODO
-            throw new RuntimeException("TODO", e);
-        }
         catch (IOException e) {
+
+            // Includes NoSuchFileException
 
             // TODO
             throw new RuntimeException("TODO", e);
@@ -326,7 +353,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
             batchState.setPid(process.pid());
             processMap.put(process.pid(), process);
 
-            logBatchStart(jobState.getJobKey(), process, batchDir);
+            logBatchStart(jobState.getJobKey(), pb, process);
 
             // If used, this should go on the main service executor
 //            process.onExit().whenComplete((proc, err) ->
@@ -362,6 +389,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
                 return batchDir
                         .resolve(volume)
                         .resolve(arg.getPathArg())
+                        .normalize()
                         .toString();
 
             default:
@@ -370,15 +398,13 @@ public class LocalBatchExecutor implements IBatchExecutor {
         }
     }
 
-    private void logBatchStart(String jobKey, Process batchProcess, Path batchDir) {
-
-        var procInfo = batchProcess.info();
+    private void logBatchStart(String jobKey, ProcessBuilder processBuilder, Process process) {
 
         log.info("Starting batch process [{}]", jobKey);
-        log.info("Command: {}", procInfo.commandLine().orElse("unknown"));
-        log.info("Working dir: {}", batchDir);
-        log.info("User: [{}]", procInfo.user().orElse("unknown"));
-        log.info("PID: [{}]", batchProcess.pid());
+        log.info("Command: [{}]", String.join(" ", processBuilder.command()));
+        log.info("Working dir: [{}]", processBuilder.directory());
+        log.info("User: [{}]", process.info().user().orElse("unknown"));
+        log.info("PID: [{}]", process.pid());
     }
 
     private void logBatchComplete(String jobKey, Process batchProcess, LocalBatchState batchState) {
