@@ -30,10 +30,60 @@ import tracdap.rt.impl.util as _util
 class IModelRepository:
 
     @abc.abstractmethod
-    def checkout_model(
+    def checkout_key(self, model_def: _meta.ModelDefinition) -> str:
+
+        """
+        A unique key identifying the checkout required for the given model definition.
+
+        For example, in Git repositories the checkout key might be a commit hash or tag.
+        For binary packages in Nexus, the checkout key might involve both package and version.
+        Other repositories might need to use the path as well.
+
+        This key is used to avoid duplicate checkouts. So for example, if several models exist in
+        the same version of a package, returning the same key will mean the checkout is only performed once.
+
+        :param model_def: Model to request a checkout key for
+        :return: Checkout key for the given model
+        """
+
+        pass
+
+    @abc.abstractmethod
+    def package_path(
             self, model_def: _meta.ModelDefinition,
-            checkout_dir: tp.Union[str, pathlib.Path]) \
-            -> tp.Union[pathlib.Path, str, None]:
+            checkout_dir: pathlib.Path) \
+            -> tp.Optional[pathlib.Path]:
+
+        """
+        Get the root directory for package loading, assuming the model is checked out in the supplied directory.
+        The package directory will contain the Python package for the model described by the model definition,
+        it can be used as a package root (Python source root) by the TRAC model loading mechanism.
+
+        For example, in Git repositories this will be the path from the model definition, relative to the checkout dir.
+
+        :param model_def: Model for which the package path is requested
+        :param checkout_dir: Directory where the model is checked out (checkout must have happened previously)
+        :return: A package root directory, containing the Python package of the requested model
+        """
+
+        pass
+
+    @abc.abstractmethod
+    def do_checkout(
+            self, model_def: _meta.ModelDefinition,
+            checkout_dir: pathlib.Path) \
+            -> tp.Optional[pathlib.Path]:
+
+        """
+        Perform a checkout for the given model definition, into the supplied checkout dir.
+
+        The checkout dir must be empty before this method is called.
+        The return value is the package path for the model, as per :py:meth:`package_path()`.
+
+        :param model_def: The model to check out
+        :param checkout_dir: Empty directory into which the checkout will be performed
+        :return: The package path for the model, as per :py:meth:`package_path()`.
+        """
 
         pass
 
@@ -43,14 +93,23 @@ class IntegratedSource(IModelRepository):
     def __init__(self, repo_config: _cfg.RepositoryConfig):
         self._repo_config = repo_config
 
-    def checkout_model(
+    def checkout_key(self, model_def: _meta.ModelDefinition):
+        return "trac_integrated"
+
+    def package_path(
+            self, model_def: _meta.ModelDefinition,
+            checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
+
+        return None
+
+    def do_checkout(
             self, model_def: _meta.ModelDefinition,
             checkout_dir: tp.Union[str, pathlib.Path]) \
             -> None:
 
         # For the integrated repo there is nothing to check out
 
-        return None
+        return self.package_path(model_def, checkout_dir)
 
 
 class LocalRepository(IModelRepository):
@@ -58,17 +117,23 @@ class LocalRepository(IModelRepository):
     def __init__(self, repo_config: _cfg.RepositoryConfig):
         self._repo_config = repo_config
 
-    def checkout_model(
-            self, model_def: _meta.ModelDefinition,
-            checkout_dir: tp.Union[str, pathlib.Path]) \
-            -> pathlib.Path:
+    def checkout_key(self, model_def: _meta.ModelDefinition):
+        return "trac_local"
 
-        # For local repos, checkout is a no-op since the model is already local
-        # Return the existing full path to the model package as the checkout dir
+    def package_path(
+            self, model_def: _meta.ModelDefinition,
+            checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
 
         checkout_path = pathlib.Path(self._repo_config.repoUrl).joinpath(model_def.path)
 
         return checkout_path
+
+    def do_checkout(self, model_def: _meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
+
+        # For local repos, checkout is a no-op since the model is already local
+        # Just return the existing package path
+
+        return self.package_path(model_def, checkout_dir)
 
 
 class GitRepository(IModelRepository):
@@ -79,22 +144,20 @@ class GitRepository(IModelRepository):
         self._repo_config = repo_config
         self._log = _util.logger_for_object(self)
 
-    def checkout_model(
+    def checkout_key(self, model_def: _meta.ModelDefinition):
+        return model_def.version
+
+    def package_path(
             self, model_def: _meta.ModelDefinition,
-            checkout_dir: tp.Union[str, pathlib.Path]) \
-            -> pathlib.Path:
+            checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
 
-        checkout_dir = checkout_dir.resolve()
-        repo_dir = pathlib.Path(checkout_dir) \
-            .joinpath(model_def.repository) \
-            .joinpath(model_def.version) \
-            .resolve()
+        return checkout_dir.joinpath(model_def.path)
 
-        self._log.info(f"Git checkout {model_def.repository} {model_def.version} -> {repo_dir}")
+    def do_checkout(self, model_def: _meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
 
-        repo_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+        self._log.info(f"Git checkout {model_def.repository} {model_def.version} -> {checkout_dir}")
 
-        git_cli = ["git", "-C", str(repo_dir)]
+        git_cli = ["git", "-C", str(checkout_dir)]
 
         git_cmds = [
             ["init"],
@@ -114,8 +177,8 @@ class GitRepository(IModelRepository):
             # Finding the current owner requires either batch scripting or using the win32_api package
             # Workaround: Explicitly take ownership of the repo directory, always, before starting the checkout
             try:
-                self._log.info(f"Fixing filesystem permissions for [{repo_dir.relative_to(checkout_dir)}]")
-                subprocess.run(f"takeown /f \"{repo_dir}\"")
+                self._log.info(f"Fixing filesystem permissions for [{checkout_dir}]")
+                subprocess.run(f"takeown /f \"{checkout_dir}\"")
             except Exception:  # noqa
                 self._log.info(f"Failed to fix filesystem permissions, this might prevent checkout from succeeding")
 
@@ -124,12 +187,12 @@ class GitRepository(IModelRepository):
             self._log.info(f"git {' '.join(git_cmd)}")
 
             cmd = [*git_cli, *git_cmd]
-            cmd_result = sp.run(cmd, cwd=repo_dir, stdout=sp.PIPE, stderr=sp.PIPE, timeout=self.GIT_TIMEOUT_SECONDS)
+            cmd_result = sp.run(cmd, cwd=checkout_dir, stdout=sp.PIPE, stderr=sp.PIPE, timeout=self.GIT_TIMEOUT_SECONDS)
 
             if cmd_result.returncode != 0:
                 time.sleep(1)
                 self._log.warning(f"git {' '.join(git_cmd)} (retrying)")
-                cmd_result = sp.run(cmd, cwd=repo_dir, stdout=sp.PIPE, stderr=sp.PIPE, timeout=self.GIT_TIMEOUT_SECONDS)
+                cmd_result = sp.run(cmd, cwd=checkout_dir, stdout=sp.PIPE, stderr=sp.PIPE, timeout=self.GIT_TIMEOUT_SECONDS)  # noqa
 
             cmd_out = str(cmd_result.stdout, 'utf-8').splitlines()
             cmd_err = str(cmd_result.stderr, 'utf-8').splitlines()
@@ -151,7 +214,7 @@ class GitRepository(IModelRepository):
 
         self._log.info(f"Git checkout succeeded for {model_def.repository} {model_def.version}")
 
-        return repo_dir.joinpath(model_def.path)
+        return self.package_path(model_def, checkout_dir)
 
 
 class RepositoryManager:
