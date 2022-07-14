@@ -18,7 +18,6 @@ import abc
 import subprocess
 import typing as tp
 import pathlib
-import platform
 import subprocess as sp
 import time
 
@@ -85,10 +84,11 @@ class GitRepository(IModelRepository):
             checkout_dir: tp.Union[str, pathlib.Path]) \
             -> pathlib.Path:
 
+        checkout_dir = checkout_dir.resolve()
         repo_dir = pathlib.Path(checkout_dir) \
-                .joinpath(model_def.repository) \
-                .joinpath(model_def.version) \
-                .resolve()
+            .joinpath(model_def.repository) \
+            .joinpath(model_def.version) \
+            .resolve()
 
         self._log.info(f"Git checkout {model_def.repository} {model_def.version} -> {repo_dir}")
 
@@ -103,7 +103,7 @@ class GitRepository(IModelRepository):
             ["reset", "--hard", "FETCH_HEAD"]]
 
         # Work around Windows issues
-        if "win" in platform.system().lower():
+        if _util.is_windows():
 
             # Some machines may still be setup without long path support in Windows and/or the Git client
             # Workaround: Enable the core.longpaths flag for each individual Git command (do not rely on system config)
@@ -111,11 +111,13 @@ class GitRepository(IModelRepository):
 
             # On some systems, directories created by the TRAC runtime process may not be owned by the process owner
             # This will cause Git to report an unsafe repo directory
-            # Workaround: Explicitly take ownership of the repo directory before starting the checkout
+            # Finding the current owner requires either batch scripting or using the win32_api package
+            # Workaround: Explicitly take ownership of the repo directory, always, before starting the checkout
             try:
+                self._log.info(f"Fixing filesystem permissions for [{repo_dir.relative_to(checkout_dir)}]")
                 subprocess.run(f"takeown /f \"{repo_dir}\"")
             except Exception:  # noqa
-                pass
+                self._log.info(f"Failed to fix filesystem permissions, this might prevent checkout from succeeding")
 
         for git_cmd in git_cmds:
 
