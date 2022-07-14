@@ -40,7 +40,7 @@ class ModelLoader:
         self.__log = _util.logger_for_object(self)
 
         self.__scratch_dir = scratch_dir.joinpath("models")
-        self.__scratch_dir.mkdir(exist_ok=True, parents=False, mode=700)
+        self.__scratch_dir.mkdir(exist_ok=True, parents=False, mode=0o750)
 
         self.__repos = _repos.RepositoryManager(sys_config)
         self.__scopes: tp.Dict[str, ModelLoader._ScopeState] = dict()
@@ -52,7 +52,7 @@ class ModelLoader:
             self.__log.info(f"Creating model scope [{scope}]")
 
             scope_scratch_dir = self.__scratch_dir.joinpath(scope)
-            scope_scratch_dir.mkdir(exist_ok=False, parents=False, mode=700)
+            scope_scratch_dir.mkdir(exist_ok=False, parents=False, mode=0o750)
 
             scope_state = ModelLoader._ScopeState(scope_scratch_dir)
             self.__scopes[scope] = scope_state

@@ -92,7 +92,7 @@ class GitRepository(IModelRepository):
 
         self._log.info(f"Git checkout {model_def.repository} {model_def.version} -> {repo_dir}")
 
-        repo_dir.mkdir(mode=750, parents=True, exist_ok=False)
+        repo_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
         git_cli = ["git", "-C", str(repo_dir)]
 
