@@ -14,9 +14,7 @@
 
 from __future__ import annotations
 
-import types
 import typing as tp
-import tempfile
 import pathlib
 
 import tracdap.rt.api as _api
@@ -33,29 +31,47 @@ import tracdap.rt.impl.shim as _shim
 class ModelLoader:
 
     class _ScopeState:
-        def __init__(self, scratch_dir: tp.Union[pathlib.Path, str]):
+        def __init__(self, scratch_dir: pathlib.Path):
             self.scratch_dir = scratch_dir
             self.cache: tp.Dict[str, _api.TracModel.__class__] = dict()
 
-    def __init__(self, sys_config: _cfg.RuntimeConfig):
-        self.__repos = _repos.RepositoryManager(sys_config)
-        self.__scopes: tp.Dict[str, ModelLoader._ScopeState] = dict()
+    def __init__(self, sys_config: _cfg.RuntimeConfig, scratch_dir: pathlib.Path):
+
         self.__log = _util.logger_for_object(self)
 
-    def create_scope(self, scope: str, model_scratch_dir: tp.Union[str, pathlib.Path, types.NoneType] = None):
+        self.__scratch_dir = scratch_dir.joinpath("models")
+        self.__scratch_dir.mkdir(exist_ok=True, parents=False, mode=700)
 
-        # TODO: Use a per-job location for model checkouts, that can be cleaned up?
+        self.__repos = _repos.RepositoryManager(sys_config)
+        self.__scopes: tp.Dict[str, ModelLoader._ScopeState] = dict()
 
-        if model_scratch_dir is None:
-            model_scratch_dir = tempfile.mkdtemp()
+    def create_scope(self, scope: str):
 
-        self.__scopes[scope] = ModelLoader._ScopeState(model_scratch_dir)
+        try:
+
+            self.__log.info(f"Creating model scope [{scope}]")
+
+            scope_scratch_dir = self.__scratch_dir.joinpath(scope)
+            scope_scratch_dir.mkdir(exist_ok=False, parents=False, mode=700)
+
+            scope_state = ModelLoader._ScopeState(scope_scratch_dir)
+            self.__scopes[scope] = scope_state
+
+        except FileExistsError as e:
+
+            msg = f"Model scope [{scope}] already exists"
+            self.__log.error(msg)
+            self.__log.exception(e)
+            raise _ex.EStartup(msg) from e
 
     def destroy_scope(self, scope: str):
 
-        # TODO: Delete model checkout location
+        self.__log.info(f"Destroying model scope [{scope}]")
 
+        scope_state = self.__scopes[scope]
         del self.__scopes[scope]
+
+        _util.try_clean_dir(scope_state.scratch_dir, remove=True)
 
     def load_model_class(self, scope: str, model_def: _meta.ModelDefinition) -> _api.TracModel.__class__:
 
