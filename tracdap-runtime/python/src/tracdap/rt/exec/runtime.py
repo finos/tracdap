@@ -17,6 +17,7 @@ from __future__ import annotations
 import datetime as dt
 import sys
 import pathlib
+import tempfile
 import typing as tp
 
 import tracdap.rt.api as _api
@@ -42,8 +43,8 @@ class TracRuntime:
             job_config: tp.Union[str, pathlib.Path, _cfg.JobConfig, None] = None,
             job_result_dir: tp.Union[str, pathlib.Path, None] = None,
             job_result_format: tp.Optional[str] = None,
-            scratch_dir: tp.Optional[tp.Union, str, pathlib.Path, None] = None,
-            scratch_dir_debug: bool = False,
+            scratch_dir: tp.Union[str, pathlib.Path, None] = None,
+            scratch_dir_persist: bool = False,
             dev_mode: bool = False,
             model_class: tp.Optional[_api.TracModel.__class__] = None):
 
@@ -64,6 +65,9 @@ class TracRuntime:
         if dev_mode:
             print(f">>> Development mode enabled (DO NOT USE THIS IN PRODUCTION)")
 
+        if isinstance(scratch_dir, str):
+            scratch_dir = pathlib.Path(scratch_dir)
+
         util.configure_logging()
         self._log = util.logger_for_object(self)
         self._log.info(f"TRAC D.A.P. Python Runtime {trac_version}")
@@ -74,7 +78,8 @@ class TracRuntime:
         self._job_result_dir = job_result_dir
         self._job_result_format = job_result_format
         self._scratch_dir = scratch_dir
-        self._scratch_dir_debug = scratch_dir_debug
+        self._scratch_dir_provided = True if scratch_dir is not None else False
+        self._scratch_dir_persist = scratch_dir_persist
         self._batch_mode = bool(job_config is not None)
         self._dev_mode = dev_mode
         self._model_class = model_class
@@ -112,6 +117,10 @@ class TracRuntime:
 
             self._log.info(f"Beginning pre-start sequence...")
 
+            # Scratch dir is needed during pre-start (at least dev mode translation uses the model loader)
+
+            self._prepare_scratch_dir()
+
             # Plugins will be loaded here, before config
 
             _hook.RuntimeHookImpl.register_impl()
@@ -142,7 +151,7 @@ class TracRuntime:
                 job_config, sys_config = _dev_mode.DevModeTranslator.translate_dev_mode_config(
                     self._sys_config, self._job_config,
                     self._sys_config_path, self._job_config_path,
-                    self._model_class)
+                    self._scratch_dir, self._model_class)
 
                 self._job_config = job_config
                 self._sys_config = sys_config
@@ -156,7 +165,7 @@ class TracRuntime:
 
             self._log.info("Starting the engine...")
 
-            self._models = _models.ModelLoader(self._sys_config)
+            self._models = _models.ModelLoader(self._sys_config, self._scratch_dir)
             self._storage = _storage.StorageManager(self._sys_config, self._sys_config_dir)
 
             self._engine = _engine.TracEngine(
@@ -179,6 +188,8 @@ class TracRuntime:
 
         self._system.wait_for_shutdown()
 
+        self._clean_scratch_dir()
+
         if self._system.shutdown_code() == 0:
             self._log.info("TRAC runtime has gone down cleanly")
         else:
@@ -187,6 +198,33 @@ class TracRuntime:
             # For now, use the final error that propagated in the engine as the shutdown error
             # A more sophisticated approach would handle job-related errors by writing job output metadata
             raise self._system.shutdown_error()
+
+    def _prepare_scratch_dir(self):
+
+        if not self._scratch_dir_provided:
+            scratch_dir = tempfile.mkdtemp(prefix="tracdap_scratch_")
+            self._scratch_dir = pathlib.Path(scratch_dir)
+
+        self._log.info(f"Using scratch directory [{self._scratch_dir}]")
+
+        if not self._scratch_dir.exists():
+            raise _ex.EStartup(f"Scratch directory [{self._scratch_dir}] does not exist")
+
+        if not self._scratch_dir.is_dir() or any(self._scratch_dir.iterdir()):
+            raise _ex.EStartup(f"Scratch directory [{self._scratch_dir}] is not an empty directory")
+
+        try:
+            write_test_path = self._scratch_dir.joinpath("trac_write_test.dat")
+            with open(write_test_path, "wb") as write_test:
+                write_test.write(bytes([1, 2, 3]))
+            write_test_path.unlink()
+        except Exception:
+            raise _ex.EStartup(f"Scratch directory [{self._scratch_dir}] is not writable")
+
+    def _clean_scratch_dir(self):
+
+        if not self._scratch_dir_persist:
+            util.try_clean_dir(self._scratch_dir, remove=(not self._scratch_dir_provided))
 
     # ------------------------------------------------------------------------------------------------------------------
     # Job submission
