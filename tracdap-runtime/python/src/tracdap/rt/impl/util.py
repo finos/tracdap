@@ -268,7 +268,9 @@ def try_clean_dir(dir_path: pathlib.Path, remove: bool = False) -> bool:
 
         else:
             try:
-                if __IS_WINDOWS and len(str(item)) >= 260 and not str(item).startswith("\\\\?\\"):
+                # Windows MAX_PATH = 260 characters, including the drive letter and terminating nul character
+                # In Python the path string does not include a nul, so we need to limit to 259 characters
+                if is_windows() and len(str(item)) >= 259 and not str(item).startswith("\\\\?\\"):
                     unc_item = pathlib.Path("\\\\?\\" + str(item))
                     unc_item.unlink()
                     return True
