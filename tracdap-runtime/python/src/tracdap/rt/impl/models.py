@@ -69,10 +69,12 @@ class ModelLoader:
 
         self.__log.info(f"Destroying model scope [{scope}]")
 
-        scope_state = self.__scopes[scope]
         del self.__scopes[scope]
 
-        _util.try_clean_dir(scope_state.scratch_dir, remove=True)
+        # Do not delete scope scratch dir here
+        # The top level scratch dir is cleaned up on exit, depending on the --scratch-dir-persist flag
+        # If the flag is set, all scratch content should be left behind
+        # This can be for debugging, or because the scratch data is written to an ephemeral volume
 
     def load_model_class(self, scope: str, model_def: _meta.ModelDefinition) -> _api.TracModel.__class__:
 
