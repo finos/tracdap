@@ -29,12 +29,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
 
 public class LocalBatchExecutor implements IBatchExecutor {
 
     public static final String CONFIG_VENV_PATH = "venvPath";
+    public static final String CONFIG_BATCH_DIR = "batchDir";
+    public static final String CONFIG_BATCH_PERSIST = "batchPersist";
+
     public static final String PROCESS_USERNAME_PROPERTY = "user.name";
 
     private static final String JOB_DIR_TEMPLATE = "tracdap_%s_";
@@ -50,11 +54,20 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
     private final Path tracRuntimeVenv;
     private final Path batchRootDir;
+    private final boolean batchPersist;
     private final String batchUser;
 
     private final Map<Long, Process> processMap = new HashMap<>();
 
     public LocalBatchExecutor(Properties properties) {
+
+        this.tracRuntimeVenv = prepareVenvPath(properties);
+        this.batchRootDir = prepareBatchRootDir(properties);
+        this.batchPersist = prepareBatchPersist(properties);
+        this.batchUser = lookupBatchUser();
+    }
+
+    private Path prepareVenvPath(Properties properties) {
 
         var venvPath = properties.getProperty(CONFIG_VENV_PATH);
 
@@ -65,7 +78,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
             throw new EStartup(err);
         }
 
-        this.tracRuntimeVenv = Paths.get(venvPath)
+        var tracRuntimeVenv = Paths.get(venvPath)
                 .toAbsolutePath()
                 .normalize();
 
@@ -75,8 +88,37 @@ public class LocalBatchExecutor implements IBatchExecutor {
             throw new EStartup(err);
         }
 
-        this.batchRootDir = null;
-        this.batchUser = lookupBatchUser();
+        return tracRuntimeVenv;
+    }
+
+    private Path prepareBatchRootDir(Properties properties) {
+
+        var batchDir = properties.getProperty(CONFIG_BATCH_DIR);
+
+        if (batchDir == null)
+            return null;
+
+        var batchRootDir = Paths.get(batchDir)
+                .toAbsolutePath()
+                .normalize();
+
+        if (!Files.exists(batchRootDir) || !Files.isDirectory(batchRootDir) || !Files.isWritable(batchRootDir)) {
+            var err = String.format("Local executor batch dir is not a writable directory: [%s]", batchRootDir);
+            log.error(err);
+            throw new EStartup(err);
+        }
+
+        return batchRootDir;
+    }
+
+    private boolean prepareBatchPersist(Properties properties) {
+
+        var batchPersist = properties.getProperty(CONFIG_BATCH_PERSIST);
+
+        if (batchPersist == null)
+            return false;
+
+        return Boolean.parseBoolean(batchPersist);
     }
 
     private String lookupBatchUser() {
@@ -165,6 +207,7 @@ public class LocalBatchExecutor implements IBatchExecutor {
     public void destroyBatch(String jobKey, ExecutorState state) {
 
         var batchState = validState(state);
+        var batchDir = Paths.get(batchState.getBatchDir());
         var process = processMap.get(batchState.getPid());
 
         if (process == null)
@@ -175,7 +218,29 @@ public class LocalBatchExecutor implements IBatchExecutor {
             process.destroyForcibly();
         }
 
-        // TODO: Remove files depending on config
+        if (!batchPersist) {
+
+            log.info("Cleaning up sandbox directory [{}]...", batchDir);
+
+            try (var files = Files.walk(batchDir)) {
+
+                files.sorted(Comparator.reverseOrder()).forEach(f -> {
+                    try { Files.delete(f); }
+                    catch (IOException e) { throw new CompletionException(e); }
+                });
+            }
+            catch (IOException e) {
+                log.warn("Failed to clean up sandbox directory [{}]: {}", batchDir, e.getMessage(), e);
+            }
+            catch (CompletionException e) {
+                var cause = e.getCause();
+                log.warn("Failed to clean up sandbox directory [{}]: {}", batchDir, cause.getMessage(), cause);
+            }
+        }
+        else {
+
+            log.info("Sandbox directory [{}] will be retained", batchDir);
+        }
 
         processMap.remove(batchState.getPid());
     }
@@ -330,6 +395,9 @@ public class LocalBatchExecutor implements IBatchExecutor {
             processArgs.add(pythonExe);
             processArgs.addAll(TRAC_CMD_ARGS);
             processArgs.addAll(decodedArgs);
+
+            if (batchPersist)
+                processArgs.add("--scratch-dir-persist");
 
             var pb = new ProcessBuilder();
             pb.command(processArgs);
