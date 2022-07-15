@@ -14,15 +14,24 @@
 
 from __future__ import annotations
 
-import logging
-import sys
-import uuid
 import datetime as dt
+import logging
+import pathlib
+import platform
+import sys
 import typing as tp
+import uuid
 
 import tracdap.rt.exceptions as ex
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as cfg
+
+
+__IS_WINDOWS = platform.system() == "Windows"
+
+
+def is_windows():
+    return __IS_WINDOWS
 
 
 class ColorFormatter(logging.Formatter):
@@ -245,3 +254,35 @@ def get_args(metaclass: type):
         return metaclass.__args__  # noqa
     else:
         return None
+
+
+def try_clean_dir(dir_path: pathlib.Path, remove: bool = False) -> bool:
+
+    clean_ok = True
+    normalized_path = dir_path.resolve()
+
+    for item in normalized_path.iterdir():
+
+        if item.is_dir():
+            clean_ok &= try_clean_dir(item, remove=True)
+
+        else:
+            try:
+                # Windows MAX_PATH = 260 characters, including the drive letter and terminating nul character
+                # In Python the path string does not include a nul, so we need to limit to 259 characters
+                if is_windows() and len(str(item)) >= 259 and not str(item).startswith("\\\\?\\"):
+                    unc_item = pathlib.Path("\\\\?\\" + str(item))
+                    unc_item.unlink()
+                    return True
+                else:
+                    item.unlink()
+                    return True
+            except Exception as e:  # noqa
+                return False
+
+    if remove:
+        try:
+            normalized_path.rmdir()
+            return clean_ok
+        except Exception:  # noqa
+            return False

@@ -28,6 +28,7 @@ import org.finos.tracdap.test.helpers.PlatformTest;
 import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,11 +45,22 @@ import static org.finos.tracdap.svc.orch.jobs.Helpers.runJob;
 @Tag("integration")
 @Tag("int-e2e")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class RunModelTest {
+public abstract class RunModelTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
     private static final String INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
+
+    protected abstract String useTracRepo();
+
+    public static class LocalRepoTest extends RunFlowTest {
+        protected String useTracRepo() { return "TRAC_LOCAL_REPO"; }
+    }
+
+    @EnabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true", disabledReason = "Only run in CI")
+    public static class GitRepoTest extends RunFlowTest {
+        protected String useTracRepo() { return "TRAC_GIT_REPO"; }
+    }
 
     @RegisterExtension
     private static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG)
@@ -138,7 +150,7 @@ public class RunModelTest {
 
         var importModel = ImportModelJob.newBuilder()
                 .setLanguage("python")
-                .setRepository("UNIT_TEST_REPO")
+                .setRepository(useTracRepo())
                 .setPath("examples/models/python/src")
                 .setEntryPoint("tutorial.using_data.UsingDataModel")
                 .setVersion(modelVersion)

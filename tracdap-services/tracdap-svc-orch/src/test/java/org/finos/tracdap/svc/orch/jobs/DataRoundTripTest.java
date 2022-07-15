@@ -128,7 +128,7 @@ public abstract class DataRoundTripTest {
 
         var importModel = ImportModelJob.newBuilder()
                 .setLanguage("python")
-                .setRepository("UNIT_TEST_REPO")
+                .setRepository("TRAC_LOCAL_REPO")
                 .setPath("tracdap-services/tracdap-svc-orch/src/test/resources")
                 .setEntryPoint("data_round_trip.DataRoundTripModel")
                 .setVersion(modelVersion)

@@ -189,15 +189,15 @@ class ShimLoader:
         sys.meta_path.append(_NamespaceShimFinder(cls.__shim_map))
 
     @classmethod
-    def create_shim(cls, model_import_root: tp.Union[str, pathlib.Path]) -> str:
+    def create_shim(cls, package_root: tp.Union[str, pathlib.Path]) -> str:
 
         shim_id = next(cls.__shim_id_seq)
         shim_namespace = f"{cls.SHIM_NAMESPACE}._{shim_id}"
-        model_import_root = pathlib.Path(model_import_root).resolve()
+        package_root = pathlib.Path(package_root).resolve()
 
-        cls.__shim_map[shim_namespace] = model_import_root
+        cls.__shim_map[shim_namespace] = package_root
 
-        cls._log.info(f"Creating shim [{shim_namespace}] for path [{model_import_root}]")
+        cls._log.info(f"Creating shim [{shim_namespace}] for path [{package_root}]")
 
         _il.import_module(shim_namespace)
 
@@ -235,15 +235,15 @@ class ShimLoader:
 
     @classmethod
     @contextlib.contextmanager
-    def use_checkout(cls, model_checkout: tp.Union[str, pathlib.Path]):
+    def use_package_root(cls, package_root: tp.Union[str, pathlib.Path]):
 
-        if model_checkout:
-            shim = cls.create_shim(model_checkout)
+        if package_root:
+            shim = cls.create_shim(package_root)
             cls.activate_shim(shim)
 
         yield
 
-        if model_checkout:
+        if package_root:
             cls.deactivate_shim()
 
     @classmethod

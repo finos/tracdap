@@ -69,9 +69,14 @@ services:
     port: 8083
 
     repositories:
-      UNIT_TEST_REPO:
+
+      TRAC_LOCAL_REPO:
         repoType: local
-        repoUrl: ${TRAC_REPO_DIR}
+        repoUrl: ${TRAC_LOCAL_REPO}
+
+      TRAC_GIT_REPO:
+        repoType: git
+        repoUrl: ${TRAC_GIT_REPO}
 
     executor:
       executorType: LOCAL

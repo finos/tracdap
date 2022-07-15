@@ -31,10 +31,10 @@ import tracdap.rt.impl.util as _util
 
 
 DEV_MODE_JOB_CONFIG = [
-    re.compile(r"job\.run(Model|Flow)\.parameters\.[\w]+"),
-    re.compile(r"job\.run(Model|Flow)\.inputs\.[\w]+"),
-    re.compile(r"job\.run(Model|Flow)\.outputs\.[\w]+"),
-    re.compile(r"job\.run(Model|Flow)\.models\.[\w]+"),
+    re.compile(r"job\.run(Model|Flow)\.parameters\.\w+"),
+    re.compile(r"job\.run(Model|Flow)\.inputs\.\w+"),
+    re.compile(r"job\.run(Model|Flow)\.outputs\.\w+"),
+    re.compile(r"job\.run(Model|Flow)\.models\.\w+"),
     re.compile(r"job\.run(Model|Flow)\.flow+")]
 
 DEV_MODE_SYS_CONFIG = []
@@ -51,12 +51,16 @@ class DevModeTranslator:
             job_config: _cfg.JobConfig,
             sys_config_path: pathlib.Path,
             job_config_path: pathlib.Path,
+            scratch_dir: pathlib.Path,
             model_class: tp.Optional[_api.TracModel.__class__]) \
             -> (_cfg.JobConfig, _cfg.RuntimeConfig):
 
         cls._log.info(f"Applying dev mode config translation")
 
         sys_config = cls._add_integrated_repo(sys_config)
+
+        model_loader = _models.ModelLoader(sys_config, scratch_dir)
+        model_loader.create_scope("DEV_MODE_TRANSLATION")
 
         if not job_config.jobId:
             job_config = cls._process_job_id(job_config)
@@ -66,7 +70,7 @@ class DevModeTranslator:
 
         if model_class is not None:
 
-            model_id, model_obj = cls._generate_model_for_class(sys_config, model_class)
+            model_id, model_obj = cls._generate_model_for_class(model_loader, model_class)
             job_config = cls._add_job_resource(job_config, model_id, model_obj)
             job_config.job.runModel.model = _util.selector_for(model_id)
 
@@ -74,7 +78,7 @@ class DevModeTranslator:
 
             original_models = job_config.job.runFlow.models.copy()
             for model_key, model_detail in original_models.items():
-                model_id, model_obj = cls._generate_model_for_entry_point(sys_config, model_detail)
+                model_id, model_obj = cls._generate_model_for_entry_point(model_loader, model_detail)
                 job_config = cls._add_job_resource(job_config, model_id, model_obj)
                 job_config.job.runFlow.models[model_key] = _util.selector_for(model_id)
 
@@ -82,18 +86,20 @@ class DevModeTranslator:
             job_config = cls._add_job_resource(job_config, flow_id, flow_obj)
             job_config.job.runFlow.flow = _util.selector_for(flow_id)
 
+        model_loader.destroy_scope("DEV_MODE_TRANSLATION")
+
         if job_config.job.jobType in [_meta.JobType.RUN_MODEL, _meta.JobType.RUN_FLOW]:
             job_config = cls._process_parameters(job_config)
 
         if job_config.job.jobType not in [_meta.JobType.RUN_MODEL, _meta.JobType.RUN_FLOW]:
             return job_config, sys_config
 
-        runInfo = job_config.job.runModel \
+        run_info = job_config.job.runModel \
             if job_config.job.jobType == _meta.JobType.RUN_MODEL \
             else job_config.job.runFlow
 
-        original_inputs = runInfo.inputs
-        original_outputs = runInfo.outputs
+        original_inputs = run_info.inputs
+        original_outputs = run_info.outputs
         original_resources = job_config.resources
 
         translated_inputs = copy.copy(original_inputs)
@@ -139,8 +145,8 @@ class DevModeTranslator:
 
         job_config = copy.copy(job_config)
         job_config.resources = translated_resources
-        runInfo.inputs = translated_inputs
-        runInfo.outputs = translated_outputs
+        run_info.inputs = translated_inputs
+        run_info.outputs = translated_outputs
 
         return job_config, sys_config
 
@@ -204,16 +210,16 @@ class DevModeTranslator:
 
     @classmethod
     def _generate_model_for_class(
-            cls, sys_config: _cfg.RuntimeConfig, model_class: _api.TracModel.__class__) \
+            cls, model_loader: _models.ModelLoader, model_class: _api.TracModel.__class__) \
             -> (_meta.TagHeader, _meta.ObjectDefinition):
 
         model_entry_point = f"{model_class.__module__}.{model_class.__name__}"
 
-        return cls._generate_model_for_entry_point(sys_config, model_entry_point)
+        return cls._generate_model_for_entry_point(model_loader, model_entry_point)
 
     @classmethod
     def _generate_model_for_entry_point(
-            cls, sys_config: _cfg.RuntimeConfig, model_entry_point: str) \
+            cls, model_loader: _models.ModelLoader, model_entry_point: str) \
             -> (_meta.TagHeader, _meta.ObjectDefinition):
 
         model_id = _util.new_object_id(_meta.ObjectType.MODEL)
@@ -230,14 +236,8 @@ class DevModeTranslator:
             inputs={},
             outputs={})
 
-        loader = _models.ModelLoader(sys_config)
-
-        try:
-            loader.create_scope("DEV_MODE_TRANSLATION")
-            model_class = loader.load_model_class("DEV_MODE_TRANSLATION", skeleton_modeL_def)
-            model_scan = loader.scan_model(model_class)
-        finally:
-            loader.destroy_scope("DEV_MODE_TRANSLATION")
+        model_class = model_loader.load_model_class("DEV_MODE_TRANSLATION", skeleton_modeL_def)
+        model_scan = model_loader.scan_model(model_class)
 
         model_def = _meta.ModelDefinition(  # noqa
             language="python",

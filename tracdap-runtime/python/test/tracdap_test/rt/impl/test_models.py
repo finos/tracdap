@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import tempfile
 import typing as tp
 import unittest
 import pathlib
@@ -75,6 +76,12 @@ class ImportModelTest(unittest.TestCase):
         self.repo_url = repo_url_proc.stdout.decode('utf-8').strip()
         self.commit_hash = commit_hash_proc.stdout.decode('utf-8').strip()
 
+        self.scratch_dir = pathlib.Path(tempfile.mkdtemp())
+
+    def tearDown(self) -> None:
+
+        util.try_clean_dir(self.scratch_dir, remove=True)
+
     def test_load_integrated_ok(self):
 
         sys_config = config.RuntimeConfig()
@@ -86,7 +93,7 @@ class ImportModelTest(unittest.TestCase):
             entryPoint="tracdap_test.rt.impl.test_models.SampleModel"
         )
 
-        loader = models.ModelLoader(sys_config)
+        loader = models.ModelLoader(sys_config, self.scratch_dir)
         loader.create_scope(self.test_scope)
 
         model_class = loader.load_model_class(self.test_scope, stub_model_def)
@@ -117,7 +124,7 @@ class ImportModelTest(unittest.TestCase):
             entryPoint="tutorial.hello_world.HelloWorldModel"
         )
 
-        loader = models.ModelLoader(sys_config)
+        loader = models.ModelLoader(sys_config, self.scratch_dir)
         loader.create_scope(self.test_scope)
 
         model_class = loader.load_model_class(self.test_scope, stub_model_def)
@@ -146,7 +153,7 @@ class ImportModelTest(unittest.TestCase):
             version=self.commit_hash
         )
 
-        loader = models.ModelLoader(sys_config)
+        loader = models.ModelLoader(sys_config, self.scratch_dir)
         loader.create_scope(self.test_scope)
 
         model_class = loader.load_model_class(self.test_scope, stub_model_def)
@@ -164,7 +171,7 @@ class ImportModelTest(unittest.TestCase):
             return meta.TypeDescriptor(basic_type)
 
         sys_config = config.RuntimeConfig()
-        loader = models.ModelLoader(sys_config)
+        loader = models.ModelLoader(sys_config, self.scratch_dir)
 
         model_class = SampleModel
         model_def = loader.scan_model(model_class)
