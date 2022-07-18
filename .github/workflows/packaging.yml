@@ -104,7 +104,7 @@ jobs:
           mkdir -p ~/.gnupg/
           printf "$GPG_KEY_BASE64" | base64 --decode > ~/.gnupg/keyring.gpg
           ./gradlew \
-            publishToSonatype closeSonatypeStagingRepository \
+            publishToSonatype closeAndReleaseSonatypeStagingRepository \
             -PincludeJavadoc=true \
             -PincludeSources=true \
             -PsonatypeUsername=$MAVEN_USERNAME \
