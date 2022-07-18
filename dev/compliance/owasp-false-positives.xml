@@ -66,6 +66,14 @@
         <vulnerabilityName>CVE-2022-33915</vulnerabilityName>
     </suppress>
 
+    <!-- https://github.com/github/securitylab/issues/669#issuecomment-1186015526 -->
+    <!-- Hopefully this will be fixed in the vulnerability database soon and this entry can be removed! -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.google\.android/annotations@.*$</packageUrl>
+        <cpe>cpe:/a:projects_project:projects</cpe>
+    </suppress>
+
 
     <!-- Web API false positives -->
 
