@@ -25,23 +25,38 @@ import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
 
 import java.net.URI;
-import java.util.regex.Pattern;
 
 
 public class Http1Proxy extends ChannelDuplexHandler {
 
     private final GwRoute routeConfig;
-    private final Pattern matchPath;
+
+    private final String sourcePrefix;
+    private final String targetPrefix;
 
     public Http1Proxy(GwRoute routeConfig) {
+
         this.routeConfig = routeConfig;
-        this.matchPath = Pattern.compile("^" + routeConfig.getMatch().getPath());
+
+        // For now, route translation is a simple string replace
+        // No wild-card matching, regex etc.
+
+        this.sourcePrefix = routeConfig.getMatch().getPath();
+        var rawTargetPrefix = routeConfig.getTarget().getPath();
+
+        // We need to handle source/target paths that have different trailing slashes
+        // We don't want to introduce a double slash, or missing slash, in the translated path
+
+        if (sourcePrefix.endsWith("/") && !rawTargetPrefix.endsWith("/"))
+            this.targetPrefix = rawTargetPrefix + "/";
+        else if (rawTargetPrefix.endsWith("/") && !sourcePrefix.endsWith("/"))
+            this.targetPrefix = rawTargetPrefix.substring(0, rawTargetPrefix.length() - 1);
+        else
+            this.targetPrefix = rawTargetPrefix;
     }
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
-
-        //log.info("intercept client write call for msg type {}", msg.getClass().getName());
 
         if (msg instanceof HttpRequest) {
 
@@ -60,8 +75,6 @@ public class Http1Proxy extends ChannelDuplexHandler {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-
-        //log.info("intercept client read call for msg type {}", msg.getClass().getName());
 
         if (msg instanceof HttpResponse) {
 
@@ -84,16 +97,12 @@ public class Http1Proxy extends ChannelDuplexHandler {
 
         var sourceUri = URI.create(sourceRequest.uri());
         var sourcePath = sourceUri.getPath();
-        // var sourceMatch = matchPath.matcher(sourcePath);
 
         // Match should already be checked before a request is sent to this handler
-        if (!sourcePath.startsWith(routeConfig.getMatch().getPath()))
+        if (!sourcePath.startsWith(this.sourcePrefix))
             throw new EUnexpected();
 
-        //var targetPath = sourceMatch.replaceFirst(routeConfig.getTarget().getPath());
-        var targetPath = sourcePath.replaceFirst(
-                routeConfig.getMatch().getPath(),
-                routeConfig.getTarget().getPath());
+        var targetPath = sourcePath.replaceFirst(this.sourcePrefix, this.targetPrefix);
 
         var targetHeaders = new DefaultHttpHeaders();
         targetHeaders.add(sourceRequest.headers());

@@ -34,7 +34,7 @@ routes:
 
     match:
       host: localhost
-      path: /static/docs/
+      path: /static/docs
 
     target:
       scheme: http
@@ -47,7 +47,7 @@ routes:
 
     match:
       host: localhost
-      path: /static/server_timeout/
+      path: /static/server_timeout
 
     target:
       scheme: http
@@ -60,7 +60,7 @@ routes:
 
     match:
       host: localhost
-      path: /static/server_down/
+      path: /static/server_down
 
     target:
       scheme: http
