@@ -48,13 +48,6 @@
 
     <!-- This vulnerability is in AWS hotpatch, not the base log4j libraries -->
     <!-- We are not using AWS hotpatch -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/org\.apache\.logging\.log4j/log4j\-api@.*$</packageUrl>
-        <vulnerabilityName>CVE-2022-33915</vulnerabilityName>
-    </suppress>
-
-    <!-- This vulnerability is in AWS hotpatch, not the base log4j libraries -->
-    <!-- We are not using AWS hotpatch -->
 
     <suppress>
         <packageUrl regex="true">^pkg:maven/org\.apache\.logging\.log4j/log4j\-api@.*$</packageUrl>
@@ -64,25 +57,6 @@
     <suppress>
         <packageUrl regex="true">^pkg:maven/org\.apache\.logging\.log4j/log4j\-core@.*$</packageUrl>
         <vulnerabilityName>CVE-2022-33915</vulnerabilityName>
-    </suppress>
-
-    <!-- https://github.com/github/securitylab/issues/669#issuecomment-1186015526 -->
-    <!-- Hopefully this will be fixed in the vulnerability database soon and this entry can be removed! -->
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/com\.google\.android/annotations@.*$</packageUrl>
-        <cpe>cpe:/a:projects_project:projects</cpe>
-    </suppress>
-
-
-    <!-- Web API false positives -->
-
-    <!-- Vulnerability is fixed in 11.6.3, but still recorded as a vulnerability in Sonatype -->
-    <!-- https://github.com/OSSIndex/vulns/issues/305 -->
-
-    <suppress>
-        <packageUrl regex="true">^pkg:npm/protobufjs@6\.11\.3$</packageUrl>
-        <vulnerabilityName>CVE-2022-25878</vulnerabilityName>
     </suppress>
 
 </suppressions>
