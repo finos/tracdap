@@ -34,7 +34,8 @@ const pbjsArgs = [
     "--target", "static-module",
     "--wrap", "./wrapper.js",
     "--root", "tracdap",
-    "--force-number",
+    "--force-number",               // Use native JavaScript numbers for numeric types
+    "--null-defaults",              // Set optional fields to null if they are not present
     "--path", './build',
     "--out", jsOutFile
 ];
