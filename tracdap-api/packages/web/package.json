@@ -31,6 +31,9 @@
     "owasp-dependency-check": "0.0.19",
     "node-fetch": "^3.2.0"
   },
+  "overrides": {
+    "taffydb": "2.7.3"
+  },
   "scripts": {
     "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
     "tracVersion:posix": "npm version `../../../dev/version.sh`",
