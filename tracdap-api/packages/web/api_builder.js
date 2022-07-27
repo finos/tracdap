@@ -16,8 +16,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const pbjs = require('protobufjs/cli/pbjs');
-const pbts = require('protobufjs/cli/pbts');
+const pbjs = require('protobufjs-cli/pbjs');
+const pbts = require('protobufjs-cli/pbts');
 
 
 const packages = {
