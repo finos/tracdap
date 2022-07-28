@@ -23,19 +23,24 @@
   "main": "tracdap.js",
   "dependencies": {
     "grpc-web": "~1.3.1",
-    "protobufjs": "~6.11.3"
+    "protobufjs": "~7.0.0"
   },
   "devDependencies": {
+    "protobufjs-cli": "~1.0.0",
     "license-checker-rseidelsohn": "^3.1.0",
     "owasp-dependency-check": "0.0.19",
     "node-fetch": "^3.2.0"
+  },
+  "overrides": {
+    "taffydb": "2.7.3"
   },
   "scripts": {
     "tracVersion:windows": "for /f %v in ('powershell -ExecutionPolicy Bypass -File ..\\..\\..\\dev\\version.ps1') do npm version \"%v\"",
     "tracVersion:posix": "npm version `../../../dev/version.sh`",
     "buildApi": "node api_builder.js",
     "compliance-owasp": "owasp-dependency-check --project \"tracdap-web-api\" --suppression ../../../dev/compliance/owasp-false-positives.xml --failOnCVSS 4 --data ../../../build/compliance-cache/nvd_web_api --out ../../../build/compliance/web-api-owasp/",
-    "compliance-licenses": "license-checker-rseidelsohn --onlyAllow \"MIT; Apache-2.0; BSD; BSD-3-Clause; ISC; BSD-2-Clause; Unlicense; WTFPL\" --excludePackages \"spdx-exceptions;spdx-license-ids\" --json --out ../../../build/compliance/web-api-licenses/license-report.json",
-    "compliance-audit": "npm audit > ../../../build/compliance/web-api-npm-audit/npm-audit.txt"
+    "compliance-licenses": "license-checker-rseidelsohn --onlyAllow \"MIT; Apache-2.0; BSD; BSD-3-Clause; ISC; BSD-2-Clause; Unlicense; WTFPL; Python-2.0\" --excludePackages \"spdx-exceptions;spdx-license-ids\" --json --out ../../../build/compliance/web-api-licenses/license-report.json",
+    "compliance-audit": "npm audit > ../../../build/compliance/web-api-npm-audit/npm-audit.txt",
+    "pbtsTask": "pbts -o tracdap.d.ts tracdap.js"
   }
 }

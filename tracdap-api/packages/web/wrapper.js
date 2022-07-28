@@ -43,24 +43,19 @@
 
     $OUTPUT;
 
+    $root.tracdap.api.TracMetadataApi._serviceName = "tracdap.api.TracMetadataApi";
+    $root.tracdap.api.TracDataApi._serviceName = "tracdap.api.TracDataApi";
+    $root.tracdap.api.TracOrchestratorApi._serviceName = "tracdap.api.TracOrchestratorApi";
+
     // RPC impl and setup functions should move to a separate source file
 
     const WebRpcImpl = (function() {
 
         const METHOD_TYPE_MAP = $METHOD_TYPE_MAPPING;
 
-        function WebRpcImpl(service, namespace, protocol, host, port) {
+        function WebRpcImpl(serviceName, protocol, host, port) {
 
-            const tracdap = $root.tracdap;
-
-            // If the namespace is not specified, the service must be part of trac.api
-            if (!namespace && !(service.name in tracdap.api))
-                throw new Error('Service ' + service.name + ' is not part of tracdap.api, you must specify a namespace');
-
-            // If a namespace is supplied, always use it even if the service exists in trac.api
-            this.serviceName = namespace
-                ? namespace + '.' + service.name
-                : 'tracdap.api.' + service.name;
+            this.serviceName = serviceName
 
             this.hostAddress = protocol
                 ? protocol + "://" + host + ":" + port
@@ -152,7 +147,10 @@
          */
         setup.rpcImplForBrowser = function(serviceClass) {
 
-            const rpcImpl = new WebRpcImpl(serviceClass, '');
+            if (!serviceClass.hasOwnProperty("_serviceName"))
+                throw new Error("Service class must specify gRPC service in _serviceName (this is a bug)")
+
+            const rpcImpl = new WebRpcImpl(serviceClass._serviceName, null, null, null);
             return rpcImpl.rpcImpl.bind(rpcImpl);
         }
 
@@ -168,7 +166,10 @@
          */
         setup.rpcImplForTarget = function(serviceClass, protocol, host, port) {
 
-            const rpcImpl = new WebRpcImpl(serviceClass, '', protocol, host, port);
+            if (!serviceClass.hasOwnProperty("_serviceName"))
+                throw new Error("Service class must specify gRPC service in _serviceName (this is a bug)")
+
+            const rpcImpl = new WebRpcImpl(serviceClass._serviceName, protocol, host, port);
             return rpcImpl.rpcImpl.bind(rpcImpl);
         }
 
