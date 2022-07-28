@@ -24,8 +24,6 @@ from tracdap.rt.metadata import *  # DOCGEN_REMOVE
 
 if _tp.TYPE_CHECKING:
     import pandas
-    import pyspark
-    import pyspark.sql
 
 
 class TracContext:
@@ -132,20 +130,6 @@ class TracContext:
         pass
 
     @_abc.abstractmethod
-    def get_spark_table(self, dataset_name: str) -> pyspark.sql.DataFrame:
-
-        """Spark support is not available in the current version of the runtime"""
-
-        pass
-
-    @_abc.abstractmethod
-    def get_spark_table_rdd(self, dataset_name: str) -> pyspark.RDD:
-
-        """Spark support is not available in the current version of the runtime"""
-
-        pass
-
-    @_abc.abstractmethod
     def put_pandas_table(self, dataset_name: str, dataset: pandas.DataFrame):
 
         """
@@ -169,34 +153,6 @@ class TracContext:
         :raises: :py:class:`ERuntimeValidation<trac.rt.exceptions.ERuntimeValidation>`,
                  :py:class:`EDataValidation<trac.rt.exceptions.EDataValidation>`
         """
-
-        pass
-
-    @_abc.abstractmethod
-    def put_spark_table(self, dataset_name: str, dataset: pyspark.sql.DataFrame):
-
-        """Spark support is not available in the current version of the runtime"""
-
-        pass
-
-    @_abc.abstractmethod
-    def put_spark_table_rdd(self, dataset_name: str, dataset: pyspark.RDD):
-
-        """Spark support is not available in the current version of the runtime"""
-
-        pass
-
-    @_abc.abstractmethod
-    def get_spark_context(self) -> pyspark.SparkContext:
-
-        """Spark support is not available in the current version of the runtime"""
-
-        pass
-
-    @_abc.abstractmethod
-    def get_spark_sql_context(self) -> pyspark.sql.SQLContext:
-
-        """Spark support is not available in the current version of the runtime"""
 
         pass
 
