@@ -78,12 +78,12 @@ import "google/api/annotations.proto";
  * tenant code, for REST requests the tenant code is the first element of every
  * path.
  *
- * @see trac.metadata.ObjectDefinition
- * @see trac.metadata.Tag
- * @see trac.metadata.TagHeader
- * @see trac.metadata.TagSelector
- * @see trac.metadata.TagUpdate
- * @see trac.metadata.SearchParameters
+ * @see tracdap.metadata.ObjectDefinition
+ * @see tracdap.metadata.Tag
+ * @see tracdap.metadata.TagHeader
+ * @see tracdap.metadata.TagSelector
+ * @see tracdap.metadata.TagUpdate
+ * @see tracdap.metadata.SearchParameters
  */
 service TracMetadataApi {
 
@@ -110,8 +110,8 @@ service TracMetadataApi {
      * Error conditions include: Invalid request, unknown tenant, object type does
      * not match the supplied definition, validation failure.
      *
-     * @see trac.metadata.ObjectDefinition
-     * @see trac.metadata.TagUpdate
+     * @see tracdap.metadata.ObjectDefinition
+     * @see tracdap.metadata.TagUpdate
      */
     rpc createObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
@@ -147,9 +147,9 @@ service TracMetadataApi {
      * ID or version, wrong object type (not the same as the prior version), object
      * version is superseded.
      *
-     * @see trac.metadata.ObjectDefinition
-     * @see trac.metadata.TagSelector
-     * @see trac.metadata.TagUpdate
+     * @see tracdap.metadata.ObjectDefinition
+     * @see tracdap.metadata.TagSelector
+     * @see tracdap.metadata.TagUpdate
      */
     rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
@@ -176,8 +176,8 @@ service TracMetadataApi {
      * ID, object version or tag version, wrong object type (does not match what
      * is stored in TRAC), tag version is superseded.
      *
-     * @see trac.metadata.TagSelector
-     * @see trac.metadata.TagUpdate
+     * @see tracdap.metadata.TagSelector
+     * @see tracdap.metadata.TagUpdate
      */
     rpc updateTag (MetadataWriteRequest) returns (metadata.TagHeader) {
         option (google.api.http) = {
@@ -205,7 +205,7 @@ service TracMetadataApi {
      * tenant, unknown object ID, object type does not match ID, unknown object
      * version, unknown tag version.
      *
-     * @see trac.metadata.TagSelector
+     * @see tracdap.metadata.TagSelector
      */
     rpc readObject(MetadataReadRequest) returns (metadata.Tag) {
         option (google.api.http) = {
@@ -235,7 +235,7 @@ service TracMetadataApi {
      * object version, unknown tag version. If there is an error for any of the
      * selectors the whole request will fail.
      *
-     * @see trac.metadata.TagSelector
+     * @see tracdap.metadata.TagSelector
      */
     rpc readBatch(MetadataBatchRequest) returns (MetadataBatchResponse) {
         option (google.api.http) = {
@@ -255,7 +255,7 @@ service TracMetadataApi {
      * REST calls the tenant is passed in the URL and searchParameters are supplied
      * as the request body.
      *
-     * @see trac.metadata.SearchParameters
+     * @see tracdap.metadata.SearchParameters
      */
     rpc search(MetadataSearchRequest) returns (MetadataSearchResponse) {
         option (google.api.http) = {
