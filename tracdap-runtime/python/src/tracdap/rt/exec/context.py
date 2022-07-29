@@ -12,20 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import logging
 import typing as tp
 import re
 import traceback
 
 import pandas as pd
-import pyspark as pys
-import pyspark.sql as pyss
 
 import tracdap.rt.api as _api
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.impl.api_hook as _api_hook
 import tracdap.rt.impl.type_system as _types
 import tracdap.rt.impl.data as _data
 import tracdap.rt.impl.util as _util
@@ -51,9 +48,9 @@ class TracContextImpl(_api.TracContext):
 
     :param model_def: Definition object for the model that will run in this context
     :param model_class: Type for the model that will run in this context
-    :param parameters: Dictionary of all parameters that will be available to the model (as Python-native types)
-    :param data: Dictionary of all datasets (inputs and outputs) that will be available to the model
-        (output views will contain schemas but no data)
+    :param local_ctx: Dictionary of all parameters, inputs and outputs that will be available to the model
+            Parameters are supplied as python native types.
+            Output views will contain schemas but no data.
     """
 
     def __init__(self,
@@ -77,6 +74,8 @@ class TracContextImpl(_api.TracContext):
 
     def get_parameter(self, parameter_name: str) -> tp.Any:
 
+        _api_hook.ApiGuard.validate_signature(self.get_parameter, parameter_name)
+
         self.__val.check_param_not_null(parameter_name)
         self.__val.check_param_valid_identifier(parameter_name)
         self.__val.check_param_exists(parameter_name)
@@ -86,6 +85,8 @@ class TracContextImpl(_api.TracContext):
         return _types.MetadataCodec.decode_value(value)
 
     def get_schema(self, dataset_name: str) -> _meta.SchemaDefinition:
+
+        _api_hook.ApiGuard.validate_signature(self.get_schema, dataset_name)
 
         self.__val.check_dataset_name_not_null(dataset_name)
         self.__val.check_dataset_valid_identifier(dataset_name)
@@ -98,6 +99,8 @@ class TracContextImpl(_api.TracContext):
         return data_view.trac_schema
 
     def get_pandas_table(self, dataset_name: str) -> pd.DataFrame:
+
+        _api_hook.ApiGuard.validate_signature(self.get_pandas_table, dataset_name)
 
         part_key = _data.DataPartKey.for_root()
 
@@ -112,13 +115,9 @@ class TracContextImpl(_api.TracContext):
 
         return _data.DataMapping.view_to_pandas(data_view, part_key)
 
-    def get_spark_table(self, dataset_name: str) -> pyss.DataFrame:
-        raise NotImplementedError()
-
-    def get_spark_table_rdd(self, dataset_name: str) -> pys.RDD:
-        raise NotImplementedError()
-
     def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
+
+        _api_hook.ApiGuard.validate_signature(self.put_pandas_table, dataset_name, dataset)
 
         part_key = _data.DataPartKey.for_root()
 
@@ -138,19 +137,10 @@ class TracContextImpl(_api.TracContext):
 
         self.__data[dataset_name] = data_view
 
-    def put_spark_table(self, dataset_name: str, dataset: pyss.DataFrame):
-        raise NotImplementedError()
-
-    def put_spark_table_rdd(self, dataset_name: str, dataset: pys.RDD):
-        raise NotImplementedError()
-
-    def get_spark_context(self) -> pys.SparkContext:
-        raise NotImplementedError()
-
-    def get_spark_sql_context(self) -> pyss.SQLContext:
-        raise NotImplementedError()
-
     def log(self) -> logging.Logger:
+
+        _api_hook.ApiGuard.validate_signature(self.log)
+
         return self.__model_log
 
 
