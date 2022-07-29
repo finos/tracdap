@@ -33,20 +33,30 @@ class ApiGuard:
     # To work around this, detect the correct metaclass by inspecting a generic type variable
     __generic_metaclass = type(_tp.List[object])
 
+    # Cache method signatures to avoid inspection on every call
+    # Inspecting a function signature can take ~ half a second in Python 3.7
+    __method_cache: _tp.Dict[str, inspect.Signature] = dict()
+
     _log: logging.Logger
 
     @classmethod
-    def validate_signature(cls, method_name: str, method: inspect.Signature, *args, **kwargs):
+    def validate_signature(cls, method: _tp.Callable, *args, **kwargs):
+
+        if method.__name__ in cls.__method_cache:
+            signature = cls.__method_cache[method.__name__]
+        else:
+            signature = inspect.signature(method)
+            cls.__method_cache[method.__name__] = signature
 
         positional_index = 0
 
-        for param_name, param in method.parameters.items():
+        for param_name, param in signature.parameters.items():
 
-            values = cls._select_arg(method_name, param, positional_index, *args, **kwargs)
+            values = cls._select_arg(method.__name__, param, positional_index, *args, **kwargs)
             positional_index += len(values)
 
             for value in values:
-                cls._validate_arg(method_name, param, value)
+                cls._validate_arg(method.__name__, param, value)
 
     @classmethod
     def _select_arg(
@@ -180,17 +190,6 @@ ApiGuard._log = _util.logger_for_class(ApiGuard)
 
 class RuntimeHookImpl(_RuntimeHook):
 
-    __define_parameter_signature: inspect.Signature
-    __define_parameters_signature: inspect.Signature
-    __define_field_signature: inspect.Signature
-    __define_schema_signature: inspect.Signature
-    __load_schema_signature: inspect.Signature
-    __define_input_table_signature: inspect.Signature
-    __define_output_table_signature: inspect.Signature
-
-    def __init__(self):
-        self._prepare_signatures()
-
     @classmethod
     def register_impl(cls):
 
@@ -210,9 +209,7 @@ class RuntimeHookImpl(_RuntimeHook):
             label: str, default_value: _tp.Optional[_tp.Any] = None) \
             -> _Named[_meta.ModelParameter]:
 
-        ApiGuard.validate_signature(
-            self.define_parameter.__name__, self.__define_parameter_signature,
-            param_name, param_type, label, default_value)
+        ApiGuard.validate_signature(self.define_parameter, param_name, param_type, label, default_value)
 
         if isinstance(param_type, _meta.TypeDescriptor):
             param_type_descriptor = param_type
@@ -225,9 +222,7 @@ class RuntimeHookImpl(_RuntimeHook):
             self, *params: _tp.Union[_Named[_meta.ModelParameter], _tp.List[_Named[_meta.ModelParameter]]]) \
             -> _tp.Dict[str, _meta.ModelParameter]:
 
-        ApiGuard.validate_signature(
-            self.define_parameters.__name__, self.__define_parameters_signature,
-            *params)
+        ApiGuard.validate_signature(self.define_parameters, *params)
 
         if len(params) == 1 and isinstance(params[0], list):
             return {p.item_name: p.item for p in params[0]}
@@ -241,8 +236,8 @@ class RuntimeHookImpl(_RuntimeHook):
             -> _meta.FieldSchema:
 
         ApiGuard.validate_signature(
-            self.define_field.__name__, self.__define_field_signature,
-            field_name, field_type, label, business_key, categorical, format_code, field_order)
+            self.define_field, field_name, field_type, label,
+            business_key, categorical, format_code, field_order)
 
         return _meta.FieldSchema(
             field_name,
@@ -258,9 +253,7 @@ class RuntimeHookImpl(_RuntimeHook):
             schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
             -> _meta.SchemaDefinition:
 
-        ApiGuard.validate_signature(
-            self.define_schema.__name__, self.__define_schema_signature,
-            *fields, schema_type=schema_type)
+        ApiGuard.validate_signature(self.define_schema, *fields, schema_type=schema_type)
 
         if schema_type == _meta.SchemaType.TABLE:
 
@@ -274,9 +267,7 @@ class RuntimeHookImpl(_RuntimeHook):
             schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
             -> _meta.SchemaDefinition:
 
-        ApiGuard.validate_signature(
-            self.load_schema.__name__, self.__load_schema_signature,
-            package, schema_file, schema_type)
+        ApiGuard.validate_signature(self.load_schema, package, schema_file, schema_type)
 
         return _schemas.SchemaLoader.load_schema(package, schema_file)
 
@@ -284,9 +275,7 @@ class RuntimeHookImpl(_RuntimeHook):
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]]) \
             -> _meta.ModelInputSchema:
 
-        ApiGuard.validate_signature(
-            self.define_input_table.__name__, self.__define_input_table_signature,
-            *fields)
+        ApiGuard.validate_signature(self.define_input_table, *fields)
 
         schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
         return _meta.ModelInputSchema(schema=schema_def)
@@ -295,9 +284,7 @@ class RuntimeHookImpl(_RuntimeHook):
             self, *fields: _tp.Union[_meta.FieldSchema, _tp.List[_meta.FieldSchema]]) \
             -> _meta.ModelOutputSchema:
 
-        ApiGuard.validate_signature(
-            self.define_output_table.__name__, self.__define_output_table_signature,
-            *fields)
+        ApiGuard.validate_signature(self.define_output_table, *fields)
 
         schema_def = self.define_schema(*fields, schema_type=_meta.SchemaType.TABLE)
         return _meta.ModelOutputSchema(schema=schema_def)
@@ -317,13 +304,3 @@ class RuntimeHookImpl(_RuntimeHook):
                 field.fieldOrder = index
 
         return _meta.TableSchema([*fields_])
-
-    def _prepare_signatures(self):
-
-        self.__define_parameter_signature = inspect.signature(self.define_parameter)
-        self.__define_parameters_signature = inspect.signature(self.define_parameters)
-        self.__define_field_signature = inspect.signature(self.define_field)
-        self.__define_schema_signature = inspect.signature(self.define_schema)
-        self.__load_schema_signature = inspect.signature(self.load_schema)
-        self.__define_input_table_signature = inspect.signature(self.define_input_table)
-        self.__define_output_table_signature = inspect.signature(self.define_output_table)
