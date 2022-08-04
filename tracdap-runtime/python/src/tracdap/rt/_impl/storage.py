@@ -12,18 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import abc
 import decimal
-import typing as tp
 import pathlib
-import datetime as dt
-import dataclasses as dc
-import enum
-
 import codecs
 import csv
 
-import pyarrow as pa
 import pyarrow.compute as pac
 import pyarrow.feather as pa_ft
 import pyarrow.parquet as pa_pq
@@ -35,127 +28,8 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.data as _data
 import tracdap.rt._impl.util as _util
 
-
-class FileType(enum.Enum):
-
-    FILE = 1
-    DIRECTORY = 2
-
-
-@dc.dataclass
-class FileStat:
-
-    """
-    Dataclass to represent some basic  file stat info independent of the storage technology used
-    I.e. do not depend on Python stat_result class that refers to locally-mounted filesystems
-    Timestamps are held in UTC
-    """
-
-    file_type: FileType
-    size: int
-
-    ctime: tp.Optional[dt.datetime] = None
-    mtime: tp.Optional[dt.datetime] = None
-    atime: tp.Optional[dt.datetime] = None
-
-    uid: tp.Optional[int] = None
-    gid: tp.Optional[int] = None
-    mode: tp.Optional[int] = None
-
-
-class IFileStorage:
-
-    @abc.abstractmethod
-    def exists(self, storage_path: str) -> bool:
-        pass
-
-    @abc.abstractmethod
-    def size(self, storage_path: str) -> int:
-        pass
-
-    @abc.abstractmethod
-    def stat(self, storage_path: str) -> FileStat:
-        pass
-
-    @abc.abstractmethod
-    def ls(self, storage_path: str) -> tp.List[str]:
-        pass
-
-    @abc.abstractmethod
-    def mkdir(self, storage_path: str, recursive: bool = False, exists_ok: bool = False):
-        pass
-
-    @abc.abstractmethod
-    def rm(self, storage_path: str, recursive: bool = False):
-        pass
-
-    @abc.abstractmethod
-    def read_bytes(self, storage_path: str) -> bytes:
-        pass
-
-    @abc.abstractmethod
-    def read_byte_stream(self, storage_path: str) -> tp.BinaryIO:
-        pass
-
-    @abc.abstractmethod
-    def write_bytes(self, storage_path: str, data: bytes, overwrite: bool = False):
-        pass
-
-    @abc.abstractmethod
-    def write_byte_stream(self, storage_path: str, overwrite: bool = False) -> tp.BinaryIO:
-        pass
-
-    @abc.abstractmethod
-    def read_text(self, storage_path: str, encoding: str = 'utf-8') -> str:
-        pass
-
-    @abc.abstractmethod
-    def read_text_stream(self, storage_path: str, encoding: str = 'utf-8') -> tp.TextIO:
-        pass
-
-    @abc.abstractmethod
-    def write_text(self, storage_path: str, data: str, encoding: str = 'utf-8', overwrite: bool = False):
-        pass
-
-    @abc.abstractmethod
-    def write_text_stream(self, storage_path: str, encoding: str = 'utf-8', overwrite: bool = False) -> tp.TextIO:
-        pass
-
-
-class IDataStorage:
-
-    @abc.abstractmethod
-    def read_table(
-            self,
-            storage_path: str, storage_format: str,
-            schema: tp.Optional[pa.Schema],
-            storage_options: tp.Dict[str, tp.Any] = None) \
-            -> pa.Table:
-        pass
-
-    @abc.abstractmethod
-    def write_table(
-            self,
-            storage_path: str, storage_format: str,
-            table: pa.Table,
-            storage_options: tp.Dict[str, tp.Any] = None,
-            overwrite: bool = False):
-        pass
-
-    @abc.abstractmethod
-    def query_table(self):
-        pass
-
-
-class IDataFormat:
-
-    @abc.abstractmethod
-    def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
-        pass
-
-    @abc.abstractmethod
-    def write_table(self, target: tp.BinaryIO, table: pa.Table):
-        pass
+# Import storage interfaces
+from tracdap.rt.ext.storage import *
 
 
 class FormatManager:
