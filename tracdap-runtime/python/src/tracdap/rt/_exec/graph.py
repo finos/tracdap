@@ -18,7 +18,7 @@ import pathlib
 import typing as tp
 import dataclasses as dc
 
-import tracdap.rt.impl.data as _data
+import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as cfg
 

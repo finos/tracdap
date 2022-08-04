@@ -32,8 +32,8 @@ import pyarrow.csv as pa_csv
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.impl.data as _data
-import tracdap.rt.impl.util as _util
+import tracdap.rt._impl.data as _data
+import tracdap.rt._impl.util as _util
 
 
 class FileType(enum.Enum):
