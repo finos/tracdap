@@ -19,8 +19,8 @@ import subprocess as sp
 
 import tracdap.rt.config as cfg
 import tracdap.rt.metadata as meta
-import tracdap.rt.exec.runtime as runtime
-import tracdap.rt.impl.util as util
+import tracdap.rt._exec.runtime as runtime  # noqa
+import tracdap.rt._impl.util as util  # noqa
 
 
 class ImportModelTest(unittest.TestCase):

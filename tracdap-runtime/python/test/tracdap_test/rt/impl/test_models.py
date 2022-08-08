@@ -21,9 +21,9 @@ import subprocess as sp
 import tracdap.rt.api as api
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
-import tracdap.rt.impl.api_hook as api_hook
-import tracdap.rt.impl.models as models
-import tracdap.rt.impl.util as util
+import tracdap.rt._impl.api_hook as api_hook  # noqa
+import tracdap.rt._impl.models as models  # noqa
+import tracdap.rt._impl.util as util  # noqa
 
 
 class SampleModel(api.TracModel):

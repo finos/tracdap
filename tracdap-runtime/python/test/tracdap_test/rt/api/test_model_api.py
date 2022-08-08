@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 import tracdap.rt.api as trac
-import tracdap.rt.impl.api_hook as api_hook
+import tracdap.rt._impl.api_hook as api_hook  # noqa
 
 import typing as tp
 

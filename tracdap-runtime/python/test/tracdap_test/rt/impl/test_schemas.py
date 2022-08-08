@@ -19,8 +19,8 @@ import unittest
 import tracdap.rt.api as trac
 import tracdap.rt.launch as launch
 import tracdap.rt.exceptions as ex
-import tracdap.rt.impl.api_hook as api_hook
-import tracdap.rt.impl.util as util
+import tracdap.rt._impl.api_hook as api_hook  # noqa
+import tracdap.rt._impl.util as util  # noqa
 
 import tracdap_test.resources as test_resources
 
