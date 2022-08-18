@@ -67,7 +67,7 @@ class TracContext:
 
         :param parameter_name: The name of the parameter to get
         :return: The parameter value, as a native Python data type
-        :raises: :py:class:`ERuntimeValidation<trac.rt.exceptions.ERuntimeValidation>`
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
         pass
@@ -92,8 +92,8 @@ class TracContext:
 
         :param dataset_name: The name of the input or output to get the schema for
         :return: The schema definition for the named dataset
-        :rtype: :py:class:`SchemaDefinition <trac.rt.metadata.SchemaDefinition>`
-        :raises: :py:class:`ERuntimeValidation<trac.rt.exceptions.ERuntimeValidation>`
+        :rtype: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
         pass
@@ -125,7 +125,7 @@ class TracContext:
 
         :param dataset_name: The name of the model input or output to get data for
         :return: A pandas dataframe containing the data for the named dataset
-        :raises: :py:class:`ERuntimeValidation<trac.rt.exceptions.ERuntimeValidation>`
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
         pass
 
@@ -150,8 +150,8 @@ class TracContext:
 
         :param dataset_name: The name of the model output to save data for
         :param dataset: A pandas dataframe containing the data for the named dataset
-        :raises: :py:class:`ERuntimeValidation<trac.rt.exceptions.ERuntimeValidation>`,
-                 :py:class:`EDataValidation<trac.rt.exceptions.EDataValidation>`
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`,
+                 :py:class:`EDataValidation <tracdap.rt.exceptions.EDataValidation>`
         """
 
         pass
@@ -187,7 +187,7 @@ class TracModel:
     :py:meth:`define_inputs()<TracModel.define_inputs>` and
     :py:meth:`define_outputs()<TracModel.define_outputs>`.
     The parameters, inputs and outputs that are defined will be available in the context at runtime.
-    The :py:mod:`trac.rt.api` package includes a number of helper functions to implement these methods in
+    The :py:mod:`tracdap.rt.api` package includes a number of helper functions to implement these methods in
     a clear and robust way.
 
     While model components can largely do what they like, there are three rules that should be followed
@@ -216,7 +216,7 @@ class TracModel:
         model uses must be defined. Models may choose to ignore some parameters,
         it is ok to define parameters that are not always used.
 
-        To declare model parameters in code, always use the declare_* functions in the :py:mod:`trac.rt.api` package.
+        To declare model parameters in code, always use the declare_* functions in the :py:mod:`tracdap.rt.api` package.
         This will ensure parameters are defined in the correct format with all the required fields.
         Parameters that are defined in the wrong format or with required fields missing
         will result in a model validation failure.
@@ -236,7 +236,7 @@ class TracModel:
         model uses must be defined. Models may choose to ignore some inputs,
         it is ok to define inputs that are not always used.
 
-        To declare model inputs in code, always use the declare_* functions in the :py:mod:`trac.rt.api` package.
+        To declare model inputs in code, always use the declare_* functions in the :py:mod:`tracdap.rt.api` package.
         This will ensure inputs are defined in the correct format with all the required fields.
         Model inputs that are defined in the wrong format or with required fields missing
         will result in a model validation failure.
@@ -257,7 +257,7 @@ class TracModel:
         produced. If a model defines an output which is not produced, a runtime
         validation error will be raised after the model completes.
 
-        To declare model outputs in code, always use the declare_* functions in the :py:mod:`trac.rt.api` package.
+        To declare model outputs in code, always use the declare_* functions in the :py:mod:`tracdap.rt.api` package.
         This will ensure outputs are defined in the correct format with all the required fields.
         Model outputs that are defined in the wrong format or with required fields missing
         will result in a model validation failure.
