@@ -19,7 +19,7 @@ import pathlib
 import typing as _tp
 
 import tracdap.rt.api as api
-import tracdap.rt.exec.runtime as runtime
+import tracdap.rt._exec.runtime as runtime  # noqa
 
 from .cli import cli_args
 

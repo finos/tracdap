@@ -29,7 +29,7 @@ import importlib.machinery as _ilm
 import importlib.resources as _ilr
 
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.impl.util as _util
+import tracdap.rt._impl.util as _util
 
 
 class _NamespaceShimFinder(_ila.MetaPathFinder):

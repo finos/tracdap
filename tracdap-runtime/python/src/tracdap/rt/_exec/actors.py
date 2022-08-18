@@ -21,7 +21,7 @@ import enum
 import dataclasses as dc
 import inspect
 
-import tracdap.rt.impl.util as util
+import tracdap.rt._impl.util as util  # noqa
 import tracdap.rt.exceptions as _ex
 
 

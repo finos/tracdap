@@ -19,8 +19,8 @@ import types as _ts
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.impl.schemas as _schemas
-import tracdap.rt.impl.util as _util
+import tracdap.rt._impl.schemas as _schemas
+import tracdap.rt._impl.util as _util
 
 # Import hook interfaces into this module namespace
 from tracdap.rt.api.hook import _RuntimeHook  # noqa

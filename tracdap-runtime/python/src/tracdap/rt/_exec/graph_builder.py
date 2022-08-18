@@ -19,8 +19,8 @@ import dataclasses  # noqa
 
 import tracdap.rt.config as config
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.impl.data as _data
-import tracdap.rt.impl.util as _util
+import tracdap.rt._impl.data as _data  # noqa
+import tracdap.rt._impl.util as _util  # noqa
 
 from .graph import *
 

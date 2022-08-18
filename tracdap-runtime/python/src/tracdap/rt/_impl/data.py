@@ -26,7 +26,7 @@ import pandas as pd
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.impl.util as _util
+import tracdap.rt._impl.util as _util
 
 
 @dc.dataclass(frozen=True)
