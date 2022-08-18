@@ -12,13 +12,13 @@ under *examples/models/python*.
     :name: schema_files.py
     :lines: 15-
 
-.. literalinclude:: ../../../examples/models/python/src/tutorial/schemas/customer_loans.csv
-    :caption: customer_loans.csv
-    :name: customer_loans.csv
+.. csv-table:: customer_loans.csv
+   :file: ../../../examples/models/python/src/tutorial/schemas/customer_loans.csv
+   :header-rows: 1
 
-.. literalinclude:: ../../../examples/models/python/src/tutorial/schemas/profit_by_region.csv
-    :caption: profit_by_region.csv
-    :name: profit_by_region.csv
+.. csv-table:: profit_by_region.csv
+   :file: ../../../examples/models/python/src/tutorial/schemas/profit_by_region.csv
+   :header-rows: 1
 
 The system config and job config files are exactly the same as in the *using_data* example,
 they do not need to change when schemas are defined in schema files.
