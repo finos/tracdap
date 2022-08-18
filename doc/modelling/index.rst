@@ -12,4 +12,4 @@ Modelling
     :maxdepth: 4
 
     tutorial/index
-    Runtime API (Python) </autoapi/tracdap/rt/api/index>
+    Runtime API (Python) </autoapi/tracdap/rt/index>
