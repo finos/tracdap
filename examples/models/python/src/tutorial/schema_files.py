@@ -19,7 +19,7 @@ import tutorial.using_data as using_data
 import tutorial.schemas as schemas
 
 
-class SchemaResourcesModel(trac.TracModel):
+class SchemaFilesModel(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
@@ -64,4 +64,4 @@ class SchemaResourcesModel(trac.TracModel):
 
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
-    launch.launch_model(SchemaResourcesModel, "config/using_data.yaml", "config/sys_config.yaml")
+    launch.launch_model(SchemaFilesModel, "config/using_data.yaml", "config/sys_config.yaml")
