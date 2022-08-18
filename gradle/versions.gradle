@@ -41,7 +41,7 @@ ext {
     h2_version = '2.1.212'
     mysql_version = '8.0.30'
     mariadb_version = '2.7.5'             // Update to MariaDB 3.x driver series is a breaking change
-    postgresql_version = '42.3.3'
+    postgresql_version = '42.4.2'
     sqlserver_version = '9.4.1.jre11'     // Update to SqlServer 10.x driver series is a breaking change
     oracle_version = '19.14.0.0'
 
