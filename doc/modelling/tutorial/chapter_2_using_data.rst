@@ -34,7 +34,7 @@ Define inputs
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
     :name: using_data_py_part_3
-    :lines: 68-79
+    :lines: 68-78
     :linenos:
     :lineno-start: 68
 
