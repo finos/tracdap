@@ -23,7 +23,7 @@ class SchemaFilesModel(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
-        return trac.declare_parameters(
+        return trac.define_parameters(
 
             trac.P("eur_usd_rate", trac.BasicType.FLOAT,
                    label="EUR/USD spot rate for reporting"),
