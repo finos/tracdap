@@ -680,6 +680,8 @@ class TracGenerator:
 
         base_type = self.python_base_type(package, field, make_relative=True, alias=True)
 
+        typing_prefix = "_tp." if not self._options.get("doc_format") else ""
+
         # Repeated fields are either lists or maps - these need special handling
         if field.label == field.Label.LABEL_REPEATED:
 
@@ -694,21 +696,21 @@ class TracGenerator:
 
                 key_type = self.python_base_type(package, nested_type.field[0], make_relative=True, alias=True)
                 value_type = self.python_base_type(package, nested_type.field[1], make_relative=True, alias=True)
-                return f"_tp.Dict[{key_type}, {value_type}]"
+                return f"{typing_prefix}Dict[{key_type}, {value_type}]"
 
             # Otherwise repeated fields are generated as lists
             else:
-                return f"_tp.List[{base_type}]"
+                return f"{typing_prefix}List[{base_type}]"
 
         # Fields explicitly marked optional in the proto are, of course, optional!
         elif field.proto3_optional:
-            return f"_tp.Optional[{base_type}]"
+            return f"{typing_prefix}Optional[{base_type}]"
 
         # Fields in a oneof group are also optional
         # If no oneof group is set, oneof_index will have default value of 0
         # To check if this field is really set, use HasField()
         elif field.HasField('oneof_index'):
-            return f"_tp.Optional[{base_type}]"
+            return f"{typing_prefix}Optional[{base_type}]"
 
         # Everything else should be either a (non-optional) message, an enum or a primitive
         else:
