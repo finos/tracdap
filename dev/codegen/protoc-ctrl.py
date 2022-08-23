@@ -151,35 +151,32 @@ def build_protoc_args(generator, proto_paths, output_location, packages):
             f"--python_out={output_location}"
         ]
 
-    elif generator == "python_runtime":
-
-        options = "--trac_opt=target_package=tracdap.rt"
-
-        if packages_option:
-            options += f";{packages_option}"
-
-        proto_args = [
-            f"--plugin={trac_plugin}",
-            f"--trac_out={output_location}",
-            options
-        ]
-
-    elif generator == "api_doc":
-
-        options = "--trac_opt=flat_pack"
-
-        if packages_option:
-            options += f";{packages_option}"
-
-        proto_args = [
-            f"--plugin={trac_plugin}",
-            f"--trac_out={output_location}",
-            options
-        ]
-
     else:
 
-        raise ValueError(f"Unknown generator [{generator}]")
+        if generator == "python_runtime":
+
+            options = "--trac_opt=target_package=tracdap.rt"
+
+        elif generator == "python_doc":
+
+            options = "--trac_opt=target_package=tracdap.rt;doc_format"
+
+        elif generator == "api_doc":
+
+            options = "--trac_opt=flat_pack;doc_format"
+
+        else:
+
+            raise ValueError(f"Unknown generator [{generator}]")
+
+        if packages_option:
+            options += f";{packages_option}"
+
+        proto_args = [
+            f"--plugin={trac_plugin}",
+            f"--trac_out={output_location}",
+            options
+        ]
 
     return proto_path_args + proto_args
 
@@ -189,7 +186,8 @@ def cli_args():
     parser = argparse.ArgumentParser(description='TRAC code generator')
 
     parser.add_argument(
-        "generator", type=str, metavar="generator", choices=["python_proto", "python_runtime", "api_doc"],
+        "generator", type=str, metavar="generator",
+        choices=["python_proto", "python_runtime", "python_doc", "api_doc"],
         help="The documentation targets to build")
 
     parser.add_argument(
