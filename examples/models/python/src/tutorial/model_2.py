@@ -33,7 +33,7 @@ class SecondModel(trac.TracModel):
 
         preprocessed = trac.define_input_table(
             trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
-            trac.F("some_quantity_x", trac.DECIMAL, label="Some quantity X", format_code="CCY:EUR"))
+            trac.F("some_quantity_x", trac.DECIMAL, label="Some quantity X"))
 
         return {"preprocessed_data": preprocessed}
 
@@ -41,7 +41,7 @@ class SecondModel(trac.TracModel):
 
         profit_by_region = trac.define_output_table(
             trac.F("region", trac.STRING, label="Customer home region", categorical=True),
-            trac.F("gross_profit", trac.DECIMAL, label="Total gross profit", format_code="CCY:USD"))
+            trac.F("gross_profit", trac.DECIMAL, label="Total gross profit"))
 
         return {"profit_by_region": profit_by_region}
 

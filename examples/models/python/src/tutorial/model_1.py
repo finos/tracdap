@@ -30,15 +30,15 @@ class FirstModel(trac.TracModel):
 
         customer_loans = trac.define_input_table(
             trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
-            trac.F("loan_amount", trac.DECIMAL, label="Principal loan amount", format_code="CCY:EUR"),
-            trac.F("total_pymnt", trac.DECIMAL, label="Total amount repaid", format_code="CCY:EUR"),
+            trac.F("loan_amount", trac.DECIMAL, label="Principal loan amount"),
+            trac.F("total_pymnt", trac.DECIMAL, label="Total amount repaid"),
             trac.F("region", trac.STRING, label="Customer home region", categorical=True),
             trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category", categorical=True))
 
         currency_data = trac.define_input_table(
             trac.F("ccy_code", trac.STRING, label="Currency code", categorical=True),
             trac.F("spot_date", trac.DATE, label="Spot date for FX rate"),
-            trac.F("dollar_rate", trac.DECIMAL, label="Dollar FX rate", format_code="CCY:USD"))
+            trac.F("dollar_rate", trac.DECIMAL, label="Dollar FX rate"))
 
         return {"customer_loans": customer_loans, "currency_data": currency_data}
 
@@ -46,7 +46,7 @@ class FirstModel(trac.TracModel):
 
         preprocessed = trac.declare_output_table(
             trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
-            trac.F("some_quantity_x", trac.DECIMAL, label="Some quantity X", format_code="CCY:EUR"))
+            trac.F("some_quantity_x", trac.DECIMAL, label="Some quantity X"))
 
         return {"preprocessed_data": preprocessed}
 
