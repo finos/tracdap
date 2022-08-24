@@ -9,7 +9,6 @@ Modelling
 
 
 .. toctree::
-    :maxdepth: 4
+    :maxdepth: 3
 
     tutorial/index
-    Runtime API (Python) </autoapi/tracdap/rt/index>

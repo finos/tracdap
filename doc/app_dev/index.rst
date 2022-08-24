@@ -14,4 +14,3 @@ App Development
 
     tutorial/index
     ./rest_examples
-    Platform API Listing </autoapi/tracdap/api/index>
