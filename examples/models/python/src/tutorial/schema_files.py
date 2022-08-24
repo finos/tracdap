@@ -56,8 +56,8 @@ class SchemaFilesModel(trac.TracModel):
         customer_loans = ctx.get_pandas_table("customer_loans")
 
         profit_by_region = using_data.calculate_profit_by_region(
-            customer_loans, filter_defaults,
-            default_weighting, eur_usd_rate)
+            customer_loans, eur_usd_rate,
+            default_weighting, filter_defaults)
 
         ctx.put_pandas_table("profit_by_region", profit_by_region)
 

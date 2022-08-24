@@ -21,9 +21,9 @@ import tracdap.rt.api as trac
 
 def calculate_profit_by_region(
         customer_loans: pd.DataFrame,
-        filter_defaults: bool,
+        eur_usd_rate: float,
         default_weighting: float,
-        eur_usd_rate: float):
+        filter_defaults: bool):
 
     """
     Aggregate expected profit by region on a book of customer loans
@@ -93,8 +93,8 @@ class UsingDataModel(trac.TracModel):
         customer_loans = ctx.get_pandas_table("customer_loans")
 
         profit_by_region = calculate_profit_by_region(
-            customer_loans, filter_defaults,
-            default_weighting, eur_usd_rate)
+            customer_loans, eur_usd_rate,
+            default_weighting, filter_defaults)
 
         ctx.put_pandas_table("profit_by_region", profit_by_region)
 
