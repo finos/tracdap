@@ -50,8 +50,8 @@ def define_parameter(
     :param param_type: The parameter type, expressed in the TRAC type system
     :param label: A descriptive label for the parameter (required)
     :param default_value: A default value to use if no explicit value is supplied (optional)
-    :return: A named model parameter, suitable for passing to :py:func:`define_parameters`
 
+    :return: A named model parameter, suitable for passing to :py:func:`define_parameters`
     :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
@@ -71,6 +71,8 @@ def declare_parameter(
 
     .. deprecated:: 0.5
        Use :py:func:`define_parameter` or :py:func:`P` instead.
+
+    :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
     return define_parameter(param_name, param_type, label, default_value)
@@ -83,7 +85,11 @@ def P(  # noqa
         default_value: _tp.Optional[_tp.Any] = None) \
         -> _Named[ModelParameter]:
 
-    """Shorthand alias for :py:func:`define_parameter`"""
+    """
+    Shorthand alias for :py:func:`define_parameter`
+
+    :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
+    """
 
     return declare_parameter(
         param_name, param_type, label,
@@ -102,11 +108,12 @@ def define_parameters(
     (or :py:func:`trac.P <tracdap.rt.api.P>`).
 
     :param params: The parameters that will be defined, either as individual arguments or as a list
-    :return: A set of model parameters, in the correct format to return from :py:meth:TracModel.define_parameters
 
     :type params: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`] |
                   List[_Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]]
 
+    :return: A set of model parameters, in the correct format to return from
+             :py:meth:`TracModel.define_parameters`
     """
 
     rh = _RuntimeHook.runtime()
@@ -122,6 +129,9 @@ def declare_parameters(
 
     .. deprecated:: 0.5
        Use :py:func:`define_parameters` instead.
+
+    :type params: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`] |
+                  List[_Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]]
     """
 
     return define_parameters(*params)
@@ -160,6 +170,7 @@ def define_field(
     :param categorical: Flag indicating whether this is a categorical field (default: False)
     :param format_code: A code that can be interpreted by client applications to format the field (optional)
     :param field_order: Explicit field ordering (optional)
+
     :return: A field schema, suitable for use in a schema definition
     """
 
@@ -204,7 +215,11 @@ def F(  # noqa
         field_order: _tp.Optional[int] = None) \
         -> FieldSchema:
 
-    """Shorthand alias for :py:func:`define_field`"""
+    """
+    Shorthand alias for :py:func:`define_field
+
+    :rtype: FieldSchema
+    """
 
     return define_field(
         field_name, field_type, label,
@@ -232,7 +247,9 @@ def define_schema(
 
     :param fields: The list of fields to include in the schema
     :param schema_type: The type of schema to create (currently only TABLE schemas are supported)
+
     :return: A schema definition built from the supplied fields and schema type
+    :rtype: SchemaDefinition
     """
 
     rh = _RuntimeHook.runtime()
@@ -267,6 +284,7 @@ def load_schema(
     :param package: Package (or package name) in the model repository that contains the schema file
     :param schema_file: Name of the schema file to load, which must be in the specified package
     :param schema_type: The type of schema to create (currently only TABLE schemas are supported)
+
     :return: A schema definition loaded from the schema file
     """
 
