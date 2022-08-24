@@ -222,6 +222,7 @@ class TracModel:
         will result in a model validation failure.
 
         :return: The full set of parameters that will be available to the model at
+        :rtype: Dict[str, :py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
         """
 
         pass
@@ -242,6 +243,7 @@ class TracModel:
         will result in a model validation failure.
 
         :return: The full set of inputs that will be available to the model at runtime
+        :rtype: Dict[str, :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`]
         """
 
         pass
@@ -263,6 +265,7 @@ class TracModel:
         will result in a model validation failure.
 
         :return: The full set of outputs that will be produced by the model at runtime
+        :rtype: Dict[str, :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`]
         """
 
         pass
