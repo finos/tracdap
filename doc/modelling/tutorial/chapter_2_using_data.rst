@@ -171,8 +171,7 @@ location, which is used for both inputs and outputs, so we mark that as the defa
 In the *job_config* file we need to specify what data to use for the model inputs and outputs. Each
 input named in the model must have an entry in the inputs section, and each output in the outputs
 section. In this example we are using CSV files and just specify a simple path for each input
-and output. Output files will be created when the model runs, if you run the model multiple times
-outputs will be suffixed with a number.
+and output.
 
 Input and output paths are always relative to the data storage location, it is not possible to use
 absolute paths for model inputs and outputs in a job config. This is part of how the TRAC framework
@@ -186,4 +185,10 @@ The model parameters are also set in the job config, in the same way as the prev
     :lines: 2-
 
 These simple config files are enough to run a model locally using sample data in CSV files.
-TRAC will validate the configuration against the model during startup, and report errors if they do not match.
+Output files will be created when the model runs, if you run the model multiple times outputs
+will be suffixed with a number.
+
+
+.. seealso::
+    The full source code for this example is
+    `available on GitHub <https://github.com/finos/tracdap/tree/main/examples/models/python/src/tutorial/using_data.py>`_
