@@ -25,13 +25,13 @@ class SchemaFilesModel(trac.TracModel):
 
         return trac.define_parameters(
 
-            trac.P("eur_usd_rate", trac.BasicType.FLOAT,
+            trac.P("eur_usd_rate", trac.FLOAT,
                    label="EUR/USD spot rate for reporting"),
 
-            trac.P("default_weighting", trac.BasicType.FLOAT,
+            trac.P("default_weighting", trac.FLOAT,
                    label="Weighting factor applied to the profit/loss of a defaulted loan"),
 
-            trac.P("filter_defaults", trac.BasicType.BOOLEAN,
+            trac.P("filter_defaults", trac.BOOLEAN,
                    label="Exclude defaulted loans from the calculation",
                    default_value=False))
 
