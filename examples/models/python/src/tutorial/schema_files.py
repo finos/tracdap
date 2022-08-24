@@ -19,19 +19,19 @@ import tutorial.using_data as using_data
 import tutorial.schemas as schemas
 
 
-class SchemaResourcesModel(trac.TracModel):
+class SchemaFilesModel(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
-        return trac.declare_parameters(
+        return trac.define_parameters(
 
-            trac.P("eur_usd_rate", trac.BasicType.FLOAT,
+            trac.P("eur_usd_rate", trac.FLOAT,
                    label="EUR/USD spot rate for reporting"),
 
-            trac.P("default_weighting", trac.BasicType.FLOAT,
+            trac.P("default_weighting", trac.FLOAT,
                    label="Weighting factor applied to the profit/loss of a defaulted loan"),
 
-            trac.P("filter_defaults", trac.BasicType.BOOLEAN,
+            trac.P("filter_defaults", trac.BOOLEAN,
                    label="Exclude defaulted loans from the calculation",
                    default_value=False))
 
@@ -56,12 +56,12 @@ class SchemaResourcesModel(trac.TracModel):
         customer_loans = ctx.get_pandas_table("customer_loans")
 
         profit_by_region = using_data.calculate_profit_by_region(
-            customer_loans, filter_defaults,
-            default_weighting, eur_usd_rate)
+            customer_loans, eur_usd_rate,
+            default_weighting, filter_defaults)
 
         ctx.put_pandas_table("profit_by_region", profit_by_region)
 
 
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
-    launch.launch_model(SchemaResourcesModel, "config/using_data.yaml", "config/sys_config.yaml")
+    launch.launch_model(SchemaFilesModel, "config/using_data.yaml", "config/sys_config.yaml")

@@ -160,7 +160,7 @@ class DocGen:
         # For doc gen, we generate a new copy and just move it to the right place
         codegen_exe = "python"
         codegen_args = [
-            str(CODEGEN_SCRIPT), "python_runtime",
+            str(CODEGEN_SCRIPT), "python_doc",
             "--proto_path", "tracdap-api/tracdap-metadata/src/main/proto",
             "--out", "build/doc/code/runtime_python"]
 

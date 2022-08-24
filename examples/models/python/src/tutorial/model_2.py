@@ -25,23 +25,23 @@ class SecondModel(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
-        return trac.declare_parameters(
+        return trac.define_parameters(
             trac.P("param_2", trac.DATE, "A data parameter", default_value=dt.date(2000, 1, 1)),
             trac.P("param_3", trac.FLOAT, "A float parameter"))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
 
-        preprocessed = trac.declare_input_table(
-            trac.F("id", trac.BasicType.STRING, label="Customer account ID", business_key=True),
-            trac.F("some_quantity_x", trac.BasicType.DECIMAL, label="Some quantity X", format_code="CCY:EUR"))
+        preprocessed = trac.define_input_table(
+            trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
+            trac.F("some_quantity_x", trac.DECIMAL, label="Some quantity X"))
 
         return {"preprocessed_data": preprocessed}
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
 
-        profit_by_region = trac.declare_output_table(
-            trac.F("region", trac.BasicType.STRING, label="Customer home region", categorical=True),
-            trac.F("gross_profit", trac.BasicType.DECIMAL, label="Total gross profit", format_code="CCY:USD"))
+        profit_by_region = trac.define_output_table(
+            trac.F("region", trac.STRING, label="Customer home region", categorical=True),
+            trac.F("gross_profit", trac.DECIMAL, label="Total gross profit"))
 
         return {"profit_by_region": profit_by_region}
 

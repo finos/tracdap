@@ -159,7 +159,15 @@ class TracGenerator:
     DATA_MEMBER_TEMPLATE = (
         '{INDENT}{MEMBER_NAME}: {MEMBER_TYPE} = {MEMBER_DEFAULT}'
         '\n\n'
-        '{DOC_COMMENT}')
+        '{COMMENT}')
+
+    DATA_MEMBER_TEMPLATE_DOCU = (
+        '{INDENT}{MEMBER_NAME} = {MEMBER_DEFAULT}'
+        '\n\n'
+        '{INDENT}"""\n'
+        '{INDENT}{COMMENT}\n\n'
+        '{INDENT}:type: {MEMBER_TYPE}\n'
+        '{INDENT}"""\n\n')
 
     SERVICE_CLASS_TEMPLATE = (
         '{INDENT}class {SERVICE_NAME}:\n'
@@ -560,13 +568,15 @@ class TracGenerator:
         if not descriptor.field:
             return self.PASS_TEMPLATE.replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent)
 
+        is_doc_format = self._options["doc_format"] if "doc_format" in self._options else False
+
         members_ctx = self.index_sub_ctx(
             ctx.src_locations,
             self._desc_message_field,
             ctx.indent)
 
         members = list(map(lambda f: self.generate_data_member(
-            package, next(members_ctx), descriptor, f, types),
+            package, next(members_ctx), descriptor, f, types, is_doc_format),
             descriptor.field))
 
         return "".join(members)
@@ -575,23 +585,29 @@ class TracGenerator:
             self, package: str, ctx: LocationContext,
             message: pb_desc.DescriptorProto,
             field: pb_desc.FieldDescriptorProto,
-            types: TYPE_INFO_MAP) \
+            types: TYPE_INFO_MAP,
+            is_doc_format: bool) \
             -> str:
 
         filtered_loc = self.filter_src_location(ctx.src_locations, ctx.src_loc_code, ctx.src_loc_index)
 
         field_type = self.python_field_type(package, field, message)
         field_default = self.python_default_value(package, field, message, types)
-
         raw_comment = self.comment_for_current_location(filtered_loc)
-        doc_comment = self.format_doc_comment(ctx, raw_comment)
 
-        return self.DATA_MEMBER_TEMPLATE \
+        if is_doc_format:
+            data_member_template = self.DATA_MEMBER_TEMPLATE_DOCU
+            comment = self.translate_comment_from_proto(ctx, raw_comment, use_next_indent=False).strip() or field.name
+        else:
+            data_member_template = self.DATA_MEMBER_TEMPLATE
+            comment = self.format_doc_comment(ctx, raw_comment, next_indent=False)
+
+        return data_member_template \
             .replace("{INDENT}", self.INDENT_TEMPLATE * ctx.indent) \
             .replace("{MEMBER_NAME}", field.name) \
             .replace("{MEMBER_TYPE}", field_type) \
             .replace("{MEMBER_DEFAULT}", field_default) \
-            .replace("{DOC_COMMENT}", doc_comment)
+            .replace("{COMMENT}", comment)
 
     def generate_enum(
             self, ctx: LocationContext,
@@ -664,6 +680,8 @@ class TracGenerator:
 
         base_type = self.python_base_type(package, field, make_relative=True, alias=True)
 
+        typing_prefix = "_tp." if not self._options.get("doc_format") else ""
+
         # Repeated fields are either lists or maps - these need special handling
         if field.label == field.Label.LABEL_REPEATED:
 
@@ -678,21 +696,21 @@ class TracGenerator:
 
                 key_type = self.python_base_type(package, nested_type.field[0], make_relative=True, alias=True)
                 value_type = self.python_base_type(package, nested_type.field[1], make_relative=True, alias=True)
-                return f"_tp.Dict[{key_type}, {value_type}]"
+                return f"{typing_prefix}Dict[{key_type}, {value_type}]"
 
             # Otherwise repeated fields are generated as lists
             else:
-                return f"_tp.List[{base_type}]"
+                return f"{typing_prefix}List[{base_type}]"
 
         # Fields explicitly marked optional in the proto are, of course, optional!
         elif field.proto3_optional:
-            return f"_tp.Optional[{base_type}]"
+            return f"{typing_prefix}Optional[{base_type}]"
 
         # Fields in a oneof group are also optional
         # If no oneof group is set, oneof_index will have default value of 0
         # To check if this field is really set, use HasField()
         elif field.HasField('oneof_index'):
-            return f"_tp.Optional[{base_type}]"
+            return f"{typing_prefix}Optional[{base_type}]"
 
         # Everything else should be either a (non-optional) message, an enum or a primitive
         else:

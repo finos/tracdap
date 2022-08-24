@@ -22,31 +22,31 @@ class FirstModel(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
-        return trac.declare_parameters(
+        return trac.define_parameters(
             trac.P("param_1", trac.INTEGER, "First parameter"),
             trac.P("param_2", trac.DATE, "Second parameter", default_value=dt.date(2001, 1, 1)))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
 
-        customer_loans = trac.declare_input_table(
-            trac.F("id", trac.BasicType.STRING, label="Customer account ID", business_key=True),
-            trac.F("loan_amount", trac.BasicType.DECIMAL, label="Principal loan amount", format_code="CCY:EUR"),
-            trac.F("total_pymnt", trac.BasicType.DECIMAL, label="Total amount repaid", format_code="CCY:EUR"),
-            trac.F("region", trac.BasicType.STRING, label="Customer home region", categorical=True),
-            trac.F("loan_condition_cat", trac.BasicType.INTEGER, label="Loan condition category", categorical=True))
+        customer_loans = trac.define_input_table(
+            trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
+            trac.F("loan_amount", trac.DECIMAL, label="Principal loan amount"),
+            trac.F("total_pymnt", trac.DECIMAL, label="Total amount repaid"),
+            trac.F("region", trac.STRING, label="Customer home region", categorical=True),
+            trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category", categorical=True))
 
-        currency_data = trac.declare_input_table(
-            trac.F("ccy_code", trac.BasicType.STRING, label="Currency code", categorical=True),
-            trac.F("spot_date", trac.BasicType.DATE, label="Spot date for FX rate"),
-            trac.F("dollar_rate", trac.BasicType.DECIMAL, label="Dollar FX rate", format_code="CCY:USD"))
+        currency_data = trac.define_input_table(
+            trac.F("ccy_code", trac.STRING, label="Currency code", categorical=True),
+            trac.F("spot_date", trac.DATE, label="Spot date for FX rate"),
+            trac.F("dollar_rate", trac.DECIMAL, label="Dollar FX rate"))
 
         return {"customer_loans": customer_loans, "currency_data": currency_data}
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
 
         preprocessed = trac.declare_output_table(
-            trac.F("id", trac.BasicType.STRING, label="Customer account ID", business_key=True),
-            trac.F("some_quantity_x", trac.BasicType.DECIMAL, label="Some quantity X", format_code="CCY:EUR"))
+            trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
+            trac.F("some_quantity_x", trac.DECIMAL, label="Some quantity X"))
 
         return {"preprocessed_data": preprocessed}
 

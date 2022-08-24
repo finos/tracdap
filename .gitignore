@@ -14,11 +14,14 @@
 # limitations under the License.
 # -----------------------------------------------------------------------------
 
-build/
-.gradle/
+/build/
+/.gradle/
 
 # Tracked IDEA config files are in dev/ide/idea
-.idea/*
+/.idea/*
+
+# Build scripts have their own venv
+/dev/venv/**
 
 /tracdap-api/packages/web/node_modules/**
 /tracdap-api/packages/web/build/**

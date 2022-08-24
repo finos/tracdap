@@ -16,32 +16,31 @@ import decimal
 import typing as tp
 
 import pandas as pd
-
 import tracdap.rt.api as trac
 
 
 def calculate_profit_by_region(
         customer_loans: pd.DataFrame,
-        filter_defaults: bool,
+        eur_usd_rate: float,
         default_weighting: float,
-        eur_usd_rate: float):
+        filter_defaults: bool):
+
+    """
+    Aggregate expected profit by region on a book of customer loans
+    Use a weighting factor for bad loans and report results in USD
+    Optionally, bad loans can be filtered from the results
+    """
 
     if filter_defaults:
         customer_loans = customer_loans[customer_loans["loan_condition_cat"] == 0]
 
-    customer_loans["gross_profit_unweighted"] = \
-        customer_loans["total_pymnt"] - \
-        customer_loans["loan_amount"]
-
+    # Build a weighting vector, use default_weighting for bad loans and 1.0 for good loans
     condition_weighting = customer_loans["loan_condition_cat"] \
         .apply(lambda c: decimal.Decimal(default_weighting) if c > 0 else decimal.Decimal(1))
 
-    customer_loans["gross_profit_weighted"] = \
-        customer_loans["gross_profit_unweighted"] * condition_weighting
-
-    customer_loans["gross_profit"] = \
-        customer_loans["gross_profit_weighted"] \
-            .apply(lambda x: x * decimal.Decimal.from_float(eur_usd_rate))
+    customer_loans["gross_profit_unweighted"] = customer_loans["total_pymnt"] - customer_loans["loan_amount"]
+    customer_loans["gross_profit_weighted"] = customer_loans["gross_profit_unweighted"] * condition_weighting
+    customer_loans["gross_profit"] = customer_loans["gross_profit_weighted"] * decimal.Decimal(eur_usd_rate)
 
     profit_by_region = customer_loans \
         .groupby("region", as_index=False) \
@@ -54,34 +53,34 @@ class UsingDataModel(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
-        return trac.declare_parameters(
+        return trac.define_parameters(
 
-            trac.P("eur_usd_rate", trac.BasicType.FLOAT,
+            trac.P("eur_usd_rate", trac.FLOAT,
                    label="EUR/USD spot rate for reporting"),
 
-            trac.P("default_weighting", trac.BasicType.FLOAT,
+            trac.P("default_weighting", trac.FLOAT,
                    label="Weighting factor applied to the profit/loss of a defaulted loan"),
 
-            trac.P("filter_defaults", trac.BasicType.BOOLEAN,
+            trac.P("filter_defaults", trac.BOOLEAN,
                    label="Exclude defaulted loans from the calculation",
                    default_value=False))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
 
-        customer_loans = trac.declare_input_table(
-            trac.F("id", trac.BasicType.STRING, label="Customer account ID", business_key=True),
-            trac.F("loan_amount", trac.BasicType.DECIMAL, label="Principal loan amount", format_code="CCY:EUR"),
-            trac.F("total_pymnt", trac.BasicType.DECIMAL, label="Total amount repaid", format_code="CCY:EUR"),
-            trac.F("region", trac.BasicType.STRING, label="Customer home region", categorical=True),
-            trac.F("loan_condition_cat", trac.BasicType.INTEGER, label="Loan condition category", categorical=True))
+        customer_loans = trac.define_input_table(
+            trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
+            trac.F("loan_amount", trac.DECIMAL, label="Principal loan amount"),
+            trac.F("total_pymnt", trac.DECIMAL, label="Total amount repaid"),
+            trac.F("region", trac.STRING, label="Customer home region", categorical=True),
+            trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category", categorical=True))
 
         return {"customer_loans": customer_loans}
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
 
-        profit_by_region = trac.declare_output_table(
-            trac.F("region", trac.BasicType.STRING, label="Customer home region", categorical=True),
-            trac.F("gross_profit", trac.BasicType.DECIMAL, label="Total gross profit", format_code="CCY:USD"))
+        profit_by_region = trac.define_output_table(
+            trac.F("region", trac.STRING, label="Customer home region", categorical=True),
+            trac.F("gross_profit", trac.DECIMAL, label="Total gross profit"))
 
         return {"profit_by_region": profit_by_region}
 
@@ -94,8 +93,8 @@ class UsingDataModel(trac.TracModel):
         customer_loans = ctx.get_pandas_table("customer_loans")
 
         profit_by_region = calculate_profit_by_region(
-            customer_loans, filter_defaults,
-            default_weighting, eur_usd_rate)
+            customer_loans, eur_usd_rate,
+            default_weighting, filter_defaults)
 
         ctx.put_pandas_table("profit_by_region", profit_by_region)
 

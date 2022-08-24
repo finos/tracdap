@@ -1,6 +1,6 @@
 field_name, field_type, label, categorical, business_key, format_code
 id, STRING, Customer account ID, false, true
-loan_amount, DECIMAL, Principal loan amount, false, false, CCY:EUR
-total_pymnt, DECIMAL, Total amount repaid, false, false, CCY:EUR
+loan_amount, DECIMAL, Principal loan amount, false, false
+total_pymnt, DECIMAL, Total amount repaid, false, false
 region, STRING, Customer home region, true, false
 loan_condition_cat, INTEGER, Loan condition category, false, false

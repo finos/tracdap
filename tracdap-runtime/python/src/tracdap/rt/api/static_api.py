@@ -52,6 +52,11 @@ def define_parameter(
     :param default_value: A default value to use if no explicit value is supplied (optional)
     :return: A named model parameter, suitable for passing to :py:func:`define_parameters`
 
+    :type param_name: str
+    :type param_type: :py:class:`TypeDescriptor <tracdap.rt.metadata.TypeDescriptor>` |
+                      :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
+    :type label: str
+    :type default_value: Optional[Any]
     :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
@@ -67,10 +72,15 @@ def declare_parameter(
         -> _Named[ModelParameter]:
 
     """
-    Alias for :py:func:`define_parameter` (deprecated)
-
-    .. deprecated:: 0.5
+    .. deprecated:: 0.4.4
        Use :py:func:`define_parameter` or :py:func:`P` instead.
+
+    :type param_name: str
+    :type param_type: :py:class:`TypeDescriptor <tracdap.rt.metadata.TypeDescriptor>` |
+                      :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
+    :type label: str
+    :type default_value: Optional[Any]
+    :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
     return define_parameter(param_name, param_type, label, default_value)
@@ -83,7 +93,16 @@ def P(  # noqa
         default_value: _tp.Optional[_tp.Any] = None) \
         -> _Named[ModelParameter]:
 
-    """Shorthand alias for :py:func:`define_parameter`"""
+    """
+    Shorthand alias for :py:func:`define_parameter`
+
+    :type param_name: str
+    :type param_type: :py:class:`TypeDescriptor <tracdap.rt.metadata.TypeDescriptor>` |
+                      :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
+    :type label: str
+    :type default_value: Optional[Any]
+    :rtype: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
+    """
 
     return declare_parameter(
         param_name, param_type, label,
@@ -102,11 +121,12 @@ def define_parameters(
     (or :py:func:`trac.P <tracdap.rt.api.P>`).
 
     :param params: The parameters that will be defined, either as individual arguments or as a list
-    :return: A set of model parameters, in the correct format to return from :py:meth:TracModel.define_parameters
+    :return: A set of model parameters, in the correct format to return from
+             :py:meth:`TracModel.define_parameters`
 
     :type params: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`] |
                   List[_Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]]
-
+    :rtype: Dict[str, :py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
     rh = _RuntimeHook.runtime()
@@ -118,10 +138,12 @@ def declare_parameters(
         -> _tp.Dict[str, ModelParameter]:
 
     """
-    Alias for :py:func:`define_parameters` (deprecated)
-
-    .. deprecated:: 0.5
+    .. deprecated:: 0.4.4
        Use :py:func:`define_parameters` instead.
+
+    :type params: _Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`] |
+                  List[_Named[:py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]]
+    :rtype: Dict[str, :py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
     """
 
     return define_parameters(*params)
@@ -161,6 +183,15 @@ def define_field(
     :param format_code: A code that can be interpreted by client applications to format the field (optional)
     :param field_order: Explicit field ordering (optional)
     :return: A field schema, suitable for use in a schema definition
+
+    :type field_name: str
+    :type field_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
+    :type label: str
+    :type business_key: bool
+    :type categorical: bool
+    :type format_code: _tp.Optional[str]
+    :type field_order: _tp.Optional[int]
+    :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
     """
 
     rh = _RuntimeHook.runtime()
@@ -182,10 +213,17 @@ def declare_field(
         -> FieldSchema:
 
     """
-    Alias for :py:func:`define_field` (deprecated)
-
-    .. deprecated:: 0.5
+    .. deprecated:: 0.4.4
        Use :py:func:`define_field` or :py:func:`F` instead.
+
+    :type field_name: str
+    :type field_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
+    :type label: str
+    :type business_key: bool
+    :type categorical: bool
+    :type format_code: _tp.Optional[str]
+    :type field_order: _tp.Optional[int]
+    :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
     """
 
     return define_field(
@@ -204,7 +242,18 @@ def F(  # noqa
         field_order: _tp.Optional[int] = None) \
         -> FieldSchema:
 
-    """Shorthand alias for :py:func:`define_field`"""
+    """
+    Shorthand alias for :py:func:`define_field`
+
+    :type field_name: str
+    :type field_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>`
+    :type label: str
+    :type business_key: bool
+    :type categorical: bool
+    :type format_code: _tp.Optional[str]
+    :type field_order: _tp.Optional[int]
+    :rtype: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`
+    """
 
     return define_field(
         field_name, field_type, label,
@@ -233,6 +282,11 @@ def define_schema(
     :param fields: The list of fields to include in the schema
     :param schema_type: The type of schema to create (currently only TABLE schemas are supported)
     :return: A schema definition built from the supplied fields and schema type
+
+    :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
+                  List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
+    :type schema_type: :py:class:`SchemaType <tracdap.rt.metadata.SchemaType>`
+    :rtype: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
     """
 
     rh = _RuntimeHook.runtime()
@@ -245,8 +299,7 @@ def load_schema(
         -> SchemaDefinition:
 
     """
-    Create a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
-    by loading the schema from a CSV file included in the model repository.
+    load a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` from a CSV file or package resource.
 
     The schema CSV file must contain the following columns:
 
@@ -268,6 +321,11 @@ def load_schema(
     :param schema_file: Name of the schema file to load, which must be in the specified package
     :param schema_type: The type of schema to create (currently only TABLE schemas are supported)
     :return: A schema definition loaded from the schema file
+
+    :type package: ModuleType | str
+    :type schema_file: str
+    :type schema_type: :py:class:`SchemaType <tracdap.rt.metadata.SchemaType>`
+    :rtype: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
     """
 
     rh = _RuntimeHook.runtime()
@@ -284,9 +342,12 @@ def define_input_table(
     Fields can be supplied either as individual arguments to this function or as a list.
     Individual fields should be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
 
-    :param fields: A set of fields to make up a :py:class:`TableSchema <trac.rt.metadata.TableSchema>`
-
+    :param fields: A set of fields to make up a :py:class:`TableSchema <tracdap.rt.metadata.TableSchema>`
     :return: A model input schema, suitable for returning from :py:meth:`TracModel.define_inputs`
+
+    :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
+                  List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
+    :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
     """
 
     rh = _RuntimeHook.runtime()
@@ -298,10 +359,12 @@ def declare_input_table(
         -> ModelInputSchema:
 
     """
-    Alias for :py:func:`define_input_table` (deprecated)
-
-    .. deprecated:: 0.5
+    .. deprecated:: 0.4.4
        Use :py:func:`define_input_table` instead.
+
+    :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
+                  List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
+    :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
     """
 
     return define_input_table(*fields)
@@ -317,9 +380,12 @@ def define_output_table(
     Fields can be supplied either as individual arguments to this function or as a list.
     Individual fields should be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
 
-    :param fields: A set of fields to make up a :py:class:`TableSchema <trac.rt.metadata.TableSchema>`
-
+    :param fields: A set of fields to make up a :py:class:`TableSchema <tracdap.rt.metadata.TableSchema>`
     :return: A model output schema, suitable for returning from :py:meth:`TracModel.define_outputs`
+
+    :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
+                  List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
+    :rtype: :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
     """
 
     rh = _RuntimeHook.runtime()
@@ -331,10 +397,12 @@ def declare_output_table(
         -> ModelOutputSchema:
 
     """
-    Alias for :py:func:`define_output_table` (deprecated)
-
-    .. deprecated:: 0.5
+    .. deprecated:: 0.4.4
        Use :py:func:`define_output_table` instead.
+
+    :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
+                  List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
+    :rtype: :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
     """
 
     return define_output_table(*fields)
