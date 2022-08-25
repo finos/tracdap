@@ -17,6 +17,7 @@ import pathlib
 import codecs
 import csv
 import dataclasses as dc  # noqa
+import typing as tp  # noqa
 
 import pyarrow.compute as pac
 import pyarrow.feather as pa_ft
@@ -385,14 +386,31 @@ class CsvStorageFormat(IDataFormat):
 
         if format_options:
 
-            if format_options.get(self.__LENIENT_CSV_PARSER) is True:
-                self._use_lenient_parser = True
+            if self.__LENIENT_CSV_PARSER in format_options:
+                self._use_lenient_parser = self._validate_lenient_flag(format_options[self.__LENIENT_CSV_PARSER])
 
             if self.__DATE_FORMAT in format_options:
                 self._date_format = self._validate_date_format(format_options[self.__DATE_FORMAT])
             
             if self.__DATETIME_FORMAT in format_options:
                 self._datetime_format = self._validate_datetime_format(format_options[self.__DATETIME_FORMAT])
+
+    @classmethod
+    def _validate_lenient_flag(cls, lenient_flag: tp.Any):
+
+        if lenient_flag is None:
+            return False
+
+        if isinstance(lenient_flag, bool):
+            return lenient_flag
+
+        if isinstance(lenient_flag, str):
+            if lenient_flag.lower() == "false":
+                return False
+            if lenient_flag.lower() == "true":
+                return True
+
+        raise _ex.EConfigParse(f"Invalid lenient flag for CSV storage: [{lenient_flag}]")
             
     @classmethod
     def _validate_date_format(cls, date_format: str):

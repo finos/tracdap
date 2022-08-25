@@ -20,6 +20,7 @@ import tempfile
 import unittest
 import sys
 import random
+import copy
 
 import pyarrow as pa
 
@@ -305,6 +306,7 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
         test_lib_file_storage = _storage.LocalFileStorage(test_lib_storage_instance)
         test_lib_data_storage = _storage.CommonDataStorage(test_lib_storage_instance, test_lib_file_storage)
 
+        cls.test_lib_storage_instance_cfg = test_lib_storage_instance
         cls.test_lib_storage = test_lib_data_storage
 
     @classmethod
@@ -385,6 +387,22 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
         for row, value in enumerate(table.column(0)):
             self.assertIsNotNone(value.as_py())
             self.assertTrue(math.isnan(value.as_py()))
+
+    def test_date_format_props(self):
+
+        test_lib_storage_instance = copy.deepcopy(self.test_lib_storage_instance_cfg)
+        test_lib_storage_instance.storageProps["csv.lenient_csv_parser"] = "true"
+        test_lib_storage_instance.storageProps["csv.date_format"] = "%d/%m/%Y"
+        test_lib_storage_instance.storageProps["csv.datetime_format"] = "%d/%m/%Y %H:%M:%S"
+
+        test_lib_file_storage = _storage.LocalFileStorage(test_lib_storage_instance)
+        test_lib_data_storage = _storage.CommonDataStorage(test_lib_storage_instance, test_lib_file_storage)
+
+        schema = self.sample_schema()
+        table = test_lib_data_storage.read_table("csv_basic_uk_dates.csv", "CSV", schema)
+
+        self.assertEqual(7, table.num_columns)
+        self.assertEqual(10, table.num_rows)
 
 
 class LocalArrowStorageTest(unittest.TestCase, LocalStorageTest):
