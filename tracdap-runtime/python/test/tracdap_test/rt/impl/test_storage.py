@@ -267,10 +267,9 @@ class LocalStorageTest(DataStorageTestSuite):
         storage_instance = _cfg.StorageInstance(
             storageType="LOCAL",
             storageProps={"rootPath": cls.storage_root.name})
-        storage_config = _cfg.StorageConfig([storage_instance])
 
         file_storage = _storage.LocalFileStorage(storage_instance)
-        data_storage = _storage.CommonDataStorage(storage_config, file_storage)
+        data_storage = _storage.CommonDataStorage(storage_instance, file_storage)
 
         cls.file_storage = file_storage
 
@@ -303,9 +302,8 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
             storageType="LOCAL",
             storageProps={"rootPath": str(_TEST_DATA_DIR)})
 
-        test_lib_storage_config = _cfg.StorageConfig([test_lib_storage_instance])
         test_lib_file_storage = _storage.LocalFileStorage(test_lib_storage_instance)
-        test_lib_data_storage = _storage.CommonDataStorage(test_lib_storage_config, test_lib_file_storage)
+        test_lib_data_storage = _storage.CommonDataStorage(test_lib_storage_instance, test_lib_file_storage)
 
         cls.test_lib_storage = test_lib_data_storage
 
