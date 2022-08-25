@@ -222,7 +222,7 @@ class DataMapping:
         return cls.__PANDAS_DATETIME_TYPE
 
     @classmethod
-    def view_to_pandas(cls, view: DataView, part: DataPartKey) -> pd.DataFrame:
+    def view_to_pandas(cls, view: DataView, part: DataPartKey, date_as_object: bool) -> pd.DataFrame:
 
         deltas = view.parts.get(part)
 
@@ -235,7 +235,7 @@ class DataMapping:
             raise _ex.ETracInternal(f"Data view for part [{part.opaque_key}] does not contain any items")
 
         if len(deltas) == 1:
-            return cls.item_to_pandas(deltas[0])
+            return cls.item_to_pandas(deltas[0], date_as_object)
 
         batches = {
             batch
@@ -246,30 +246,30 @@ class DataMapping:
                 else delta.table.to_batches())}
 
         table = pa.Table.from_batches(batches) # noqa
-        return table.to_pandas()
+        return cls.arrow_to_pandas(table, date_as_object)
 
     @classmethod
-    def item_to_pandas(cls, item: DataItem) -> pd.DataFrame:
+    def item_to_pandas(cls, item: DataItem, date_as_object: bool) -> pd.DataFrame:
 
         if item.pandas is not None:
             return item.pandas.copy()
 
         if item.table is not None:
-            return cls.arrow_to_pandas(item.table)
+            return cls.arrow_to_pandas(item.table, date_as_object)
 
         if item.batches is not None:
             table = pa.Table.from_batches(item.batches, item.schema)  # noqa
-            return cls.arrow_to_pandas(table)
+            return cls.arrow_to_pandas(table, date_as_object)
 
         raise _ex.ETracInternal(f"Data item does not contain any usable data")
 
     @classmethod
-    def arrow_to_pandas(cls, table: pa.Table) -> pd.DataFrame:
+    def arrow_to_pandas(cls, table: pa.Table, date_as_object: bool = False) -> pd.DataFrame:
 
         return table.to_pandas(
             ignore_metadata=True,  # noqa
-            date_as_object=False,  # noqa
-            timestamp_as_object=False,  # noqa
+            date_as_object=date_as_object,  # noqa
+            timestamp_as_object=date_as_object,  # noqa
             types_mapper=cls.__ARROW_TO_PANDAS_TYPE_MAPPING.get)
 
     @classmethod

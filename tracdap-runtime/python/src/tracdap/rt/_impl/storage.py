@@ -16,6 +16,8 @@ import decimal
 import pathlib
 import codecs
 import csv
+import dataclasses as dc  # noqa
+import typing as tp  # noqa
 
 import pyarrow.compute as pac
 import pyarrow.feather as pa_ft
@@ -34,58 +36,67 @@ from tracdap.rt.ext.storage import *
 
 class FormatManager:
 
-    __formats: tp.Dict[str, IDataFormat.__class__] = dict()
-    __extensions: tp.Dict[str, IDataFormat.__class__] = dict()
+    @dc.dataclass
+    class _FormatSpec:
+        format_class: IDataFormat.__class__
+        format_code: str
+        format_ext: str
 
-    __extension_to_format: tp.Dict[str, str] = dict()
-    __format_to_extension: tp.Dict[str, str] = dict()
+    __formats: tp.Dict[str, _FormatSpec] = dict()
+    __extensions: tp.Dict[str, _FormatSpec] = dict()
 
     @classmethod
     def register_data_format(
-            cls, format_code: str,
-            format_impl: IDataFormat.__class__):
+            cls, format_impl: IDataFormat.__class__,
+            format_code: str, format_ext: str,
+            extra_codes: tp.List[str] = None,
+            extra_ext: tp.List[str] = None):
 
-        cls.__formats[format_code.lower()] = format_impl
+        if format_ext.startswith("."):
+            format_ext = format_ext[1:]
 
-        for extension, impl in cls.__extensions.items():
-            if impl == format_impl:
-                cls.__extension_to_format[extension] = format_code
-                cls.__format_to_extension[format_code] = extension
+        spec = cls._FormatSpec(format_impl, format_code, format_ext)
 
-    @classmethod
-    def register_extension(
-            cls, extension: str,
-            format_impl: IDataFormat.__class__):
+        cls.__formats[format_code.lower()] = spec
+        cls.__extensions[format_ext.lower()] = spec
 
-        if extension.startswith("."):
-            extension = extension[1:]
+        if extra_codes:
+            for code in extra_codes:
+                cls.__formats[code.lower()] = spec
 
-        cls.__extensions[extension.lower()] = format_impl
-
-        for format_code, impl in cls.__formats.items():
-            if impl == format_impl:
-                cls.__extension_to_format[extension] = format_code
-                cls.__format_to_extension[format_code] = extension
+        if extra_ext:
+            for ext in extra_ext:
+                cls.__extensions[ext.lower()] = spec
 
     @classmethod
     def get_data_format(cls, format_code: str, format_options: tp.Dict[str, tp.Any]) -> IDataFormat:
 
-        format_impl = cls.__formats.get(format_code.lower())
+        spec = cls.__formats.get(format_code.lower())
 
-        if format_impl is None:
+        if spec is None:
             raise _ex.EStorageConfig(f"Unsupported storage format [{format_code}]")
 
-        return format_impl.__call__(format_options)
+        return spec.format_class.__call__(format_options)
+
+    @classmethod
+    def primary_format_code(cls, format_code: str) -> str:
+
+        spec = cls.__formats.get(format_code.lower())
+
+        if spec is None:
+            raise _ex.EStorageConfig(f"Unsupported storage format [{format_code}]")
+
+        return spec.format_code.lower()
 
     @classmethod
     def extension_for_format(cls, format_code: str) -> str:
 
-        extension = cls.__format_to_extension.get(format_code.lower())
+        spec = cls.__formats.get(format_code.lower())
 
-        if extension is None:
+        if spec is None:
             raise _ex.EStorageConfig(f"Unsupported storage format [{format_code}]")
 
-        return extension
+        return spec.format_ext
 
     @classmethod
     def format_for_extension(cls, extension: str) -> str:
@@ -93,12 +104,12 @@ class FormatManager:
         if extension.startswith("."):
             extension = extension[1:]
 
-        format_code = cls.__extension_to_format[extension]
+        spec = cls.__extensions.get(extension)
 
-        if format_code is None:
+        if spec is None:
             raise _ex.EStorageConfig(f"No storage format is registered for file extension [{extension}]")
 
-        return extension
+        return spec.format_code
 
 
 class StorageManager:
@@ -192,7 +203,7 @@ class StorageManager:
 class CommonDataStorage(IDataStorage):
 
     def __init__(
-            self, config: _cfg.StorageConfig, file_storage: IFileStorage,
+            self, config: _cfg.StorageInstance, file_storage: IFileStorage,
             pushdown_pandas: bool = False, pushdown_spark: bool = False):
 
         self.__log = _util.logger_for_object(self)
@@ -210,7 +221,15 @@ class CommonDataStorage(IDataStorage):
 
         try:
 
-            format_impl = FormatManager.get_data_format(storage_format, storage_options)
+            format_code = FormatManager.primary_format_code(storage_format)
+            format_options = storage_options.copy() if storage_options else dict()
+
+            for prop_key, prop_value in self.__config.storageProps.items():
+                if prop_key.startswith(f"{format_code}."):
+                    format_prop_key = prop_key[len(format_code) + 1:]
+                    format_options[format_prop_key] = prop_value
+
+            format_impl = FormatManager.get_data_format(storage_format, format_options)
 
             stat = self.__file_storage.stat(storage_path)
 
@@ -350,6 +369,8 @@ class ParquetStorageFormat(IDataFormat):
 class CsvStorageFormat(IDataFormat):
 
     __LENIENT_CSV_PARSER = "lenient_csv_parser"
+    __DATE_FORMAT = "date_format"
+    __DATETIME_FORMAT = "datetime_format"
 
     __TRUE_VALUES = ['true', 't', 'yes' 'y', '1']
     __FALSE_VALUES = ['false', 'f', 'no' 'n', '0']
@@ -360,11 +381,57 @@ class CsvStorageFormat(IDataFormat):
 
         self._format_options = format_options
         self._use_lenient_parser = False
+        self._date_format = None
+        self._datetime_format = None
 
         if format_options:
-            if format_options.get(self.__LENIENT_CSV_PARSER) is True:
-                self._use_lenient_parser = True
 
+            if self.__LENIENT_CSV_PARSER in format_options:
+                self._use_lenient_parser = self._validate_lenient_flag(format_options[self.__LENIENT_CSV_PARSER])
+
+            if self.__DATE_FORMAT in format_options:
+                self._date_format = self._validate_date_format(format_options[self.__DATE_FORMAT])
+            
+            if self.__DATETIME_FORMAT in format_options:
+                self._datetime_format = self._validate_datetime_format(format_options[self.__DATETIME_FORMAT])
+
+    @classmethod
+    def _validate_lenient_flag(cls, lenient_flag: tp.Any):
+
+        if lenient_flag is None:
+            return False
+
+        if isinstance(lenient_flag, bool):
+            return lenient_flag
+
+        if isinstance(lenient_flag, str):
+            if lenient_flag.lower() == "false":
+                return False
+            if lenient_flag.lower() == "true":
+                return True
+
+        raise _ex.EConfigParse(f"Invalid lenient flag for CSV storage: [{lenient_flag}]")
+            
+    @classmethod
+    def _validate_date_format(cls, date_format: str):
+        
+        try:
+            current_date = dt.datetime.now().date()
+            current_date.strftime(date_format)
+            return date_format
+        except EncodingWarning:
+            raise _ex.EConfigParse(f"Invalid date format for CSV storage: [{date_format}]")
+
+    @classmethod
+    def _validate_datetime_format(cls, datetime_format: str):
+
+        try:
+            current_datetime = dt.datetime.now()
+            current_datetime.strftime(datetime_format)
+            return datetime_format
+        except EncodingWarning:
+            raise _ex.EConfigParse(f"Invalid datetime format for CSV storage: [{datetime_format}]")
+            
     def read_table(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
 
         # For CSV data, if there is no schema then type inference will do unpredictable things!
@@ -630,11 +697,17 @@ class CsvStorageFormat(IDataFormat):
 
             if python_type == dt.date:
                 if isinstance(raw_value, str):
-                    return dt.date.fromisoformat(raw_value)
+                    if self._date_format is not None:
+                        return dt.datetime.strptime(raw_value, self._date_format).date()
+                    else:
+                        return dt.date.fromisoformat(raw_value)
 
             if python_type == dt.datetime:
                 if isinstance(raw_value, str):
-                    return dt.datetime.fromisoformat(raw_value)
+                    if self._datetime_format is not None:
+                        return dt.datetime.strptime(raw_value, self._datetime_format)
+                    else:
+                        return dt.datetime.fromisoformat(raw_value)
 
         except Exception as e:
 
@@ -654,20 +727,21 @@ class CsvStorageFormat(IDataFormat):
         raise _ex.EDataConformance(msg)
 
 
-FormatManager.register_data_format("ARROW_FILE", ArrowFileFormat)
-FormatManager.register_data_format("application/vnd.apache.arrow.file", ArrowFileFormat)
-FormatManager.register_data_format("application/x-apache-arrow-file", ArrowFileFormat)
-FormatManager.register_extension(".arrow", ArrowFileFormat)
+FormatManager.register_data_format(
+    ArrowFileFormat, "ARROW_FILE", ".arrow",
+    extra_codes=[
+        "application/vnd.apache.arrow.file",
+        "application/x-apache-arrow-file"])
 
 # Mime type for Parquet is not registered yet! But there is an issue open to register one:
 # https://issues.apache.org/jira/browse/PARQUET-1889
-FormatManager.register_data_format("PARQUET", ParquetStorageFormat)
-FormatManager.register_data_format("application/vnd.apache.parquet", ParquetStorageFormat)
-FormatManager.register_extension(".parquet", ParquetStorageFormat)
+FormatManager.register_data_format(
+    ParquetStorageFormat, "PARQUET", ".parquet",
+    extra_codes=["application/vnd.apache.parquet"])
 
-FormatManager.register_data_format("CSV", CsvStorageFormat)
-FormatManager.register_data_format("text/csv", CsvStorageFormat)
-FormatManager.register_extension(".csv", CsvStorageFormat)
+FormatManager.register_data_format(
+    CsvStorageFormat, "CSV", ".csv",
+    extra_codes=["text/csv"])
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -914,7 +988,7 @@ class LocalFileStorage(IFileStorage):
 
 class LocalDataStorage(CommonDataStorage):
 
-    def __init__(self, storage_config: _cfg.StorageConfig, file_storage: LocalFileStorage):
+    def __init__(self, storage_config: _cfg.StorageInstance, file_storage: LocalFileStorage):
         super().__init__(storage_config, file_storage, pushdown_pandas=True, pushdown_spark=True)
 
 
