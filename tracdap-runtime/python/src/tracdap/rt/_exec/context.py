@@ -53,7 +53,7 @@ class TracContextImpl(_api.TracContext):
             Output views will contain schemas but no data.
     """
 
-    __DEFAULT_DATES_AS_OBJECTS = False
+    __DEFAULT_TEMPORAL_OBJECTS = False
 
     def __init__(self,
                  model_def: _meta.ModelDefinition,
@@ -100,9 +100,9 @@ class TracContextImpl(_api.TracContext):
 
         return data_view.trac_schema
 
-    def get_pandas_table(self, dataset_name: str, dates_as_objects: tp.Optional[bool] = None) -> pd.DataFrame:
+    def get_pandas_table(self, dataset_name: str, use_temporal_objects: tp.Optional[bool] = None) -> pd.DataFrame:
 
-        _api_hook.ApiGuard.validate_signature(self.get_pandas_table, dataset_name, dates_as_objects)
+        _api_hook.ApiGuard.validate_signature(self.get_pandas_table, dataset_name, use_temporal_objects)
 
         part_key = _data.DataPartKey.for_root()
 
@@ -115,10 +115,10 @@ class TracContextImpl(_api.TracContext):
 
         data_view = self.__data[dataset_name]
 
-        if dates_as_objects is None:
-            dates_as_objects = self.__DEFAULT_DATES_AS_OBJECTS
+        if use_temporal_objects is None:
+            use_temporal_objects = self.__DEFAULT_TEMPORAL_OBJECTS
 
-        return _data.DataMapping.view_to_pandas(data_view, part_key, dates_as_objects)
+        return _data.DataMapping.view_to_pandas(data_view, part_key, use_temporal_objects)
 
     def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
 
