@@ -99,7 +99,7 @@ class TracContext:
         pass
 
     @_abc.abstractmethod
-    def get_pandas_table(self, dataset_name: str) -> pandas.DataFrame:
+    def get_pandas_table(self, dataset_name: str, dates_as_objects: _tp.Optional[bool] = None) -> pandas.DataFrame:
 
         """
         Get the data for a model input or output as a Pandas dataframe
@@ -124,6 +124,7 @@ class TracContext:
         other models.
 
         :param dataset_name: The name of the model input or output to get data for
+        :param dates_as_objects: Use Python objects for date/time fields instead of the NumPy *datetime64* type
         :return: A pandas dataframe containing the data for the named dataset
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
