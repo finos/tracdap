@@ -354,7 +354,7 @@ class ParquetStorageFormat(IDataFormat):
 
         try:
             columns = schema.names if schema else None
-            return pa_pq.read_table(source, columns)
+            return pa_pq.read_table(source, columns=columns)
 
         except pa.ArrowInvalid as e:
             err = f"Parquet file decoding failed, content is garbled"
