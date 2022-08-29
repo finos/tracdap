@@ -1,6 +1,24 @@
 
-# Baseline support for Arrow, on series 6.x
-pyarrow >= 7.0.0, < 8.0.0
+# Protobuf is used for generating and reading config files and metadata
+# PyYAML is used to load config supplied in YAML format
+
+# Currently protobuf is not used at runtime, only YAML and JSON formats can be loaded directly
+# This is likely to change in future versions!
+# For runtime dependencies of the package, see setup.cfg
+
+protoc-wheel-0 >= 21, < 22
+protobuf >= 4.21, < 4.22
+googleapis-common-protos >= 1.56, < 2.0
+
+pyyaml >= 6.0, < 7.0
+
+
+# Core data framework is based on Arrow
+
+pyarrow >= 9, < 10
+
+
+# Data is presented to model code using Pandas and/or PySpark
 
 # Baseline support for Pandas on series 1.x
 # Try to avoid supporting the 0.x series!
@@ -9,17 +27,6 @@ pandas >= 1.2.0, < 2.0.0
 # Support PySpark series 2.4.x, 3.0.x and 3.1.x
 pyspark >= 2.4.0, < 3.3.0
 
-# PyYAML is used to load config supplied in YAML format
-pyyaml >= 5.3.0, < 6.0.0
-
-
-# Protobuf codegen dependencies
-# Currently protobuf is not used at runtime, this is likely to change in future versions!
-# For runtime dependencies of the package, see setup.cfg
-
-protoc-wheel-0 >= 3.15, < 4.0
-protobuf >= 3.15, < 4.0
-googleapis-common-protos >= 1.53, < 2.0
 
 
 # Tools for building and packaging the Python runtime

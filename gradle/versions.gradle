@@ -19,15 +19,15 @@ ext {
     java_min_version = JavaVersion.VERSION_11
 
     // Core platform technologies
-    netty_version = '4.1.77.Final'  // gRPC does not support changes in Netty 4.1.75 yet (mar 2022)
+    netty_version = '4.1.80.Final'  // gRPC does not support changes in Netty 4.1.75 yet (mar 2022)
     guava_version = '31.1-jre'
-    proto_version = '3.20.1'
-    grpc_version = '1.46.0'
-    gapi_version = '2.7.4'
+    proto_version = '3.21.5'
+    grpc_version = '1.49.0'
+    gapi_version = '2.9.2'
 
 
     // Data technologies
-    arrow_version = '7.0.0'
+    arrow_version = '9.0.0'
     jackson_version = '2.13.2'
     jackson_databind_version = '2.13.2.2'
 

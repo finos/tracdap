@@ -149,7 +149,7 @@ class SchemaLoader:
     @classmethod
     def _arrow_to_py_boolean(
             cls, schema_field_name: str, field_name: str, field_index: int,
-            arrow_value: pa.BooleanValue, required: bool = False, default: tp.Optional[bool] = None):
+            arrow_value: pa.BooleanScalar, required: bool = False, default: tp.Optional[bool] = None):
 
         if arrow_value is not None:
             return arrow_value.as_py()
