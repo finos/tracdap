@@ -582,7 +582,7 @@ class CsvStorageFormat(IDataFormat):
 
         return pa.array(map(format_timestamp, column), pa.utf8())
 
-    def _read_table_lenient(self, source: tp.BinaryIO, schema: tp.Optional[pa.Schema]) -> pa.Table:
+    def _read_table_lenient(self, source: tp.BinaryIO, schema: pa.Schema) -> pa.Table:
 
         try:
 
@@ -608,6 +608,7 @@ class CsvStorageFormat(IDataFormat):
             schema_columns = {col.lower(): index for index, col in enumerate(schema.names)}
             col_mapping = [schema_columns.get(col) for col in header_lower]
             python_types = list(map(_data.DataMapping.arrow_to_python_type, schema.types))
+            nullable_flags = list(map(lambda c: schema.field(c).nullable, range(len(schema.names))))
 
             data = [[] for _ in range(len(schema.names))]
             csv_row = 1  # Allowing for header
@@ -617,11 +618,13 @@ class CsvStorageFormat(IDataFormat):
 
                 for raw_value in row:
 
+                    col_name = header[csv_col]
                     output_col = col_mapping[csv_col]
 
                     if output_col is not None:
                         python_type = python_types[output_col]
-                        python_value = self._convert_python_value(raw_value, python_type, csv_row, csv_col)
+                        nullable = nullable_flags[output_col]
+                        python_value = self._convert_python_value(raw_value, python_type, nullable, csv_row, col_name)
                         data[output_col].append(python_value)
 
                     csv_col += 1
@@ -650,12 +653,24 @@ class CsvStorageFormat(IDataFormat):
             self._log.exception(err)
             raise _ex.EDataCorruption(err) from e
 
-    def _convert_python_value(self, raw_value: tp.Any, python_type: type, row: int, col: int) -> tp.Any:
+    def _convert_python_value(
+            self, raw_value: tp.Any, python_type: type, nullable: bool,
+            row: int, col: str) -> tp.Any:
 
         try:
 
-            if raw_value is None:
-                return None
+            # TODO: CSV reader in _read_table_lenient does not know the difference between empty string and null
+            # The Java CSV parser has a work-around looking at the token length
+
+            if raw_value is None or (isinstance(raw_value, str) and raw_value.strip() == ""):
+                if python_type == str:
+                    return raw_value
+                if nullable:
+                    return None
+                else:
+                    msg = f"CSV data contains null value for a not-null field (col = {col}, row = {row})"
+                    self._log.error(msg)
+                    raise _ex.EDataConformance(msg)
 
             if isinstance(raw_value, python_type):
                 return raw_value
@@ -712,7 +727,7 @@ class CsvStorageFormat(IDataFormat):
         except Exception as e:
 
             msg = f"CSV data does not match the schema and cannot be converted" \
-                + f" (row = {row}, col = {col}, expected type = [{python_type.__name__}], value = [{str(raw_value)}])" \
+                + f" (col = {col}, row = {row}, expected type = [{python_type.__name__}], value = [{str(raw_value)}])" \
                 + f": {str(e)}"
 
             self._log.exception(msg)
@@ -721,7 +736,7 @@ class CsvStorageFormat(IDataFormat):
         # Default case: unrecognized python_type
 
         msg = f"CSV data does not match the schema and cannot be converted" \
-              + f" (row = {row}, col = {col}, expected type = [{python_type.__name__}], value = [{str(raw_value)}])"
+              + f" (col = {col}, row = {row}, expected type = [{python_type.__name__}], value = [{str(raw_value)}])"
 
         self._log.error(msg)
         raise _ex.EDataConformance(msg)

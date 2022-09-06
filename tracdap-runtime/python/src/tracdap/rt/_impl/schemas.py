@@ -92,12 +92,12 @@ class SchemaLoader:
             categorical = cls._arrow_to_py_boolean("categorical", field_name, field_index, categorical_val, default=False)  # noqa
             format_code = cls._arrow_to_py_string("format_code", field_name, field_index, format_code_val)
 
-            if len(field_name.strip()) == 0:
+            if field_name is None or len(field_name.strip()) == 0:
                 err = f"Field name cannot be blank for field at index [{field_index}]"
                 cls._log.error(err)
                 raise _ex.EDataConformance(err)
 
-            if len(label.strip()) == 0:
+            if label is None or len(label.strip()) == 0:
                 err = f"Label cannot be blank for field [{field_name}] at index [{field_index}]"
                 cls._log.error(err)
                 raise _ex.EDataConformance(err)
