@@ -59,4 +59,17 @@
         <vulnerabilityName>CVE-2022-33915</vulnerabilityName>
     </suppress>
 
+    <!-- This issue in SnakeYAML has no fix available yet -->
+    <!-- Developers are discussing whether this is a false positive -->
+    <!-- We don't expose YAML in service APIs, it is only used for config parsing and offline runs -->
+    <!-- https://bitbucket.org/snakeyaml/snakeyaml/issues/546/false-positive-mend-vulnerability-for -->
+
+    <suppress>
+        <notes><![CDATA[
+   file name: snakeyaml-1.31.jar
+   ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.yaml/snakeyaml@.*$</packageUrl>
+        <vulnerabilityName>CVE-2022-38752</vulnerabilityName>
+    </suppress>
+
 </suppressions>
