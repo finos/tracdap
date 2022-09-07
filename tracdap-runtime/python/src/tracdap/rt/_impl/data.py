@@ -267,10 +267,20 @@ class DataMapping:
     def arrow_to_pandas(cls, table: pa.Table, temporal_objects_flag: bool = False) -> pd.DataFrame:
 
         return table.to_pandas(
-            ignore_metadata=True,  # noqa
+
+            # Mapping for arrow -> pandas types for core types
+            types_mapper=cls.__ARROW_TO_PANDAS_TYPE_MAPPING.get,
+
+            # Use Python objects for dates and times if temporal_objects_flag is set
             date_as_object=temporal_objects_flag,  # noqa
             timestamp_as_object=temporal_objects_flag,  # noqa
-            types_mapper=cls.__ARROW_TO_PANDAS_TYPE_MAPPING.get)
+
+            # Do not bring any Arrow metadata into Pandas dataframe
+            ignore_metadata=True,  # noqa
+
+            # Do not consolidate memory across columns when preparing the Pandas vectors
+            # This is a significant performance win for very wide datasets
+            split_blocks=True)  # noqa
 
     @classmethod
     def pandas_to_view(cls, df: pd.DataFrame, prior_view: DataView, part: DataPartKey):
