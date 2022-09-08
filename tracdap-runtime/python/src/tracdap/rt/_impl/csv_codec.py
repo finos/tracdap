@@ -324,10 +324,9 @@ class CsvStorageFormat(IDataFormat):
 
         try:
 
-            # TODO: CSV reader in _read_table_lenient does not know the difference between empty string and null
-            # The Java CSV parser has a work-around looking at the token length
+            # Python's csv.reader does not know the difference between empty string and null
 
-            if raw_value is None or (isinstance(raw_value, str) and raw_value.strip() == ""):
+            if raw_value is None or (isinstance(raw_value, str) and raw_value == ""):
                 if python_type == str:
                     return raw_value
                 if nullable:
@@ -392,8 +391,8 @@ class CsvStorageFormat(IDataFormat):
         except Exception as e:
 
             msg = f"CSV data does not match the schema and cannot be converted" \
-                  + f" (col = {col}, row = {row}, expected type = [{python_type.__name__}], value = [{str(raw_value)}])" \
-                  + f": {str(e)}"
+                + f" (col = {col}, row = {row}, expected type = [{python_type.__name__}], value = [{str(raw_value)}])" \
+                + f": {str(e)}"
 
             self._log.exception(msg)
             raise _ex.EDataConformance(msg) from e

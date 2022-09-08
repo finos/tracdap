@@ -353,7 +353,14 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
             column: pa.Array = table.column(i)
             column_name = table.column_names[i]
             value = column[i].as_py()
-            self.assertIsNone(value, msg=f"Found non-null value in row [{i}], column [{column_name}]")
+
+            # The lenient CSV parser does not know the difference between empty string and null
+
+            if column_name == "string_field":
+                self.assertEqual(value, "")
+
+            else:
+                self.assertIsNone(value, msg=f"Found non-null value in row [{i}], column [{column_name}]")
 
     def test_lenient_read_garbled_data(self):
 
