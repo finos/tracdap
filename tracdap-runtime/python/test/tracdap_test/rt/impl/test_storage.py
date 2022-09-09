@@ -337,6 +337,31 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
         self.assertEqual(7, table.num_columns)
         self.assertEqual(10, table.num_rows)
 
+    def test_lenient_nulls(self):
+
+        storage_options = {"lenient_csv_parser": True}
+
+        schema = self.sample_schema()
+        table = self.test_lib_storage.read_table("csv_nulls.csv", "CSV", schema, storage_options)
+
+        self.assertEqual(7, table.num_columns)
+        self.assertEqual(7, table.num_rows)
+
+        # Nulls test dataset has nulls in the diagonals, i.e. row 0 col 0, row 1 col 1 etc.
+
+        for i in range(7):
+            column: pa.Array = table.column(i)
+            column_name = table.column_names[i]
+            value = column[i].as_py()
+
+            # The lenient CSV parser does not know the difference between empty string and null
+
+            if column_name == "string_field":
+                self.assertEqual(value, "")
+
+            else:
+                self.assertIsNone(value, msg=f"Found non-null value in row [{i}], column [{column_name}]")
+
     def test_lenient_read_garbled_data(self):
 
         # Try reading garbage data with the lenient CSV parser
