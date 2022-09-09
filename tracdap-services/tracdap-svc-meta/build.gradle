@@ -37,6 +37,12 @@ application {
     tasks.run.systemProperty("io.netty.tryReflectionSetAccessible", true)
 }
 
+tasks.withType(CreateStartScripts) {
+
+    unixStartScriptGenerator.template = resources.text.fromFile(rootDir.toPath().resolve("scripts/service-ctrl.sh"))
+    windowsStartScriptGenerator.template = resources.text.fromFile(rootDir.toPath().resolve("scripts/service-ctrl.bat"))
+}
+
 dependencies {
 
     implementation project(':tracdap-api-metadata')
