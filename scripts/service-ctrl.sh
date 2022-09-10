@@ -61,7 +61,11 @@ start() {
     echo "Application config: \${CONFIG_FILE}"
     echo
 
-    java -cp \$CORE_CLASSPATH \$APPLICATION_CLASS --config "\${CONFIG_FILE}"
+    export CLASSPATH=\$CORE_CLASSPATH
+
+    java \
+      \${DEFAULT_JVM_OPTS} \
+      \$APPLICATION_CLASS --config "\${CONFIG_FILE}"
 }
 
 stop() {
