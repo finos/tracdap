@@ -32,7 +32,8 @@ application {
 
     applicationDefaultJvmArgs = [
             "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
-            "--add-opens", "java.base/java.nio=ALL-UNNAMED"
+            "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+            "-Dio.netty.tryReflectionSetAccessible=true"
     ]
 
     tasks.run.workingDir = rootProject.projectDir

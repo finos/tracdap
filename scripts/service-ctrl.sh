@@ -32,24 +32,26 @@ ENABLE_PLUGINS_EXT=\${ENABLE_PLUGINS_EXT:=false}
 
 # Standard directory locations, relative to the install dir
 
-PLUGIN_DIR="plugins"
-PLUGIN_EXT_DIR="plugins_ext"
-LOG_DIR="log"
-RUN_DIR="run"
-
-
-# JVM settings
-
-DEFAULT_JVM_OPTS=$defaultJvmOpts
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 
 APP_HOME=\$(cd `dirname \$0` && cd .. && pwd)
 
+PLUGIN_DIR="\${APP_HOME}/plugins"
+PLUGIN_EXT_DIR="\${APP_HOME}/plugins_ext"
+
+# PID_DIR="\${APP_HOME}/run
+PID_DIR=/tmp
+PID_FILE=\${PID_DIR}/${applicationName}.pid
+
 CORE_CLASSPATH=\$(cat <<-CLASSPATH_END
 ${classpath.replace(":", ":\\\n")}
 CLASSPATH_END)
+
+CORE_JAVA_OPTS=\$(cat <<-JAVA_OPTS_END
+${defaultJvmOpts.replace("'", "").replace(' "-', '\n"-').replace('"', '')}
+JAVA_OPTS_END)
 
 
 start() {
@@ -57,15 +59,26 @@ start() {
     echo "Starting application: \${APPLICATION_NAME}"
     echo
 
+    if [ ! -w \${PID_DIR} ]; then
+      echo "PID dir is not writable: \${RUN_DIR}"
+      exit -1
+    fi
+
+    if [ -f \${PID_FILE} ]; then
+      echo "Application is already running, try \$0 [stop | kill]"
+      exit -1
+    fi
+
     echo "Application install location: \${APP_HOME}"
     echo "Application config: \${CONFIG_FILE}"
     echo
 
     export CLASSPATH=\$CORE_CLASSPATH
 
-    java \
-      \${DEFAULT_JVM_OPTS} \
-      \$APPLICATION_CLASS --config "\${CONFIG_FILE}"
+    java \${CORE_JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" &
+
+    PID=\$!
+    echo PID > "\${PID_FILE}"
 }
 
 stop() {
