@@ -101,8 +101,7 @@ case "\$1" in
        # example: status program_name
        ;;
     *)
-       echo "Usage: \$0
-       } {start|stop|status|restart}"
+       echo "Usage: \$0 {start|stop|status|restart}"
 esac
 
 exit 0
