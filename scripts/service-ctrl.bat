@@ -15,21 +15,22 @@ rem See the License for the specific language governing permissions and
 rem limitations under the License.
 
 
-set APPLICATION_NAME="$applicationName"
-set APPLICATION_CLASS="$mainClassName"
+set APPLICATION_NAME=$applicationName
+set APPLICATION_CLASS=$mainClassName
 
 
 rem These environment variables are required to start the service
 
 if not defined CONFIG_FILE (
     echo Missing required environment variable CONFIG_FILE
-    exit 1)
+    exit /B -1
+)
 
 
 rem Optional environment variables, set if needed, defaults are normally fine
 
-if not defined ENABLE_PLUGINS (set ENABLE_PLUGINS = true)
-if not defined ENABLE_PLUGINS_EXT (set ENABLE_PLUGINS_EXT = false)
+if not defined ENABLE_PLUGINS (set ENABLE_PLUGINS=true)
+if not defined ENABLE_PLUGINS_EXT (set ENABLE_PLUGINS_EXT=false)
 
 
 rem --------------------------------------------------------------------------------------------------------------------
@@ -37,38 +38,38 @@ rem ----------------------------------------------------------------------------
 rem APP_HOME
 for %%A in ("%~dp0.") do set APP_HOME=%%~dpA
 
-set PLUGIN_DIR = %APP_HOME%\\plugins
-set PLUGIN_EXT_DIR = %APP_HOME%\\plugins_ext
+set PLUGIN_DIR=%APP_HOME%\\plugins
+set PLUGIN_EXT_DIR=%APP_HOME%\\plugins_ext
 
-set PID_DIR = %APP_HOME%\\run
-set PID_FILE = %PID_DIR%\\tracdap-svc-meta.pid
+set PID_DIR=%APP_HOME%\\run
+set PID_FILE=%PID_DIR%\\tracdap-svc-meta.pid
 
-set CORE_CLASSPATH = ""
-set CORE_CLASSPATH = %CORE_CLASSPATH%;${classpath.replace(";", "\nset CORE_CLASSPATH = %CORE_CLASSPATH%;")}
+set CORE_CLASSPATH=""
+set CORE_CLASSPATH=%CORE_CLASSPATH%;${classpath.replace(";", "\nset CORE_CLASSPATH=%CORE_CLASSPATH%;")}
 
-set CORE_JAVA_OPTS = ""
-set CORE_JAVA_OPTS = %CORE_JAVA_OPTS% ${defaultJvmOpts.replace("'", "").replace(' \"-', '\nset CORE_JAVA_OPTS = %CORE_JAVA_OPTS% "-').replace('"', '')}
+set CORE_JAVA_OPTS=""
+set CORE_JAVA_OPTS=%CORE_JAVA_OPTS% ${defaultJvmOpts.replace("'", "").replace(' \"-', '\nset CORE_JAVA_OPTS=%CORE_JAVA_OPTS% "-').replace('"', '')}
 
 
 
 
 :start
-    echo "Starting application: %APPLICATION_NAME%"
-    echo
+    echo Starting application: %APPLICATION_NAME%
+    echo.
 
     if not exist "%PID_DIR%" (
-      echo "PID dir does not exist: %PID_DIR%"
-      exit -1
+      echo PID dir does not exist: %PID_DIR%
+      exit /B -1
     )
 
     if exist "%PID_FILE%" (
-      echo "Application is already running, try %%0 [stop | kill]"
-      exit -1
+      echo Application is already running, try %%0 [stop | kill]
+      exit /B -1
     )
 
-    echo "Application install location: %APP_HOME%"
-    echo "Application config: %CONFIG_FILE%"
-    echo
+    echo Application install location: %APP_HOME%
+    echo Application config: %CONFIG_FILE%
+    echo.
 
     set CLASSPATH=%CORE_CLASSPATH%
 
@@ -80,13 +81,13 @@ set CORE_JAVA_OPTS = %CORE_JAVA_OPTS% ${defaultJvmOpts.replace("'", "").replace(
 
     echo PID > "%PID_FILE%"
 
-exit /b 0
+exit /B 0
 
 
 :stop
     echo Stopping service: %APPLICATION_NAME%
 
 
-exit /b 0
+exit /B 0
 
 
