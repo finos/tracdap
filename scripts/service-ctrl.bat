@@ -51,6 +51,7 @@ set CORE_JAVA_OPTS=""
 set CORE_JAVA_OPTS=%CORE_JAVA_OPTS% ${defaultJvmOpts.replace("'", "").replace(' \"-', '\nset CORE_JAVA_OPTS=%CORE_JAVA_OPTS% "-').replace('"', '')}
 
 
+goto :main
 
 
 :start
@@ -81,13 +82,24 @@ set CORE_JAVA_OPTS=%CORE_JAVA_OPTS% ${defaultJvmOpts.replace("'", "").replace(' 
 
     echo PID > "%PID_FILE%"
 
-exit /B 0
+goto :eof
 
 
 :stop
     echo Stopping service: %APPLICATION_NAME%
 
+goto :eof
 
-exit /B 0
 
+:main
 
+if "%1" == "start" (
+    call :start:
+) else if "%1" == "stop" (
+    call :stop:
+) else if "%1" == "restart" (
+    call :stop:
+    call :start:
+) else (
+    echo Usage: %0 {start^|stop^|restart^|status}
+)
