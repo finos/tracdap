@@ -46,8 +46,16 @@ application {
 
 tasks.withType(CreateStartScripts) {
 
-    unixStartScriptGenerator.template = resources.text.fromFile(rootDir.toPath().resolve("scripts/service-ctrl.sh"))
-    windowsStartScriptGenerator.template = resources.text.fromFile(rootDir.toPath().resolve("scripts/service-ctrl.bat"))
+    unixStartScriptGenerator.template = resources.text.fromFile("${rootDir}/dist/scripts/service-ctrl.sh")
+    windowsStartScriptGenerator.template = resources.text.fromFile("${rootDir}/dist/scripts/service-ctrl.bat")
+}
+
+distributions {
+    main {
+        contents {
+            into("") { from("${rootDir}/dist/template") }
+        }
+    }
 }
 
 dependencies {
