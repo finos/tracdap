@@ -43,18 +43,20 @@ APP_HOME=\$(cd `dirname \$0` && cd .. && pwd)
 CONFIG_DIR="\${APP_HOME}/config"
 PLUGIN_DIR="\${APP_HOME}/plugins"
 PLUGIN_EXT_DIR="\${APP_HOME}/plugins_ext"
+LOG_DIR="\${APP_HOME}/log"
 RUN_DIR="\${APP_HOME}/run"
+PID_DIR="\${RUN_DIR}"
 
 ENV_FILE="\${CONFIG_DIR}/env.sh"
 PID_FILE="\${RUN_DIR}/${applicationName}.pid"
 
-if [ ! -w \${RUN_DIR} ]; then
-    echo "Run directory is not writable: \${RUN_DIR}"
-    exit -1
-fi
-
 if [ -f "\${ENV_FILE}" ]; then
     . "\${ENV_FILE}"
+fi
+
+if [ ! -w \${PID_DIR} ]; then
+    echo "PID directory is not writable: \${PID_DIR}"
+    exit -1
 fi
 
 CORE_CLASSPATH=\$(cat <<-CLASSPATH_END
