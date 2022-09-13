@@ -21,7 +21,7 @@ APPLICATION_CLASS="$mainClassName"
 
 # These environment variables are required to start the service
 
-CONFIG_FILE="\${CONFIG_FILE:?Missing required environment variable CONFIG_FILE}"
+CONFIG_FILE="\${CONFIG_FILE}"
 
 
 # Optional environment variables, set if needed, defaults are normally fine
@@ -30,20 +30,32 @@ ENABLE_PLUGINS=\${ENABLE_PLUGINS:=true}
 ENABLE_PLUGINS_EXT=\${ENABLE_PLUGINS_EXT:=false}
 
 
-# Standard directory locations, relative to the install dir
+# Control script settings
 
-
+STARTUP_WAIT_TIME=3
+SHUTDOWN_WAIT_TIME=30
 
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 APP_HOME=\$(cd `dirname \$0` && cd .. && pwd)
 
+CONFIG_DIR="\${APP_HOME}/config"
 PLUGIN_DIR="\${APP_HOME}/plugins"
 PLUGIN_EXT_DIR="\${APP_HOME}/plugins_ext"
+RUN_DIR="\${APP_HOME}/run"
 
-# PID_DIR="\${APP_HOME}/run
-PID_DIR=/tmp
-PID_FILE=\${PID_DIR}/${applicationName}.pid
+ENV_FILE="\${CONFIG_DIR}/env.sh"
+PID_FILE="\${RUN_DIR}/${applicationName}.pid"
+
+if [ ! -w \${RUN_DIR} ]; then
+    echo "Run directory is not writable: \${RUN_DIR}"
+    exit -1
+fi
+
+if [ -f "\${ENV_FILE}" ]; then
+    . "\${ENV_FILE}"
+fi
 
 CORE_CLASSPATH=\$(cat <<-CLASSPATH_END
 ${classpath.replace(":", ":\\\n")}
@@ -57,11 +69,10 @@ JAVA_OPTS_END)
 start() {
 
     echo "Starting application: \${APPLICATION_NAME}"
-    echo
 
-    if [ ! -w \${PID_DIR} ]; then
-      echo "PID dir is not writable: \${RUN_DIR}"
-      exit -1
+    if [ "\${CONFIG_FILE}" == "" ]; then
+        echo "Missing required environment variable CONFIG_FILE"
+        exit -1
     fi
 
     if [ -f \${PID_FILE} ]; then
@@ -69,20 +80,137 @@ start() {
       exit -1
     fi
 
-    echo "Application install location: \${APP_HOME}"
-    echo "Application config: \${CONFIG_FILE}"
-    echo
+    echo "Install location: \${APP_HOME}"
+    echo "Config: \${CONFIG_FILE}"
 
     export CLASSPATH=\$CORE_CLASSPATH
 
     java \${CORE_JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" &
-
     PID=\$!
-    echo PID > "\${PID_FILE}"
+
+    # Before recording the PID, wait to make sure the service doesn't crash on startup
+    # Not a fail-safe guarantee, but will catch e.g. missing or invalid config files
+
+    COUNTDOWN=\$STARTUP_WAIT_TIME
+    while `ps -p \$PID > /dev/null` && [ \$COUNTDOWN -gt 0 ]; do
+        sleep 1
+        COUNTDOWN=\$((COUNTDOWN - 1))
+    done
+
+    if [ \$COUNTDOWN -eq 0 ]; then
+        echo \$PID > "\${PID_FILE}"
+    else
+        echo "\${APPLICATION_NAME} failed to start"
+        exit -1
+    fi
 }
 
 stop() {
-    echo "This will stop \${APPLICATION_CLASS}"
+
+    echo "Stopping application: \${APPLICATION_NAME}"
+
+    if [ ! -f "\${PID_FILE}" ]; then
+
+        echo "\${APPLICATION_NAME} is not running"
+
+    else
+
+        PID=`cat "\${PID_FILE}"`
+
+        # Do not send the TERM signal if the application has already been stopped
+        if `ps -p \$PID > /dev/null`; then
+
+            kill -TERM \$PID
+
+            # Wait for the application to go down cleanly
+            COUNTDOWN=\$SHUTDOWN_WAIT_TIME
+            while `ps -p \$PID > /dev/null` && [ \$COUNTDOWN -gt 0 ]; do
+                sleep 1
+                COUNTDOWN=\$((COUNTDOWN - 1))
+            done
+
+            # If the timeout expired, send a kill signal
+            if [ \$COUNTDOWN -eq 0 ]; then
+                echo "\${APPLICATION_NAME} did not stop in time"
+                kill -KILL \$PID
+                echo "\${APPLICATION_NAME} has been killed"
+            fi
+
+        else
+
+            echo "\${APPLICATION_NAME} has already stopped"
+
+        fi
+
+        rm "\${PID_FILE}"
+    fi
+}
+
+status() {
+
+    if [ ! -f "\${PID_FILE}" ]; then
+
+        echo "\${APPLICATION_NAME} is down"
+
+    else
+
+        PID=`cat "\${PID_FILE}"`
+
+        if [ `ps -p \$PID > /dev/null` ]; then
+
+            echo "\${APPLICATION_NAME} is up"
+
+        else
+
+            echo "\${APPLICATION_NAME} is down"
+
+            # Clean up the PID file if it refers to a dead process
+            rm "\${PID_FILE}"
+        fi
+    fi
+}
+
+kill_pid() {
+
+    echo "Killing application: \${APPLICATION_NAME}"
+
+    if [ ! -f "\${PID_FILE}" ]; then
+
+        echo "\${APPLICATION_NAME} is not running"
+
+    else
+
+        PID=`cat "\${PID_FILE}"`
+
+        # Do not send the TERM signal if the application has already been stopped
+        if `ps -p \$PID > /dev/null`; then
+            kill -TERM \$PID
+            echo "\${APPLICATION_NAME} has been killed"
+        else
+            echo "\${APPLICATION_NAME} has already stopped"
+        fi
+
+        rm "\${PID_FILE}"
+    fi
+}
+
+kill_all() {
+
+    FOUND=0
+
+    for PID in `ps -A | grep "[j]ava" | grep "\${APPLICATION_CLASS}" | awk '{print \$1;}'`; do
+        echo "Killing PID \$PID..."
+        kill -KILL \$PID
+        FOUND=1
+    done
+
+    if [ \$FOUND -eq 0 ]; then
+        echo "No processes found for \${APPLICATION_NAME}"
+    fi
+
+    if [ -f "\${PID_FILE}" ]; then
+        rm "\${PID_FILE}"
+    fi
 }
 
 case "\$1" in
@@ -97,11 +225,16 @@ case "\$1" in
        start
        ;;
     status)
-       # code to check status of app comes here
-       # example: status program_name
+       status
+       ;;
+    kill)
+       kill_pid
+       ;;
+    kill_all)
+       kill_all
        ;;
     *)
-       echo "Usage: \$0 {start|stop|status|restart}"
+       echo "Usage: \$0 {start|stop|restart|status|kill|kill_all}"
 esac
 
 exit 0
