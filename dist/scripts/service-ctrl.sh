@@ -15,49 +15,69 @@
 # limitations under the License.
 
 
-APPLICATION_NAME="$applicationName"
-APPLICATION_CLASS="$mainClassName"
+# Control script for ${applicationName}
 
-
-# These environment variables are required to start the service
-
-CONFIG_FILE="\${CONFIG_FILE}"
-
-
-# Optional environment variables, set if needed, defaults are normally fine
-
-ENABLE_PLUGINS=\${ENABLE_PLUGINS:=true}
-ENABLE_PLUGINS_EXT=\${ENABLE_PLUGINS_EXT:=false}
-
-
-# Control script settings
-
-STARTUP_WAIT_TIME=3
-SHUTDOWN_WAIT_TIME=30
+# The following environment variables must be set to start the application:
+#
+#   CONFIG_FILE
+#
+# You may also wish to set these variables to control the JVM:
+#
+#   JAVA_HOME
+#   JAVA_OPTS
+#
+# All these can be set directly before calling this script, or via the env.sh
+# in the config directory.
 
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+# Variables in this section do not need to be set, but can be overridden if needed in env.sh.
+
+# Find the installation folder
 APP_HOME=\$(cd `dirname \$0` && cd .. && pwd)
 
+# Set up the default folder structure (this can be overridden in env.sh if required)
 CONFIG_DIR="\${APP_HOME}/config"
-PLUGIN_DIR="\${APP_HOME}/plugins"
-PLUGIN_EXT_DIR="\${APP_HOME}/plugins_ext"
+PLUGINS_DIR="\${APP_HOME}/plugins"
+PLUGINS_EXT_DIR="\${APP_HOME}/plugins_ext"
 LOG_DIR="\${APP_HOME}/log"
 RUN_DIR="\${APP_HOME}/run"
 PID_DIR="\${RUN_DIR}"
 
-ENV_FILE="\${CONFIG_DIR}/env.sh"
-PID_FILE="\${RUN_DIR}/${applicationName}.pid"
+PLUGINS_ENABLED=true
+PLUGINS_EXT_ENABLED=false
 
+STARTUP_WAIT_TIME=3
+SHUTDOWN_WAIT_TIME=30
+
+ENV_FILE="\${CONFIG_DIR}/env.sh"
+
+# Any variables set before this point can be overridden by the env file
 if [ -f "\${ENV_FILE}" ]; then
     . "\${ENV_FILE}"
 fi
 
-if [ ! -w \${PID_DIR} ]; then
+# If the PID directory is not writable, don't even try to start
+if [ ! -w "\${PID_DIR}" ]; then
     echo "PID directory is not writable: \${PID_DIR}"
     exit -1
 fi
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+# Variables in this section are set up automatically and should not be overridden
+
+APPLICATION_NAME="$applicationName"
+APPLICATION_CLASS="$mainClassName"
+
+PID_FILE="\${PID_DIR}/${applicationName}.pid"
+
+# Core classpath and Java options are supplied by the build system
+# These should never be edited directly
+# The classpath can be extended using plugins in the PLUGINS and PLUGINS_EXT folders
+# Extra java options can be specified in JAVA_OPTS
 
 CORE_CLASSPATH=\$(cat <<-CLASSPATH_END
 ${classpath.replace(":", ":\\\n")}
@@ -66,6 +86,8 @@ CLASSPATH_END)
 CORE_JAVA_OPTS=\$(cat <<-JAVA_OPTS_END
 ${defaultJvmOpts.replace("'", "").replace(' "-', '\n"-').replace('"', '')}
 JAVA_OPTS_END)
+
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 start() {
@@ -214,6 +236,7 @@ kill_all() {
         rm "\${PID_FILE}"
     fi
 }
+
 
 case "\$1" in
     start)
