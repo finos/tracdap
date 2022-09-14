@@ -96,7 +96,7 @@ tasks.withType(CreateStartScripts) {
 
     // Default config file location
     startScripts { doLast {
-        unixScript.text = unixScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-platform.yaml")
-        windowsScript.text = windowsScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-platform.yaml")
+        unixScript.text = unixScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-gateway.yaml")
+        windowsScript.text = windowsScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-gateway.yaml")
     }}
 }
