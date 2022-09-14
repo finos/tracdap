@@ -78,6 +78,11 @@ APPLICATION_CLASS="$mainClassName"
 
 PID_FILE="\${PID_DIR}/${applicationName}.pid"
 
+# If CONFIG_FILE is relative, look in the config folder
+if [ "\${CONFIG_FILE}" != "" ] && [ "\${CONFIG_FILE:0:1}" != "/" ]; then
+    CONFIG_FILE="\${CONFIG_DIR}/\${CONFIG_FILE}"
+fi
+
 
 # Discover Java
 
@@ -147,6 +152,40 @@ JAVA_OPTS="\${CORE_JAVA_OPTS} \${JAVA_OPTS}"
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+run() {
+
+    echo "Running application: \${APPLICATION_NAME}"
+
+    if [ "\${CONFIG_FILE}" == "" ]; then
+        echo "Missing required environment variable CONFIG_FILE"
+        exit -1
+    fi
+
+    if [ -f \${PID_FILE} ]; then
+      echo "Application is already running, try \$0 [stop | kill]"
+      exit -1
+    fi
+
+    echo "Java location: [\${JAVA_CMD}]"
+    echo "Install location: [\${APP_HOME}]"
+    echo "Working directory: [\${RUN_DIR}]"
+    echo "Config file: [\${CONFIG_FILE}]"
+    echo
+
+    if [ \$# -gt 0 ]; then
+        TASK_LIST=""
+        for TASK in \$@; do
+            echo "Task: \$TASK"
+            TASK_LIST="\${TASK_LIST} --task \"\${TASK}\""
+        done
+        echo
+    fi
+
+    export CLASSPATH
+
+    (cd "\${RUN_DIR}" && java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \${TASK_LIST})
+}
+
 start() {
 
     echo "Starting application: \${APPLICATION_NAME}"
@@ -163,12 +202,13 @@ start() {
 
     echo "Java location: [\${JAVA_CMD}]"
     echo "Install location: [\${APP_HOME}]"
+    echo "Working directory: [\${RUN_DIR}]"
     echo "Config file: [\${CONFIG_FILE}]"
     echo
 
     export CLASSPATH
 
-    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" &
+    (cd "\${RUN_DIR}" && java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}") &
     PID=\$!
 
     # Before recording the PID, wait to make sure the service doesn't crash on startup
@@ -298,6 +338,10 @@ kill_all() {
 
 
 case "\$1" in
+    run)
+       shift
+       run \$@
+       ;;
     start)
        start
        ;;
@@ -318,7 +362,7 @@ case "\$1" in
        kill_all
        ;;
     *)
-       echo "Usage: \$0 {start|stop|restart|status|kill|kill_all}"
+       echo "Usage: \$0 {run|start|stop|restart|status|kill|kill_all}"
 esac
 
 exit 0
