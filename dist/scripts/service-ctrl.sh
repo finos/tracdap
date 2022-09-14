@@ -17,9 +17,12 @@
 
 # Control script for ${applicationName}
 
-# The following environment variables must be set to start the application:
+# The following environment variables are used to start the application:
 #
-#   CONFIG_FILE
+#   CONFIG_FILE - defaults to \${APP_HOME}/config/<DEFAULT_CONFIG_FILE>
+#
+#   PLUGINS_ENABLED - load plugins from \${APP_HOME}/plugins, defaults to true
+#   PLUGINS_EXT_ENABLED - load plugins from \${APP_HOME}/plugins_ext, defaults to false
 #
 # You may also wish to set these variables to control the JVM:
 #
@@ -45,13 +48,14 @@ LOG_DIR="\${APP_HOME}/log"
 RUN_DIR="\${APP_HOME}/run"
 PID_DIR="\${RUN_DIR}"
 
-PLUGINS_ENABLED=true
-PLUGINS_EXT_ENABLED=false
+CONFIG_FILE="\${CONFIG_FILE:=\${APP_HOME}/config/<DEFAULT_CONFIG_FILE>}"
+ENV_FILE="\${CONFIG_DIR}/env.sh"
+
+PLUGINS_ENABLED="\${PLUGINS_ENABLED:=true}"
+PLUGINS_EXT_ENABLED="\${PLUGINS_EXT_ENABLED:=false}"
 
 STARTUP_WAIT_TIME=3
 SHUTDOWN_WAIT_TIME=30
-
-ENV_FILE="\${CONFIG_DIR}/env.sh"
 
 # Any variables set before this point can be overridden by the env file
 if [ -f "\${ENV_FILE}" ]; then

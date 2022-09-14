@@ -30,15 +30,21 @@ application {
 
     mainClass.set("org.finos.tracdap.svc.meta.TracMetadataService")
 
+    // JVM flags needed for Arrow / Netty / gRPC to access native memory
     applicationDefaultJvmArgs = [
             "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
             "--add-opens", "java.base/java.nio=ALL-UNNAMED",
             "-Dio.netty.tryReflectionSetAccessible=true"
     ]
 
-    tasks.run.workingDir = rootProject.projectDir
+    // Default config file location
+    startScripts { doLast {
+        unixScript.text = unixScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-platform.yaml")
+        windowsScript.text = windowsScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-platform.yaml")
+    }}
 
-    // JVM flags needed for Arrow / Netty / gRPC to access native memory
+    // Gradle task for running in the IDE
+    tasks.run.workingDir = rootProject.projectDir
     tasks.run.jvmArgs("--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED")
     tasks.run.jvmArgs("--add-opens", "java.base/java.nio=ALL-UNNAMED")
     tasks.run.systemProperty("io.netty.tryReflectionSetAccessible", true)
