@@ -19,7 +19,7 @@
 
 # The following environment variables are used to start the application:
 #
-#   CONFIG_FILE - defaults to \${APP_HOME}/config/<DEFAULT_CONFIG_FILE>
+#   CONFIG_FILE - defaults to \${APP_HOME}/etc/<DEFAULT_CONFIG_FILE>
 #
 #   PLUGINS_ENABLED - load plugins from \${APP_HOME}/plugins, defaults to true
 #   PLUGINS_EXT_ENABLED - load plugins from \${APP_HOME}/plugins_ext, defaults to false
@@ -30,7 +30,7 @@
 #   JAVA_OPTS
 #
 # All these can be set directly before calling this script, or via the env.sh
-# in the config directory.
+# in the etc directory.
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -41,14 +41,14 @@
 APP_HOME=\$(cd `dirname \$0` && cd .. && pwd)
 
 # Set up the default folder structure (this can be overridden in env.sh if required)
-CONFIG_DIR="\${APP_HOME}/config"
+CONFIG_DIR="\${APP_HOME}/etc"
 PLUGINS_DIR="\${APP_HOME}/plugins"
 PLUGINS_EXT_DIR="\${APP_HOME}/plugins_ext"
 LOG_DIR="\${APP_HOME}/log"
 RUN_DIR="\${APP_HOME}/run"
 PID_DIR="\${RUN_DIR}"
 
-CONFIG_FILE="\${CONFIG_FILE:=\${APP_HOME}/config/<DEFAULT_CONFIG_FILE>}"
+CONFIG_FILE="\${CONFIG_FILE:=\${APP_HOME}/etc/<DEFAULT_CONFIG_FILE>}"
 ENV_FILE="\${CONFIG_DIR}/env.sh"
 
 PLUGINS_ENABLED="\${PLUGINS_ENABLED:=true}"
