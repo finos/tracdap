@@ -268,7 +268,7 @@ jobs:
           name: web_api_package
           path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/web_api_package
 
-      - name: Build dist tarball
+      - name: Build API packages tarball
         run: tar -cvzf tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/
 
       - name: Publish platform package
