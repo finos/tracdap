@@ -96,3 +96,23 @@ sourceSets.each { dialect ->
         }
     }
 }
+
+distributions {
+    main {
+        contents {
+            into("") { from("${rootDir}/dist/template") }
+        }
+    }
+}
+
+tasks.withType(CreateStartScripts) {
+
+    unixStartScriptGenerator.template = resources.text.fromFile("${rootDir}/dist/scripts/service-ctrl.sh")
+    windowsStartScriptGenerator.template = resources.text.fromFile("${rootDir}/dist/scripts/service-ctrl.bat")
+
+    // Default config file location
+    startScripts { doLast {
+        unixScript.text = unixScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-platform.yaml")
+        windowsScript.text = windowsScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-platform.yaml")
+    }}
+}
