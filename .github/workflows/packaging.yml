@@ -120,16 +120,6 @@ jobs:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_KEY_PASSPHRASE: ${{ secrets.GPG_KEY_PASSPHRASE }}
 
-      - name: Save publication artifacts
-        if: ${{ github.event_name != 'pull_request' }}
-        uses: actions/upload-artifact@v2
-        with:
-          name: java_artifacts
-          path: |
-            ~/.m2/repository/org/finos/tracdap/**
-            !~/.m2/repository/org/finos/tracdap/*/maven-metadata-local.xml
-          retention-days: 7
-
       - name: Publish to Maven Central
         if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
         run: |
@@ -260,35 +250,55 @@ jobs:
           echo "tracdap_version = ${tracdap_version}"
           echo "::set-output name=tracdap_version::${tracdap_version}"
 
-      - name: Fetch Java artifacts
+      - name: Fetch platform and sandbox packages
         uses: actions/download-artifact@v2
         with:
-          name: java_artifacts
-          path: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/java
+          name: platform_packages
+          path: .
 
       - name: Fetch Python runtime package
         uses: actions/download-artifact@v2
         with:
           name: python_runtime_package
-          path: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/python_runtime_package
+          path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/python_runtime_package
 
       - name: Fetch web API package
         uses: actions/download-artifact@v2
         with:
           name: web_api_package
-          path: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/web_api_package
+          path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/web_api_package
 
       - name: Build dist tarball
-        run: tar -cvzf tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/
+        run: tar -cvzf tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/
 
-      - name: Publish release assets
+      - name: Publish platform package
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
-          asset_name: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
+          asset_path: tracdap-platform-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
+          asset_name: tracdap-platform-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
+          asset_content_type: application/gzip
+
+      - name: Publish sandbox package
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: tracdap-sandbox-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
+          asset_name: tracdap-sandbox-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
+          asset_content_type: application/zip
+
+      - name: Publish API packages
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
+          asset_name: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
           asset_content_type: application/gzip
 
   publish_to_pypi:
