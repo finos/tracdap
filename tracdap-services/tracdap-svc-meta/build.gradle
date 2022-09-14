@@ -21,10 +21,7 @@ plugins {
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 
-
 description = "TRAC D.A.P. metadata service, stateless service component to answer the TRAC metadata API"
-
-ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Metadata Service")
 
 application {
 
@@ -32,37 +29,16 @@ application {
 
     // JVM flags needed for Arrow / Netty / gRPC to access native memory
     applicationDefaultJvmArgs = [
-            "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
-            "--add-opens", "java.base/java.nio=ALL-UNNAMED",
-            "-Dio.netty.tryReflectionSetAccessible=true"
+        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
+        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+        "-Dio.netty.tryReflectionSetAccessible=true"
     ]
 
-    // Default config file location
-    startScripts { doLast {
-        unixScript.text = unixScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-platform.yaml")
-        windowsScript.text = windowsScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-platform.yaml")
-    }}
-
-    // Gradle task for running in the IDE
+    // Working dir when running in the IDE
     tasks.run.workingDir = rootProject.projectDir
-    tasks.run.jvmArgs("--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED")
-    tasks.run.jvmArgs("--add-opens", "java.base/java.nio=ALL-UNNAMED")
-    tasks.run.systemProperty("io.netty.tryReflectionSetAccessible", true)
 }
 
-tasks.withType(CreateStartScripts) {
-
-    unixStartScriptGenerator.template = resources.text.fromFile("${rootDir}/dist/scripts/service-ctrl.sh")
-    windowsStartScriptGenerator.template = resources.text.fromFile("${rootDir}/dist/scripts/service-ctrl.bat")
-}
-
-distributions {
-    main {
-        contents {
-            into("") { from("${rootDir}/dist/template") }
-        }
-    }
-}
+ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Metadata Service")
 
 dependencies {
 
@@ -104,9 +80,28 @@ dependencies {
 ext.pluginDependency("AWS_CONFIG", project(":aws-config"))
 ext.pluginDependency("GCP_CONFIG", project(":gcp-config"))
 
-
 // Bring DDL files into test JAR as resources
 processTestResources {
 
     from "${project(':tracdap-svc-meta').projectDir.path}/src/schema"
+}
+
+distributions {
+    main {
+        contents {
+            into("") { from("${rootDir}/dist/template") }
+        }
+    }
+}
+
+tasks.withType(CreateStartScripts) {
+
+    unixStartScriptGenerator.template = resources.text.fromFile("${rootDir}/dist/scripts/service-ctrl.sh")
+    windowsStartScriptGenerator.template = resources.text.fromFile("${rootDir}/dist/scripts/service-ctrl.bat")
+
+    // Default config file location
+    startScripts { doLast {
+        unixScript.text = unixScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-platform.yaml")
+        windowsScript.text = windowsScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-platform.yaml")
+    }}
 }
