@@ -74,18 +74,71 @@ APPLICATION_CLASS="$mainClassName"
 
 PID_FILE="\${PID_DIR}/${applicationName}.pid"
 
-# Core classpath and Java options are supplied by the build system
-# These should never be edited directly
-# The classpath can be extended using plugins in the PLUGINS and PLUGINS_EXT folders
-# Extra java options can be specified in JAVA_OPTS
 
-CORE_CLASSPATH=\$(cat <<-CLASSPATH_END
+# Discover Java
+
+if [ -n "\$JAVA_HOME" ] ; then
+
+    if [ -x "\$JAVA_HOME/jre/sh/java" ] ; then
+        # IBM's JDK on AIX uses strange locations for the executables
+        JAVA_CMD=\$JAVA_HOME/jre/sh/java
+    else
+        JAVA_CMD=\$JAVA_HOME/bin/java
+    fi
+
+    if [ ! -x "\$JAVA_CMD" ] ; then
+        echo "JAVA_HOME does not contain a valid Java installation: [\${JAVA_HOME}]"
+        exit -1
+    fi
+
+else
+
+    JAVA_CMD=`which java`
+
+    if [ ! -x "\$JAVA_CMD" ] ; then
+        echo "JAVA_HOME is not set and no 'java' command could be found in PATH"
+        exit -1
+    fi
+
+fi
+
+
+# Core classpath is supplied by the build system and should never be edited directly
+
+CLASSPATH=\$(cat <<-CLASSPATH_END
 ${classpath.replace(":", ":\\\n")}
 CLASSPATH_END)
+
+# Discover standard plugins
+
+if [ "\${PLUGINS_ENABLED}" = "true" ]; then
+    CWD=`pwd` && cd "\${PLUGINS_DIR}"
+    for JAR in `find . -name "*.jar" | sed s#^./##`; do
+        CLASSPATH="\${CLASSPATH}:\${PLUGINS_EXT_DIR}/\${JAR}";
+    done
+    cd "\${CWD}"
+fi
+
+# Discover external plugins
+
+if [ "\${PLUGINS_EXT_ENABLED}" = "true" ]; then
+    CWD=`pwd` && cd "\${PLUGINS_EXT_DIR}"
+    for JAR in `find . -name "*.jar" | sed s#^./##`; do
+        CLASSPATH="\${CLASSPATH}:\${PLUGINS_EXT_DIR}/\${JAR}";
+    done
+    cd "\${CWD}"
+fi
+
+
+# Core Java opts are supplied by the build system and should never be edited directly
 
 CORE_JAVA_OPTS=\$(cat <<-JAVA_OPTS_END
 ${defaultJvmOpts.replace("'", "").replace(' "-', '\n"-').replace('"', '')}
 JAVA_OPTS_END)
+
+# Add core Java opts to opts supplied from the environment or env.sh
+
+JAVA_OPTS="\${CORE_JAVA_OPTS} \${JAVA_OPTS}"
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -104,12 +157,14 @@ start() {
       exit -1
     fi
 
-    echo "Install location: \${APP_HOME}"
-    echo "Config: \${CONFIG_FILE}"
+    echo "Java location: [\${JAVA_CMD}]"
+    echo "Install location: [\${APP_HOME}]"
+    echo "Config file: [\${CONFIG_FILE}]"
+    echo
 
-    export CLASSPATH=\$CORE_CLASSPATH
+    export CLASSPATH
 
-    java \${CORE_JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" &
+    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" &
     PID=\$!
 
     # Before recording the PID, wait to make sure the service doesn't crash on startup
