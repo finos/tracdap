@@ -127,7 +127,7 @@ CLASSPATH_END)
 if [ "\${PLUGINS_ENABLED}" = "true" ]; then
     CWD=`pwd` && cd "\${PLUGINS_DIR}"
     for JAR in `find . -name "*.jar" | sed s#^./##`; do
-        CLASSPATH="\${CLASSPATH}:\${PLUGINS_EXT_DIR}/\${JAR}";
+        CLASSPATH="\${CLASSPATH}:\${PLUGINS_DIR}/\${JAR}";
     done
     cd "\${CWD}"
 fi
