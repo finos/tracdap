@@ -20,22 +20,16 @@
 
     <Appenders>
 
-        <!-- The STDOUT appender is recommended for containers and interactive sessions -->
-        <Appender name="STDOUT" type="Console">
-            <Layout type="PatternLayout" disableAnsi="false">
-                <Pattern>
-                    %d{yyyy-MM-dd HH:mm:ss.SSS} %highlight{%-5level} [%-16t] %cyan{%c{1.}} - %msg%n
-                </Pattern>
-            </Layout>
-        </Appender>
-
         <!-- The LOCAL_FILES appender is recommended for deployments on physical machines and VMs -->
-        <!-- The LOG_DIR and APPLICATION_NAME variables are set by the service startup script -->
-        <!-- <Appender
+
+        <!-- The LOG_DIR and LOG_NAME variables are set up as Java properties by the start-up script -->
+        <!-- Use JAVA_OPTS to define additional properties if needed -->
+
+        <Appender
                 name="LOCAL_FILES"
                 type="RollingFile"
-                fileName="${LOG_DIR}/${APPLICATION_NAME}.log"
-                filePatter="${LOG_DIR}/${APPLICATION_NAME}-%d{yyyy-MM-dd}.log.gz">
+                fileName="${sys:LOG_DIR}/${sys:LOG_NAME}.log"
+                filePattern="${sys:LOG_DIR}/${sys:LOG_NAME}-%d{yyyy-MM-dd}.log.gz">
 
             <Layout type="PatternLayout" disableAnsi="true">
                 <Pattern>
@@ -43,14 +37,27 @@
                 </Pattern>
             </Layout>
 
+            <Policies>
+            </Policies>
+
+        </Appender>
+
+        <!-- The STDOUT appender is recommended for containers and interactive sessions -->
+
+        <!-- <Appender name="STDOUT" type="Console">
+            <Layout type="PatternLayout" disableAnsi="true">
+                <Pattern>
+                    %d{yyyy-MM-dd HH:mm:ss.SSS} %highlight{%-5level} [%-16t] %cyan{%c{1.}} - %msg%n
+                </Pattern>
+            </Layout>
         </Appender> -->
 
     </Appenders>
 
     <Loggers>
         <Root level="info">
-            <AppenderRef ref="STDOUT"/>
-            <!-- <AppenderRef ref="LOCAL_FILES"/> -->
+            <AppenderRef ref="LOCAL_FILES"/>
+            <!-- <AppenderRef ref="STDOUT"/> -->
         </Root>
     </Loggers>
 

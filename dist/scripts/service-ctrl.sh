@@ -145,6 +145,11 @@ CORE_JAVA_OPTS=\$(cat <<-JAVA_OPTS_END
 ${defaultJvmOpts.replace("'", "").replace(' "-', '\n"-').replace('"', '')}
 JAVA_OPTS_END)
 
+# Set java properties used for logging
+
+CORE_JAVA_OPTS="\${CORE_JAVA_OPTS} -DLOG_DIR=\${LOG_DIR}"
+CORE_JAVA_OPTS="\${CORE_JAVA_OPTS} -DLOG_NAME=\${APPLICATION_NAME}"
+
 # Add core Java opts to opts supplied from the environment or env.sh
 
 JAVA_OPTS="\${CORE_JAVA_OPTS} \${JAVA_OPTS}"
