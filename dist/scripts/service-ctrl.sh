@@ -80,7 +80,11 @@ PID_FILE="\${PID_DIR}/${applicationName}.pid"
 
 # If CONFIG_FILE is relative, look in the config folder
 if [ "\${CONFIG_FILE}" != "" ] && [ "\${CONFIG_FILE:0:1}" != "/" ]; then
-    CONFIG_FILE="\${CONFIG_DIR}/\${CONFIG_FILE}"
+    if [ "\${CONFIG_FILE:0:4}" == "etc/" ]; then
+        CONFIG_FILE="\${APP_HOME}/\${CONFIG_FILE}"
+    else
+        CONFIG_FILE="\${CONFIG_DIR}/\${CONFIG_FILE}"
+    fi
 fi
 
 
