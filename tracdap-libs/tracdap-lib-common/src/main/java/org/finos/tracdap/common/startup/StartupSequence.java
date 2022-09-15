@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.startup;
 
+import org.apache.logging.log4j.LogManager;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -165,6 +166,10 @@ public class StartupSequence {
             try (var configStream = new ByteArrayInputStream(loggingConfig.getBytes())) {
 
                 var configSource = new ConfigurationSource(configStream);
+
+                log.info("Initialize logging...");
+
+                LogManager.shutdown();
                 Configurator.initialize(getClass().getClassLoader(), configSource);
 
                 // Invalid logging configuration cause the startup sequence to bomb out
@@ -177,11 +182,9 @@ public class StartupSequence {
         }
         else {
 
-            log.info("Using default logging config");
+            log.info("No logging config provided, using default...");
+            Configurator.reconfigure();
         }
-
-        log.info("Initialize logging...");
-        Configurator.reconfigure();
     }
 
     private String lookupLoggingConfigUrl(Map<?, ?> rootConfigMap) {
