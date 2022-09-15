@@ -80,7 +80,11 @@ PID_FILE="\${PID_DIR}/${applicationName}.pid"
 
 # If CONFIG_FILE is relative, look in the config folder
 if [ "\${CONFIG_FILE}" != "" ] && [ "\${CONFIG_FILE:0:1}" != "/" ]; then
-    CONFIG_FILE="\${CONFIG_DIR}/\${CONFIG_FILE}"
+    if [ "\${CONFIG_FILE:0:4}" == "etc/" ]; then
+        CONFIG_FILE="\${APP_HOME}/\${CONFIG_FILE}"
+    else
+        CONFIG_FILE="\${CONFIG_DIR}/\${CONFIG_FILE}"
+    fi
 fi
 
 
@@ -123,7 +127,7 @@ CLASSPATH_END)
 if [ "\${PLUGINS_ENABLED}" = "true" ]; then
     CWD=`pwd` && cd "\${PLUGINS_DIR}"
     for JAR in `find . -name "*.jar" | sed s#^./##`; do
-        CLASSPATH="\${CLASSPATH}:\${PLUGINS_EXT_DIR}/\${JAR}";
+        CLASSPATH="\${CLASSPATH}:\${PLUGINS_DIR}/\${JAR}";
     done
     cd "\${CWD}"
 fi
@@ -144,6 +148,11 @@ fi
 CORE_JAVA_OPTS=\$(cat <<-JAVA_OPTS_END
 ${defaultJvmOpts.replace("'", "").replace(' "-', '\n"-').replace('"', '')}
 JAVA_OPTS_END)
+
+# Set java properties used for logging
+
+CORE_JAVA_OPTS="\${CORE_JAVA_OPTS} -DLOG_DIR=\${LOG_DIR}"
+CORE_JAVA_OPTS="\${CORE_JAVA_OPTS} -DLOG_NAME=\${APPLICATION_NAME}"
 
 # Add core Java opts to opts supplied from the environment or env.sh
 
@@ -172,18 +181,12 @@ run() {
     echo "Config file: [\${CONFIG_FILE}]"
     echo
 
-    if [ \$# -gt 0 ]; then
-        TASK_LIST=""
-        for TASK in \$@; do
-            echo "Task: \$TASK"
-            TASK_LIST="\${TASK_LIST} --task \"\${TASK}\""
-        done
-        echo
-    fi
-
     export CLASSPATH
 
-    (cd "\${RUN_DIR}" && java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \${TASK_LIST})
+    CWD=`pwd`
+    cd "\${RUN_DIR}"
+    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \$@
+    cd "\${CWD}"
 }
 
 start() {
@@ -208,8 +211,11 @@ start() {
 
     export CLASSPATH
 
-    (cd "\${RUN_DIR}" && java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}") &
+    CWD=`pwd`
+    cd "\${RUN_DIR}"
+    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \$@ &
     PID=\$!
+    cd "\${CWD}"
 
     # Before recording the PID, wait to make sure the service doesn't crash on startup
     # Not a fail-safe guarantee, but will catch e.g. missing or invalid config files
@@ -343,7 +349,8 @@ case "\$1" in
        run \$@
        ;;
     start)
-       start
+       shift
+       start \$@
        ;;
     stop)
        stop

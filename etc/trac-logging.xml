@@ -28,11 +28,30 @@
             </Layout>
         </Appender>
 
+        <!-- Example appender for logging to files -->
+        <!-- <Appender
+                name="LOCAL_FILES"
+                type="RollingFile"
+                fileName="build/log/tracdap-svc-meta.log"
+                filePattern="build/log/tracdap-svc-meta-%d{yyyy-MM-dd}.log.gz">
+
+            <Layout type="PatternLayout" disableAnsi="true">
+                <Pattern>
+                    %d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%-16t] %c{1.} - %msg%n
+                </Pattern>
+            </Layout>
+
+            <Policies>
+            </Policies>
+
+        </Appender> -->
+
     </Appenders>
 
     <Loggers>
         <Root level="info">
             <AppenderRef ref="STDOUT"/>
+            <!--<AppenderRef ref="LOCAL_FILES"/>-->
         </Root>
     </Loggers>
 

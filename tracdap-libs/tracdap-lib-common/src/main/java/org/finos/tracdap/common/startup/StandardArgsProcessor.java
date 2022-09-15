@@ -190,14 +190,24 @@ public class StandardArgsProcessor {
 
     private static Options standardOptions(boolean usingTasks) {
 
-        var options = helpOptions(usingTasks);
+        return buildOOptions(usingTasks, false);
+    }
+
+    private static Options helpOptions(boolean usingTasks) {
+
+        return buildOOptions(usingTasks, true);
+    }
+
+    private static Options buildOOptions(boolean usingTasks, boolean buildingHelp) {
+
+        var options = new Options();
 
         options.addOption(Option.builder()
                 .desc("Location of the service config file")
                 .longOpt("config")
                 .hasArg()
                 .argName("config_file")
-                .required()
+                .required(!buildingHelp)
                 .build());
 
         options.addOption(Option.builder()
@@ -205,6 +215,11 @@ public class StandardArgsProcessor {
                 .longOpt("keystore-key")
                 .hasArg()
                 .argName("keystore_key")
+                .build());
+
+        options.addOption(Option.builder()
+                .desc("Display this help and then quit")
+                .longOpt("help")
                 .build());
 
         if (usingTasks) {
@@ -215,23 +230,8 @@ public class StandardArgsProcessor {
                     .hasArgs()
                     .argName("task")
                     .valueSeparator(':')
-                    .required()
+                    .required(!buildingHelp)
                     .build());
-        }
-
-        return options;
-    }
-
-    private static Options helpOptions(boolean usingTasks) {
-
-        var options = new Options();
-
-        options.addOption(Option.builder()
-                .desc("Display this help and then quit")
-                .longOpt("help")
-                .build());
-
-        if (usingTasks) {
 
             options.addOption(Option.builder()
                     .desc("Display the list of available tasks and then quit")
