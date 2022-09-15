@@ -14,8 +14,6 @@
 
 config:
   logging: trac-logging-example.xml
-  keystore.type: PKCS12
-  keystore.url: trac-keystore.pfx
 
 
 instances:
