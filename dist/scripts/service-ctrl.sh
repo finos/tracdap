@@ -183,7 +183,10 @@ run() {
 
     export CLASSPATH
 
-    (cd "\${RUN_DIR}" && java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \${TASK_LIST})
+    CWD=`pwd`
+    cd "\${RUN_DIR}"
+    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" &
+    cd "\${CWD}"
 }
 
 start() {
@@ -208,8 +211,11 @@ start() {
 
     export CLASSPATH
 
-    (cd "\${RUN_DIR}" && java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}") &
+    CWD=`pwd`
+    cd "\${RUN_DIR}"
+    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" &
     PID=\$!
+    cd "\${CWD}"
 
     # Before recording the PID, wait to make sure the service doesn't crash on startup
     # Not a fail-safe guarantee, but will catch e.g. missing or invalid config files
