@@ -52,6 +52,16 @@
             </Layout>
         </Appender> -->
 
+        <!-- An alternative STDOUT appender with ANSI color-coding enabled -->
+
+        <!-- <Appender type="Console" name="STDOUT">
+            <Layout type="PatternLayout" disableAnsi="false">
+                <Pattern>
+                    %d{yyyy-MM-dd HH:mm:ss.SSS} %highlight{%-5level} [%-16t] %cyan{%c{1.}} - %msg%n
+                </Pattern>
+            </Layout>
+        </Appender> -->
+
     </Appenders>
 
     <Loggers>
