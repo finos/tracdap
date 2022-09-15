@@ -194,7 +194,7 @@ run() {
 
     CWD=`pwd`
     cd "\${RUN_DIR}"
-    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" &
+    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \${TASK_LIST}
     cd "\${CWD}"
 }
 
