@@ -181,20 +181,11 @@ run() {
     echo "Config file: [\${CONFIG_FILE}]"
     echo
 
-    if [ \$# -gt 0 ]; then
-        TASK_LIST=""
-        for TASK in \$@; do
-            echo "Task: \$TASK"
-            TASK_LIST="\${TASK_LIST} --task \"\${TASK}\""
-        done
-        echo
-    fi
-
     export CLASSPATH
 
     CWD=`pwd`
     cd "\${RUN_DIR}"
-    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \${TASK_LIST}
+    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \$@
     cd "\${CWD}"
 }
 
@@ -222,7 +213,7 @@ start() {
 
     CWD=`pwd`
     cd "\${RUN_DIR}"
-    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" &
+    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \$@ &
     PID=\$!
     cd "\${CWD}"
 
@@ -358,7 +349,8 @@ case "\$1" in
        run \$@
        ;;
     start)
-       start
+       shift
+       start \$@
        ;;
     stop)
        stop
