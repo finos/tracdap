@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  ~ Copyright 2020 Accenture Global Solutions Limited
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<Configuration strict="true" name="TRAC example logging configuration">
+
+    <Appenders>
+
+        <!-- The STDOUT appender is recommended for containers and interactive sessions -->
+        <Appender name="STDOUT" type="Console">
+            <Layout type="PatternLayout" disableAnsi="false">
+                <Pattern>
+                    %d{yyyy-MM-dd HH:mm:ss.SSS} %highlight{%-5level} [%-16t] %cyan{%c{1.}} - %msg%n
+                </Pattern>
+            </Layout>
+        </Appender>
+
+        <!-- The LOCAL_FILES appender is recommended for deployments on physical machines and VMs -->
+        <!-- The LOG_DIR and APPLICATION_NAME variables are set by the service startup script -->
+        <!-- <Appender
+                name="LOCAL_FILES"
+                type="RollingFile"
+                fileName="${LOG_DIR}/${APPLICATION_NAME}.log"
+                filePatter="${LOG_DIR}/${APPLICATION_NAME}-%d{yyyy-MM-dd}.log.gz">
+
+            <Layout type="PatternLayout" disableAnsi="true">
+                <Pattern>
+                    %d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%-16t] %c{1.} - %msg%n
+                </Pattern>
+            </Layout>
+
+        </Appender> -->
+
+    </Appenders>
+
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="STDOUT"/>
+            <!-- <AppenderRef ref="LOCAL_FILES"/> -->
+        </Root>
+    </Loggers>
+
+</Configuration>

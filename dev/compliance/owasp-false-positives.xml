@@ -70,6 +70,7 @@
    ]]></notes>
         <packageUrl regex="true">^pkg:maven/org\.yaml/snakeyaml@.*$</packageUrl>
         <vulnerabilityName>CVE-2022-38752</vulnerabilityName>
+        <vulnerabilityName>CVE-2022-38751</vulnerabilityName>
     </suppress>
 
 </suppressions>

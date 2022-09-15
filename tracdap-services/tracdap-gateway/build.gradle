@@ -22,21 +22,24 @@ apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/plugins.gradle"
 
-
 description = "TRAC D.A.P. gateway component, provides authentication, routing, load balancing and API translation"
-
-ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Platform Gateway")
 
 application {
 
     mainClass.set("org.finos.tracdap.gateway.TracPlatformGateway")
-    tasks.run.workingDir = rootProject.projectDir
 
     // JVM flags needed for Arrow / Netty / gRPC to access native memory
-    tasks.run.jvmArgs("--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED")
-    tasks.run.jvmArgs("--add-opens", "java.base/java.nio=ALL-UNNAMED")
-    tasks.run.systemProperty("io.netty.tryReflectionSetAccessible", true)
+    applicationDefaultJvmArgs = [
+            "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
+            "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+            "-Dio.netty.tryReflectionSetAccessible=true"
+    ]
+
+    // Working dir when running in the IDE
+    tasks.run.workingDir = rootProject.projectDir
 }
+
+ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Platform Gateway")
 
 sourceSets {
     aws {}
@@ -77,3 +80,23 @@ dependencies {
 
 ext.pluginDependency("AWS_CONFIG", project(":aws-config"))
 ext.pluginDependency("GCP_CONFIG", project(":gcp-config"))
+
+distributions {
+    main {
+        contents {
+            into("") { from("${rootDir}/dist/template") }
+        }
+    }
+}
+
+tasks.withType(CreateStartScripts) {
+
+    unixStartScriptGenerator.template = resources.text.fromFile("${rootDir}/dist/scripts/service-ctrl.sh")
+    windowsStartScriptGenerator.template = resources.text.fromFile("${rootDir}/dist/scripts/service-ctrl.bat")
+
+    // Default config file location
+    startScripts { doLast {
+        unixScript.text = unixScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-gateway.yaml")
+        windowsScript.text = windowsScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-gateway.yaml")
+    }}
+}

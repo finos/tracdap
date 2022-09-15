@@ -35,7 +35,7 @@ jobs:
   # There is no neat way to split the build / publish phases across jobs
   # So, include publish to Maven as a conditional step in the build job
 
-  java_artifacts:
+  platform_packages:
 
     runs-on: ubuntu-latest
 
@@ -67,12 +67,44 @@ jobs:
       - name: Build JARs
         run: ./gradlew jar javadocJar sourcesJar -PincludeJavadoc=true -PincludeSources=true
 
+      - name: Build packages for distribution
+        run: ./gradlew installDist
+
+      - name: Assemble platform package
+        run: |
+          VERSION=`dev/version.sh`
+          mkdir -p build/dist/tracdap-platform-${VERSION}
+          for MODULE in build/modules/*/install/*; do
+            cp -R $MODULE build/dist/tracdap-platform-${VERSION}
+          done
+          cd build/dist
+          tar -czvf tracdap-platform-${VERSION}.tgz tracdap-platform-${VERSION}/*
+
+      - name: Assemble sandbox package
+        run: |
+          VERSION=`dev/version.sh`
+          mkdir -p build/dist/tracdap-sandbox-${VERSION}
+          for MODULE in build/modules/*/install/*; do
+            cp -R $MODULE/* build/dist/tracdap-sandbox-${VERSION}
+          done
+          cd build/dist
+          zip -r tracdap-sandbox-${VERSION}.zip tracdap-sandbox-${VERSION}
+
+      - name: Save packages
+        uses: actions/upload-artifact@v2
+        with:
+          name: platform_packages
+          path: |
+            build/dist/*.tgz
+            build/dist/*.zip
+          retention-days: 7
+
       # GitHub Secrets are not available in pull request builds, to prevent forked repos stealing secrets.
       # Secrets are needed to build the Java artifacts, which use GPG signing
       # Solution is to disable the artifact build on PRs (it will still run on merge to main)
       # It is possible to work around this, but doing so would open up the secret-stealing vulnerability
 
-      - name: Build publication artifacts
+      - name: Build Maven artifacts
         if: ${{ github.event_name != 'pull_request' }}
         run: |
           mkdir -p ~/.gnupg/
@@ -87,16 +119,6 @@ jobs:
           GPG_KEY_BASE64: ${{ secrets.GPG_KEY_BASE64 }}
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_KEY_PASSPHRASE: ${{ secrets.GPG_KEY_PASSPHRASE }}
-
-      - name: Save publication artifacts
-        if: ${{ github.event_name != 'pull_request' }}
-        uses: actions/upload-artifact@v2
-        with:
-          name: java_artifacts
-          path: |
-            ~/.m2/repository/org/finos/tracdap/**
-            !~/.m2/repository/org/finos/tracdap/*/maven-metadata-local.xml
-          retention-days: 7
 
       - name: Publish to Maven Central
         if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
@@ -209,7 +231,7 @@ jobs:
     runs-on: ubuntu-latest
 
     needs:
-      - java_artifacts
+      - platform_packages
       - python_runtime_package
       - web_api_package
 
@@ -228,35 +250,55 @@ jobs:
           echo "tracdap_version = ${tracdap_version}"
           echo "::set-output name=tracdap_version::${tracdap_version}"
 
-      - name: Fetch Java artifacts
+      - name: Fetch platform and sandbox packages
         uses: actions/download-artifact@v2
         with:
-          name: java_artifacts
-          path: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/java
+          name: platform_packages
+          path: .
 
       - name: Fetch Python runtime package
         uses: actions/download-artifact@v2
         with:
           name: python_runtime_package
-          path: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/python_runtime_package
+          path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/python_runtime_package
 
       - name: Fetch web API package
         uses: actions/download-artifact@v2
         with:
           name: web_api_package
-          path: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/web_api_package
+          path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/web_api_package
 
-      - name: Build dist tarball
-        run: tar -cvzf tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/
+      - name: Build API packages tarball
+        run: tar -cvzf tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/
 
-      - name: Publish release assets
+      - name: Publish platform package
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
-          asset_name: tracdap-dist-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
+          asset_path: tracdap-platform-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
+          asset_name: tracdap-platform-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
+          asset_content_type: application/gzip
+
+      - name: Publish sandbox package
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: tracdap-sandbox-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
+          asset_name: tracdap-sandbox-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
+          asset_content_type: application/zip
+
+      - name: Publish API packages
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
+          asset_name: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
           asset_content_type: application/gzip
 
   publish_to_pypi:
