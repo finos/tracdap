@@ -83,50 +83,47 @@ set PID_FILE=%PID_DIR%${applicationName}.pid
 @rem If CONFIG_FILE is relative, look in the config folder
 if not "%CONFIG_FILE%" == "" (
 if not "%CONFIG_FILE:~0,1%" == "\\" (
-if not "%CONFIG_FILE:~1,2%" == ":" (
+if not "%CONFIG_FILE:~0,1%" == "/" (
+if not "%CONFIG_FILE:~1,1%" == ":" (
+
     if "%CONFIG_FILE:~0,4%" == "etc\\" (
-        set CONFIG_FILE="%APP_HOME%\\%CONFIG_FILE%"
+        set CONFIG_FILE="%APP_HOME%%CONFIG_FILE%"
     ) else if "%CONFIG_FILE:~0,4%" == "etc/" (
-        set CONFIG_FILE="%APP_HOME%\\%CONFIG_FILE%"
+        set CONFIG_FILE="%APP_HOME%%CONFIG_FILE%"
     ) else (
-        set CONFIG_FILE="%CONFIG_DIR%\\%CONFIG_FILE%"
+        set CONFIG_FILE="%CONFIG_DIR%%CONFIG_FILE%"
     )
-)))
+
+))))
 
 
 @rem Discover Java
 
 if not "%JAVA_HOME%" == "" (
-
     set JAVA_CMD=%JAVA_HOME%\\bin\\java.exe
-
-    %JAVA_CMD% -version >NUL 2>&1
-    if errorlevel 1 (
-        echo "JAVA_HOME does not contain a valid Java installation: [%JAVA_HOME%]"
-        exit /b -1
-    )
-
 ) else (
-
     set JAVA_CMD=java.exe
+)
 
-    %JAVA_CMD% -version >NUL 2>&1
-    if errorlevel 1 (
-        echo "JAVA_HOME is not set and no 'java' command could be found in PATH"
-        exit /b -1
+"%JAVA_CMD%" -version >NUL 2>&1
+if errorlevel 1 (
+    if not "%JAVA_HOME%" == "" (
+        echo JAVA_HOME does not contain a valid Java installation: [%JAVA_HOME%]
+    ) else (
+        echo JAVA_HOME is not set and no 'java.exe' command could be found in PATH
     )
-
+    exit /b -1
 )
 
 
 @rem Core classpath is supplied by the build system and should never be edited directly
 
-set CLASSPATH=${classpath.replace(";", "\nset CLASSPATH=%CLASSPATH%;")}
+set CLASSPATH=${classpath.replace(";", "\nset CLASSPATH=%CLASSPATH%;").replace("%APP_HOME%\\", "%APP_HOME%")}
 
 @rem Discover standard plugins
 
 if "%PLUGINS_ENABLED%" == "true" (
-    for %%j in (%PLUGINS_DIR%\\*.jar) do (
+    for %%j in (%PLUGINS_DIR%*.jar) do (
         set CLASSPATH=%CLASSPATH%;%%j
     )
 )
@@ -134,7 +131,7 @@ if "%PLUGINS_ENABLED%" == "true" (
 @rem Discover external plugins
 
 if "%PLUGINS_EXT_ENABLED%" == "true" (
-    for %%j in (%PLUGINS_EXT_DIR%\\*.jar) do (
+    for %%j in (%PLUGINS_EXT_DIR%*.jar) do (
         set CLASSPATH=%CLASSPATH%;%%j
     )
 )
@@ -146,18 +143,17 @@ set CORE_JAVA_OPTS=${defaultJvmOpts.replace(' "-', '\nset CORE_JAVA_OPTS=%CORE_J
 
 @rem Set java properties used for logging
 
-set CORE_JAVA_OPTS="%CORE_JAVA_OPTS% -DLOG_DIR=%LOG_DIR%"
-set CORE_JAVA_OPTS="%CORE_JAVA_OPTS% -DLOG_NAME=%APPLICATION_NAME%"
+set CORE_JAVA_OPTS=%CORE_JAVA_OPTS% -DLOG_DIR=%LOG_DIR%
+set CORE_JAVA_OPTS=%CORE_JAVA_OPTS% -DLOG_NAME=%APPLICATION_NAME%
 
 @rem Add core Java opts to opts supplied from the environment or env.sh
 
-set JAVA_OPTS="%CORE_JAVA_OPTS% %JAVA_OPTS%"
+set JAVA_OPTS=%CORE_JAVA_OPTS% %JAVA_OPTS%
 
 @rem -------------------------------------------------------------------------------------------------------------------
 
 
-
-echo CONFIG_DIR = %CONFIG_FILE%
+echo CONFIG_DIR = %CONFIG_DIR%
 echo PLUGINS_DIR = %PLUGINS_DIR%
 echo PLUGINS_EXT_DIR = %PLUGINS_EXT_DIR%
 echo LOG_DIR = %LOG_DIR%
