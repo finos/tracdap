@@ -62,14 +62,6 @@ if exist "%ENV_FILE%" (
     call "%ENV_FILE%"
 )
 
-@rem If the PID directory is not writable, don't even try to start
-echo. > "%PID_DIR%${applicationName}.test"
-del "%PID_DIR%${applicationName}.test"
-if errorlevel 1 (
-    echo "PID directory is not writable: %PID_DIR%"
-    exit /b -1
-)
-
 @rem -------------------------------------------------------------------------------------------------------------------
 
 
@@ -78,7 +70,17 @@ if errorlevel 1 (
 set APPLICATION_NAME=$applicationName
 set APPLICATION_CLASS=$mainClassName
 
+
 set PID_FILE=%PID_DIR%${applicationName}.pid
+
+@rem If the PID directory is not writable, don't even try to start
+echo. > "%PID_DIR%${applicationName}.test"
+del "%PID_DIR%${applicationName}.test"
+if errorlevel 1 (
+    echo "PID directory is not writable: %PID_DIR%"
+    exit /b 1
+)
+
 
 @rem If CONFIG_FILE is relative, look in the config folder
 if not "%CONFIG_FILE%" == "" (
@@ -112,7 +114,7 @@ if errorlevel 1 (
     ) else (
         echo JAVA_HOME is not set and no 'java.exe' command could be found in PATH
     )
-    exit /b -1
+    exit /b 1
 )
 
 
@@ -153,28 +155,137 @@ set JAVA_OPTS=%CORE_JAVA_OPTS% %JAVA_OPTS%
 @rem -------------------------------------------------------------------------------------------------------------------
 
 
-echo CONFIG_DIR = %CONFIG_DIR%
-echo PLUGINS_DIR = %PLUGINS_DIR%
-echo PLUGINS_EXT_DIR = %PLUGINS_EXT_DIR%
-echo LOG_DIR = %LOG_DIR%
-echo RUN_DIR = %RUN_DIR%
-echo PID_DIR = %PID_DIR%
+goto :main
 
-echo CONFIG_FILE = %CONFIG_FILE%
-echo ENV_FILE = %ENV_FILE%
-echo PLUGINS_ENABLED = %PLUGINS_ENABLED%
-echo PLUGINS_EXT_ENABLED = %PLUGINS_EXT_ENABLED%
-echo STARTUP_WAIT_TIME = %STARTUP_WAIT_TIME%
-echo SHUTDOWN_WAIT_TIME = %SHUTDOWN_WAIT_TIME%
+:run
 
-echo APPLICATION_NAME = %APPLICATION_NAME%
-echo APPLICATION_CLASS = %APPLICATION_CLASS%
-echo PID_FILE = %PID_FILE%
+    echo Running application: %APPLICATION_NAME%
 
-echo JAVA_HOME = %JAVA_HOME%
-echo JAVA_CMD = %JAVA_CMD%
+    if "%CONFIG_FILE%" == "" (
+        echo Missing required environment variable CONFIG_FILE
+        exit /b 1
+    )
 
-@rem echo CLASSPATH = %CLASSPATH%
+    if exist "%PID_FILE%" (
+        echo Application is already running, try %0 [stop^|kill]
+        exit /b 1
+    )
 
-echo CORE_JAVA_OPTS = %CORE_JAVA_OPTS%
-echo JAVA_OPTS = %JAVA_OPTS%
+    echo Java location: [%JAVA_CMD%]
+    echo Install location: ^[%APP_HOME%]
+    echo Working directory: [%RUN_DIR%]
+    echo Config file: [%CONFIG_FILE%]
+    echo.
+
+    set CWD=%cd%
+    cd "%RUN_DIR%"
+    "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" %*
+    set RESULT=%errorlevel%
+    cd "%CWD%"
+
+exit /b %RESULT%
+
+:start
+
+    echo Starting application: %APPLICATION_NAME%
+
+    if "%CONFIG_FILE%" == "" (
+        echo Missing required environment variable CONFIG_FILE
+        exit /b 1
+    )
+
+    if exist "%PID_FILE%" (
+        echo Application is already running, try %0 [stop^|kill]
+        exit /b 1
+    )
+
+    echo Java location: [%JAVA_CMD%]
+    echo Install location: ^[%APP_HOME%]
+    echo Working directory: [%RUN_DIR%]
+    echo Config file: [%CONFIG_FILE%]
+    echo.
+
+    set CWD=%cd%
+    cd "%RUN_DIR%"
+    echo start "%APPLICATION_NAME%" "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" %*
+    cd "%CWD%"
+
+    tasklist /fi "WINDOWTITLE eq $applicationName"
+    for /f "TOKENS=1,2,*" %%p in ('tasklist /fi "WINDOWTITLE eq %APPLICATION_NAME%"') do set PID=%%p
+    echo %PID%
+
+    @rem Before recording the PID, wait to make sure the service doesn't crash on startup
+    @rem Not a fail-safe guarantee, but will catch e.g. missing or invalid config files
+
+@REM     set COUNTDOWN=%STARTUP_WAIT_TIME%
+@REM     while `ps -p \$PID > /dev/null` && [ \$COUNTDOWN -gt 0 ]; do
+@REM         sleep 1
+@REM         COUNTDOWN=\$((COUNTDOWN - 1))
+@REM     done
+@REM
+@REM     if [ \$COUNTDOWN -eq 0 ]; then
+@REM         echo \$PID > "\${PID_FILE}"
+@REM     else
+@REM         echo "\${APPLICATION_NAME} failed to start"
+@REM         exit -1
+@REM     fi
+
+exit /b 0
+
+:stop
+
+    echo Stopping application: %APPLICATION_NAME%
+
+exit /b 0
+
+:status
+
+    echo "Status"
+
+exit /b 0
+
+:kill_pid
+
+    echo "Kill PID"
+
+exit /b 0
+
+:kill_all
+
+    echo "Kill all"
+
+exit /b 0
+
+:main
+
+    set CMD=%1
+    set ARGS=
+    shift
+
+    :arg_loop
+        if "%1"=="" goto arg_loop_done
+        set ARGS=%ARGS% %1
+        shift
+    goto arg_loop
+    :arg_loop_done
+
+    if "%CMD%" == "run" (
+        echo %ARGS%
+        call :run %ARGS%
+    ) else if "%CMD%" == "start" (
+        call :start %ARGS%
+    ) else if "%CMD%" == "stop" (
+         call :stop
+    ) else if "%CMD%" == "restart" (
+        call :stop && call :start
+    ) else if "%CMD%" == "status" (
+        call :status
+    ) else if "%CMD%" == "kill" (
+        call :kill_pid
+    ) else if "%CMD%" == "kill_all" (
+        call :kill_all
+    ) else (
+        echo Usage: %0 ^[run^|start^|stop^|restart^|status^|kill^|kill_all^]
+    )
+
+exit /b %errorlevel%
