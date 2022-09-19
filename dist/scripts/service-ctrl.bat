@@ -157,6 +157,7 @@ set JAVA_OPTS=%CORE_JAVA_OPTS% %JAVA_OPTS%
 
 goto :main
 
+
 :run
 
     echo Running application: %APPLICATION_NAME%
@@ -184,6 +185,7 @@ goto :main
     cd "%CWD%"
 
 exit /b %RESULT%
+
 
 :start
 
@@ -241,11 +243,54 @@ exit /b %RESULT%
 
 exit /b 0
 
+
 :stop
 
     echo Stopping application: %APPLICATION_NAME%
 
+    if not exist "%PID_FILE%" (
+
+        echo %APPLICATION_NAME% is not running
+
+    ) else (
+
+        @rem Query WMIC for the PID stored in the PID file
+        for /f "delims=" %%p in (%PID_FILE%) do set PID=%%p
+        wmic process where "processid=!PID!" get processid 2>nul | findstr "!PID!" >nul
+
+        @rem Do not send the TERM signal if the application has already been stopped
+        if !errorlevel! equ 0 (
+
+            taskkill /pid !PID!
+
+            @rem Wait for the application to go down cleanly
+            set COUNTDOWN=%SHUTDOWN_WAIT_TIME%
+            :stop_countdown
+                wmic process where "processid=%PID%" get processid 2>nul | findstr "%PID%" >nul
+                if %errorlevel% equ 0 ( if !COUNTDOWN! gtr 0 (
+                    timeout 1 >nul
+                    set /a COUNTDOWN=!COUNTDOWN!-1
+                    goto stop_countdown
+                ))
+
+            @rem If the timeout expired, send a kill signal
+            if %COUNTDOWN% equ 0 (
+                echo %APPLICATION_NAME% did not stop in time
+                taskkill /pid !PID! /f
+                echo %APPLICATION_NAME% has been killed
+            )
+
+        ) else (
+
+            echo %APPLICATION_NAME% has already stopped
+
+        )
+
+        del "%PID_FILE%"
+    )
+
 exit /b 0
+
 
 :status
 
@@ -256,7 +301,6 @@ exit /b 0
     ) else (
 
         @rem Query WMIC for the PID stored in the PID file
-
         for /f "delims=" %%p in (%PID_FILE%) do set PID=%%p
         wmic process where "processid=!PID!" get processid 2>nul | findstr "!PID!" >nul
 
@@ -275,17 +319,20 @@ exit /b 0
 
 exit /b 0
 
+
 :kill_pid
 
     echo "Kill PID"
 
 exit /b 0
 
+
 :kill_all
 
     echo "Kill all"
 
 exit /b 0
+
 
 :main
 
