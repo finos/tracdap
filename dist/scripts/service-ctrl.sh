@@ -288,13 +288,9 @@ status() {
         PID=`cat "\${PID_FILE}"`
 
         if [ `ps -p \$PID > /dev/null` ]; then
-
             echo "\${APPLICATION_NAME} is up"
-
         else
-
             echo "\${APPLICATION_NAME} is down"
-
             # Clean up the PID file if it refers to a dead process
             rm "\${PID_FILE}"
         fi
@@ -315,7 +311,7 @@ kill_pid() {
 
         # Do not send the TERM signal if the application has already been stopped
         if `ps -p \$PID > /dev/null`; then
-            kill -TERM \$PID
+            kill -KILL \$PID
             echo "\${APPLICATION_NAME} has been killed"
         else
             echo "\${APPLICATION_NAME} has already stopped"

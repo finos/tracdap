@@ -305,13 +305,9 @@ exit /b 0
         wmic process where "processid=!PID!" get processid 2>nul | findstr "!PID!" >nul
 
         if !errorlevel! equ 0 (
-
             echo %APPLICATION_NAME% is up
-
         ) else (
-
             echo %APPLICATION_NAME% is down
-
             @rem Clean up the PID file if it refers to a dead process
             del "%PID_FILE%"
         )
@@ -322,7 +318,28 @@ exit /b 0
 
 :kill_pid
 
-    echo "Kill PID"
+    echo Killing application: %APPLICATION_NAME%
+
+    if not exist "%PID_FILE%" (
+
+        echo %APPLICATION_NAME% is not running
+
+    ) else (
+
+        @rem Query WMIC for the PID stored in the PID file
+        for /f "delims=" %%p in (%PID_FILE%) do set PID=%%p
+        wmic process where "processid=!PID!" get processid 2>nul | findstr "!PID!" >nul
+
+        @rem Do not send the TERM signal if the application has already been stopped
+        if !errorlevel! equ 0 (
+            taskkill /pid !PID! /f
+            echo %APPLICATION_NAME% has been killed
+        ) else (
+            echo %APPLICATION_NAME% has already stopped
+        )
+
+        del "%PID_FILE%"
+    )
 
 exit /b 0
 
