@@ -32,7 +32,7 @@
 @rem -------------------------------------------------------------------------------------------------------------------
 
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 
 @rem Variables in this section do not need to be set, but can be overridden if needed in env.bat.
 
@@ -67,9 +67,9 @@ if exist "%ENV_FILE%" (
 
 @rem Variables in this section are set up automatically and should not be overridden
 
+set SCRIPT_CMD=%0
 set APPLICATION_NAME=$applicationName
 set APPLICATION_CLASS=$mainClassName
-
 
 set PID_FILE=%PID_DIR%${applicationName}.pid
 
@@ -89,11 +89,11 @@ if not "%CONFIG_FILE:~0,1%" == "/" (
 if not "%CONFIG_FILE:~1,1%" == ":" (
 
     if "%CONFIG_FILE:~0,4%" == "etc\\" (
-        set CONFIG_FILE="%APP_HOME%%CONFIG_FILE%"
+        set CONFIG_FILE=%APP_HOME%%CONFIG_FILE%
     ) else if "%CONFIG_FILE:~0,4%" == "etc/" (
-        set CONFIG_FILE="%APP_HOME%%CONFIG_FILE%"
+        set CONFIG_FILE=%APP_HOME%%CONFIG_FILE%
     ) else (
-        set CONFIG_FILE="%CONFIG_DIR%%CONFIG_FILE%"
+        set CONFIG_FILE=%CONFIG_DIR%%CONFIG_FILE%
     )
 
 ))))
@@ -167,7 +167,7 @@ goto :main
     )
 
     if exist "%PID_FILE%" (
-        echo Application is already running, try %0 [stop^|kill]
+        echo Application is already running, try %SCRIPT_CMD% [stop^|kill]
         exit /b 1
     )
 
@@ -195,7 +195,7 @@ exit /b %RESULT%
     )
 
     if exist "%PID_FILE%" (
-        echo Application is already running, try %0 [stop^|kill]
+        echo Application is already running, try %SCRIPT_CMD% [stop^|kill]
         exit /b 1
     )
 
@@ -205,30 +205,39 @@ exit /b %RESULT%
     echo Config file: [%CONFIG_FILE%]
     echo.
 
-    set CWD=%cd%
-    cd "%RUN_DIR%"
-    echo start "%APPLICATION_NAME%" "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" %*
-    cd "%CWD%"
+    start "%APPLICATION_NAME%" /D "%RUN_DIR%" /B "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" %*
 
-    tasklist /fi "WINDOWTITLE eq $applicationName"
-    for /f "TOKENS=1,2,*" %%p in ('tasklist /fi "WINDOWTITLE eq %APPLICATION_NAME%"') do set PID=%%p
-    echo %PID%
+    @rem Look up PID using wmic
+    @rem name='java.exe' stops wmic from finding itself
+    @rem findstr filters out blank lines, which are included in the output
+
+    for /f "usebackq skip=1" %%p in (
+        `wmic process where "commandline like '%%%APPLICATION_CLASS%%%' and name='java.exe'" get processid 2^>nul ^| findstr /r /v "^\$"`
+    ) do set PID=%%p
 
     @rem Before recording the PID, wait to make sure the service doesn't crash on startup
     @rem Not a fail-safe guarantee, but will catch e.g. missing or invalid config files
 
-@REM     set COUNTDOWN=%STARTUP_WAIT_TIME%
-@REM     while `ps -p \$PID > /dev/null` && [ \$COUNTDOWN -gt 0 ]; do
-@REM         sleep 1
-@REM         COUNTDOWN=\$((COUNTDOWN - 1))
-@REM     done
-@REM
-@REM     if [ \$COUNTDOWN -eq 0 ]; then
-@REM         echo \$PID > "\${PID_FILE}"
-@REM     else
-@REM         echo "\${APPLICATION_NAME} failed to start"
-@REM         exit -1
-@REM     fi
+    set COUNTDOWN=%STARTUP_WAIT_TIME%
+    :start_countdown
+
+        @rem Use wmic to check for the process explicitly by PID (always returns zero)
+        @rem findstr returns an error code if there is no match
+
+        wmic process where "processid=%PID%" get processid 2>nul | findstr "%PID%" >nul
+
+        if %errorlevel% equ 0 ( if !COUNTDOWN! gtr 0 (
+            timeout 1 >nul
+            set /a COUNTDOWN=!COUNTDOWN!-1
+            goto start_countdown
+        ))
+
+    if %COUNTDOWN% equ 0 (
+        echo %PID% > "%PID_FILE%"
+    ) else (
+        echo %APPLICATION_NAME% failed to start
+        exit /b 1
+    )
 
 exit /b 0
 
@@ -285,7 +294,7 @@ exit /b 0
     ) else if "%CMD%" == "kill_all" (
         call :kill_all
     ) else (
-        echo Usage: %0 ^[run^|start^|stop^|restart^|status^|kill^|kill_all^]
+        echo Usage: %SCRIPT_CMD% ^[run^|start^|stop^|restart^|status^|kill^|kill_all^]
     )
 
 exit /b %errorlevel%
