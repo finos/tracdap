@@ -216,37 +216,29 @@ public class ConfigManager {
 
     private URI resolveConfigRootFile(String suppliedConfigUrl, Path workingDir) {
 
-        try {
+        if (suppliedConfigUrl == null || suppliedConfigUrl.isBlank())
+            throw new EStartup("URL for root config file is missing or blank");
 
-            if (suppliedConfigUrl == null || suppliedConfigUrl.isBlank())
-                throw new EStartup("URL for root config file is missing or blank");
+        var configUrl = parseUrl(suppliedConfigUrl);
+        var configProtocol = configUrl.getScheme();
 
-            var configUrl = URI.create(suppliedConfigUrl);
-            var configProtocol = configUrl.getScheme();
+        // Special handling if the config URI is for a file
+        // In this case, it may be relative to the process working dir
+        if (configProtocol == null || configProtocol.isBlank() || configProtocol.equals("file")) {
 
-            // Special handling if the config URI is for a file
-            // In this case, it may be relative to the process working dir
-            if (configProtocol == null || configProtocol.isBlank() || configProtocol.equals("file")) {
+            if (configUrl.isAbsolute())
+                return configUrl;
 
-                if (configUrl.isAbsolute())
-                    return configUrl;
-
-                var configPath = workingDir.resolve(configUrl.getPath());
-                return configPath.toUri();
-            }
-
-            return configUrl;
+            var configPath = workingDir.resolve(configUrl.getPath());
+            return configPath.toUri();
         }
-        catch (IllegalArgumentException e) {
 
-            var message = String.format("URL for root config file is invalid: [%s]", suppliedConfigUrl);
-            throw new EStartup(message);
-        }
+        return configUrl;
     }
 
     private URI parseUrl(String url) {
 
-        if (url.startsWith("/") || url.startsWith("\\")) {
+        if (url.startsWith("/") || url.startsWith("\\") || url.startsWith(":\\", 1)) {
             try {
                 return Paths.get(url).toUri().normalize();
             }

@@ -62,12 +62,6 @@ if [ -f "\${ENV_FILE}" ]; then
     . "\${ENV_FILE}"
 fi
 
-# If the PID directory is not writable, don't even try to start
-if [ ! -w "\${PID_DIR}" ]; then
-    echo "PID directory is not writable: \${PID_DIR}"
-    exit -1
-fi
-
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -76,7 +70,15 @@ fi
 APPLICATION_NAME="$applicationName"
 APPLICATION_CLASS="$mainClassName"
 
+
 PID_FILE="\${PID_DIR}/${applicationName}.pid"
+
+# If the PID directory is not writable, don't even try to start
+if [ ! -w "\${PID_DIR}" ]; then
+    echo "PID directory is not writable: \${PID_DIR}"
+    exit -1
+fi
+
 
 # If CONFIG_FILE is relative, look in the config folder
 if [ "\${CONFIG_FILE}" != "" ] && [ "\${CONFIG_FILE:0:1}" != "/" ]; then
@@ -171,7 +173,7 @@ run() {
     fi
 
     if [ -f \${PID_FILE} ]; then
-      echo "Application is already running, try \$0 [stop | kill]"
+      echo "Application is already running, try \$0 [stop|kill]"
       exit -1
     fi
 
@@ -199,7 +201,7 @@ start() {
     fi
 
     if [ -f \${PID_FILE} ]; then
-      echo "Application is already running, try \$0 [stop | kill]"
+      echo "Application is already running, try \$0 [stop|kill]"
       exit -1
     fi
 
@@ -260,7 +262,7 @@ stop() {
 
             # If the timeout expired, send a kill signal
             if [ \$COUNTDOWN -eq 0 ]; then
-                echo "\${APPLICATION_NAME} did not stop in time"
+                echo "\${APPLICATION_NAME} did not stop in time, sending kill signal..."
                 kill -KILL \$PID
                 echo "\${APPLICATION_NAME} has been killed"
             fi
@@ -286,13 +288,9 @@ status() {
         PID=`cat "\${PID_FILE}"`
 
         if [ `ps -p \$PID > /dev/null` ]; then
-
             echo "\${APPLICATION_NAME} is up"
-
         else
-
             echo "\${APPLICATION_NAME} is down"
-
             # Clean up the PID file if it refers to a dead process
             rm "\${PID_FILE}"
         fi
@@ -313,7 +311,7 @@ kill_pid() {
 
         # Do not send the TERM signal if the application has already been stopped
         if `ps -p \$PID > /dev/null`; then
-            kill -TERM \$PID
+            kill -KILL \$PID
             echo "\${APPLICATION_NAME} has been killed"
         else
             echo "\${APPLICATION_NAME} has already stopped"
@@ -369,7 +367,7 @@ case "\$1" in
        kill_all
        ;;
     *)
-       echo "Usage: \$0 {run|start|stop|restart|status|kill|kill_all}"
+       echo "Usage: \$0 [run|start|stop|restart|status|kill|kill_all]"
 esac
 
 exit 0

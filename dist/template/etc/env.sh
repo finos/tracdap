@@ -17,7 +17,7 @@
 
 # These are some variables that might useful:
 
-# CONFIG_FILE - Location of the primary config file
+# CONFIG_FILE - Location of the primary config file (relative paths are relative to ${APP_HOME}/etc)
 # LOG_DIR - Log directory (only applies to file-based logging)
 # PLUGINS_DIR - Location for standard plugins, JARs in this folder will be added to the classpath
 # PLUGINS_ENABLED - Whether to load plugins from PLUGIN_DIR, defaults to true
