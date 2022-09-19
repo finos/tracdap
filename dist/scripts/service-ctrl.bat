@@ -209,13 +209,19 @@ exit /b %RESULT%
 
     start "%APPLICATION_NAME%" /D "%RUN_DIR%" /B "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" %*
 
-    @rem Look up PID using wmic
-    @rem name='java.exe' stops wmic from finding itself
+    @rem Look up PID using WMIC, name='java.exe' stops wmic from finding itself
     @rem findstr filters out blank lines, which are included in the output
+    @rem sort orders by most recently started process, headers on top
+    @rem skip headers (skip=1) and select second token (processId) as %%q
 
-    for /f "usebackq skip=1" %%p in (
-        `wmic process where "commandline like '%%%APPLICATION_CLASS%%%' and name='java.exe'" get processid 2^>nul ^| findstr /r /v "^\$"`
-    ) do set PID=%%p
+    for /f "usebackq skip=1 tokens=1,2" %%p in (
+        `wmic process
+            where "commandline like '%%%APPLICATION_CLASS%%%' and name='java.exe'"
+            get creationDate^, processId 2^>nul ^|
+        findstr /r /v "^\$" ^|
+        sort /r`
+    ) do set PID=%%q & goto got_pid
+    :got_pid
 
     @rem Before recording the PID, wait to make sure the service doesn't crash on startup
     @rem Not a fail-safe guarantee, but will catch e.g. missing or invalid config files
@@ -226,7 +232,7 @@ exit /b %RESULT%
         @rem Use wmic to check for the process explicitly by PID (always returns zero)
         @rem findstr returns an error code if there is no match
 
-        wmic process where "processid=%PID%" get processid 2>nul | findstr "%PID%" >nul
+        wmic process where "processid=%PID%" get processid 2>nul | findstr "%PID%" >nul 2>nul
 
         if %errorlevel% equ 0 ( if !COUNTDOWN! gtr 0 (
             timeout 1 >nul
@@ -256,34 +262,37 @@ exit /b 0
 
         @rem Query WMIC for the PID stored in the PID file
         for /f "delims=" %%p in (%PID_FILE%) do set PID=%%p
-        wmic process where "processid=!PID!" get processid 2>nul | findstr "!PID!" >nul
+        wmic process where "processid=!PID!" get processid 2>nul | findstr "!PID!" >nul 2>nul
 
         @rem Do not send the TERM signal if the application has already been stopped
-        if !errorlevel! equ 0 (
+        if !errorlevel! neq 0 (
+            echo %APPLICATION_NAME% has already stopped
+        ) else (
 
-            taskkill /pid !PID!
+            @rem taskkill /pid !PID! only works if a window is allocated, and still does not trigger clean shutdown
+            @rem wmic process terminate works regardless of allocating a window, but does not trigger clean shutdown
+            @rem The only option to make this work correctly is to bundle a binary that can send process signals
+
+            @rem For clean shutdown on Windows, run processes in the foreground using the "run" command
+
+            wmic process where "processid=!PID!" call terminate >nul 2>nul
 
             @rem Wait for the application to go down cleanly
             set COUNTDOWN=%SHUTDOWN_WAIT_TIME%
             :stop_countdown
-                wmic process where "processid=%PID%" get processid 2>nul | findstr "%PID%" >nul
-                if %errorlevel% equ 0 ( if !COUNTDOWN! gtr 0 (
+                wmic process where "processid=%PID%" get processid 2>nul | findstr "%PID%" >nul 2>nul
+                if !errorlevel! equ 0 ( if !COUNTDOWN! gtr 0 (
                     timeout 1 >nul
                     set /a COUNTDOWN=!COUNTDOWN!-1
                     goto stop_countdown
                 ))
 
             @rem If the timeout expired, send a kill signal
-            if %COUNTDOWN% equ 0 (
-                echo %APPLICATION_NAME% did not stop in time
+            if !COUNTDOWN! equ 0 (
+                echo %APPLICATION_NAME% did not stop in time, sending kill signal...
                 taskkill /pid !PID! /f
                 echo %APPLICATION_NAME% has been killed
             )
-
-        ) else (
-
-            echo %APPLICATION_NAME% has already stopped
-
         )
 
         del "%PID_FILE%"
@@ -302,7 +311,7 @@ exit /b 0
 
         @rem Query WMIC for the PID stored in the PID file
         for /f "delims=" %%p in (%PID_FILE%) do set PID=%%p
-        wmic process where "processid=!PID!" get processid 2>nul | findstr "!PID!" >nul
+        wmic process where "processid=!PID!" get processid 2>nul | findstr "!PID!" >nul 2>nul
 
         if !errorlevel! equ 0 (
             echo %APPLICATION_NAME% is up
@@ -328,14 +337,15 @@ exit /b 0
 
         @rem Query WMIC for the PID stored in the PID file
         for /f "delims=" %%p in (%PID_FILE%) do set PID=%%p
-        wmic process where "processid=!PID!" get processid 2>nul | findstr "!PID!" >nul
+        wmic process where "processid=!PID!" get processid 2>nul | findstr "!PID!" >nul 2>nul
 
         @rem Do not send the TERM signal if the application has already been stopped
-        if !errorlevel! equ 0 (
+        if !errorlevel! neq 0 (
+            echo %APPLICATION_NAME% has already stopped
+        ) else (
+
             taskkill /pid !PID! /f
             echo %APPLICATION_NAME% has been killed
-        ) else (
-            echo %APPLICATION_NAME% has already stopped
         )
 
         del "%PID_FILE%"
@@ -346,7 +356,27 @@ exit /b 0
 
 :kill_all
 
-    echo "Kill all"
+    set FOUND=0
+
+    for /f "usebackq skip=1" %%p in (
+        `wmic process
+            where "commandline like '%%%APPLICATION_CLASS%%%' and name='java.exe'"
+            get processId 2^>nul ^|
+        findstr /r /v "^\$" 2^>nul`
+    ) do (
+        set PID=%%p
+        echo Killing PID !PID!...
+        taskkill /pid !PID! /f
+        set FOUND=1
+    )
+
+    if %FOUND% equ 0 (
+        echo No processes found for %APPLICATION_NAME%
+    )
+
+    if exist "%PID_FILE%" (
+        del "%PID_FILE%"
+    )
 
 exit /b 0
 

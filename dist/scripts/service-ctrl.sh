@@ -262,7 +262,7 @@ stop() {
 
             # If the timeout expired, send a kill signal
             if [ \$COUNTDOWN -eq 0 ]; then
-                echo "\${APPLICATION_NAME} did not stop in time"
+                echo "\${APPLICATION_NAME} did not stop in time, sending kill signal..."
                 kill -KILL \$PID
                 echo "\${APPLICATION_NAME} has been killed"
             fi
