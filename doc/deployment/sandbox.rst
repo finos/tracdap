@@ -1,12 +1,8 @@
 
+
 TRAC D.A.P. Sandbox - Quick Start
 =================================
 
-The TRAC platform sandbox is available to download on the
-`GitHub release page <https://github.com/finos/tracdap/releases>`_.
-
-What is the sandbox?
---------------------
 
 The TRAC sandbox is a self-contained distribution of TRAC D.A.P. that can run on a single machine.
 It includes all the functionality of the platform in one ready-to-use bundle.
@@ -19,8 +15,38 @@ develop and test end-to-end processes, including models, model chains, data prep
 control / sign-off workflows. All these items should work without modification  when deployed to a real production
 instance of TRAC *(subject to capacity constraints and assuming models are coded in line with TRAC conventions)*.
 
+
+Downloading
+-----------
+
+The TRAC platform sandbox is available to download on the GitHub release page:
+
+* https://github.com/finos/tracdap/releases
+
+You want the tracdap-sandbox zip file, the package will work on Linux, macOS and Windows.
+Unless you have a good reason, always use the latest stable release.
+
+
 Deploying the sandbox
 ---------------------
+
+**Java**
+
+TRAC requires Java version 11 or higher, using LTS 11 or LTS 17 is recommended.
+Suitable JDKs are available from
+`Azul (Zulu) <https://www.azul.com/downloads/?package=jdk>`_ and
+`Adoptium (Eclipse Temurin) <https://adoptium.net/>`_.
+If your company restricts software deployment, it is fine to use the Java package they provide
+so long as it is version 11 or higher.
+
+**Python**
+
+TRAC requires Python 3.7 or higher, which can be downloaded and installed from
+`python.org <https://www.python.org/downloads/>`_.
+If your company restricts software deployment, it is fine to use the Python package they provide
+so long as it is version 3.7 or higher.
+
+**TRAC Services**
 
 Start by creating a directory for your TRAC installation and unzipping the sandbox distribution.
 
@@ -64,6 +90,40 @@ versioned deployment folder, because you want to keep them when you install newe
             mkdir C:\trac\data
             mkdir C:\trac\metadata
 
+**VENV for model execution**
+
+You will need to set up a Python VENV with the TRAC runtime library installed,
+which will be used for executing models. If you have multiple versions of Python installed,
+make sure to use the right one to create your venv.
+
+.. tab-set::
+
+    .. tab-item:: Linux / macOS
+        :sync: platform_linux
+
+        .. code-block:: shell
+
+            cd /opt/trac/trac-platform-<version>
+            python -m venv ./venv
+            . venv/bin/activate
+
+            pip install "tracdap-runtime == <version>"
+
+    .. tab-item:: Windows
+        :sync: platform_windows
+
+        .. code-block:: batch
+
+            cd C:\trac\trac-platform-<version>
+            python -m venv .\venv
+            venv\Scripts\activate
+
+            pip install "tracdap-runtime == <version>"
+
+The pip install command will download the TRAC runtime package for Python from PyPi.
+If you are behind a corporate firewall, you may need to use a web proxy and/or
+point at a Nexus server hosted inside your network to download dependencies.
+
 
 Quick configuration
 -------------------
@@ -80,7 +140,7 @@ where the database file will be stored:
     dalType: JDBC
     dalProps:
       dialect: H2
-      jdbcUrl: /opt/trac/metadata/trac.meta
+      jdbcUrl: /path/to/trac/metadata/trac.meta
       ...
 
 The configuration also contains an example for using local data storage. You need to specify a path.
@@ -93,7 +153,7 @@ The configuration also contains an example for using local data storage. You nee
         instances:
           - storageType: LOCAL
             storageProps:
-              rootPath: /opt/trac/data
+              rootPath: /path/to/trac/data
 
 Pay particular attention to the storage key, which is *ACME_SALES_DATA* in this example.
 The storage key is a unique identifier for a storage location, you may want to give it
@@ -110,8 +170,7 @@ you can also change the default storage format to *CSV*.
       defaultStorageKey: ACME_SALES_DATA
       defaultStorageFormat: ARROW_FILE
 
-The last thing you need to add to the platform config file is model repositories. The
-example config contains the TRAC repository as an example, you should replace this with
+The example config contains the TRAC repository as an example, you should replace this with
 your own model repository and choose a meaningful repository key. You can add multiple
 repositories if required, so long as each one has a unique key.
 
@@ -122,6 +181,17 @@ repositories if required, so long as each one has a unique key.
       sales_model_repo:
         repoType: git
         repoUrl: https://github.com/acme_corp/sales_model_repo
+
+The last thing you need to add in the platform config is an executor. The example config is already set up
+with a local executor, so you just need to add the path for the VENV you built in the deployment step.
+
+.. code-block:: yaml
+
+    executor:
+      executorType: LOCAL
+      executorProps:
+        venvPath: /path/to/trac/tracdap-sandbox-<version>/venv
+
 
 The gateway example config will work without alteration to serve the API endpoints for the TRAC services.
 However, the gateway can also be used to route requests for client applications; this is particularly
