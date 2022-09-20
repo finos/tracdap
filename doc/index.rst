@@ -24,6 +24,7 @@ TRAC Data & Analytics Platform
     overview/index
     modelling/index
     app_dev/index
+    deployment/index
     reference/index
 
 
@@ -88,6 +89,27 @@ TRAC Data & Analytics Platform
             :expand:
 
             App development
+
+    .. grid-item-card::
+        :class-header: sd-bg-light sd-pt-0 sd-pb-1
+        :class-body: sd-py-0
+        :class-footer: sd-border-0 sd-pt-0 sd-pb-3
+        :shadow: md
+
+
+        **Deploy and manage the platform**
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+        Everything to do with deployment, configuration and technology integration,
+        for dev-ops engineers and systems administrators.
+
+        +++
+        .. button-ref:: deployment/index
+            :color: primary
+            :outline:
+            :expand:
+
+            Deployment
 
 
 .. rubric:: Can't find what you're looking for?
