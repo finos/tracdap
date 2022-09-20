@@ -14,25 +14,28 @@
 
 from __future__ import annotations
 
-import inspect
-import pathlib
+import inspect as _inspect
+import pathlib as _pathlib
 import typing as _tp
 
-import tracdap.rt.api as api
-import tracdap.rt._exec.runtime as runtime  # noqa
+import tracdap.rt.api as _api
+import tracdap.rt.config as _config
+import tracdap.rt._impl.config_parser as _cparse  # noqa
+import tracdap.rt._impl.util as _util  # noqa
+import tracdap.rt._exec.runtime as _runtime  # noqa
 
 from .cli import cli_args
 
 
 def _resolve_config_file(
-        config_path: _tp.Union[str, pathlib.Path],
-        model_dir: _tp.Optional[pathlib.Path] = None) \
-        -> pathlib.Path:
+        config_path: _tp.Union[str, _pathlib.Path],
+        model_dir: _tp.Optional[_pathlib.Path] = None) \
+        -> _pathlib.Path:
 
-    if pathlib.Path(config_path).is_absolute():
+    if _pathlib.Path(config_path).is_absolute():
         return config_path
 
-    cwd = pathlib.Path.cwd()
+    cwd = _pathlib.Path.cwd()
     cwd_config_path = cwd.joinpath(config_path).resolve()
 
     if cwd_config_path.exists():
@@ -45,16 +48,16 @@ def _resolve_config_file(
         if model_config_path.exists():
             return model_config_path
 
-    if isinstance(config_path, pathlib.Path):
+    if isinstance(config_path, _pathlib.Path):
         return config_path
     else:
-        return pathlib.Path(config_path)
+        return _pathlib.Path(config_path)
 
 
 def launch_model(
-        model_class: api.TracModel.__class__,
-        job_config: _tp.Union[str, pathlib.Path],
-        sys_config: _tp.Union[str, pathlib.Path]):
+        model_class: _api.TracModel.__class__,
+        job_config: _tp.Union[str, _pathlib.Path],
+        sys_config: _tp.Union[str, _pathlib.Path]):
 
     """
     Launch an individual model component by class (embedded launch)
@@ -77,13 +80,13 @@ def launch_model(
     :param sys_config: Path to the system configuration file
     """
 
-    model_file = inspect.getfile(model_class)
-    model_dir = pathlib.Path(model_file).parent
+    model_file = _inspect.getfile(model_class)
+    model_dir = _pathlib.Path(model_file).parent
 
     _sys_config = _resolve_config_file(sys_config, model_dir)
     _job_config = _resolve_config_file(job_config, model_dir)
 
-    runtime_instance = runtime.TracRuntime(
+    runtime_instance = _runtime.TracRuntime(
         _sys_config, _job_config,
         dev_mode=True,
         model_class=model_class)
@@ -96,14 +99,14 @@ def launch_model(
 
 
 def launch_job(
-        job_config: _tp.Union[str, pathlib.Path],
-        sys_config: _tp.Union[str, pathlib.Path],
+        job_config: _tp.Union[str, _pathlib.Path],
+        sys_config: _tp.Union[str, _pathlib.Path],
         dev_mode: bool = False):
 
     _sys_config = _resolve_config_file(sys_config, None)
     _job_config = _resolve_config_file(job_config, None)
 
-    runtime_instance = runtime.TracRuntime(
+    runtime_instance = _runtime.TracRuntime(
         _sys_config, _job_config,
         dev_mode=dev_mode)
 
@@ -121,7 +124,7 @@ def launch_cli():
     _sys_config = _resolve_config_file(launch_args.sys_config, None)
     _job_config = _resolve_config_file(launch_args.job_config, None)
 
-    runtime_instance = runtime.TracRuntime(
+    runtime_instance = _runtime.TracRuntime(
         _sys_config, _job_config,
         dev_mode=launch_args.dev_mode,
         job_result_dir=launch_args.job_result_dir,
@@ -134,3 +137,47 @@ def launch_cli():
     with runtime_instance as rt:
         rt.submit_batch()
         rt.wait_for_shutdown()
+        
+        
+def launch_embedded(
+        job_config: _config.JobConfig,
+        sys_config: _config.RuntimeConfig) \
+        -> _config.JobResult:
+
+    """
+    Launch an embedded job, using the TRAC runtime as a library
+
+    .. note::
+        The API for embedded operations may change in future versions of the runtime
+
+    This method allows the TRAC runtime library to be used within a custom execution component.
+    In this pattern, the custom component would handle communication with a (custom) platform
+    and build TRAC-format metadata to set up a job. This method will execute the job and return
+    a result object. It is likely that custom data / model sources will also be needed.
+
+    :param job_config: A fully-populated job config object (dev-mode translations are NOT applied)
+    :param sys_config: A fully-populated system (runtime) config object (dev-mode translations are NOT applied)
+    :return: A job result object
+    """
+
+    runtime_instance = _runtime.TracRuntime(sys_config, job_config)
+    runtime_instance.pre_start()
+
+    scratch_dir = _pathlib.Path(runtime_instance._scratch_dir)  # noqa
+    result_dir = scratch_dir.joinpath("results")
+    runtime_instance._job_result_dir = result_dir
+    runtime_instance._job_result_format = "json"
+
+    with runtime_instance as rt:
+        rt.submit_batch()
+        rt.wait_for_shutdown()
+
+    job_key = _util.object_key(runtime_instance._job_config.jobId)  # noqa
+    job_result_file = f"job_result_{job_key}.json"
+    job_result_path = result_dir.joinpath(job_result_file)
+
+    job_result_parser = _cparse.ConfigParser(_config.JobResult)
+    job_result_raw = job_result_parser.load_raw_config(job_result_path, config_file_name="result")
+    job_result = job_result_parser.parse(job_result_raw, job_result_path)
+
+    return job_result
