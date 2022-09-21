@@ -493,6 +493,13 @@ class ActorSystem:
         target = self._lookup_actor_node(signal.target)
 
         if target is None:
+
+            # stopped / failed messages can arrive from a child actor after the parent has stopped
+            # This is a normal condition and should be silently ignored (not be logged as a warning)
+            if self._parent_id(signal.sender) == signal.target and \
+                    signal.message in [SignalNames.STOPPED, SignalNames.FAILED]:
+                return
+
             # Unhandled messages are dropped, with just a warning in the log
             self._log.warning(f"Signal ignored: [{signal.message}] -> {signal.target}  (target actor not found)")
             return
