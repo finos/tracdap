@@ -132,6 +132,8 @@ The sandbox deployment comes with some example configuration to use as a startin
 these configuration files, it is recommended to take a copy as a backup, in case you need to refer to it
 later.
 
+**Platform configuration**
+
 The sample platform configuration is already set up to use the H2 database, but you need to specify a path
 where the database file will be stored:
 
@@ -192,12 +194,25 @@ with a local executor, so you just need to add the path for the VENV you built i
       executorProps:
         venvPath: /path/to/trac/tracdap-sandbox-<version>/venv
 
+**Gateway configuration**
 
 The gateway example config will work without alteration to serve the API endpoints for the TRAC services.
 However, the gateway can also be used to route requests for client applications; this is particularly
 useful for web applications in a dev / test scenario, because it provides a direct route to access the TRAC
 API and avoids CORS issues. If you want to use this capability, look in the gateway config and you will find
 an example of setting up an additional HTTP route. You can add as many HTTP routes as you need.
+
+**Logging**
+
+Logging is provided using log4j, the example configuration writes to the local log/ directory by default.
+
+**Environment**
+
+Environment variables can be specified in the shell before launching the TRAC services. Alternatively,
+an environment file is available for both Linux / macOS (env.sh) and Windows (env.bat). These can be
+useful for specifying system settings, such as JAVA_HOME to select a particular installation of Java,
+or JAVA_OPTS to control the JVM memory parameters. You can also control some of the TRAC options here,
+e.g. setting CONFIG_FILE will tell trac to load a different root config file.
 
 Metadata setup
 --------------
