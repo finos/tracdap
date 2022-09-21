@@ -76,7 +76,7 @@ class TracEngine(_actors.Actor):
             self, sys_config: _cfg.RuntimeConfig,
             models: _models.ModelLoader,
             storage: _storage.StorageManager,
-            batch_mode=False):
+            notify_callback: tp.Callable[[str, tp.Optional[_cfg.JobResult], tp.Optional[Exception]], None]):
 
         super().__init__()
 
@@ -85,7 +85,7 @@ class TracEngine(_actors.Actor):
         self._sys_config = sys_config
         self._models = models
         self._storage = storage
-        self._batch_mode = batch_mode
+        self._notify_callback = notify_callback
 
         self._job_actors = dict()
 
@@ -119,40 +119,33 @@ class TracEngine(_actors.Actor):
         self._job_actors = job_actors
 
     @_actors.Message
-    def job_succeeded(self, job_key: str):
+    def job_succeeded(self, job_key: str, job_result: _cfg.JobResult):
 
         self._log.info(f"Recording job as successful: {job_key}")
+
+        if self._notify_callback is not None:
+            self._notify_callback(job_key, job_result, None)
+
         self._finalize_job(job_key)
 
     @_actors.Message
     def job_failed(self, job_key: str, error: Exception):
 
         self._log.error(f"Recording job as failed: {job_key}")
-        self._finalize_job(job_key, error)
 
-    def _finalize_job(self, job_key: str, error: tp.Optional[Exception] = None):
+        if self._notify_callback is not None:
+            self._notify_callback(job_key, None, error)
+
+        self._finalize_job(job_key)
+
+    def _finalize_job(self, job_key: str):
 
         # TODO: How should the engine respond when attempting to finalize an unknown job?
 
         job_actors = self._job_actors
         job_actor_id = job_actors.pop(job_key)
-
-        if self._batch_mode:
-
-            # If the engine is in batch mode, shut down the whole engine once the first job completes
-            if error:
-                self._log.error("Batch run failed, shutting down the engine")
-                engine_error = RuntimeError("Batch job failed")
-                self.actors().fail(engine_error, cause=error)
-
-            else:
-                self._log.info("Batch run complete, shutting down the engine")
-                self.actors().stop()
-
-        else:
-            # Otherwise, just stop the individual job actor for the job that has completed
-            self.actors().stop(job_actor_id)
-            self._job_actors = job_actors
+        self.actors().stop(job_actor_id)
+        self._job_actors = job_actors
 
 
 class JobProcessor(_actors.Actor):
@@ -186,14 +179,14 @@ class JobProcessor(_actors.Actor):
         self._models.destroy_scope(self.job_key)
 
     @_actors.Message
-    def job_graph(self, graph: _EngineContext):
-        self.actors().spawn(GraphProcessor, graph)
+    def job_graph(self, graph: _EngineContext, root_id: NodeId):
+        self.actors().spawn(GraphProcessor, graph, root_id)
         self.actors().stop(self.actors().sender)
 
     @_actors.Message
-    def job_succeeded(self):
+    def job_succeeded(self, job_result: _cfg.JobResult):
         self._log.info(f"Job succeeded {self.job_key}")
-        self.actors().send_parent("job_succeeded", self.job_key)
+        self.actors().send_parent("job_succeeded", self.job_key, job_result)
 
     @_actors.Message
     def job_failed(self, error: Exception):
@@ -237,7 +230,7 @@ class GraphBuilder(_actors.Actor):
             node.function = self._resolver.resolve_node(node.node)
 
         self.graph = graph
-        self.actors().send_parent("job_graph", self.graph)
+        self.actors().send_parent("job_graph", self.graph, graph_data.root_id)
 
     @_actors.Message
     def get_execution_graph(self):
@@ -258,9 +251,10 @@ class GraphProcessor(_actors.Actor):
     Once all running nodes are stopped, an error is reported to the parent
     """
 
-    def __init__(self, graph: _EngineContext):
+    def __init__(self, graph: _EngineContext, root_id: NodeId):
         super().__init__()
         self.graph = graph
+        self.root_id = root_id
         self.processors: tp.Dict[NodeId, _actors.ActorId] = dict()
         self._log = _util.logger_for_object(self)
 
@@ -426,7 +420,8 @@ class GraphProcessor(_actors.Actor):
                     self.actors().send_parent("job_failed", RuntimeError("Job suffered multiple errors", errors))
 
             else:
-                self.actors().send_parent("job_succeeded")
+                job_result = self.graph.nodes[self.root_id].result
+                self.actors().send_parent("job_succeeded", job_result)
 
 
 class NodeProcessor(_actors.Actor):
