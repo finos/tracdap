@@ -25,10 +25,11 @@ Documentation for the TRAC platform is available on our website at
 
 The following packages are available:
 
-| Package                                                                  | Description                                                                |
-|--------------------------------------------------------------------------|----------------------------------------------------------------------------|
-| [Model runtime for Python](https://pypi.org/project/tracdap-runtime/)    | Build models and test them in a sandbox, ready to deploy to the platform   |
-| [Web API package](https://www.npmjs.com/package/@finos/tracdap-web-api)  | Build client apps in JavaScript or TypeScript using the TRAC platform APIs |
+| Package                                                                  | Description                                                                                           |
+|--------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| [Model runtime for Python](https://pypi.org/project/tracdap-runtime/)    | Build models and test them in a sandbox, ready to deploy to the platform                              |
+| [Web API package](https://www.npmjs.com/package/@finos/tracdap-web-api)  | Build client apps in JavaScript or TypeScript using the TRAC platform APIs                            |
+| [Platform releases](https://github.com/finos/tracdap/releases)           | Packages for the platform services and a standalone sandbox are published with each release on GitHub |
 
 
 ## Development Status
@@ -59,65 +60,17 @@ after which it may be added to but no fields will be removed or changed.
 For more information see the
 [development roadmap](https://github.com/finos/tracdap/wiki/Development-Roadmap).
 
-## Building TRAC
+## Building models
 
-The core platform services require Java version 11 or higher, using LTS 11 or LTS 17
-is recommended. Suitable JDKs are available from Azul and Adoptium:
+TODO
 
-* [Azul - Zulu](https://www.azul.com/downloads/?package=jdk)
-* [Adoptium - Eclipse Temurin](https://adoptium.net/)
+## Running the TRAC platform
 
-To build the TRAC platform, clone the repository and run this command
-in the source directory:
+TODO
 
-    gradlew build     # Windows
-    ./gradlew build   # Linux or macOS
-    
-If you are behind a corporate firewall, you may need to use a web proxy and/or
-point Gradle at a Nexus server hosted inside your network to download 
-dependencies. The Gradle documentation explains how to declare a local mirror
-in an init script, so that it can be used for all Gradle builds.
+## Development
 
-* [Gradle web proxy](https://docs.gradle.org/current/userguide/build_environment.html#sec:accessing_the_web_via_a_proxy)
-* [Gradle init scripts](https://docs.gradle.org/current/userguide/init_scripts.html)
-* [Gradle repo declarations](https://docs.gradle.org/current/userguide/declaring_repositories.html)
-
-
-## Running TRAC
-
-In order to run TRAC you will need to supply some configuration. There is a
-sample "devlocal" configuration included in the "etc" folder which is set up
-to use a local backend with data stored under build/run.
-
-Before starting the TRAC services you will need to create a metadata database.
-There is a tool provided that can deploy the schema and create tenants. To use
-the "devlocal" setup the supplied config can be used as-is, this will deploy
-the TRAC metadata schema into an H2 database file.
-
-    gradlew :deploy-metadb:run --args="--config etc/trac-devlocal.yaml --task deploy_schema"
-    gradlew :deploy-metadb:run --args="--config etc/trac-devlocal.yaml --task add_tenant:ACME_CORP"
-
-To run models in TRAC you will need an execution environment. A local execution
-environment for can be configured by creating a Python venv and installing the
-TRAC D.A.P. runtime, then editing trac-devlocal.yaml to set the executor venvPath.
-
-    python -m vemv path/to/venv/
-    . path/to/venv/bin/activate     # For macOS and Linux
-    path\to\venv\Scripts\activate   # For Windows
-    pip install tracdap-runtime
-
-Once you have a database and an executor prepared, you can start the TRAC services.
-
-    gradlew :tracdap-svc-meta:run --args="--config etc/trac-devlocal.yaml"
-    gradlew :tracdap-svc-data:run --args="--config etc/trac-devlocal.yaml"
-    gradlew :tracdap-svc-orch:run --args="--config etc/trac-devlocal.yaml"
-    gradlew :tracdap-gateway:run --args="--config etc/trac-devlocal-gateway.yaml"
-
-To confirm the platform is working you can use the [example API calls](./examples/rest_calls)
-with a REST client such as [Postman](https://www.postman.com/). For more information on the
-platform APIs and how to use them to build applications, check out the
-[application development section](https://tracdap.readthedocs.io/en/stable/app_dev)
-in the online documentation.
+TODO
 
 ## Contributing
 
