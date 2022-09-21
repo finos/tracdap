@@ -45,19 +45,26 @@ class DevModeTranslator:
     _log: tp.Optional[_util.logging.Logger] = None
 
     @classmethod
-    def translate_dev_mode_config(
+    def translate_sys_config(cls, sys_config: _cfg.RuntimeConfig, config_dir: tp.Optional[pathlib.Path]):
+
+        cls._log.info(f"Applying dev mode config translation to system config")
+
+        sys_config = cls._add_integrated_repo(sys_config)
+        sys_config = cls._resolve_relative_storage_root(sys_config, config_dir)
+
+        return sys_config
+
+    @classmethod
+    def translate_job_config(
             cls,
             sys_config: _cfg.RuntimeConfig,
             job_config: _cfg.JobConfig,
-            sys_config_path: pathlib.Path,
-            job_config_path: pathlib.Path,
             scratch_dir: pathlib.Path,
+            config_dir: tp.Optional[pathlib.Path],
             model_class: tp.Optional[_api.TracModel.__class__]) \
-            -> (_cfg.JobConfig, _cfg.RuntimeConfig):
+            -> _cfg.JobConfig:
 
-        cls._log.info(f"Applying dev mode config translation")
-
-        sys_config = cls._add_integrated_repo(sys_config)
+        cls._log.info(f"Applying dev mode config translation to job config")
 
         model_loader = _models.ModelLoader(sys_config, scratch_dir)
         model_loader.create_scope("DEV_MODE_TRANSLATION")
@@ -82,7 +89,7 @@ class DevModeTranslator:
                 job_config = cls._add_job_resource(job_config, model_id, model_obj)
                 job_config.job.runFlow.models[model_key] = _util.selector_for(model_id)
 
-            flow_id, flow_obj = cls._expand_flow_definition(job_config, sys_config, job_config_path.parent)
+            flow_id, flow_obj = cls._expand_flow_definition(job_config, config_dir)
             job_config = cls._add_job_resource(job_config, flow_id, flow_obj)
             job_config.job.runFlow.flow = _util.selector_for(flow_id)
 
@@ -92,7 +99,7 @@ class DevModeTranslator:
             job_config = cls._process_parameters(job_config)
 
         if job_config.job.jobType not in [_meta.JobType.RUN_MODEL, _meta.JobType.RUN_FLOW]:
-            return job_config, sys_config
+            return job_config
 
         run_info = job_config.job.runModel \
             if job_config.job.jobType == _meta.JobType.RUN_MODEL \
@@ -122,10 +129,8 @@ class DevModeTranslator:
                 schema = None
 
             data_obj, storage_obj = cls._process_job_io(
-                sys_config, sys_config_path.parent,
-                data_key, data_value, data_id, storage_id,
-                new_unique_file=not is_input,
-                schema=schema)
+                sys_config, data_key, data_value, data_id, storage_id,
+                new_unique_file=not is_input, schema=schema)
 
             translated_resources[_util.object_key(data_id)] = data_obj
             translated_resources[_util.object_key(storage_id)] = storage_obj
@@ -148,7 +153,7 @@ class DevModeTranslator:
         run_info.inputs = translated_inputs
         run_info.outputs = translated_outputs
 
-        return job_config, sys_config
+        return job_config
 
     @classmethod
     def _add_integrated_repo(cls, sys_config: _cfg.RuntimeConfig) -> _cfg.RuntimeConfig:
@@ -156,6 +161,56 @@ class DevModeTranslator:
         # Add the integrated model repo trac_integrated
 
         sys_config.repositories["trac_integrated"] = _cfg.RepositoryConfig("integrated")
+
+        return sys_config
+
+    @classmethod
+    def _resolve_relative_storage_root(
+            cls, sys_config: _cfg.RuntimeConfig,
+            sys_config_path: tp.Optional[pathlib.Path]):
+
+        storage_map = copy.deepcopy(sys_config.storage)
+
+        for key, storage in storage_map.items():
+            storage_set = copy.copy(storage)
+            storage_set.instances = []
+
+            for instance in storage.instances:
+
+                if instance.storageType != "LOCAL":
+                    continue
+
+                if "rootPath" not in instance.storageProps:
+                    continue
+
+                root_path = pathlib.Path(instance.storageProps["rootPath"])
+
+                if root_path.is_absolute():
+                    continue
+
+                cls._log.info(f"Resolving relative path for [{key}] local storage...")
+
+                if sys_config_path is not None:
+                    absolute_path = sys_config_path.joinpath(root_path).resolve()
+                    if absolute_path.exists():
+                        cls._log.info(f"Resolved [{root_path}] -> [{absolute_path}]")
+                        instance.storageProps["rootPath"] = str(absolute_path)
+                        continue
+
+                cwd = pathlib.Path.cwd()
+                absolute_path = cwd.joinpath(root_path).resolve()
+
+                if absolute_path.exists():
+                    cls._log.info(f"Resolved [{root_path}] -> [{absolute_path}]")
+                    instance.storageProps["rootPath"] = str(absolute_path)
+                    continue
+
+                msg = f"Failed to resolve relative storage path [{root_path}]"
+                cls._log.error(msg)
+                raise _ex.EConfigParse(msg)
+
+        sys_config = copy.copy(sys_config)
+        sys_config.storage = storage_map
 
         return sys_config
 
@@ -256,17 +311,16 @@ class DevModeTranslator:
 
     @classmethod
     def _expand_flow_definition(
-            cls, job_config: _cfg.JobConfig, sys_config: _cfg.RuntimeConfig,
-            job_config_dir: pathlib.Path) \
-            -> (_cfg.JobConfig, _cfg.RuntimeConfig):
+            cls, job_config: _cfg.JobConfig, config_dir: pathlib.Path) \
+            -> (_meta.TagHeader, _meta.ObjectDefinition):
 
         flow_details = job_config.job.runFlow.flow
 
         # The full specification for a flow is as a tag selector for a valid job resource
         # This is still allowed in dev mode, in which case dev mode translation is not applied
         if isinstance(flow_details, _meta.TagHeader) or isinstance(flow_details, _meta.TagSelector):
-            _util.get_job_resource(flow_details, job_config, optional=False)
-            return job_config, sys_config
+            flow_obj = _util.get_job_resource(flow_details, job_config, optional=False)
+            return flow_details, flow_obj
 
         # Otherwise, flow is specified as the path to dev-mode flow definition
         if not isinstance(flow_details, str):
@@ -279,7 +333,7 @@ class DevModeTranslator:
 
         cls._log.info(f"Generating flow definition for [{flow_details}] with ID = [{flow_key}]")
 
-        flow_path = job_config_dir.joinpath(flow_details)
+        flow_path = config_dir.joinpath(flow_details) if config_dir is not None else pathlib.Path(flow_details)
         flow_parser = _cfg_p.ConfigParser(_meta.FlowDefinition)
         flow_raw_data = flow_parser.load_raw_config(flow_path, flow_path.name)
         flow_def = flow_parser.parse(flow_raw_data, flow_path.name)
@@ -557,8 +611,7 @@ class DevModeTranslator:
 
     @classmethod
     def _process_job_io(
-            cls, sys_config, sys_config_dir,
-            data_key, data_value, data_id, storage_id,
+            cls, sys_config, data_key, data_value, data_id, storage_id,
             new_unique_file=False, schema: tp.Optional[_meta.SchemaDefinition] = None):
 
         if isinstance(data_value, str):
@@ -589,7 +642,7 @@ class DevModeTranslator:
 
         if new_unique_file:
 
-            x_storage_mgr = _storage.StorageManager(sys_config, sys_config_dir)
+            x_storage_mgr = _storage.StorageManager(sys_config)
             x_storage = x_storage_mgr.get_file_storage(storage_key)
             x_orig_path = pathlib.PurePath(storage_path)
             x_name = x_orig_path.name
