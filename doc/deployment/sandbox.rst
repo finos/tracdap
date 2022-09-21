@@ -1,7 +1,7 @@
 
 
-TRAC D.A.P. Sandbox - Quick Start
-=================================
+Sandbox Quick Start
+===================
 
 
 The TRAC sandbox is a self-contained distribution of TRAC D.A.P. that can run on a single machine.
