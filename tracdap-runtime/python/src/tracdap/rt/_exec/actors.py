@@ -541,6 +541,7 @@ class ActorSystem:
             return
 
         self._log.error(f"{actor_id} [{message}]: {str(error)}")
+        self._log.exception(error)
         self._log.error(f"Actor failed: {actor_id} [{message}] (actor will be stopped)")
 
         # Dp not send STOP signal for errors that occur while processing START or STOP
