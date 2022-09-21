@@ -90,6 +90,17 @@ versioned deployment folder, because you want to keep them when you install newe
             mkdir C:\trac\data
             mkdir C:\trac\metadata
 
+**Database driver**
+
+The metadata service requires a JDBC database driver, which must be copied as a JAR file into the
+*plugins* folder of the TRAC installation. To use the H2 embedded database, you can download the H2
+JDBC JAR from Maven Central:
+
+* https://search.maven.org/artifact/com.h2database/h2
+
+If you are behind a corporate firewall, you may need to use a web proxy and/or
+point at a Nexus server hosted inside your network.
+
 **VENV for model execution**
 
 You will need to set up a Python VENV with the TRAC runtime library installed,
@@ -122,7 +133,7 @@ make sure to use the right one to create your venv.
 
 The pip install command will download the TRAC runtime package for Python from PyPi.
 If you are behind a corporate firewall, you may need to use a web proxy and/or
-point at a Nexus server hosted inside your network to download dependencies.
+point at a Nexus server hosted inside your network.
 
 
 Quick configuration
