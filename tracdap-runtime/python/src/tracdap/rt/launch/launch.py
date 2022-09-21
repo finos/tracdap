@@ -86,16 +86,14 @@ def launch_model(
     _sys_config = _resolve_config_file(sys_config, model_dir)
     _job_config = _resolve_config_file(job_config, model_dir)
 
-    runtime_instance = _runtime.TracRuntime(
-        _sys_config, _job_config,
-        dev_mode=True,
-        model_class=model_class)
-
+    runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=True)
     runtime_instance.pre_start()
 
+    job = runtime_instance.load_job_config(_job_config, model_class=model_class)
+
     with runtime_instance as rt:
-        rt.submit_batch()
-        rt.wait_for_shutdown()
+        rt.submit_job(job)
+        rt.wait_for_job(job.jobId)
 
 
 def launch_job(
@@ -106,15 +104,14 @@ def launch_job(
     _sys_config = _resolve_config_file(sys_config, None)
     _job_config = _resolve_config_file(job_config, None)
 
-    runtime_instance = _runtime.TracRuntime(
-        _sys_config, _job_config,
-        dev_mode=dev_mode)
-
+    runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=dev_mode)
     runtime_instance.pre_start()
 
+    job = runtime_instance.load_job_config(_job_config)
+
     with runtime_instance as rt:
-        rt.submit_batch()
-        rt.wait_for_shutdown()
+        rt.submit_job(job)
+        rt.wait_for_job(job.jobId)
 
 
 def launch_cli():
@@ -125,7 +122,7 @@ def launch_cli():
     _job_config = _resolve_config_file(launch_args.job_config, None)
 
     runtime_instance = _runtime.TracRuntime(
-        _sys_config, _job_config,
+        _sys_config,
         dev_mode=launch_args.dev_mode,
         job_result_dir=launch_args.job_result_dir,
         job_result_format=launch_args.job_result_format,
@@ -134,9 +131,11 @@ def launch_cli():
 
     runtime_instance.pre_start()
 
+    job = runtime_instance.load_job_config(_job_config)
+
     with runtime_instance as rt:
-        rt.submit_batch()
-        rt.wait_for_shutdown()
+        rt.submit_job(job)
+        rt.wait_for_job(job.jobId)
         
         
 def launch_embedded(
@@ -160,24 +159,12 @@ def launch_embedded(
     :return: A job result object
     """
 
-    runtime_instance = _runtime.TracRuntime(sys_config, job_config)
+    runtime_instance = _runtime.TracRuntime(sys_config)
     runtime_instance.pre_start()
 
-    scratch_dir = _pathlib.Path(runtime_instance._scratch_dir)  # noqa
-    result_dir = scratch_dir.joinpath("results")
-    runtime_instance._job_result_dir = result_dir
-    runtime_instance._job_result_format = "json"
-
     with runtime_instance as rt:
-        rt.submit_batch()
-        rt.wait_for_shutdown()
 
-    job_key = _util.object_key(runtime_instance._job_config.jobId)  # noqa
-    job_result_file = f"job_result_{job_key}.json"
-    job_result_path = result_dir.joinpath(job_result_file)
+        rt.submit_job(job_config)
+        job_result = rt.wait_for_job(job_config.jobId)
 
-    job_result_parser = _cparse.ConfigParser(_config.JobResult)
-    job_result_raw = job_result_parser.load_raw_config(job_result_path, config_file_name="result")
-    job_result = job_result_parser.parse(job_result_raw, job_result_path)
-
-    return job_result
+        return job_result
