@@ -13,7 +13,7 @@
 # limitations under the License.
 
 config:
-  logging: trac-logging-example.xml
+  logging: trac-logging.xml
 
 
 port: 8080

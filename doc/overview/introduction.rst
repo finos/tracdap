@@ -9,31 +9,37 @@ for multiple personas.
 .. image:: ../_images/overview_personas.png
     :align: center
 
-.. panels::
-    :column: col-lg-6 col-md-12 col-sm-12 col-xs-12 p-2 border-0
-    :header: text-center pt-0 pb-1
-    :body: text-left pt-0 pb-0
+.. grid:: 1 2 2 2
+    :gutter: 3
 
-    **What is TRAC?**
-    ^^^^^^^^^^^^^^^^^
+    .. grid-item-card::
+        :class-header: sd-bg-light sd-pt-0 sd-pb-1
+        :class-body: sd-py-0
+        :shadow: md
 
-    * A model management and orchestration solution which is;
-    * Built around a structural meta-data model
-    * Designed to manage complex, critical, highly governed models
-    * Open source and free of any licence costs
-    * Compatible with all major cloud providers and Hadoop
+        **What is TRAC?**
+        ^^^^^^^^^^^^^^^^^
 
-    ---
+        * A model management and orchestration solution which is;
+        * Built around a structural meta-data model
+        * Designed to manage complex, critical, highly governed models
+        * Open source and free of any licence costs
+        * Compatible with all major cloud providers and Hadoop
 
-    **What is different about TRAC?**
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    .. grid-item-card::
+        :class-header: sd-bg-light sd-pt-0 sd-pb-1
+        :class-body: sd-py-0
+        :shadow: md
 
-    * Integrates the model inventory, code repository and model execution
-    * Systemizes the model execution process, including overlays and sign-off
-    * Comprehensive version history and audit trail (BCBS239, SoX)
-    * Perfect roll-back and repeatability of any historical calculation
-    * Easy to configure what-if and champion-challenger analysis
-    * Flexible system for policy controls and model risk reporting
+        **What is different about TRAC?**
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+        * Integrates the model inventory, code repository and model execution
+        * Systemizes the model execution process, including overlays and sign-off
+        * Comprehensive version history and audit trail (BCBS239, SoX)
+        * Perfect roll-back and repeatability of any historical calculation
+        * Easy to configure what-if and champion-challenger analysis
+        * Flexible system for policy controls and model risk reporting
 
 
 Structured meta-data model
@@ -116,26 +122,34 @@ TRAC uses open standards to provide a familiar developer experience and several 
 .. image:: ../_images/overview_compatibility.png
     :align: center
 
-.. panels::
-    :column: col-lg-6 col-md-12 col-sm-12 col-xs-12 p-2 border-0
-    :header: text-center pt-0 pb-1
-    :body: text-left pt-0 pb-0
+.. grid:: 1 2 2 2
+    :gutter: 3
+    :class-container: sd-pt-2
 
-    **Open standards**
-    ^^^^^^^^^^^^^^^^^^
+    .. grid-item-card::
+        :class-header: sd-bg-light sd-pt-0 sd-pb-1
+        :class-body: sd-py-0
+        :shadow: md
 
-    * **Built on open standards** for maximum compatibility and minimum lock-in
-    * **Focus on developer experience** with a “batteries included” philosophy,
-      so developers can get going right away
-    * **Designed for integration** with complex data landscapes; open standards are best,
-      integration with bespoke components is also possible
+        **Open standards**
+        ^^^^^^^^^^^^^^^^^^
 
-    ---
+        * **Built on open standards** for maximum compatibility and minimum lock-in
+        * **Focus on developer experience** with a “batteries included” philosophy,
+          so developers can get going right away
+        * **Designed for integration** with complex data landscapes; open standards are best,
+          integration with bespoke components is also possible
 
-    **Deployment options**
-    ^^^^^^^^^^^^^^^^^^^^^^
+    .. grid-item-card::
+        :class-header: sd-bg-light sd-pt-0 sd-pb-1
+        :class-body: sd-py-0
+        :shadow: md
 
-    * **Using established patterns** that your organization already has in place will simplify deployment and maintenance
-    * **Cloud and tooling vendors** are willing to produce deployment templates for TRAC on their
-      platforms (some already have)!
-    * **Common tools** such as Terraform or Ansible can be set up quickly if there is nothing else in place
+        **Deployment options**
+        ^^^^^^^^^^^^^^^^^^^^^^
+
+        * **Using established patterns** that your organization already has in place will simplify
+          deployment and maintenance
+        * **Cloud and tooling vendors** are willing to produce deployment templates for TRAC on their
+          platforms (some already have)!
+        * **Common tools** such as Terraform or Ansible can be set up quickly if there is nothing else in place

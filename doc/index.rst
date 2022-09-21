@@ -24,55 +24,92 @@ TRAC Data & Analytics Platform
     overview/index
     modelling/index
     app_dev/index
+    deployment/index
     reference/index
 
 
+.. grid:: 1 2 2 2
+    :gutter: 3
+
+    .. grid-item-card::
+        :class-header: sd-bg-light sd-pt-0 sd-pb-1
+        :class-body: sd-py-0
+        :class-footer: sd-border-0 sd-pt-0 sd-pb-3
+        :shadow: md
+
+        **Learn about TRAC**
+        ^^^^^^^^^^^^^^^^^^^^
+
+        Learn about the TRAC platform, starting with the metadata model.
+
+        +++
+        .. button-ref:: overview/introduction
+            :color: primary
+            :outline:
+            :expand:
+
+            Platform overview
+
+    .. grid-item-card::
+        :class-header: sd-bg-light sd-pt-0 sd-pb-1
+        :class-body: sd-py-0
+        :class-footer: sd-border-0 sd-pt-0 sd-pb-3
+        :shadow: md
+
+        **Build and run models**
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+        Use the TRAC runtime APIs to build portable, self-documenting models.
+
+        +++
+        .. button-ref:: modelling/index
+            :color: primary
+            :outline:
+            :expand:
+
+            Modelling
+
+    .. grid-item-card::
+        :class-header: sd-bg-light sd-pt-0 sd-pb-1
+        :class-body: sd-py-0
+        :class-footer: sd-border-0 sd-pt-0 sd-pb-3
+        :shadow: md
+
+        **Build applications and workflows**
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+        Connect web or desktop applications to the TRAC services and metadata catalog.
+
+        *(Also relevant for system-to-system integration).*
+
+        +++
+        .. button-ref:: app_dev/index
+            :color: primary
+            :outline:
+            :expand:
+
+            App development
+
+    .. grid-item-card::
+        :class-header: sd-bg-light sd-pt-0 sd-pb-1
+        :class-body: sd-py-0
+        :class-footer: sd-border-0 sd-pt-0 sd-pb-3
+        :shadow: md
 
 
-.. panels::
-    :column: col-lg-6 col-md-12 p-2 border-0
-    :header: text-center pt-0 pb-1
-    :footer: text-center pt-0 pb-3 border-0 bg-white
-    :body: text-left pt-0 pb-0
+        **Deploy and manage the platform**
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-    **Learn about TRAC**
-    ^^^^^^^^^^^^^^^^^^^^
-	
-    Learn about the TRAC platform, starting with the metadata model.
+        Everything to do with deployment, configuration and technology integration,
+        for dev-ops engineers and systems administrators.
 
-    +++
-    .. link-button:: overview/introduction
-        :type: ref
-        :text: Platform overview
-        :classes: btn-outline-primary btn-block stretched-link
+        +++
+        .. button-ref:: deployment/index
+            :color: primary
+            :outline:
+            :expand:
 
-    ---
-
-    **Build and run models**
-    ^^^^^^^^^^^^^^^^^^^^^^^^
-	
-    Use the TRAC runtime APIs to build portable, self-documenting models.
-
-    +++
-    .. link-button:: modelling/index
-        :type: ref
-        :text: Modelling
-        :classes: btn-outline-primary btn-block stretched-link
-
-    ---
-
-    **Build applications and workflows**
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    
-    Connect web or desktop applications to the TRAC services and metadata catalog.
-    
-    *(Also relevant for system-to-system integration).*
-
-    +++
-    .. link-button:: app_dev/index
-        :type: ref
-        :text: App development
-        :classes: btn-outline-primary btn-block stretched-link
+            Deployment
 
 
 .. rubric:: Can't find what you're looking for?
