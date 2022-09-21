@@ -124,14 +124,14 @@ class StorageManager:
         cls.__file_impls[storage_type] = file_impl
         cls.__data_impls[storage_type] = data_impl
 
-    def __init__(self, sys_config: _cfg.RuntimeConfig, sys_config_dir: tp.Union[str, pathlib.Path]):
+    def __init__(self, sys_config: _cfg.RuntimeConfig):
 
         self.__log = _util.logger_for_object(self)
         self.__file_storage: tp.Dict[str, IFileStorage] = dict()
         self.__data_storage: tp.Dict[str, IDataStorage] = dict()
         self.__settings = sys_config.storageSettings
 
-        storage_options = {"sys_config_dir": sys_config_dir}
+        storage_options = dict()
 
         for storage_key, storage_config in sys_config.storage.items():
             self.create_storage(storage_key, storage_config, storage_options)
@@ -405,11 +405,8 @@ class LocalFileStorage(IFileStorage):
         if supplied_root.is_absolute():
             absolute_root = supplied_root
 
-        elif "sys_config_dir" in self._options:
-            absolute_root = pathlib.Path(self._options["sys_config_dir"]).joinpath(supplied_root).absolute()
-
         else:
-            err = f"Could not resolve relative path for storage root [{supplied_root}]"
+            err = f"Relative path not allowed for storage root [{supplied_root}]"
             self._log.error(err)
             raise _ex.EStorageConfig(err)
 
