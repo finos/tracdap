@@ -13,4 +13,5 @@ Deployment
     :maxdepth: 3
 
     sandbox
-    metadb
+    platform
+    metadata_store
