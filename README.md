@@ -62,15 +62,45 @@ For more information see the
 
 ## Building models
 
-TODO
+With TRAC D.A.P. you can build and run production-ready models right on your desktop!
+All you need is an IDE, Python  and the tracdap-runtime Python package.
+TRAC D.A.P. requires Python 3.7 or later.
 
-## Running the TRAC platform
+The [modelling tutorial](https://tracdap.finos.org/en/stable/modelling/tutorial/chapter_1_hello_world.html)
+shows you how to get set up and write your first models. You can write models locally using
+an IDE or notebook, once the model is working t can be loaded to the platform without modification.
+TRAC D.A.P. will validate the model and ensure it behaves the same on-platform as it does locally.
+Of course, the production platform will allow for significantly greater data volumes and compute power!
 
-TODO
+A full listing of the modelling API is available in the
+[model API reference](https://tracdap.finos.org/en/stable/autoapi/tracdap/rt/index.html).
+
+## Running the platform
+
+TRAC D.A.P. is designed for easy installation in complex and controlled enterprise environments.
+The tracdap-platform package is available with each release on our
+[release page](https://github.com/finos/tracdap/releases) and includes a pre-built distribution
+of each  of the platform services and supporting tools, suitable for deploying in a container
+or on physical or virtual infrastructure. All the packages are platform-agnostic. 
+
+A sandbox version of the platform is also available for quick setup in development, testing and demo
+scenarios. The tracdap-sandbox package is available with each release on our
+[release page](https://github.com/finos/tracdap/releases) and instructions are available in the
+[sandbox quick start guide](https://tracdap.finos.org/en/stable/deployment/sandbox.html)
+in our documentation.
 
 ## Development
 
-TODO
+We have used the excellent tools from [JetBrains](https://www.jetbrains.com) to build TRAC D.A.P.
+After you fork and clone the repository you can open the project in IntelliJ IDEA and use the script
+dev/ide/copy_settings.sh (Linux/macOS) or dev\ide\copy_settings.bat (Windows) to set up some helpful IDE
+config, including modules for the non-Java components, run configurations, license templates etc. 
+If you prefer another IDE that is also fine, you may wish to set up a similar set of config in which case
+we would welcome a PR.
+
+If you need help getting set up to develop features for TRAC D.A.P., please
+[get in touch](https://github.com/finos/tracdap/issues)!
+
 
 ## Contributing
 
