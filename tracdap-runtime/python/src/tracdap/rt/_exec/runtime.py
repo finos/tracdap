@@ -169,6 +169,11 @@ class TracRuntime:
         else:
             self._log.info("Shutting down the engine")
 
+        if not self._system:
+            self._log.warning("TRAC runtime engine was never started")
+            self._clean_scratch_dir()
+            return
+
         self._system.stop()
         self._system.wait_for_shutdown()
         self._clean_scratch_dir()
