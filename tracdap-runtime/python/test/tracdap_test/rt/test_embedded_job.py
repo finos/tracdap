@@ -19,7 +19,7 @@ import datetime as dt
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
-import tracdap.rt.launch as launch
+import tracdap.rt.ext.embed as embed
 
 import tracdap.rt._impl.api_hook as api_hook  # noqa
 
@@ -52,6 +52,24 @@ class ModelApiTest(unittest.TestCase):
                     language="python", repository="tutorials", path="src",
                     entryPoint="tutorial.using_data.UsingDataModel", version="N/A")))
 
-        result = launch.launch.launch_embedded(job_config, sys_config)
+        with embed.create_runtime(sys_config) as rt:
 
-        self.assertIsInstance(result, config.JobResult)
+            result = embed.run_job(rt, job_config)
+
+            self.assertIsInstance(result, config.JobResult)
+
+    def test_embedded_bad_shutdown(self):
+
+        sys_config = config.RuntimeConfig(
+            repositories={
+                "tutorials": config.RepositoryConfig(
+                    repoType="local",
+                    repoUrl=str(_ROOT_DIR.joinpath("examples/models/python")))
+            })
+
+        try:
+            rt = embed.create_runtime(sys_config)  # noqa
+            del rt
+
+        except Exception as e:
+            self.fail("Bad shutdown caused an error" + str(e))
