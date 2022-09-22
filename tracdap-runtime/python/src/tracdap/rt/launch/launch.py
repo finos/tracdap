@@ -19,7 +19,6 @@ import pathlib as _pathlib
 import typing as _tp
 
 import tracdap.rt.api as _api
-import tracdap.rt.config as _config
 import tracdap.rt._impl.config_parser as _cparse  # noqa
 import tracdap.rt._impl.util as _util  # noqa
 import tracdap.rt._exec.runtime as _runtime  # noqa
@@ -136,35 +135,3 @@ def launch_cli():
     with runtime_instance as rt:
         rt.submit_job(job)
         rt.wait_for_job(job.jobId)
-        
-        
-def launch_embedded(
-        job_config: _config.JobConfig,
-        sys_config: _config.RuntimeConfig) \
-        -> _config.JobResult:
-
-    """
-    Launch an embedded job, using the TRAC runtime as a library
-
-    .. note::
-        The API for embedded operations may change in future versions of the runtime
-
-    This method allows the TRAC runtime library to be used within a custom execution component.
-    In this pattern, the custom component would handle communication with a (custom) platform
-    and build TRAC-format metadata to set up a job. This method will execute the job and return
-    a result object. It is likely that custom data / model sources will also be needed.
-
-    :param job_config: A fully-populated job config object (dev-mode translations are NOT applied)
-    :param sys_config: A fully-populated system (runtime) config object (dev-mode translations are NOT applied)
-    :return: A job result object
-    """
-
-    runtime_instance = _runtime.TracRuntime(sys_config)
-    runtime_instance.pre_start()
-
-    with runtime_instance as rt:
-
-        rt.submit_job(job_config)
-        job_result = rt.wait_for_job(job_config.jobId)
-
-        return job_result
