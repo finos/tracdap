@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import typing as tp
 import types
 import itertools
@@ -21,9 +19,11 @@ import logging
 import pathlib
 import sys
 import contextlib
+import functools as fn
 
 import inspect
 import importlib as _il
+import importlib.util as _ilu
 import importlib.abc as _ila
 import importlib.machinery as _ilm
 import importlib.resources as _ilr
@@ -32,66 +32,36 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.util as _util
 
 
-class _NamespaceShimFinder(_ila.MetaPathFinder):
+class _ActiveShim:
 
-    def __init__(self, shim_map: tp.Dict[str, pathlib.Path]):
-        self.__shim_map = shim_map
-        self._log = _util.logger_for_object(self)
+    # Wrapper class to hold a reference to the active shim
+    # This reference needs to be shared across the various pieces of machinery for shim loading
 
-    def find_spec(
-            self, fullname: str,
-            path: tp.Optional[tp.Sequence[tp.Union[bytes, str]]] = None,
-            target: tp.Optional[types.ModuleType] = None) \
-            -> tp.Optional[_ilm.ModuleSpec]:
-
-        module_parts = fullname.split(".")  # TODO: Relative import
-
-        if ".".join(module_parts[:2]) != ShimLoader.SHIM_NAMESPACE:
-            return None
-
-        if len(module_parts) == 2:
-            spec = _ilm.ModuleSpec(fullname, origin=None, is_package=True, loader=None)
-            return spec
-
-        shim_namespace = ".".join(module_parts[:3])
-        shim_path = self.__shim_map.get(shim_namespace)
-
-        if shim_path is None:
-
-            # TODO: More helpful error message
-            self._log.warning(f"Attempt to load module [{fullname}] from unregistered shim [{shim_namespace}]")
-
-            return None
-
-        if len(module_parts) == 3:
-
-            self._log.info(f"Created module spec for shim namespace [{shim_namespace}]")
-
-            spec = _ilm.ModuleSpec(fullname, origin=None, is_package=True, loader=None)
-            spec.submodule_search_locations = str(shim_path)
-
-            return spec
-
-        self._log.warning(f"Attempt to load submodule [{fullname}] in shim [{shim_namespace}]")
-
-        return None
-
-    def invalidate_caches(self) -> None:
-        pass
+    def __init__(self):
+        self.shim: tp.Optional[str] = None
 
 
 class _ActiveShimFinder(_ila.MetaPathFinder):
 
-    def __init__(self, shim_map: tp.Dict[str, pathlib.Path], active_shim: tp.Optional[str] = None):
+    # The active shim finder trys to resolve global module imports in the active shim
+    # For imports of the form: import acme_global.module
+    # The module name is mapped: acme_global.module -> tracdap.shim._XXX.acme_global.module
+    # The shimmed module name is passed back to importlib for resolution
+
+    # Absolute imports in model code will always come to this finder
+    # Consequently, absolute imports only work when the shim is active, i.e. when the model module is imported
+    # Absolute imports in model code will not work (imports in model code is very bad practice anyway)!
+
+    def __init__(self, shim_map: tp.Dict[str, pathlib.Path], active_shim: _ActiveShim):
         self.__shim_map = shim_map
-        self.__activate_shim = active_shim
+        self.__active_shim = active_shim
         self._log = _util.logger_for_object(self)
 
     def set_shim_map(self, shim_map: tp.Dict[str, pathlib.Path]):
         self.__shim_map = shim_map
 
     def set_active_shim(self, active_shim: tp.Optional[str]):
-        self.__activate_shim = active_shim
+        self.__active_shim = active_shim
 
     def find_spec(
             self, fullname: str,
@@ -99,39 +69,19 @@ class _ActiveShimFinder(_ila.MetaPathFinder):
             target: tp.Optional[types.ModuleType] = None) \
             -> tp.Optional[_ilm.ModuleSpec]:
 
-        # If the module name is already qualified with a shim, don't use the active shim finder
-        # Qualified modules can be looked up statically by the namespace shim finder
+        # If the module name is already qualified with a shim, don't try to re-qualify it
         if fullname.startswith(ShimLoader.SHIM_NAMESPACE):
             return None
 
-        shim_module = f"{self.__activate_shim}.{fullname}"
-        shim_path = self.__shim_map[self.__activate_shim]
+        # If there is no active shim set, don't return a module
+        if self.__active_shim.shim is None:
+            return None
 
-        self._log.info(f"Looking for [{fullname}] in shim [{self.__activate_shim}]")
+        shim_module = f"{self.__active_shim.shim}.{fullname}"
+        shim_path = self.__shim_map.get(self.__active_shim.shim)
 
-        module_parts = fullname.split(".")  # TODO: Handle relative imports?
-        module_package_path = shim_path
-
-        for i in range(len(module_parts) - 1):
-            module_package_path = module_package_path.joinpath(module_parts[i])
-
-        module_path = module_package_path.joinpath(module_parts[-1] + ".py")
-        package_path = module_package_path.joinpath(module_parts[-1], "__init__.py")
-
-        if module_path.exists() and module_path.is_file():
-
-            shim_module_loader = _ActiveShimLoader(fullname, shim_module, str(module_path))
-            spec = _ilm.ModuleSpec(shim_module, origin=str(module_path), loader=shim_module_loader)
-            return spec
-
-        if package_path.exists() and package_path.is_file():
-
-            shim_module_loader = _ActiveShimLoader(fullname, shim_module, str(package_path))
-            spec = _ilm.ModuleSpec(shim_module, origin=str(package_path), is_package=True, loader=shim_module_loader)
-            spec.submodule_search_locations = str(package_path.parent)
-            return spec
-
-        return None
+        # Looking for the shimmed module will hit the namespace shim finder
+        return _ilu.find_spec(shim_module, str(shim_path))
 
     def invalidate_caches(self) -> None:
         pass
@@ -139,10 +89,20 @@ class _ActiveShimFinder(_ila.MetaPathFinder):
 
 class _ActiveShimLoader(_ilm.SourceFileLoader):
 
-    def __init__(self, raw_module_name, shim_module_name, path):
-        super().__init__(shim_module_name, path)
-        self._raw_module_name = raw_module_name
-        self._exec_done = False
+    # When loading in an active shim, put a global entry in sys.modules for the relative module name
+    # Submodule loads will expect the parent module to be present with the relative module name
+    # This behavior is built into the base implementation of Pythons module loading mechanism
+    # It is important to add the global entry before the module is executed, which is when submodule imports happen
+
+    # Global module names are removed from sys.modules when the shim is deactivated
+    # At that point all module members are available in the shim namespace and global names are no longer needed
+
+    # Logic code around import statements will work, so long as all that logic executes during the initial import
+    # Very strange behaviors, like attempting dynamic imports at runtime, are likely to fail or behave erratically
+
+    def __init__(self, relative_name, fullname, path):
+        super().__init__(fullname, path)
+        self._relative_name = relative_name
 
     def create_module(self, spec: _ilm.ModuleSpec) -> tp.Optional[types.ModuleType]:
 
@@ -150,23 +110,108 @@ class _ActiveShimLoader(_ilm.SourceFileLoader):
 
     def exec_module(self, module: types.ModuleType) -> None:
 
-        # When loading in an active shim, put an additional entry in sys.modules for the raw module name
-        # Submodule loads will expect the parent module to be present with the raw module name
-        # This behavior is built into the base implementation of Pythons module loading mechanism
-
-        # Raw module names are removed from sys.modules when the shim is deactivated
-        # At that point all module members are available in the shim namespace and raw names are no longer needed
-        # Logic code around import statements will work, so long as all that logic executes during the initial import
-        # Very strange behaviors, like attempting dynamic imports at runtime, are likely to fail or behave erratically
-
-        # It is important to add the entry for the raw module name before the module is executed
-        # This is because the module may import from submodules,
-        # which would otherwise cause either a lookup error or infinite recursion
-
-        if self._raw_module_name not in sys.modules:
-            sys.modules[self._raw_module_name] = module
+        if self._relative_name not in sys.modules:
+            sys.modules[self._relative_name] = module
 
         super().exec_module(module)
+
+
+class _NamespaceShimFinder(_ila.MetaPathFinder):
+
+    def __init__(self, shim_map: tp.Dict[str, pathlib.Path], active_shim: _ActiveShim):
+        self.__shim_map = shim_map
+        self.__active_shim = active_shim
+        self._log = _util.logger_for_object(self)
+
+    def find_spec(
+            self, fullname: str,
+            path: tp.Optional[tp.Sequence[tp.Union[bytes, str]]] = None,
+            target: tp.Optional[types.ModuleType] = None) \
+            -> tp.Optional[_ilm.ModuleSpec]:
+
+        module_parts = fullname.split(".")
+
+        # Ignore requests for anything that is not a shim module
+        if ".".join(module_parts[:2]) != ShimLoader.SHIM_NAMESPACE:
+            return None
+
+        # If this request is for the shim root itself, create a namespace package
+        # This will be requested / created before any other shim modules
+        if len(module_parts) == 2:
+            spec = _ilm.ModuleSpec(fullname, origin=None, is_package=True, loader=None)
+            return spec
+
+        # The shim namespace is the first three parts of the module name, tracdap.shim._XXX
+        # This should have been registered in the shim map by ShimLoader.create_shim
+        shim_namespace = ".".join(module_parts[:3])
+        shim_path = self.__shim_map.get(shim_namespace)
+
+        # The relative module name is everything after the shim namespace
+        # This is what would be written in the original model code, and will look familiar to modellers
+        relative_parts = module_parts[3:]
+        relative_name = ".".join(relative_parts)
+
+        # If the shim is not registered, this is probably a bug
+        # The loader mechanism should not generate requests to load from unregistered shims
+        # The alternative is an explicit reference to a shim in model code, which should definitely not be allowed!
+        if shim_path is None:
+
+            self._log.error("There was an error in the model loading mechanism (this is a bug)")
+            self._log.error(f"Attempt to load module [{relative_name}] from unregistered shim [{shim_namespace}]")
+            raise _ex.ETracInternal("There was an error in the model loading mechanism (this is a bug)")
+
+        # If this request is for a shim namespace package, create a namespace module spec
+        # This should only happen after the shim has been created in ShimLoader
+        # Attach the shim path to the spec, this will be the location to search for modules in the shim
+        if len(module_parts) == 3:
+
+            self._log.info(f"Creating namespace package for shim [{shim_namespace}]")
+
+            spec = _ilm.ModuleSpec(fullname, origin=None, is_package=True, loader=None)
+            spec.submodule_search_locations = str(shim_path)
+
+            return spec
+
+        # Once the code falls through to here, the request is for a module inside a recognized shim
+        self._log.info(f"Looking for module [{relative_name}] in shim [{shim_namespace}]")
+
+        # The requested module can be either a normal module or a package
+        # The expected path is different for modules and packages, we need to check for both
+        parent_path = fn.reduce(lambda p, q: p.joinpath(q), relative_parts[:-1], shim_path)
+        module_path = parent_path.joinpath(relative_parts[-1] + ".py")
+        package_path = parent_path.joinpath(relative_parts[-1], "__init__.py")
+
+        # If the module path is found, return a spec for a regular module
+        # The module exists in the shim namespace only
+        # Since modules have no children, there will be no issues resolving submodules with absolute imports
+        if module_path.exists() and module_path.is_file():
+
+            shim_loader = _ilm.SourceFileLoader(fullname, str(module_path))
+            spec = _ilm.ModuleSpec(fullname, origin=str(module_path), loader=shim_loader)
+            return spec
+
+        # Packages have submodules which can be imported using global or relative import statements
+        # To import global submodules the package needs to be in the global namespace
+        # This can only happen when the shim is active, in which case we use the active shim loader
+        # When the active shim is deactivated, shim modules will be removed from the global namespace
+        # If the shim is not active the only option is a regular source loader in the shim namespace
+        # This does not normally happen unless model code uses dynamic imports (highly unrecommended)!
+        if package_path.exists() and package_path.is_file():
+
+            if shim_namespace == self.__active_shim.shim:
+                shim_loader = _ActiveShimLoader(relative_name, fullname, str(package_path))
+            else:
+                shim_loader = _ilm.SourceFileLoader(fullname, str(package_path))
+
+            spec = _ilm.ModuleSpec(fullname, origin=str(package_path), is_package=True, loader=shim_loader)
+            spec.submodule_search_locations = str(package_path.parent)
+            return spec
+
+        # Module not found, return None
+        return None
+
+    def invalidate_caches(self) -> None:
+        pass
 
 
 class ShimLoader:
@@ -179,14 +224,13 @@ class ShimLoader:
 
     __shim_id_seq = itertools.count()
     __shim_map: tp.Dict[str, pathlib.Path] = dict()
-
-    __shim: tp.Optional[str] = None
-    __finder: tp.Optional[_ActiveShimFinder] = None
+    __active_shim = _ActiveShim()
 
     @classmethod
     def _init(cls):
 
-        sys.meta_path.append(_NamespaceShimFinder(cls.__shim_map))
+        sys.meta_path.append(_NamespaceShimFinder(cls.__shim_map, cls.__active_shim))
+        sys.meta_path.append(_ActiveShimFinder(cls.__shim_map, cls.__active_shim))
 
     @classmethod
     def create_shim(cls, package_root: tp.Union[str, pathlib.Path]) -> str:
@@ -206,10 +250,7 @@ class ShimLoader:
     @classmethod
     def activate_shim(cls, shim: str):
 
-        cls.__shim = shim
-        cls.__finder = _ActiveShimFinder(cls.__shim_map, cls.__shim)
-
-        sys.meta_path.append(cls.__finder)
+        cls.__active_shim.shim = shim
 
         # It may be useful to put raw name entries for modules in the active shim back into sys.modules
         # This will help if a shim is reactivated at a later point in time, e.g. to load additional resources
@@ -217,13 +258,10 @@ class ShimLoader:
     @classmethod
     def deactivate_shim(cls):
 
-        sys.meta_path.remove(cls.__finder)
-
-        shim_namespace = cls.__shim
+        shim_namespace = cls.__active_shim.shim
         shim_modules = []
 
-        cls.__finder = None
-        cls.__shim = None
+        cls.__active_shim.shim = None
 
         for module_name, module in sys.modules.items():
             shim_module_name = f"{shim_namespace}.{module_name}"
