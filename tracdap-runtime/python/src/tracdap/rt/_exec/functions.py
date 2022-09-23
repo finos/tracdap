@@ -546,8 +546,14 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
 
         trac_ctx = _ctx.TracContextImpl(self.node.model_def, self.model_class, local_ctx)
 
-        model = self.model_class()
-        model.run_model(trac_ctx)
+        try:
+            model = self.model_class()
+            model.run_model(trac_ctx)
+        except _ex.ETrac:
+            raise
+        except Exception as e:
+            msg = f"There was an unhandled error in the model: {str(e)}"
+            raise _ex.EModelExec(msg) from e
 
         # The node result is just the model outputs taken from the local context
         model_outputs: Bundle[_data.DataView] = {

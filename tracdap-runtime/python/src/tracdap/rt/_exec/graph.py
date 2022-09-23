@@ -29,20 +29,33 @@ _T = tp.TypeVar('_T')
 @dc.dataclass(frozen=True)
 class NodeNamespace:
 
+    __ROOT = None
+
+    @classmethod
+    def root(cls):
+        if cls.__ROOT is None:
+            cls.__ROOT = NodeNamespace("", parent=None)
+        return cls.__ROOT
+
     name: str
-    parent: tp.Optional[NodeNamespace] = None
+    parent: tp.Optional[NodeNamespace] = dc.field(default_factory=lambda: NodeNamespace.root())
 
     def __str__(self):
-        return ", ".join(self.components())
+        if self is self.__ROOT:
+            return "ROOT"
+        else:
+            return ", ".join(self.components())
 
     def __repr__(self):
-        return self.components()
+        return repr(self.components())
 
     def components(self) -> [str]:
-        level = self
-        while level is not None:
-            yield level.name
-            level = level.parent
+        if self == self.__ROOT:
+            return ["ROOT"]
+        elif self.parent is self.__ROOT or self.parent is None:
+            return [self.name]
+        else:
+            return [self.name] + self.parent.components()
 
 
 @dc.dataclass(frozen=True)

@@ -14,25 +14,27 @@
 
 from __future__ import annotations
 
-import inspect
-import pathlib
+import inspect as _inspect
+import pathlib as _pathlib
 import typing as _tp
 
-import tracdap.rt.api as api
-import tracdap.rt._exec.runtime as runtime  # noqa
+import tracdap.rt.api as _api
+import tracdap.rt._impl.config_parser as _cparse  # noqa
+import tracdap.rt._impl.util as _util  # noqa
+import tracdap.rt._exec.runtime as _runtime  # noqa
 
 from .cli import cli_args
 
 
 def _resolve_config_file(
-        config_path: _tp.Union[str, pathlib.Path],
-        model_dir: _tp.Optional[pathlib.Path] = None) \
-        -> pathlib.Path:
+        config_path: _tp.Union[str, _pathlib.Path],
+        model_dir: _tp.Optional[_pathlib.Path] = None) \
+        -> _pathlib.Path:
 
-    if pathlib.Path(config_path).is_absolute():
+    if _pathlib.Path(config_path).is_absolute():
         return config_path
 
-    cwd = pathlib.Path.cwd()
+    cwd = _pathlib.Path.cwd()
     cwd_config_path = cwd.joinpath(config_path).resolve()
 
     if cwd_config_path.exists():
@@ -45,16 +47,16 @@ def _resolve_config_file(
         if model_config_path.exists():
             return model_config_path
 
-    if isinstance(config_path, pathlib.Path):
+    if isinstance(config_path, _pathlib.Path):
         return config_path
     else:
-        return pathlib.Path(config_path)
+        return _pathlib.Path(config_path)
 
 
 def launch_model(
-        model_class: api.TracModel.__class__,
-        job_config: _tp.Union[str, pathlib.Path],
-        sys_config: _tp.Union[str, pathlib.Path]):
+        model_class: _api.TracModel.__class__,
+        job_config: _tp.Union[str, _pathlib.Path],
+        sys_config: _tp.Union[str, _pathlib.Path]):
 
     """
     Launch an individual model component by class (embedded launch)
@@ -77,41 +79,38 @@ def launch_model(
     :param sys_config: Path to the system configuration file
     """
 
-    model_file = inspect.getfile(model_class)
-    model_dir = pathlib.Path(model_file).parent
+    model_file = _inspect.getfile(model_class)
+    model_dir = _pathlib.Path(model_file).parent
 
     _sys_config = _resolve_config_file(sys_config, model_dir)
     _job_config = _resolve_config_file(job_config, model_dir)
 
-    runtime_instance = runtime.TracRuntime(
-        _sys_config, _job_config,
-        dev_mode=True,
-        model_class=model_class)
-
+    runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=True)
     runtime_instance.pre_start()
 
+    job = runtime_instance.load_job_config(_job_config, model_class=model_class)
+
     with runtime_instance as rt:
-        rt.submit_batch()
-        rt.wait_for_shutdown()
+        rt.submit_job(job)
+        rt.wait_for_job(job.jobId)
 
 
 def launch_job(
-        job_config: _tp.Union[str, pathlib.Path],
-        sys_config: _tp.Union[str, pathlib.Path],
+        job_config: _tp.Union[str, _pathlib.Path],
+        sys_config: _tp.Union[str, _pathlib.Path],
         dev_mode: bool = False):
 
     _sys_config = _resolve_config_file(sys_config, None)
     _job_config = _resolve_config_file(job_config, None)
 
-    runtime_instance = runtime.TracRuntime(
-        _sys_config, _job_config,
-        dev_mode=dev_mode)
-
+    runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=dev_mode)
     runtime_instance.pre_start()
 
+    job = runtime_instance.load_job_config(_job_config)
+
     with runtime_instance as rt:
-        rt.submit_batch()
-        rt.wait_for_shutdown()
+        rt.submit_job(job)
+        rt.wait_for_job(job.jobId)
 
 
 def launch_cli():
@@ -121,8 +120,8 @@ def launch_cli():
     _sys_config = _resolve_config_file(launch_args.sys_config, None)
     _job_config = _resolve_config_file(launch_args.job_config, None)
 
-    runtime_instance = runtime.TracRuntime(
-        _sys_config, _job_config,
+    runtime_instance = _runtime.TracRuntime(
+        _sys_config,
         dev_mode=launch_args.dev_mode,
         job_result_dir=launch_args.job_result_dir,
         job_result_format=launch_args.job_result_format,
@@ -131,6 +130,8 @@ def launch_cli():
 
     runtime_instance.pre_start()
 
+    job = runtime_instance.load_job_config(_job_config)
+
     with runtime_instance as rt:
-        rt.submit_batch()
-        rt.wait_for_shutdown()
+        rt.submit_job(job)
+        rt.wait_for_job(job.jobId)

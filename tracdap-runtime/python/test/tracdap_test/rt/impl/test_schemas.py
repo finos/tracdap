@@ -173,10 +173,6 @@ class SchemaResourcesTest(unittest.TestCase):
             launch.launch_model(RunModelGuard, job_config, sys_config)
             self.fail("Expected exception was not raised")
 
-        except Exception as e:
+        except Exception as failure:
 
-            # The engine wraps errors that occur during job execution
-            # The cause of the engine failure error should be the original exception
-
-            cause = e.__cause__
-            self.assertIsInstance(cause, ex.ERuntimeValidation)
+            self.assertIsInstance(failure, ex.ERuntimeValidation)

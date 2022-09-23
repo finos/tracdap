@@ -135,10 +135,10 @@ class ModelLoader:
 
     def scan_model(self, model_class: _api.TracModel.__class__) -> _meta.ModelDefinition:
 
-        model: _api.TracModel = object.__new__(model_class)
-        model_class.__init__(model)
-
         try:
+
+            model: _api.TracModel = object.__new__(model_class)
+            model_class.__init__(model)
 
             parameters = model.define_parameters()
             inputs = model.define_inputs()

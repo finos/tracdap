@@ -64,12 +64,12 @@ class ImportModelTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
 
             trac_runtime = runtime.TracRuntime(
-                self.sys_config, job_config,
+                self.sys_config,
                 job_result_dir=tmpdir,
                 job_result_format="json")
 
             trac_runtime.pre_start()
 
             with trac_runtime as rt:
-                rt.submit_batch()
-                rt.wait_for_shutdown()
+                rt.submit_job(job_config)
+                rt.wait_for_job(job_id)

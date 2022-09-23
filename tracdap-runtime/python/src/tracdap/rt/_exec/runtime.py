@@ -14,7 +14,10 @@
 
 from __future__ import annotations
 
+import dataclasses as dc
 import datetime as dt
+import threading
+
 import sys
 import pathlib
 import tempfile
@@ -34,32 +37,32 @@ import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.api_hook as _hook  # noqa
 
 
+@dc.dataclass
+class _RuntimeJobInfo:
+    done: bool = dc.field(default=False)
+    result: _cfg.JobResult = dc.field(default=None)
+    error: Exception = dc.field(default=None)
+
+
 class TracRuntime:
 
     def __init__(
             self,
             sys_config: tp.Union[str, pathlib.Path, _cfg.RuntimeConfig],
-            job_config: tp.Union[str, pathlib.Path, _cfg.JobConfig, None] = None,
             job_result_dir: tp.Union[str, pathlib.Path, None] = None,
             job_result_format: tp.Optional[str] = None,
             scratch_dir: tp.Union[str, pathlib.Path, None] = None,
             scratch_dir_persist: bool = False,
-            dev_mode: bool = False,
-            model_class: tp.Optional[_api.TracModel.__class__] = None):
+            dev_mode: bool = False):
 
         trac_version = _version.__version__
         python_version = sys.version.replace("\n", "")
-        mode = "batch" if job_config else "service"
 
         sys_config_path = "[embedded]" if isinstance(sys_config, _cfg.RuntimeConfig) else sys_config
-        job_config_path = "[embedded]" if isinstance(job_config, _cfg.JobConfig) else job_config
 
-        print(f">>> TRAC D.A.P. Python Runtime {trac_version} starting in {mode} mode at {dt.datetime.now()}")
+        print(f">>> TRAC D.A.P. Python Runtime {trac_version} starting at {dt.datetime.now()}")
         print(f">>> Python installation: {python_version} ({sys.exec_prefix})")
         print(f">>> System config: {sys_config_path}")
-
-        if job_config:
-            print(f">>> Job config: {job_config_path}")
 
         if dev_mode:
             print(f">>> Development mode enabled (DO NOT USE THIS IN PRODUCTION)")
@@ -71,28 +74,25 @@ class TracRuntime:
         self._log = util.logger_for_object(self)
         self._log.info(f"TRAC D.A.P. Python Runtime {trac_version}")
 
-        self._sys_config_dir = pathlib.Path(sys_config_path).parent
-        self._sys_config_path = sys_config_path
-        self._job_config_path = job_config_path
+        self._sys_config = sys_config if isinstance(sys_config, _cfg.RuntimeConfig) else None
+        self._sys_config_path = pathlib.Path(sys_config) if not self._sys_config else None
         self._job_result_dir = job_result_dir
         self._job_result_format = job_result_format
         self._scratch_dir = scratch_dir
         self._scratch_dir_provided = True if scratch_dir is not None else False
         self._scratch_dir_persist = scratch_dir_persist
-        self._batch_mode = bool(job_config is not None)
         self._dev_mode = dev_mode
-        self._model_class = model_class
-
-        self._sys_config = sys_config if isinstance(sys_config, _cfg.RuntimeConfig) else None
-        self._job_config = job_config if isinstance(job_config, _cfg.JobConfig) else None
 
         # Top level resources
         self._models: tp.Optional[_models.ModelLoader] = None
         self._storage: tp.Optional[_storage.StorageManager] = None
 
         # The execution engine
-        self._engine: tp.Optional[_engine.TracEngine] = None
         self._system: tp.Optional[_actors.ActorSystem] = None
+        self._engine: tp.Optional[_engine.TracEngine] = None
+        self._engine_event = threading.Condition()
+
+        self._jobs: tp.Dict[str, _RuntimeJobInfo] = dict()
 
     # ------------------------------------------------------------------------------------------------------------------
     # Runtime service control
@@ -104,11 +104,10 @@ class TracRuntime:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
 
-        # Do not call self.stop()
-        # In batch mode, the engine will stop itself once the job is complete, so no need to stop twice
-        # It may be necessary to call self.stop() in service mode, depending on how stop is triggered (e.g. interrupt)
-
-        pass
+        if exc_type is not None:
+            self.stop(due_to_error=True)
+        else:
+            self.stop()
 
     def pre_start(self):
 
@@ -134,26 +133,12 @@ class TracRuntime:
             else:
                 self._log.info("Using embedded system config")
 
-            if self._job_config is None and self._batch_mode:
-                job_config_dev_mode = _dev_mode.DEV_MODE_JOB_CONFIG if self._dev_mode else None
-                job_config_parser = _cparse.ConfigParser(_cfg.JobConfig, job_config_dev_mode)
-                job_config_raw = job_config_parser.load_raw_config(self._job_config_path, config_file_name="job")
-                self._job_config = job_config_parser.parse(job_config_raw, self._job_config_path)
-            elif self._batch_mode:
-                self._log.info("Using embedded job config")
-
             # Dev mode translation is controlled by the dev mode flag
             # I.e. it can be applied to embedded configs
 
             if self._dev_mode:
-
-                job_config, sys_config = _dev_mode.DevModeTranslator.translate_dev_mode_config(
-                    self._sys_config, self._job_config,
-                    self._sys_config_path, self._job_config_path,
-                    self._scratch_dir, self._model_class)
-
-                self._job_config = job_config
-                self._sys_config = sys_config
+                config_dir = self._sys_config_path.parent if self._sys_config_path is not None else None
+                self._sys_config = _dev_mode.DevModeTranslator.translate_sys_config(self._sys_config, config_dir)
 
         except Exception as e:
             self._handle_startup_error(e)
@@ -165,12 +150,11 @@ class TracRuntime:
             self._log.info("Starting the engine...")
 
             self._models = _models.ModelLoader(self._sys_config, self._scratch_dir)
-            self._storage = _storage.StorageManager(self._sys_config, self._sys_config_dir)
+            self._storage = _storage.StorageManager(self._sys_config)
 
             self._engine = _engine.TracEngine(
-                self._sys_config,
-                self._models, self._storage,
-                batch_mode=self._batch_mode)
+                self._sys_config, self._models, self._storage,
+                notify_callback=self._engine_callback)
 
             self._system = _actors.ActorSystem(self._engine, system_thread="engine")
             self._system.start(wait=wait)
@@ -178,25 +162,36 @@ class TracRuntime:
         except Exception as e:
             self._handle_startup_error(e)
 
-    def stop(self):
+    def stop(self, due_to_error=False):
 
-        self._log.info("Shutting down the engine")
+        if due_to_error:
+            self._log.info("Shutting down the engine in response to an error")
+        else:
+            self._log.info("Shutting down the engine")
+
+        if not self._system:
+            self._log.warning("TRAC runtime engine was never started")
+            self._clean_scratch_dir()
+            return
+
         self._system.stop()
-
-    def wait_for_shutdown(self):
-
         self._system.wait_for_shutdown()
-
         self._clean_scratch_dir()
 
-        if self._system.shutdown_code() == 0:
-            self._log.info("TRAC runtime has gone down cleanly")
-        else:
-            self._log.error("TRAC runtime has gone down with errors")
+        # If there are errors in the engine code or actor system, this is the most serious failure
+        # Report these errors as the highest priority
+        if self._system.shutdown_code() != 0:
 
-            # For now, use the final error that propagated in the engine as the shutdown error
-            # A more sophisticated approach would handle job-related errors by writing job output metadata
+            self._log.error("TRAC runtime has gone down with errors")
             raise self._system.shutdown_error()
+
+        # If the engine went down cleanly, but in response to an error, this still counts as a failure
+        # This will normally be because of errors in a job
+        elif due_to_error:
+            self._log.error("TRAC runtime has gone down, previous errors will be propagated")
+
+        else:
+            self._log.info("TRAC runtime has gone down cleanly")
 
     def _prepare_scratch_dir(self):
 
@@ -229,26 +224,76 @@ class TracRuntime:
     # Job submission
     # ------------------------------------------------------------------------------------------------------------------
 
-    def submit_job(self, job_config_path: str):
+    def load_job_config(
+            self, job_config: tp.Union[str, pathlib.Path, _cfg.JobConfig],
+            model_class: tp.Optional[_api.TracModel.__class__] = None):
 
-        if self._batch_mode:
-            msg = "Additional jobs cannot be submitted in batch mode"
-            self._log.error(msg)
-            raise _ex.EJobValidation(msg)
+        if isinstance(job_config, _cfg.JobConfig):
+            self._log.info("Using embedded job config")
+            job_config_path = None
 
-        self._system.send("submit_job", job_config_path)
+        else:
+            job_config_path = job_config
+            job_config_dev_mode = _dev_mode.DEV_MODE_JOB_CONFIG if self._dev_mode else None
+            job_config_parser = _cparse.ConfigParser(_cfg.JobConfig, job_config_dev_mode)
+            job_config_raw = job_config_parser.load_raw_config(job_config_path, config_file_name="job")
+            job_config = job_config_parser.parse(job_config_raw, job_config_path)
 
-    def submit_batch(self):
+        if self._dev_mode:
+            config_dir = job_config_path.parent if job_config_path is not None else None
+            job_config = _dev_mode.DevModeTranslator.translate_job_config(
+                self._sys_config, job_config,
+                self._scratch_dir, config_dir,
+                model_class)
 
-        if not self._batch_mode:
-            msg = "Batch jobs cannot be triggered in service mode"
-            self._log.error(msg)
-            raise _ex.EJobValidation(msg)
+        return job_config
+
+    def submit_job(self, job_config: _cfg.JobConfig):
+
+        job_key = util.object_key(job_config.jobId)
+        self._jobs[job_key] = _RuntimeJobInfo()
 
         self._system.send(
-            "submit_job", self._job_config,
+            "submit_job", job_config,
             str(self._job_result_dir) if self._job_result_dir else "",
             self._job_result_format if self._job_result_format else "")
+
+    def wait_for_job(self, job_id: _api.TagHeader):
+
+        job_key = util.object_key(job_id)
+
+        if job_key not in self._jobs:
+            raise _ex.ETracInternal(f"Attempt to wait for a job that was never started")
+
+        with self._engine_event:
+            while True:
+
+                job_info = self._jobs[job_key]
+
+                if job_info.error is not None:
+                    raise job_info.error
+
+                if job_info.result is not None:
+                    return job_info.result
+
+                # TODO: Timeout / heartbeat
+
+                self._engine_event.wait(1)
+
+    def _engine_callback(self, job_key, job_result, job_error):
+
+        with self._engine_event:
+
+            if job_result is not None:
+                self._jobs[job_key].done = True
+                self._jobs[job_key].result = job_result
+            elif job_error is not None:
+                self._jobs[job_key].done = True
+                self._jobs[job_key].error = job_error
+            else:
+                pass
+
+            self._engine_event.notify()
 
     # ------------------------------------------------------------------------------------------------------------------
     # Error handling

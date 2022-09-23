@@ -54,31 +54,45 @@ class GraphBuilder:
 
         # Set up the job context
 
-        job_namespace = NodeNamespace(_util.object_key(job_config.jobId))
+        job_key = _util.object_key(job_config.jobId)
+        job_namespace = NodeNamespace(job_key)
 
-        job_push_id = NodeId("trac_job_push", job_namespace, Bundle[tp.Any])
-        job_push_node = ContextPushNode(job_push_id, job_namespace)
-        job_push_section = GraphSection({job_push_id: job_push_node}, must_run=[job_push_id])
+        push_id = NodeId("trac_job_push", job_namespace, Bundle[tp.Any])
+        push_node = ContextPushNode(push_id, job_namespace)
+        push_section = GraphSection({push_id: push_node}, must_run=[push_id])
 
         # Build the execution graphs for the main job and results recording
 
-        main_section = build_func(job_config, result_spec, job_namespace, job_push_id)
+        main_section = build_func(job_config, result_spec, job_namespace, push_id)
+        main_result_id = NodeId.of("trac_build_result", job_namespace, config.JobResult)
 
         # Clean up the job context
 
-        job_pop_id = NodeId("trac_job_pop", job_namespace, Bundle[tp.Any])
-        job_pop_node = ContextPopNode(job_pop_id, job_namespace, explicit_deps=main_section.must_run)
-        job_pop_section = GraphSection({job_pop_id: job_pop_node}, must_run=[job_pop_id])
+        global_result_id = NodeId.of(job_key, NodeNamespace.root(), config.JobResult)
 
-        job = cls._join_sections(job_push_section, main_section, job_pop_section)
+        pop_id = NodeId("trac_job_pop", job_namespace, Bundle[tp.Any])
+        pop_mapping = {main_result_id: global_result_id}
 
-        return Graph(job.nodes, job_pop_id)
+        pop_node = ContextPopNode(
+            pop_id, job_namespace, pop_mapping,
+            explicit_deps=main_section.must_run,
+            bundle=NodeNamespace.root())
+
+        global_result_node = BundleItemNode(global_result_id, pop_id, job_key)
+
+        pop_section = GraphSection({
+            pop_id: pop_node,
+            global_result_id: global_result_node})
+
+        job = cls._join_sections(push_section, main_section, pop_section)
+
+        return Graph(job.nodes, global_result_id)
 
     @classmethod
     def build_import_model_job(
             cls, job_config: config.JobConfig, result_spec: JobResultSpec,
             job_namespace: NodeNamespace, job_push_id: NodeId) \
-            -> (GraphSection, GraphSection):
+            -> GraphSection:
 
         # Main section: run the model import
 
@@ -109,7 +123,7 @@ class GraphBuilder:
     def build_run_model_job(
             cls, job_config: config.JobConfig, result_spec: JobResultSpec,
             job_namespace: NodeNamespace, job_push_id: NodeId) \
-            -> (GraphSection, GraphSection):
+            -> GraphSection:
 
         return cls.build_calculation_job(
             job_config, result_spec, job_namespace, job_push_id,
@@ -122,7 +136,7 @@ class GraphBuilder:
     def build_run_flow_job(
             cls, job_config: config.JobConfig, result_spec: JobResultSpec,
             job_namespace: NodeNamespace, job_push_id: NodeId) \
-            -> (GraphSection, GraphSection):
+            -> GraphSection:
 
         return cls.build_calculation_job(
             job_config, result_spec, job_namespace, job_push_id,
@@ -418,7 +432,7 @@ class GraphBuilder:
         # This is to ensure dependencies are still pulled in for models with no inputs!
 
         job_namespace = namespace
-        while job_namespace.parent:
+        while job_namespace.parent != NodeNamespace.root():
             job_namespace = job_namespace.parent
 
         model_scope = str(job_namespace)
