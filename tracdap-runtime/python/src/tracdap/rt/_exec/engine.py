@@ -28,6 +28,7 @@ import tracdap.rt._impl.models as _models  # noqa
 import tracdap.rt._impl.data as _data  # noqa
 import tracdap.rt._impl.storage as _storage  # noqa
 import tracdap.rt._impl.util as _util  # noqa
+from .actors import Signal
 
 from .graph import NodeId
 
@@ -96,6 +97,36 @@ class TracEngine(_actors.Actor):
     def on_stop(self):
 
         self._log.info("Engine shutdown complete")
+
+    def on_signal(self, signal: Signal) -> tp.Optional[bool]:
+
+        # Failed signals can propagate from leaf nodes up the actor tree for a job
+        # If the failure goes all the way up the tree without being handled, it will reach the engine node
+        # In this case we want to fail the job, rather than propagating to root which would crash the engine
+        # This also ensures notifications are delivered for jobs with unhandled errors
+
+        if signal.message == _actors.SignalNames.FAILED:
+
+            failed_job_key = None
+
+            # Look for the job key corresponding to the failed actor
+            for job_key, job_actor in self._job_actors.items():
+                if job_actor == signal.sender:
+                    failed_job_key = job_key
+
+            # If the job key is not found, the job has already been stopped and no action is needed
+            # If the job is still live, call job_failed explicitly
+            if failed_job_key is not None:
+                if isinstance(signal, _actors.ErrorSignal) and signal.error:
+                    error = signal.error
+                else:
+                    error = _ex.ETracInternal("An unknown error occurred")
+                self.job_failed(failed_job_key, error)
+
+            # Failed signal has been handled, do not propagate
+            return True
+
+        return super().on_signal(signal)
 
     @_actors.Message
     def submit_job(
