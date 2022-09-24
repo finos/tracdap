@@ -263,6 +263,16 @@ class ShimLoader:
     @classmethod
     def activate_shim(cls, shim_namespace: str):
 
+        if shim_namespace not in cls.__shim_map:
+            msg = f"Cannot activate module loading shim, shim is not registered for [{shim_namespace}]"
+            cls._log.error(msg)
+            raise _ex.ETracInternal(msg)
+
+        if cls.__active_shim.shim is not None:
+            msg = f"Cannot activate module loading shim, another shim is already active"
+            cls._log.error(msg)
+            raise _ex.ETracInternal(msg)
+
         cls.__active_shim.shim = shim_namespace
         shim_modules = {}
 
@@ -282,6 +292,11 @@ class ShimLoader:
 
     @classmethod
     def deactivate_shim(cls):
+
+        if cls.__active_shim.shim is None:
+            msg = f"Cannot deactivate module loading shim, no shim is active"
+            cls._log.error(msg)
+            raise _ex.ETracInternal(msg)
 
         shim_namespace = cls.__active_shim.shim
         shim_modules = []
