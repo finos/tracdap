@@ -261,12 +261,24 @@ class ShimLoader:
         return shim_namespace
 
     @classmethod
-    def activate_shim(cls, shim: str):
+    def activate_shim(cls, shim_namespace: str):
 
-        cls.__active_shim.shim = shim
+        cls.__active_shim.shim = shim_namespace
+        shim_modules = {}
 
-        # It may be useful to put raw name entries for modules in the active shim back into sys.modules
-        # This will help if a shim is reactivated at a later point in time, e.g. to load additional resources
+        # Put shim modules for the active shim back into the global namespace
+        # For absolute imports, Python expects the module to exist in the global namespace
+        # If the same shim is used multiple times, this prevents existing modules from being reloaded
+
+        for module_name, module in sys.modules.items():
+            module_parts = module_name.split(".")
+            if len(module_parts) > 3 and ".".join(module_parts[:3]) == shim_namespace:
+                relative_name = ".".join(module_parts[3:])
+                shim_modules[relative_name] = module
+
+        for relative_name, module in shim_modules.items():
+            if relative_name not in sys.modules:
+                sys.modules[relative_name] = module
 
     @classmethod
     def deactivate_shim(cls):
@@ -275,6 +287,9 @@ class ShimLoader:
         shim_modules = []
 
         cls.__active_shim.shim = None
+
+        # Remove shim modules from the global namespace
+        # (prevents contamination across different shims)
 
         for module_name, module in sys.modules.items():
             shim_module_name = f"{shim_namespace}.{module_name}"
@@ -286,14 +301,14 @@ class ShimLoader:
 
     @classmethod
     @contextlib.contextmanager
-    def use_shim(cls, shim: str):
+    def use_shim(cls, shim_namespace: str):
 
-        if shim:
-            cls.activate_shim(shim)
+        if shim_namespace:
+            cls.activate_shim(shim_namespace)
 
         yield
 
-        if shim:
+        if shim_namespace:
             cls.deactivate_shim()
 
     @classmethod
