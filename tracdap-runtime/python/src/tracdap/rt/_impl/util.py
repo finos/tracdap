@@ -103,9 +103,10 @@ class ColorFormatter(logging.Formatter):
         return f"\033[{1 if is_bold else 0};{base_code + color_offset}m"
 
 
-def configure_logging():
+def configure_logging(enable_debug=False):
 
     root_logger = logging.getLogger()
+    log_level = logging.DEBUG if enable_debug else logging.INFO
 
     if not root_logger.hasHandlers():
 
@@ -114,16 +115,16 @@ def configure_logging():
         console_handler.setFormatter(console_formatter)
         console_handler.setLevel(logging.INFO)
         root_logger.addHandler(console_handler)
-        root_logger.setLevel(logging.INFO)
+        root_logger.setLevel(log_level)
 
         # Use is_bright=False for logs from the TRAC runtime, so model logs stand out
 
-        trac_logger = logging.getLogger("trac")
+        trac_logger = logging.getLogger("tracdap.rt")
 
         console_formatter = ColorFormatter(is_bright=False)
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(console_formatter)
-        console_handler.setLevel(logging.INFO)
+        console_handler.setLevel(log_level)
         trac_logger.addHandler(console_handler)
         trac_logger.propagate = False
 
