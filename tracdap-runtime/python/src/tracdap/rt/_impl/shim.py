@@ -188,17 +188,6 @@ class _NamespaceShimFinder(_ila.MetaPathFinder):
         if package_path.exists() and module_path.exists():
             self._log.warning(f"Module [{relative_name}] is both a regular module and a package (this causes problems)")
 
-        # If the module path is found, return a spec for a regular module
-        # The module exists in the shim namespace only
-        # Since modules have no children, there will be no issues resolving submodules with absolute imports
-        if module_path.exists() and module_path.is_file():
-
-            self._log.debug(f"Loading module [{relative_name}] in shim [{shim_namespace}]")
-
-            shim_loader = _ilm.SourceFileLoader(fullname, str(module_path))
-            spec = _ilm.ModuleSpec(fullname, origin=str(module_path), loader=shim_loader)
-            return spec
-
         # Packages have submodules which can be imported using global or relative import statements
         # To import global submodules the package needs to be in the global namespace
         # This can only happen when the shim is active, in which case we use the active shim loader
@@ -216,6 +205,17 @@ class _NamespaceShimFinder(_ila.MetaPathFinder):
 
             spec = _ilm.ModuleSpec(fullname, origin=str(package_path), is_package=True, loader=shim_loader)
             spec.submodule_search_locations = str(package_path.parent)
+            return spec
+
+        # If the module path is found, return a spec for a regular module
+        # The module exists in the shim namespace only
+        # Since modules have no children, there will be no issues resolving submodules with absolute imports
+        elif module_path.exists() and module_path.is_file():
+
+            self._log.debug(f"Loading module [{relative_name}] in shim [{shim_namespace}]")
+
+            shim_loader = _ilm.SourceFileLoader(fullname, str(module_path))
+            spec = _ilm.ModuleSpec(fullname, origin=str(module_path), loader=shim_loader)
             return spec
 
         # Module not found, return None
