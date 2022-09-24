@@ -286,15 +286,14 @@ class ShimLoader:
 
     @classmethod
     @contextlib.contextmanager
-    def use_package_root(cls, package_root: tp.Union[str, pathlib.Path]):
+    def use_shim(cls, shim: str):
 
-        if package_root:
-            shim = cls.create_shim(package_root)
+        if shim:
             cls.activate_shim(shim)
 
         yield
 
-        if package_root:
+        if shim:
             cls.deactivate_shim()
 
     @classmethod
@@ -304,28 +303,39 @@ class ShimLoader:
 
         cls._run_model_guard()
 
-        if isinstance(module, str):
-            module_name = module
-            module = _il.import_module(module_name)
-        else:
+        if isinstance(module, types.ModuleType):
             module_name = module.__name__
+        else:
+            module_name = module
 
-        class_ = module.__dict__.get(class_name)
+        try:
 
-        if class_ is None:
-            error_msg = f"Class [{class_name}] was not found in module [{module_name}]"
-            cls._log.error(error_msg)
-            raise _ex.EModelRepoRequest(error_msg)
+            cls._log.debug(f"Loading class [{class_name}] from [{module_name}]")
 
-        if not isinstance(class_, class_type.__class__):
+            if module_name == module:
+                module = _il.import_module(module_name)
 
-            error_msg = f"Class [{class_name}] is the wrong type" \
-                      + f" (expected [{class_type.__name__}], got [{type(class_)}]"
+            class_ = module.__dict__.get(class_name)
 
-            cls._log.error(error_msg)
-            raise _ex.EModelRepoRequest(error_msg)
+            if class_ is None:
+                error_msg = f"Class [{class_name}] was not found in module [{module_name}]"
+                cls._log.error(error_msg)
+                raise _ex.EModelRepoRequest(error_msg)
 
-        return class_
+            if not isinstance(class_, class_type.__class__):
+
+                error_msg = f"Class [{class_name}] is the wrong type" \
+                          + f" (expected [{class_type.__name__}], got [{type(class_)}]"
+
+                cls._log.error(error_msg)
+                raise _ex.EModelRepoRequest(error_msg)
+
+            return class_
+
+        except ModuleNotFoundError as e:
+            err = f"Loading classes failed: Module not found for [{module_name}]"
+            cls._log.error(err)
+            raise _ex.EModelRepoResource(err) from e
 
     @classmethod
     def load_resource(
@@ -356,22 +366,22 @@ class ShimLoader:
 
         try:
 
-            cls._log.info(f"Loading [{resource_name}] from [{module_name}]")
+            cls._log.debug(f"Loading resource [{resource_name}] from [{module_name}]")
 
             if isinstance(module, str):
                 module = _il.import_module(module_name)
 
             return load_func(module, resource_name)
 
-        except ModuleNotFoundError:
+        except ModuleNotFoundError as e:
             err = f"Loading resources failed: Module not found for [{module_name}]"
             cls._log.error(err)
-            raise _ex.EModelRepoResource(err)
+            raise _ex.EModelRepoResource(err) from e
 
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             err = f"Loading resources failed: Resource not found for [{resource_name}] in [{module_name}]"
             cls._log.error(err)
-            raise _ex.EModelRepoResource(err)
+            raise _ex.EModelRepoResource(err) from e
 
     @classmethod
     def _run_model_guard(cls):
