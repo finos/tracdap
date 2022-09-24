@@ -55,7 +55,6 @@ class _ActiveShimFinder(_ila.MetaPathFinder):
     def __init__(self, shim_map: tp.Dict[str, pathlib.Path], active_shim: _ActiveShim):
         self.__shim_map = shim_map
         self.__active_shim = active_shim
-        self._log = _util.logger_for_object(self)
 
     def set_shim_map(self, shim_map: tp.Dict[str, pathlib.Path]):
         self.__shim_map = shim_map
@@ -121,7 +120,7 @@ class _NamespaceShimFinder(_ila.MetaPathFinder):
     def __init__(self, shim_map: tp.Dict[str, pathlib.Path], active_shim: _ActiveShim):
         self.__shim_map = shim_map
         self.__active_shim = active_shim
-        self._log = _util.logger_for_object(self)
+        self._log = _util.logger_for_class(ShimLoader)
 
     def find_spec(
             self, fullname: str,
@@ -165,7 +164,7 @@ class _NamespaceShimFinder(_ila.MetaPathFinder):
         # Attach the shim path to the spec, this will be the location to search for modules in the shim
         if len(module_parts) == 3:
 
-            self._log.info(f"Creating namespace package for shim [{shim_namespace}]")
+            self._log.debug(f"Creating namespace package for shim [{shim_namespace}]")
 
             spec = _ilm.ModuleSpec(fullname, origin=None, is_package=True, loader=None)
             spec.submodule_search_locations = str(shim_path)
@@ -173,18 +172,28 @@ class _NamespaceShimFinder(_ila.MetaPathFinder):
             return spec
 
         # Once the code falls through to here, the request is for a module inside a recognized shim
-        self._log.info(f"Looking for module [{relative_name}] in shim [{shim_namespace}]")
 
         # The requested module can be either a normal module or a package
         # The expected path is different for modules and packages, we need to check for both
         parent_path = fn.reduce(lambda p, q: p.joinpath(q), relative_parts[:-1], shim_path)
-        module_path = parent_path.joinpath(relative_parts[-1] + ".py")
         package_path = parent_path.joinpath(relative_parts[-1], "__init__.py")
+        module_path = parent_path.joinpath(relative_parts[-1] + ".py")
+
+        # A module can exist as both a module and a package in the same source path
+        # This is a very bad thing to do and should always be avoided
+        # However, it is allowed when using the regular Python loader mechanisms
+        # We want to replicate the same behaviour, to avoid unexpected breaks when loading to the platform
+        # The Python behaviour is to give precedence to packages, so the shim loader should do the same
+
+        if package_path.exists() and module_path.exists():
+            self._log.warning(f"Module [{relative_name}] is both a regular module and a package (this causes problems)")
 
         # If the module path is found, return a spec for a regular module
         # The module exists in the shim namespace only
         # Since modules have no children, there will be no issues resolving submodules with absolute imports
         if module_path.exists() and module_path.is_file():
+
+            self._log.debug(f"Loading module [{relative_name}] in shim [{shim_namespace}]")
 
             shim_loader = _ilm.SourceFileLoader(fullname, str(module_path))
             spec = _ilm.ModuleSpec(fullname, origin=str(module_path), loader=shim_loader)
@@ -198,6 +207,8 @@ class _NamespaceShimFinder(_ila.MetaPathFinder):
         # This does not normally happen unless model code uses dynamic imports (highly unrecommended)!
         if package_path.exists() and package_path.is_file():
 
+            self._log.debug(f"Loading package [{relative_name}] in shim [{shim_namespace}]")
+
             if shim_namespace == self.__active_shim.shim:
                 shim_loader = _ActiveShimLoader(relative_name, fullname, str(package_path))
             else:
@@ -208,7 +219,9 @@ class _NamespaceShimFinder(_ila.MetaPathFinder):
             return spec
 
         # Module not found, return None
-        return None
+        else:
+            self._log.debug(f"Module [{relative_name}] not found in shim [{shim_namespace}]")
+            return None
 
     def invalidate_caches(self) -> None:
         pass
@@ -241,7 +254,7 @@ class ShimLoader:
 
         cls.__shim_map[shim_namespace] = package_root
 
-        cls._log.info(f"Creating shim [{shim_namespace}] for path [{package_root}]")
+        cls._log.debug(f"Creating shim [{shim_namespace}] for path [{package_root}]")
 
         _il.import_module(shim_namespace)
 
