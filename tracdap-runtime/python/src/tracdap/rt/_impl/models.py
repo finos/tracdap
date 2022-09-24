@@ -35,6 +35,7 @@ class ModelLoader:
             self.scratch_dir = scratch_dir
             self.model_cache: tp.Dict[str, _api.TracModel.__class__] = dict()
             self.code_cache: tp.Dict[str, pathlib.Path] = dict()
+            self.shims: tp.Dict[pathlib.Path, str] = dict()
 
     def __init__(self, sys_config: _cfg.RuntimeConfig, scratch_dir: pathlib.Path):
 
@@ -121,9 +122,24 @@ class ModelLoader:
 
             scope_state.code_cache[code_cache_key] = checkout_dir
 
-        # Now we have the package dir, we can use it with the shim loader to load a model
+        # For the integrated repo (i.e. model code in PYTHONPATH), do not use a shim
+        if package_dir is None:
+            shim = None
 
-        with _shim.ShimLoader.use_package_root(package_dir):
+        # For all other repo types, use a shim to load external model code
+        # Only create one shim per package root in each model scope
+        # This allows models from the same repo / version to be loaded in the same namespace
+        else:
+            package_dir = package_dir.absolute().resolve()
+            if package_dir in scope_state.shims:
+                shim = scope_state.shims[package_dir]
+            else:
+                shim = _shim.ShimLoader.create_shim(package_dir)
+                scope_state.shims[package_dir] = shim
+
+        # Now we have the required shim, we can use it with the shim loader to load a model
+
+        with _shim.ShimLoader.use_shim(shim):
 
             module_name = model_def.entryPoint.rsplit(".", maxsplit=1)[0]
             class_name = model_def.entryPoint.rsplit(".", maxsplit=1)[1]
