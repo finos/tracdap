@@ -35,17 +35,22 @@ public enum ConfigFormat {
 
     private final List<String> extensions;
 
-    public static ConfigFormat fromExtension(URI configFileUri) {
+    public static ConfigFormat fromExtension(URI configFileUrl) {
 
-        var ext = Files.getFileExtension(configFileUri.getPath());
+        return fromExtension(configFileUrl.getPath());
+    }
+
+    public static ConfigFormat fromExtension(String configFileUrl) {
+
+        var ext = Files.getFileExtension(configFileUrl);
 
         if (ext.isEmpty())
-            throw new EStartup(String.format("Unknown config format for file: [%s]", configFileUri));
+            throw new EStartup(String.format("Unknown config format for file: [%s]", configFileUrl));
 
         for (var format : ConfigFormat.values())
             if (format.extensions.contains(ext))
                 return format;
 
-        throw new EStartup(String.format("Unknown config format for file: [%s]", configFileUri));
+        throw new EStartup(String.format("Unknown config format for file: [%s]", configFileUrl));
     }
 }

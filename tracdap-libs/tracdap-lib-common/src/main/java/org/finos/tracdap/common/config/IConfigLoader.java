@@ -68,4 +68,6 @@ public interface IConfigLoader {
      * @throws EStartup There was a problem loading the file
      */
     String loadTextFile(URI configUrl);
+
+    byte[] loadBinaryFile(URI configUrl);
 }

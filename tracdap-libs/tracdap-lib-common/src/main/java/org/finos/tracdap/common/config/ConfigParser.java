@@ -17,8 +17,8 @@
 package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.exception.EStartup;
-
 import org.finos.tracdap.common.exception.EUnexpected;
+
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -26,33 +26,23 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
-import io.netty.buffer.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.*;
-import org.yaml.snakeyaml.constructor.Constructor;
-import org.yaml.snakeyaml.error.MarkedYAMLException;
-import org.yaml.snakeyaml.error.YAMLException;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
 
 
 public class ConfigParser {
 
-    private static final Logger log = LoggerFactory.getLogger(ConfigParser.class);
+    public static <TConfig extends Message>
+    TConfig parseConfig(byte[] configData, ConfigFormat configFormat, Class<TConfig> configClass) {
 
+        return parseConfig(configData, configFormat, configClass, /* leniency = */ false);
+    }
 
-    public static <TConfig extends Message, B extends Message.Builder>
-    TConfig parseConfig(
-            ByteBuf configData, ConfigFormat configFormat,
-            Class<TConfig> configClass) {
-
-
-
-
+    @SuppressWarnings("unchecked")
+    public static <TConfig extends Message>
+    TConfig parseConfig(byte[] configData, ConfigFormat configFormat, Class<TConfig> configClass, boolean leniency) {
 
         try {
 
@@ -66,10 +56,12 @@ public class ConfigParser {
                     return parseProtoConfig(configData, blankConfig);
 
                 case JSON:
-                    return parseJsonConfig(configData, blankConfig);
+                    var json = new String(configData, StandardCharsets.UTF_8);
+                    return parseJsonConfig(json, blankConfig, leniency);
 
                 case YAML:
-                    return parseYamlConfig(configData, blankConfig);
+                    var yaml = new String(configData, StandardCharsets.UTF_8);
+                    return parseYamlConfig(yaml, blankConfig, leniency);
 
                 default:
                     throw new EStartup(String.format("Unknown config format [%s]", configFormat));
@@ -84,39 +76,41 @@ public class ConfigParser {
             // Error invoking reflective method for builder
             throw new EUnexpected();
         }
-        finally {
-
-            configData.release();
-        }
     }
 
+    @SuppressWarnings("unchecked")
     private static <TConfig extends Message>
-    TConfig parseProtoConfig(ByteBuf configData, TConfig defaultConfig) throws InvalidProtocolBufferException {
+    TConfig parseProtoConfig(byte[] protoData, TConfig defaultConfig) throws InvalidProtocolBufferException {
 
-        return (TConfig) defaultConfig.toBuilder()
-                .mergeFrom(configData.array())
+        var builder = defaultConfig.newBuilderForType();
+
+        return (TConfig) builder
+                .mergeFrom(protoData)
                 .build();
     }
 
+    @SuppressWarnings("unchecked")
     private static <TConfig extends Message>
-    TConfig parseJsonConfig(ByteBuf configData, TConfig defaultConfig) throws InvalidProtocolBufferException {
-
-        var json = configData.getCharSequence(0, configData.readableBytes(), StandardCharsets.UTF_8).toString();
+    TConfig parseJsonConfig(String jsonData, TConfig defaultConfig, boolean lenient) throws InvalidProtocolBufferException {
 
         var parser = JsonFormat.parser();
-        var builder = defaultConfig.toBuilder();
+        var builder = defaultConfig.newBuilderForType();
 
-        parser.merge(json, builder);
+        if (lenient)
+            parser = parser.ignoringUnknownFields();
+
+        parser.merge(jsonData,  builder);
 
         return (TConfig) builder.build();
     }
 
     private static <TConfig extends Message>
-    TConfig parseYamlConfig(ByteBuf configData, TConfig defaultConfig) throws InvalidProtocolBufferException {
+    TConfig parseYamlConfig(String yamlData, TConfig defaultConfig, boolean leniency) throws InvalidProtocolBufferException {
 
-        var json = Unpooled.EMPTY_BUFFER;
+        // To parse YAML, first convert into JSON using Jackson
+        // Then parse JSON using the Protobuf built-in JSON parser
 
-        try (var stream = (InputStream) new ByteBufInputStream(configData)) {
+        try  {
 
             var yamlFactory = new YAMLFactory();
             var jsonFactory = new JsonFactory();
@@ -124,64 +118,16 @@ public class ConfigParser {
             var reader = new YAMLMapper(yamlFactory);
             var writer = new JsonMapper(jsonFactory);
 
-            var obj = reader.readValue(stream, Object.class);
-            var jsonBytes = writer.writeValueAsBytes(obj);
+            var obj = reader.readValue(yamlData, Object.class);
+            var jsonData = writer.writeValueAsString(obj);
 
-            json = Unpooled.wrappedBuffer(jsonBytes);
-
-            return parseJsonConfig(json, defaultConfig);
+            return parseJsonConfig(jsonData, defaultConfig, leniency);
         }
         catch (IOException e) {
 
             throw new EStartup(e.getMessage(), e);
         }
-        finally {
-
-            if (json != Unpooled.EMPTY_BUFFER)
-                json.release();
-        }
     }
 
-
-
-    static <TConfig> TConfig parseStructuredConfig(
-            String configData, ConfigFormat configFormat,
-            Class<TConfig> elementClass) throws EStartup {
-
-        switch (configFormat) {
-
-            case YAML: return parseYamlConfig_(configData, elementClass);
-
-            default:
-                throw new EStartup(String.format("Unsupported config format '%s'", configFormat));
-        }
-    }
-
-    static <TConfig> TConfig parseYamlConfig_(String configData, Class<TConfig> elementClass) throws EStartup {
-
-        // TODO: This is a scratch implementation!
-        // TODO: Work is needed to make this much more robust and report errors in a sensible way
-
-        try {
-
-            var loaderOptions = new LoaderOptions();
-            loaderOptions.setEnumCaseSensitive(false);
-
-            var constructor = new Constructor(elementClass, loaderOptions);
-            var yaml = new Yaml(constructor);
-
-            return yaml.loadAs(configData, elementClass);
-        }
-        catch (MarkedYAMLException e) {
-
-            // TODO: Errors
-            log.error("YAML Error", e);
-            throw new EStartup("YAML error", e);
-
-        }
-        catch (YAMLException e) {
-            throw new EStartup("There was an unexpected problem parsing YAML config: " + e.getMessage(), e);
-        }
-    }
 }
 

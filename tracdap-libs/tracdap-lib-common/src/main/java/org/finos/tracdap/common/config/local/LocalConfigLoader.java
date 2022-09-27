@@ -43,7 +43,14 @@ public class LocalConfigLoader implements IConfigLoader {
     }
 
     @Override
-    public String loadTextFile(URI uri) {
+    public String loadTextFile(URI url) {
+
+        var bytes = loadBinaryFile(url);
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public byte[] loadBinaryFile(URI uri) {
 
         var ERROR_MSG_TEMPLATE = "Failed to load config file: %2$s [%1$s]";
 
@@ -52,7 +59,7 @@ public class LocalConfigLoader implements IConfigLoader {
         try {
 
             path = Paths.get(uri);
-            return Files.readString(path, StandardCharsets.UTF_8);
+            return Files.readAllBytes(path);
         }
         catch (IllegalArgumentException e) {
 

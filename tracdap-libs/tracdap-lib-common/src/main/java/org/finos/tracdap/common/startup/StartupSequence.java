@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 
 public class StartupSequence {
 
@@ -156,8 +155,8 @@ public class StartupSequence {
         // Logger configured using initStartupLogging
         var log = LoggerFactory.getLogger(getClass());
 
-        var rootConfigMap = config.loadRootConfigObject(Map.class);
-        String loggingConfigUrl = lookupLoggingConfigUrl(rootConfigMap);
+        var configMap = config.loadRootConfigMap();
+        String loggingConfigUrl = configMap.get(ConfigKeys.LOGGING_CONFIG_KEY);
 
         if (loggingConfigUrl != null && !loggingConfigUrl.isBlank()) {
 
@@ -185,28 +184,5 @@ public class StartupSequence {
             log.info("No logging config provided, using default...");
             Configurator.reconfigure();
         }
-    }
-
-    private String lookupLoggingConfigUrl(Map<?, ?> rootConfigMap) {
-
-        if (!rootConfigMap.containsKey(ConfigKeys.EXTERNAL_CONFIG_KEY))
-            return null;
-
-        var externalConfig = rootConfigMap.get(ConfigKeys.EXTERNAL_CONFIG_KEY);
-
-        if (!(externalConfig instanceof Map))
-            return null;
-
-        var externalConfigMap = (Map<?, ?>) externalConfig;
-
-        if (!externalConfigMap.containsKey(ConfigKeys.LOGGING_CONFIG_KEY))
-            return null;
-
-        var loggingConfig = externalConfigMap.get(ConfigKeys.LOGGING_CONFIG_KEY);
-
-        if (loggingConfig == null)
-            return null;
-
-        return loggingConfig.toString();
     }
 }

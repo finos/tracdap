@@ -22,7 +22,7 @@ import org.finos.tracdap.common.startup.Startup;
 import org.finos.tracdap.common.startup.StartupSequence;
 
 import com.google.protobuf.Message;
-import io.netty.buffer.Unpooled;
+import org.finos.tracdap.config._ConfigFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 
 
 /**
@@ -106,6 +107,17 @@ public class ConfigManager {
     // Config loading
     // -----------------------------------------------------------------------------------------------------------------
 
+
+    public byte[] loadConfigBytes(String configUrl) {
+
+        if (configUrl == null || configUrl.isBlank())
+            throw new EStartup("Config URL is missing or blank");
+
+        var requestedUrl = parseUrl(configUrl);
+
+        return loadConfigFromUrl(requestedUrl);
+    }
+
     /**
      * Load a config file as plain text
      *
@@ -121,12 +133,9 @@ public class ConfigManager {
      */
     public String loadConfigFile(String configUrl) {
 
-        if (configUrl == null || configUrl.isBlank())
-            throw new EStartup("Config URL is missing or blank");
+        var configBytes = loadConfigBytes(configUrl);
 
-        var requestedUrl = parseUrl(configUrl);
-
-        return loadConfigFromUrl(requestedUrl);
+        return new String(configBytes, StandardCharsets.UTF_8);
     }
 
     /**
@@ -149,36 +158,12 @@ public class ConfigManager {
      *
      * @see ConfigParser
      */
-    public <TConfig, X extends Message> TConfig loadConfigObject(String configUrl, Class<TConfig> configClass) {
+    public <TConfig extends Message> TConfig loadConfigObject(String configUrl, Class<TConfig> configClass) {
 
-        if (configUrl == null || configUrl.isBlank())
-            throw new EStartup("Config URL is missing or blank");
+        var configBytes = loadConfigBytes(configUrl);
+        var configFormat = ConfigFormat.fromExtension(configUrl);
 
-        var requestedUrl = parseUrl(configUrl);
-
-        var configData = loadConfigFromUrl(requestedUrl);
-        var configFormat = ConfigFormat.fromExtension(requestedUrl);
-
-        if (Message.class.isAssignableFrom(configClass)) {
-
-            var configBytes = Unpooled.wrappedBuffer(configData.getBytes(StandardCharsets.UTF_8));
-            var configMsgClass = (Class<? extends Message>) configClass;
-            return (TConfig) ConfigParser.parseConfig(configBytes, configFormat, configMsgClass);
-
-        }
-        else
-            return ConfigParser.parseStructuredConfig(configData, configFormat, configClass);
-    }
-
-    /**
-     * Load the root config file as plain text
-     *
-     * @return The contents of the root config file, as text
-     * @throws EStartup The root configuration file could not be loaded for any reason
-     */
-    public String loadRootConfigFile() {
-
-        return loadConfigFile(configRootFile.toString());
+        return ConfigParser.parseConfig(configBytes, configFormat, configClass);
     }
 
     /**
@@ -191,9 +176,19 @@ public class ConfigManager {
      * @return The root configuration as a structured object
      * @throws EStartup The root configuration file could not be loaded or parsed for any reason
      */
-    public <TConfig> TConfig loadRootConfigObject(Class<TConfig> configClass) {
+    public <TConfig extends Message> TConfig loadRootConfigObject(Class<TConfig> configClass) {
 
         return loadConfigObject(configRootFile.toString(), configClass);
+    }
+
+    public Map<String, String> loadRootConfigMap() {
+
+        var configBytes = loadConfigBytes(configRootFile.toString());
+        var configFormat = ConfigFormat.fromExtension(configRootFile);
+
+        var configFile = ConfigParser.parseConfig(configBytes, configFormat, _ConfigFile.class, /* leniency = */ true);
+
+        return configFile.getConfigMap();
     }
 
 
@@ -201,7 +196,7 @@ public class ConfigManager {
     // Helpers
     // -----------------------------------------------------------------------------------------------------------------
 
-    private String loadConfigFromUrl(URI requestedUrl) {
+    private byte[] loadConfigFromUrl(URI requestedUrl) {
 
         var resolvedUrl = resolveUrl(requestedUrl);
         var relativeUrl = configRootDir.relativize(resolvedUrl);
@@ -211,7 +206,7 @@ public class ConfigManager {
         var protocol = resolvedUrl.getScheme();
         var loader = configLoaderForProtocol(protocol);
 
-        return loader.loadTextFile(resolvedUrl);
+        return loader.loadBinaryFile(resolvedUrl);
     }
 
     private URI resolveConfigRootFile(String suppliedConfigUrl, Path workingDir) {
@@ -236,26 +231,33 @@ public class ConfigManager {
         return configUrl;
     }
 
-    private URI parseUrl(String url) {
+    private URI parseUrl(String urlString) {
 
-        if (url.startsWith("/") || url.startsWith("\\") || url.startsWith(":\\", 1)) {
-            try {
-                return Paths.get(url).toUri().normalize();
-            }
-            catch (InvalidPathException ignored) { }
-        }
+        Path path = null;
+        URI url = null;
 
         try {
-            return URI.create(url);
-        }
-        catch (IllegalArgumentException ignored) { }
-
-        try {
-            return Paths.get(url).toUri().normalize();
+            path = Paths.get(urlString).normalize();
         }
         catch (InvalidPathException ignored) { }
 
-        throw new EStartup("Requested config URL is not a valid URL or path: " + url);
+        try {
+            url = URI.create(urlString);
+        }
+        catch (IllegalArgumentException ignored) { }
+
+        if (urlString.startsWith("/") || urlString.startsWith("\\") || urlString.startsWith(":\\", 1)) {
+            if (path != null)
+                return path.toUri();
+        }
+
+        if (url != null)
+            return url;
+
+        if (path != null)
+            return path.toUri();
+
+        throw new EStartup("Requested config URL is not a valid URL or path: " + urlString);
     }
 
     private URI resolveUrl(URI url) {
