@@ -187,7 +187,7 @@ run() {
 
     CWD=`pwd`
     cd "\${RUN_DIR}"
-    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \$@
+    "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \$@
     cd "\${CWD}"
 }
 
@@ -215,7 +215,7 @@ start() {
 
     CWD=`pwd`
     cd "\${RUN_DIR}"
-    java \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \$@ &
+    "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \$@ &
     PID=\$!
     cd "\${CWD}"
 
