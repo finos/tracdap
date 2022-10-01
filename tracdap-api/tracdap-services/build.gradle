@@ -57,6 +57,10 @@ sourceSets {
             // Include generated code from protoc / gRPC
             srcDirs "${project.buildDir}/generated-sources/main/java"
             srcDirs "${project.buildDir}/generated-sources/main/grpc"
+
+            // Including the proto src dir lets autocomplete work in the IDE
+            // Not strictly necessary for protobuf itself
+            srcDirs "${projectDir}/src/main/proto"
         }
     }
 }
