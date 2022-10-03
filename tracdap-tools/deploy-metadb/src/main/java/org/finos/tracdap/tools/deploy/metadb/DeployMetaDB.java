@@ -36,9 +36,15 @@ import java.util.List;
 import java.util.Properties;
 
 
+/**
+ * Deployment tool to manage the TRAC metadata database
+ */
 public class DeployMetaDB {
 
+    /** Task name for deploying the schema **/
     public final static String DEPLOY_SCHEMA_TASK_NAME = "deploy_schema";
+
+    /** Task name for adding a tenant **/
     public final static String ADD_TENANT_TASK_NAME = "add_tenant";
 
     private final static String SCHEMA_LOCATION = "classpath:%s";
@@ -50,12 +56,22 @@ public class DeployMetaDB {
     private final Logger log;
     private final ConfigManager configManager;
 
+    /**
+     * Construct a new instance of the deployment tool
+     *
+     * @param configManager A prepared instance of ConfigManager
+     */
     public DeployMetaDB(ConfigManager configManager) {
 
         this.log = LoggerFactory.getLogger(getClass());
         this.configManager = configManager;
     }
 
+    /**
+     * Run deployment tasks, as specified by standard args tasks on the commane line
+     *
+     * @param tasks The list of deployment tasks to execute
+     */
     public void runDeployment(List<StandardArgs.Task> tasks) {
 
         var componentName = VersionInfo.getComponentName(DeployMetaDB.class);
@@ -155,6 +171,11 @@ public class DeployMetaDB {
 
     }
 
+    /**
+     * Entry point for the DeployMetaDB tool.
+     *
+     * @param args Command line args
+     */
     public static void main(String[] args) {
 
         try {
