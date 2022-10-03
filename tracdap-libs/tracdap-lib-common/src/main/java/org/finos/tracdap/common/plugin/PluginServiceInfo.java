@@ -23,54 +23,76 @@ import java.util.List;
 import java.util.Map;
 
 
+/**
+ * Describes a service provided by a TRAC plugin, via ITracPlugin.
+ *
+ * @see ITracPlugin
+ */
 public class PluginServiceInfo {
 
-    static final Map<String, String> SERVICE_NAMES = Map.ofEntries(
-            Map.entry("org.finos.tracdap.common.config.IConfigLoader", "CONFIG"),
-            Map.entry("org.finos.tracdap.common.codec.ICodec", "FORMAT"),
-            Map.entry("org.finos.tracdap.common.storage.IFileStorage", "FILE_STORAGE"),
-            Map.entry("org.finos.tracdap.common.storage.IDataStorage", "DATA_STORAGE"),
-            Map.entry("org.finos.tracdap.common.exec.IBatchExecutor", "BATCH_EXECUTOR"));
+    /** Standard service type for CONFIG services **/
+    public static final String CONFIG_SERVICE_TYPE = "CONFIG";
 
-    private final String pluginName;
+    /** Standard service type for STORAGE services **/
+    public static final String STORAGE_SERVICE_TYPE = "STORAGE";
+
+    /** Standard service type for FORMAT services (i.e. data codecs) **/
+    public static final String FORMAT_SERVICE_TYPE = "FORMAT";
+
+    /** Standard service types for EXECUTION services **/
+    public static final String EXECUTION_SERVICE_TYPE = "EXECUTION";
+
+    /**
+     * Mapping of known service interfaces to service types.
+     *
+     * <p>Only service interfaces included in this mapping can be loaded
+     * using the TRAC plugin mechanism</p>
+     **/
+    static final Map<String, String> SERVICE_TYPES = Map.ofEntries(
+            Map.entry("org.finos.tracdap.common.config.IConfigLoader", CONFIG_SERVICE_TYPE),
+            Map.entry("org.finos.tracdap.common.config.ISecretLoader", CONFIG_SERVICE_TYPE),
+            Map.entry("org.finos.tracdap.common.codec.ICodec", FORMAT_SERVICE_TYPE),
+            Map.entry("org.finos.tracdap.common.storage.IFileStorage", STORAGE_SERVICE_TYPE),
+            Map.entry("org.finos.tracdap.common.storage.IDataStorage", STORAGE_SERVICE_TYPE),
+            Map.entry("org.finos.tracdap.common.exec.IBatchExecutor", EXECUTION_SERVICE_TYPE));
+
     private final Class<?> serviceClass;
-    private final String serviceTypeName;
     private final String serviceName;
+    private final String serviceType;
     private final List<String> protocols;
 
+    /** Create a new service info object **/
     public PluginServiceInfo(
-            @Nonnull String pluginName,
             @Nonnull Class<?> serviceClass,
             @Nonnull String serviceName,
             @Nonnull List<String> protocols) {
 
-        this.pluginName = pluginName;
         this.serviceClass = serviceClass;
         this.serviceName = serviceName;
         this.protocols = protocols;
 
-        this.serviceTypeName = SERVICE_NAMES.getOrDefault(serviceClass.getName(), null);
+        this.serviceType = SERVICE_TYPES.getOrDefault(serviceClass.getName(), null);
 
-        if (this.serviceTypeName == null)
+        if (this.serviceType == null)
             throw new ETracInternal("Service class is not a recognized pluggable service class");
     }
 
-    public String pluginName() {
-        return pluginName;
-    }
-
+    /** Get the service class interface for this service **/
     public Class<?> serviceClass() {
         return serviceClass;
     }
 
-    public String serviceTypeName() {
-        return serviceTypeName;
-    }
-
+    /** Get the service name for this service **/
     public String serviceName() {
         return serviceName;
     }
 
+    /** Get the standard service type for this service **/
+    public String serviceType() {
+        return serviceType;
+    }
+
+    /** Get the list of protocols supported by this service **/
     public List<String> protocols() {
         return protocols;
     }
