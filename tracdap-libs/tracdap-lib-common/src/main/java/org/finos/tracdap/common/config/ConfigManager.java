@@ -22,7 +22,6 @@ import org.finos.tracdap.common.startup.Startup;
 import org.finos.tracdap.common.startup.StartupSequence;
 
 import com.google.protobuf.Message;
-import org.finos.tracdap.config._ConfigFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
+import java.util.Properties;
 
 
 /**
@@ -69,8 +68,8 @@ public class ConfigManager {
 
     private final IPluginManager plugins;
 
-    private final URI configRootFile;
-    private final URI configRootDir;
+    private final URI rootConfigFile;
+    private final URI rootConfigDir;
 
     /**
      * Create a ConfigManager for the root config URL
@@ -84,13 +83,17 @@ public class ConfigManager {
 
         this.plugins = plugins;
 
-        configRootFile = resolveConfigRootFile(configUrl, workingDir);
-        configRootDir = configRootFile.resolve(".").normalize();
+        this.rootConfigFile = resolveRootUrl(parseUrl(configUrl), workingDir);
+        this.rootConfigDir = rootConfigFile.resolve(".").normalize();
 
-        if ("file".equals(configRootDir.getScheme()))
-            log.info("Using config root: {}", Paths.get(configRootDir));
+        if ("file".equals(rootConfigDir.getScheme()))
+            log.info("Using config root: {}", Paths.get(rootConfigDir));
         else
-            log.info("Using config root: {}", configRootDir);
+            log.info("Using config root: {}", rootConfigDir);
+    }
+
+    public void preloadConfig() {
+
     }
 
     /**
@@ -99,7 +102,7 @@ public class ConfigManager {
      * @return The root config directory
      */
     public URI configRoot() {
-        return configRootDir;
+        return rootConfigDir;
     }
 
 
@@ -108,14 +111,24 @@ public class ConfigManager {
     // -----------------------------------------------------------------------------------------------------------------
 
 
-    public byte[] loadConfigBytes(String configUrl) {
+    /**
+     * Load a config file as an array of bytes
+     *
+     * <p>Config URLs may be relative or absolute. Relative URLs are resolved relative to the
+     * root config directory, absolute URLs may either be a local file path or a full URL
+     * including a protocol. Absolute URLs can use a different protocol from the root config
+     * file, so long as a config loader is available that can handle that protocol and the required
+     * access has been set up.</p>
+     *
+     * @param configUrl URL of the config file to load
+     * @return The contents of the requested config file, as a byte array
+     * @throws EStartup The requested config file could not be loaded for any reason
+     */
+    public byte[] loadBinaryConfig(String configUrl) {
 
-        if (configUrl == null || configUrl.isBlank())
-            throw new EStartup("Config URL is missing or blank");
-
-        var requestedUrl = parseUrl(configUrl);
-
-        return loadConfigFromUrl(requestedUrl);
+        var parsed = parseUrl(configUrl);
+        var resolved = resolveUrl(parsed);
+        return loadUrl(resolved);
     }
 
     /**
@@ -131,11 +144,12 @@ public class ConfigManager {
      * @return The contents of the requested config file, as text
      * @throws EStartup The requested config file could not be loaded for any reason
      */
-    public String loadConfigFile(String configUrl) {
+    public String loadTextConfig(String configUrl) {
 
-        var configBytes = loadConfigBytes(configUrl);
-
-        return new String(configBytes, StandardCharsets.UTF_8);
+        var parsed = parseUrl(configUrl);
+        var resolved = resolveUrl(parsed);
+        var bytes = loadUrl(resolved);
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 
     /**
@@ -152,19 +166,41 @@ public class ConfigManager {
      * must be in known config format.</p>
      *
      * @param configUrl URL of the config file to load
-     * @param configClass the object class to convert the configuration into
+     * @param configClass Config class used to parse the configuration
+     * @param <TConfig> Type variable for the config class (must be a protobuf message type)
+     * @param leniency If true, ignore unrecognized fields in the configuration
      * @return A config object of the requested class
      * @throws EStartup The requested config file could not be loaded or parsed for any reason
      *
      * @see ConfigParser
      */
+    public <TConfig extends Message> TConfig loadConfigObject(
+            String configUrl, Class<TConfig> configClass, boolean leniency) {
+
+        var parsed = parseUrl(configUrl);
+        var resolved = resolveUrl(parsed);
+        var bytes = loadUrl(resolved);
+        var format = ConfigFormat.fromExtension(resolved);
+
+        return ConfigParser.parseConfig(bytes, format, configClass, leniency);
+    }
+
+    /**
+     * Load a config file and convert it into an object using the config parser
+     *
+     * <p>Convenience overload with leniency = false</p>
+     *
+     * @param configUrl URL of the config file to load
+     * @param configClass Config class used to parse the configuration
+     * @param <TConfig> Type variable for the config class (must be a protobuf message type)
+     * @return A config object of the requested class
+     * @throws EStartup The requested config file could not be loaded or parsed for any reason
+     */
     public <TConfig extends Message> TConfig loadConfigObject(String configUrl, Class<TConfig> configClass) {
 
-        var configBytes = loadConfigBytes(configUrl);
-        var configFormat = ConfigFormat.fromExtension(configUrl);
-
-        return ConfigParser.parseConfig(configBytes, configFormat, configClass);
+        return loadConfigObject(configUrl, configClass, /* leniency = */ false);
     }
+
 
     /**
      * Load the root config file and convert it into an object using the config parser
@@ -173,22 +209,42 @@ public class ConfigManager {
      * The configuration must match the structure of the class provided and the file
      * must be in known config format.</p>
      *
+     * @param configClass Config class used to parse the configuration
+     * @param <TConfig> Type variable for the config class (must be a protobuf message type)
+     * @param leniency If true, ignore unrecognized fields in the configuration
+     * @return The root configuration as a structured object
+     * @throws EStartup The root configuration file could not be loaded or parsed for any reason
+     */
+    public <TConfig extends Message> TConfig loadRootConfigObject(Class<TConfig> configClass, boolean leniency) {
+
+        var bytes = loadUrl(rootConfigFile);
+        var format = ConfigFormat.fromExtension(rootConfigFile);
+
+        return ConfigParser.parseConfig(bytes, format, configClass, leniency);
+    }
+
+    /**
+     * Load the root config file and convert it into an object using the config parser
+     *
+     * <p>Convenience overload with leniency = false</p>
+     *
+     * @param configClass Config class used to parse the configuration
+     * @param <TConfig> Type variable for the config class (must be a protobuf message type)
      * @return The root configuration as a structured object
      * @throws EStartup The root configuration file could not be loaded or parsed for any reason
      */
     public <TConfig extends Message> TConfig loadRootConfigObject(Class<TConfig> configClass) {
 
-        return loadConfigObject(configRootFile.toString(), configClass);
+        return loadConfigObject(rootConfigFile.toString(), configClass, /* leniency = */ false);
     }
 
-    public Map<String, String> loadRootConfigMap() {
 
-        var configBytes = loadConfigBytes(configRootFile.toString());
-        var configFormat = ConfigFormat.fromExtension(configRootFile);
+    public String loadTextSecret(String key) {
+        return null;
+    }
 
-        var configFile = ConfigParser.parseConfig(configBytes, configFormat, _ConfigFile.class, /* leniency = */ true);
-
-        return configFile.getConfigMap();
+    public byte[] loadBinarySecret(String key) {
+        return null;
     }
 
 
@@ -196,42 +252,10 @@ public class ConfigManager {
     // Helpers
     // -----------------------------------------------------------------------------------------------------------------
 
-    private byte[] loadConfigFromUrl(URI requestedUrl) {
-
-        var resolvedUrl = resolveUrl(requestedUrl);
-        var relativeUrl = configRootDir.relativize(resolvedUrl);
-
-        log.info("Loading config file: {}", relativeUrl);
-
-        var protocol = resolvedUrl.getScheme();
-        var loader = configLoaderForProtocol(protocol);
-
-        return loader.loadBinaryFile(resolvedUrl);
-    }
-
-    private URI resolveConfigRootFile(String suppliedConfigUrl, Path workingDir) {
-
-        if (suppliedConfigUrl == null || suppliedConfigUrl.isBlank())
-            throw new EStartup("URL for root config file is missing or blank");
-
-        var configUrl = parseUrl(suppliedConfigUrl);
-        var configProtocol = configUrl.getScheme();
-
-        // Special handling if the config URI is for a file
-        // In this case, it may be relative to the process working dir
-        if (configProtocol == null || configProtocol.isBlank() || configProtocol.equals("file")) {
-
-            if (configUrl.isAbsolute())
-                return configUrl;
-
-            var configPath = workingDir.resolve(configUrl.getPath());
-            return configPath.toUri();
-        }
-
-        return configUrl;
-    }
-
     private URI parseUrl(String urlString) {
+
+        if (urlString == null || urlString.isBlank())
+            throw new EStartup("Config URL is missing or blank");
 
         Path path = null;
         URI url = null;
@@ -298,8 +322,48 @@ public class ConfigManager {
             return url.normalize();
         }
         else {
-            return configRootDir.resolve(url).normalize();
+            return rootConfigDir.resolve(url).normalize();
         }
+    }
+
+    private URI resolveRootUrl(URI url, Path workingDir) {
+
+        var protocol = url.getScheme();
+
+        // Special handling if the config URI is for a file
+        // In this case, it may be relative to the process working dir
+        if (protocol == null || protocol.isBlank() || protocol.equals("file")) {
+
+            if (url.isAbsolute()) {
+                return url;
+            }
+            else {
+                var configPath = workingDir.resolve(url.getPath());
+                return configPath.toUri();
+            }
+        }
+        else {
+
+            if (!url.isAbsolute()) {
+                var message = String.format("Relative URL is not allowed for root config file with protocol [%s]: [%s]", protocol, url);
+                throw new EStartup(message);
+            }
+            else {
+                return url;
+            }
+        }
+    }
+
+    private byte[] loadUrl(URI absoluteUrl) {
+
+        // Display relative URLs in the log if possible
+        var relativeUrl = rootConfigDir.relativize(absoluteUrl);
+        log.info("Loading config file: {}", relativeUrl);
+
+        var protocol = absoluteUrl.getScheme();
+        var loader = configLoaderForProtocol(protocol);
+
+        return loader.loadBinaryFile(absoluteUrl);
     }
 
     private IConfigLoader configLoaderForProtocol(String protocol) {
@@ -316,5 +380,23 @@ public class ConfigManager {
         }
 
         return plugins.createService(IConfigLoader.class, protocol);
+    }
+
+    private ISecretLoader secretLoaderForProtocol(String protocol) {
+
+        if (!plugins.isServiceAvailable(IConfigLoader.class, protocol)) {
+
+            var message = String.format("No secret loader available for protocol [%s]", protocol);
+
+            log.error(message);
+            throw new EStartup(message);
+        }
+
+        var secretProps = new Properties();
+        var secretLoader = plugins.createService(ISecretLoader.class, protocol);
+
+        secretLoader.init(this);
+
+        return secretLoader;
     }
 }

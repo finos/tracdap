@@ -194,7 +194,7 @@ public class StartupSequence {
 
         if (!loggingConfigUrl.isBlank()) {
 
-            var loggingConfig = config.loadConfigFile(loggingConfigUrl);
+            var loggingConfig = config.loadTextConfig(loggingConfigUrl);
 
             try (var configStream = new ByteArrayInputStream(loggingConfig.getBytes())) {
 

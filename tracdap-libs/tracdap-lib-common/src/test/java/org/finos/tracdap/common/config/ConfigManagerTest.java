@@ -115,10 +115,10 @@ class ConfigManagerTest {
         var fileConfigUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(fileConfigUrl, tempDir, plugins);
         
-        var contentsFromFile = manager.loadConfigFile(absoluteFilePath);
+        var contentsFromFile = manager.loadTextConfig(absoluteFilePath);
         assertFalse(contentsFromFile.isBlank());
 
-        var contentsFromTest = manager.loadConfigFile(absoluteTestUrl);
+        var contentsFromTest = manager.loadTextConfig(absoluteTestUrl);
         assertFalse(contentsFromTest.isBlank());
 
         // Using test-protocol loader
@@ -126,10 +126,10 @@ class ConfigManagerTest {
         var testConfigUrl = "test://config_svr/config_dir/sample-config.yaml";
         var manager2 = new ConfigManager(testConfigUrl, tempDir, plugins);
 
-        var contentsFromFile2 = manager2.loadConfigFile(absoluteFilePath);
+        var contentsFromFile2 = manager2.loadTextConfig(absoluteFilePath);
         assertFalse(contentsFromFile2.isBlank());
 
-        var contentsFromTest2 = manager2.loadConfigFile(absoluteTestUrl);
+        var contentsFromTest2 = manager2.loadTextConfig(absoluteTestUrl);
         assertFalse(contentsFromTest2.isBlank());
     }
 
@@ -143,7 +143,7 @@ class ConfigManagerTest {
 
         var absoluteUrl = "//config_svr/config_dir/sample-config.json";
 
-        assertThrows(EStartup.class, () -> manager.loadConfigFile(absoluteUrl));
+        assertThrows(EStartup.class, () -> manager.loadTextConfig(absoluteUrl));
     }
 
     @Test
@@ -154,7 +154,7 @@ class ConfigManagerTest {
 
         var absoluteUrl = "unknown://config_svr/config_dir/sample-config.json";
 
-        assertThrows(EStartup.class, () -> manager.loadConfigFile(absoluteUrl));
+        assertThrows(EStartup.class, () -> manager.loadTextConfig(absoluteUrl));
     }
 
     @Test
@@ -167,7 +167,7 @@ class ConfigManagerTest {
 
         var relativePath = "sample-config.json";
 
-        var contents = manager.loadConfigFile(relativePath);
+        var contents = manager.loadTextConfig(relativePath);
         assertFalse(contents.isBlank());
 
         // Using test-protocol loader
@@ -177,7 +177,7 @@ class ConfigManagerTest {
 
         var relativePath2 = "sample-config.json";
 
-        var contents2 = manager2.loadConfigFile(relativePath2);
+        var contents2 = manager2.loadTextConfig(relativePath2);
         assertFalse(contents2.isBlank());
     }
 
@@ -191,7 +191,7 @@ class ConfigManagerTest {
 
         var relativePath = "file:./sample-config.json";
 
-        assertThrows(EStartup.class, () -> manager.loadConfigFile(relativePath));
+        assertThrows(EStartup.class, () -> manager.loadTextConfig(relativePath));
 
         // Using test-protocol loader
 
@@ -200,7 +200,7 @@ class ConfigManagerTest {
         
         var relativePath2 = "test:./sample-config.json";
 
-        assertThrows(EStartup.class, () -> manager2.loadConfigFile(relativePath2));
+        assertThrows(EStartup.class, () -> manager2.loadTextConfig(relativePath2));
     }
 
     @Test
@@ -213,14 +213,14 @@ class ConfigManagerTest {
 
         var relativePath = "missing.properties";
 
-        assertThrows(EStartup.class, () -> manager.loadConfigFile(relativePath));
+        assertThrows(EStartup.class, () -> manager.loadTextConfig(relativePath));
 
         // Using test-protocol loader
 
         var configUrl2 = "test://config_svr/config_dir/sample-config.yaml";
         var manager2 = new ConfigManager(configUrl2, tempDir, plugins);
 
-        assertThrows(EStartup.class, () -> manager2.loadConfigFile(relativePath));
+        assertThrows(EStartup.class, () -> manager2.loadTextConfig(relativePath));
     }
 
     @Test
@@ -229,10 +229,10 @@ class ConfigManagerTest {
         var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
-        assertThrows(EStartup.class, () -> manager.loadConfigFile(null));
-        assertThrows(EStartup.class, () -> manager.loadConfigFile(""));
-        assertThrows(EStartup.class, () -> manager.loadConfigFile(" "));
-        assertThrows(EStartup.class, () -> manager.loadConfigFile("\n"));
+        assertThrows(EStartup.class, () -> manager.loadTextConfig(null));
+        assertThrows(EStartup.class, () -> manager.loadTextConfig(""));
+        assertThrows(EStartup.class, () -> manager.loadTextConfig(" "));
+        assertThrows(EStartup.class, () -> manager.loadTextConfig("\n"));
     }
 
     @Test
@@ -241,8 +241,8 @@ class ConfigManagerTest {
         var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
-        assertThrows(EStartup.class, () -> manager.loadConfigFile("file:::-:"));
-        assertThrows(EStartup.class, () -> manager.loadConfigFile("//_>>@"));
+        assertThrows(EStartup.class, () -> manager.loadTextConfig("file:::-:"));
+        assertThrows(EStartup.class, () -> manager.loadTextConfig("//_>>@"));
     }
 
     // loadProperties uses the same loading mechanism as loadTextFile
