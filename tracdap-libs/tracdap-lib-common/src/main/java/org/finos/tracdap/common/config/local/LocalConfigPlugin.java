@@ -28,11 +28,10 @@ import java.util.Properties;
 public class LocalConfigPlugin extends TracPlugin {
 
     private static final String PLUGIN_NAME = "LOCAL_CONFIG";
-    private static final String SERVICE_NAME = "LOCAL_CONFIG";
+    private static final String FILE_LOADER = "FILE_LOADER";
 
-    private static final PluginServiceInfo psi = new PluginServiceInfo(
-            PLUGIN_NAME, IConfigLoader.class,
-            SERVICE_NAME, List.of("file"));
+    private static final List<PluginServiceInfo> serviceInfo = List.of(
+            new PluginServiceInfo(IConfigLoader.class, FILE_LOADER, List.of("LOCAL", "file")));
 
     @Override
     public String pluginName() {
@@ -41,13 +40,13 @@ public class LocalConfigPlugin extends TracPlugin {
 
     @Override
     public List<PluginServiceInfo> serviceInfo() {
-        return List.of(psi);
+        return serviceInfo;
     }
 
     @Override @SuppressWarnings("unchecked")
     protected <T> T createService(String serviceName, Properties properties) {
 
-        if (serviceName.equals(SERVICE_NAME))
+        if (serviceName.equals(FILE_LOADER))
             return (T) new LocalConfigLoader();
 
         throw new EUnexpected();
