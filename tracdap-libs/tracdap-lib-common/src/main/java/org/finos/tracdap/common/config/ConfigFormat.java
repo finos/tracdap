@@ -23,10 +23,18 @@ import java.net.URI;
 import java.util.List;
 
 
+/**
+ * Enumeration of available config file formats, associated with standard file extensions
+ */
 public enum ConfigFormat {
 
+    /** YAML format (text) **/
     YAML ("yaml", "yml"),
+
+    /** JSON format (text) **/
     JSON ("json"),
+
+    /** Protobuf format (binary) **/
     PROTO ("proto");
 
     ConfigFormat(String... extensions) {
@@ -35,14 +43,11 @@ public enum ConfigFormat {
 
     private final List<String> extensions;
 
+    /** Look up the format of a config file based on its URL **/
     public static ConfigFormat fromExtension(URI configFileUrl) {
 
-        return fromExtension(configFileUrl.getPath());
-    }
-
-    public static ConfigFormat fromExtension(String configFileUrl) {
-
-        var ext = Files.getFileExtension(configFileUrl);
+        var path = configFileUrl.getPath();
+        var ext = Files.getFileExtension(path);
 
         if (ext.isEmpty())
             throw new EStartup(String.format("Unknown config format for file: [%s]", configFileUrl));
