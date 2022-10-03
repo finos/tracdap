@@ -163,7 +163,7 @@ public class DeployMetaDB {
             startup.runStartupSequence();
 
             var config = startup.getConfig();
-            var tasks = startup.getTasks();
+            var tasks = startup.getArgs().getTasks();
 
             var deploy = new DeployMetaDB(config);
             deploy.runDeployment(tasks);

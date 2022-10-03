@@ -31,8 +31,21 @@ import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.List;
 
+
+/**
+ * Standard startup sequence for service components and offline tools.
+ *
+ * <p>The startup sequence is responsible for these tasks:
+ * - Printing the startup banner
+ * - Setting up the config manager and plugin manager
+ * - Loading plugins required to access config files
+ * - Loading logging config and initializing logging
+ * </p>
+ *
+ * <p>The start up sequence is not responsible for setting up the main service / tool.
+ * Standard command line args must be parsed before using the startup sequence.</p>
+ */
 public class StartupSequence {
 
     private static final String STARTUP_LOG_CONFIG = "/log4j2_startup.xml";
@@ -45,12 +58,14 @@ public class StartupSequence {
     private PluginManager plugins;
     private ConfigManager config;
 
+    /** Create a startup sequence for the given service class and command line arguments **/
     StartupSequence(Class<?> serviceClass, StandardArgs standardArgs, boolean doPrintBanner) {
         this.serviceClass = serviceClass;
         this.standardArgs = standardArgs;
         this.doPrintBanner = doPrintBanner;
     }
 
+    /** Run the startup sequence **/
     public void runStartupSequence() {
 
         if (doPrintBanner)
@@ -67,6 +82,7 @@ public class StartupSequence {
         sequenceComplete = true;
     }
 
+    /** Get the plugin manager that was configured during the startup sequence **/
     public PluginManager getPlugins() {
 
         if (!sequenceComplete)
@@ -75,6 +91,7 @@ public class StartupSequence {
         return plugins;
     }
 
+    /** Get the config manager that was configured during the startup sequence **/
     public ConfigManager getConfig() {
 
         if (!sequenceComplete)
@@ -83,10 +100,12 @@ public class StartupSequence {
         return config;
     }
 
-    public List<StandardArgs.Task> getTasks() {
-        return standardArgs.getTasks();
+    /** Get the standard args that were used for this startup sequence **/
+    public StandardArgs getArgs() {
+        return standardArgs;
     }
 
+    /** Print the headline banner for this service or tool **/
     public static void printBanner(Class<?> serviceClass) {
 
         var componentName = VersionInfo.getComponentName(serviceClass);
@@ -118,7 +137,7 @@ public class StartupSequence {
         }
     }
 
-    public void initConfigPlugins() {
+    private void initConfigPlugins() {
 
         plugins = new PluginManager();
         plugins.initConfigPlugins();
@@ -149,7 +168,7 @@ public class StartupSequence {
      * @throws EStartup There was an error processing the logging config
      */
     @SuppressWarnings("resource")
-    public void initLogging() {
+    private void initLogging() {
 
         // Logger configured using initStartupLogging
         var log = LoggerFactory.getLogger(getClass());
