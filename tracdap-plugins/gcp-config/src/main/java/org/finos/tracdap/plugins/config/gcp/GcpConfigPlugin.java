@@ -33,9 +33,8 @@ public class GcpConfigPlugin extends TracPlugin {
     private static final String PLUGIN_NAME = "GCP_CONFIG";
     private static final String SERVICE_NAME = "GCP_CONFIG";
 
-    private static final PluginServiceInfo serviceInfo = new PluginServiceInfo(
-            PLUGIN_NAME, IConfigLoader.class,
-            SERVICE_NAME, List.of("gcp"));
+    private static final List<PluginServiceInfo> serviceInfo = List.of(
+            new PluginServiceInfo(IConfigLoader.class, SERVICE_NAME, List.of("gcp")));
 
     @Override
     public String pluginName() {
@@ -44,7 +43,7 @@ public class GcpConfigPlugin extends TracPlugin {
 
     @Override
     public List<PluginServiceInfo> serviceInfo() {
-        return List.of(serviceInfo);
+        return serviceInfo;
     }
 
     @Override @SuppressWarnings("unchecked")
