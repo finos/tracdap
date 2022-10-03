@@ -15,6 +15,6 @@
 config:
   logging: log-test.xml
 
-test:
-  prop1: hello
-  prop2: 42
+services:
+  meta:
+    dalType: JDBC

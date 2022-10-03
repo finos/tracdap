@@ -17,17 +17,20 @@
 package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.config.test.TestConfigPlugin;
-import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.config.MetaServiceConfig;
+import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.test.helpers.TestResourceHelpers;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Paths;
-import java.util.Map;
+
 
 public class ConfigParserTest {
 
-    private static final String TEST_CONFIG_1 = "/config_mgr_test/root.yaml";
+    private static final String SAMPLE_YAML_CONFIG = "/config_mgr_test/sample-config.yaml";
+    private static final String SAMPLE_JSON_CONFIG = "/config_mgr_test/sample-config.json";
 
     @BeforeAll
     public static void testLoader() {
@@ -37,59 +40,34 @@ public class ConfigParserTest {
     }
 
     @Test
-    public void testYaml_basicLoadOk() throws Exception {
+    public void testJson_basicLoadOk() {
 
-        var configFileUrl = getClass().getResource(TEST_CONFIG_1);
-        Assertions.assertNotNull(configFileUrl);
+        var configBytes = TestResourceHelpers.loadResourceAsBytes(SAMPLE_JSON_CONFIG);
 
-        var configFilePath = Paths.get(".")
-                .toAbsolutePath()
-                .relativize(Paths.get(configFileUrl.toURI()))
-                .toString()
-                .replace("\\", "/");
+        var configObject = ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class);
 
-        var configPlugins = new PluginManager();
-        configPlugins.initConfigPlugins();
+        Assertions.assertNotNull(configObject);
+        Assertions.assertInstanceOf(PlatformConfig.class, configObject);
 
-        var config = new ConfigManager(configFilePath, Paths.get("."), configPlugins);
-        var configText = config.loadRootConfigFile();
+        var metaSvcConfig = configObject.getServices().getMeta();
 
-        var configRoot = ConfigParser.parseStructuredConfig(configText, ConfigFormat.YAML, SampleConfig.class);
-        Assertions.assertNotNull(config);
-
-        var sample = configRoot.test;
-        Assertions.assertNotNull(sample);
-        Assertions.assertEquals("hello", sample.getProp1());
-        Assertions.assertEquals(42, sample.getProp2());
+        Assertions.assertInstanceOf(MetaServiceConfig.class, metaSvcConfig);
+        Assertions.assertEquals("JDBC", metaSvcConfig.getDalType());
     }
 
+    @Test
+    public void testYaml_basicLoadOk() {
 
-    public static class SampleConfig {
+        var configBytes = TestResourceHelpers.loadResourceAsBytes(SAMPLE_YAML_CONFIG);
 
-        public Map<String, Object> config;
-        public TestConfig test;
-    }
+        var configObject = ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class);
 
+        Assertions.assertNotNull(configObject);
+        Assertions.assertInstanceOf(PlatformConfig.class, configObject);
 
-    public static class TestConfig {
+        var metaSvcConfig = configObject.getServices().getMeta();
 
-        private String prop1;
-        private int prop2;
-
-        public String getProp1() {
-            return prop1;
-        }
-
-        public void setProp1(String prop1) {
-            this.prop1 = prop1;
-        }
-
-        public int getProp2() {
-            return prop2;
-        }
-
-        public void setProp2(int prop2) {
-            this.prop2 = prop2;
-        }
+        Assertions.assertInstanceOf(MetaServiceConfig.class, metaSvcConfig);
+        Assertions.assertEquals("JDBC", metaSvcConfig.getDalType());
     }
 }

@@ -1,0 +1,10 @@
+{
+  "config": {
+    "logging": "log-test.xml"
+  },
+  "services": {
+    "meta": {
+      "dalType": "JDBC"
+    }
+  }
+}
