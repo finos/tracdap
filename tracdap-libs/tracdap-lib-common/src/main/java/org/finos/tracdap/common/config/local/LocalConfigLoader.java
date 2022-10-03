@@ -24,23 +24,12 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.List;
 
 
 /**
  * A config loader implementation for loading from the local filesystem.
  */
 public class LocalConfigLoader implements IConfigLoader {
-
-    @Override
-    public String loaderName() {
-        return "FILESYSTEM";
-    }
-
-    @Override
-    public List<String> protocols() {
-        return List.of("file");
-    }
 
     @Override
     public String loadTextFile(URI url) {

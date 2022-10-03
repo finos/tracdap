@@ -21,9 +21,9 @@ import org.finos.tracdap.common.exception.EStartup;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 
 public class TestConfigLoader implements IConfigLoader {
@@ -35,27 +35,24 @@ public class TestConfigLoader implements IConfigLoader {
     }
 
     @Override
-    public String loaderName() {
-        return "TEST";
-    }
-
-    @Override
-    public List<String> protocols() {
-        return List.of("test");
-    }
-
-    @Override
-    public String loadTextFile(URI uri) {
+    public byte[] loadBinaryFile(URI uri) {
 
         var relativePath = uri.getPath().substring(1);  // Ignore leading slash on path component
         var absolutePath = tempDir.resolve(relativePath);
 
         try {
-            return Files.readString(absolutePath);
+            return Files.readAllBytes(absolutePath);
         }
         catch (IOException e) {
 
             throw new EStartup("Config file could not be read: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public String loadTextFile(URI uri) {
+
+        var bytes = loadBinaryFile(uri);
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 }
