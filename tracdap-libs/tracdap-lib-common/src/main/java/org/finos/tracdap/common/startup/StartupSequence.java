@@ -26,6 +26,7 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.util.VersionInfo;
 import org.apache.logging.log4j.core.config.ConfigurationSource;
 import org.apache.logging.log4j.core.config.Configurator;
+import org.finos.tracdap.config._ConfigFile;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
@@ -43,10 +44,6 @@ public class StartupSequence {
     private boolean sequenceComplete = false;
     private PluginManager plugins;
     private ConfigManager config;
-
-    public StartupSequence(Class<?> serviceClass, StandardArgs standardArgs) {
-        this(serviceClass, standardArgs, true);
-    }
 
     StartupSequence(Class<?> serviceClass, StandardArgs standardArgs, boolean doPrintBanner) {
         this.serviceClass = serviceClass;
@@ -105,6 +102,7 @@ public class StartupSequence {
         System.out.println();
     }
 
+    @SuppressWarnings("resource")
     private void initStartupLogging() {
 
         try (var logConfig = Startup.class.getResourceAsStream(STARTUP_LOG_CONFIG)) {
@@ -150,15 +148,16 @@ public class StartupSequence {
      *
      * @throws EStartup There was an error processing the logging config
      */
+    @SuppressWarnings("resource")
     public void initLogging() {
 
         // Logger configured using initStartupLogging
         var log = LoggerFactory.getLogger(getClass());
 
-        var configMap = config.loadRootConfigMap();
-        String loggingConfigUrl = configMap.get(ConfigKeys.LOGGING_CONFIG_KEY);
+        var baseConfig = config.loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
+        var loggingConfigUrl = baseConfig.getConfigOrDefault(ConfigKeys.LOGGING_CONFIG_KEY, "");
 
-        if (loggingConfigUrl != null && !loggingConfigUrl.isBlank()) {
+        if (!loggingConfigUrl.isBlank()) {
 
             var loggingConfig = config.loadConfigFile(loggingConfigUrl);
 
