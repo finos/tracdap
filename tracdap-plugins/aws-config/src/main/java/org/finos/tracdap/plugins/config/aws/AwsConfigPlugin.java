@@ -28,17 +28,17 @@ import java.util.Properties;
 /**
  * A config loader plugin for loading from the AWS S3.
  *
- * This plugin requires AWS credentials and the desired region to be set up in the environment.
- * https://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/setup-credentials.html
+ * <p>This plugin requires AWS credentials and the desired region to be set up in the environment.
+ * <a href="https://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/setup-credentials.html">
+ * https://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/setup-credentials.html</a></p>
  */
 public class AwsConfigPlugin extends TracPlugin {
 
     private static final String PLUGIN_NAME = "AWS_CONFIG";
     private static final String SERVICE_NAME = "AWS_S3_CONFIG";
 
-    private static final PluginServiceInfo serviceInfo = new PluginServiceInfo(
-            PLUGIN_NAME, IConfigLoader.class,
-            SERVICE_NAME, List.of("s3"));
+    private static final List<PluginServiceInfo> serviceInfo = List.of(
+            new PluginServiceInfo(IConfigLoader.class, SERVICE_NAME, List.of("s3")));
 
     @Override
     public String pluginName() {
@@ -47,7 +47,7 @@ public class AwsConfigPlugin extends TracPlugin {
 
     @Override
     public List<PluginServiceInfo> serviceInfo() {
-        return List.of(serviceInfo);
+        return serviceInfo;
     }
 
     @Override @SuppressWarnings("unchecked")
