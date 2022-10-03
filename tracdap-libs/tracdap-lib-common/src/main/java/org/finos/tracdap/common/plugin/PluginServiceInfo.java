@@ -61,7 +61,13 @@ public class PluginServiceInfo {
     private final String serviceType;
     private final List<String> protocols;
 
-    /** Create a new service info object **/
+    /**
+     * Create a new service info object
+     *
+     * @param serviceClass The service class interface for this service
+     * @param serviceName The service name for this service
+     * @param protocols The list of protocols supported by this service
+     */
     public PluginServiceInfo(
             @Nonnull Class<?> serviceClass,
             @Nonnull String serviceName,
@@ -77,22 +83,38 @@ public class PluginServiceInfo {
             throw new ETracInternal("Service class is not a recognized pluggable service class");
     }
 
-    /** Get the service class interface for this service **/
+    /**
+     * Get the service class interface for this service
+     *
+     * @return The service class interface for this service
+     **/
     public Class<?> serviceClass() {
         return serviceClass;
     }
 
-    /** Get the service name for this service **/
+    /**
+     * Get the service name for this service
+     *
+     * @return The service name for this service
+     **/
     public String serviceName() {
         return serviceName;
     }
 
-    /** Get the standard service type for this service **/
+    /**
+     * Get the standard service type for this service
+     *
+     * @return The standard service type for this service
+     **/
     public String serviceType() {
         return serviceType;
     }
 
-    /** Get the list of protocols supported by this service **/
+    /**
+     * Get the list of protocols supported by this service
+     *
+     * @return The list of protocols supported by this service
+     **/
     public List<String> protocols() {
         return protocols;
     }

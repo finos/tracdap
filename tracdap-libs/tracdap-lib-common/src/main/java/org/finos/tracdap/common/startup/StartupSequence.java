@@ -82,7 +82,11 @@ public class StartupSequence {
         sequenceComplete = true;
     }
 
-    /** Get the plugin manager that was configured during the startup sequence **/
+    /**
+     * Get the plugin manager that was configured during the startup sequence
+     *
+     * @return The PluginManager instance
+     * **/
     public PluginManager getPlugins() {
 
         if (!sequenceComplete)
@@ -91,7 +95,11 @@ public class StartupSequence {
         return plugins;
     }
 
-    /** Get the config manager that was configured during the startup sequence **/
+    /**
+     * Get the config manager that was configured during the startup sequence
+     *
+     * @return The ConfigManager instance
+     **/
     public ConfigManager getConfig() {
 
         if (!sequenceComplete)
@@ -100,12 +108,20 @@ public class StartupSequence {
         return config;
     }
 
-    /** Get the standard args that were used for this startup sequence **/
+    /**
+     * Get the standard args that were used for this startup sequence
+     *
+     * @return The StandardArgs instance
+     **/
     public StandardArgs getArgs() {
         return standardArgs;
     }
 
-    /** Print the headline banner for this service or tool **/
+    /**
+     * Print the headline banner for this service or tool
+     *
+     * @param serviceClass The main class of this service or tool
+     **/
     public static void printBanner(Class<?> serviceClass) {
 
         var componentName = VersionInfo.getComponentName(serviceClass);

@@ -40,14 +40,14 @@ import java.util.TimerTask;
 /**
  * Base class for implementing TRAC services
  *
- * The service base class supplies start/stop control, signal handling and timeouts.
- * It also calls ConfigBootstrap and supplies a config to the service class.
+ * <p>The service base class supplies start/stop control, signal handling and timeouts.
+ * It also calls ConfigBootstrap and supplies a config to the service class.</p>
  *
- * Services implement doStartup() and doShutdown to provide startup and shutdown
+ * <p>Services implement doStartup() and doShutdown to provide startup and shutdown
  * sequences. The base class will take care of registering signal hooks to call these
  * methods when needed. The base class also provides timeouts for the start and stop
  * sequences, so they will automatically fail if they do not complete in the required
- * time.
+ * time.</p>
  */
 public abstract class CommonServiceBase {
 
@@ -62,23 +62,23 @@ public abstract class CommonServiceBase {
     /**
      * Services must implement this method to provide their startup logic
      *
-     * When implementing doStartup, services should wait for all resources to be brought
+     * <p>When implementing doStartup, services should wait for all resources to be brought
      * up. Where resources are created asynchronously, use await() or sync() or equivalent
      * calls to wait for those operations to complete and check the results. In the case of
      * errors, doStartup should throw an exception (preferably EStartup). There is no
-     * mechanism of callbacks to report startup results after doStartup returns.
+     * mechanism of callbacks to report startup results after doStartup returns.</p>
      *
-     * The startup sequence must complete within the specified timeout. Services can
+     * <p>The startup sequence must complete within the specified timeout. Services can
      * use the timeout parameter to e.g. set timeouts in await() or equivalent calls.
      * Alternatively, the service does not need to set timeouts on startup operations, and
      * can instead rely on the base class to interrupt the startup thread if the timeout expires.
      * To change the startup timeout, use setStartupTimeout() before the startup sequence begins,
      * i.e. in the constructor (it is not possible to change the timeout once doStartup has been called).
-     * The default startup timeout is 30 seconds.
+     * The default startup timeout is 30 seconds.</p>
      *
-     * Services should ensure there is at least one service thread (i.e. non-daemon thread)
+     * <p>Services should ensure there is at least one service thread (i.e. non-daemon thread)
      * created by the startup process as the main thread will terminate once the startup
-     * sequence is complete.
+     * sequence is complete.</p>
      *
      * @param startupTimeout The maximum time allowed before the startup sequence is considered to have failed
      * @throws InterruptedException The startup sequence is interrupted, either externally or by a timeout
@@ -89,42 +89,27 @@ public abstract class CommonServiceBase {
     /**
      * Services must implement this method to provide their shutdown logic
      *
-     * Shutdown all resources and return an exit code, to be used as the exit code of the process.
+     * <p>Shutdown all resources and return an exit code, to be used as the exit code of the process.
      * When implementing doShutdown, services should wait for all resources to be brought
      * down. Where resources are destroyed asynchronously, use await() or sync() or equivalent
      * calls to wait for those operations to complete and check the results. In the case of
      * errors, doShutdown should return a non-zero result (or throw an error). Only if all
-     * resources are closed successfully should doShutdown return a zero result.
+     * resources are closed successfully should doShutdown return a zero result.</p>
      *
-     * The shutdown sequence must complete within the specified timeout. Services can
+     * <p>The shutdown sequence must complete within the specified timeout. Services can
      * use the timeout parameter to e.g. set timeouts in await() or equivalent calls.
      * Alternatively, the service does not need to set timeouts on shutdown operations, and
      * can instead rely on the base class to interrupt the shutdown thread if the timeout expires.
      * To change the shutdown timeout, use setShutdownTimeout() before the shutdown sequence begins,
      * e.g. during startup when config is loaded (it is not possible to change the timeout once
-     * doShutdown has been called). The default shutdown timeout is 30 seconds.
+     * doShutdown has been called). The default shutdown timeout is 30 seconds.</p>
      *
      * @param shutdownTimeout The maximum time allowed before the shutdown sequence is considered to have failed
+     * @return The process exit code, that will be passed back to the OS when the process exits
      * @throws InterruptedException The shutdown sequence is interrupted, either externally or by a timeout
      * @throws ETrac The shutdown sequence can throw an error from the ETrac hierarchy if it fails for any reason
      */
     protected abstract int doShutdown(Duration shutdownTimeout) throws InterruptedException;
-
-    /**
-     * Change the timeout parameter for the startup sequence
-     * @param startupTimeout The new timeout for the startup sequence
-     */
-    protected void setStartupTimeout(Duration startupTimeout) {
-        this.startupTimeout = startupTimeout;
-    }
-
-    /**
-     * Change the timeout parameter for the shutdown sequence
-     * @param shutdownTimeout The new timeout for the shutdown sequence
-     */
-    protected void setShutdownTimeout(Duration shutdownTimeout) {
-        this.shutdownTimeout = shutdownTimeout;
-    }
 
     /**
      * Helper function for shutting down resources with a shutdown deadline
@@ -172,13 +157,16 @@ public abstract class CommonServiceBase {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
-    private Duration shutdownTimeout = DEFAULT_SHUTDOWN_TIMEOUT;
+    // At present no services are changing the startup / shutdown timeout
+    // If necessary, we can add setStartupTimeout and / or setShutdownTimeout to change these values
+
+    private final Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
+    private final Duration shutdownTimeout = DEFAULT_SHUTDOWN_TIMEOUT;
 
     /**
      * Entry point for spawning a new service
      *
-     * Services can call this method from their own main() method to get the standard startup sequence.
+     * <p>Services can call this method from their own main() method to get the standard startup sequence.</p>
      *
      * @param svcClass The service class to be spawned
      * @param args Command line args passed into the JVM
@@ -246,11 +234,11 @@ public abstract class CommonServiceBase {
     /**
      * Start the service
      *
-     * This method does not register any shutdown hooks and so is suitable for
-     * embedded services and for testing.
+     * <p>This method does not register any shutdown hooks and so is suitable for
+     * embedded services and for testing.</p>
      *
-     * Note: Services started using svcMain() have their lifecycle managed automatically,
-     * there is no need to call start() or stop().
+     * <p>Note: Services started using svcMain() have their lifecycle managed automatically,
+     * there is no need to call start() or stop().</P>
      */
     public void start() {
 
@@ -261,11 +249,11 @@ public abstract class CommonServiceBase {
     /**
      * Start the service
      *
-     * This method can optionally register shutdown hooks, which are needed to
-     * run a standalone instance of the service.
+     * <P>This method can optionally register shutdown hooks, which are needed to
+     * run a standalone instance of the service.</P>
      *
-     * Note: Services started using svcMain() have their lifecycle managed automatically,
-     * there is no need to call start() or stop().
+     * <P>Note: Services started using svcMain() have their lifecycle managed automatically,
+     * there is no need to call start() or stop().</P>
      *
      * @param registerShutdownHook Flag indicating a JVM shutdown hook should be registered to manage clean shutdowns
      */
@@ -319,8 +307,8 @@ public abstract class CommonServiceBase {
     /**
      * Stop the service
      *
-     * This method can be used to stop both standalone services and embedded/testing instances.
-     * Returns zero on success, non-zero on failure.
+     * <P>This method can be used to stop both standalone services and embedded/testing instances.
+     * Returns zero on success, non-zero on failure.</P>
      *
      * @return A result code that can be used as the exit code of the Java process
      */

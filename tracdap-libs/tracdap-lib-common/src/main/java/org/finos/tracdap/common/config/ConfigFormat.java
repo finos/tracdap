@@ -43,7 +43,12 @@ public enum ConfigFormat {
 
     private final List<String> extensions;
 
-    /** Look up the format of a config file based on its URL **/
+    /**
+     * Look up the format of a config file based on its URL
+     *
+     * @param configFileUrl The URL to take the file extension from
+     * @return The selected ConfigFormat
+     **/
     public static ConfigFormat fromExtension(URI configFileUrl) {
 
         var path = configFileUrl.getPath();
