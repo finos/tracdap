@@ -20,6 +20,8 @@ import org.finos.tracdap.common.config.test.TestConfigPlugin;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config._ConfigFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,8 +38,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class ConfigManagerTest {
 
     List<String> CONFIG_SAMPLES = List.of(
-            "/config_mgr_test/root.yaml",
-            "/config_mgr_test/secondary.json",
+            "/config_mgr_test/sample-config.yaml",
+            "/config_mgr_test/sample-config.json",
             "/config_mgr_test/extra.xml",
             "/config_mgr_test/log-test.xml");
 
@@ -75,7 +77,7 @@ class ConfigManagerTest {
     @Test
     void configRoot_file() {
 
-        var configUrl = "config_dir/root.yaml";
+        var configUrl = "config_dir/sample-config.yaml";
         var expectedRoot = tempDir.resolve("config_dir").normalize();
         
         var manager = new ConfigManager(configUrl, tempDir, plugins);
@@ -89,7 +91,7 @@ class ConfigManagerTest {
     @Test
     void configRoot_nonFile() {
         
-        var configUrl = "test://config_svr/config_dir/root.yaml";
+        var configUrl = "test://config_svr/config_dir/sample-config.yaml";
         var expectedRoot = URI.create("test://config_svr/config_dir/");
 
         var manager = new ConfigManager(configUrl, tempDir, plugins);
@@ -101,16 +103,16 @@ class ConfigManagerTest {
     @Test
     void loadText_absolutePathOk() {
         
-        var absoluteFilePath = tempDir.resolve("config_dir/secondary.json")
+        var absoluteFilePath = tempDir.resolve("config_dir/sample-config.json")
                 .toAbsolutePath()
                 .normalize()
                 .toString();
 
-        var absoluteTestUrl = "test://config_svr/config_dir/secondary.json";
+        var absoluteTestUrl = "test://config_svr/config_dir/sample-config.json";
 
         // Using file loader
 
-        var fileConfigUrl = "config_dir/root.yaml";
+        var fileConfigUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(fileConfigUrl, tempDir, plugins);
         
         var contentsFromFile = manager.loadConfigFile(absoluteFilePath);
@@ -121,7 +123,7 @@ class ConfigManagerTest {
 
         // Using test-protocol loader
 
-        var testConfigUrl = "test://config_svr/config_dir/root.yaml";
+        var testConfigUrl = "test://config_svr/config_dir/sample-config.yaml";
         var manager2 = new ConfigManager(testConfigUrl, tempDir, plugins);
 
         var contentsFromFile2 = manager2.loadConfigFile(absoluteFilePath);
@@ -136,10 +138,10 @@ class ConfigManagerTest {
 
         // Missing protocol interpreted as "file" protocol for absolute paths
         
-        var configUrl = "config_dir/root.yaml";
+        var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
-        var absoluteUrl = "//config_svr/config_dir/secondary.json";
+        var absoluteUrl = "//config_svr/config_dir/sample-config.json";
 
         assertThrows(EStartup.class, () -> manager.loadConfigFile(absoluteUrl));
     }
@@ -147,10 +149,10 @@ class ConfigManagerTest {
     @Test
     void loadText_absolutePathUnknownProtocol() {
 
-        var configUrl = "config_dir/root.yaml";
+        var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
-        var absoluteUrl = "unknown://config_svr/config_dir/secondary.json";
+        var absoluteUrl = "unknown://config_svr/config_dir/sample-config.json";
 
         assertThrows(EStartup.class, () -> manager.loadConfigFile(absoluteUrl));
     }
@@ -160,20 +162,20 @@ class ConfigManagerTest {
 
         // Using file loader
 
-        var configUrl = "config_dir/root.yaml";
+        var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
-        var relativePath = "secondary.json";
+        var relativePath = "sample-config.json";
 
         var contents = manager.loadConfigFile(relativePath);
         assertFalse(contents.isBlank());
 
         // Using test-protocol loader
         
-        var configUrl2 = "test://config_svr/config_dir/root.yaml";
+        var configUrl2 = "test://config_svr/config_dir/sample-config.yaml";
         var manager2 = new ConfigManager(configUrl2, tempDir, plugins);
 
-        var relativePath2 = "secondary.json";
+        var relativePath2 = "sample-config.json";
 
         var contents2 = manager2.loadConfigFile(relativePath2);
         assertFalse(contents2.isBlank());
@@ -184,19 +186,19 @@ class ConfigManagerTest {
 
         // Using file loader
 
-        var configUrl = "config_dir/root.yaml";
+        var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
-        var relativePath = "file:./secondary.json";
+        var relativePath = "file:./sample-config.json";
 
         assertThrows(EStartup.class, () -> manager.loadConfigFile(relativePath));
 
         // Using test-protocol loader
 
-        var configUrl2 = "test://config_svr/config_dir/root.yaml";
+        var configUrl2 = "test://config_svr/config_dir/sample-config.yaml";
         var manager2 = new ConfigManager(configUrl2, tempDir, plugins);
         
-        var relativePath2 = "test:./secondary.json";
+        var relativePath2 = "test:./sample-config.json";
 
         assertThrows(EStartup.class, () -> manager2.loadConfigFile(relativePath2));
     }
@@ -206,7 +208,7 @@ class ConfigManagerTest {
 
         // Using file loader
 
-        var configUrl = "config_dir/root.yaml";
+        var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
         var relativePath = "missing.properties";
@@ -215,7 +217,7 @@ class ConfigManagerTest {
 
         // Using test-protocol loader
 
-        var configUrl2 = "test://config_svr/config_dir/root.yaml";
+        var configUrl2 = "test://config_svr/config_dir/sample-config.yaml";
         var manager2 = new ConfigManager(configUrl2, tempDir, plugins);
 
         assertThrows(EStartup.class, () -> manager2.loadConfigFile(relativePath));
@@ -224,7 +226,7 @@ class ConfigManagerTest {
     @Test
     void loadText_nullOrBlankUrl() {
 
-        var configUrl = "config_dir/root.yaml";
+        var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
         assertThrows(EStartup.class, () -> manager.loadConfigFile(null));
@@ -236,7 +238,7 @@ class ConfigManagerTest {
     @Test
     void loadText_invalidUrl() {
 
-        var configUrl = "config_dir/root.yaml";
+        var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
         assertThrows(EStartup.class, () -> manager.loadConfigFile("file:::-:"));
@@ -252,24 +254,23 @@ class ConfigManagerTest {
 
         // Using file loader
 
-        var configUrl = "config_dir/root.yaml";
+        var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
-        var relativePath = "root.yaml";
+        var relativePath = "sample-config.yaml";
 
-        var config = manager.loadConfigObject(relativePath, ConfigParserTest.SampleConfig.class);
-        var prop1 = config.test.getProp1();
-
-        assertEquals("hello", prop1);
+        var config1 = manager.loadConfigObject(relativePath, PlatformConfig.class);
+        var prop1 = config1.getConfigMap().get("logging");
+        assertEquals("log-test.xml", prop1);
 
         // Using test-protocol loader
 
-        var configUrl2 = "test://config_svr/config_dir/root.yaml";
+        var configUrl2 = "test://config_svr/config_dir/sample-config.yaml";
         var manager2 = new ConfigManager(configUrl2, tempDir, plugins);
 
-        var config2 = manager2.loadConfigObject(relativePath, ConfigParserTest.SampleConfig.class);
-        var prop2 = config2.test.getProp2();
-        assertEquals(42, prop2);
+        var config2 = manager2.loadConfigObject(relativePath, PlatformConfig.class);
+        var prop2 = config2.getConfigMap().get("logging");
+        assertEquals("log-test.xml", prop2);
     }
 
     @Test
@@ -277,19 +278,19 @@ class ConfigManagerTest {
 
         // Using file loader
 
-        var configUrl = "config_dir/root.yaml";
+        var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
         var relativePath = "missing.yaml";
 
-        assertThrows(EStartup.class, () -> manager.loadConfigObject(relativePath, ConfigParserTest.SampleConfig.class));
+        assertThrows(EStartup.class, () -> manager.loadConfigObject(relativePath, _ConfigFile.class));
 
         // Using test-protocol loader
 
-        var configUrl2 = "test://config_svr/config_dir/root.yaml";
+        var configUrl2 = "test://config_svr/config_dir/sample-config.yaml";
         var manager2 = new ConfigManager(configUrl2, tempDir, plugins);
 
-        assertThrows(EStartup.class, () -> manager2.loadConfigObject(relativePath, ConfigParserTest.SampleConfig.class));
+        assertThrows(EStartup.class, () -> manager2.loadConfigObject(relativePath, _ConfigFile.class));
     }
 
     @Test
@@ -297,21 +298,21 @@ class ConfigManagerTest {
 
         // Using file loader
 
-        var configUrl = "config_dir/root.yaml";
+        var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
-        var config = manager.loadRootConfigObject(ConfigParserTest.SampleConfig.class);
-        var prop1 = config.test.getProp1();
-        assertEquals("hello", prop1);
+        var config1 = manager.loadRootConfigObject(PlatformConfig.class);
+        var prop1 = config1.getConfigMap().get("logging");
+        assertEquals("log-test.xml", prop1);
 
         // Using test-protocol loader
 
-        var configUrl2 = "test://config_svr/config_dir/root.yaml";
+        var configUrl2 = "test://config_svr/config_dir/sample-config.yaml";
         var manager2 = new ConfigManager(configUrl2, tempDir, plugins);
 
-        var config2 = manager2.loadRootConfigObject(ConfigParserTest.SampleConfig.class);
-        var prop2 = config2.test.getProp2();
-        assertEquals(42, prop2);
+        var config2 = manager2.loadRootConfigObject(PlatformConfig.class);
+        var prop2 = config2.getConfigMap().get("logging");
+        assertEquals("log-test.xml", prop2);
     }
 
     @Test
@@ -322,14 +323,14 @@ class ConfigManagerTest {
         var configUrl = "config_dir/missing.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
-        assertThrows(EStartup.class, () -> manager.loadRootConfigObject(ConfigParserTest.SampleConfig.class));
+        assertThrows(EStartup.class, () -> manager.loadRootConfigObject(_ConfigFile.class));
 
         // Using test-protocol loader
 
         var configUrl2 = "test://config_svr/config_dir/missing.yaml";
         var manager2 = new ConfigManager(configUrl2, tempDir, plugins);
 
-        assertThrows(EStartup.class, () -> manager2.loadRootConfigObject(ConfigParserTest.SampleConfig.class));
+        assertThrows(EStartup.class, () -> manager2.loadRootConfigObject(_ConfigFile.class));
     }
 
     @Test
@@ -346,10 +347,10 @@ class ConfigManagerTest {
 
         var configUrl1 = "file:::-:";
         assertThrows(EStartup.class, () -> new ConfigManager(configUrl1, tempDir, plugins)
-                .loadRootConfigObject(ConfigParserTest.SampleConfig.class));
+                .loadRootConfigObject(_ConfigFile.class));
 
         var configUrl2 = "//_>>@";
         assertThrows(EStartup.class, () -> new ConfigManager(configUrl2, tempDir, plugins)
-                .loadRootConfigObject(ConfigParserTest.SampleConfig.class));
+                .loadRootConfigObject(_ConfigFile.class));
     }
 }
