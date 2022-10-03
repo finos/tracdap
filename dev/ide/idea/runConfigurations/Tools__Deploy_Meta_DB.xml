@@ -2,7 +2,7 @@
   <configuration default="false" name="Tools: Deploy Meta DB" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="org.finos.tracdap.tools.deploy.metadb.DeployMetaDB" />
     <module name="tracdap.deploy-metadb.main" />
-    <option name="PROGRAM_PARAMETERS" value="--config etc/trac-devlocal.yaml --task deploy_schema --task add_tenant:ACME_CORP" />
+    <option name="PROGRAM_PARAMETERS" value="--config dev/config/trac-devlocal.yaml --task deploy_schema --task add_tenant:ACME_CORP" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
