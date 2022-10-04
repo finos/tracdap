@@ -25,6 +25,8 @@ import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
 
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.List;
 
 
 public class Http1Proxy extends ChannelDuplexHandler {
@@ -107,8 +109,13 @@ public class Http1Proxy extends ChannelDuplexHandler {
 
         var targetHeaders = new DefaultHttpHeaders();
         targetHeaders.add(sourceRequest.headers());
-        targetHeaders.remove(HttpHeaderNames.HOST);
-        targetHeaders.add(HttpHeaderNames.HOST, routeConfig.getTarget().getHost());
+
+        if (sourceRequest.headers().contains(HttpHeaderNames.HOST)) {
+
+            var proxyHost = translateHostHeader();
+            targetHeaders.remove(HttpHeaderNames.HOST);
+            targetHeaders.add(HttpHeaderNames.HOST, proxyHost);
+        }
 
         if (sourceRequest instanceof FullHttpRequest) {
 
@@ -164,17 +171,65 @@ public class Http1Proxy extends ChannelDuplexHandler {
         }
     }
 
+    private String translateHostHeader() {
+
+        var target = routeConfig.getTarget();
+
+        // Do not include :<port> in host header for standard ports
+        for (var scheme : List.of(HttpScheme.HTTP, HttpScheme.HTTPS)) {
+            if (scheme.toString().equalsIgnoreCase(target.getScheme()) && scheme.port() == target.getPort())
+                return target.getHost();
+        }
+
+        return target.getHost() + ":" + target.getPort();
+    }
+
     private String translateLocationHeader(String location) {
 
         var target = routeConfig.getTarget();
         var locationUri = URI.create(location);
+        var locationHost = locationUri.getHost();
+        var locationPort = locationUri.getPort();
         var locationPath = locationUri.getPath();
 
-        if (locationPath.startsWith(target.getPath())) {
-
-            return locationPath.replace(target.getPath(), routeConfig.getMatch().getPath());
+        // Use default port for scheme if no port is specified
+        if (locationPort < 0) {
+            for (var scheme : List.of(HttpScheme.HTTP, HttpScheme.HTTPS))
+                if (scheme.toString().equalsIgnoreCase(locationUri.getScheme()))
+                    locationPort = scheme.port();
         }
 
+        // If the redirect location is in the same proxy target, rewrite the location header
+        if (locationPath.startsWith(target.getPath())) {
+
+            // Redirects specified without a host, only the leading path section needs to match
+            if (locationHost == null)
+                return location.replace(target.getPath(), routeConfig.getMatch().getPath());
+
+            // If host and port are specified, these need to match as well
+            if (locationHost.equals(target.getHost()) && locationPort == target.getPort()) {
+
+                try {
+
+                    // Using null scheme and host creates a URL starting with the path component
+                    // This is interpreted to mean the current host / port / scheme
+                    // Query and fragment sections need to be copied over if they are present
+
+                    var proxyPath = locationPath.replace(target.getPath(), routeConfig.getMatch().getPath());
+                    var proxyUri = new URI(
+                            /* scheme = */ null, /* host = */ null,
+                            proxyPath, locationUri.getQuery(), locationUri.getFragment());
+
+                    return proxyUri.toString();
+                }
+                catch (URISyntaxException e) {
+                    throw new EUnexpected(e);
+                }
+            }
+        }
+
+        // For redirects outside the proxy target, return the unaltered location from the source server
+        // This could be e.g. a redirect to a totally different domain
         return location;
     }
 }
