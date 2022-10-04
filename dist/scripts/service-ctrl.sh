@@ -122,7 +122,8 @@ fi
 
 CLASSPATH=\$(cat <<-CLASSPATH_END
 ${classpath.replace(":", ":\\\n")}
-CLASSPATH_END)
+CLASSPATH_END
+)
 
 # Discover standard plugins
 
@@ -287,7 +288,7 @@ status() {
 
         PID=`cat "\${PID_FILE}"`
 
-        if [ `ps -p \$PID > /dev/null` ]; then
+        if `ps -p \$PID > /dev/null`; then
             echo "\${APPLICATION_NAME} is up"
         else
             echo "\${APPLICATION_NAME} is down"
@@ -325,7 +326,7 @@ kill_all() {
 
     FOUND=0
 
-    for PID in `ps -A | grep "[j]ava" | grep "\${APPLICATION_CLASS}" | awk '{print \$1;}'`; do
+    for PID in `ps -Ao "pid,command" | grep "[j]ava" | grep "\${APPLICATION_CLASS}" | awk '{print \$1;}'`; do
         echo "Killing PID \$PID..."
         kill -KILL \$PID
         FOUND=1
