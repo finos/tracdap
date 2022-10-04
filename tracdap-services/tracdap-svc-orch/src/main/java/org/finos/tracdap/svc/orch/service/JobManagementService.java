@@ -106,8 +106,6 @@ public class JobManagementService {
 
         try {
 
-            log.info("Polling job cache...");
-
             var finishedStates = List.of(JobStatusCode.FINISHING, JobStatusCode.CANCELLED);
             var finishedJobs = jobCache.pollJobs(job -> finishedStates.contains(job.statusCode));
             var queuedJobs = jobCache.pollJobs(job -> job.statusCode == JobStatusCode.QUEUED);
@@ -134,8 +132,6 @@ public class JobManagementService {
 
         try  {
 
-            log.info("Polling executor...");
-
             var activeStates = List.of(JobStatusCode.SUBMITTED, JobStatusCode.RUNNING);
             var activeJobs = jobCache.pollJobs(job -> activeStates.contains(job.statusCode));
 
@@ -147,9 +143,6 @@ public class JobManagementService {
             }
 
             var pollResults = jobExecutor.pollAllBatches(execStateMap);
-
-            if (pollResults.isEmpty())
-                return;
 
             for (var result : pollResults) {
 
@@ -214,6 +207,8 @@ public class JobManagementService {
         jobState.statusCode = execResult.statusCode;
         jobState.statusMessage = execResult.statusMessage;
 
+        // For succeeded jobs, try to read and validate the result metadata
+        // Any exceptions here will put the job into a failed state and recordJobResult will be called again
         if (execResult.statusCode == JobStatusCode.SUCCEEDED) {
 
             var jobResultFile = String.format("job_result_%s.json", jobKey);
@@ -229,13 +224,16 @@ public class JobManagementService {
                 log.info("Validating job result [{}]", result.getKey());
                 validator.validateFixedObject(result.getValue());
             }
-
-            jobLifecycle.processJobResult(jobState).toCompletableFuture().join();
         }
 
+        // This is what publishes metadata for the job to the metadata service
+        jobLifecycle.processJobResult(jobState).toCompletableFuture().join();
+
+        // Only once the results are recorded, update the cache and remove the physical job
         jobCache.updateJob(jobKey, jobState, ticket);
         jobExecutor.destroyBatch(jobKey, execState);
 
+        // Schedule removal from the cache at some later time (allows check-job for some time after completion)
         executorService.schedule(
                 () -> jobOperation(jobKey, this::deleteJob),
                 RETAIN_COMPLETE_DELAY.getSeconds(), TimeUnit.SECONDS);
@@ -246,17 +244,6 @@ public class JobManagementService {
             log.error("Job [{}] {} {}", jobKey, jobState.statusCode, jobState.statusMessage);
             if (execResult.errorDetail != null)
                 log.error(execResult.errorDetail);
-        }
-    }
-
-    private void recordJobError(String jobKey) {
-
-        try (var ctx = jobCache.useTicket(jobKey)) {
-
-            if (ctx.superseded())
-                return;
-
-            log.info("Record job result: [{}]", jobKey);
         }
     }
 

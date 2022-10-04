@@ -69,6 +69,7 @@ public class MetadataConstants {
 
     public static final String TRAC_JOB_TYPE_ATTR = "trac_job_type";
     public static final String TRAC_JOB_STATUS_ATTR = "trac_job_status";
+    public static final String TRAC_JOB_ERROR_MESSAGE_ATTR = "trac_job_error_message";
 
     public static final String TRAC_SCHEMA_TYPE_ATTR = "trac_schema_type";
 
