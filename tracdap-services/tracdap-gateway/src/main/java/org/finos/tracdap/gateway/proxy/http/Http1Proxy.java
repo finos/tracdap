@@ -34,6 +34,7 @@ public class Http1Proxy extends ChannelDuplexHandler {
     private final String sourcePrefix;
     private final String targetPrefix;
 
+
     public Http1Proxy(GwRoute routeConfig) {
 
         this.routeConfig = routeConfig;
@@ -133,6 +134,47 @@ public class Http1Proxy extends ChannelDuplexHandler {
 
     private HttpResponse proxyResponse(HttpResponse serverResponse) {
 
-        return serverResponse;
+        var proxyHeaders = new DefaultHttpHeaders();
+        proxyHeaders.add(serverResponse.headers());
+
+        if (proxyHeaders.contains(HttpHeaderNames.LOCATION)) {
+
+            var proxyLocation = translateLocationHeader(serverResponse.headers().get(HttpHeaderNames.LOCATION));
+            proxyHeaders.remove(HttpHeaderNames.LOCATION);
+            proxyHeaders.set(HttpHeaderNames.LOCATION, proxyLocation);
+        }
+
+        if (serverResponse instanceof FullHttpResponse) {
+
+            var fullResponse = (FullHttpResponse) serverResponse;
+
+            return new DefaultFullHttpResponse(
+                    fullResponse.protocolVersion(),
+                    fullResponse.status(),
+                    fullResponse.content(),
+                    proxyHeaders,
+                    fullResponse.trailingHeaders());
+        }
+        else {
+
+            return new DefaultHttpResponse(
+                    serverResponse.protocolVersion(),
+                    serverResponse.status(),
+                    proxyHeaders);
+        }
+    }
+
+    private String translateLocationHeader(String location) {
+
+        var target = routeConfig.getTarget();
+        var locationUri = URI.create(location);
+        var locationPath = locationUri.getPath();
+
+        if (locationPath.startsWith(target.getPath())) {
+
+            return locationPath.replace(target.getPath(), routeConfig.getMatch().getPath());
+        }
+
+        return location;
     }
 }
