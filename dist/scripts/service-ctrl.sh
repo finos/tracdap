@@ -150,7 +150,8 @@ fi
 
 CORE_JAVA_OPTS=\$(cat <<-JAVA_OPTS_END
 ${defaultJvmOpts.replace("'", "").replace(' "-', '\n"-').replace('"', '')}
-JAVA_OPTS_END)
+JAVA_OPTS_END
+)
 
 # Set java properties used for logging
 
