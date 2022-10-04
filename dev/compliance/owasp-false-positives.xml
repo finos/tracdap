@@ -73,4 +73,16 @@
         <vulnerabilityName>CVE-2022-38751</vulnerabilityName>
     </suppress>
 
+    <!-- This error is fixed in Jackson version 2.14-rc1 -->
+    <!-- MAT: I'm not comfortable putting the dependency on an RC version -->
+    <!-- As soon as 2.14 is released, we can upgrade and remove this exception -->
+
+    <suppress>
+        <notes><![CDATA[
+   file name: jackson-databind-2.13.4.jar
+   ]]></notes>
+        <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\.core/jackson\-databind@.*$</packageUrl>
+        <vulnerabilityName>CVE-2022-42003</vulnerabilityName>
+    </suppress>
+
 </suppressions>
