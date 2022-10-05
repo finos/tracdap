@@ -238,10 +238,10 @@ public class JobManagementService {
                 () -> jobOperation(jobKey, this::deleteJob),
                 RETAIN_COMPLETE_DELAY.getSeconds(), TimeUnit.SECONDS);
 
-        if (jobState.statusCode == JobStatusCode.SUCCEEDED) {
-            log.info("Job [{}] {} {}", jobKey, jobState.statusCode, jobState.statusMessage);
-        } else {
-            log.error("Job [{}] {} {}", jobKey, jobState.statusCode, jobState.statusMessage);
+        log.info("Job [{}] {}", jobKey, jobState.statusCode);
+
+        if (jobState.statusCode != JobStatusCode.SUCCEEDED) {
+            log.error("{}", jobState.statusMessage);
             if (execResult.errorDetail != null)
                 log.error(execResult.errorDetail);
         }
