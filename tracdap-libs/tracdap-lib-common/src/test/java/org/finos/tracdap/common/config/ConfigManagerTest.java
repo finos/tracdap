@@ -37,11 +37,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ConfigManagerTest {
 
-    List<String> CONFIG_SAMPLES = List.of(
+    private static final List<String> CONFIG_SAMPLES = List.of(
             "/config_mgr_test/sample-config.yaml",
             "/config_mgr_test/sample-config.json",
             "/config_mgr_test/extra.xml",
             "/config_mgr_test/log-test.xml");
+
+    private static final String SECRET_NAME = "very_secret_password";
+    private static final String EXPECTED_SECRET_VALUE = "You'll_never gu£ss, this very (!!!) secret [PASS=WORD]!";
 
     PluginManager plugins;
 
@@ -352,5 +355,64 @@ class ConfigManagerTest {
         var configUrl2 = "//_>>@";
         assertThrows(EStartup.class, () -> new ConfigManager(configUrl2, tempDir, plugins)
                 .loadRootConfigObject(_ConfigFile.class));
+    }
+
+    @Test
+    void loadSecret_ok() {
+
+        // Using file loader
+
+        var fileConfigUrl = "config_dir/sample-config.yaml";
+        var manager = new ConfigManager(fileConfigUrl, tempDir, plugins);
+
+        var textSecret = manager.loadTextSecret(SECRET_NAME);
+        assertEquals(EXPECTED_SECRET_VALUE, textSecret);
+
+        // Using test-protocol loader
+        // This will still use the JKS secret loader, but the JKS file will be loaded over the test protocol
+
+        var testConfigUrl = "test://config_svr/config_dir/sample-config.yaml";
+        var manager2 = new ConfigManager(testConfigUrl, tempDir, plugins);
+
+        var textSecret2 = manager2.loadTextSecret(SECRET_NAME);
+        assertEquals(EXPECTED_SECRET_VALUE, textSecret2);
+    }
+
+    @Test
+    void loadSecret_missing() {
+
+        // Using file loader
+
+        var fileConfigUrl = "config_dir/sample-config.yaml";
+        var manager = new ConfigManager(fileConfigUrl, tempDir, plugins);
+
+        assertThrows(EStartup.class, () -> manager.loadTextSecret("UNKNOWN_SECRET"));
+
+        // Using test-protocol loader
+        // This will still use the JKS secret loader, but the JKS file will be loaded over the test protocol
+
+        var testConfigUrl = "test://config_svr/config_dir/sample-config.yaml";
+        var manager2 = new ConfigManager(testConfigUrl, tempDir, plugins);
+
+        assertThrows(EStartup.class, () -> manager2.loadTextSecret("UNKNOWN_SECRET"));
+    }
+
+    @Test
+    void loadSecret_invalid() {
+
+        // Using file loader
+
+        var fileConfigUrl = "config_dir/sample-config.yaml";
+        var manager = new ConfigManager(fileConfigUrl, tempDir, plugins);
+
+        assertThrows(EStartup.class, () -> manager.loadTextSecret("$@£$%@-  ++03>?"));
+
+        // Using test-protocol loader
+        // This will still use the JKS secret loader, but the JKS file will be loaded over the test protocol
+
+        var testConfigUrl = "test://config_svr/config_dir/sample-config.yaml";
+        var manager2 = new ConfigManager(testConfigUrl, tempDir, plugins);
+
+        assertThrows(EStartup.class, () -> manager2.loadTextSecret("$@£$%@-  ++03>?"));
     }
 }
