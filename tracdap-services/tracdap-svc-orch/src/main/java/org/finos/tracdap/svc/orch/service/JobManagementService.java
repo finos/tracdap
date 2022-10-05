@@ -207,22 +207,33 @@ public class JobManagementService {
         jobState.statusCode = execResult.statusCode;
         jobState.statusMessage = execResult.statusMessage;
 
-        // For succeeded jobs, try to read and validate the result metadata
-        // Any exceptions here will put the job into a failed state and recordJobResult will be called again
         if (execResult.statusCode == JobStatusCode.SUCCEEDED) {
 
-            var jobResultFile = String.format("job_result_%s.json", jobKey);
-            var jobResultBytes = jobExecutor.readFile(execState, "result", jobResultFile);
+            try {
 
-            jobState.jobResult = decodeProto(jobResultBytes, ConfigFormat.JSON, JobResult.class, JobResult.newBuilder());
+                var jobResultFile = String.format("job_result_%s.json", jobKey);
+                var jobResultBytes = jobExecutor.readFile(execState, "result", jobResultFile);
 
-            // If the validator is extended to cover the config interface,
-            // The top level job result could be validated directly
+                jobState.jobResult = decodeProto(jobResultBytes, ConfigFormat.JSON, JobResult.class, JobResult.newBuilder());
 
-            for (var result : jobState.jobResult.getResultsMap().entrySet()) {
+                // If the validator is extended to cover the config interface,
+                // The top level job result could be validated directly
 
-                log.info("Validating job result [{}]", result.getKey());
-                validator.validateFixedObject(result.getValue());
+                for (var result : jobState.jobResult.getResultsMap().entrySet()) {
+
+                    log.info("Validating job result [{}]", result.getKey());
+                    validator.validateFixedObject(result.getValue());
+                }
+            }
+            catch (EExecutorFailure | EValidation e) {
+
+                log.error("Job [{}] succeeded but the response could not be processed", jobKey, e);
+
+                var errorMessage = e.getMessage();
+                var shortMessage = errorMessage.lines().findFirst().orElseGet(() -> "No details available");
+
+                jobState.statusCode = JobStatusCode.FAILED;
+                jobState.statusMessage = shortMessage;
             }
         }
 
@@ -238,9 +249,11 @@ public class JobManagementService {
                 () -> jobOperation(jobKey, this::deleteJob),
                 RETAIN_COMPLETE_DELAY.getSeconds(), TimeUnit.SECONDS);
 
-        log.info("Job [{}] {}", jobKey, jobState.statusCode);
-
-        if (jobState.statusCode != JobStatusCode.SUCCEEDED) {
+        if (jobState.statusCode == JobStatusCode.SUCCEEDED) {
+            log.info("Job [{}] {}", jobKey, jobState.statusCode);
+        }
+        else {
+            log.error("Job [{}] {}", jobKey, jobState.statusCode);
             log.error("{}", jobState.statusMessage);
             if (execResult.errorDetail != null)
                 log.error(execResult.errorDetail);

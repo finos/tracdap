@@ -376,12 +376,14 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
             return Files.readAllBytes(filePath);
         }
+        // TODO: These error messages will not be meaningful to users
+        catch (NoSuchFileException e) {
+            var message = String.format("Executor read failed for [%s]: File not found", fileName);
+            throw new EExecutorFailure(message, e);
+        }
         catch (IOException e) {
-
-            // Includes NoSuchFileException
-
-            // TODO
-            throw new RuntimeException("TODO", e);
+            var message = String.format("Executor read failed for [%s]: %s", fileName, e.getMessage());
+            throw new EExecutorFailure(message, e);
         }
     }
 
