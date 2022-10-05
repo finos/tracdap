@@ -106,8 +106,6 @@ public class JobManagementService {
 
         try {
 
-            log.info("Polling job cache...");
-
             var finishedStates = List.of(JobStatusCode.FINISHING, JobStatusCode.CANCELLED);
             var finishedJobs = jobCache.pollJobs(job -> finishedStates.contains(job.statusCode));
             var queuedJobs = jobCache.pollJobs(job -> job.statusCode == JobStatusCode.QUEUED);
@@ -134,8 +132,6 @@ public class JobManagementService {
 
         try  {
 
-            log.info("Polling executor...");
-
             var activeStates = List.of(JobStatusCode.SUBMITTED, JobStatusCode.RUNNING);
             var activeJobs = jobCache.pollJobs(job -> activeStates.contains(job.statusCode));
 
@@ -147,9 +143,6 @@ public class JobManagementService {
             }
 
             var pollResults = jobExecutor.pollAllBatches(execStateMap);
-
-            if (pollResults.isEmpty())
-                return;
 
             for (var result : pollResults) {
 
@@ -216,47 +209,54 @@ public class JobManagementService {
 
         if (execResult.statusCode == JobStatusCode.SUCCEEDED) {
 
-            var jobResultFile = String.format("job_result_%s.json", jobKey);
-            var jobResultBytes = jobExecutor.readFile(execState, "result", jobResultFile);
+            try {
 
-            jobState.jobResult = decodeProto(jobResultBytes, ConfigFormat.JSON, JobResult.class, JobResult.newBuilder());
+                var jobResultFile = String.format("job_result_%s.json", jobKey);
+                var jobResultBytes = jobExecutor.readFile(execState, "result", jobResultFile);
 
-            // If the validator is extended to cover the config interface,
-            // The top level job result could be validated directly
+                jobState.jobResult = decodeProto(jobResultBytes, ConfigFormat.JSON, JobResult.class, JobResult.newBuilder());
 
-            for (var result : jobState.jobResult.getResultsMap().entrySet()) {
+                // If the validator is extended to cover the config interface,
+                // The top level job result could be validated directly
 
-                log.info("Validating job result [{}]", result.getKey());
-                validator.validateFixedObject(result.getValue());
+                for (var result : jobState.jobResult.getResultsMap().entrySet()) {
+
+                    log.info("Validating job result [{}]", result.getKey());
+                    validator.validateFixedObject(result.getValue());
+                }
             }
+            catch (EExecutorFailure | EValidation e) {
 
-            jobLifecycle.processJobResult(jobState).toCompletableFuture().join();
+                log.error("Job [{}] succeeded but the response could not be processed", jobKey, e);
+
+                var errorMessage = e.getMessage();
+                var shortMessage = errorMessage.lines().findFirst().orElseGet(() -> "No details available");
+
+                jobState.statusCode = JobStatusCode.FAILED;
+                jobState.statusMessage = shortMessage;
+            }
         }
 
+        // This is what publishes metadata for the job to the metadata service
+        jobLifecycle.processJobResult(jobState).toCompletableFuture().join();
+
+        // Only once the results are recorded, update the cache and remove the physical job
         jobCache.updateJob(jobKey, jobState, ticket);
         jobExecutor.destroyBatch(jobKey, execState);
 
+        // Schedule removal from the cache at some later time (allows check-job for some time after completion)
         executorService.schedule(
                 () -> jobOperation(jobKey, this::deleteJob),
                 RETAIN_COMPLETE_DELAY.getSeconds(), TimeUnit.SECONDS);
 
         if (jobState.statusCode == JobStatusCode.SUCCEEDED) {
-            log.info("Job [{}] {} {}", jobKey, jobState.statusCode, jobState.statusMessage);
-        } else {
-            log.error("Job [{}] {} {}", jobKey, jobState.statusCode, jobState.statusMessage);
+            log.info("Job [{}] {}", jobKey, jobState.statusCode);
+        }
+        else {
+            log.error("Job [{}] {}", jobKey, jobState.statusCode);
+            log.error("{}", jobState.statusMessage);
             if (execResult.errorDetail != null)
                 log.error(execResult.errorDetail);
-        }
-    }
-
-    private void recordJobError(String jobKey) {
-
-        try (var ctx = jobCache.useTicket(jobKey)) {
-
-            if (ctx.superseded())
-                return;
-
-            log.info("Record job result: [{}]", jobKey);
         }
     }
 

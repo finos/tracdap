@@ -30,6 +30,8 @@ import java.nio.file.*;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletionException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 
@@ -49,6 +51,11 @@ public class LocalBatchExecutor implements IBatchExecutor {
     private static final String VENV_BIN_SUBDIR = IS_WINDOWS ? "Scripts" : "bin";
     private static final String VENV_ENV_VAR = "VIRTUAL_ENV";
     private static final List<String> TRAC_CMD_ARGS = List.of("-m", "tracdap.rt.launch");
+
+    private static final String FALLBACK_ERROR_MESSAGE = "Local batch terminated with non-zero exit code [%d]";
+    private static final String FALLBACK_ERROR_DETAIL = "No details available";
+
+    private static final Pattern TRAC_ERROR_LINE = Pattern.compile("tracdap.rt.exceptions.(E\\w+): (.+)");
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -369,12 +376,14 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
             return Files.readAllBytes(filePath);
         }
+        // TODO: These error messages will not be meaningful to users
+        catch (NoSuchFileException e) {
+            var message = String.format("Executor read failed for [%s]: File not found", fileName);
+            throw new EExecutorFailure(message, e);
+        }
         catch (IOException e) {
-
-            // Includes NoSuchFileException
-
-            // TODO
-            throw new RuntimeException("TODO", e);
+            var message = String.format("Executor read failed for [%s]: %s", fileName, e.getMessage());
+            throw new EExecutorFailure(message, e);
         }
     }
 
@@ -528,12 +537,19 @@ public class LocalBatchExecutor implements IBatchExecutor {
 
             if (pollResult.statusCode == JobStatusCode.FAILED) {
 
-                var statusMessage = String.format("Local batch terminated with non-zero exit code [%d]", process.exitValue());
-                var errorBytes = readFile(batchState, JOB_LOG_SUBDIR, "trac_rt_stderr.txt");
-                var errorDetail = new String(errorBytes, StandardCharsets.UTF_8);
+                if (Files.exists(Path.of(batchState.getBatchDir(), JOB_LOG_SUBDIR, "trac_rt_stderr.txt"))) {
 
-                pollResult.statusMessage = statusMessage;
-                pollResult.errorDetail = errorDetail;
+                    var errorBytes = readFile(batchState, JOB_LOG_SUBDIR, "trac_rt_stderr.txt");
+                    var errorDetail = new String(errorBytes, StandardCharsets.UTF_8);
+
+                    pollResult.statusMessage = extractErrorMessage(errorDetail, process.exitValue());
+                    pollResult.errorDetail = errorDetail;
+                }
+                else {
+
+                    pollResult.statusMessage = String.format(FALLBACK_ERROR_MESSAGE, process.exitValue());
+                    pollResult.errorDetail = FALLBACK_ERROR_DETAIL;
+                }
             }
 
             return pollResult;
@@ -542,6 +558,27 @@ public class LocalBatchExecutor implements IBatchExecutor {
             e.printStackTrace();
             // TODO
             throw new RuntimeException("TODO");
+        }
+    }
+
+    private String extractErrorMessage(String errorDetail, int exitCode) {
+
+        var lastLineIndex = errorDetail.stripTrailing().lastIndexOf("\n");
+        var lastLine = errorDetail.substring(lastLineIndex + 1).stripTrailing();
+
+        var tracError = TRAC_ERROR_LINE.matcher(lastLine);
+
+        if (tracError.matches()) {
+
+            var exception = tracError.group(1);
+            var message = tracError.group(2);
+
+            log.error("Runtime error [{}]: {}", exception, message);
+            return message;
+        }
+        else {
+
+            return String.format(FALLBACK_ERROR_MESSAGE, exitCode);
         }
     }
 

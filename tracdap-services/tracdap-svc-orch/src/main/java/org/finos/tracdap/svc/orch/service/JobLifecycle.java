@@ -285,8 +285,14 @@ public class JobLifecycle {
         log.info("Record job result [{}]: {}", jobState.jobKey, jobState.statusCode);
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
-        var metaUpdates = jobLogic.buildResultMetadata(jobState.tenant, jobState.jobConfig, jobState.jobResult);
-        var jobUpdate = buildJobSucceededUpdate(jobState);
+
+        var metaUpdates = jobState.statusCode == JobStatusCode.SUCCEEDED
+                ? jobLogic.buildResultMetadata(jobState.tenant, jobState.jobConfig, jobState.jobResult)
+                : List.<MetadataWriteRequest>of();
+
+        var jobUpdate = jobState.statusCode == JobStatusCode.SUCCEEDED
+                ? buildJobSucceededUpdate(jobState)
+                : buildJobFailedUpdate(jobState);
 
         CompletionStage<?> updateResult = CompletableFuture.completedFuture(0);
 
@@ -321,6 +327,26 @@ public class JobLifecycle {
                 TagUpdate.newBuilder()
                         .setAttrName(TRAC_JOB_STATUS_ATTR)
                         .setValue(encodeValue(jobState.statusCode.toString()))
+                        .build());
+
+        return MetadataWriteRequest.newBuilder()
+                .setTenant(jobState.tenant)
+                .setObjectType(ObjectType.JOB)
+                .setPriorVersion(selectorFor(jobState.jobId))
+                .addAllTagUpdates(attrUpdates)
+                .build();
+    }
+
+    private MetadataWriteRequest buildJobFailedUpdate(JobState jobState) {
+
+        var attrUpdates = List.of(
+                TagUpdate.newBuilder()
+                        .setAttrName(TRAC_JOB_STATUS_ATTR)
+                        .setValue(encodeValue(jobState.statusCode.toString()))
+                        .build(),
+                TagUpdate.newBuilder()
+                        .setAttrName(TRAC_JOB_ERROR_MESSAGE_ATTR)
+                        .setValue(encodeValue(jobState.statusMessage))
                         .build());
 
         return MetadataWriteRequest.newBuilder()

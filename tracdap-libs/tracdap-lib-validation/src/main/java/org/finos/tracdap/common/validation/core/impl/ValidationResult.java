@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
 
 public class ValidationResult {
 
+    private static final String MULTIPLE_ERRORS_MESSAGE = "There were multiple validation errors";
+
     private final List<ValidationFailure> failures;
 
     public static ValidationResult pass() {
@@ -50,7 +52,13 @@ public class ValidationResult {
 
     public String failureMessage() {
 
-        return failures().stream()
+        if (failures.isEmpty())
+            return "";
+
+        if (failures.size() == 1)
+            return failures.get(0).message();
+
+        return MULTIPLE_ERRORS_MESSAGE + "\n" + failures().stream()
                 .map(ValidationFailure::message)
                 .collect(Collectors.joining("\n"));
     }
