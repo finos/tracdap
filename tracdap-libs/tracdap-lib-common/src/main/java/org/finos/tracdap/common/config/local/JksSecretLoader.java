@@ -71,13 +71,13 @@ public class JksSecretLoader implements ISecretLoader {
             log.info("Initializing JKS secret loader...");
 
             if (keystoreUrl == null || keystoreUrl.isBlank()) {
-                var message = String.format("JKS secrets need [%s] in the main config file", ConfigKeys.SECRET_URL_KEY);
+                var message = String.format("JKS secrets need %s in the main config file", ConfigKeys.SECRET_URL_KEY);
                 log.error(message);
                 throw new EStartup(message);
             }
 
             if (keystoreKey == null || keystoreKey.isBlank()) {
-                var template = "JKS secrets need a secret key, use --secret-key or set [%s] in the environment";
+                var template = "JKS secrets need a secret key, use --secret-key or set %s in the environment";
                 var message = String.format(template, ConfigKeys.SECRET_KEY_ENV);
                 log.error(message);
                 throw new EStartup(message);
@@ -101,7 +101,8 @@ public class JksSecretLoader implements ISecretLoader {
         catch (IOException e) {
             // Inner error is more meaningful if keystore cannot be read
             var error = e.getCause() != null ? e.getCause() : e;
-            var message = String.format("Failed to open keystore [%s]: %s", keystoreUrl, error.getMessage());
+            var errorDetail = error.getMessage() + " (this normally means the secret key is wrong)";
+            var message = String.format("Failed to open keystore [%s]: %s", keystoreUrl, errorDetail);
             log.error(message);
             throw new EStartup(message);
         }
