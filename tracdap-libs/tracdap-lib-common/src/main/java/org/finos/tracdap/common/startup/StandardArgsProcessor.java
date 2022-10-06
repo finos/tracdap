@@ -28,25 +28,24 @@ import java.util.stream.Collectors;
 
 
 /**
- * Process command line arguments for TRAC services and utilities
- * <p>
+ * Process command line arguments for TRAC services and utilities.
  *
- * The processor creates a StandardArgs object, which holds the
+ * <p>The processor creates a StandardArgs object, which holds the
  * location of the primary configuration file, a key for unlocking
  * any secrets held in the configuration and the working directory
  * of the process. This is enough information to create a
  * ConfigManager, load in the primary configuration file and
- * initialise a TRAC service or utility.
+ * initialise a TRAC service or utility.</p>
  *
- * The processor has the ability to process --task options. These allow
+ * <p>The processor has the ability to process --task options. These allow
  * one or more tasks to be specified on the command line and are
  * intended for use with command line utilities. To use task processing,
  * supply a list of available tasks to processArgs(). The processor will
  * only accept tasks that are in the list of available tasks. If an
  * available task is passed in with a parameter then tasks with this name
- * will accept a parameter, otherwise they will not.
+ * will accept a parameter, otherwise they will not.</p>
  *
- * For an example of task processing, look in trac-tools/deploy-metadb.
+ * <p>For an example of task processing, look in trac-tools/deploy-metadb.</p>
  *
  * @see ConfigManager
  */
@@ -55,7 +54,7 @@ public class StandardArgsProcessor {
     /**
      * Read standard args from the command line.
      *
-     * This variant of processArgs() does not enable task processing.
+     * <p>This variant of processArgs() does not enable task processing.</p>
      *
      * @param appName Name of the application, displayed in help messages
      * @param args The command line args received on startup
@@ -70,7 +69,7 @@ public class StandardArgsProcessor {
     /**
      * Read standard args from the command line.
      *
-     * This variant of processArgs() can be used to enable task processing.
+     * <p>This variant of processArgs() can be used to enable task processing.</p>
      *
      * @param appName Name of the application, displayed in help messages
      * @param args The command line args received on startup
@@ -94,13 +93,13 @@ public class StandardArgsProcessor {
             var command = parser.parse(options, args, false);
             var workingDir = Paths.get(".").toAbsolutePath().normalize();
             var configFile = command.getOptionValue("config");
-            var keystoreKey = command.getOptionValue("keystore-key");
+            var secretKey = command.getOptionValue("secret-key");
 
             var tasks = usingTasks
                     ? processTasks(command, availableTasks)
                     : null;
 
-            return new StandardArgs(workingDir, configFile, keystoreKey, tasks);
+            return new StandardArgs(workingDir, configFile, secretKey, tasks);
         }
         catch (ParseException e) {
 
@@ -203,7 +202,7 @@ public class StandardArgsProcessor {
         var options = new Options();
 
         options.addOption(Option.builder()
-                .desc("Location of the service config file")
+                .desc("Location of the primary config file")
                 .longOpt("config")
                 .hasArg()
                 .argName("config_file")
@@ -211,10 +210,10 @@ public class StandardArgsProcessor {
                 .build());
 
         options.addOption(Option.builder()
-                .desc("Master key used to unlock the service keystore")
-                .longOpt("keystore-key")
+                .desc("Master key used to unlock secrets (use depends on secret.type in the primary config)")
+                .longOpt("secret-key")
                 .hasArg()
-                .argName("keystore_key")
+                .argName("secret_key")
                 .build());
 
         options.addOption(Option.builder()

@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.startup;
 
-import org.apache.logging.log4j.LogManager;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -24,10 +23,12 @@ import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.util.VersionInfo;
+
 import org.apache.logging.log4j.core.config.ConfigurationSource;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.finos.tracdap.config._ConfigFile;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -47,8 +48,6 @@ import java.io.IOException;
  * Standard command line args must be parsed before using the startup sequence.</p>
  */
 public class StartupSequence {
-
-    private static final String STARTUP_LOG_CONFIG = "/log4j2_startup.xml";
 
     private final Class<?> serviceClass;
     private final StandardArgs standardArgs;
@@ -73,11 +72,14 @@ public class StartupSequence {
 
         printSubBanner();
 
-        initStartupLogging();
         initConfigPlugins();
         loadConfig();
-
         initLogging();
+
+        printFirstLogLine();
+
+        plugins.initRegularPlugins();
+        config.prepareSecrets();
 
         sequenceComplete = true;
     }
@@ -137,20 +139,13 @@ public class StartupSequence {
         System.out.println();
     }
 
-    @SuppressWarnings("resource")
-    private void initStartupLogging() {
+    private void printFirstLogLine() {
 
-        try (var logConfig = Startup.class.getResourceAsStream(STARTUP_LOG_CONFIG)) {
+        var componentName = VersionInfo.getComponentName(serviceClass);
+        var componentVersion = VersionInfo.getComponentVersion(serviceClass);
 
-            if (logConfig == null)
-                throw new EStartup("Failed to load logging config for bootstrap");
-
-            var configSource = new ConfigurationSource(logConfig);
-            Configurator.initialize(Startup.class.getClassLoader(), configSource);
-        }
-        catch (IOException e) {
-            throw new EStartup("Failed to load logging config for startup sequence (this is a bug)");
-        }
+        var log = LoggerFactory.getLogger(serviceClass);
+        log.info("{} {}", componentName, componentVersion);
     }
 
     private void initConfigPlugins() {
@@ -163,15 +158,16 @@ public class StartupSequence {
 
         var configFile = standardArgs.getConfigFile();
         var workingDir = standardArgs.getWorkingDir();
+        var secretKey = standardArgs.getSecretKey();
 
-        config = new ConfigManager(configFile, workingDir, plugins);
+        config = new ConfigManager(configFile, workingDir, plugins, secretKey);
     }
 
 
     /**
      * Initialize the logging framework.
      *
-     * <p>Logging can be configured by setting the property logging.url in the config
+     * <p>Logging can be configured by setting the logging property in the config
      * section of the root configuration, to point to the location of a logging config file.
      * TRAC uses Log4j2 as a backend for slf4j, so the logging config file must be a valid
      * log4j2 config file. If no logging config is provided, messages will be logged
@@ -186,9 +182,6 @@ public class StartupSequence {
     @SuppressWarnings("resource")
     private void initLogging() {
 
-        // Logger configured using initStartupLogging
-        var log = LoggerFactory.getLogger(getClass());
-
         var baseConfig = config.loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
         var loggingConfigUrl = baseConfig.getConfigOrDefault(ConfigKeys.LOGGING_CONFIG_KEY, "");
 
@@ -200,12 +193,10 @@ public class StartupSequence {
 
                 var configSource = new ConfigurationSource(configStream);
 
-                log.info("Initialize logging...");
-
-                LogManager.shutdown();
-                Configurator.initialize(getClass().getClassLoader(), configSource);
+                StartupLog.log(this, Level.INFO, "Initialize logging...");
 
                 // Invalid logging configuration cause the startup sequence to bomb out
+                Configurator.initialize(getClass().getClassLoader(), configSource);
             }
             catch (IOException e) {
 
@@ -215,8 +206,11 @@ public class StartupSequence {
         }
         else {
 
-            log.info("No logging config provided, using default...");
+            StartupLog.log(this, Level.INFO, "No logging config provided, using default...");
             Configurator.reconfigure();
         }
+
+        // Components that use start-up logging can write to the main logs after this point
+        StartupLog.setLogSystemActive();
     }
 }

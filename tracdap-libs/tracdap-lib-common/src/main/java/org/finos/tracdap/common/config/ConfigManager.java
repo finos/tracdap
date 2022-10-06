@@ -22,14 +22,16 @@ import org.finos.tracdap.common.startup.Startup;
 import org.finos.tracdap.common.startup.StartupSequence;
 
 import com.google.protobuf.Message;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.finos.tracdap.common.startup.StartupLog;
+import org.finos.tracdap.config._ConfigFile;
+import org.slf4j.event.Level;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 import java.util.Properties;
 
 
@@ -64,12 +66,17 @@ import java.util.Properties;
  */
 public class ConfigManager {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
-
     private final IPluginManager plugins;
 
     private final URI rootConfigFile;
     private final URI rootConfigDir;
+
+    private final String secretKey;
+    private ISecretLoader secrets = null;
+
+    public ConfigManager(String configUrl, Path workingDir, IPluginManager plugins) {
+        this(configUrl, workingDir, plugins, null);
+    }
 
     /**
      * Create a ConfigManager for the root config URL
@@ -79,21 +86,37 @@ public class ConfigManager {
      * @param plugins Plugin manager, used to obtain config loaders depending on the protocol of the config URL
      * @throws EStartup The supplied settings are not valid
      */
-    public ConfigManager(String configUrl, Path workingDir, IPluginManager plugins) {
+    public ConfigManager(String configUrl, Path workingDir, IPluginManager plugins, String secretKey) {
 
         this.plugins = plugins;
+        this.secretKey = secretKey;
 
         this.rootConfigFile = resolveRootUrl(parseUrl(configUrl), workingDir);
         this.rootConfigDir = rootConfigFile.resolve(".").normalize();
 
-        if ("file".equals(rootConfigDir.getScheme()))
-            log.info("Using config root: {}", Paths.get(rootConfigDir));
-        else
-            log.info("Using config root: {}", rootConfigDir);
+        var rootDirDisplay = "file".equals(rootConfigDir.getScheme())
+                ? Paths.get(rootConfigDir).toString()
+                : rootConfigDir.toString();
+
+        StartupLog.log(this, Level.INFO, String.format("Using config root: %s", rootDirDisplay));
     }
 
-    public void preloadConfig() {
+    public void prepareSecrets() {
 
+        var rootConfig = loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
+        var configMap = rootConfig.getConfigMap();
+
+        var secretType = configMap.getOrDefault(ConfigKeys.SECRET_TYPE_KEY, "");
+        var secretUrl = configMap.getOrDefault(ConfigKeys.SECRET_URL_KEY, "");
+
+        if (secretType == null || secretType.isBlank()) {
+            StartupLog.log(this, Level.INFO, "Using secrets: [none]");
+            return;
+        }
+
+        StartupLog.log(this, Level.INFO, String.format("Using secrets: [%s] %s", secretType, secretUrl));
+
+        this.secrets = secretLoaderForProtocol(secretType, configMap);
     }
 
     /**
@@ -239,12 +262,15 @@ public class ConfigManager {
     }
 
 
-    public String loadTextSecret(String key) {
-        return null;
-    }
+    public String loadPassword(String secretName) {
 
-    public byte[] loadBinarySecret(String key) {
-        return null;
+        if (secrets == null) {
+            var message = String.format("Secrets are not enabled, to use secrets set secret.type in [%s]", rootConfigFile);
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EStartup(message);
+        }
+
+        return secrets.loadPassword(secretName);
     }
 
 
@@ -358,7 +384,9 @@ public class ConfigManager {
 
         // Display relative URLs in the log if possible
         var relativeUrl = rootConfigDir.relativize(absoluteUrl);
-        log.info("Loading config file: {}", relativeUrl);
+
+        var message = String.format("Loading config file: [%s]", relativeUrl);
+        StartupLog.log(this, Level.INFO, message);
 
         var protocol = absoluteUrl.getScheme();
         var loader = configLoaderForProtocol(protocol);
@@ -375,28 +403,47 @@ public class ConfigManager {
 
             var message = String.format("No config loader available for protocol [%s]", protocol);
 
-            log.error(message);
+            StartupLog.log(this, Level.ERROR, message);
             throw new EStartup(message);
         }
 
         return plugins.createService(IConfigLoader.class, protocol);
     }
 
-    private ISecretLoader secretLoaderForProtocol(String protocol) {
+    private ISecretLoader secretLoaderForProtocol(String protocol, Map<String, String> configMap) {
 
-        if (!plugins.isServiceAvailable(IConfigLoader.class, protocol)) {
+        if (!plugins.isServiceAvailable(ISecretLoader.class, protocol)) {
 
             var message = String.format("No secret loader available for protocol [%s]", protocol);
 
-            log.error(message);
+            StartupLog.log(this, Level.ERROR, message);
             throw new EStartup(message);
         }
 
-        var secretProps = new Properties();
-        var secretLoader = plugins.createService(ISecretLoader.class, protocol);
-
+        var secretProps = buildSecretProps(configMap);
+        var secretLoader = plugins.createService(ISecretLoader.class, protocol, secretProps);
         secretLoader.init(this);
 
         return secretLoader;
+    }
+
+    private Properties buildSecretProps(Map<String, String> configMap) {
+
+        // These props are needed for JKS secrets
+        // Cloud platforms would normally use IAM to access the secret store
+        // But, any set of props can be used, with keys like secret.*
+
+        var secretProps = new Properties();
+
+        for (var secretEntry : configMap.entrySet()) {
+            if (secretEntry.getKey().startsWith("secret.") && secretEntry.getValue() != null)
+                secretProps.put(secretEntry.getKey(), secretEntry.getValue());
+        }
+
+        if (secretKey != null && !secretKey.isBlank()) {
+            secretProps.put(ConfigKeys.SECRET_KEY_KEY, secretKey);
+        }
+
+        return secretProps;
     }
 }

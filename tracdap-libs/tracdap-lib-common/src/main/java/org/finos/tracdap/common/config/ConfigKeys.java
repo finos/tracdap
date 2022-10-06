@@ -18,6 +18,9 @@ package org.finos.tracdap.common.config;
 
 public class ConfigKeys {
 
-    public static final String EXTERNAL_CONFIG_KEY = "config";
     public static final String LOGGING_CONFIG_KEY = "logging";
+    public static final String SECRET_TYPE_KEY = "secret.type";
+    public static final String SECRET_URL_KEY = "secret.url";
+    public static final String SECRET_KEY_KEY = "secret.key";
+    public static final String SECRET_KEY_ENV = "SECRET_KEY";
 }

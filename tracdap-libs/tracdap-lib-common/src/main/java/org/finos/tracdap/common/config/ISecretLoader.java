@@ -35,9 +35,6 @@ import org.finos.tracdap.common.exception.EStartup;
  */
 public interface ISecretLoader {
 
-    String SECRET_TYPE_PROP = "secret.type";
-    String SECRET_KEY_PROP = "secret.key";
-
     /**
      * Initialize the secret loader.
      *
@@ -50,20 +47,11 @@ public interface ISecretLoader {
     void init(ConfigManager configManager);
 
     /**
-     * Load a secret as a text string.
+     * Load a password from the secret loader as a text string.
      *
      * @param secretName The unique name of the secret to load
-     * @return The decoded value of the secret, as a string
+     * @return The decoded password, as a string
      * @throws EStartup There was a problem loading the secret
      */
-    String loadTextSecret(String secretName);
-
-    /**
-     * Load a secret as a byte array
-     *
-     * @param secretName The unique name of the secret to load
-     * @return The decoded value of the secret, in bytes
-     * @throws EStartup There was a problem loading the secret
-     */
-    byte[] loadBinarySecret(String secretName);
+    String loadPassword(String secretName);
 }

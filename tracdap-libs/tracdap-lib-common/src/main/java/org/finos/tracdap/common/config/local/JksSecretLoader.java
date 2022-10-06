@@ -16,14 +16,15 @@
 
 package org.finos.tracdap.common.config.local;
 
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.ISecretLoader;
-import org.finos.tracdap.common.exception.EStartup;
-import org.finos.tracdap.common.exception.ETracInternal;
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.KeyStore;
@@ -31,6 +32,7 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableEntryException;
 import java.security.cert.CertificateException;
+import java.security.spec.InvalidKeySpecException;
 import java.util.Properties;
 
 
@@ -40,57 +42,78 @@ public class JksSecretLoader implements ISecretLoader {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final Properties keystoreProps;
-    private final KeyStore keystore;
+    private final Properties properties;
+    private KeyStore keystore;
     private boolean ready;
+    String secretKey;
 
     public JksSecretLoader(Properties properties) {
 
-        var keystoreType = properties.getProperty(SECRET_TYPE_PROP, DEFAULT_KEYSTORE_TYPE);
-
-        try {
-
-            this.keystoreProps = properties;
-            this.keystore = KeyStore.getInstance(keystoreType);
-            this.ready = false;
-        }
-        catch (KeyStoreException e) {
-            throw new RuntimeException(e);
-        }
+        this.properties = properties;
+        this.keystore = null;
+        this.ready = false;
     }
 
     @Override
     public void init(ConfigManager configManager) {
 
         if (ready) {
-            log.error("JKS Secret loader initialized twice");
-            throw new EStartup("JKS Secret loader initialized twice");
+            log.error("JKS secret loader initialized twice");
+            throw new EStartup("JKS secret loader initialized twice");
         }
 
-        log.info("Initializing JKS Secret loader...");
+        var keystoreType = properties.getProperty(ConfigKeys.SECRET_TYPE_KEY, DEFAULT_KEYSTORE_TYPE);
+        var keystoreUrl = properties.getProperty(ConfigKeys.SECRET_URL_KEY);
+        var keystoreKey = properties.getProperty(ConfigKeys.SECRET_KEY_KEY);
 
-        var keystoreUrl = "";
-        var keystoreKey = this.keystoreProps.getProperty(SECRET_KEY_PROP);
+        try {
 
-        var keystoreBytes = configManager.loadBinaryConfig(keystoreUrl);
+            log.info("Initializing JKS secret loader...");
 
-        try (var stream = new ByteArrayInputStream(keystoreBytes)) {
+            if (keystoreUrl == null || keystoreUrl.isBlank()) {
+                var message = String.format("JKS secrets need [%s] in the main config file", ConfigKeys.SECRET_URL_KEY);
+                log.error(message);
+                throw new EStartup(message);
+            }
 
-            keystore.load(stream, keystoreKey.toCharArray());
+            if (keystoreKey == null || keystoreKey.isBlank()) {
+                var template = "JKS secrets need a secret key, use --secret-key or set [%s] in the environment";
+                var message = String.format(template, ConfigKeys.SECRET_KEY_ENV);
+                log.error(message);
+                throw new EStartup(message);
+            }
 
-            ready = true;
+            this.keystore = KeyStore.getInstance(keystoreType);
+            var keystoreBytes = configManager.loadBinaryConfig(keystoreUrl);
+
+            try (var stream = new ByteArrayInputStream(keystoreBytes)) {
+
+                keystore.load(stream, keystoreKey.toCharArray());
+                ready = true;
+                this.secretKey = keystoreKey;
+            }
+        }
+        catch (KeyStoreException e) {
+            var message = String.format("Keystore type is not supported: [%s]", keystoreType);
+            log.error(message);
+            throw new EStartup(message);
         }
         catch (IOException e) {
-            throw new RuntimeException(e);
+            // Inner error is more meaningful if keystore cannot be read
+            var error = e.getCause() != null ? e.getCause() : e;
+            var message = String.format("Failed to open keystore [%s]: %s", keystoreUrl, error.getMessage());
+            log.error(message);
+            throw new EStartup(message);
         }
         catch (NoSuchAlgorithmException | CertificateException e) {
-            throw new RuntimeException(e);
+            var message = String.format("Failed to open keystore [%s]: %s", keystoreUrl, e.getMessage());
+            log.error(message);
+            throw new EStartup(message);
         }
-
     }
 
     @Override
-    public String loadTextSecret(String secretName) {
+    public String loadPassword(String secretName) {
 
         try {
 
@@ -99,22 +122,33 @@ public class JksSecretLoader implements ISecretLoader {
                 throw new ETracInternal("JKS Secret loader has not been initialized");
             }
 
-            var secret = keystore.getEntry(secretName, /* protection = */ null);
+            var entry = keystore.getEntry(secretName, new KeyStore.PasswordProtection(secretKey.toCharArray()));  // KeyStore.ProtectionParameter() /* protection = */);
 
-            if (secret == null) {
-                // todo
+            if (entry == null) {
+                var message = String.format("Secret is not present in the store: [%s]", secretName);
+                log.error(message);
+                throw new EConfigLoad(message);
             }
 
-            if (!(secret instanceof KeyStore.SecretKeyEntry)) {
-                throw new EUnexpected();  // todo
+            if (!(entry instanceof KeyStore.SecretKeyEntry)) {
+                var message = String.format("Secret is not a secret key: [%s] is %s", secretName, entry.getClass().getSimpleName());
+                log.error(message);
+                throw new EConfigLoad(message);
             }
 
-//        ((KeyStore.SecretKeyEntry) secret).getSecretKey().
-//
-//        Keystore.En
+            var secret = (KeyStore.SecretKeyEntry) entry;
+            var algorithm = secret.getSecretKey().getAlgorithm();
+            var factory = SecretKeyFactory.getInstance(algorithm);
 
-            return null;
+            // Decode using based encryption
+            var keySpecType = PBEKeySpec.class;
+            var keySpec = (PBEKeySpec) factory.getKeySpec(secret.getSecretKey(), keySpecType);
+
+            var password = keySpec.getPassword();
+
+            return new String(password);
         }
+        // TODO: Errors
         catch (UnrecoverableEntryException e) {
             throw new RuntimeException(e);
         }
@@ -123,19 +157,8 @@ public class JksSecretLoader implements ISecretLoader {
         }
         catch (KeyStoreException e) {
             throw new RuntimeException(e);
+        } catch (InvalidKeySpecException e) {
+            throw new RuntimeException(e);
         }
     }
-
-    @Override
-    public byte[] loadBinarySecret(String secretName) {
-
-        if (!ready) {
-            log.error("JKS Secret loader has not been initialized");
-            throw new ETracInternal("JKS Secret loader has not been initialized");
-        }
-
-        return new byte[0];
-    }
-
-
 }
