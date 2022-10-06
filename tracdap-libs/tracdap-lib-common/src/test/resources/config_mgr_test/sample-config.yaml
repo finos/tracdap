@@ -14,6 +14,8 @@
 
 config:
   logging: log-test.xml
+  secret.type: pkcs12
+  secret.url: secrets.p12
 
 services:
   meta:
