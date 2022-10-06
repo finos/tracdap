@@ -21,7 +21,7 @@ import org.finos.tracdap.common.startup.Startup;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.ETrac;
-import org.finos.tracdap.common.util.VersionInfo;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.Configurator;
@@ -260,10 +260,7 @@ public abstract class CommonServiceBase {
     public void start(boolean registerShutdownHook) {
 
         try {
-            var serviceClass = getClass();
-            var componentName = VersionInfo.getComponentName(serviceClass);
-            var componentVersion = VersionInfo.getComponentVersion(serviceClass);
-            log.info("{} {}", componentName, componentVersion);
+
             log.info("Service is coming up...");
 
             timedSequence(t -> {doStartup(t); return null;}, startupTimeout, "startup");

@@ -21,12 +21,10 @@ import org.finos.tracdap.common.exception.ETracPublic;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.exception.EStartup;
-
 import org.finos.tracdap.common.startup.Startup;
-import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.config.PlatformConfig;
-import org.flywaydb.core.Flyway;
 
+import org.flywaydb.core.Flyway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,10 +71,6 @@ public class DeployMetaDB {
      * @param tasks The list of deployment tasks to execute
      */
     public void runDeployment(List<StandardArgs.Task> tasks) {
-
-        var componentName = VersionInfo.getComponentName(DeployMetaDB.class);
-        var componentVersion = VersionInfo.getComponentVersion(DeployMetaDB.class);
-        log.info("{} {}", componentName, componentVersion);
 
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
         var metaConfig = platformConfig.getServices().getMeta();

@@ -83,15 +83,6 @@ public class TracOrchestratorService extends CommonServiceBase {
         OrchServiceConfig orchestratorConfig;
 
         try {
-            pluginManager.initRegularPlugins();
-        }
-        catch (Exception e) {
-            var errorMessage = "There was a problem loading the plugins: " + e.getMessage();
-            log.error(errorMessage, e);
-            throw new EStartup(errorMessage, e);
-        }
-
-        try {
             log.info("Loading TRAC platform config...");
 
             platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
