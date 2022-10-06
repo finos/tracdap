@@ -74,6 +74,8 @@ public class ConfigManager {
     private final String secretKey;
     private ISecretLoader secrets = null;
 
+    private byte[] rootConfigCache = null;
+
     public ConfigManager(String configUrl, Path workingDir, IPluginManager plugins) {
         this(configUrl, workingDir, plugins, null);
     }
@@ -240,7 +242,14 @@ public class ConfigManager {
      */
     public <TConfig extends Message> TConfig loadRootConfigObject(Class<TConfig> configClass, boolean leniency) {
 
-        var bytes = loadUrl(rootConfigFile);
+        // Avoid loading root config file multiple times during startup
+        var bytes = rootConfigCache;
+
+        if (bytes == null) {
+            bytes = loadUrl(rootConfigFile);
+            rootConfigCache = bytes;
+        }
+
         var format = ConfigFormat.fromExtension(rootConfigFile);
 
         return ConfigParser.parseConfig(bytes, format, configClass, leniency);
@@ -258,7 +267,7 @@ public class ConfigManager {
      */
     public <TConfig extends Message> TConfig loadRootConfigObject(Class<TConfig> configClass) {
 
-        return loadConfigObject(rootConfigFile.toString(), configClass, /* leniency = */ false);
+        return loadRootConfigObject(configClass, /* leniency = */ false);
     }
 
 
