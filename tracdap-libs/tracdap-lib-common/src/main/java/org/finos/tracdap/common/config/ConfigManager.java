@@ -246,7 +246,11 @@ public class ConfigManager {
         var bytes = rootConfigCache;
 
         if (bytes == null) {
-            bytes = loadUrl(rootConfigFile);
+
+            var parsed = parseUrl(rootConfigFile.toString());
+            var resolved = resolveUrl(parsed);
+
+            bytes = loadUrl(resolved);
             rootConfigCache = bytes;
         }
 
