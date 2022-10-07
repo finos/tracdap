@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.config.test.TestConfigPlugin;
+import org.finos.tracdap.common.exception.EConfigParse;
 import org.finos.tracdap.config.MetaServiceConfig;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.test.helpers.TestResourceHelpers;
@@ -25,12 +26,16 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Paths;
+import java.util.Random;
 
 
 public class ConfigParserTest {
 
     private static final String SAMPLE_YAML_CONFIG = "/config_mgr_test/sample-config.yaml";
     private static final String SAMPLE_JSON_CONFIG = "/config_mgr_test/sample-config.json";
+
+    private static final String UNKNOWN_ITEM_YAML_CONFIG = "/config_mgr_test/unknown-item.yaml";
+    private static final String UNKNOWN_ITEM_JSON_CONFIG = "/config_mgr_test/unknown-item.json";
 
     @BeforeAll
     public static void testLoader() {
@@ -43,7 +48,49 @@ public class ConfigParserTest {
     public void testJson_basicLoadOk() {
 
         var configBytes = TestResourceHelpers.loadResourceAsBytes(SAMPLE_JSON_CONFIG);
+        var configObject = ConfigParser.parseConfig(configBytes, ConfigFormat.JSON, PlatformConfig.class);
 
+        Assertions.assertNotNull(configObject);
+        Assertions.assertInstanceOf(PlatformConfig.class, configObject);
+
+        var metaSvcConfig = configObject.getServices().getMeta();
+
+        Assertions.assertInstanceOf(MetaServiceConfig.class, metaSvcConfig);
+        Assertions.assertEquals("JDBC", metaSvcConfig.getDalType());
+    }
+
+    @Test
+    public void testJson_garbled() {
+
+        var configBytes = new byte[1000];
+        new Random().nextBytes(configBytes);
+
+        Assertions.assertThrows(EConfigParse.class, () ->
+                ConfigParser.parseConfig(configBytes, ConfigFormat.JSON, PlatformConfig.class));
+    }
+
+    @Test
+    public void testJson_unknownItem() {
+
+        var configBytes = TestResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_JSON_CONFIG);
+
+        Assertions.assertThrows(EConfigParse.class, () ->
+                ConfigParser.parseConfig(configBytes, ConfigFormat.JSON, PlatformConfig.class));
+    }
+
+    @Test
+    public void testJson_lenient() {
+
+        var configBytes = TestResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_JSON_CONFIG);
+
+        Assertions.assertDoesNotThrow(() ->
+                ConfigParser.parseConfig(configBytes, ConfigFormat.JSON, PlatformConfig.class, true));
+    }
+
+    @Test
+    public void testYaml_basicLoadOk() {
+
+        var configBytes = TestResourceHelpers.loadResourceAsBytes(SAMPLE_YAML_CONFIG);
         var configObject = ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class);
 
         Assertions.assertNotNull(configObject);
@@ -56,18 +103,30 @@ public class ConfigParserTest {
     }
 
     @Test
-    public void testYaml_basicLoadOk() {
+    public void testYaml_garbled() {
 
-        var configBytes = TestResourceHelpers.loadResourceAsBytes(SAMPLE_YAML_CONFIG);
+        var configBytes = new byte[1000];
+        new Random().nextBytes(configBytes);
 
-        var configObject = ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class);
+        Assertions.assertThrows(EConfigParse.class, () ->
+                ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class));
+    }
 
-        Assertions.assertNotNull(configObject);
-        Assertions.assertInstanceOf(PlatformConfig.class, configObject);
+    @Test
+    public void testYaml_unknownItem() {
 
-        var metaSvcConfig = configObject.getServices().getMeta();
+        var configBytes = TestResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_YAML_CONFIG);
 
-        Assertions.assertInstanceOf(MetaServiceConfig.class, metaSvcConfig);
-        Assertions.assertEquals("JDBC", metaSvcConfig.getDalType());
+        Assertions.assertThrows(EConfigParse.class, () ->
+                ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class));
+    }
+
+    @Test
+    public void testYaml_lenient() {
+
+        var configBytes = TestResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_YAML_CONFIG);
+
+        Assertions.assertDoesNotThrow(() ->
+                ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class, true));
     }
 }

@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.config;
 
+import org.finos.tracdap.common.exception.EConfigParse;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EUnexpected;
 
@@ -69,7 +70,7 @@ public class ConfigParser {
         }
         catch (InvalidProtocolBufferException e) {
 
-            throw new EStartup("Invalid config: " + e.getMessage(), e);
+            throw new EConfigParse("Invalid config: " + e.getMessage(), e);
         }
         catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
 
@@ -125,7 +126,7 @@ public class ConfigParser {
         }
         catch (IOException e) {
 
-            throw new EStartup(e.getMessage(), e);
+            throw new EConfigParse("Invalid config: " + e.getMessage(), e);
         }
     }
 
