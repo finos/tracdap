@@ -126,11 +126,20 @@ public class StartupSequence {
      **/
     public static void printBanner(Class<?> serviceClass) {
 
-        var componentName = VersionInfo.getComponentName(serviceClass);
-        var componentVersion = VersionInfo.getComponentVersion(serviceClass);
+        if (serviceClass != null) {
 
-        var startupBanner = String.format(">>> %s %s", componentName, componentVersion);
-        System.out.println(startupBanner);
+            var componentName = VersionInfo.getComponentName(serviceClass);
+            var componentVersion = VersionInfo.getComponentVersion(serviceClass);
+
+            var startupBanner = String.format(">>> %s %s", componentName, componentVersion);
+            System.out.println(startupBanner);
+        }
+        else {
+
+            // StartupSequence is used extensively for tests, particularly integration tests
+            // Service class and version resources are not always available in test code (e.g. in -lib-test)
+            System.out.println(">>> NO SERVICE REGISTERED (this should not happen in production)");
+        }
     }
 
     private void printSubBanner() {
@@ -141,11 +150,21 @@ public class StartupSequence {
 
     private void printFirstLogLine() {
 
-        var componentName = VersionInfo.getComponentName(serviceClass);
-        var componentVersion = VersionInfo.getComponentVersion(serviceClass);
+        if (serviceClass != null) {
 
-        var log = LoggerFactory.getLogger(serviceClass);
-        log.info("{} {}", componentName, componentVersion);
+            var componentName = VersionInfo.getComponentName(serviceClass);
+            var componentVersion = VersionInfo.getComponentVersion(serviceClass);
+
+            var log = LoggerFactory.getLogger(serviceClass);
+            log.info("{} {}", componentName, componentVersion);
+        }
+        else {
+
+            // StartupSequence is used extensively for tests, particularly integration tests
+            // Service class and version resources are not always available in test code (e.g. in -lib-test)
+            var log = LoggerFactory.getLogger(StartupSequence.class);
+            log.warn("NO SERVICE REGISTERED (this should not happen in production)");
+        }
     }
 
     private void initConfigPlugins() {
