@@ -27,12 +27,8 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableEntryException;
+import java.security.*;
 import java.security.cert.CertificateException;
-import java.security.spec.InvalidKeySpecException;
 import java.util.Properties;
 
 
@@ -121,7 +117,7 @@ public class JksSecretLoader implements ISecretLoader {
                 throw new ETracInternal("JKS Secret loader has not been initialized");
             }
 
-            var entry = keystore.getEntry(secretName, new KeyStore.PasswordProtection(secretKey.toCharArray()));  // KeyStore.ProtectionParameter() /* protection = */);
+            var entry = keystore.getEntry(secretName, new KeyStore.PasswordProtection(secretKey.toCharArray()));
 
             if (entry == null) {
                 var message = String.format("Secret is not present in the store: [%s]", secretName);
@@ -147,17 +143,11 @@ public class JksSecretLoader implements ISecretLoader {
 
             return new String(password);
         }
-        // TODO: Errors
-        catch (UnrecoverableEntryException e) {
-            throw new RuntimeException(e);
-        }
-        catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
-        catch (KeyStoreException e) {
-            throw new RuntimeException(e);
-        } catch (InvalidKeySpecException e) {
-            throw new RuntimeException(e);
+        catch (GeneralSecurityException e) {
+
+            var message = String.format("Secret could not be retrieved from the key store: [%s] %s", secretName, e.getMessage());
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EConfigLoad(message, e);
         }
     }
 }
