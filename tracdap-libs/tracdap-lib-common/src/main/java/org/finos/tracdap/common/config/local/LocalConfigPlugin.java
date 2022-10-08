@@ -34,7 +34,7 @@ public class LocalConfigPlugin extends TracPlugin {
 
     private static final List<PluginServiceInfo> serviceInfo = List.of(
             new PluginServiceInfo(IConfigLoader.class, FILE_LOADER, List.of("LOCAL", "file")),
-            new PluginServiceInfo(ISecretLoader.class, JKS_SECRET_LOADER, List.of("JKS", "PKCS12")));
+            new PluginServiceInfo(ISecretLoader.class, JKS_SECRET_LOADER, List.of("PKCS12", "JCEKS")));
 
 
     @Override

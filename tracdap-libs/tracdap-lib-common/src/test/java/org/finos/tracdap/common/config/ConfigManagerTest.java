@@ -42,7 +42,9 @@ class ConfigManagerTest {
             "/config_mgr_test/sample-config.json",
             "/config_mgr_test/extra.xml",
             "/config_mgr_test/log-test.xml",
-            "/config_mgr_test/secrets.p12");
+            "/config_mgr_test/secrets.p12",
+            "/config_mgr_test/secrets.jceks",
+            "/config_mgr_test/secrets-jceks.yaml");
 
     private static final String SECRET_KEY = "secret_master_key";
     private static final String SECRET_NAME = "very_secret_password";
@@ -360,7 +362,7 @@ class ConfigManagerTest {
     }
 
     @Test
-    void loadPassword_ok() {
+    void loadPassword_pkcs12() {
 
         // Using file loader
 
@@ -375,6 +377,29 @@ class ConfigManagerTest {
         // This will still use the JKS secret loader, but the JKS file will be loaded over the test protocol
 
         var testConfigUrl = "test://config_svr/config_dir/sample-config.yaml";
+        var manager2 = new ConfigManager(testConfigUrl, tempDir, plugins, SECRET_KEY);
+        manager2.prepareSecrets();
+
+        var textSecret2 = manager2.loadPassword(SECRET_NAME);
+        assertEquals(EXPECTED_SECRET_VALUE, textSecret2);
+    }
+
+    @Test
+    void loadPassword_jceks() {
+
+        // Using file loader
+
+        var fileConfigUrl = "config_dir/secrets-jceks.yaml";
+        var manager = new ConfigManager(fileConfigUrl, tempDir, plugins, SECRET_KEY);
+        manager.prepareSecrets();
+
+        var textSecret = manager.loadPassword(SECRET_NAME);
+        assertEquals(EXPECTED_SECRET_VALUE, textSecret);
+
+        // Using test-protocol loader
+        // This will still use the JKS secret loader, but the JKS file will be loaded over the test protocol
+
+        var testConfigUrl = "test://config_svr/config_dir/secrets-jceks.yaml";
         var manager2 = new ConfigManager(testConfigUrl, tempDir, plugins, SECRET_KEY);
         manager2.prepareSecrets();
 
