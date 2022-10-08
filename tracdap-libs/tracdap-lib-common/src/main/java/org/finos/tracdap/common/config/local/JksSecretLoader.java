@@ -20,8 +20,8 @@ import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.finos.tracdap.common.startup.StartupLog;
+import org.slf4j.event.Level;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
@@ -40,8 +40,6 @@ public class JksSecretLoader implements ISecretLoader {
 
     public static final String DEFAULT_KEYSTORE_TYPE = "PKCS12";
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
-
     private final Properties properties;
     private KeyStore keystore;
     private boolean ready;
@@ -58,7 +56,7 @@ public class JksSecretLoader implements ISecretLoader {
     public void init(ConfigManager configManager) {
 
         if (ready) {
-            log.error("JKS secret loader initialized twice");
+            StartupLog.log(this, Level.ERROR, "JKS secret loader initialized twice");
             throw new EStartup("JKS secret loader initialized twice");
         }
 
@@ -68,18 +66,18 @@ public class JksSecretLoader implements ISecretLoader {
 
         try {
 
-            log.info("Initializing JKS secret loader...");
+            StartupLog.log(this, Level.INFO, "Initializing JKS secret loader...");
 
             if (keystoreUrl == null || keystoreUrl.isBlank()) {
                 var message = String.format("JKS secrets need %s in the main config file", ConfigKeys.SECRET_URL_KEY);
-                log.error(message);
+                StartupLog.log(this, Level.ERROR, message);
                 throw new EStartup(message);
             }
 
             if (keystoreKey == null || keystoreKey.isBlank()) {
                 var template = "JKS secrets need a secret key, use --secret-key or set %s in the environment";
                 var message = String.format(template, ConfigKeys.SECRET_KEY_ENV);
-                log.error(message);
+                StartupLog.log(this, Level.ERROR, message);
                 throw new EStartup(message);
             }
 
@@ -95,7 +93,7 @@ public class JksSecretLoader implements ISecretLoader {
         }
         catch (KeyStoreException e) {
             var message = String.format("Keystore type is not supported: [%s]", keystoreType);
-            log.error(message);
+            StartupLog.log(this, Level.ERROR, message);
             throw new EStartup(message);
         }
         catch (IOException e) {
@@ -103,12 +101,12 @@ public class JksSecretLoader implements ISecretLoader {
             var error = e.getCause() != null ? e.getCause() : e;
             var errorDetail = error.getMessage() + " (this normally means the secret key is wrong)";
             var message = String.format("Failed to open keystore [%s]: %s", keystoreUrl, errorDetail);
-            log.error(message);
+            StartupLog.log(this, Level.ERROR, message);
             throw new EStartup(message);
         }
         catch (NoSuchAlgorithmException | CertificateException e) {
             var message = String.format("Failed to open keystore [%s]: %s", keystoreUrl, e.getMessage());
-            log.error(message);
+            StartupLog.log(this, Level.ERROR, message);
             throw new EStartup(message);
         }
     }
@@ -119,7 +117,7 @@ public class JksSecretLoader implements ISecretLoader {
         try {
 
             if (!ready) {
-                log.error("JKS Secret loader has not been initialized");
+                StartupLog.log(this, Level.ERROR, "JKS Secret loader has not been initialized");
                 throw new ETracInternal("JKS Secret loader has not been initialized");
             }
 
@@ -127,13 +125,13 @@ public class JksSecretLoader implements ISecretLoader {
 
             if (entry == null) {
                 var message = String.format("Secret is not present in the store: [%s]", secretName);
-                log.error(message);
+                StartupLog.log(this, Level.ERROR, message);
                 throw new EConfigLoad(message);
             }
 
             if (!(entry instanceof KeyStore.SecretKeyEntry)) {
                 var message = String.format("Secret is not a secret key: [%s] is %s", secretName, entry.getClass().getSimpleName());
-                log.error(message);
+                StartupLog.log(this, Level.ERROR, message);
                 throw new EConfigLoad(message);
             }
 
