@@ -28,6 +28,10 @@ import java.util.stream.Collectors;
 
 public class PluginManager implements IPluginManager {
 
+    private static final List<String> CONFIG_SERVICE_TYPES = List.of(
+            PluginServiceInfo.CONFIG_SERVICE_TYPE,
+            PluginServiceInfo.SECRETS_SERVICE_TYPE);
+
     private final Map<PluginKey, ITracPlugin> plugins;
 
     public PluginManager() {
@@ -45,7 +49,7 @@ public class PluginManager implements IPluginManager {
             var services = plugin.serviceInfo();
 
             var configServices = services.stream()
-                    .filter(si -> si.serviceType().equals(PluginServiceInfo.CONFIG_SERVICE_TYPE))
+                    .filter(si -> CONFIG_SERVICE_TYPES.contains(si.serviceType()))
                     .collect(Collectors.toList());
 
             if (!configServices.isEmpty()) {
@@ -68,7 +72,7 @@ public class PluginManager implements IPluginManager {
             var services = plugin.serviceInfo();
 
             var regularServices = services.stream()
-                    .filter(si -> ! si.serviceType().equals(PluginServiceInfo.CONFIG_SERVICE_TYPE))
+                    .filter(si -> ! CONFIG_SERVICE_TYPES.contains(si.serviceType()))
                     .collect(Collectors.toList());
 
             if (!regularServices.isEmpty()) {
