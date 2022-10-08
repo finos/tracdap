@@ -32,13 +32,13 @@ public class StandardArgs {
 
     private final Path workingDir;
     private final String configFile;
-    private final String keystoreKey;
+    private final String secretKey;
     private final List<Task> tasks;
 
-    public StandardArgs(Path workingDir, String configFile, String keystoreKey, List<Task> tasks) {
+    public StandardArgs(Path workingDir, String configFile, String secretKey, List<Task> tasks) {
         this.workingDir = workingDir;
         this.configFile = configFile;
-        this.keystoreKey = keystoreKey;
+        this.secretKey = secretKey;
         this.tasks = tasks;
     }
 
@@ -54,8 +54,8 @@ public class StandardArgs {
         return configFile;
     }
 
-    public String getKeystoreKey() {
-        return keystoreKey;
+    public String getSecretKey() {
+        return secretKey;
     }
 
     public List<Task> getTasks() {

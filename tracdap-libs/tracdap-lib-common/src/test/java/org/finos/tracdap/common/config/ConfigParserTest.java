@@ -17,17 +17,25 @@
 package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.config.test.TestConfigPlugin;
-import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.common.exception.EConfigParse;
+import org.finos.tracdap.config.MetaServiceConfig;
+import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.test.helpers.TestResourceHelpers;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Paths;
-import java.util.Map;
+import java.util.Random;
+
 
 public class ConfigParserTest {
 
-    private static final String TEST_CONFIG_1 = "/config_mgr_test/root.yaml";
+    private static final String SAMPLE_YAML_CONFIG = "/config_mgr_test/sample-config.yaml";
+    private static final String SAMPLE_JSON_CONFIG = "/config_mgr_test/sample-config.json";
+
+    private static final String UNKNOWN_ITEM_YAML_CONFIG = "/config_mgr_test/unknown-item.yaml";
+    private static final String UNKNOWN_ITEM_JSON_CONFIG = "/config_mgr_test/unknown-item.json";
 
     @BeforeAll
     public static void testLoader() {
@@ -37,59 +45,88 @@ public class ConfigParserTest {
     }
 
     @Test
-    public void testYaml_basicLoadOk() throws Exception {
+    public void testJson_basicLoadOk() {
 
-        var configFileUrl = getClass().getResource(TEST_CONFIG_1);
-        Assertions.assertNotNull(configFileUrl);
+        var configBytes = TestResourceHelpers.loadResourceAsBytes(SAMPLE_JSON_CONFIG);
+        var configObject = ConfigParser.parseConfig(configBytes, ConfigFormat.JSON, PlatformConfig.class);
 
-        var configFilePath = Paths.get(".")
-                .toAbsolutePath()
-                .relativize(Paths.get(configFileUrl.toURI()))
-                .toString()
-                .replace("\\", "/");
+        Assertions.assertNotNull(configObject);
+        Assertions.assertInstanceOf(PlatformConfig.class, configObject);
 
-        var configPlugins = new PluginManager();
-        configPlugins.initConfigPlugins();
+        var metaSvcConfig = configObject.getServices().getMeta();
 
-        var config = new ConfigManager(configFilePath, Paths.get("."), configPlugins);
-        var configText = config.loadRootConfigFile();
-
-        var configRoot = ConfigParser.parseStructuredConfig(configText, ConfigFormat.YAML, SampleConfig.class);
-        Assertions.assertNotNull(config);
-
-        var sample = configRoot.test;
-        Assertions.assertNotNull(sample);
-        Assertions.assertEquals("hello", sample.getProp1());
-        Assertions.assertEquals(42, sample.getProp2());
+        Assertions.assertInstanceOf(MetaServiceConfig.class, metaSvcConfig);
+        Assertions.assertEquals("JDBC", metaSvcConfig.getDalType());
     }
 
+    @Test
+    public void testJson_garbled() {
 
-    public static class SampleConfig {
+        var configBytes = new byte[1000];
+        new Random().nextBytes(configBytes);
 
-        public Map<String, Object> config;
-        public TestConfig test;
+        Assertions.assertThrows(EConfigParse.class, () ->
+                ConfigParser.parseConfig(configBytes, ConfigFormat.JSON, PlatformConfig.class));
     }
 
+    @Test
+    public void testJson_unknownItem() {
 
-    public static class TestConfig {
+        var configBytes = TestResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_JSON_CONFIG);
 
-        private String prop1;
-        private int prop2;
+        Assertions.assertThrows(EConfigParse.class, () ->
+                ConfigParser.parseConfig(configBytes, ConfigFormat.JSON, PlatformConfig.class));
+    }
 
-        public String getProp1() {
-            return prop1;
-        }
+    @Test
+    public void testJson_lenient() {
 
-        public void setProp1(String prop1) {
-            this.prop1 = prop1;
-        }
+        var configBytes = TestResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_JSON_CONFIG);
 
-        public int getProp2() {
-            return prop2;
-        }
+        Assertions.assertDoesNotThrow(() ->
+                ConfigParser.parseConfig(configBytes, ConfigFormat.JSON, PlatformConfig.class, true));
+    }
 
-        public void setProp2(int prop2) {
-            this.prop2 = prop2;
-        }
+    @Test
+    public void testYaml_basicLoadOk() {
+
+        var configBytes = TestResourceHelpers.loadResourceAsBytes(SAMPLE_YAML_CONFIG);
+        var configObject = ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class);
+
+        Assertions.assertNotNull(configObject);
+        Assertions.assertInstanceOf(PlatformConfig.class, configObject);
+
+        var metaSvcConfig = configObject.getServices().getMeta();
+
+        Assertions.assertInstanceOf(MetaServiceConfig.class, metaSvcConfig);
+        Assertions.assertEquals("JDBC", metaSvcConfig.getDalType());
+    }
+
+    @Test
+    public void testYaml_garbled() {
+
+        var configBytes = new byte[1000];
+        new Random().nextBytes(configBytes);
+
+        Assertions.assertThrows(EConfigParse.class, () ->
+                ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class));
+    }
+
+    @Test
+    public void testYaml_unknownItem() {
+
+        var configBytes = TestResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_YAML_CONFIG);
+
+        Assertions.assertThrows(EConfigParse.class, () ->
+                ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class));
+    }
+
+    @Test
+    public void testYaml_lenient() {
+
+        var configBytes = TestResourceHelpers.loadResourceAsBytes(UNKNOWN_ITEM_YAML_CONFIG);
+
+        Assertions.assertDoesNotThrow(() ->
+                ConfigParser.parseConfig(configBytes, ConfigFormat.YAML, PlatformConfig.class, true));
     }
 }

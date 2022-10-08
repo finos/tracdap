@@ -19,63 +19,74 @@ package org.finos.tracdap.plugins.config.gcp;
 import org.finos.tracdap.common.config.IConfigLoader;
 import org.finos.tracdap.common.exception.EStartup;
 
-import com.google.cloud.ReadChannel;
-import com.google.cloud.storage.Blob;
-import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
+import com.google.cloud.storage.StorageException;
 
-import java.io.BufferedReader;
-import java.io.UncheckedIOException;
+import java.io.IOException;
 import java.net.URI;
-import java.nio.channels.Channels;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.stream.Collectors;
 
 
 /**
- * A config loader implementation for loading from AWS S3.
+ * A config loader implementation for loading files from GCP storage
  */
 public class GcpConfigLoader implements IConfigLoader {
 
-    @Override
-    public String loaderName() {
-        return "GCP Storage";
-    }
+    private static final String ERROR_MSG_TEMPLATE = "Failed to load config file from GCP: %2$s [%1$s]";
 
     @Override
-    public List<String> protocols() {
-        return List.of("gcp");
+    public byte[] loadBinaryFile(URI uri) {
+
+        try {
+
+            var path = uri.getPath().startsWith("/")
+                    ? uri.getPath().substring(1)
+                    : uri.getPath();
+
+            var storageOptions = StorageOptions.newBuilder().build();
+            var storage = storageOptions.getService();
+
+            var blob = storage.get(uri.getHost(), path);
+
+            if (blob == null) {
+                var message = String.format(ERROR_MSG_TEMPLATE, uri, "File does not exist");
+                throw new EStartup(message);
+            }
+
+            try (var channel = blob.reader()) {
+
+                var size = (int)(long) blob.getSize();
+                var buffer = ByteBuffer.allocate(size);
+
+                var bytesRead = 0;
+                var totalBytesRead = 0;
+
+                do {
+                    bytesRead = channel.read(buffer);
+                    totalBytesRead += bytesRead;
+                }
+                while (bytesRead >= 0);
+
+                if (totalBytesRead != size) {
+                    var message = String.format(ERROR_MSG_TEMPLATE, uri, "File does not match reported size");
+                    throw new EStartup(message);
+                }
+
+                return buffer.array();
+            }
+        }
+        catch (StorageException | IOException e) {
+
+            var message = String.format(ERROR_MSG_TEMPLATE, uri, e.getMessage());
+            throw new EStartup(message, e);
+        }
     }
 
     @Override
     public String loadTextFile(URI uri) {
 
-        var ERROR_MSG_TEMPLATE = "Failed to load config file from GCP: %2$s [%1$s]";
-
-        String path = uri.getPath();
-        if (path.startsWith("/")) {
-            path = path.substring(1);
-        }
-
-        StorageOptions options = StorageOptions.newBuilder().build();
-        Storage storage = options.getService();
-        Blob blob = storage.get(uri.getHost(), path);
-        if (blob == null) {
-            var message = String.format("Cannot load config from GCP: [%s]. File does not exist.", uri);
-            throw new EStartup(message);
-        }
-        ReadChannel readChannel = blob.reader();
-        BufferedReader br = new BufferedReader(Channels.newReader(readChannel, StandardCharsets.UTF_8));
-
-        String output;
-        try {
-            output = br.lines().collect(Collectors.joining());
-            return output;
-        } catch (IllegalArgumentException | UncheckedIOException e) {
-
-            var message = String.format(ERROR_MSG_TEMPLATE, path, e.getMessage());
-            throw new EStartup(message, e);
-        }
+        var bytes = loadBinaryFile(uri);
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 }

@@ -26,6 +26,7 @@ description = "TRAC D.A.P. common library, interfaces and utilities used across 
 dependencies {
 
     api project(':tracdap-api-metadata')
+    api project(':tracdap-api-config')
 
     // Google Guava - common lib includes helpers to translate to/from equivalent JDK types
     api group: 'com.google.guava', name: 'guava', version: "$guava_version"

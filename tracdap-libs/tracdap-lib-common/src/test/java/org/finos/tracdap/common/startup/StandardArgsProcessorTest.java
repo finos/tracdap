@@ -31,14 +31,14 @@ class StandardArgsProcessorTest {
     @Test
     void testArgs_ok() {
 
-        var command = "--config etc/my_config.props --keystore-key Mellon";
+        var command = "--config etc/my_config.props --secret-key Mellon";
         var commandArgs = command.split("\\s");
 
         var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs);
 
         assertEquals(System.getProperty("user.dir"), standardArgs.getWorkingDir().toString());
         assertEquals("etc/my_config.props", standardArgs.getConfigFile());
-        assertEquals("Mellon", standardArgs.getKeystoreKey());
+        assertEquals("Mellon", standardArgs.getSecretKey());
     }
 
     @Test
@@ -77,7 +77,7 @@ class StandardArgsProcessorTest {
     @Test
     void testArgs_noConfigParam() {
 
-        var command = "--config --keystore-key Mellon";
+        var command = "--config --secret-key Mellon";
         var commandArgs = command.split("\\s");
 
         var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs));

@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.config.local;
 
 import org.finos.tracdap.common.config.IConfigLoader;
+import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
@@ -28,11 +29,13 @@ import java.util.Properties;
 public class LocalConfigPlugin extends TracPlugin {
 
     private static final String PLUGIN_NAME = "LOCAL_CONFIG";
-    private static final String SERVICE_NAME = "LOCAL_CONFIG";
+    private static final String FILE_LOADER = "FILE_LOADER";
+    private static final String JKS_SECRET_LOADER = "JKS_SECRET_LOADER";
 
-    private static final PluginServiceInfo psi = new PluginServiceInfo(
-            PLUGIN_NAME, IConfigLoader.class,
-            SERVICE_NAME, List.of("file"));
+    private static final List<PluginServiceInfo> serviceInfo = List.of(
+            new PluginServiceInfo(IConfigLoader.class, FILE_LOADER, List.of("LOCAL", "file")),
+            new PluginServiceInfo(ISecretLoader.class, JKS_SECRET_LOADER, List.of("PKCS12", "JCEKS")));
+
 
     @Override
     public String pluginName() {
@@ -41,14 +44,17 @@ public class LocalConfigPlugin extends TracPlugin {
 
     @Override
     public List<PluginServiceInfo> serviceInfo() {
-        return List.of(psi);
+        return serviceInfo;
     }
 
     @Override @SuppressWarnings("unchecked")
     protected <T> T createService(String serviceName, Properties properties) {
 
-        if (serviceName.equals(SERVICE_NAME))
+        if (serviceName.equals(FILE_LOADER))
             return (T) new LocalConfigLoader();
+
+        if (serviceName.equals(JKS_SECRET_LOADER))
+            return (T) new JksSecretLoader(properties);
 
         throw new EUnexpected();
     }

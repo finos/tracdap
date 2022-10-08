@@ -21,12 +21,10 @@ import org.finos.tracdap.common.exception.ETracPublic;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.exception.EStartup;
-
 import org.finos.tracdap.common.startup.Startup;
-import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.config.PlatformConfig;
-import org.flywaydb.core.Flyway;
 
+import org.flywaydb.core.Flyway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,9 +34,15 @@ import java.util.List;
 import java.util.Properties;
 
 
+/**
+ * Deployment tool to manage the TRAC metadata database
+ */
 public class DeployMetaDB {
 
+    /** Task name for deploying the schema **/
     public final static String DEPLOY_SCHEMA_TASK_NAME = "deploy_schema";
+
+    /** Task name for adding a tenant **/
     public final static String ADD_TENANT_TASK_NAME = "add_tenant";
 
     private final static String SCHEMA_LOCATION = "classpath:%s";
@@ -50,17 +54,23 @@ public class DeployMetaDB {
     private final Logger log;
     private final ConfigManager configManager;
 
+    /**
+     * Construct a new instance of the deployment tool
+     *
+     * @param configManager A prepared instance of ConfigManager
+     */
     public DeployMetaDB(ConfigManager configManager) {
 
         this.log = LoggerFactory.getLogger(getClass());
         this.configManager = configManager;
     }
 
+    /**
+     * Run deployment tasks, as specified by standard args tasks on the commane line
+     *
+     * @param tasks The list of deployment tasks to execute
+     */
     public void runDeployment(List<StandardArgs.Task> tasks) {
-
-        var componentName = VersionInfo.getComponentName(DeployMetaDB.class);
-        var componentVersion = VersionInfo.getComponentVersion(DeployMetaDB.class);
-        log.info("{} {}", componentName, componentVersion);
 
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
         var metaConfig = platformConfig.getServices().getMeta();
@@ -155,6 +165,11 @@ public class DeployMetaDB {
 
     }
 
+    /**
+     * Entry point for the DeployMetaDB tool.
+     *
+     * @param args Command line args
+     */
     public static void main(String[] args) {
 
         try {
@@ -163,7 +178,7 @@ public class DeployMetaDB {
             startup.runStartupSequence();
 
             var config = startup.getConfig();
-            var tasks = startup.getTasks();
+            var tasks = startup.getArgs().getTasks();
 
             var deploy = new DeployMetaDB(config);
             deploy.runDeployment(tasks);

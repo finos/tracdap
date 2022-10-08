@@ -28,3 +28,9 @@ enum ConfigFormat {
   JSON = 2;
   PROTO = 3;
 }
+
+
+message _ConfigFile {
+
+  map<string, string> config = 1;
+}

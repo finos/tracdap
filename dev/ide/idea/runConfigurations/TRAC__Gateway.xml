@@ -2,7 +2,7 @@
   <configuration default="false" name="TRAC: Gateway" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="org.finos.tracdap.gateway.TracPlatformGateway" />
     <module name="tracdap.tracdap-gateway.main" />
-    <option name="PROGRAM_PARAMETERS" value="--config etc/trac-devlocal-gateway.yaml" />
+    <option name="PROGRAM_PARAMETERS" value="--config dev/config/trac-devlocal-gateway.yaml --secret-key devlocal_key" />
     <option name="VM_PARAMETERS" value="--add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED -Dio.netty.tryReflectionSetAccessible=true" />
     <method v="2">
       <option name="Make" enabled="true" />

@@ -1,0 +1,11 @@
+{
+  "config": {
+    "logging": "log-test.xml"
+  },
+  "services": {
+    "meta": {
+      "dalType": "JDBC"
+    }
+  },
+  "unknownField": "Should not be here"
+}

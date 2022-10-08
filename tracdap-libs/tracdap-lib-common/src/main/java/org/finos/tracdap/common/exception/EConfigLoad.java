@@ -14,13 +14,26 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.config;
+package org.finos.tracdap.common.exception;
 
-public class ConfigKeys {
 
-    public static final String LOGGING_CONFIG_KEY = "logging";
-    public static final String SECRET_TYPE_KEY = "secret.type";
-    public static final String SECRET_URL_KEY = "secret.url";
-    public static final String SECRET_KEY_KEY = "secret.key";
-    public static final String SECRET_KEY_ENV = "SECRET_KEY";
+/** Config errors related to loading files and resources **/
+public class EConfigLoad extends EConfig {
+
+    /**
+     * Construct an error with just a message
+     * @param message The error message
+     **/
+    public EConfigLoad(String message) {
+        super(message);
+    }
+
+    /**
+     * Construct an error with just a message
+     * @param message The error message
+     * @param cause The cause of the error
+     **/
+    public EConfigLoad(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

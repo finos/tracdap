@@ -14,7 +14,9 @@
 
 config:
   logging: log-test.xml
+  secret.type: pkcs12
+  secret.url: secrets.p12
 
-test:
-  prop1: hello
-  prop2: 42
+services:
+  meta:
+    dalType: JDBC

@@ -16,11 +16,11 @@
 
 package org.finos.tracdap.common.plugin;
 
-import org.finos.tracdap.common.config.IConfigLoader;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.finos.tracdap.common.startup.StartupLog;
+
+import org.slf4j.event.Level;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -28,7 +28,9 @@ import java.util.stream.Collectors;
 
 public class PluginManager implements IPluginManager {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final List<String> CONFIG_SERVICE_TYPES = List.of(
+            PluginServiceInfo.CONFIG_SERVICE_TYPE,
+            PluginServiceInfo.SECRETS_SERVICE_TYPE);
 
     private final Map<PluginKey, ITracPlugin> plugins;
 
@@ -38,7 +40,7 @@ public class PluginManager implements IPluginManager {
 
     public void initConfigPlugins() {
 
-        log.info("Loading config plugins...");
+        StartupLog.log(this, Level.INFO, "Loading config plugins...");
 
         var availablePlugins = ServiceLoader.load(ITracPlugin.class);
 
@@ -47,12 +49,12 @@ public class PluginManager implements IPluginManager {
             var services = plugin.serviceInfo();
 
             var configServices = services.stream()
-                    .filter(si -> si.serviceClass() == IConfigLoader.class)
+                    .filter(si -> CONFIG_SERVICE_TYPES.contains(si.serviceType()))
                     .collect(Collectors.toList());
 
             if (!configServices.isEmpty()) {
 
-                log.info("Plugin: [{}]", plugin.pluginName());
+                StartupLog.log(this, Level.INFO, String.format("Plugin: [%s]", plugin.pluginName()));
 
                 registerServices(plugin, configServices);
             }
@@ -61,7 +63,7 @@ public class PluginManager implements IPluginManager {
 
     public void initRegularPlugins() {
 
-        log.info("Loading plugins...");
+        StartupLog.log(this, Level.INFO, "Loading plugins...");
 
         var availablePlugins = ServiceLoader.load(ITracPlugin.class);
 
@@ -70,12 +72,12 @@ public class PluginManager implements IPluginManager {
             var services = plugin.serviceInfo();
 
             var regularServices = services.stream()
-                    .filter(si -> si.serviceClass() != IConfigLoader.class)
+                    .filter(si -> ! CONFIG_SERVICE_TYPES.contains(si.serviceType()))
                     .collect(Collectors.toList());
 
             if (!regularServices.isEmpty()) {
 
-                log.info("Plugin: [{}]", plugin.pluginName());
+                StartupLog.log(this, Level.INFO, String.format("Plugin: [%s]", plugin.pluginName()));
 
                 registerServices(plugin, regularServices);
             }
@@ -86,13 +88,13 @@ public class PluginManager implements IPluginManager {
 
         for (var service : services) {
 
-            var prettyServiceType = prettyTypeName(service.serviceTypeName(), true);
+            var prettyServiceType = prettyTypeName(service.serviceType(), true);
             var protocols = String.join(", ", service.protocols());
 
-            log.info(" |-> {}: [{}] (protocols: {})",
-                    prettyServiceType,
-                    service.serviceName(),
-                    protocols);
+
+            StartupLog.log(this, Level.INFO, String.format(
+                    " |-> %s: [%s] (protocols: %s)",
+                    prettyServiceType, service.serviceName(), protocols));
 
             for (var protocol : service.protocols()) {
 
@@ -133,17 +135,17 @@ public class PluginManager implements IPluginManager {
 
         var pluginKey = new PluginKey(serviceClass, protocol);
 
-        if (!PluginServiceInfo.SERVICE_NAMES.containsKey(serviceClass.getName()))
+        if (!PluginServiceInfo.SERVICE_TYPES.containsKey(serviceClass.getName()))
             throw new EUnexpected();
 
         if (!plugins.containsKey(pluginKey)) {
 
-            var rawTypeName = PluginServiceInfo.SERVICE_NAMES.get(serviceClass.getName());
+            var rawTypeName = PluginServiceInfo.SERVICE_TYPES.get(serviceClass.getName());
             var message = String.format(
                     "Plugin not available for %s protocol: [%s]",
                     prettyTypeName(rawTypeName, false), protocol);
 
-            log.error(message);
+            StartupLog.log(this, Level.ERROR, message);
             throw new EPluginNotAvailable(message);
         }
 

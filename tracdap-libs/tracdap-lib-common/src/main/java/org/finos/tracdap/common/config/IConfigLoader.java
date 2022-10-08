@@ -21,11 +21,10 @@ import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.TracPlugin;
 
 import java.net.URI;
-import java.util.List;
 
 
 /**
- * Interface for physical loading of config files.
+ * Tech stack abstraction interface for loading config files.
  *
  * <p> Config plugins can supply an IConfigLoader implementation to
  * handle physical loading of config files. The loader can advertise
@@ -44,28 +43,26 @@ import java.util.List;
 public interface IConfigLoader {
 
     /**
-     * Get the name of this loader (useful for debugging startup failures).
-     *
-     * @return The name of the loader
-     */
-    String loaderName();
-
-    /**
-     * Get the list of protocols supported by this loader.
-     *
-     * @return The list of supported protocols
-     */
-    List<String> protocols();
-
-    /**
      * Use the loader to load a text file.
      *
-     * <p>The supplied configUrl will always be an absolute URL using one of the protocols
-     * advertised by the protocols() method.</p>
+     * <p>The supplied configUrl will always be an absolute URL.
+     * Only protocols registered when the plugin was loaded will be requested.</p>
      *
      * @param configUrl URL of the file to load
      * @return The content of the file as text
      * @throws EStartup There was a problem loading the file
      */
     String loadTextFile(URI configUrl);
+
+    /**
+     * Use the loader to load a binary file.
+     *
+     * <p>The supplied configUrl will always be an absolute URL.
+     * Only protocols registered when the plugin was loaded will be requested.</p>
+     *
+     * @param configUrl URL of the file to load
+     * @return The content of the file as text
+     * @throws EStartup There was a problem loading the file
+     */
+    byte[] loadBinaryFile(URI configUrl);
 }

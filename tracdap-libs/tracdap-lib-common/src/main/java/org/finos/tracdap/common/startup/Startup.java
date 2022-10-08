@@ -62,14 +62,6 @@ public class Startup {
         return new StartupSequence(serviceClass, standardArgs, false);
     }
 
-    public static ConfigManager quickConfig(String configFile) {
-
-        var workingDir = Paths.get(".").toAbsolutePath().normalize();
-        var keystoreKey = "";
-
-        return quickConfig(workingDir, configFile, keystoreKey);
-    }
-
     public static ConfigManager quickConfig(Path workingDir, String configFile, String keystoreKey) {
 
         var standardArgs = new StandardArgs(workingDir, configFile, keystoreKey);
@@ -78,22 +70,4 @@ public class Startup {
 
         return startup.getConfig();
     }
-
-//    public static ConfigManager quickConfig(Class<?> serviceClass, Path workingDir, String configFile, String keystoreKey) {
-//
-//        var startup = useConfigFile(serviceClass, workingDir, configFile, keystoreKey);
-//        startup.runStartupSequence();
-//
-//        return startup.getConfig();
-//    }
-
-//    public static StartupSequence useConfigFile(String configFile) {
-//
-//        var workingDir = Paths.get(".").toAbsolutePath().normalize();
-//        var keystoreKey = "";
-//
-//        var standardArgs = new StandardArgs(workingDir, configFile, keystoreKey);
-//
-//        return new StartupSequence(serviceClass, standardArgs);
-//    }
 }

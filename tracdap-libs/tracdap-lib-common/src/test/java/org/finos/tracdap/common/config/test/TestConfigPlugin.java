@@ -32,9 +32,8 @@ public class TestConfigPlugin extends TracPlugin {
     private static final String PLUGIN_NAME = "TEST_CONFIG";
     private static final String SERVICE_NAME = "TEST_CONFIG";
 
-    private static final PluginServiceInfo serviceInfo = new PluginServiceInfo(
-            PLUGIN_NAME, IConfigLoader.class,
-            SERVICE_NAME, List.of("test"));
+    private static final List<PluginServiceInfo> serviceInfo = List.of(
+            new PluginServiceInfo(IConfigLoader.class, SERVICE_NAME, List.of("test")));
 
     @Override
     public String pluginName() {
@@ -43,7 +42,7 @@ public class TestConfigPlugin extends TracPlugin {
 
     @Override
     public List<PluginServiceInfo> serviceInfo() {
-        return List.of(serviceInfo);
+        return serviceInfo;
     }
 
     @Override @SuppressWarnings("unchecked")

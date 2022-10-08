@@ -18,6 +18,7 @@ package org.finos.tracdap.plugins.config.aws;
 
 import org.finos.tracdap.common.config.IConfigLoader;
 import org.finos.tracdap.common.exception.EStartup;
+
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
@@ -27,7 +28,7 @@ import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
-import java.util.List;
+import java.nio.charset.StandardCharsets;
 
 
 /**
@@ -36,17 +37,7 @@ import java.util.List;
 public class AwsConfigLoader implements IConfigLoader {
 
     @Override
-    public String loaderName() {
-        return "AWS S3";
-    }
-
-    @Override
-    public List<String> protocols() {
-        return List.of("s3");
-    }
-
-    @Override
-    public String loadTextFile(URI uri) {
+    public byte[] loadBinaryFile(URI uri) {
 
         var ERROR_MSG_TEMPLATE = "Failed to load config file from S3: %2$s [%1$s]";
 
@@ -56,7 +47,6 @@ public class AwsConfigLoader implements IConfigLoader {
             path = path.substring(1);
         }
 
-        String output;
         try {
             S3Object o = s3.getObject(uri.getHost(), path);
             try (S3ObjectInputStream s3is = o.getObjectContent()) {
@@ -66,14 +56,21 @@ public class AwsConfigLoader implements IConfigLoader {
                     while ((read_len = s3is.read(read_buf)) > 0) {
                         fos.write(read_buf, 0, read_len);
                     }
-                    output = fos.toString();
+                    return fos.toByteArray();
                 }
             }
-            return output;
-        } catch (AmazonS3Exception | IOException e) {
+        }
+        catch (AmazonS3Exception | IOException e) {
 
             var message = String.format(ERROR_MSG_TEMPLATE, path, e.getMessage());
             throw new EStartup(message, e);
         }
+    }
+
+    @Override
+    public String loadTextFile(URI uri) {
+
+        var bytes = loadBinaryFile(uri);
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 }

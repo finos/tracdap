@@ -31,7 +31,7 @@ public class LocalExecutorPlugin extends TracPlugin {
     private static final String LOCAL_BATCH_EXECUTOR_NAME = "LOCAL_BATCH";
 
     private static final List<PluginServiceInfo> psi = List.of(
-            new PluginServiceInfo(PLUGIN_NAME, IBatchExecutor.class, LOCAL_BATCH_EXECUTOR_NAME, List.of("LOCAL")));
+            new PluginServiceInfo(IBatchExecutor.class, LOCAL_BATCH_EXECUTOR_NAME, List.of("LOCAL")));
 
 
     @Override

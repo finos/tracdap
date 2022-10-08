@@ -46,6 +46,10 @@ sourceSets {
         java {
             // Include generated code from protoc
             srcDirs "${project.buildDir}/generated-sources/main/java"
+
+            // Including the proto src dir lets autocomplete work in the IDE
+            // Not strictly necessary for protobuf itself
+            srcDirs "${projectDir}/src/main/proto"
         }
     }
 }
@@ -54,4 +58,10 @@ dependencies {
 
     // Core protobuf for Java
     api group: 'com.google.protobuf', name: 'protobuf-java', version: "$proto_version"
+}
+
+// Javadoc gives a lot of warnings on the protobuf generated code
+// Turn these warnings off, they're noisy and obscure real Javadoc warnings from TRAC's own code
+tasks.withType(Javadoc) {
+    options.addStringOption('Xdoclint:none', '-quiet')
 }

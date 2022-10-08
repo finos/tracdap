@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.startup;
 
-import org.apache.logging.log4j.LogManager;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -24,18 +23,31 @@ import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.util.VersionInfo;
+
 import org.apache.logging.log4j.core.config.ConfigurationSource;
 import org.apache.logging.log4j.core.config.Configurator;
+import org.finos.tracdap.config._ConfigFile;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
 
+
+/**
+ * Standard startup sequence for service components and offline tools.
+ *
+ * <p>The startup sequence is responsible for these tasks:
+ * - Printing the startup banner
+ * - Setting up the config manager and plugin manager
+ * - Loading plugins required to access config files
+ * - Loading logging config and initializing logging
+ * </p>
+ *
+ * <p>The start up sequence is not responsible for setting up the main service / tool.
+ * Standard command line args must be parsed before using the startup sequence.</p>
+ */
 public class StartupSequence {
-
-    private static final String STARTUP_LOG_CONFIG = "/log4j2_startup.xml";
 
     private final Class<?> serviceClass;
     private final StandardArgs standardArgs;
@@ -45,16 +57,14 @@ public class StartupSequence {
     private PluginManager plugins;
     private ConfigManager config;
 
-    public StartupSequence(Class<?> serviceClass, StandardArgs standardArgs) {
-        this(serviceClass, standardArgs, true);
-    }
-
+    /** Create a startup sequence for the given service class and command line arguments **/
     StartupSequence(Class<?> serviceClass, StandardArgs standardArgs, boolean doPrintBanner) {
         this.serviceClass = serviceClass;
         this.standardArgs = standardArgs;
         this.doPrintBanner = doPrintBanner;
     }
 
+    /** Run the startup sequence **/
     public void runStartupSequence() {
 
         if (doPrintBanner)
@@ -62,15 +72,23 @@ public class StartupSequence {
 
         printSubBanner();
 
-        initStartupLogging();
         initConfigPlugins();
         loadConfig();
-
         initLogging();
+
+        printFirstLogLine();
+
+        plugins.initRegularPlugins();
+        config.prepareSecrets();
 
         sequenceComplete = true;
     }
 
+    /**
+     * Get the plugin manager that was configured during the startup sequence
+     *
+     * @return The PluginManager instance
+     * **/
     public PluginManager getPlugins() {
 
         if (!sequenceComplete)
@@ -79,6 +97,11 @@ public class StartupSequence {
         return plugins;
     }
 
+    /**
+     * Get the config manager that was configured during the startup sequence
+     *
+     * @return The ConfigManager instance
+     **/
     public ConfigManager getConfig() {
 
         if (!sequenceComplete)
@@ -87,17 +110,36 @@ public class StartupSequence {
         return config;
     }
 
-    public List<StandardArgs.Task> getTasks() {
-        return standardArgs.getTasks();
+    /**
+     * Get the standard args that were used for this startup sequence
+     *
+     * @return The StandardArgs instance
+     **/
+    public StandardArgs getArgs() {
+        return standardArgs;
     }
 
+    /**
+     * Print the headline banner for this service or tool
+     *
+     * @param serviceClass The main class of this service or tool
+     **/
     public static void printBanner(Class<?> serviceClass) {
 
-        var componentName = VersionInfo.getComponentName(serviceClass);
-        var componentVersion = VersionInfo.getComponentVersion(serviceClass);
+        if (serviceClass != null) {
 
-        var startupBanner = String.format(">>> %s %s", componentName, componentVersion);
-        System.out.println(startupBanner);
+            var componentName = VersionInfo.getComponentName(serviceClass);
+            var componentVersion = VersionInfo.getComponentVersion(serviceClass);
+
+            var startupBanner = String.format(">>> %s %s", componentName, componentVersion);
+            System.out.println(startupBanner);
+        }
+        else {
+
+            // StartupSequence is used extensively for tests, particularly integration tests
+            // Service class and version resources are not always available in test code (e.g. in -lib-test)
+            System.out.println(">>> NO SERVICE REGISTERED (this should not happen in production)");
+        }
     }
 
     private void printSubBanner() {
@@ -106,22 +148,26 @@ public class StartupSequence {
         System.out.println();
     }
 
-    private void initStartupLogging() {
+    private void printFirstLogLine() {
 
-        try (var logConfig = Startup.class.getResourceAsStream(STARTUP_LOG_CONFIG)) {
+        if (serviceClass != null) {
 
-            if (logConfig == null)
-                throw new EStartup("Failed to load logging config for bootstrap");
+            var componentName = VersionInfo.getComponentName(serviceClass);
+            var componentVersion = VersionInfo.getComponentVersion(serviceClass);
 
-            var configSource = new ConfigurationSource(logConfig);
-            Configurator.initialize(Startup.class.getClassLoader(), configSource);
+            var log = LoggerFactory.getLogger(serviceClass);
+            log.info("{} {}", componentName, componentVersion);
         }
-        catch (IOException e) {
-            throw new EStartup("Failed to load logging config for startup sequence (this is a bug)");
+        else {
+
+            // StartupSequence is used extensively for tests, particularly integration tests
+            // Service class and version resources are not always available in test code (e.g. in -lib-test)
+            var log = LoggerFactory.getLogger(StartupSequence.class);
+            log.warn("NO SERVICE REGISTERED (this should not happen in production)");
         }
     }
 
-    public void initConfigPlugins() {
+    private void initConfigPlugins() {
 
         plugins = new PluginManager();
         plugins.initConfigPlugins();
@@ -131,15 +177,16 @@ public class StartupSequence {
 
         var configFile = standardArgs.getConfigFile();
         var workingDir = standardArgs.getWorkingDir();
+        var secretKey = standardArgs.getSecretKey();
 
-        config = new ConfigManager(configFile, workingDir, plugins);
+        config = new ConfigManager(configFile, workingDir, plugins, secretKey);
     }
 
 
     /**
      * Initialize the logging framework.
      *
-     * <p>Logging can be configured by setting the property logging.url in the config
+     * <p>Logging can be configured by setting the logging property in the config
      * section of the root configuration, to point to the location of a logging config file.
      * TRAC uses Log4j2 as a backend for slf4j, so the logging config file must be a valid
      * log4j2 config file. If no logging config is provided, messages will be logged
@@ -151,28 +198,24 @@ public class StartupSequence {
      *
      * @throws EStartup There was an error processing the logging config
      */
-    public void initLogging() {
+    @SuppressWarnings("resource")
+    private void initLogging() {
 
-        // Logger configured using initStartupLogging
-        var log = LoggerFactory.getLogger(getClass());
+        var baseConfig = config.loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
+        var loggingConfigUrl = baseConfig.getConfigOrDefault(ConfigKeys.LOGGING_CONFIG_KEY, "");
 
-        var rootConfigMap = config.loadRootConfigObject(Map.class);
-        String loggingConfigUrl = lookupLoggingConfigUrl(rootConfigMap);
+        if (!loggingConfigUrl.isBlank()) {
 
-        if (loggingConfigUrl != null && !loggingConfigUrl.isBlank()) {
-
-            var loggingConfig = config.loadConfigFile(loggingConfigUrl);
+            var loggingConfig = config.loadTextConfig(loggingConfigUrl);
 
             try (var configStream = new ByteArrayInputStream(loggingConfig.getBytes())) {
 
                 var configSource = new ConfigurationSource(configStream);
 
-                log.info("Initialize logging...");
-
-                LogManager.shutdown();
-                Configurator.initialize(getClass().getClassLoader(), configSource);
+                StartupLog.log(this, Level.INFO, "Initialize logging...");
 
                 // Invalid logging configuration cause the startup sequence to bomb out
+                Configurator.initialize(getClass().getClassLoader(), configSource);
             }
             catch (IOException e) {
 
@@ -182,31 +225,11 @@ public class StartupSequence {
         }
         else {
 
-            log.info("No logging config provided, using default...");
+            StartupLog.log(this, Level.INFO, "No logging config provided, using default...");
             Configurator.reconfigure();
         }
-    }
 
-    private String lookupLoggingConfigUrl(Map<?, ?> rootConfigMap) {
-
-        if (!rootConfigMap.containsKey(ConfigKeys.EXTERNAL_CONFIG_KEY))
-            return null;
-
-        var externalConfig = rootConfigMap.get(ConfigKeys.EXTERNAL_CONFIG_KEY);
-
-        if (!(externalConfig instanceof Map))
-            return null;
-
-        var externalConfigMap = (Map<?, ?>) externalConfig;
-
-        if (!externalConfigMap.containsKey(ConfigKeys.LOGGING_CONFIG_KEY))
-            return null;
-
-        var loggingConfig = externalConfigMap.get(ConfigKeys.LOGGING_CONFIG_KEY);
-
-        if (loggingConfig == null)
-            return null;
-
-        return loggingConfig.toString();
+        // Components that use start-up logging can write to the main logs after this point
+        StartupLog.setLogSystemActive();
     }
 }

@@ -17,14 +17,13 @@
 package org.finos.tracdap.common.config.local;
 
 import org.finos.tracdap.common.config.IConfigLoader;
-import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.exception.ETracInternal;
 
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.List;
 
 
 /**
@@ -33,17 +32,14 @@ import java.util.List;
 public class LocalConfigLoader implements IConfigLoader {
 
     @Override
-    public String loaderName() {
-        return "FILESYSTEM";
+    public String loadTextFile(URI url) {
+
+        var bytes = loadBinaryFile(url);
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 
     @Override
-    public List<String> protocols() {
-        return List.of("file");
-    }
-
-    @Override
-    public String loadTextFile(URI uri) {
+    public byte[] loadBinaryFile(URI uri) {
 
         var ERROR_MSG_TEMPLATE = "Failed to load config file: %2$s [%1$s]";
 
@@ -52,7 +48,7 @@ public class LocalConfigLoader implements IConfigLoader {
         try {
 
             path = Paths.get(uri);
-            return Files.readString(path, StandardCharsets.UTF_8);
+            return Files.readAllBytes(path);
         }
         catch (IllegalArgumentException e) {
 
@@ -66,17 +62,17 @@ public class LocalConfigLoader implements IConfigLoader {
         catch (NoSuchFileException e) {
 
             var message = String.format(ERROR_MSG_TEMPLATE, path, "File does not exist");
-            throw new EStartup(message, e);
+            throw new EConfigLoad(message, e);
         }
         catch (AccessDeniedException e) {
 
             var message = String.format(ERROR_MSG_TEMPLATE, path, "Access denied");
-            throw new EStartup(message, e);
+            throw new EConfigLoad(message, e);
         }
         catch (IOException e) {
 
             var message = String.format(ERROR_MSG_TEMPLATE, path, e.getMessage());
-            throw new EStartup(message, e);
+            throw new EConfigLoad(message, e);
         }
     }
 }
