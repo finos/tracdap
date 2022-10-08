@@ -500,7 +500,11 @@ class DevModeTranslator:
             if len(input_schemas) == 1:
                 inputs[node_name] = input_schemas[0]
             else:
-                raise _ex.EUnexpected()  # todo schema combination
+                first_schema = input_schemas[0]
+                if all(map(lambda s: s == first_schema, input_schemas[1:])):
+                    inputs[node_name] = first_schema
+                else:
+                    raise _ex.EJobValidation(f"Multiple models use input [{node_name}] but expect different schemas")
 
         flow.inputs = inputs
 
