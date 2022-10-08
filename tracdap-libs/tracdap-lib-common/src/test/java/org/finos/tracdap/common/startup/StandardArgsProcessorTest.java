@@ -55,7 +55,7 @@ class StandardArgsProcessorTest {
     @Test
     void testArgs_unknownOption() {
 
-        var command = "--config etc/my_config.props --keystore-key Mellon --unknown option";
+        var command = "--config etc/my_config.props --secret-key Mellon --unknown option";
         var commandArgs = command.split("\\s");
 
         var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs));
@@ -66,7 +66,7 @@ class StandardArgsProcessorTest {
     @Test
     void testArgs_noConfig() {
 
-        var command = "--keystore-key Mellon";
+        var command = "--secret-key Mellon";
         var commandArgs = command.split("\\s");
 
         var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs));
