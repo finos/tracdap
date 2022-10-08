@@ -17,7 +17,7 @@
 package org.finos.tracdap.common.config.test;
 
 import org.finos.tracdap.common.config.IConfigLoader;
-import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.EConfigLoad;
 
 import java.io.IOException;
 import java.net.URI;
@@ -45,7 +45,7 @@ public class TestConfigLoader implements IConfigLoader {
         }
         catch (IOException e) {
 
-            throw new EStartup("Config file could not be read: " + e.getMessage(), e);
+            throw new EConfigLoad("Config file could not be read: " + e.getMessage(), e);
         }
     }
 

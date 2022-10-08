@@ -18,7 +18,6 @@ package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.config.test.TestConfigPlugin;
 import org.finos.tracdap.common.exception.EConfigLoad;
-import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.config.PlatformConfig;
@@ -149,7 +148,7 @@ class ConfigManagerTest {
 
         var absoluteUrl = "//config_svr/config_dir/sample-config.json";
 
-        assertThrows(EStartup.class, () -> manager.loadTextConfig(absoluteUrl));
+        assertThrows(EConfigLoad.class, () -> manager.loadTextConfig(absoluteUrl));
     }
 
     @Test
@@ -160,7 +159,7 @@ class ConfigManagerTest {
 
         var absoluteUrl = "unknown://config_svr/config_dir/sample-config.json";
 
-        assertThrows(EStartup.class, () -> manager.loadTextConfig(absoluteUrl));
+        assertThrows(EConfigLoad.class, () -> manager.loadTextConfig(absoluteUrl));
     }
 
     @Test
@@ -197,7 +196,7 @@ class ConfigManagerTest {
 
         var relativePath = "file:./sample-config.json";
 
-        assertThrows(EStartup.class, () -> manager.loadTextConfig(relativePath));
+        assertThrows(EConfigLoad.class, () -> manager.loadTextConfig(relativePath));
 
         // Using test-protocol loader
 
@@ -206,7 +205,7 @@ class ConfigManagerTest {
         
         var relativePath2 = "test:./sample-config.json";
 
-        assertThrows(EStartup.class, () -> manager2.loadTextConfig(relativePath2));
+        assertThrows(EConfigLoad.class, () -> manager2.loadTextConfig(relativePath2));
     }
 
     @Test
@@ -219,14 +218,14 @@ class ConfigManagerTest {
 
         var relativePath = "missing.properties";
 
-        assertThrows(EStartup.class, () -> manager.loadTextConfig(relativePath));
+        assertThrows(EConfigLoad.class, () -> manager.loadTextConfig(relativePath));
 
         // Using test-protocol loader
 
         var configUrl2 = "test://config_svr/config_dir/sample-config.yaml";
         var manager2 = new ConfigManager(configUrl2, tempDir, plugins);
 
-        assertThrows(EStartup.class, () -> manager2.loadTextConfig(relativePath));
+        assertThrows(EConfigLoad.class, () -> manager2.loadTextConfig(relativePath));
     }
 
     @Test
@@ -235,10 +234,10 @@ class ConfigManagerTest {
         var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
-        assertThrows(EStartup.class, () -> manager.loadTextConfig(null));
-        assertThrows(EStartup.class, () -> manager.loadTextConfig(""));
-        assertThrows(EStartup.class, () -> manager.loadTextConfig(" "));
-        assertThrows(EStartup.class, () -> manager.loadTextConfig("\n"));
+        assertThrows(EConfigLoad.class, () -> manager.loadTextConfig(null));
+        assertThrows(EConfigLoad.class, () -> manager.loadTextConfig(""));
+        assertThrows(EConfigLoad.class, () -> manager.loadTextConfig(" "));
+        assertThrows(EConfigLoad.class, () -> manager.loadTextConfig("\n"));
     }
 
     @Test
@@ -247,8 +246,8 @@ class ConfigManagerTest {
         var configUrl = "config_dir/sample-config.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
-        assertThrows(EStartup.class, () -> manager.loadTextConfig("file:::-:"));
-        assertThrows(EStartup.class, () -> manager.loadTextConfig("//_>>@"));
+        assertThrows(EConfigLoad.class, () -> manager.loadTextConfig("file:::-:"));
+        assertThrows(EConfigLoad.class, () -> manager.loadTextConfig("//_>>@"));
     }
 
     // loadProperties uses the same loading mechanism as loadTextFile
@@ -289,14 +288,14 @@ class ConfigManagerTest {
 
         var relativePath = "missing.yaml";
 
-        assertThrows(EStartup.class, () -> manager.loadConfigObject(relativePath, _ConfigFile.class));
+        assertThrows(EConfigLoad.class, () -> manager.loadConfigObject(relativePath, _ConfigFile.class));
 
         // Using test-protocol loader
 
         var configUrl2 = "test://config_svr/config_dir/sample-config.yaml";
         var manager2 = new ConfigManager(configUrl2, tempDir, plugins);
 
-        assertThrows(EStartup.class, () -> manager2.loadConfigObject(relativePath, _ConfigFile.class));
+        assertThrows(EConfigLoad.class, () -> manager2.loadConfigObject(relativePath, _ConfigFile.class));
     }
 
     @Test
@@ -329,34 +328,34 @@ class ConfigManagerTest {
         var configUrl = "config_dir/missing.yaml";
         var manager = new ConfigManager(configUrl, tempDir, plugins);
 
-        assertThrows(EStartup.class, () -> manager.loadRootConfigObject(_ConfigFile.class));
+        assertThrows(EConfigLoad.class, () -> manager.loadRootConfigObject(_ConfigFile.class));
 
         // Using test-protocol loader
 
         var configUrl2 = "test://config_svr/config_dir/missing.yaml";
         var manager2 = new ConfigManager(configUrl2, tempDir, plugins);
 
-        assertThrows(EStartup.class, () -> manager2.loadRootConfigObject(_ConfigFile.class));
+        assertThrows(EConfigLoad.class, () -> manager2.loadRootConfigObject(_ConfigFile.class));
     }
 
     @Test
     void loadRootConfig_nullOrBlankUrl() {
 
-        assertThrows(EStartup.class, () -> new ConfigManager(null, tempDir, plugins));
-        assertThrows(EStartup.class, () -> new ConfigManager("", tempDir, plugins));
-        assertThrows(EStartup.class, () -> new ConfigManager(" ", tempDir, plugins));
-        assertThrows(EStartup.class, () -> new ConfigManager("\n", tempDir, plugins));
+        assertThrows(EConfigLoad.class, () -> new ConfigManager(null, tempDir, plugins));
+        assertThrows(EConfigLoad.class, () -> new ConfigManager("", tempDir, plugins));
+        assertThrows(EConfigLoad.class, () -> new ConfigManager(" ", tempDir, plugins));
+        assertThrows(EConfigLoad.class, () -> new ConfigManager("\n", tempDir, plugins));
     }
 
     @Test
     void loadRootConfig_invalidUrl() {
 
         var configUrl1 = "file:::-:";
-        assertThrows(EStartup.class, () -> new ConfigManager(configUrl1, tempDir, plugins)
+        assertThrows(EConfigLoad.class, () -> new ConfigManager(configUrl1, tempDir, plugins)
                 .loadRootConfigObject(_ConfigFile.class));
 
         var configUrl2 = "//_>>@";
-        assertThrows(EStartup.class, () -> new ConfigManager(configUrl2, tempDir, plugins)
+        assertThrows(EConfigLoad.class, () -> new ConfigManager(configUrl2, tempDir, plugins)
                 .loadRootConfigObject(_ConfigFile.class));
     }
 

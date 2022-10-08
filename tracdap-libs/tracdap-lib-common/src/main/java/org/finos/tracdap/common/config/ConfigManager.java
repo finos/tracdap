@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.config;
 
+import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.plugin.IPluginManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.startup.Startup;
@@ -294,7 +295,7 @@ public class ConfigManager {
     private URI parseUrl(String urlString) {
 
         if (urlString == null || urlString.isBlank())
-            throw new EStartup("Config URL is missing or blank");
+            throw new EConfigLoad("Config URL is missing or blank");
 
         Path path = null;
         URI url = null;
@@ -320,7 +321,7 @@ public class ConfigManager {
         if (path != null)
             return path.toUri();
 
-        throw new EStartup("Requested config URL is not a valid URL or path: " + urlString);
+        throw new EConfigLoad("Requested config URL is not a valid URL or path: " + urlString);
     }
 
     private URI resolveUrl(URI url) {
@@ -338,13 +339,13 @@ public class ConfigManager {
         if (isAbsolute) {
             if (protocol == null || protocol.isBlank()) {
                 var message = String.format(ERROR_MSG_TEMPLATE, url, "Absolute URLs must specify an explicit protocol");
-                throw new EStartup(message);
+                throw new EConfigLoad(message);
             }
         }
         else {
             if (protocol != null && !protocol.isBlank()) {
                 var message = String.format(ERROR_MSG_TEMPLATE, url, "Relative URLs cannot specify an explicit protocol");
-                throw new EStartup(message);
+                throw new EConfigLoad(message);
             }
         }
 
@@ -353,7 +354,7 @@ public class ConfigManager {
 
             if (url.getHost() != null) {
                 var message = String.format(ERROR_MSG_TEMPLATE, url, "Network file paths are not supported");
-                throw new EStartup(message);
+                throw new EConfigLoad(message);
             }
         }
 
@@ -385,7 +386,7 @@ public class ConfigManager {
 
             if (!url.isAbsolute()) {
                 var message = String.format("Relative URL is not allowed for root config file with protocol [%s]: [%s]", protocol, url);
-                throw new EStartup(message);
+                throw new EConfigLoad(message);
             }
             else {
                 return url;
@@ -417,7 +418,7 @@ public class ConfigManager {
             var message = String.format("No config loader available for protocol [%s]", protocol);
 
             StartupLog.log(this, Level.ERROR, message);
-            throw new EStartup(message);
+            throw new EConfigLoad(message);
         }
 
         return plugins.createService(IConfigLoader.class, protocol);
@@ -430,7 +431,7 @@ public class ConfigManager {
             var message = String.format("No secret loader available for protocol [%s]", protocol);
 
             StartupLog.log(this, Level.ERROR, message);
-            throw new EStartup(message);
+            throw new EConfigLoad(message);
         }
 
         var secretProps = buildSecretProps(configMap);

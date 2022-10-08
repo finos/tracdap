@@ -17,7 +17,7 @@
 package org.finos.tracdap.common.config.local;
 
 import org.finos.tracdap.common.config.IConfigLoader;
-import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.exception.ETracInternal;
 
 import java.io.IOException;
@@ -62,17 +62,17 @@ public class LocalConfigLoader implements IConfigLoader {
         catch (NoSuchFileException e) {
 
             var message = String.format(ERROR_MSG_TEMPLATE, path, "File does not exist");
-            throw new EStartup(message, e);
+            throw new EConfigLoad(message, e);
         }
         catch (AccessDeniedException e) {
 
             var message = String.format(ERROR_MSG_TEMPLATE, path, "Access denied");
-            throw new EStartup(message, e);
+            throw new EConfigLoad(message, e);
         }
         catch (IOException e) {
 
             var message = String.format(ERROR_MSG_TEMPLATE, path, e.getMessage());
-            throw new EStartup(message, e);
+            throw new EConfigLoad(message, e);
         }
     }
 }
