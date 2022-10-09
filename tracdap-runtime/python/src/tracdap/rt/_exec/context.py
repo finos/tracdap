@@ -58,16 +58,18 @@ class TracContextImpl(_api.TracContext):
     def __init__(self,
                  model_def: _meta.ModelDefinition,
                  model_class: _api.TracModel.__class__,
-                 local_ctx: tp.Dict[str, _data.DataView]):
+                 local_ctx: tp.Dict[str, _data.DataView],
+                 schemas: tp.Dict[str, _meta.SchemaDefinition]):
 
         self.__ctx_log = _util.logger_for_object(self)
+        self.__model_log = _util.logger_for_class(model_class)
 
         self.__model_def = model_def
         self.__model_class = model_class
-        self.__model_log = _util.logger_for_class(self.__model_class)
 
         self.__parameters = local_ctx or {}
         self.__data = local_ctx or {}
+        self.__schemas = schemas
 
         self.__val = TracContextValidator(
             self.__ctx_log,
@@ -92,6 +94,11 @@ class TracContextImpl(_api.TracContext):
 
         self.__val.check_dataset_name_not_null(dataset_name)
         self.__val.check_dataset_valid_identifier(dataset_name)
+
+        # There is no need to look in the data map if the model has defined a static schema
+        if dataset_name in self.__schemas:
+            return self.__schemas[dataset_name]
+
         self.__val.check_context_item_exists(dataset_name)
         self.__val.check_context_item_is_dataset(dataset_name)
         self.__val.check_dataset_schema_defined(dataset_name)
@@ -115,10 +122,17 @@ class TracContextImpl(_api.TracContext):
 
         data_view = self.__data[dataset_name]
 
+        # If the model defines a static input schema, use that for schema conformance
+        # Otherwise, take what is in the incoming dataset (schema is dynamic)
+        if dataset_name in self.__schemas:
+            schema = _data.DataMapping.trac_to_arrow_schema(self.__schemas[dataset_name])
+        else:
+            schema = data_view.arrow_schema
+
         if use_temporal_objects is None:
             use_temporal_objects = self.__DEFAULT_TEMPORAL_OBJECTS
 
-        return _data.DataMapping.view_to_pandas(data_view, part_key, use_temporal_objects)
+        return _data.DataMapping.view_to_pandas(data_view, part_key, schema, use_temporal_objects)
 
     def put_pandas_table(self, dataset_name: str, dataset: pd.DataFrame):
 
@@ -137,7 +151,14 @@ class TracContextImpl(_api.TracContext):
 
         prior_view = self.__data[dataset_name]
 
-        data_item = _data.DataMapping.pandas_to_item(dataset, schema=prior_view.arrow_schema)
+        # If the model defines a static output schema, use that for schema conformance
+        # Otherwise, use the schema in the data view for this output (this could be a dynamic schema)
+        if dataset_name in self.__schemas:
+            schema = _data.DataMapping.trac_to_arrow_schema(self.__schemas[dataset_name])
+        else:
+            schema = prior_view.arrow_schema
+
+        data_item = _data.DataMapping.pandas_to_item(dataset, schema)
         data_view = _data.DataMapping.add_item_to_view(prior_view, part_key, data_item)
 
         self.__data[dataset_name] = data_view
