@@ -17,6 +17,7 @@ import unittest
 
 import tracdap.rt._impl.shim as shim
 import tracdap.rt._impl.util as util
+import tracdap.rt.exceptions as _ex
 
 _SHIM_TEST_DIR = pathlib.Path(__file__).parent \
     .joinpath("../../../..") \
@@ -96,3 +97,20 @@ class TestShimLoader(unittest.TestCase):
         self.assertIsInstance(instance_, class_)
         self.assertEqual(instance_.dup_source, "package")
 
+    def test_unknown_module(self):
+
+        self.assertRaises(
+            _ex.EModelLoad, lambda:
+            self._shim_loader.load_class("nonexistent.module", "ImportTest", object))
+
+    def test_unknown_class(self):
+
+        self.assertRaises(
+            _ex.EModelLoad, lambda:
+            self._shim_loader.load_class("acme.rockets.abs1", "NonexistentClass", object))
+
+    def test_load_wrong_type(self):
+
+        self.assertRaises(
+            _ex.EModelLoad, lambda:
+            self._shim_loader.load_class("acme.rockets.abs1", "ImportTest", dict))
