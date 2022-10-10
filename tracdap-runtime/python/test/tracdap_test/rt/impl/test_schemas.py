@@ -103,7 +103,7 @@ class SchemaResourcesTest(unittest.TestCase):
         # Missing package is a model repo resource not found error
 
         self.assertRaises(
-            ex.EModelRepoResource, lambda:
+            ex.EModelLoad, lambda:
             trac.load_schema("tracdap_test.nonexistent", "schema_sample.csv"))
 
     def test_schema_not_found(self):
@@ -111,7 +111,7 @@ class SchemaResourcesTest(unittest.TestCase):
         # Missing schema file is a model repo resource not found error
 
         self.assertRaises(
-            ex.EModelRepoResource, lambda:
+            ex.EModelLoad, lambda:
             trac.load_schema(test_resources, "not_found.csv"))
 
     def test_schema_empty(self):

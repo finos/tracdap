@@ -365,7 +365,7 @@ class ShimLoader:
         except ModuleNotFoundError as e:
             err = f"Loading classes failed in module [{module_name}]: {str(e)}"
             cls._log.error(err)
-            raise _ex.EModelRepoResource(err) from e
+            raise _ex.EModelLoad(err) from e
 
     @classmethod
     def load_resource(
@@ -406,12 +406,12 @@ class ShimLoader:
         except ModuleNotFoundError as e:
             err = f"Loading resources failed in module [{module_name}]: {str(e)}"
             cls._log.error(err)
-            raise _ex.EModelRepoResource(err) from e
+            raise _ex.EModelLoad(err) from e
 
         except FileNotFoundError as e:
             err = f"Loading resources failed in module [{module_name}]: Resource not found for [{resource_name}]"
             cls._log.error(err)
-            raise _ex.EModelRepoResource(err) from e
+            raise _ex.EModelLoad(err) from e
 
     @classmethod
     def _run_model_guard(cls):
