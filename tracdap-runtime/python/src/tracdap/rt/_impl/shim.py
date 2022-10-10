@@ -342,7 +342,7 @@ class ShimLoader:
 
             cls._log.debug(f"Loading class [{class_name}] from [{module_name}]")
 
-            if module_name == module:
+            if isinstance(module, str):
                 module = _il.import_module(module_name)
 
             class_ = module.__dict__.get(class_name)
@@ -363,7 +363,7 @@ class ShimLoader:
             return class_
 
         except ModuleNotFoundError as e:
-            err = f"Loading classes failed: Module not found for [{module_name}]"
+            err = f"Loading classes failed in module [{module_name}]: {str(e)}"
             cls._log.error(err)
             raise _ex.EModelRepoResource(err) from e
 
@@ -404,12 +404,12 @@ class ShimLoader:
             return load_func(module, resource_name)
 
         except ModuleNotFoundError as e:
-            err = f"Loading resources failed: Module not found for [{module_name}]"
+            err = f"Loading resources failed in module [{module_name}]: {str(e)}"
             cls._log.error(err)
             raise _ex.EModelRepoResource(err) from e
 
         except FileNotFoundError as e:
-            err = f"Loading resources failed: Resource not found for [{resource_name}] in [{module_name}]"
+            err = f"Loading resources failed in module [{module_name}]: Resource not found for [{resource_name}]"
             cls._log.error(err)
             raise _ex.EModelRepoResource(err) from e
 
