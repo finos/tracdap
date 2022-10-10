@@ -111,6 +111,24 @@ class ERuntimeValidation(EValidation):
     pass
 
 
+class EModel(ETrac):
+
+    """
+    Base class for model errors
+    """
+
+    pass
+
+
+class EModelLoad(EModel):
+
+    """
+    Indicates a failure to load the model class, or other runtime resources
+    """
+
+    pass
+
+
 class EModelExec(ETrac):
 
     """
@@ -257,15 +275,6 @@ class EModelRepoRequest(EModelRepo):
     The model repository responds, but the request fails for a structural reason
 
     E.g. Unknown package, version, tag or commit hash.
-    """
-
-    pass
-
-
-class EModelRepoResource(ETrac):
-
-    """
-    Attempt to load a non-existent resource from the model repo
     """
 
     pass

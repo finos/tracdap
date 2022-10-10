@@ -342,30 +342,33 @@ class ShimLoader:
 
             cls._log.debug(f"Loading class [{class_name}] from [{module_name}]")
 
-            if module_name == module:
+            if isinstance(module, str):
                 module = _il.import_module(module_name)
 
             class_ = module.__dict__.get(class_name)
 
             if class_ is None:
-                error_msg = f"Class [{class_name}] was not found in module [{module_name}]"
-                cls._log.error(error_msg)
-                raise _ex.EModelRepoRequest(error_msg)
+                err = f"Loading classes failed in module [{module_name}]: Class [{class_name}] not found"
+                cls._log.error(err)
+                raise _ex.EModelLoad(err)
 
-            if not isinstance(class_, class_type.__class__):
+            if not isinstance(class_, type):
+                err = f"Loading classes failed in module [{module_name}]: [{class_name}] is not a class"
+                cls._log.error(err)
+                raise _ex.EModelLoad(err)
 
-                error_msg = f"Class [{class_name}] is the wrong type" \
-                          + f" (expected [{class_type.__name__}], got [{type(class_)}]"
-
-                cls._log.error(error_msg)
-                raise _ex.EModelRepoRequest(error_msg)
+            if not issubclass(class_, class_type):
+                err = f"Loading classes failed in module [{module_name}]: " \
+                    + f"Class [{class_name}] does not extend [{class_type.__name__}]"
+                cls._log.error(err)
+                raise _ex.EModelLoad(err)
 
             return class_
 
         except ModuleNotFoundError as e:
-            err = f"Loading classes failed: Module not found for [{module_name}]"
+            err = f"Loading classes failed in module [{module_name}]: {str(e)}"
             cls._log.error(err)
-            raise _ex.EModelRepoResource(err) from e
+            raise _ex.EModelLoad(err) from e
 
     @classmethod
     def load_resource(
@@ -404,14 +407,14 @@ class ShimLoader:
             return load_func(module, resource_name)
 
         except ModuleNotFoundError as e:
-            err = f"Loading resources failed: Module not found for [{module_name}]"
+            err = f"Loading resources failed in module [{module_name}]: {str(e)}"
             cls._log.error(err)
-            raise _ex.EModelRepoResource(err) from e
+            raise _ex.EModelLoad(err) from e
 
         except FileNotFoundError as e:
-            err = f"Loading resources failed: Resource not found for [{resource_name}] in [{module_name}]"
+            err = f"Loading resources failed in module [{module_name}]: Resource not found for [{resource_name}]"
             cls._log.error(err)
-            raise _ex.EModelRepoResource(err) from e
+            raise _ex.EModelLoad(err) from e
 
     @classmethod
     def _run_model_guard(cls):
