@@ -71,7 +71,7 @@ class _RuntimeHook:
     @_abc.abstractmethod
     def define_attribute(
             self, attr_name: str, attr_value: _tp.Any,
-            attr_type: _tp.Union[_meta.TypeDescriptor, _meta.BasicType, None] = None,
+            attr_type: _tp.Optional[_meta.BasicType] = None,
             categorical: bool = False) \
             -> _meta.TagUpdate:
 

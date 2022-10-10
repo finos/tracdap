@@ -33,7 +33,7 @@ def define_attributes(*attrs: _tp.Union[TagUpdate, _tp.List[TagUpdate]]) -> _tp.
 
 def define_attribute(
         attr_name: str, attr_value: _tp.Any,
-        attr_type: _tp.Union[TypeDescriptor, BasicType, None] = None,
+        attr_type: _tp.Optional[BasicType] = None,
         categorical: bool = False) \
         -> TagUpdate:
 
@@ -43,7 +43,7 @@ def define_attribute(
 
 def A(  # noqa
         attr_name: str, attr_value: _tp.Any,
-        attr_type: _tp.Union[TypeDescriptor, BasicType, None] = None,
+        attr_type: _tp.Optional[BasicType] = None,
         categorical: bool = False) \
         -> TagUpdate:
 

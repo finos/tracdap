@@ -218,22 +218,26 @@ class RuntimeHookImpl(_RuntimeHook):
 
     def define_attribute(
             self, attr_name: str, attr_value: _tp.Any,
-            attr_type: _tp.Union[_meta.TypeDescriptor, _meta.BasicType, None] = None,
+            attr_type: _tp.Optional[_meta.BasicType] = None,
             categorical: bool = False) \
             -> _meta.TagUpdate:
 
         ApiGuard.validate_signature(self.define_attribute, attr_name, attr_value, attr_type, categorical)
 
-        if isinstance(attr_type, _meta.TypeDescriptor):
-            trac_value = _type_system.MetadataCodec.convert_value(attr_value, attr_type)
-        elif isinstance(attr_type, _meta.BasicType):
-            type_desc = _meta.TypeDescriptor(attr_type, None, None)
+        if isinstance(attr_value, list) and attr_type is None:
+            raise _ex.EModelValidation(f"Attribute type must be specified for multi-valued attribute [{attr_name}]")
+
+        if categorical and not (isinstance(attr_name, str) or attr_type == _meta.BasicType.STRING):
+            raise _ex.EModelValidation("Categorical flag is only allowed for STRING attributes")
+
+        if attr_type is None:
+            trac_value = _type_system.MetadataCodec.encode_value(attr_value)
+        elif isinstance(attr_value, list):
+            type_desc = _meta.TypeDescriptor(_meta.BasicType.ARRAY, arrayType=_meta.TypeDescriptor(attr_type))
             trac_value = _type_system.MetadataCodec.convert_value(attr_value, type_desc)
         else:
-            trac_value = _type_system.MetadataCodec.encode_value(attr_value)
-
-        if categorical and trac_value.type.basicType != _meta.BasicType.STRING:
-            raise _ex.EModelValidation("Categorical flag is only allowed for STRING attributes")
+            type_desc = _meta.TypeDescriptor(attr_type)
+            trac_value = _type_system.MetadataCodec.convert_value(attr_value, type_desc)
 
         return _meta.TagUpdate(_meta.TagOperation.CREATE_OR_APPEND_ATTR, attr_name, trac_value)
 

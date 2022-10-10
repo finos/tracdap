@@ -102,7 +102,12 @@ class MetadataCodec:
 
             raise _ex.ETracInternal("Missing type information")
 
-        basic_type = value.type.basicType
+        return MetadataCodec._decode_value_for_type(value, value.type)
+
+    @staticmethod
+    def _decode_value_for_type(value: _meta.Value, type_desc: _meta.TypeDescriptor):
+
+        basic_type = type_desc.basicType
 
         if basic_type == _meta.BasicType.BOOLEAN:
             return value.booleanValue
@@ -124,6 +129,10 @@ class MetadataCodec:
 
         if basic_type == _meta.BasicType.DATETIME:
             return dt.datetime.fromisoformat(value.datetimeValue.isoDatetime)
+
+        if basic_type == _meta.BasicType.ARRAY:
+            items = value.arrayValue.items
+            return list(map(lambda x: MetadataCodec._decode_value_for_type(x, type_desc.arrayType), items))
 
         raise _ex.ETracInternal(f"Decoding value type [{basic_type}] is not supported yet")
 
@@ -162,7 +171,7 @@ class MetadataCodec:
             type_desc = _meta.TypeDescriptor(_meta.BasicType.DATE)
             return _meta.Value(type_desc, dateValue=_meta.DateValue(value.isoformat()))
 
-        raise _ex.ETracInternal(f"Encoding value type [{type(value)}] is not supported yet")
+        raise _ex.ETracInternal(f"Value type [{type(value)}] is not supported yet")
 
     @classmethod
     def convert_value(cls, raw_value: tp.Any, type_desc: _meta.TypeDescriptor):
@@ -188,7 +197,23 @@ class MetadataCodec:
         if type_desc.basicType == _meta.BasicType.DATETIME:
             return cls.convert_datetime_value(raw_value)
 
+        if type_desc.basicType == _meta.BasicType.ARRAY:
+            return cls.convert_array_value(raw_value, type_desc.arrayType)
+
         raise _ex.ETracInternal(f"Conversion to value type [{type_desc.basicType.name}] is not supported yet")
+
+    @staticmethod
+    def convert_array_value(raw_value: tp.List[tp.Any], array_type: _meta.TypeDescriptor) -> _meta.Value:
+
+        type_desc = _meta.TypeDescriptor(_meta.BasicType.ARRAY, array_type)
+
+        if not isinstance(raw_value, list):
+            msg = f"Value of type [{type(raw_value)}] cannot be converted to {_meta.BasicType.ARRAY.name}"
+            raise _ex.ETracInternal(msg)
+
+        items = list(map(lambda x: MetadataCodec.convert_value(x, array_type), raw_value))
+
+        return _meta.Value(type_desc, arrayValue=_meta.ArrayValue(items))
 
     @staticmethod
     def convert_boolean_value(raw_value: tp.Any) -> _meta.Value:
