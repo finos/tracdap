@@ -25,6 +25,31 @@ from .hook import _Named
 from tracdap.rt.metadata import *  # DOCGEN_REMOVE
 
 
+def define_attributes(*attrs: _tp.Union[TagUpdate, _tp.List[TagUpdate]]) -> _tp.List[TagUpdate]:
+
+    rh = _RuntimeHook.runtime()
+    return rh.define_attributes(*attrs)
+
+
+def define_attribute(
+        attr_name: str, attr_value: _tp.Any,
+        attr_type: _tp.Union[TypeDescriptor, BasicType, None] = None,
+        categorical: bool = False) \
+        -> TagUpdate:
+
+    rh = _RuntimeHook.runtime()
+    return rh.define_attribute(attr_name, attr_value, attr_type, categorical)
+
+
+def A(  # noqa
+        attr_name: str, attr_value: _tp.Any,
+        attr_type: _tp.Union[TypeDescriptor, BasicType, None] = None,
+        categorical: bool = False) \
+        -> TagUpdate:
+
+    return define_attribute(attr_name, attr_value, attr_type, categorical)
+
+
 def define_parameter(
         param_name: str, param_type: _tp.Union[TypeDescriptor, BasicType],
         label: str, default_value: _tp.Optional[_tp.Any] = None) \

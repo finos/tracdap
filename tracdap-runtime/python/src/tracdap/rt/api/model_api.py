@@ -207,6 +207,10 @@ class TracModel:
     .. seealso:: :py:class:`TracContext`
     """
 
+    def define_attributes(self) -> _tp.List[TagUpdate]:  # noqa
+
+        return []
+
     @_abc.abstractmethod
     def define_parameters(self) -> _tp.Dict[str, ModelParameter]:
 
