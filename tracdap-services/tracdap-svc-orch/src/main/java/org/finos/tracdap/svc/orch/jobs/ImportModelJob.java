@@ -20,6 +20,7 @@ import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
+import org.finos.tracdap.config.TagUpdateList;
 import org.finos.tracdap.metadata.*;
 
 import java.util.List;
@@ -81,13 +82,22 @@ public class ImportModelJob implements IJobLogic {
     @Override
     public List<MetadataWriteRequest> buildResultMetadata(String tenant, JobConfig jobConfig, JobResult jobResult) {
 
-        var modelObjMaybe = jobResult.getResultsMap().values().stream().findFirst();
+        var modelKeyMaybe = jobResult.getResultsMap().keySet().stream().findFirst();
 
-        if (modelObjMaybe.isEmpty())
+        if (modelKeyMaybe.isEmpty())
             throw new EUnexpected();
 
-        var modelObj = modelObjMaybe.get();
+        var modelKey = modelKeyMaybe.get();
+        var modelObj = jobResult.getResultsOrThrow(modelKey);
         var modelDef = modelObj.getModel();
+
+        var modelAttrs = jobResult
+                .getAttrsOrDefault(modelKey, TagUpdateList.newBuilder().build())
+                .getAttrsList();
+
+        var suppliedAttrs = jobConfig.getJob()
+                .getImportModel()
+                .getModelAttrsList();
 
         var controlledAttrs = List.of(
 
@@ -116,16 +126,13 @@ public class ImportModelJob implements IJobLogic {
                         .setValue(encodeValue(modelDef.getVersion()))
                         .build());
 
-        var suppliedAttrs = jobConfig.getJob()
-                .getImportModel()
-                .getModelAttrsList();
-
         var modelReq = MetadataWriteRequest.newBuilder()
                 .setTenant(tenant)
                 .setObjectType(ObjectType.MODEL)
                 .setDefinition(modelObj)
-                .addAllTagUpdates(controlledAttrs)
+                .addAllTagUpdates(modelAttrs)
                 .addAllTagUpdates(suppliedAttrs)
+                .addAllTagUpdates(controlledAttrs)
                 .build();
 
         return List.of(modelReq);
