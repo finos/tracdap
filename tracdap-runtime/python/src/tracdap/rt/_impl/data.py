@@ -222,7 +222,30 @@ class DataMapping:
         return cls.__PANDAS_DATETIME_TYPE
 
     @classmethod
-    def view_to_pandas(cls, view: DataView, part: DataPartKey, temporal_objects_flag: bool) -> pd.DataFrame:
+    def view_to_pandas(
+            cls, view: DataView, part: DataPartKey, schema: tp.Optional[pa.Schema],
+            temporal_objects_flag: bool) -> pd.DataFrame:
+
+        table = cls.view_to_arrow(view, part)
+        return cls.arrow_to_pandas(table, schema, temporal_objects_flag)
+
+    @classmethod
+    def pandas_to_item(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema]) -> DataItem:
+
+        table = cls.pandas_to_arrow(df, schema)
+        return DataItem(table.schema, table)
+
+    @classmethod
+    def add_item_to_view(cls, view: DataView, part: DataPartKey, item: DataItem) -> DataView:
+
+        prior_deltas = view.parts.get(part) or list()
+        deltas = [*prior_deltas, item]
+        parts = {**view.parts, part: deltas}
+
+        return DataView(view.trac_schema, view.arrow_schema, parts)
+
+    @classmethod
+    def view_to_arrow(cls, view: DataView, part: DataPartKey) -> pa.Table:
 
         deltas = view.parts.get(part)
 
@@ -235,7 +258,7 @@ class DataMapping:
             raise _ex.ETracInternal(f"Data view for part [{part.opaque_key}] does not contain any items")
 
         if len(deltas) == 1:
-            return cls.item_to_pandas(deltas[0], temporal_objects_flag)
+            return cls.item_to_arrow(deltas[0])
 
         batches = {
             batch
@@ -245,26 +268,28 @@ class DataMapping:
                 if delta.batches
                 else delta.table.to_batches())}
 
-        table = pa.Table.from_batches(batches) # noqa
-        return cls.arrow_to_pandas(table, temporal_objects_flag)
+        return pa.Table.from_batches(batches) # noqa
 
     @classmethod
-    def item_to_pandas(cls, item: DataItem, temporal_objects_flag: bool) -> pd.DataFrame:
-
-        if item.pandas is not None:
-            return item.pandas.copy()
+    def item_to_arrow(cls, item: DataItem) -> pa.Table:
 
         if item.table is not None:
-            return cls.arrow_to_pandas(item.table, temporal_objects_flag)
+            return item.table
 
         if item.batches is not None:
-            table = pa.Table.from_batches(item.batches, item.schema)  # noqa
-            return cls.arrow_to_pandas(table, temporal_objects_flag)
+            return pa.Table.from_batches(item.batches, item.schema)  # noqa
 
         raise _ex.ETracInternal(f"Data item does not contain any usable data")
 
     @classmethod
-    def arrow_to_pandas(cls, table: pa.Table, temporal_objects_flag: bool = False) -> pd.DataFrame:
+    def arrow_to_pandas(
+            cls, table: pa.Table, schema: tp.Optional[pa.Schema] = None,
+            temporal_objects_flag: bool = False) -> pd.DataFrame:
+
+        if schema is not None:
+            table = DataConformance.conform_to_schema(table, schema, warn_extra_columns=False)
+        else:
+            DataConformance.check_duplicate_fields(table.schema.names, False)
 
         return table.to_pandas(
 
@@ -283,51 +308,39 @@ class DataMapping:
             split_blocks=True)  # noqa
 
     @classmethod
-    def pandas_to_view(cls, df: pd.DataFrame, prior_view: DataView, part: DataPartKey):
-
-        item = cls.pandas_to_item(df, prior_view.arrow_schema)
-        return cls.add_item_to_view(prior_view, part, item)
-
-    @classmethod
-    def pandas_to_item(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema]) -> DataItem:
-
-        table = cls.pandas_to_arrow(df, schema)
-        return DataItem(table.schema, table)
-
-    @classmethod
     def pandas_to_arrow(cls, df: pd.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
 
-        # Here we convert the whole Pandas df and then pass it to conformance
-        # An optimization would be to filter columns before applying conformance
-        # To do this, we'd need the case-insensitive field matching logic, including output of warnings
+        # Converting pandas -> arrow needs care to ensure type coercion is applied correctly
+        # Calling Table.from_pandas with the supplied schema will very often reject data
+        # Instead, we convert the dataframe as-is and then apply type conversion in a second step
+        # This allows us to apply specific coercion rules for each data type
 
-        # Also, note that schema is not applied in from_pandas
-        # This is because the conformance logic allows for a wider range of conversions
-        # Applying the schema directly would fail for some types where casting is possible
+        # As an optimisation, the column filter means columns will not be converted if they are not needed
+        # E.g. if a model outputs lots of undeclared columns, there is no need to convert them
 
-        if len(df) == 0:
+        if len(df) > 0:
+
+            column_filter = DataConformance.column_filter(df.columns, schema)  # noqa
+            table = pa.Table.from_pandas(df, columns=column_filter, preserve_index=False)  # noqa
+
+        # Special case handling for converting an empty dataframe
+        # These must flow through the pipe with valid schemas, like any other dataset
+        # Type coercion and column filtering happen in conform_to_schema, if a schema has been supplied
+
+        else:
+
             df_schema = pa.Schema.from_pandas(df, preserve_index=False)  # noqa
             table = pa.Table.from_batches(list(), df_schema)  # noqa
-        else:
-            table = pa.Table.from_pandas(df, preserve_index=False)  # noqa
 
         # If there is no explict schema, give back the table exactly as it was received from Pandas
-        # There could be an option here to coerce types to the appropriate TRAC standard types
+        # There could be an option here to infer and coerce for TRAC standard types
         # E.g. unsigned int 32 -> signed int 64, TRAC standard integer type
 
         if schema is None:
+            DataConformance.check_duplicate_fields(table.schema.names, False)
             return table
         else:
             return DataConformance.conform_to_schema(table, schema, df.dtypes)
-
-    @classmethod
-    def add_item_to_view(cls, view: DataView, part: DataPartKey, item: DataItem) -> DataView:
-
-        prior_deltas = view.parts.get(part) or list()
-        deltas = [*prior_deltas, item]
-        parts = {**view.parts, part: deltas}
-
-        return DataView(view.trac_schema, view.arrow_schema, parts)
 
 
 class DataConformance:
@@ -355,6 +368,29 @@ class DataConformance:
     __E_TIMEZONE_DOES_NOT_MATCH = \
         "Field [{field_name}] cannot be converted from {vector_type} to {field_type}, " + \
         "source and target have different time zones"
+
+    @classmethod
+    def column_filter(cls, columns: tp.List[str], schema: tp.Optional[pa.Schema]) -> tp.Optional[tp.List[str]]:
+
+        cls.check_duplicate_fields(columns, False)
+
+        if not schema:
+            return None
+
+        cls.check_duplicate_fields(schema.names, True)
+
+        schema_columns = set(c.lower() for c in schema.names)
+        extra_columns = list(filter(lambda c: c.lower() not in schema_columns, columns))
+
+        if not any(extra_columns):
+            return None
+
+        column_filter = list(filter(lambda c: c.lower() in schema_columns, columns))
+
+        message = f"Columns not defined in the schema will be dropped: {', '.join(extra_columns)}"
+        cls.__log.warning(message)
+
+        return column_filter
 
     @classmethod
     def conform_to_schema(
@@ -391,10 +427,11 @@ class DataConformance:
         if pandas_types is not None and len(pandas_types) != len(table.schema.types):
             raise _ex.EUnexpected()
 
-        cls._check_duplicate_fields(schema, True)
-        cls._check_duplicate_fields(table.schema, False)
+        cls.check_duplicate_fields(schema.names, True)
+        cls.check_duplicate_fields(table.schema.names, False)
 
         table_indices = {f.lower(): i for (i, f) in enumerate(table.schema.names)}
+
         conformed_data = []
         conformance_errors = []
 
@@ -453,11 +490,11 @@ class DataConformance:
         return pa.Table.from_arrays(conformed_data, schema=schema)  # noqa
 
     @classmethod
-    def _check_duplicate_fields(cls, schema: pa.Schema, schema_or_table: bool):
+    def check_duplicate_fields(cls, fields: tp.List[str], schema_or_table: bool):
 
         check = {}
 
-        for field in schema.names:
+        for field in fields:
             field_lower = field.lower()
             if field_lower not in check:
                 check[field_lower] = []

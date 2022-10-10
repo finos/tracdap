@@ -520,6 +520,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         # Still, if any nodes are missing or have the wrong type TracContextImpl will raise ERuntimeValidation
 
         local_ctx = {}
+        static_schemas = {}
 
         for node_id, node_result in _ctx_iter_items(ctx):
 
@@ -533,6 +534,8 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             if node_id.name in model_def.inputs:
                 input_name = node_id.name
                 local_ctx[input_name] = node_result
+                # At the moment, all model inputs have static schemas
+                static_schemas[input_name] = model_def.inputs[input_name].schema
 
         # Add empty data views to the local context to hold model outputs
         # Assuming outputs are all defined with static schemas
@@ -541,10 +544,12 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             output_schema = self.node.model_def.outputs[output_name].schema
             empty_data_view = _data.DataView.for_trac_schema(output_schema)
             local_ctx[output_name] = empty_data_view
+            # At the moment, all model outputs have static schemas
+            static_schemas[output_name] = output_schema
 
         # Run the model against the mapped local context
 
-        trac_ctx = _ctx.TracContextImpl(self.node.model_def, self.model_class, local_ctx)
+        trac_ctx = _ctx.TracContextImpl(self.node.model_def, self.model_class, local_ctx, static_schemas)
 
         try:
             model = self.model_class()

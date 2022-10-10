@@ -165,7 +165,13 @@ class TracContextTest(unittest.TestCase):
 
         local_ctx = {**params, **data}
 
-        self.ctx = TracContextImpl(_test_model_def, _TestModel, local_ctx)
+        static_schemas = {
+            dataset_name: dataset.schema
+            for (dataset_name, dataset)
+            in [*_test_model_def.inputs.items(), *_test_model_def.outputs.items()]
+        }
+
+        self.ctx = TracContextImpl(_test_model_def, _TestModel, local_ctx, static_schemas)
 
     # Getting params
 
