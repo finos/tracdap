@@ -157,6 +157,12 @@ class ModelLoader:
         attributes = model.define_attributes()
 
         for attr in attributes:
+
+            if attr.attrName.startswith("trac_") or attr.attrName.startswith("_"):
+                err = f"Controlled attribute [{attr.attrName}] cannot be defined in model code"
+                self.__log.error(err)
+                raise _ex.EModelValidation(err)
+
             self.__log.info(f"Attribute [{attr.attrName}] - {_types.MetadataCodec.decode_value(attr.value)}")
 
         return _cfg.TagUpdateList(attributes)
