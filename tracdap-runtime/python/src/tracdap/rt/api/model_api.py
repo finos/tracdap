@@ -207,6 +207,30 @@ class TracModel:
     .. seealso:: :py:class:`TracContext`
     """
 
+    def define_attributes(self) -> _tp.List[TagUpdate]:  # noqa
+
+        """
+        Define attributes that will be associated with the model when it is loaded into the TRAC platform
+
+        .. note::
+            This is an experimental API that is not yet stabilised, expect changes in future versions of TRAC
+
+        These attributes can be used to index or describe the model, they will be available for metadata searches.
+        Attributes must be primitive (scalar) values that can be expressed in the TRAC type system.
+        Multivalued attributes can be supplied as lists, in which case the attribute type must be given explicitly.
+        Controlled attributes (starting with trac\\_ or \\_) are not allowed and will fail validation.
+
+        To define attributes in code, always use the define_* function in the :py:mod:`tracdap.rt.api` package.
+        This will ensure attributes are defined the correct format with all the required fields.
+        Attributes that are defined in the wrong format or with required fields missing
+        will result in a model validation failure.
+
+        :return: A set of attributes that will be applied to the model when it is loaded into the TRAC platform
+        :rtype: List[:py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`]
+        """
+
+        return []
+
     @_abc.abstractmethod
     def define_parameters(self) -> _tp.Dict[str, ModelParameter]:
 
@@ -217,7 +241,7 @@ class TracModel:
         model uses must be defined. Models may choose to ignore some parameters,
         it is ok to define parameters that are not always used.
 
-        To declare model parameters in code, always use the declare_* functions in the :py:mod:`tracdap.rt.api` package.
+        To define model parameters in code, always use the define_* functions in the :py:mod:`tracdap.rt.api` package.
         This will ensure parameters are defined in the correct format with all the required fields.
         Parameters that are defined in the wrong format or with required fields missing
         will result in a model validation failure.
@@ -238,7 +262,7 @@ class TracModel:
         model uses must be defined. Models may choose to ignore some inputs,
         it is ok to define inputs that are not always used.
 
-        To declare model inputs in code, always use the declare_* functions in the :py:mod:`tracdap.rt.api` package.
+        To define model inputs in code, always use the define_* functions in the :py:mod:`tracdap.rt.api` package.
         This will ensure inputs are defined in the correct format with all the required fields.
         Model inputs that are defined in the wrong format or with required fields missing
         will result in a model validation failure.
@@ -260,7 +284,7 @@ class TracModel:
         produced. If a model defines an output which is not produced, a runtime
         validation error will be raised after the model completes.
 
-        To declare model outputs in code, always use the declare_* functions in the :py:mod:`tracdap.rt.api` package.
+        To define model outputs in code, always use the define_* functions in the :py:mod:`tracdap.rt.api` package.
         This will ensure outputs are defined in the correct format with all the required fields.
         Model outputs that are defined in the wrong format or with required fields missing
         will result in a model validation failure.

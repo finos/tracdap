@@ -21,6 +21,14 @@ import tutorial.schemas as schemas
 
 class SchemaFilesModel(trac.TracModel):
 
+    def define_attributes(self) -> tp.List[trac.TagUpdate]:
+
+        return trac.define_attributes(
+            trac.A("model_description", "A example model, for testing purposes"),
+            trac.A("business_segment", "retail_products", categorical=True),
+            trac.A("classifiers", ["loans", "uk", "examples"], attr_type=trac.STRING)
+        )
+
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
         return trac.define_parameters(

@@ -346,6 +346,13 @@ class ImportModelNode(Node[meta.ObjectDefinition]):
 
 
 @_node_type
+class ImportAttrsNode(Node[cfg.TagUpdateList]):
+
+    model_scope: str
+    import_details: meta.ImportModelJob
+
+
+@_node_type
 class RunModelNode(Node[Bundle[_data.DataView]]):
 
     model_scope: str
@@ -363,10 +370,12 @@ class BuildJobResultNode(Node[cfg.JobResult]):
     job_id: meta.TagHeader
 
     objects: tp.Dict[str, NodeId[meta.ObjectDefinition]] = dc.field(default_factory=dict)
+    attrs: tp.Dict[str, NodeId[cfg.TagUpdateList]] = dc.field(default_factory=dict)
+
     bundles: tp.List[NodeId[ObjectBundle]] = dc.field(default_factory=list)
 
     def _node_dependencies(self) -> tp.Dict[NodeId, DependencyType]:
-        dep_ids = [*self.bundles, *self.objects.values()]
+        dep_ids = [*self.bundles, *self.objects.values(), *self.attrs.values()]
         return {node_id: DependencyType.HARD for node_id in dep_ids}
 
 

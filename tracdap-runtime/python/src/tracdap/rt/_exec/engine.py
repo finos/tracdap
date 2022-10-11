@@ -121,7 +121,7 @@ class TracEngine(_actors.Actor):
                     error = signal.error
                 else:
                     error = _ex.ETracInternal("An unknown error occurred")
-                self.job_failed(failed_job_key, error)
+                self.actors().send("job_failed", failed_job_key, error)
 
             # Failed signal has been handled, do not propagate
             return True

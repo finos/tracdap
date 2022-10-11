@@ -62,6 +62,22 @@ class _RuntimeHook:
         return cls.__runtime_hook
 
     @_abc.abstractmethod
+    def define_attributes(
+            self, *attrs: _tp.Union[_meta.TagUpdate, _tp.List[_meta.TagUpdate]]) \
+            -> _tp.List[_meta.TagUpdate]:
+
+        pass
+
+    @_abc.abstractmethod
+    def define_attribute(
+            self, attr_name: str, attr_value: _tp.Any,
+            attr_type: _tp.Optional[_meta.BasicType] = None,
+            categorical: bool = False) \
+            -> _meta.TagUpdate:
+
+        pass
+
+    @_abc.abstractmethod
     def define_parameter(
             self, param_name: str, param_type: _tp.Union[_meta.TypeDescriptor, _meta.BasicType],
             label: str, default_value: _tp.Optional[_tp.Any] = None) \

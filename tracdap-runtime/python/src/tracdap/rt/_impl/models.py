@@ -149,6 +149,24 @@ class ModelLoader:
             scope_state.model_cache[model_key] = model_class
             return model_class
 
+    def scan_model_attrs(self, model_class: _api.TracModel.__class__) -> _cfg.TagUpdateList:
+
+        model: _api.TracModel = object.__new__(model_class)
+        model_class.__init__(model)
+
+        attributes = model.define_attributes()
+
+        for attr in attributes:
+
+            if attr.attrName.startswith("trac_") or attr.attrName.startswith("_"):
+                err = f"Controlled attribute [{attr.attrName}] cannot be defined in model code"
+                self.__log.error(err)
+                raise _ex.EModelValidation(err)
+
+            self.__log.info(f"Attribute [{attr.attrName}] - {_types.MetadataCodec.decode_value(attr.value)}")
+
+        return _cfg.TagUpdateList(attributes)
+
     def scan_model(self, model_class: _api.TracModel.__class__) -> _meta.ModelDefinition:
 
         try:
@@ -156,6 +174,7 @@ class ModelLoader:
             model: _api.TracModel = object.__new__(model_class)
             model_class.__init__(model)
 
+            attributes = model.define_attributes()
             parameters = model.define_parameters()
             inputs = model.define_inputs()
             outputs = model.define_outputs()

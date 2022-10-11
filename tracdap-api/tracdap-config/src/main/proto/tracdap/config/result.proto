@@ -21,9 +21,15 @@ option java_package = "org.finos.tracdap.config";
 option java_multiple_files = true;
 
 import "tracdap/metadata/object_id.proto";
-import "tracdap/metadata/object.proto";;
+import "tracdap/metadata/object.proto";
 import "tracdap/metadata/job.proto";
+import "tracdap/metadata/tag_update.proto";
 
+
+message TagUpdateList {
+
+  repeated metadata.TagUpdate attrs = 1;
+}
 
 message JobResult {
 
@@ -33,4 +39,5 @@ message JobResult {
   string statusMessage = 3;
 
   map<string, metadata.ObjectDefinition> results = 4;
+  map<string, TagUpdateList> attrs = 5;
 }
