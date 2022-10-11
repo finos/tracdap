@@ -27,6 +27,22 @@ from tracdap.rt.metadata import *  # DOCGEN_REMOVE
 
 def define_attributes(*attrs: _tp.Union[TagUpdate, _tp.List[TagUpdate]]) -> _tp.List[TagUpdate]:
 
+    """
+    Defined a set of attributes to catalogue and describe a model
+
+    Attributes can be supplied either as individual arguments to this function or as a list.
+    In either case, each attribute should be defined using :py:func:`define_attribute`
+    (or :py:func:`trac.A <tracdap.rt.api.A>`).
+
+    :param attrs: The attributes that will be defined, either as individual arguments or as a list
+    :return: A set of model attributes, in the correct format to return from
+             :py:meth:`TracModel.define_attributes`
+
+    :type attrs: :py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>` |
+                  List[:py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`]
+    :rtype: List[:py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`]
+    """
+
     rh = _RuntimeHook.runtime()
     return rh.define_attributes(*attrs)
 
@@ -37,6 +53,30 @@ def define_attribute(
         categorical: bool = False) \
         -> TagUpdate:
 
+    """
+    Define an individual model attribute
+
+    Model attributes can be defined using this method (or :py:func:`trac.A <A>`).
+    The attr_name and attr_value are always required to define an attribute.
+    attr_type is always required for multivalued attributes but is optional otherwise.
+    The categorical flag can be applied to STRING attributes if required.
+
+    Once defined attributes can be passed to :py:func:`define_attributes`,
+    either as a list or as individual arguments, to create the set of attributes for a model.
+
+    :param attr_name: The attribute name
+    :param attr_value: The attribute value (as a raw Python value)
+    :param attr_type: The TRAC type for this attribute (optional, except for multivalued attributes)
+    :param categorical: A flag to indicate whether this attribute is categorical
+    :return: An attribute for the model, ready for loading into the TRAC platform
+
+    :type attr_name: str
+    :type attr_value: Any
+    :type attr_type: Optional[:py:class:`BasicType <tracdap.rt.metadata.BasicType>`]
+    :type categorical: bool
+    :rtype: :py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`
+    """
+
     rh = _RuntimeHook.runtime()
     return rh.define_attribute(attr_name, attr_value, attr_type, categorical)
 
@@ -46,6 +86,16 @@ def A(  # noqa
         attr_type: _tp.Optional[BasicType] = None,
         categorical: bool = False) \
         -> TagUpdate:
+
+    """
+    Shorthand alias for :py:func:`define_attribute`
+
+    :type attr_name: str
+    :type attr_value: Any
+    :type attr_type: Optional[:py:class:`BasicType <tracdap.rt.metadata.BasicType>`]
+    :type categorical: bool
+    :rtype: :py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`
+    """
 
     return define_attribute(attr_name, attr_value, attr_type, categorical)
 
