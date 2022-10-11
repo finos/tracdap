@@ -30,6 +30,9 @@ def define_attributes(*attrs: _tp.Union[TagUpdate, _tp.List[TagUpdate]]) -> _tp.
     """
     Defined a set of attributes to catalogue and describe a model
 
+    .. note::
+        This is an experimental API that is not yet stabilised, expect changes in future versions of TRAC
+
     Attributes can be supplied either as individual arguments to this function or as a list.
     In either case, each attribute should be defined using :py:func:`define_attribute`
     (or :py:func:`trac.A <tracdap.rt.api.A>`).
@@ -55,6 +58,9 @@ def define_attribute(
 
     """
     Define an individual model attribute
+
+    .. note::
+        This is an experimental API that is not yet stabilised, expect changes in future versions of TRAC
 
     Model attributes can be defined using this method (or :py:func:`trac.A <A>`).
     The attr_name and attr_value are always required to define an attribute.
@@ -89,6 +95,9 @@ def A(  # noqa
 
     """
     Shorthand alias for :py:func:`define_attribute`
+
+    .. note::
+        This is an experimental API that is not yet stabilised, expect changes in future versions of TRAC
 
     :type attr_name: str
     :type attr_value: Any

@@ -212,10 +212,13 @@ class TracModel:
         """
         Define attributes that will be associated with the model when it is loaded into the TRAC platform
 
+        .. note::
+            This is an experimental API that is not yet stabilised, expect changes in future versions of TRAC
+
         These attributes can be used to index or describe the model, they will be available for metadata searches.
         Attributes must be primitive (scalar) values that can be expressed in the TRAC type system.
         Multivalued attributes can be supplied as lists, in which case the attribute type must be given explicitly.
-        Controlled attributes (starting with trac_ or _) are not allowed and will fail validation.
+        Controlled attributes (starting with trac\\_ or \\_) are not allowed and will fail validation.
 
         To define attributes in code, always use the define_* function in the :py:mod:`tracdap.rt.api` package.
         This will ensure attributes are defined the correct format with all the required fields.
