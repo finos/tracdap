@@ -16,29 +16,30 @@
 
 package org.finos.tracdap.common.codec;
 
+import io.netty.util.concurrent.DefaultEventExecutor;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.finos.tracdap.common.codec.arrow.ArrowFileCodec;
-import org.finos.tracdap.common.codec.arrow.ArrowSchema;
+import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.codec.arrow.ArrowStreamCodec;
 import org.finos.tracdap.common.codec.csv.CsvCodec;
 import org.finos.tracdap.common.codec.json.JsonCodec;
 import org.finos.tracdap.common.concurrent.Flows;
-import org.finos.tracdap.common.data.DataBlock;
+import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.data.DataPipeline;
+import org.finos.tracdap.common.data.pipeline.DataPipelineImpl;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.metadata.SchemaDefinition;
 import org.finos.tracdap.test.data.SampleData;
+import org.finos.tracdap.test.data.SingleBatchDataSink;
+import org.finos.tracdap.test.data.SingleBatchDataSource;
 import org.finos.tracdap.test.helpers.TestResourceHelpers;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.EmptyByteBuf;
 import io.netty.buffer.Unpooled;
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.*;
-import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
-import org.apache.arrow.vector.types.pojo.Schema;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIf;
 
@@ -51,7 +52,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
@@ -92,20 +92,18 @@ public abstract class CodecTestSuite {
     }
 
     @Test
-    void roundTrip_basic() throws Exception {
+    void roundTrip_basic() {
 
         var allocator = new RootAllocator();
-        var arrowSchema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var root = generateBasicData(allocator);
 
-        roundTrip_impl(SampleData.BASIC_TABLE_SCHEMA, arrowSchema, root, allocator);
+        roundTrip_impl(root, allocator);
     }
 
     @Test
-    void roundTrip_nulls() throws Exception {
+    void roundTrip_nulls() {
 
         var allocator = new RootAllocator();
-        var arrowSchema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var root = generateBasicData(allocator);
 
         // With the basic test data, we'll get one null value for each data type
@@ -133,18 +131,16 @@ public abstract class CodecTestSuite {
 
         }
 
-        roundTrip_impl(SampleData.BASIC_TABLE_SCHEMA, arrowSchema, root, allocator);
+        roundTrip_impl(root, allocator);
     }
 
     @Test
-    void edgeCaseIntegers() throws Exception {
+    void edgeCaseIntegers() {
 
         var allocator = new RootAllocator();
 
         var fieldType = new FieldType(true, ArrowSchema.ARROW_BASIC_INTEGER, null);
         var field = new Field("string_field", fieldType, null);
-        var arrowSchema = new Schema(List.of(field));
-        var tracSchema = ArrowSchema.arrowToTrac(arrowSchema);
 
         var intVec = new BigIntVector("integer_field", allocator);
         intVec.allocateNew(4);
@@ -157,18 +153,16 @@ public abstract class CodecTestSuite {
         var root = new VectorSchemaRoot(List.of(field), List.of(intVec));
         root.setRowCount(4);
 
-        roundTrip_impl(tracSchema, arrowSchema, root, allocator);
+        roundTrip_impl(root, allocator);
     }
 
     @Test
-    void edgeCaseFloats() throws Exception {
+    void edgeCaseFloats() {
 
         var allocator = new RootAllocator();
 
         var fieldType = new FieldType(true, ArrowSchema.ARROW_BASIC_FLOAT, null);
         var field = new Field("string_field", fieldType, null);
-        var arrowSchema = new Schema(List.of(field));
-        var tracSchema = ArrowSchema.arrowToTrac(arrowSchema);
 
         var floatVec = new Float8Vector("float_field", allocator);
         floatVec.allocateNew(8);
@@ -189,18 +183,16 @@ public abstract class CodecTestSuite {
         var root = new VectorSchemaRoot(List.of(field), List.of(floatVec));
         root.setRowCount(8);
 
-        roundTrip_impl(tracSchema, arrowSchema, root, allocator);
+        roundTrip_impl(root, allocator);
     }
 
     @Test
-    void edgeCaseDecimals() throws Exception {
+    void edgeCaseDecimals() {
 
         var allocator = new RootAllocator();
 
         var fieldType = new FieldType(true, ArrowSchema.ARROW_BASIC_DECIMAL, null);
         var field = new Field("decimal_field", fieldType, null);
-        var arrowSchema = new Schema(List.of(field));
-        var tracSchema = ArrowSchema.arrowToTrac(arrowSchema);
 
         var decimalVec = new DecimalVector(field, allocator);
         decimalVec.allocateNew(6);
@@ -221,18 +213,16 @@ public abstract class CodecTestSuite {
         var root = new VectorSchemaRoot(List.of(field), List.of(decimalVec));
         root.setRowCount(6);
 
-        roundTrip_impl(tracSchema, arrowSchema, root, allocator);
+        roundTrip_impl(root, allocator);
     }
 
     @Test
-    void edgeCaseStrings() throws Exception {
+    void edgeCaseStrings() {
 
         var allocator = new RootAllocator();
 
         var fieldType = new FieldType(true, ArrowSchema.ARROW_BASIC_STRING, null);
         var field = new Field("string_field", fieldType, null);
-        var arrowSchema = new Schema(List.of(field));
-        var tracSchema = ArrowSchema.arrowToTrac(arrowSchema);
 
         var stringVec = new VarCharVector("string_field", allocator);
         stringVec.allocateNew(10);
@@ -251,18 +241,16 @@ public abstract class CodecTestSuite {
         var root = new VectorSchemaRoot(List.of(field), List.of(stringVec));
         root.setRowCount(10);
 
-        roundTrip_impl(tracSchema, arrowSchema, root, allocator);
+        roundTrip_impl(root, allocator);
     }
 
     @Test
-    void edgeCaseDates() throws Exception {
+    void edgeCaseDates() {
 
         var allocator = new RootAllocator();
 
         var fieldType = new FieldType(true, ArrowSchema.ARROW_BASIC_DATE, null);
         var field = new Field("date_field", fieldType, null);
-        var arrowSchema = new Schema(List.of(field));
-        var tracSchema = ArrowSchema.arrowToTrac(arrowSchema);
 
         var dateVec = new DateDayVector("date_field", allocator);
         dateVec.allocateNew(6);
@@ -284,18 +272,16 @@ public abstract class CodecTestSuite {
         var root = new VectorSchemaRoot(List.of(field), List.of(dateVec));
         root.setRowCount(6);
 
-        roundTrip_impl(tracSchema, arrowSchema, root, allocator);
+        roundTrip_impl(root, allocator);
     }
 
     @Test
-    void edgeCaseDateTimes() throws Exception {
+    void edgeCaseDateTimes() {
 
         var allocator = new RootAllocator();
 
         var fieldType = new FieldType(true, ArrowSchema.ARROW_BASIC_DATETIME, null);
         var field = new Field("datetime_field", fieldType, null);
-        var arrowSchema = new Schema(List.of(field));
-        var tracSchema = ArrowSchema.arrowToTrac(arrowSchema);
 
         var datetimeVec = new TimeStampMilliVector("datetime_field", allocator);
         datetimeVec.allocateNew(6);
@@ -322,7 +308,7 @@ public abstract class CodecTestSuite {
         var root = new VectorSchemaRoot(List.of(field), List.of(datetimeVec));
         root.setRowCount(6);
 
-        roundTrip_impl(tracSchema, arrowSchema, root, allocator);
+        roundTrip_impl(root, allocator);
     }
 
     private long toEpochMillis(LocalDateTime localDateTime) {
@@ -343,37 +329,26 @@ public abstract class CodecTestSuite {
         return LocalDateTime.ofEpochSecond(epochSeconds, (int) nanos, ZoneOffset.UTC);
     }
 
-    void roundTrip_impl(
-            SchemaDefinition tracSchema, Schema arrowSchema,
-            VectorSchemaRoot root, RootAllocator allocator) throws Exception {
+    void roundTrip_impl(VectorSchemaRoot root, RootAllocator allocator) {
 
-        var unloader = new VectorUnloader(root);
-        var batch = unloader.getRecordBatch();
-        var schemaBlock = DataBlock.forSchema(arrowSchema);
-        var dataBlock = DataBlock.forRecords(batch);
-        var blockStream = Flows.publish(Stream.of(schemaBlock, dataBlock));
+        var ctx = new DataContext(new DefaultEventExecutor(), allocator);
 
-        var encoder = codec.getEncoder(allocator, tracSchema, Map.of());
-        var decoder = codec.getDecoder(allocator, tracSchema, Map.of());
+        var dataSrc = new SingleBatchDataSource(root);
+        var pipeline = DataPipeline.forSource(dataSrc, ctx);
 
-        blockStream.subscribe(encoder);
-        encoder.subscribe(decoder);
+        var dataSink = new SingleBatchDataSink((DataPipelineImpl) pipeline);
+        pipeline.addSink(dataSink);
 
-        var roundTrip = Flows.fold(decoder, (bs, b) -> {bs.add(b); return bs;}, new ArrayList<DataBlock>());
-        waitFor(TEST_TIMEOUT, roundTrip);
-        var rtBlocks = resultOf(roundTrip);
+        var exec = pipeline.execute();
+        waitFor(TEST_TIMEOUT, exec);
 
-        Assertions.assertEquals(2, rtBlocks.size());
-        Assertions.assertEquals(arrowSchema, rtBlocks.get(0).arrowSchema);
+        var rtSchema = dataSink.getSchema();
+        var rtRowCount = dataSink.getRowCount();
 
-        compareBatchToRoot(
-                arrowSchema, rtBlocks.get(0).arrowSchema,
-                root, rtBlocks.get(1).arrowRecords, allocator);
+        Assertions.assertEquals(root.getSchema(), rtSchema);
+        Assertions.assertEquals(root.getRowCount(), rtRowCount);
 
-        var rtBatch = rtBlocks.get(1).arrowRecords;
-        rtBatch.close();
         root.close();
-        batch.close();
     }
 
     @Test
@@ -381,29 +356,30 @@ public abstract class CodecTestSuite {
     void decode_basic() throws Exception {
 
         var allocator = new RootAllocator();
-        var arrowSchema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var root = generateBasicData(allocator);
 
         var testData = TestResourceHelpers.loadResourceAsBytes(basicData);
         var testDataBuf = Unpooled.wrappedBuffer(testData);
         var testDataStream = Flows.publish(List.of(testDataBuf));
 
-        var decoder = codec.getDecoder(allocator, SampleData.BASIC_TABLE_SCHEMA, Map.of());
-        testDataStream.subscribe(decoder);
+        var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
+        var pipeline = DataPipeline.forSource(testDataStream, dataCtx);
 
-        var roundTrip = Flows.fold(decoder, (bs, b) -> {bs.add(b); return bs;}, new ArrayList<DataBlock>());
-        waitFor(TEST_TIMEOUT, roundTrip);
-        var rtBlocks = resultOf(roundTrip);
+        var decoder = codec.getDecoder(allocator, root.getSchema(), Map.of());
+        pipeline.addStage(decoder);
 
-        Assertions.assertEquals(2, rtBlocks.size());
-        Assertions.assertEquals(arrowSchema, rtBlocks.get(0).arrowSchema);
+        var dataSink = new SingleBatchDataSink(pipeline);
+        pipeline.addSink(dataSink);
 
-        compareBatchToRoot(
-                arrowSchema, rtBlocks.get(0).arrowSchema,
-                root, rtBlocks.get(1).arrowRecords, allocator);
+        var exec = pipeline.execute();
+        waitFor(TEST_TIMEOUT, exec);
 
-        var rtBatch = rtBlocks.get(1).arrowRecords;
-        rtBatch.close();
+        var rtSchema = dataSink.getSchema();
+        var rtRowCount = dataSink.getRowCount();
+
+        Assertions.assertEquals(root.getSchema(), rtSchema);
+        Assertions.assertEquals(root.getRowCount(), rtRowCount);
+
         root.close();
     }
 
@@ -415,13 +391,21 @@ public abstract class CodecTestSuite {
         // An empty stream (i.e. with no buffers)
 
         var noBufStream = Flows.publish(List.<ByteBuf>of());
-        var noBufDecoder = codec.getDecoder(allocator, SampleData.BASIC_TABLE_SCHEMA, Map.of());
-        noBufStream.subscribe(noBufDecoder);
+        var arrowSchema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
 
-        var noBufResult = Flows.fold(noBufDecoder, (bs, b) -> {bs.add(b); return bs;}, new ArrayList<DataBlock>());
-        waitFor(TEST_TIMEOUT, noBufResult);
+        var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
+        var pipeline = DataPipeline.forSource(noBufStream, dataCtx);
 
-        Assertions.assertThrows(EDataCorruption.class, () -> resultOf(noBufResult));
+        var decoder = codec.getDecoder(allocator, arrowSchema, Map.of());
+        pipeline.addStage(decoder);
+
+        var dataSink = new SingleBatchDataSink(pipeline);
+        pipeline.addSink(dataSink);
+
+        var exec = pipeline.execute();
+        waitFor(TEST_TIMEOUT, exec);
+
+        Assertions.assertThrows(EDataCorruption.class, () -> resultOf(exec));
 
         // A stream containing a series of empty buffers
 
@@ -431,19 +415,28 @@ public abstract class CodecTestSuite {
                 new EmptyByteBuf(ByteBufAllocator.DEFAULT));
 
         var emptyBufStream = Flows.publish(emptyBuffers);
-        var emptyBufDecoder = codec.getDecoder(allocator, SampleData.BASIC_TABLE_SCHEMA, Map.of());
-        emptyBufStream.subscribe(emptyBufDecoder);
 
-        var emptyBufResult = Flows.fold(emptyBufDecoder, (bs, b) -> {bs.add(b); return bs;}, new ArrayList<DataBlock>());
-        waitFor(TEST_TIMEOUT, emptyBufResult);
+        var dataCtx2 = new DataContext(new DefaultEventExecutor(), allocator);
+        var pipeline2 = DataPipeline.forSource(emptyBufStream, dataCtx2);
 
-        Assertions.assertThrows(EDataCorruption.class, () -> resultOf(emptyBufResult));
+        var decoder2 = codec.getDecoder(allocator, arrowSchema, Map.of());
+        pipeline2.addStage(decoder2);
+
+        var dataSink2 = new SingleBatchDataSink(pipeline2);
+        pipeline2.addSink(dataSink2);
+
+        var exec2 = pipeline2.execute();
+        waitFor(TEST_TIMEOUT, exec2);
+
+        Assertions.assertThrows(EDataCorruption.class, () -> resultOf(exec2));
     }
 
     @Test
     void decode_garbled() {
 
         // Send a stream of random bytes - 3 chunks worth
+
+        var arrowSchema = ArrowSchema.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
 
         var testData = List.of(
                 new byte[10000],
@@ -459,42 +452,37 @@ public abstract class CodecTestSuite {
         // Run the garbage data through the decoder
 
         var allocator = new RootAllocator();
-        var decoder = codec.getDecoder(allocator, SampleData.BASIC_TABLE_SCHEMA, Map.of());
-        testDataStream.subscribe(decoder);
+        var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
+        var pipeline = DataPipeline.forSource(testDataStream, dataCtx);
 
-        // Decoder should report EDataCorruption
+        var decoder = codec.getDecoder(allocator, arrowSchema, Map.of());
+        pipeline.addStage(decoder);
 
-        var decodeResult = Flows.fold(decoder, (bs, b) -> {bs.add(b); return bs;}, new ArrayList<DataBlock>());
-        waitFor(TEST_TIMEOUT, decodeResult);
+        var dataSink = new SingleBatchDataSink(pipeline);
+        pipeline.addSink(dataSink);
 
-        Assertions.assertThrows(EDataCorruption.class, () -> resultOf(decodeResult));
+        var exec = pipeline.execute();
+        waitFor(TEST_TIMEOUT, exec);
+
+        Assertions.assertThrows(EDataCorruption.class, () -> resultOf(exec));
     }
 
 
-    private void compareBatchToRoot(
-            Schema expectedSchema, Schema rtSchema,
-            VectorSchemaRoot root, ArrowRecordBatch rtBatch, BufferAllocator allocator) {
+    private void compareBatches(VectorSchemaRoot original, VectorSchemaRoot roundTrip) {
 
-        Assertions.assertEquals(expectedSchema, rtSchema);
+        // Data pipeline cleans up round trip root after the pipeline completes
+        // To do this comparison, SingleBatchDataSink should convert root -> java array / maps
 
-        var rtFields = rtSchema.getFields();
-        var rtVectors = rtFields.stream().map(f -> f.createVector(allocator)).collect(Collectors.toList());
+        Assertions.assertEquals(original.getSchema(), roundTrip.getSchema());
+        Assertions.assertEquals(original.getRowCount(), roundTrip.getRowCount());
 
-        try (var rtRoot = new VectorSchemaRoot(rtFields, rtVectors)) {
+        for (var j = 0; j < original.getFieldVectors().size(); j++) {
 
-            var rtLoader = new VectorLoader(rtRoot);
-            rtLoader.load(rtBatch);
+            var vec = original.getVector(j);
+            var rtVec = roundTrip.getVector(j);
 
-            Assertions.assertEquals(root.getRowCount(), rtRoot.getRowCount());
-
-            for (var j = 0; j < root.getFieldVectors().size(); j++) {
-
-                var vec = root.getVector(j);
-                var rtVec = rtRoot.getVector(j);
-
-                for (int i = 0; i < root.getRowCount(); i++)
-                    Assertions.assertEquals(vec.getObject(i), rtVec.getObject(i), "Mismatch on row " + i);
-            }
+            for (int i = 0; i < original.getRowCount(); i++)
+                Assertions.assertEquals(vec.getObject(i), rtVec.getObject(i), "Mismatch on row " + i);
         }
     }
 }

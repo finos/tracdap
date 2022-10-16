@@ -16,18 +16,18 @@
 
 package org.finos.tracdap.common.storage.flat;
 
+import org.apache.arrow.vector.types.pojo.Schema;
 import org.finos.tracdap.common.codec.ICodec;
 import org.finos.tracdap.common.codec.ICodecManager;
-import org.finos.tracdap.common.data.DataBlock;
+import org.finos.tracdap.common.concurrent.Flows;
+import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.storage.IDataStorage;
 import org.finos.tracdap.common.storage.IFileStorage;
-import org.finos.tracdap.metadata.SchemaDefinition;
 import org.finos.tracdap.metadata.StorageCopy;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Flow;
 
 
 public class FlatDataStorage implements IDataStorage {
@@ -43,50 +43,41 @@ public class FlatDataStorage implements IDataStorage {
     }
 
     @Override
-    public Flow.Publisher<DataBlock> reader(
-            SchemaDefinition schemaDef,
-            StorageCopy storageCopy,
-            IDataContext dataContext) {
+    public DataPipeline pipelineReader(StorageCopy storageCopy, Schema requiredSchema, IDataContext dataContext) {
 
         var codec = formats.getCodec(storageCopy.getStorageFormat());
         var codecOptions = Map.<String, String>of();
 
         var chunkPath = chunkPath(storageCopy, codec);
-
         var fileReader = fileStorage.reader(chunkPath, dataContext);
-        var decoder = codec.getDecoder(dataContext.arrowAllocator(), schemaDef, codecOptions);
-        fileReader.subscribe(decoder);
+        var decoder = codec.getDecoder(dataContext.arrowAllocator(), requiredSchema, codecOptions);
 
-        return decoder;
+        var pipeline = DataPipeline.forSource(fileReader, dataContext);
+        pipeline.addStage(decoder);
+
+        return pipeline;
     }
 
     @Override
-    public Flow.Subscriber<DataBlock> writer(
-            SchemaDefinition schemaDef,
-            StorageCopy storageCopy,
-            CompletableFuture<Long> signal,
-            IDataContext dataContext) {
+    public DataPipeline pipelineWriter(
+            StorageCopy storageCopy, Schema requiredSchema,
+            IDataContext dataContext, DataPipeline pipeline,
+            CompletableFuture<Long> signal) {
 
         var codec = formats.getCodec(storageCopy.getStorageFormat());
         var codecOptions = Map.<String, String>of();
 
         var chunkPath = chunkPath(storageCopy, codec);
-
-        var encoder = codec.getEncoder(dataContext.arrowAllocator(), schemaDef, codecOptions);
+        var fileWriter = fileStorage.writer(chunkPath, signal, dataContext);
         var mkdir = fileStorage.mkdir(storageCopy.getStoragePath(), /* recursive = */ true, dataContext);
+        var mkdirAndSave = Flows.waitForSignal(fileWriter, mkdir);
 
-        mkdir.whenComplete((result, error) -> {
+        var encoder = codec.getEncoder(dataContext.arrowAllocator(), requiredSchema, codecOptions);
 
-            if (error != null)
-                signal.completeExceptionally(error);
+        pipeline.addStage(encoder);
+        pipeline.addSink(mkdirAndSave);
 
-            else {
-                var fileWriter = fileStorage.writer(chunkPath, signal, dataContext);
-                encoder.subscribe(fileWriter);
-            }
-        });
-
-        return encoder;
+        return pipeline;
     }
 
     private String chunkPath(StorageCopy storageCopy, ICodec codec) {

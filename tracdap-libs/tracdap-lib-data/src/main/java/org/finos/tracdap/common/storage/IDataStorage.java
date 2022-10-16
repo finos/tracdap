@@ -16,26 +16,26 @@
 
 package org.finos.tracdap.common.storage;
 
-
-import org.finos.tracdap.common.data.DataBlock;
+import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.IDataContext;
-import org.finos.tracdap.metadata.SchemaDefinition;
 import org.finos.tracdap.metadata.StorageCopy;
 
+import org.apache.arrow.vector.types.pojo.Schema;
+
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Flow;
 
 
 public interface IDataStorage {
 
-    Flow.Publisher<DataBlock> reader(
-            SchemaDefinition schemaDef,
+    DataPipeline pipelineReader(
             StorageCopy storageCopy,
+            Schema requiredSchema,
             IDataContext execContext);
 
-    Flow.Subscriber<DataBlock> writer(
-            SchemaDefinition schemaDef,
+    DataPipeline pipelineWriter(
             StorageCopy storageCopy,
-            CompletableFuture<Long> signal,
-            IDataContext execContext);
+            Schema requiredSchema,
+            IDataContext dataContext,
+            DataPipeline pipeline,
+            CompletableFuture<Long> signal);
 }

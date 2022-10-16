@@ -17,7 +17,8 @@
 package org.finos.tracdap.common.codec.arrow;
 
 import org.finos.tracdap.common.codec.ICodec;
-import org.finos.tracdap.metadata.SchemaDefinition;
+
+import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.memory.BufferAllocator;
 
 import java.util.List;
@@ -39,12 +40,12 @@ public class ArrowFileCodec implements ICodec {
     }
 
     @Override
-    public Encoder getEncoder(BufferAllocator arrowAllocator, SchemaDefinition schema, Map<String, String> options) {
-        return new ArrowFileEncoder(arrowAllocator);
+    public Encoder getEncoder(BufferAllocator arrowAllocator, Schema schema, Map<String, String> options) {
+        return new ArrowFileEncoder();
     }
 
     @Override
-    public Decoder getDecoder(BufferAllocator arrowAllocator, SchemaDefinition schema, Map<String, String> options) {
+    public Decoder getDecoder(BufferAllocator arrowAllocator, Schema schema, Map<String, String> options) {
         return new ArrowFileDecoder(arrowAllocator);
     }
 }

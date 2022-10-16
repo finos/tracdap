@@ -16,23 +16,18 @@
 
 package org.finos.tracdap.common.codec.arrow;
 
-import org.finos.tracdap.common.codec.BaseEncoder;
-import org.finos.tracdap.common.exception.ETracInternal;
+import org.finos.tracdap.common.codec.StreamingEncoder;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorLoader;
+
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowWriter;
-import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
-import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
-import org.apache.arrow.vector.types.pojo.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 
-public abstract class ArrowEncoder extends BaseEncoder {
+public abstract class ArrowEncoder extends StreamingEncoder implements AutoCloseable {
 
     // Common base encoder for both files and streams
     // Both receive a data stream and output a byte stream
@@ -42,28 +37,25 @@ public abstract class ArrowEncoder extends BaseEncoder {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final BufferAllocator arrowAllocator;
     private VectorSchemaRoot root;
-    private VectorLoader loader;
     private ArrowWriter writer;
 
     protected abstract ArrowWriter createWriter(VectorSchemaRoot root);
 
-    public ArrowEncoder(BufferAllocator arrowAllocator) {
+    public ArrowEncoder() {
 
-        this.arrowAllocator = arrowAllocator;
     }
 
     @Override
-    protected void encodeSchema(Schema arrowSchema) {
+    public void onStart(VectorSchemaRoot root) {
 
         try {
 
-            this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator);
-            this.loader = new VectorLoader(root);
+            this.root = root;
             this.writer = createWriter(root);
 
             writer.start();
+            emitStart();
         }
         catch (IOException e) {
 
@@ -74,11 +66,9 @@ public abstract class ArrowEncoder extends BaseEncoder {
     }
 
     @Override
-    protected void encodeRecords(ArrowRecordBatch batch) {
+    public void onNext() {
 
-        try (batch) {  // This will release the batch
-
-            loader.load(batch);  // This retains data in the VSR, must be matched by root.clear()
+        try {  // This will release the batch
             writer.writeBatch();
         }
         catch (IOException e) {
@@ -87,21 +77,10 @@ public abstract class ArrowEncoder extends BaseEncoder {
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
             throw new EUnexpected(e);
         }
-        finally {
-
-            // Release data that was retained in VSR by the loader
-            root.clear();
-        }
     }
 
     @Override
-    protected void encodeDictionary(ArrowDictionaryBatch batch) {
-
-        throw new ETracInternal("Arrow stream dictionary encoding not supported");
-    }
-
-    @Override
-    protected void encodeEos() {
+    public void onComplete() {
 
         try {
 
@@ -110,6 +89,8 @@ public abstract class ArrowEncoder extends BaseEncoder {
             writer.end();
             writer.close();
             writer = null;
+
+            emitEnd();
         }
         catch (IOException e) {
 
@@ -117,26 +98,33 @@ public abstract class ArrowEncoder extends BaseEncoder {
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
             throw new EUnexpected(e);
         }
+        finally {
+            close();
+        }
+    }
+
+    @Override
+    public void onError(Throwable error) {
+
+        try {
+            emitFailed(error);
+        }
+        finally {
+            close();
+        }
     }
 
     @Override
     public void close() {
 
-        try {
-
-            if (writer != null) {
-                writer.close();
-                writer = null;
-            }
-
-            if (root != null) {
-                root.close();
-                root = null;
-            }
+        if (writer != null) {
+            writer.close();
+            writer = null;
         }
-        finally {
 
-            super.close();
+        if (root != null) {
+            // Do not close root, we do not own it
+            root = null;
         }
     }
 }

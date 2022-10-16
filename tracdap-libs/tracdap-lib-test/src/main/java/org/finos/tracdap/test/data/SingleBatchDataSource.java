@@ -14,26 +14,36 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.codec.arrow;
-
-import org.finos.tracdap.common.util.ByteOutputChannel;
+package org.finos.tracdap.test.data;
 
 import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.ipc.ArrowFileWriter;
-import org.apache.arrow.vector.ipc.ArrowWriter;
+import org.finos.tracdap.common.data.DataPipeline;
+import org.finos.tracdap.common.data.pipeline.BaseDataProducer;
 
 
-public class ArrowFileEncoder extends ArrowEncoder {
+public class SingleBatchDataSource extends BaseDataProducer implements DataPipeline.SourceStage {
 
-    public ArrowFileEncoder() {
+    private final VectorSchemaRoot root;
 
-        super();
+    public SingleBatchDataSource(VectorSchemaRoot root) {
+        this.root = root;
     }
 
     @Override
-    protected ArrowWriter createWriter(VectorSchemaRoot root) {
+    public void pump() {
 
-        var out = new ByteOutputChannel(this::emitChunk);
-        return new ArrowFileWriter(root, /* dictionary provider = */ null, out);
+        emitRoot(root);
+        emitBatch();
+        emitEnd();
+    }
+
+    @Override
+    public void cancel() {
+
+    }
+
+    @Override
+    public void close() {
+
     }
 }

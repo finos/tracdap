@@ -16,64 +16,58 @@
 
 package org.finos.tracdap.common.codec.json;
 
-import org.finos.tracdap.common.codec.BaseDecoder;
-import org.finos.tracdap.common.codec.arrow.ArrowSchema;
-import org.finos.tracdap.common.data.DataBlock;
+import org.finos.tracdap.common.codec.StreamingDecoder;
+import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.metadata.SchemaDefinition;
+
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.types.pojo.Schema;
 
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonToken;
+
 import io.netty.buffer.ByteBuf;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
-import org.apache.arrow.vector.types.pojo.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 
-public class JsonDecoder extends BaseDecoder {
+public class JsonDecoder extends StreamingDecoder {
 
     private static final int BATCH_SIZE = 1024;
     private static final boolean CASE_INSENSITIVE = false;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
-
-    private final BufferAllocator arrowAllocator;
-    private final SchemaDefinition tracSchema;
-    private final Schema arrowSchema;
-
+    private VectorSchemaRoot root;
     private JsonStreamParser parser;
+    private long bytesConsumed;
 
-    public JsonDecoder(BufferAllocator arrowAllocator, SchemaDefinition tracSchema) {
+    public JsonDecoder(BufferAllocator arrowAllocator, Schema arrowSchema) {
 
-        super(STREAMING_DECODER);
+        // Allocate memory once, and reuse it for every batch (i.e. do not clear/allocate per batch)
+        // This memory is released in close(), which calls root.close()
 
-        this.arrowAllocator = arrowAllocator;
-        this.tracSchema = tracSchema;
+        this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, BATCH_SIZE);
 
-        // Schema cannot be inferred from JSON, so it must always be set from a TRAC schema
-        this.arrowSchema = ArrowSchema.tracToArrow(tracSchema);
+        for (var vector : root.getFieldVectors())
+            vector.allocateNew();
     }
 
     @Override
-    protected void decodeStart() {
+    public void onStart() {
 
         try {
 
             var factory = new JsonFactory();
-
-            var tableHandler = new JsonTableHandler(
-                    arrowAllocator, arrowSchema, CASE_INSENSITIVE,
-                    this::dispatchBatch, BATCH_SIZE);
+            var tableHandler = new JsonTableHandler(root, batch -> emitBatch(), BATCH_SIZE, CASE_INSENSITIVE);
 
             this.parser = new JsonStreamParser(factory, tableHandler);
 
-            emitBlock(DataBlock.forSchema(this.arrowSchema));
+            emitRoot(this.root);
         }
         catch (IOException e) {
 
@@ -84,7 +78,7 @@ public class JsonDecoder extends BaseDecoder {
     }
 
     @Override
-    protected void decodeChunk(ByteBuf chunk) {
+    public void onNext(ByteBuf chunk) {
 
         try {
 
@@ -92,6 +86,7 @@ public class JsonDecoder extends BaseDecoder {
             chunk.readBytes(bytes);
 
             parser.feedInput(bytes, 0, bytes.length);
+            bytesConsumed += bytes.length;
 
             JsonToken token;
 
@@ -132,9 +127,35 @@ public class JsonDecoder extends BaseDecoder {
     }
 
     @Override
-    protected void decodeEnd() {
+    public void onComplete() {
 
-        // No-op
+        try {
+
+            if (bytesConsumed == 0) {
+                var error = new EDataCorruption("JSON data is empty");
+                log.error(error.getMessage(), error);
+                emitFailed(error);
+            }
+            else {
+
+                emitEnd();
+            }
+        }
+        finally {
+            close();
+        }
+    }
+
+    @Override
+    public void onError(Throwable error) {
+
+        try {
+            // TODO: Should datapipeline handle this?
+            emitFailed(error);
+        }
+        finally {
+            close();
+        }
     }
 
     @Override
@@ -146,6 +167,11 @@ public class JsonDecoder extends BaseDecoder {
                 parser.close();
                 parser = null;
             }
+
+            if (root != null) {
+                root.close();
+                root = null;
+            }
         }
         catch (IOException e) {
 
@@ -153,14 +179,5 @@ public class JsonDecoder extends BaseDecoder {
             log.error("Unexpected error closing decoder: {}", e.getMessage(), e);
             throw new EUnexpected(e);
         }
-        finally {
-
-            super.close();
-        }
-    }
-
-    private void dispatchBatch(ArrowRecordBatch batch) {
-
-        emitBlock(DataBlock.forRecords(batch));
     }
 }

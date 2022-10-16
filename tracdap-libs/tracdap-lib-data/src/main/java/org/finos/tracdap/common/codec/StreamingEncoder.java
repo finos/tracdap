@@ -17,29 +17,9 @@
 package org.finos.tracdap.common.codec;
 
 import org.finos.tracdap.common.data.DataPipeline;
+import org.finos.tracdap.common.data.pipeline.BaseByteProducer;
 
-import org.apache.arrow.vector.types.pojo.Schema;
-import org.apache.arrow.memory.BufferAllocator;
-
-import java.util.List;
-import java.util.Map;
-
-public interface ICodec {
-
-    interface Encoder extends DataPipeline.DataConsumer, DataPipeline.ByteProducer {}
-    interface Decoder extends DataPipeline.ByteConsumer, DataPipeline.DataProducer {}
-
-    List<String> options();
-
-    String defaultFileExtension();
-
-    Encoder getEncoder(
-            BufferAllocator arrowAllocator,
-            Schema schema,
-            Map<String, String> options);
-
-    Decoder getDecoder(
-            BufferAllocator arrowAllocator,
-            Schema schema,
-            Map<String, String> options);
-}
+public abstract class StreamingEncoder extends BaseByteProducer implements
+        DataPipeline.DataStreamConsumer,
+        DataPipeline.ByteStreamProducer,
+        ICodec.Encoder {}

@@ -16,23 +16,17 @@
 
 package org.finos.tracdap.common.codec.csv;
 
-import org.finos.tracdap.common.codec.BaseEncoder;
-import org.finos.tracdap.common.codec.arrow.ArrowSchema;
+import org.finos.tracdap.common.codec.StreamingEncoder;
 import org.finos.tracdap.common.codec.json.JacksonValues;
-import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.util.ByteOutputStream;
-import org.finos.tracdap.metadata.SchemaDefinition;
+
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.types.pojo.Schema;
 
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.dataformat.csv.CsvFactory;
 import com.fasterxml.jackson.dataformat.csv.CsvGenerator;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorLoader;
-import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.ipc.message.ArrowDictionaryBatch;
-import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
-import org.apache.arrow.vector.types.pojo.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,45 +34,37 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 
-public class CsvEncoder extends BaseEncoder {
+public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final BufferAllocator arrowAllocator;
-    private final SchemaDefinition tracSchema;
-
-    private Schema arrowSchema;
     private VectorSchemaRoot root;
-    private VectorLoader loader;
+    private Schema actualSchema;
 
     private OutputStream out;
     private CsvGenerator generator;
 
 
-    public CsvEncoder(BufferAllocator arrowAllocator, SchemaDefinition tracSchema) {
+    public CsvEncoder() {
 
-        this.arrowAllocator = arrowAllocator;
-        this.tracSchema = tracSchema;
     }
 
     @Override
-    protected void encodeSchema(Schema arrowSchema) {
+    public void onStart(VectorSchemaRoot root) {
 
         try {
 
-            this.arrowSchema = arrowSchema;
-            this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator);
+            emitStart();
 
-            // Record batches in the TRAC intermediate data stream are always uncompressed
-            // So, there is no need to use a compression codec here
-            this.loader = new VectorLoader(root);
+            this.root = root;
+            this.actualSchema = root.getSchema();
 
             var factory = new CsvFactory()
                     // Make sure empty strings are quoted, so they can be distinguished from nulls
                     .enable(CsvGenerator.Feature.ALWAYS_QUOTE_EMPTY_STRINGS);
 
             var csvSchema = CsvSchemaMapping
-                    .arrowToCsv(arrowSchema)
+                    .arrowToCsv(actualSchema)
                     .build()
                     .withHeader();
 
@@ -93,19 +79,20 @@ public class CsvEncoder extends BaseEncoder {
 
             // Output stream is writing to memory buffers, IO errors are not expected
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
+
+            close();
+
             throw new EUnexpected(e);
         }
     }
 
     @Override
-    protected void encodeRecords(ArrowRecordBatch batch) {
+    public void onNext() {
 
-        try (batch) {
+        try {
 
-            loader.load(batch);
-
-            var nRows = batch.getLength();
-            var nCols = arrowSchema.getFields().size();
+            var nRows = root.getRowCount();
+            var nCols = actualSchema.getFields().size();
 
             for (var row = 0; row < nRows; row++) {
 
@@ -124,22 +111,15 @@ public class CsvEncoder extends BaseEncoder {
 
             // Output stream is writing to memory buffers, IO errors are not expected
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
+
+            close();
+
             throw new EUnexpected(e);
         }
-        finally {
-
-            root.clear();
-        }
     }
 
     @Override
-    protected void encodeDictionary(ArrowDictionaryBatch batch) {
-
-        throw new ETracInternal("CSV dictionary encoding not supported");
-    }
-
-    @Override
-    protected void encodeEos() {
+    public void onComplete() {
 
         try {
 
@@ -153,13 +133,24 @@ public class CsvEncoder extends BaseEncoder {
 
             out.close();
             out = null;
+
+            emitEnd();
         }
         catch (IOException e) {
 
             // Output stream is writing to memory buffers, IO errors are not expected
             log.error("Unexpected error writing to codec buffer: {}", e.getMessage(), e);
+
+            close();
+
             throw new EUnexpected(e);
         }
+    }
+
+    @Override
+    public void onError(Throwable error) {
+
+        close();
     }
 
     @Override
@@ -177,8 +168,9 @@ public class CsvEncoder extends BaseEncoder {
                 out = null;
             }
 
+            // Encoder does not own root, do not try to close it
+
             if (root != null) {
-                root.close();
                 root = null;
             }
         }
@@ -187,10 +179,6 @@ public class CsvEncoder extends BaseEncoder {
             // Output stream is writing to memory buffers, IO errors are not expected
             log.error("Unexpected error closing encoder: {}", e.getMessage(), e);
             throw new EUnexpected(e);
-        }
-        finally {
-
-            super.close();
         }
     }
 }
