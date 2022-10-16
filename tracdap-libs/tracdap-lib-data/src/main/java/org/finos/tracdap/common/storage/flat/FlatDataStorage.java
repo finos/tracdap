@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.storage.flat;
 
-import org.apache.arrow.vector.types.pojo.Schema;
 import org.finos.tracdap.common.codec.ICodec;
 import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.common.concurrent.Flows;
@@ -25,6 +24,8 @@ import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.storage.IDataStorage;
 import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.metadata.StorageCopy;
+
+import org.apache.arrow.vector.types.pojo.Schema;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -46,16 +47,16 @@ public class FlatDataStorage implements IDataStorage {
     public DataPipeline pipelineReader(StorageCopy storageCopy, Schema requiredSchema, IDataContext dataContext) {
 
         var codec = formats.getCodec(storageCopy.getStorageFormat());
-        var codecOptions = Map.<String, String>of();
 
         var chunkPath = chunkPath(storageCopy, codec);
-        var fileReader = fileStorage.reader(chunkPath, dataContext);
-        var decoder = codec.getDecoder(dataContext.arrowAllocator(), requiredSchema, codecOptions);
+        var load = fileStorage.reader(chunkPath, dataContext);
 
-        var pipeline = DataPipeline.forSource(fileReader, dataContext);
-        pipeline.addStage(decoder);
+        var pipeline = DataPipeline.forSource(load, dataContext);
 
-        return pipeline;
+        var options = Map.<String, String>of();
+        var decoder = codec.getDecoder(dataContext.arrowAllocator(), requiredSchema, options);
+
+        return pipeline.addStage(decoder);
     }
 
     @Override
@@ -65,19 +66,17 @@ public class FlatDataStorage implements IDataStorage {
             CompletableFuture<Long> signal) {
 
         var codec = formats.getCodec(storageCopy.getStorageFormat());
-        var codecOptions = Map.<String, String>of();
+        var options = Map.<String, String>of();
+        var encoder = codec.getEncoder(dataContext.arrowAllocator(), requiredSchema, options);
+
+        pipeline = pipeline.addStage(encoder);
 
         var chunkPath = chunkPath(storageCopy, codec);
-        var fileWriter = fileStorage.writer(chunkPath, signal, dataContext);
         var mkdir = fileStorage.mkdir(storageCopy.getStoragePath(), /* recursive = */ true, dataContext);
-        var mkdirAndSave = Flows.waitForSignal(fileWriter, mkdir);
+        var save = fileStorage.writer(chunkPath, signal, dataContext);
+        var mkdirAndSave = Flows.waitForSignal(save, mkdir);
 
-        var encoder = codec.getEncoder(dataContext.arrowAllocator(), requiredSchema, codecOptions);
-
-        pipeline.addStage(encoder);
-        pipeline.addSink(mkdirAndSave);
-
-        return pipeline;
+        return pipeline.addSink(mkdirAndSave);
     }
 
     private String chunkPath(StorageCopy storageCopy, ICodec codec) {
