@@ -34,7 +34,7 @@ import java.util.concurrent.Flow;
 
 public class DataPipelineImpl implements DataPipeline {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private static final Logger log = LoggerFactory.getLogger(DataPipeline.class);
 
     private final IDataContext ctx;
     private final List<DataStage> stages;
@@ -63,28 +63,48 @@ public class DataPipelineImpl implements DataPipeline {
         log.info("Executing data pipeline");
 
         started = true;
-        ctx.eventLoopExecutor().execute(this::start);
+        sourceStage.connect();
+        sinkStage.connect();
+
+        ctx.eventLoopExecutor().execute(this::doFeedData);
 
         return completion;
     }
 
-    void start() {
-
-        sinkStage.start();
-        feedData();
-    }
-
     void feedData() {
 
-        if (completion.isDone())
-            return;
+        ctx.eventLoopExecutor().execute(this::doFeedData);
+    }
+
+    private void doFeedData() {
 
         try {
-            if (sinkStage.poll())
+
+            if (completion.isDone())
+                return;
+
+            var pipeReady = true;
+
+            for (var i = stages.size() - 1; i >= 0; i--) {
+
+                var stage = stages.get(i);
+
+                if (stage.isDone())
+                    continue;
+
+                var stageReady = stage.isReady();
+
+                if (pipeReady && stageReady)
+                    stage.pump();
+
+                pipeReady = stageReady;
+            }
+
+            if (pipeReady && !sourceStage.isDone())
                 sourceStage.pump();
         }
-        finally {
-            ctx.eventLoopExecutor().execute(this::feedData);
+        catch (Throwable error) {
+            reportUnhandledError(error);
         }
     }
 
@@ -94,37 +114,57 @@ public class DataPipelineImpl implements DataPipeline {
             sourceStage.cancel();
     }
 
-    void markComplete() {
+    void reportComplete() {
+
+        // Expect all the stages have gone down cleanly
 
         log.info("Data pipeline complete");
-
         completion.complete(null);
+        close();
+    }
+
+    void reportRegularError(Throwable error) {
+
+        // Expect all the stages have gone down cleanly
+
+        log.error("Data pipeline failed: {}", error.getMessage(), error);
+        completion.completeExceptionally(error);
+        close();
+    }
+
+    void reportUnhandledError(Throwable error) {
+
+        // Expect the stages are in an inconsistent state
+        // Force shutdown for the source and sink
+
+        var unhandled = new ETracInternal("Data pipeline failed with an unhandled error: " + error.getMessage(), error);
+        log.error(unhandled.getMessage(), unhandled);
+        completion.completeExceptionally(unhandled);
+
+        sourceStage.cancel();
+        sinkStage.terminate(unhandled);
 
         close();
     }
 
-    void markAsFailed(Throwable error) {
-
-        try {
-
-            log.info("Data pipeline failed", error);
-
-            var newStatus = completion.completeExceptionally(error);
-
-            if (newStatus) {
-                sourceStage.cancel();
-                sinkStage.emitFailed(error);
-            }
-        }
-        finally {
-
-            close();
-        }
-    }
-
     void close() {
 
+        // This is a failsafe check, normally source and sink should be already stopped when close() is called
+        // But just in case, double check and shut them down with a warning if they are still running
+
+        if (!sourceStage.isDone()) {
+            log.warn("Source stage still running after data pipeline completed");
+            sourceStage.cancel();
+        }
+
+        if (!sinkStage.isDone()) {
+            log.warn("Sink stage still running after data pipeline completed");
+            var error = new ETracInternal("Sink stage still running after data pipeline completed\"");
+            sinkStage.terminate(error);
+        }
+
         for (var stage : stages) {
+
             try {
                 stage.close();
             }
@@ -142,6 +182,8 @@ public class DataPipelineImpl implements DataPipeline {
 
     public static DataPipeline forSource(SourceStage source, IDataContext ctx) {
 
+        log.info("DATA PIPELINE: New for source type [{}]", source.getClass().getSimpleName());
+
         var pipeline = new DataPipelineImpl(ctx);
 
         pipeline.stages.add(source);
@@ -152,10 +194,11 @@ public class DataPipelineImpl implements DataPipeline {
 
     public static DataPipeline forSource(Flow.Publisher<? extends ByteBuf> source, IDataContext ctx) {
 
+        log.info("DATA PIPELINE: New for stream type [{}]", source.getClass().getSimpleName());
+
         var pipeline = new DataPipelineImpl(ctx);
 
         var rbs = new ReactiveByteSource(pipeline, source);
-        source.subscribe(rbs);
 
         pipeline.stages.add(rbs);
         pipeline.sourceStage = rbs;
@@ -171,18 +214,8 @@ public class DataPipelineImpl implements DataPipeline {
         if (started)
             throw new ETracInternal("Data pipeline is already started");
 
-        if (stage instanceof DataStreamConsumer) {
-            addDataConsumer((DataStreamConsumer) stage);
-            return this;
-        }
-
-        if (stage instanceof ByteStreamConsumer) {
-            addByteConsumer((ByteStreamConsumer) stage);
-            return this;
-        }
-
-        if (stage instanceof ByteBufferConsumer) {
-            addByteConsumer((ByteBufferConsumer) stage);
+        if (stage instanceof DataConsumer<?>) {
+            doAddStage((DataConsumer<?>) stage);
             return this;
         }
 
@@ -201,70 +234,50 @@ public class DataPipelineImpl implements DataPipeline {
         sinkStage = sink;
 
         return this;
-
     }
 
     public DataPipeline addSink(Flow.Subscriber<ByteBuf> sink) {
+
+        var sinkBuffer = new ElasticBuffer();
+        addStage(sinkBuffer);
 
         var reactiveSink = new ReactiveByteSink(this, sink);
         return addSink(reactiveSink);
     }
 
-    private void addDataConsumer(DataStreamConsumer stage) {
+    private void doAddStage(DataConsumer<?> stage) {
 
-        var priorStage = stages.get(stages.size() - 1);
+        var priorStage = (DataProducer<?>) stages.get(stages.size() - 1);
 
-        if (priorStage instanceof BaseDataProducer) {
-
-            ((BaseDataProducer) priorStage).bind(stage);
-            stages.add(stage);
+        if (priorStage.consumerType().isAssignableFrom(stage.dataInterface().getClass())) {
+            connectStage(priorStage, stage);
         }
-        else {
 
-            throw new EUnexpected();
-        }
-    }
-
-    private void addByteConsumer(ByteStreamConsumer stage) {
-
-        var priorStage = stages.get(stages.size() - 1);
-
-        if (priorStage instanceof BaseByteProducer) {
-
-            ((BaseByteProducer) priorStage).bind(stage);
-            stages.add(stage);
-        }
-        else if (priorStage instanceof BaseBufferProducer) {
-
-            // todo
-            throw new EUnexpected();
-        }
-        else {
-
-            throw new EUnexpected();
-        }
-    }
-
-    private void addByteConsumer(ByteBufferConsumer stage) {
-
-        var priorStage = stages.get(stages.size() - 1);
-
-        if (priorStage instanceof BaseBufferProducer) {
-
-            ((BaseBufferProducer) priorStage).bind(stage);
-        }
-        else if (priorStage instanceof BaseByteProducer) {
+        else if (StreamApi.class.isAssignableFrom(priorStage.consumerType()) &&
+                 BufferApi.class.isAssignableFrom(stage.dataInterface().getClass())) {
 
             var buffering = new BufferingStage();
-            ((BaseByteProducer) priorStage).bind(buffering);
-            buffering.bind(stage);
-
-            stages.add(buffering);
-            stages.add(stage);
+            connectStage(priorStage, buffering);
+            connectStage(buffering, stage);
         }
+
         else {
 
             throw new EUnexpected();
         }
+    }
+
+    private void connectStage(DataProducer<?> producer, DataConsumer<?> consumer) {
+
+        log.info("DATA PIPELINE: Add stage {}", consumer.getClass().getSimpleName());
+
+        var concreteProducer = (BaseDataProducer<?>) producer;
+
+        if (concreteProducer == null)
+            throw new EUnexpected();
+
+        concreteProducer.bind(consumer);
+
+        stages.add(consumer);
     }
 }

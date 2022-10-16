@@ -24,13 +24,33 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 
 
-public class BufferingStage extends BaseBufferProducer
-        implements DataPipeline.ByteStreamConsumer{
+public class BufferingStage
+    extends
+        BaseDataProducer<DataPipeline.BufferApi>
+    implements
+        DataPipeline.DataConsumer<DataPipeline.StreamApi>,
+        DataPipeline.StreamApi {
 
     private CompositeByteBuf buffer;
 
     public BufferingStage() {
+        super(DataPipeline.BufferApi.class);
         buffer = null;
+    }
+
+    @Override
+    public DataPipeline.StreamApi dataInterface() {
+        return this;
+    }
+
+    @Override
+    public void pump() {
+        // no-op
+    }
+
+    @Override
+    public boolean isReady() {
+        return true;
     }
 
     @Override
@@ -45,9 +65,6 @@ public class BufferingStage extends BaseBufferProducer
     @Override
     public void onNext(ByteBuf chunk) {
 
-        if (buffer == null)
-            throw new EUnexpected();
-
         buffer.addComponent(chunk);
         buffer.writerIndex(this.buffer.writerIndex() + chunk.readableBytes());
     }
@@ -55,20 +72,25 @@ public class BufferingStage extends BaseBufferProducer
     @Override
     public void onComplete() {
 
-        if (buffer == null)
-            throw new EUnexpected();
+        try {
 
-        var buffer = this.buffer;
-        this.buffer = null;
+            var relinquishBuffer = this.buffer;
+            this.buffer = null;
 
-        emitBuffer(buffer);
+            markAsDone();
+            consumer().onBuffer(relinquishBuffer);
+        }
+        finally {
+            close();
+        }
     }
 
     @Override
     public void onError(Throwable error) {
 
         try {
-            // todo
+            markAsDone();
+            consumer().onError(error);
         }
         finally {
             close();

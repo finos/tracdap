@@ -19,29 +19,33 @@ package org.finos.tracdap.common.data.pipeline;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EUnexpected;
 
-import io.netty.buffer.ByteBuf;
 
+public abstract class BaseDataSink <API_T extends DataPipeline.DataInterface<API_T>>
+    extends
+        BaseDataStage
+    implements
+        DataPipeline.DataConsumer<API_T>,
+        DataPipeline.SinkStage {
 
-public abstract class BaseBufferProducer implements DataPipeline.ByteBufferProducer {
+    protected final DataPipelineImpl pipeline;
 
-    private DataPipeline.ByteBufferConsumer consumer;
+    protected BaseDataSink(DataPipeline pipeline) {
 
-    final void bind(DataPipeline.ByteBufferConsumer consumer) {
-
-        if (this.consumer != null)
-            throw new EUnexpected();  // todo err
-
-        this.consumer = consumer;
-    }
-
-    @Override
-    public void emitBuffer(ByteBuf buffer) {
-
-        //log.info("emitBuffer");
-
-        if (this.consumer == null)
+        if (!(pipeline instanceof DataPipelineImpl))
             throw new EUnexpected();
 
-        consumer.consumeBuffer(buffer);
+        this.pipeline = (DataPipelineImpl) pipeline;
+    }
+
+    protected final void reportComplete() {
+        pipeline.reportComplete();
+    }
+
+    protected final void reportRegularError(Throwable error) {
+        pipeline.reportRegularError(error);
+    }
+
+    protected final void reportUnhandledError(Throwable error) {
+        pipeline.reportUnhandledError(error);
     }
 }

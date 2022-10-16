@@ -16,53 +16,74 @@
 
 package org.finos.tracdap.common.data.pipeline;
 
-import org.finos.tracdap.common.data.DataPipeline;
-
 import io.netty.buffer.ByteBuf;
+import org.finos.tracdap.common.data.DataPipeline;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.Callable;
 import java.util.concurrent.Flow;
 
 
 public class ReactiveByteSource
-        extends BaseByteProducer
-        implements DataPipeline.SourceStage,
+    extends
+        BaseDataProducer<DataPipeline.StreamApi>
+    implements
+        DataPipeline.SourceStage,
         Flow.Subscriber<ByteBuf> {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final DataPipelineImpl pipeline;
     private final Flow.Publisher<? extends ByteBuf> publisher;
 
     private Flow.Subscription subscription;
-    private boolean started = false;
     private long nRequested;
     private long nReceived;
 
     public ReactiveByteSource(DataPipelineImpl pipeline, Flow.Publisher<? extends ByteBuf> publisher) {
+        super(DataPipeline.StreamApi.class);
         this.pipeline = pipeline;
         this.publisher = publisher;
     }
 
     @Override
-    public void pump() {
-
-        if (!started) {
-            this.started = true;
-            emitStart();
-        }
+    public void connect() {
 
         if (subscription != null) {
-
-            if (nReceived == nRequested) {
-                nRequested += 1;
-                subscription.request(1);
-            }
+            log.warn("Data stream started twice");
+            return;
         }
-        else {
-            // todo log
+
+        publisher.subscribe(this);
+    }
+
+    @Override
+    public void pump() {
+
+        if (subscription == null) {
+            log.warn("Data stream has not started yet or has already closed");
+            return;
+        }
+
+        if (nReceived == nRequested) {
+            nRequested += 1;
+            subscription.request(1);
         }
     }
 
     @Override
+    public boolean isReady() {
+        return consumerReady() && subscription != null;
+    }
+
+    @Override
     public void cancel() {
+        close();
+    }
+
+    @Override
+    public void close() {
 
         if (subscription != null) {
             subscription.cancel();
@@ -70,50 +91,80 @@ public class ReactiveByteSource
         }
     }
 
+    // The flow consumer API is called from outside the data pipeline framework
+    // Any errors still unhandled at this level need to be reported to the pipeline
+
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
 
-        this.subscription = subscription;
+        reportUnhandledErrors(() -> {
+
+            if (log.isTraceEnabled())
+                log.trace("onSubscribe()");
+
+            this.subscription = subscription;
+            consumer().onStart();
+
+            return null;
+        });
     }
 
     @Override
     public void onNext(ByteBuf chunk) {
 
-        try {
+        reportUnhandledErrors(() -> {
+
+            if (log.isTraceEnabled())
+                log.trace("onNext(), size = {}", chunk.readableBytes());
 
             nReceived += 1;
+            consumer().onNext(chunk);
 
-            emitChunk(chunk);
-        }
-        catch (Throwable e) {
-            pipeline.markAsFailed(e);
-        }
+            return null;
+        });
     }
 
     @Override
     public void onComplete() {
 
-        try {
-            emitEnd();
-        }
-        catch (Throwable e) {
-            pipeline.markAsFailed(e);
-        }
+        reportUnhandledErrors(() -> {
+
+            if (log.isTraceEnabled())
+                log.trace("onComplete()");
+
+            markAsDone();
+            consumer().onComplete();
+
+            return null;
+        });
     }
 
     @Override
     public void onError(Throwable error) {
 
-        try {
-            emitFailed(error);
-        }
-        finally {
-            pipeline.markAsFailed(error);
-        }
+        reportUnhandledErrors(() -> {
+
+            if (log.isTraceEnabled())
+                log.trace("onError()");
+
+            markAsDone();
+            consumer().onError(error);
+
+            return null;
+        });
     }
 
-    @Override
-    public void close() {
-        cancel();
+    private void reportUnhandledErrors(Callable<?> lambda) {
+
+        try {
+            lambda.call();
+        }
+        catch (Throwable error) {
+
+            log.error("Error has reached the top level: " + error.getMessage(), error);
+
+            pipeline.reportUnhandledError(error);
+            close();
+        }
     }
 }
