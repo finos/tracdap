@@ -20,7 +20,19 @@ import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.pipeline.BaseDataProducer;
 
 
-public abstract class StreamingDecoder extends BaseDataProducer implements
-        DataPipeline.ByteStreamConsumer,
-        DataPipeline.DataStreamProducer,
-        ICodec.Decoder {}
+public abstract class StreamingDecoder
+    extends
+        BaseDataProducer<DataPipeline.ArrowApi>
+    implements
+        ICodec.Decoder<DataPipeline.StreamApi>,
+        DataPipeline.StreamApi {
+
+    protected StreamingDecoder() {
+        super(DataPipeline.ArrowApi.class);
+    }
+
+    @Override
+    public DataPipeline.StreamApi dataInterface() {
+        return this;
+    }
+}

@@ -61,7 +61,7 @@ public class CsvDecoder extends BufferDecoder {
     }
 
     @Override
-    public void consumeBuffer(ByteBuf buffer) {
+    public void onBuffer(ByteBuf buffer) {
 
         if (buffer.readableBytes() == 0) {
             var error = new EDataCorruption("CSV data is empty");
@@ -81,7 +81,7 @@ public class CsvDecoder extends BufferDecoder {
              var parser = (CsvParser) csvFactory.createParser((InputStream) stream);
              var root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, BATCH_SIZE)) {
 
-            emitRoot(root);
+            consumer().onStart(root);
 
             var csvSchema =  CsvSchemaMapping
                     .arrowToCsv(this.arrowSchema)
@@ -164,7 +164,7 @@ public class CsvDecoder extends BufferDecoder {
                         if (row == BATCH_SIZE) {
 
                             root.setRowCount(row);
-                            emitBatch();
+                            consumer().onNext();
 
                             row = 0;
                         }
@@ -183,12 +183,13 @@ public class CsvDecoder extends BufferDecoder {
             if (row > 0 || col > 0) {
 
                 root.setRowCount(row);
-                emitBatch();
+                consumer().onNext();
             }
 
             // Emit the end-of-stream signal
 
-            emitEnd();
+            markAsDone();
+            consumer().onComplete();
         }
         catch (JacksonException e) {
 
@@ -222,6 +223,18 @@ public class CsvDecoder extends BufferDecoder {
         finally {
 
             buffer.release();
+        }
+    }
+
+    @Override
+    public void onError(Throwable error) {
+
+        try {
+            markAsDone();
+            consumer().onError(error);
+        }
+        finally {
+            close();
         }
     }
 

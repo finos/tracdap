@@ -19,7 +19,29 @@ package org.finos.tracdap.common.codec;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.pipeline.BaseDataProducer;
 
-public abstract class BufferDecoder extends BaseDataProducer implements
-        DataPipeline.ByteBufferConsumer,
-        DataPipeline.DataStreamProducer,
-        ICodec.Decoder {}
+public abstract class BufferDecoder
+    extends
+        BaseDataProducer<DataPipeline.ArrowApi>
+    implements
+        ICodec.Decoder<DataPipeline.BufferApi>,
+        DataPipeline.BufferApi {
+
+    protected BufferDecoder() {
+        super(DataPipeline.ArrowApi.class);
+    }
+
+    @Override
+    public DataPipeline.BufferApi dataInterface() {
+        return this;
+    }
+
+    @Override
+    public boolean isReady() {
+        return true;
+    }
+
+    @Override
+    public void pump() {
+
+    }
+}
