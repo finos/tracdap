@@ -377,9 +377,9 @@ public abstract class DataRoundTripTest {
     TagHeader saveInputData(Schema schema, VectorSchemaRoot data, String testName) throws Exception {
 
         var buf = Unpooled.compositeBuffer();
-        var channel = new ByteOutputChannel(buf::addComponent);
 
-        try (var writer = new ArrowFileWriter(data, null,  channel)) {
+        try (var channel = new ByteOutputChannel(buf::addComponent);
+             var writer = new ArrowFileWriter(data, null,  channel)) {
 
             writer.start();
             writer.writeBatch();
