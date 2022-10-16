@@ -88,16 +88,18 @@ class DataRoundTripTest {
 
         var writeChannel = new ChunkChannel();
 
+        // Keep the writer open until after the test is complete
+        // Closing the writer will close the VSR, which releases the underlying memory
         try (var writer = new ArrowStreamWriter(root, null, writeChannel)) {
 
             writer.start();
             writer.writeBatch();
             writer.end();
-        }
 
-        var mimeType = "application/vnd.apache.arrow.stream";
-        roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, BASIC_TEST_DATA, true);
-        roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, BASIC_TEST_DATA, false);
+            var mimeType = "application/vnd.apache.arrow.stream";
+            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, BASIC_TEST_DATA, true);
+            roundTripTest(writeChannel.getChunks(), mimeType, mimeType, DataApiTestHelpers::decodeArrowStream, BASIC_TEST_DATA, false);
+        }
     }
 
     @Test
