@@ -16,28 +16,30 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
-import com.google.protobuf.ByteString;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.Unpooled;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.VectorLoader;
-import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.VectorUnloader;
-import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.codec.arrow.ArrowFileCodec;
-import org.finos.tracdap.common.codec.arrow.ArrowSchema;
-import org.finos.tracdap.common.concurrent.Flows;
-import org.finos.tracdap.common.data.DataBlock;
+import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.util.ByteOutputChannel;
+import org.finos.tracdap.common.util.ByteSeekableChannel;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.metadata.ImportModelJob;
 import org.finos.tracdap.metadata.RunModelJob;
 import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
+
+
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.ipc.ArrowFileReader;
+import org.apache.arrow.vector.types.pojo.Schema;
+
+import com.google.protobuf.ByteString;
+import io.netty.buffer.Unpooled;
+
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -56,7 +58,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.finos.tracdap.svc.orch.jobs.Helpers.runJob;
-import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 
 
 @Tag("integration")
@@ -375,24 +376,21 @@ public abstract class DataRoundTripTest {
 
     TagHeader saveInputData(Schema schema, VectorSchemaRoot data, String testName) throws Exception {
 
-        var unloader = new VectorUnloader(data);
-        var batch = unloader.getRecordBatch();
-        var schemaBlock = DataBlock.forSchema(schema);
-        var dataBlock = DataBlock.forRecords(batch);
-        var blockStream = Flows.publish(Stream.of(schemaBlock, dataBlock));
+        var buf = Unpooled.compositeBuffer();
+        var channel = new ByteOutputChannel(buf::addComponent);
 
-        var codec = new ArrowFileCodec();
-        var encoder = codec.getEncoder(ALLOCATOR, SampleData.BASIC_TABLE_SCHEMA, Map.of());
+        try (var writer = new ArrowFileWriter(data, null,  channel)) {
 
-        blockStream.subscribe(encoder);
-        var opaqueData_ = Flows.fold(encoder, (bs, b) -> bs.addComponent(true, b), ByteBufAllocator.DEFAULT.compositeBuffer());
-        var opaqueData = resultOf(opaqueData_);
+            writer.start();
+            writer.writeBatch();
+            writer.end();
+        }
 
         var writeRequest = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSchema(SampleData.BASIC_TABLE_SCHEMA)
                 .setFormat("application/vnd.apache.arrow.file")
-                .setContent(ByteString.copyFrom(opaqueData.nioBuffer()))
+                .setContent(ByteString.copyFrom(buf.nioBuffer()))
                 .addTagUpdates(TagUpdate.newBuilder()
                         .setAttrName("round_trip_dataset")
                         .setValue(MetadataCodec.encodeValue(testName + ":input")))
@@ -463,32 +461,19 @@ public abstract class DataRoundTripTest {
         var dataClient = platform.dataClientBlocking();
         var dataResponse = dataClient.readSmallDataset(readRequest);
         var dataBuf = Unpooled.wrappedBuffer(dataResponse.getContent().asReadOnlyByteBuffer());
-        var dataStream = Flows.publish(Stream.of(dataBuf));
 
-        var codec = new ArrowFileCodec();
         var allocator = new RootAllocator();
-        var decoder = codec.getDecoder(allocator, SampleData.BASIC_TABLE_SCHEMA, Map.of());
 
-        dataStream.subscribe(decoder);
-        var blocks = resultOf(Flows.toList(decoder));
+        try (var reader = new ArrowFileReader(new ByteSeekableChannel(dataBuf), allocator)) {
 
-        Assertions.assertTrue(blocks.size() == 1 || blocks.size() == 2);
-        Assertions.assertNotNull(blocks.get(0).arrowSchema);
+            reader.loadNextBatch();
 
-        if (blocks.size() == 1) {
-            var fields = blocks.get(0).arrowSchema.getFields();
-            var emptyVectors = fields.stream()
-                    .map(f -> f.createVector(ALLOCATOR))
-                    .collect(Collectors.toList());
-            return new VectorSchemaRoot(fields, emptyVectors, 0);
+            var root = reader.getVectorSchemaRoot();
+
+            var arrowSchema = ArrowSchema.tracToArrow(dataResponse.getSchema());
+            Assertions.assertEquals(arrowSchema, root.getSchema());
+
+            return root;
         }
-
-        var arrowSchema = blocks.get(0).arrowSchema;
-        var arrowRecords = blocks.get(1).arrowRecords;
-        var root = VectorSchemaRoot.create(arrowSchema, allocator);
-        var loader = new VectorLoader(root);
-        loader.load(arrowRecords);
-
-        return root;
     }
 }
