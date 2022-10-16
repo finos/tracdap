@@ -16,24 +16,26 @@
 
 package org.finos.tracdap.common.codec.arrow;
 
-import org.finos.tracdap.common.codec.BaseDecoder;
-import org.finos.tracdap.common.data.DataBlock;
+
+import org.finos.tracdap.common.codec.BufferDecoder;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.util.ByteSeekableChannel;
-import io.netty.buffer.ByteBuf;
+
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorUnloader;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
+
+import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.channels.SeekableByteChannel;
 
 
-public class ArrowStreamDecoder extends BaseDecoder {
+public class ArrowStreamDecoder extends BufferDecoder {
 
     // Safeguard max allowed size for first (schema) message - 16 MiB should be ample
     private static final int CONTINUATION_MARKER = 0xffffffff;
@@ -45,20 +47,19 @@ public class ArrowStreamDecoder extends BaseDecoder {
 
     public ArrowStreamDecoder(BufferAllocator arrowAllocator) {
 
-        super(BUFFERED_DECODER);
-
         this.arrowAllocator = arrowAllocator;
     }
 
     @Override
-    protected void decodeStart() {
-        // No-op, current version of CSV decode buffers the full input
-    }
+    public void consumeBuffer(ByteBuf buffer) {
 
-    @Override
-    protected void decodeChunk(ByteBuf chunk) {
+        if (buffer.readableBytes() == 0) {
+            var error = new EDataCorruption("Arrow data stream is empty");
+            log.error(error.getMessage(), error);
+            throw error;
+        }
 
-        try (var stream = new ByteSeekableChannel(chunk)) {
+        try (var channel = new ByteSeekableChannel(buffer)) {
 
             // Arrow does not attempt to validate the stream before reading
             // This quick validation peeks at the start of the stream for a basic sanity check
@@ -67,24 +68,19 @@ public class ArrowStreamDecoder extends BaseDecoder {
             // Make sure to do this check before setting up reader + root,
             // since that will trigger reading the initial schema message
 
-            validateStartOfStream(stream);
+            validateStartOfStream(channel);
 
-            try (var reader = new ArrowStreamReader(stream, arrowAllocator);
+            try (var reader = new ArrowStreamReader(channel, arrowAllocator);
                  var root = reader.getVectorSchemaRoot()){
 
-                var schema = root.getSchema();
-                emitBlock(DataBlock.forSchema(schema));
-
-                var unloader = new VectorUnloader(root);
+                emitRoot(root);
 
                 while (reader.loadNextBatch()) {
 
-                    var batch = unloader.getRecordBatch();
-                    emitBlock(DataBlock.forRecords(batch));
-
-                    // Release memory retained in VSR (batch still has a reference)
-                    root.clear();
+                    emitBatch();
                 }
+
+                emitEnd();
             }
         }
         catch (NotAnArrowStream e) {
@@ -115,17 +111,17 @@ public class ArrowStreamDecoder extends BaseDecoder {
         }
         finally {
 
-            chunk.release();
+            buffer.release();
         }
     }
 
     @Override
-    protected void decodeEnd() {
+    public void close() {
 
-        // No-op, current version of arrow file decoder buffers the full input
+        // No-op, no resources are held outside consumeBuffer()
     }
 
-    private void validateStartOfStream(ByteSeekableChannel stream) throws IOException {
+    private void validateStartOfStream(SeekableByteChannel channel) throws IOException {
 
         // https://arrow.apache.org/docs/format/Columnar.html#encapsulated-message-format
 
@@ -135,15 +131,15 @@ public class ArrowStreamDecoder extends BaseDecoder {
         // E.g. if a data stream contains a totally different format
 
         // Record the stream position, so it can be restored after the validation
-        long pos = stream.position();
+        long pos = channel.position();
 
         var headerBytes = new byte[8];
         var headerBuf = ByteBuffer.wrap(headerBytes);
         headerBuf.order(ByteOrder.LITTLE_ENDIAN);
 
-        stream.position(0);
+        channel.position(0);
 
-        var prefaceLength = stream.read(headerBuf);
+        var prefaceLength = channel.read(headerBuf);
         var continuation = headerBuf.getInt(0);
         var messageSize = headerBuf.getInt(4);
 
@@ -153,7 +149,7 @@ public class ArrowStreamDecoder extends BaseDecoder {
             throw new NotAnArrowStream();
 
         // Restore original stream position
-        stream.position(pos);
+        channel.position(pos);
     }
 
     private static class NotAnArrowStream extends RuntimeException { }

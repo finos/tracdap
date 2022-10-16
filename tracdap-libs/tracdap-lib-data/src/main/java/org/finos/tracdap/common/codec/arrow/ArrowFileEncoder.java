@@ -17,7 +17,7 @@
 package org.finos.tracdap.common.codec.arrow;
 
 import org.finos.tracdap.common.util.ByteOutputChannel;
-import org.apache.arrow.memory.BufferAllocator;
+
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.apache.arrow.vector.ipc.ArrowWriter;
@@ -25,9 +25,9 @@ import org.apache.arrow.vector.ipc.ArrowWriter;
 
 public class ArrowFileEncoder extends ArrowEncoder {
 
-    public ArrowFileEncoder(BufferAllocator arrowAllocator) {
+    public ArrowFileEncoder() {
 
-        super(arrowAllocator);
+        super();
     }
 
     @Override

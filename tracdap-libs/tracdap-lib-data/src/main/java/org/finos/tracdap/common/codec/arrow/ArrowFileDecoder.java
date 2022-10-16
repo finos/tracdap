@@ -16,23 +16,23 @@
 
 package org.finos.tracdap.common.codec.arrow;
 
-import org.finos.tracdap.common.codec.BaseDecoder;
-import org.finos.tracdap.common.data.DataBlock;
+import org.finos.tracdap.common.codec.BufferDecoder;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.util.ByteSeekableChannel;
-import io.netty.buffer.ByteBuf;
+
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.VectorUnloader;
 import org.apache.arrow.vector.ipc.ArrowFileReader;
 import org.apache.arrow.vector.ipc.InvalidArrowFileException;
+
+import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 
-public class ArrowFileDecoder extends BaseDecoder {
+public class ArrowFileDecoder extends BufferDecoder {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -40,33 +40,31 @@ public class ArrowFileDecoder extends BaseDecoder {
 
     public ArrowFileDecoder(BufferAllocator arrowAllocator) {
 
-        super(BUFFERED_DECODER);
-
         this.arrowAllocator = arrowAllocator;
     }
 
     @Override
-    protected void decodeStart() {
-        // No-op, current version of CSV decode buffers the full input
-    }
+    public void consumeBuffer(ByteBuf buffer) {
 
-    @Override
-    protected void decodeChunk(ByteBuf chunk) {
+        if (buffer.readableBytes() == 0) {
+            var error = new EDataCorruption("Arrow data file is empty");
+            log.error(error.getMessage(), error);
+            throw error;
+        }
 
-        try (var stream = new ByteSeekableChannel(chunk);
-             var reader = new ArrowFileReader(stream, arrowAllocator);
+        try (var channel = new ByteSeekableChannel(buffer);
+
+             var reader = new ArrowFileReader(channel, arrowAllocator);
              var root = reader.getVectorSchemaRoot()) {
 
-            var schema = root.getSchema();
-            emitBlock(DataBlock.forSchema(schema));
-
-            var unloader = new VectorUnloader(root);
+            emitRoot(root);
 
             while (reader.loadNextBatch()) {
 
-                var batch = unloader.getRecordBatch();
-                emitBlock(DataBlock.forRecords(batch));
+                emitBatch();
             }
+
+            emitEnd();
         }
         catch (InvalidArrowFileException e) {
 
@@ -99,13 +97,13 @@ public class ArrowFileDecoder extends BaseDecoder {
         }
         finally {
 
-            chunk.release();
+            buffer.release();
         }
     }
 
     @Override
-    protected void decodeEnd() {
+    public void close() {
 
-        // No-op, current version of arrow file decoder buffers the full input
+        // No-op, no resources are held outside consumeBuffer()
     }
 }
