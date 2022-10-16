@@ -16,14 +16,9 @@
 
 package org.finos.tracdap.common.codec.json;
 
-import org.finos.tracdap.common.codec.arrow.ArrowSchema;
-
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
-import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.VectorUnloader;
-import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 import org.apache.arrow.vector.types.pojo.Schema;
 
 import java.io.IOException;
@@ -36,31 +31,28 @@ import java.util.stream.IntStream;
 
 class JsonTableHandler implements JsonStreamParser.Handler {
 
-    private final Map<String, Integer> fieldMap;
-
     private final VectorSchemaRoot root;
-    private final VectorUnloader unloader;
-    private final Consumer<ArrowRecordBatch> batchEmitter;
+    private final Consumer<Void> batchSignal;
+
+    // Batch signal notifies the pipeline that a batch is ready to be processed
+    // It is processed synchronously, after which the batch is available to be re-used
+    // This is not the same thing as a Bat Signal, which summons the Bat Man
+    // That's a totally different kind of signal and the two should not be confused
+
     private final int batchSize;
+    private final Map<String, Integer> fieldMap;
 
     private int batchRow;
 
     JsonTableHandler(
-            BufferAllocator arrowAllocator, Schema arrowSchema, boolean isCaseSensitive,
-            Consumer<ArrowRecordBatch> batchEmitter, int batchSize) {
+            VectorSchemaRoot root, Consumer<Void> batchSignal,
+            int batchSize, boolean isCaseSensitive) {
 
-        this.fieldMap = buildFieldMap(arrowSchema, isCaseSensitive);
+        this.root = root;
+        this.batchSignal = batchSignal;
 
-        this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, batchSize);
-        this.unloader = new VectorUnloader(root);
-
-        this.batchEmitter = batchEmitter;
         this.batchSize = batchSize;
-
-        // Allocate memory once, and reuse it for every batch (i.e. do not clear/allocate per batch)
-        // This memory is released in close(), which calls root.close()
-        for (var vector : root.getFieldVectors())
-            vector.allocateNew();
+        this.fieldMap = buildFieldMap(root.getSchema(), isCaseSensitive);
     }
 
     @Override
@@ -168,8 +160,6 @@ class JsonTableHandler implements JsonStreamParser.Handler {
     private void dispatchBatch() {
 
         root.setRowCount(batchRow);
-
-        var batch = unloader.getRecordBatch();
-        batchEmitter.accept(batch);
+        batchSignal.accept(null);
     }
 }

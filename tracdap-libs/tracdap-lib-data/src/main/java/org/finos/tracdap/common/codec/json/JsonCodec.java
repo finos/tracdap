@@ -17,11 +17,13 @@
 package org.finos.tracdap.common.codec.json;
 
 import org.finos.tracdap.common.codec.ICodec;
-import org.finos.tracdap.metadata.SchemaDefinition;
+
+import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.memory.BufferAllocator;
 
 import java.util.List;
 import java.util.Map;
+
 
 public class JsonCodec implements ICodec {
 
@@ -38,12 +40,12 @@ public class JsonCodec implements ICodec {
     }
 
     @Override
-    public Encoder getEncoder(BufferAllocator arrowAllocator, SchemaDefinition schema, Map<String, String> options) {
-        return new JsonEncoder(arrowAllocator, schema);
+    public Encoder getEncoder(BufferAllocator arrowAllocator, Schema schema, Map<String, String> options) {
+        return new JsonEncoder();
     }
 
     @Override
-    public Decoder getDecoder(BufferAllocator arrowAllocator, SchemaDefinition schema, Map<String, String> options) {
+    public Decoder getDecoder(BufferAllocator arrowAllocator, Schema schema, Map<String, String> options) {
         return new JsonDecoder(arrowAllocator, schema);
     }
 }
