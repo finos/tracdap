@@ -48,7 +48,7 @@ import java.util.concurrent.Flow;
  * The pipeline will join stages together and choose an execution context for the pipeline.
  * For example, a pipeline where all event-driven stages can execute on the event loop,
  * while a pipeline that reads from a blocking input stream would be assigned a worker thread.
- * Sometimes the pipeline can plug together stages with different patterns (e.g. block input -> streaming output),
+ * Sometimes the pipeline can plug together stages with different patterns (e.g. block input to streaming output),
  * where this is not possible errors will be raised when the pipeline is built.</p>
  */
 public interface DataPipeline {
