@@ -36,6 +36,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.Flow;
@@ -107,6 +108,22 @@ public class FileRoundTripTest  {
 
         var random = new Random();
         random.nextBytes(content.get(0));
+
+        roundTripTest(content, true);
+        roundTripTest(content, false);
+    }
+
+    @Test
+    void testRoundTrip_lageFile() throws Exception {
+
+        var content = new ArrayList<byte[]>();
+        var random = new Random();
+
+        for (var i = 0; i < 500; i++) {
+            var chunk = new byte[4096];
+            random.nextBytes(chunk);
+            content.add(chunk);
+        }
 
         roundTripTest(content, true);
         roundTripTest(content, false);

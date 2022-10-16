@@ -229,7 +229,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
 
             gotError = true;
 
-            // If the cancel results in an error closing the file, do send the onError message
+            // If the cancel results in an error closing the file, do not send the onError message
         }
     }
 
