@@ -16,25 +16,24 @@
 
 package org.finos.tracdap.common.codec.csv;
 
-import org.finos.tracdap.common.codec.BaseDecoder;
-import org.finos.tracdap.common.codec.arrow.ArrowSchema;
+import org.finos.tracdap.common.codec.BufferDecoder;
+import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.codec.json.JacksonValues;
-import org.finos.tracdap.common.data.DataBlock;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.metadata.SchemaDefinition;
+
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.arrow.vector.types.Types;
 
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.dataformat.csv.CsvFactory;
 import com.fasterxml.jackson.dataformat.csv.CsvParser;
 import com.fasterxml.jackson.dataformat.csv.CsvReadException;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.*;
-import org.apache.arrow.vector.types.pojo.Schema;
-import org.apache.arrow.vector.types.Types;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +41,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 
-public class CsvDecoder extends BaseDecoder {
+public class CsvDecoder extends BufferDecoder {
 
     private static final int BATCH_SIZE = 1024;
 
@@ -51,35 +50,24 @@ public class CsvDecoder extends BaseDecoder {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final BufferAllocator arrowAllocator;
-
     private final Schema arrowSchema;
-    private VectorSchemaRoot root;
-    private VectorUnloader unloader;
 
-    public CsvDecoder(BufferAllocator arrowAllocator, SchemaDefinition tracSchema) {
-
-        super(BUFFERED_DECODER);
+    public CsvDecoder(BufferAllocator arrowAllocator, Schema arrowSchema) {
 
         this.arrowAllocator = arrowAllocator;
 
         // Schema cannot be inferred from CSV, so it must always be set from a TRAC schema
-        this.arrowSchema = ArrowSchema.tracToArrow(tracSchema);
+        this.arrowSchema = arrowSchema;
     }
 
     @Override
-    protected void decodeStart() {
+    public void consumeBuffer(ByteBuf buffer) {
 
-        this.root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, BATCH_SIZE);
-
-        // Record batches in the TRAC intermediate data stream are always uncompressed
-        // So, there is no need to use a compression codec here
-        this.unloader = new VectorUnloader(root);
-
-        emitBlock(DataBlock.forSchema(this.arrowSchema));
-    }
-
-    @Override
-    protected void decodeChunk(ByteBuf chunk) {
+        if (buffer.readableBytes() == 0) {
+            var error = new EDataCorruption("CSV data is empty");
+            log.error(error.getMessage(), error);
+            throw error;
+        }
 
         var csvFactory = new CsvFactory()
                 // Require strict adherence to the schema
@@ -89,8 +77,11 @@ public class CsvDecoder extends BaseDecoder {
                 // Permissive handling of extra space (strings with leading/trailing spaces must be quoted anyway)
                 .enable(CsvParser.Feature.TRIM_SPACES);
 
-        try (var stream = new ByteBufInputStream(chunk);
-             var parser = (CsvParser) csvFactory.createParser((InputStream) stream)) {
+        try (var stream = new ByteBufInputStream(buffer);
+             var parser = (CsvParser) csvFactory.createParser((InputStream) stream);
+             var root = ArrowSchema.createRoot(arrowSchema, arrowAllocator, BATCH_SIZE)) {
+
+            emitRoot(root);
 
             var csvSchema =  CsvSchemaMapping
                     .arrowToCsv(this.arrowSchema)
@@ -173,7 +164,7 @@ public class CsvDecoder extends BaseDecoder {
                         if (row == BATCH_SIZE) {
 
                             root.setRowCount(row);
-                            dispatchBatch(root);
+                            emitBatch();
 
                             row = 0;
                         }
@@ -192,8 +183,12 @@ public class CsvDecoder extends BaseDecoder {
             if (row > 0 || col > 0) {
 
                 root.setRowCount(row);
-                dispatchBatch(root);
+                emitBatch();
             }
+
+            // Emit the end-of-stream signal
+
+            emitEnd();
         }
         catch (JacksonException e) {
 
@@ -226,40 +221,13 @@ public class CsvDecoder extends BaseDecoder {
         }
         finally {
 
-            chunk.release();
+            buffer.release();
         }
-    }
-
-    @Override
-    protected void decodeEnd() {
-
-        // No-op, current version of CSV decoder buffers the full input
     }
 
     @Override
     public void close() {
 
-        try {
-
-            if (root != null) {
-                root.close();
-                root = null;
-            }
-        }
-        finally {
-
-            super.close();
-        }
-    }
-
-    private void dispatchBatch(VectorSchemaRoot root) {
-
-        var batch = unloader.getRecordBatch();
-        var block = DataBlock.forRecords(batch);
-        emitBlock(block);
-
-        // Release memory in the root
-        // Memory is still referenced by the batch, until the batch is consumed
-        root.clear();
+        // No-op, no resources are held outside consumeBuffer()
     }
 }
