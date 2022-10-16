@@ -16,10 +16,9 @@
 
 package org.finos.tracdap.common.data.pipeline;
 
-import io.netty.buffer.ByteBuf;
 import org.finos.tracdap.common.data.DataPipeline;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import io.netty.buffer.ByteBuf;
 
 import java.util.concurrent.Flow;
 
@@ -28,8 +27,6 @@ public class ReactiveByteSource
         extends BaseByteProducer
         implements DataPipeline.SourceStage,
         Flow.Subscriber<ByteBuf> {
-
-    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final DataPipelineImpl pipeline;
     private final Flow.Publisher<? extends ByteBuf> publisher;
@@ -82,8 +79,6 @@ public class ReactiveByteSource
     @Override
     public void onNext(ByteBuf chunk) {
 
-        log.info("onNext");
-
         try {
 
             nReceived += 1;
@@ -98,8 +93,6 @@ public class ReactiveByteSource
     @Override
     public void onComplete() {
 
-        log.info("onComplete");
-
         try {
             emitEnd();
         }
@@ -110,8 +103,6 @@ public class ReactiveByteSource
 
     @Override
     public void onError(Throwable error) {
-
-        log.info("onError");
 
         try {
             emitFailed(error);

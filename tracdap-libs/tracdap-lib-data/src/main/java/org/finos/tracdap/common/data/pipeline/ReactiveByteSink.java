@@ -21,16 +21,13 @@ import org.finos.tracdap.common.exception.EUnexpected;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.Flow;
 
-public class ReactiveByteSink extends BaseSinkStage implements DataPipeline.ByteStreamConsumer {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+public class ReactiveByteSink extends BaseSinkStage implements DataPipeline.ByteStreamConsumer {
 
     private static final ByteBuf EOS = Unpooled.EMPTY_BUFFER;
 

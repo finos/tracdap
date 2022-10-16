@@ -17,19 +17,15 @@
 package org.finos.tracdap.common.data.pipeline;
 
 import org.finos.tracdap.common.data.DataPipeline;
+import org.finos.tracdap.common.exception.EUnexpected;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
-import org.finos.tracdap.common.exception.EUnexpected;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class BufferingStage extends BaseBufferProducer
         implements DataPipeline.ByteStreamConsumer{
-
-    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private CompositeByteBuf buffer;
 
@@ -61,8 +57,6 @@ public class BufferingStage extends BaseBufferProducer
 
         if (buffer == null)
             throw new EUnexpected();
-
-        log.info("Buffer size: {}", buffer.readableBytes());
 
         var buffer = this.buffer;
         this.buffer = null;

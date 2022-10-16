@@ -20,13 +20,9 @@ import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import io.netty.buffer.ByteBuf;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public abstract class BaseBufferProducer implements DataPipeline.ByteBufferProducer {
-
-    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private DataPipeline.ByteBufferConsumer consumer;
 
