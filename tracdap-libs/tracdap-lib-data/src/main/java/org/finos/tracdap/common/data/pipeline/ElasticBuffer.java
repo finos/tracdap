@@ -73,15 +73,6 @@ public class ElasticBuffer
     }
 
     @Override
-    public void close() {
-
-        while (!queue.isEmpty()) {
-            var chunk = queue.remove();
-            chunk.release();
-        }
-    }
-
-    @Override
     public void onStart() {
 
         consumer().onStart();
@@ -138,6 +129,15 @@ public class ElasticBuffer
         }
         finally {
             close();
+        }
+    }
+
+    @Override
+    public void close() {
+
+        while (!queue.isEmpty()) {
+            var chunk = queue.remove();
+            chunk.release();
         }
     }
 }

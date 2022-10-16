@@ -88,6 +88,8 @@ public abstract class ArrowEncoder extends StreamingEncoder implements DataPipel
 
         try {
 
+            markAsDone();
+
             // Flush and close output
 
             writer.end();
@@ -111,6 +113,7 @@ public abstract class ArrowEncoder extends StreamingEncoder implements DataPipel
     public void onError(Throwable error) {
 
         try {
+            markAsDone();
             consumer().onError(error);
         }
         finally {

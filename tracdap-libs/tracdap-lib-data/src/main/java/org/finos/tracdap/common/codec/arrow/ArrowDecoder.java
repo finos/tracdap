@@ -68,6 +68,7 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
             var isComplete = sendBatches();
 
             if (isComplete) {
+                markAsDone();
                 consumer().onComplete();
                 close();
             }
@@ -80,6 +81,7 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
     public void onError(Throwable error) {
 
         try  {
+            markAsDone();
             consumer().onError(error);
         }
         finally {
@@ -92,14 +94,14 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
 
         handleErrors(() -> {
 
-            // log.info("Pumping");
-
+            // Don't try to pump if the stage isn't active yet
             if (root == null)
                 return null;
 
             var isComplete = sendBatches();
 
             if (isComplete) {
+                markAsDone();
                 consumer().onComplete();
                 close();
             }
@@ -109,6 +111,9 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
     }
 
     private boolean sendBatches() throws IOException {
+
+        // Data arrives in one big buffer, so don't send it all at once
+        // PUsh what the consumer requests, then wait for another call to pump()
 
         while (consumerReady()) {
 
@@ -123,33 +128,6 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
         }
 
         return false;
-    }
-
-    @Override
-    public void close() {
-
-        try {
-
-            if (root != null) {
-                root.close();
-                root = null;
-            }
-
-            if (reader != null) {
-                reader.close();
-                reader = null;
-            }
-
-            if (buffer != null) {
-                buffer.release();
-                buffer = null;
-            }
-        }
-        catch (Exception e) {
-
-            log.error("Unexpected error while shutting down Arrow file decoder", e);
-            throw new EUnexpected(e);
-        }
     }
 
     private void handleErrors(Callable<Void> lambda) {
@@ -194,6 +172,33 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
             // Ensure unexpected errors are still reported to the Flow API
 
             log.error("Unexpected error in Arrow decoding", e);
+            throw new EUnexpected(e);
+        }
+    }
+
+    @Override
+    public void close() {
+
+        try {
+
+            if (root != null) {
+                root.close();
+                root = null;
+            }
+
+            if (reader != null) {
+                reader.close();
+                reader = null;
+            }
+
+            if (buffer != null) {
+                buffer.release();
+                buffer = null;
+            }
+        }
+        catch (Exception e) {
+
+            log.error("Unexpected error while shutting down Arrow file decoder", e);
             throw new EUnexpected(e);
         }
     }
