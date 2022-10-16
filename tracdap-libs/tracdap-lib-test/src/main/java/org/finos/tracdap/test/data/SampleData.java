@@ -17,7 +17,7 @@
 package org.finos.tracdap.test.data;
 
 import org.apache.arrow.vector.types.pojo.Schema;
-import org.finos.tracdap.common.codec.arrow.ArrowSchema;
+import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.metadata.*;
