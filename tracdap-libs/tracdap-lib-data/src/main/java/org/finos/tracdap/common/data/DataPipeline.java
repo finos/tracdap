@@ -26,6 +26,31 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
 
+/**
+ * <p>The previous data framework used Java Flow publisher / subscriber classes to stream data.
+ * However, this approach had limitations:</p>
+ *
+ * <ul>
+ *
+ * <li>In Arrow / Java, VSR is.a single container that data flows through, not a stream of objects.
+ * Data that is loaded must be unloaded before it can be re-used,
+ * which is not guaranteed in the loosely coupled Flow interface.</li>
+ *
+ * <li>Sources and sinks have several different interfaces and mapping them to publishers / subscribers
+ * is not always beneficial. Channels, blocking streams and memory buffers are all needed to support
+ * different client libraries. While any of these can be converted to Flow interfaces, the mapping
+ * is not always natural, which restricts flow control and increases data copying.</li>
+ *
+ * </ul>
+ *
+ * <p>The data pipeline framework is an attempt to address these issues.
+ * It allows stages to be strung together in a pipeline and connected to different sources / sinks.
+ * The pipeline will join stages together and choose an execution context for the pipeline.
+ * For example, a pipeline where all event-driven stages can execute on the event loop,
+ * while a pipeline that reads from a blocking input stream would be assigned a worker thread.
+ * Sometimes the pipeline can plug together stages with different patterns (e.g. block input -> streaming output),
+ * where this is not possible errors will be raised when the pipeline is built.</p>
+ */
 public interface DataPipeline {
 
 
