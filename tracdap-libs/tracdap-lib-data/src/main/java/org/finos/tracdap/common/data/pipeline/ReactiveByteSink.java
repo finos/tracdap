@@ -68,7 +68,7 @@ public class ReactiveByteSink
     private void doRequest(long n) {
 
         chunksRequested += n;
-        pipeline.feedData();
+        pipeline.pumpData();
     }
 
     public void doCancel() {
@@ -86,7 +86,7 @@ public class ReactiveByteSink
     public void pump() {
 
         if (isReady())
-            pipeline.feedData();
+            pipeline.pumpData();
     }
 
     @Override

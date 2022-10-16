@@ -67,17 +67,33 @@ public class DataPipelineImpl implements DataPipeline {
         sourceStage.connect();
         sinkStage.connect();
 
-        ctx.eventLoopExecutor().execute(this::doFeedData);
+        // Schedule running the data pump on the pipeline's event loop
+        ctx.eventLoopExecutor().execute(this::runDataPump);
 
         return completion;
     }
 
-    void feedData() {
+    void pumpData() {
 
-        ctx.eventLoopExecutor().execute(this::doFeedData);
+        // Schedule running the data pump on the pipeline's event loop
+        ctx.eventLoopExecutor().execute(this::runDataPump);
     }
 
-    private void doFeedData() {
+    private void runDataPump() {
+
+        // The data pump makes one pass over all the stages in the pipeline, starting at the back
+        // Any stages that are in a ready state are pumped
+
+        // The feedback is that stages can request a pump if they have entered a ready state
+        // This happens by a stage calling pumpData(), to schedule another pump on the event loop
+
+        // Source and sink stages can be triggered externally, depending on their transport mechanism
+        // These triggers must come in on the same event loop as the data pump is not thread safe
+        // Currently all processors for a single request run on the same event loop, which keeps things simple
+        // When we look at data back-ends with blocking APIs, we may need to allocate a worker thread to a pipeline
+
+        // Any errors that propagate are picked up using reportUnhandledError (the same as the source/sink stages)
+        // Since this is a top level call on teh event loop, it is important to make sure no errors get lost
 
         try {
 
