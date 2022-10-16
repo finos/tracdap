@@ -378,7 +378,7 @@ public abstract class DataRoundTripTest {
 
         var buf = Unpooled.compositeBuffer();
 
-        try (var channel = new ByteOutputChannel(buf::addComponent);
+        try (var channel = new ByteOutputChannel(buf::writeBytes);
              var writer = new ArrowFileWriter(data, null,  channel)) {
 
             writer.start();
@@ -464,16 +464,14 @@ public abstract class DataRoundTripTest {
 
         var allocator = new RootAllocator();
 
-        try (var reader = new ArrowFileReader(new ByteSeekableChannel(dataBuf), allocator)) {
+        var reader = new ArrowFileReader(new ByteSeekableChannel(dataBuf), allocator);
+        reader.loadNextBatch();
 
-            reader.loadNextBatch();
+        var root = reader.getVectorSchemaRoot();
 
-            var root = reader.getVectorSchemaRoot();
+        var arrowSchema = ArrowSchema.tracToArrow(dataResponse.getSchema());
+        Assertions.assertEquals(arrowSchema, root.getSchema());
 
-            var arrowSchema = ArrowSchema.tracToArrow(dataResponse.getSchema());
-            Assertions.assertEquals(arrowSchema, root.getSchema());
-
-            return root;
-        }
+        return root;
     }
 }
