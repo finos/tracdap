@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.codec.arrow;
+package org.finos.tracdap.common.data;
 
 import org.finos.tracdap.common.exception.EDataTypeNotSupported;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.metadata.*;
+
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
