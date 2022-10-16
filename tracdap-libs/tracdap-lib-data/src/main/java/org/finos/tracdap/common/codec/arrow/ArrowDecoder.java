@@ -19,6 +19,7 @@ package org.finos.tracdap.common.codec.arrow;
 import org.finos.tracdap.common.codec.BufferDecoder;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EDataCorruption;
+import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import org.apache.arrow.vector.VectorSchemaRoot;
@@ -157,12 +158,21 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
 
             lambda.call();
         }
+        catch (ETrac e) {
+
+            // Error has already been handled, propagate as-is
+
+            var errorMessage = "Arrow decoding failed: " + e.getMessage();
+
+            log.error(errorMessage, e);
+            throw e;
+        }
         catch (InvalidArrowFileException e) {
 
             // A nice clean validation failure from the Arrow framework
             // E.g. missing / incorrect magic number at the start (or end) of the file
 
-            var errorMessage = "Arrow file decoding failed, file is invalid: " + e.getMessage();
+            var errorMessage = "Arrow decoding failed, file is invalid: " + e.getMessage();
 
             log.error(errorMessage, e);
             throw new EDataCorruption(errorMessage, e);
@@ -174,7 +184,7 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
 
             // Decoders work on a stream of buffers, "real" IO exceptions should not occur
 
-            var errorMessage = "Arrow file decoding failed, content is garbled";
+            var errorMessage = "Arrow decoding failed, content is garbled";
 
             log.error(errorMessage, e);
             throw new EDataCorruption(errorMessage, e);
@@ -183,7 +193,7 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
 
             // Ensure unexpected errors are still reported to the Flow API
 
-            log.error("Unexpected error in Arrow file decoding", e);
+            log.error("Unexpected error in Arrow decoding", e);
             throw new EUnexpected(e);
         }
     }

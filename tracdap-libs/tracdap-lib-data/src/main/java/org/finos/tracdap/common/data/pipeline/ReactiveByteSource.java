@@ -18,6 +18,7 @@ package org.finos.tracdap.common.data.pipeline;
 
 import io.netty.buffer.ByteBuf;
 import org.finos.tracdap.common.data.DataPipeline;
+import org.finos.tracdap.common.exception.ETracPublic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +80,9 @@ public class ReactiveByteSource
 
     @Override
     public void cancel() {
+
+        markAsDone();
+
         close();
     }
 
@@ -159,9 +163,18 @@ public class ReactiveByteSource
         try {
             lambda.call();
         }
+        catch (ETracPublic regularError) {
+
+            markAsDone();
+
+            pipeline.reportRegularError(regularError);
+            close();
+        }
         catch (Throwable error) {
 
-            log.error("Error has reached the top level: " + error.getMessage(), error);
+            log.error("An unhandled error has reached the top level: " + error.getMessage(), error);
+
+            markAsDone();
 
             pipeline.reportUnhandledError(error);
             close();

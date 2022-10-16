@@ -19,6 +19,7 @@ package org.finos.tracdap.common.codec.json;
 import org.finos.tracdap.common.codec.StreamingDecoder;
 import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.exception.EDataCorruption;
+import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -95,6 +96,15 @@ public class JsonDecoder extends StreamingDecoder {
 
             while ((token = parser.nextToken()) != JsonToken.NOT_AVAILABLE)
                 parser.acceptToken(token);
+        }
+        catch (ETrac e) {
+
+            // Error has already been handled, propagate as-is
+
+            var errorMessage = "JSON decoding failed: " + e.getMessage();
+
+            log.error(errorMessage, e);
+            throw e;
         }
         catch (JacksonException e) {
 

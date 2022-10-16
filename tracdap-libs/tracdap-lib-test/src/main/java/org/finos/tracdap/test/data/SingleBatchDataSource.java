@@ -51,7 +51,7 @@ public class SingleBatchDataSource
 
     @Override
     public void cancel() {
-
+        markAsDone();
     }
 
     @Override

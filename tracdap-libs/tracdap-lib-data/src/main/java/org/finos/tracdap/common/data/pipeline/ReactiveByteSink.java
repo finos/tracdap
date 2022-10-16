@@ -73,7 +73,7 @@ public class ReactiveByteSink
 
     public void doCancel() {
 
-        pipeline.cancel();
+        pipeline.requestCancel();
         close();
     }
 

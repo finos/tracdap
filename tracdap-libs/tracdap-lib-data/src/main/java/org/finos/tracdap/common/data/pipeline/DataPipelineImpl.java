@@ -19,6 +19,7 @@ package org.finos.tracdap.common.data.pipeline;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.ETracInternal;
+import org.finos.tracdap.common.exception.ETracPublic;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import io.netty.buffer.ByteBuf;
@@ -108,10 +109,22 @@ public class DataPipelineImpl implements DataPipeline {
         }
     }
 
-    void cancel() {
+    void requestCancel() {
 
-        if (sourceStage != null)
+        log.warn("Request to cancel the data operation");
+        var error = new ETracPublic("Request to cancel the data operation");
+
+        completion.completeExceptionally(error);
+
+        if (sourceStage.isDone()) {
             sourceStage.cancel();
+        }
+
+        if (!sinkStage.isDone()) {
+            sinkStage.terminate(error);
+        }
+
+        closeAllStages();
     }
 
     void reportComplete() {
@@ -120,34 +133,6 @@ public class DataPipelineImpl implements DataPipeline {
 
         log.info("Data pipeline complete");
         completion.complete(null);
-        close();
-    }
-
-    void reportRegularError(Throwable error) {
-
-        // Expect all the stages have gone down cleanly
-
-        log.error("Data pipeline failed: {}", error.getMessage(), error);
-        completion.completeExceptionally(error);
-        close();
-    }
-
-    void reportUnhandledError(Throwable error) {
-
-        // Expect the stages are in an inconsistent state
-        // Force shutdown for the source and sink
-
-        var unhandled = new ETracInternal("Data pipeline failed with an unhandled error: " + error.getMessage(), error);
-        log.error(unhandled.getMessage(), unhandled);
-        completion.completeExceptionally(unhandled);
-
-        sourceStage.cancel();
-        sinkStage.terminate(unhandled);
-
-        close();
-    }
-
-    void close() {
 
         // This is a failsafe check, normally source and sink should be already stopped when close() is called
         // But just in case, double check and shut them down with a warning if they are still running
@@ -162,6 +147,41 @@ public class DataPipelineImpl implements DataPipeline {
             var error = new ETracInternal("Sink stage still running after data pipeline completed\"");
             sinkStage.terminate(error);
         }
+
+        closeAllStages();
+    }
+
+    void reportRegularError(Throwable error) {
+
+        // Expect all the stages have gone down cleanly
+
+        log.error("Data pipeline failed: {}", error.getMessage(), error);
+        completion.completeExceptionally(error);
+
+        sourceStage.cancel();
+        sinkStage.terminate(error);
+
+        closeAllStages();
+    }
+
+    void reportUnhandledError(Throwable error) {
+
+        // Expect the stages are in an inconsistent state
+        // Force shutdown for the source and sink
+
+        var unhandled = new ETracInternal("Data pipeline failed with an unhandled error: " + error.getMessage(), error);
+        log.error(unhandled.getMessage(), unhandled);
+        completion.completeExceptionally(unhandled);
+
+        sourceStage.cancel();
+        sinkStage.terminate(unhandled);
+
+        closeAllStages();
+    }
+
+    private void closeAllStages() {
+
+        // This method is internal, to trigger a shutdown externally use requestCancel(), or report compete / error.
 
         for (var stage : stages) {
 

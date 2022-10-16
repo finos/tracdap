@@ -20,6 +20,7 @@ import org.finos.tracdap.common.codec.BufferDecoder;
 import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.codec.json.JacksonValues;
 import org.finos.tracdap.common.exception.EDataCorruption;
+import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -190,6 +191,15 @@ public class CsvDecoder extends BufferDecoder {
 
             markAsDone();
             consumer().onComplete();
+        }
+        catch (ETrac e) {
+
+            // Error has already been handled, propagate as-is
+
+            var errorMessage = "CSV decoding failed: " + e.getMessage();
+
+            log.error(errorMessage, e);
+            throw e;
         }
         catch (JacksonException e) {
 
