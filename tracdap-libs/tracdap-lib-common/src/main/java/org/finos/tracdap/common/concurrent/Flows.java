@@ -64,6 +64,12 @@ public class Flows {
         return interceptor;
     }
 
+    public static <T>
+    Flow.Subscriber<T> waitForSignal(Flow.Subscriber<T> target, CompletionStage<?> signal) {
+
+        return new DelayedSubscriber<>(target, signal);
+    }
+
     public static <T, U>
     Flow.Publisher<U> map(Flow.Publisher<T> source, Function<T, U> mapping) {
 
