@@ -17,6 +17,8 @@
 package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.data.ArrowSchema;
+import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.config.DataServiceConfig;
 import org.finos.tracdap.metadata.*;
@@ -627,13 +629,17 @@ public class DataService {
             StorageCopy copy,
             IDataContext dataCtx) {
 
-        var encoder = codec.getEncoder(arrowAllocator, schema, codecOptions);
-        encoder.subscribe(contentStream);
+        var requiredSchema = ArrowSchema.tracToArrow(schema);
 
         var storageKey = copy.getStorageKey();
         var storage = storageManager.getDataStorage(storageKey);
-        var reader = storage.reader(schema, copy, dataCtx);
-        reader.subscribe(encoder);
+        var encoder = codec.getEncoder(arrowAllocator, requiredSchema, codecOptions);
+
+        var pipeline = storage.pipelineReader(copy, requiredSchema, dataCtx);
+        pipeline.addStage(encoder);
+        pipeline.addSink(contentStream);
+
+        pipeline.execute();
     }
 
     private CompletionStage<Long> decodeAndSave(
@@ -642,15 +648,19 @@ public class DataService {
             StorageCopy copy,
             IDataContext dataCtx) {
 
-        var signal = new CompletableFuture<Long>();
+        var requiredSchema = ArrowSchema.tracToArrow(schema);
 
-        var decoder = codec.getDecoder(arrowAllocator, schema, codecOptions);
-        contentStream.subscribe(decoder);
+        var signal = new CompletableFuture<Long>();
 
         var storageKey = copy.getStorageKey();
         var storage = storageManager.getDataStorage(storageKey);
-        var writer = storage.writer(schema, copy, signal, dataCtx);
-        decoder.subscribe(writer);
+        var decoder = codec.getDecoder(dataCtx.arrowAllocator(), requiredSchema, codecOptions);
+
+        var pipeline = DataPipeline.forSource(contentStream, dataCtx);
+        pipeline.addStage(decoder);
+        pipeline = storage.pipelineWriter(copy, requiredSchema, dataCtx, pipeline, signal);
+
+        pipeline.execute();
 
         return signal;
     }
