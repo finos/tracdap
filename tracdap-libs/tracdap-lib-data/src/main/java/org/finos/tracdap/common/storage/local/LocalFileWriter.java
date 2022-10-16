@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.storage.local;
 
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.concurrent.OrderedEventExecutor;
@@ -149,6 +150,9 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
 
     // These methods are only ever called on the ordered event executor
 
+    // Note: All errors must be passed to handleError
+    // Errors that escape on the executor thread will be lost
+
     private void doStart() {
 
         try {
@@ -180,8 +184,12 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
             return;
 
         try {
-            if (chunksRequested < CHUNK_BUFFER_MIN_REQUESTS)
-                subscription.request(CHUNK_BUFFER_MIN_REQUESTS);
+
+            if (chunksRequested < CHUNK_BUFFER_MIN_REQUESTS) {
+                var requestSize = CHUNK_BUFFER_MIN_REQUESTS;
+                chunksRequested += requestSize;
+                subscription.request(requestSize);
+            }
         }
         catch (Exception e) {
 
@@ -202,8 +210,11 @@ public class LocalFileWriter implements Flow.Subscriber<ByteBuf> {
         var bufferedOk = chunkBuffer.offer(chunk);
 
         // Buffer overflow will only happen if more chunks are sent than have been requested
-        if (!bufferedOk)
-            throw new EUnexpected();
+        if (!bufferedOk) {
+            var err = "Buffer overflow (data was received more quickly than it could be written)";
+            log.error(err);
+            handleError(new ETracInternal(err), true);
+        }
 
         if (!chunkInProgress)
             writeNextChunk();
