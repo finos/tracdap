@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.common.data.pipeline;
 
-import io.netty.buffer.Unpooled;
+import io.netty.buffer.ByteBufAllocator;
 import org.finos.tracdap.common.data.DataPipeline;
 
 import io.netty.buffer.ByteBuf;
@@ -39,7 +39,10 @@ public class ElasticBuffer
 
     private static final int QUEUE_LIMIT = 4096;
     private static final int QUEUE_SAFETY_LIMIT = 512;
-    private static final ByteBuf EOS = Unpooled.EMPTY_BUFFER;
+
+    // The special buffer Unpooled.EMPTY_BUFFER can be (and is) sent out by upstream components
+    // We need a guaranteed unique buffer for the EOS marker, to avoid terminating the stream early
+    private static final ByteBuf EOS = ByteBufAllocator.DEFAULT.buffer(0);
 
     private final Queue<ByteBuf> queue;
 
