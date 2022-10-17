@@ -59,7 +59,7 @@ public class ElasticBuffer
     @Override
     public void pump() {
 
-        if (consumerReady() && !queue.isEmpty()) {
+        while (consumerReady() && !queue.isEmpty()) {
 
             var chunk = queue.remove();
 
