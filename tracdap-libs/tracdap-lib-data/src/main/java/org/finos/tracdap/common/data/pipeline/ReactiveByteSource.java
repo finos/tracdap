@@ -67,7 +67,7 @@ public class ReactiveByteSource
             return;
         }
 
-        if (nReceived == nRequested) {
+        if (consumerReady() && nReceived == nRequested) {
             nRequested += 1;
             subscription.request(1);
         }
@@ -123,6 +123,11 @@ public class ReactiveByteSource
 
             nReceived += 1;
             consumer().onNext(chunk);
+
+            if (consumerReady()) {
+                nRequested += 1;
+                subscription.request(1);
+            }
 
             return null;
         });
