@@ -152,6 +152,11 @@ class TracEngine(_actors.Actor):
     @_actors.Message
     def job_succeeded(self, job_key: str, job_result: _cfg.JobResult):
 
+        # Ignore duplicate messages from the job processor (can happen in unusual error cases)
+        if job_key not in self._job_actors:
+            self._log.warning(f"Ignoring [job_succeeded] message, job [{job_key}] has already completed")
+            return
+
         self._log.info(f"Recording job as successful: {job_key}")
 
         if self._notify_callback is not None:
@@ -162,6 +167,11 @@ class TracEngine(_actors.Actor):
     @_actors.Message
     def job_failed(self, job_key: str, error: Exception):
 
+        # Ignore duplicate messages from the job processor (can happen in unusual error cases)
+        if job_key not in self._job_actors:
+            self._log.warning(f"Ignoring [job_failed] message, job [{job_key}] has already completed")
+            return
+
         self._log.error(f"Recording job as failed: {job_key}")
 
         if self._notify_callback is not None:
@@ -170,8 +180,6 @@ class TracEngine(_actors.Actor):
         self._finalize_job(job_key)
 
     def _finalize_job(self, job_key: str):
-
-        # TODO: How should the engine respond when attempting to finalize an unknown job?
 
         job_actors = self._job_actors
         job_actor_id = job_actors.pop(job_key)
@@ -437,7 +445,7 @@ class GraphProcessor(_actors.Actor):
             if any(self.graph.pending_nodes):
                 err_msg = "Processor has become deadlocked (cyclic dependency error)"
                 self._log.error(err_msg)
-                self.actors().send_parent("job_failed", RuntimeError(err_msg))
+                self.actors().send_parent("job_failed", _ex.ETracInternal(err_msg))
 
             elif any(self.graph.failed_nodes):
 
@@ -448,7 +456,7 @@ class GraphProcessor(_actors.Actor):
                 if len(errors) == 1:
                     self.actors().send_parent("job_failed", errors[0])
                 else:
-                    self.actors().send_parent("job_failed", RuntimeError("Job suffered multiple errors", errors))
+                    self.actors().send_parent("job_failed", _ex.EModelExec("Job suffered multiple errors", errors))
 
             else:
                 job_result = self.graph.nodes[self.root_id].result
