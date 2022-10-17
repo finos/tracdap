@@ -33,7 +33,7 @@ public class ArrowFileEncoder extends ArrowEncoder {
     @Override
     protected ArrowWriter createWriter(VectorSchemaRoot root) {
 
-        var out = new ByteOutputChannel(this::emitChunk);
+        var out = new ByteOutputChannel(bb -> consumer().onNext(bb));
         return new ArrowFileWriter(root, /* dictionary provider = */ null, out);
     }
 }

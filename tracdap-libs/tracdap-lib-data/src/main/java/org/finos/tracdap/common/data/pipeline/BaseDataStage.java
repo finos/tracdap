@@ -17,38 +17,23 @@
 package org.finos.tracdap.common.data.pipeline;
 
 import org.finos.tracdap.common.data.DataPipeline;
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-public abstract class BaseSinkStage implements DataPipeline.SinkStage {
+public abstract class BaseDataStage implements DataPipeline.DataStage {
 
-    private final DataPipelineImpl pipeline;
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
-    protected BaseSinkStage(DataPipeline pipeline) {
+    private boolean isDone = false;
 
-        if (!(pipeline instanceof DataPipelineImpl))
-            throw new EUnexpected();
-
-        this.pipeline = (DataPipelineImpl) pipeline;
+    protected final void markAsDone() {
+        log.info("DONE STAGE [{}]", getClass().getSimpleName());
+        isDone = true;
     }
 
     @Override
-    public void start() {
-        pipeline.feedData();
-    }
-
-    @Override
-    public boolean poll() {
-        return true;
-    }
-
-    @Override
-    public void emitFailed(Throwable e) {
-        pipeline.markAsFailed(e);
-    }
-
-    @Override
-    public void emitComplete() {
-        pipeline.markComplete();
+    public boolean isDone() {
+        return isDone;
     }
 }

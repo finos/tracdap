@@ -21,25 +21,37 @@ import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.pipeline.BaseDataProducer;
 
 
-public class SingleBatchDataSource extends BaseDataProducer implements DataPipeline.SourceStage {
+public class SingleBatchDataSource
+        extends BaseDataProducer<DataPipeline.ArrowApi>
+        implements DataPipeline.SourceStage {
 
     private final VectorSchemaRoot root;
 
     public SingleBatchDataSource(VectorSchemaRoot root) {
+        super(DataPipeline.ArrowApi.class);
         this.root = root;
+    }
+
+    @Override
+    public void connect() {
+        // no-op
     }
 
     @Override
     public void pump() {
 
-        emitRoot(root);
-        emitBatch();
-        emitEnd();
+        consumer().onStart(root);
+        consumer().onNext();
+        consumer().onComplete();
+    }
+
+    @Override public boolean isReady() {
+        return true;
     }
 
     @Override
     public void cancel() {
-
+        markAsDone();
     }
 
     @Override

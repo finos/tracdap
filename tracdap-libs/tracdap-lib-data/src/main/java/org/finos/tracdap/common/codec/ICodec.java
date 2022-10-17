@@ -26,19 +26,26 @@ import java.util.Map;
 
 public interface ICodec {
 
-    interface Encoder extends DataPipeline.DataConsumer, DataPipeline.ByteProducer {}
-    interface Decoder extends DataPipeline.ByteConsumer, DataPipeline.DataProducer {}
+    interface Encoder <API_T extends DataPipeline.DataInterface<API_T>>
+        extends
+            DataPipeline.DataConsumer<DataPipeline.ArrowApi>,
+            DataPipeline.DataProducer<API_T> {}
+
+    interface Decoder <API_T extends DataPipeline.DataInterface<API_T>>
+        extends
+            DataPipeline.DataConsumer<API_T>,
+            DataPipeline.DataProducer<DataPipeline.ArrowApi> {}
 
     List<String> options();
 
     String defaultFileExtension();
 
-    Encoder getEncoder(
+    Encoder<?> getEncoder(
             BufferAllocator arrowAllocator,
             Schema schema,
             Map<String, String> options);
 
-    Decoder getDecoder(
+    Decoder<?> getDecoder(
             BufferAllocator arrowAllocator,
             Schema schema,
             Map<String, String> options);

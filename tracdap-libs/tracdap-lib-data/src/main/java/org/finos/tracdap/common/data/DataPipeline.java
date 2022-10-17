@@ -54,9 +54,11 @@ import java.util.concurrent.Flow;
 public interface DataPipeline {
 
 
+
     // -----------------------------------------------------------------------------------------------------------------
     // BUILD PIPELINES
     // -----------------------------------------------------------------------------------------------------------------
+
 
     static DataPipeline forSource(SourceStage source, IDataContext ctx) {
         return DataPipelineImpl.forSource(source, ctx);
@@ -71,44 +73,27 @@ public interface DataPipeline {
     DataPipeline addSink(Flow.Subscriber<ByteBuf> sink);
 
 
+
     // -----------------------------------------------------------------------------------------------------------------
     // RUN / MONITOR PIPELINES
     // -----------------------------------------------------------------------------------------------------------------
 
+
     CompletionStage<Void> execute();
+
 
 
     // -----------------------------------------------------------------------------------------------------------------
     // PIPELINE STAGE INTERFACES
     // -----------------------------------------------------------------------------------------------------------------
 
-    interface PipelineStage extends AutoCloseable {}
 
-    interface ActionStage extends PipelineStage { }
-    interface DataStage extends PipelineStage {}
+    interface DataInterface <API_T>  {
 
-    interface DataProducer extends DataStage {}
-    interface DataConsumer extends DataStage {}
-    interface ByteProducer extends DataStage {}
-    interface ByteConsumer extends DataStage {}
-
-    interface SourceStage extends DataStage {
-
-        void pump();
-        void cancel();
+        API_T dataInterface();
     }
 
-    interface SinkStage extends DataStage {
-
-        void start();
-        boolean poll();
-
-        void emitComplete();
-        void emitFailed(Throwable error);
-    }
-
-
-    interface DataStreamConsumer extends DataConsumer {
+    interface ArrowApi extends DataInterface<ArrowApi> {
 
         void onStart(VectorSchemaRoot root);
         void onNext();
@@ -116,7 +101,7 @@ public interface DataPipeline {
         void onError(Throwable error);
     }
 
-    interface ByteStreamConsumer extends ByteConsumer {
+    interface StreamApi extends DataInterface<StreamApi> {
 
         void onStart();
         void onNext(ByteBuf chunk);
@@ -124,29 +109,41 @@ public interface DataPipeline {
         void onError(Throwable error);
     }
 
-    interface ByteBufferConsumer extends ByteConsumer {
+    interface BufferApi extends DataInterface<BufferApi> {
 
-        void consumeBuffer(ByteBuf buffer);
+        void onBuffer(ByteBuf buffer);
+        void onError(Throwable error);
     }
 
-    interface DataStreamProducer extends DataProducer {
 
-        void emitRoot(VectorSchemaRoot root);
-        void emitBatch();
-        void emitEnd();
-        void emitFailed(Throwable error);
+    interface DataStage extends AutoCloseable {
+
+        boolean isDone();
+        boolean isReady();
+        void pump();
     }
 
-    interface ByteStreamProducer extends ByteProducer {
+    interface SourceStage extends DataStage {
 
-         void emitStart();
-         void emitChunk(ByteBuf chunk);
-         void emitEnd();
-         void emitFailed(Throwable error);
+        void connect();
+        void cancel();
     }
 
-    interface ByteBufferProducer extends ByteProducer {
+    interface SinkStage extends DataStage {
 
-        void emitBuffer(ByteBuf buffer);
+        void connect();
+        void terminate(Throwable error);
+    }
+
+    interface DataConsumer <API_T> extends DataStage, DataInterface<API_T> {
+
+        API_T dataInterface();
+    }
+
+    interface DataProducer<API_T extends DataInterface<API_T>> extends DataStage {
+
+        Class<API_T> consumerType();
+        boolean consumerReady();
+        API_T consumer();
     }
 }

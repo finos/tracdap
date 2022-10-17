@@ -16,16 +16,17 @@
 
 package org.finos.tracdap.test.data;
 
+import org.finos.tracdap.common.data.DataPipeline;
+import org.finos.tracdap.common.data.pipeline.BaseDataSink;
+
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.types.pojo.Schema;
-import org.finos.tracdap.common.data.DataPipeline;
-import org.finos.tracdap.common.data.pipeline.BaseSinkStage;
-import org.finos.tracdap.common.data.pipeline.DataPipelineImpl;
-import org.finos.tracdap.common.exception.EUnexpected;
 
-public class SingleBatchDataSink extends BaseSinkStage implements DataPipeline.DataStreamConsumer {
 
-    DataPipelineImpl pipeline;
+public class SingleBatchDataSink
+        extends BaseDataSink <DataPipeline.ArrowApi>
+        implements DataPipeline.ArrowApi {
+
     private VectorSchemaRoot root;
 
     private Schema schema;
@@ -34,11 +35,11 @@ public class SingleBatchDataSink extends BaseSinkStage implements DataPipeline.D
     public SingleBatchDataSink(DataPipeline pipeline) {
 
         super(pipeline);
+    }
 
-        if (!(pipeline instanceof DataPipelineImpl))
-            throw new EUnexpected();
-
-        this.pipeline = (DataPipelineImpl) pipeline;
+    @Override
+    public DataPipeline.ArrowApi dataInterface() {
+        return this;
     }
 
     public Schema getSchema() {
@@ -46,6 +47,27 @@ public class SingleBatchDataSink extends BaseSinkStage implements DataPipeline.D
     }
 
     public long getRowCount() { return rowCount; }
+
+    @Override
+    public void connect() {
+        // no-op
+    }
+
+    @Override
+    public void pump() { /* no-op, immediate stage */ }
+
+    @Override
+    public boolean isReady() { return true; }
+
+    @Override
+    public void terminate(Throwable error) {
+
+    }
+
+    @Override
+    public void close() {
+
+    }
 
     @Override
     public void onStart(VectorSchemaRoot root) {
@@ -61,17 +83,12 @@ public class SingleBatchDataSink extends BaseSinkStage implements DataPipeline.D
     @Override
     public void onComplete() {
 
-        emitComplete();
+        reportComplete();
     }
 
     @Override
     public void onError(Throwable error) {
 
-        emitFailed(error);
-    }
-
-    @Override
-    public void close() {
-
+        reportRegularError(error);
     }
 }

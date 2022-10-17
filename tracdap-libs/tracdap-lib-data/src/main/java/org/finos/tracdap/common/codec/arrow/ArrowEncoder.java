@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.codec.arrow;
 
 import org.finos.tracdap.common.codec.StreamingEncoder;
+import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EUnexpected;
 
 import org.apache.arrow.vector.VectorSchemaRoot;
@@ -27,7 +28,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 
-public abstract class ArrowEncoder extends StreamingEncoder implements AutoCloseable {
+public abstract class ArrowEncoder extends StreamingEncoder implements DataPipeline.ArrowApi {
 
     // Common base encoder for both files and streams
     // Both receive a data stream and output a byte stream
@@ -46,6 +47,9 @@ public abstract class ArrowEncoder extends StreamingEncoder implements AutoClose
 
     }
 
+    @Override public boolean isReady() { return true; }
+    @Override public void pump() {  /* no-op, immediate stage */ }
+
     @Override
     public void onStart(VectorSchemaRoot root) {
 
@@ -55,7 +59,7 @@ public abstract class ArrowEncoder extends StreamingEncoder implements AutoClose
             this.writer = createWriter(root);
 
             writer.start();
-            emitStart();
+            consumer().onStart();
         }
         catch (IOException e) {
 
@@ -84,13 +88,15 @@ public abstract class ArrowEncoder extends StreamingEncoder implements AutoClose
 
         try {
 
+            markAsDone();
+
             // Flush and close output
 
             writer.end();
             writer.close();
             writer = null;
 
-            emitEnd();
+            consumer().onComplete();
         }
         catch (IOException e) {
 
@@ -107,7 +113,8 @@ public abstract class ArrowEncoder extends StreamingEncoder implements AutoClose
     public void onError(Throwable error) {
 
         try {
-            emitFailed(error);
+            markAsDone();
+            consumer().onError(error);
         }
         finally {
             close();

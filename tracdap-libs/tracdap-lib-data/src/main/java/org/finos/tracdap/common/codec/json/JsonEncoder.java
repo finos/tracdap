@@ -47,17 +47,20 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
 
     }
 
+    @Override public boolean isReady() { return true; }
+    @Override public void pump() {  /* no-op, immediate stage */ }
+
     @Override
     public void onStart(VectorSchemaRoot root) {
 
         try {
 
-            emitStart();
+            consumer().onStart();
 
             this.root = root;
             this.arrowSchema = root.getSchema();
 
-            out = new ByteOutputStream(this::emitChunk);
+            out = new ByteOutputStream(bb -> consumer().onNext(bb));
 
             var factory = new JsonFactory();
             generator = factory.createGenerator(out, JsonEncoding.UTF8);
@@ -127,7 +130,8 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
             out.flush();
             out = null;
 
-            emitEnd();
+            markAsDone();
+            consumer().onComplete();
         }
         catch (IOException e) {
 
@@ -144,7 +148,13 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
     @Override
     public void onError(Throwable error) {
 
-        close();
+        try {
+            markAsDone();
+            consumer().onError(error);
+        }
+        finally {
+            close();
+        }
     }
 
     @Override

@@ -17,55 +17,94 @@
 package org.finos.tracdap.common.data.pipeline;
 
 import org.finos.tracdap.common.data.DataPipeline;
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.ETracInternal;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.ArrayDeque;
-import java.util.Queue;
 import java.util.concurrent.Flow;
 
 
-public class ReactiveByteSink extends BaseSinkStage implements DataPipeline.ByteStreamConsumer {
+public class ReactiveByteSink
+    extends
+        BaseDataSink<DataPipeline.StreamApi>
+    implements
+        DataPipeline.StreamApi {
 
-    private static final ByteBuf EOS = Unpooled.EMPTY_BUFFER;
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final DataPipelineImpl pipeline;
     private final Flow.Subscriber<ByteBuf> sink;
-
-    private final Queue<ByteBuf> chunkBuffer;
+    private Flow.Subscription subscription;
     private int chunksRequested;
     private int chunksDelivered;
-
-    private Flow.Subscription subscription;
 
     ReactiveByteSink(DataPipelineImpl pipeline, Flow.Subscriber<ByteBuf> sink) {
 
         super(pipeline);
 
-        this.pipeline = pipeline;
         this.sink = sink;
-
-        this.chunkBuffer = new ArrayDeque<>();
         this.chunksRequested = 0;
         this.chunksDelivered = 0;
     }
 
     @Override
-    public void start() {
-
-        if (subscription != null)
-            throw new EUnexpected();
-
-        this.subscription = new Subscription();
-        sink.onSubscribe(subscription);
+    public DataPipeline.StreamApi dataInterface() {
+        return this;
     }
 
     @Override
-    public boolean poll() {
+    public void connect() {
 
-        return chunkBuffer.isEmpty() && chunksRequested > chunksDelivered;
+        if (subscription != null) {
+            log.warn("Data stream started twice");
+            return;
+        }
+
+        subscription = new Subscription();
+        sink.onSubscribe(subscription);
+    }
+
+    private void doRequest(long n) {
+
+        chunksRequested += n;
+        pipeline.pumpData();
+    }
+
+    public void doCancel() {
+
+        pipeline.requestCancel();
+        close();
+    }
+
+    @Override
+    public boolean isReady() {
+        return chunksRequested > chunksDelivered && subscription != null;
+    }
+
+    @Override
+    public void pump() {
+
+        if (isReady())
+            pipeline.pumpData();
+    }
+
+    @Override
+    public void terminate(Throwable error) {
+
+        if (isDone()) {
+            log.warn("Requested termination, but stage is already down");
+            return;
+        }
+
+        markAsDone();
+        sink.onError(error);
+    }
+
+    @Override
+    public void close() {
+
+        // no-op
     }
 
     @Override
@@ -77,127 +116,44 @@ public class ReactiveByteSink extends BaseSinkStage implements DataPipeline.Byte
     @Override
     public void onNext(ByteBuf chunk) {
 
-        try {
-
-            var chunksPending = chunksRequested - chunksDelivered;
-
-            if (chunksPending > 0 && chunkBuffer.isEmpty()) {
-                chunksDelivered += 1;
-                sink.onNext(chunk);
-            } else {
-                chunkBuffer.add(chunk);
-                deliverPendingChunks();
-            }
+        if (chunksRequested <= chunksDelivered) {
+            var err = new ETracInternal("Data stream is out of sync");
+            log.error(err.getMessage(), err);
+            throw err;
         }
-        catch (Throwable error) {
 
-            emitFailed(error);
-        }
+        chunksDelivered += 1;
+        sink.onNext(chunk);
     }
 
     @Override
     public void onComplete() {
 
-        try {
+        markAsDone();
+        sink.onComplete();
 
-            if (chunkBuffer.isEmpty()) {
-                sink.onComplete();
-                pipeline.markComplete();
-                close();
-            } else {
-                chunkBuffer.add(EOS);
-                deliverPendingChunks();
-            }
-        }
-        catch (Throwable error) {
-
-            emitFailed(error);
-        }
+        reportComplete();
     }
 
     @Override
     public void onError(Throwable error) {
 
-        emitFailed(error);
-    }
+        markAsDone();
+        sink.onError(error);
 
-    @Override
-    public void emitComplete() {
-
-        try {
-            sink.onComplete();
-            super.emitComplete();
-        }
-        finally {
-            close();
-        }
-
-    }
-
-    @Override
-    public void emitFailed(Throwable error) {
-
-        try {
-
-            if (subscription != null)
-                sink.onError(error);
-
-            close();
-        }
-        finally {
-            super.emitFailed(error);
-        }
+        reportRegularError(error);
     }
 
     private class Subscription implements Flow.Subscription {
 
         @Override
         public void request(long n) {
-
-            chunksRequested += n;
-            deliverPendingChunks();
-
-            if (chunksRequested > chunksDelivered)
-                pipeline.feedData();
+            doRequest(n);
         }
 
         @Override
         public void cancel() {
-
-            try {
-                pipeline.cancel();
-            }
-            finally {
-                close();
-            }
-        }
-    }
-
-    @Override
-    public void close() {
-
-        while(!chunkBuffer.isEmpty()) {
-            chunkBuffer.remove().release();
-        }
-    }
-
-    private void deliverPendingChunks() {
-
-        var chunksPending = chunksRequested - chunksDelivered;
-
-        while (chunksPending > 0 && !chunkBuffer.isEmpty()) {
-
-            var chunk = chunkBuffer.remove();
-
-            if (chunk == EOS) {
-                emitComplete();
-                return;
-            }
-
-            chunksDelivered += 1;
-            sink.onNext(chunk);
-
-            chunksPending = chunksRequested - chunksDelivered;
+            doCancel();
         }
     }
 }

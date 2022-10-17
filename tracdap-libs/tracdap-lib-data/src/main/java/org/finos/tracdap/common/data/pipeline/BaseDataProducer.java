@@ -19,58 +19,40 @@ package org.finos.tracdap.common.data.pipeline;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EUnexpected;
 
-import org.apache.arrow.vector.VectorSchemaRoot;
 
+public abstract class BaseDataProducer
+        <API_T extends DataPipeline.DataInterface<API_T>>
+        extends BaseDataStage
+        implements DataPipeline.DataProducer<API_T> {
 
-public abstract class BaseDataProducer implements DataPipeline.DataStreamProducer {
+    private final Class<API_T> consumerType;
+    private DataPipeline.DataConsumer<API_T> consumer;
 
-    private DataPipeline.DataStreamConsumer consumer;
-
-    final void bind(DataPipeline.DataStreamConsumer consumer) {
-
-        if (this.consumer != null)
-            throw new EUnexpected();  // todo err
-
-        this.consumer = consumer;
+    protected BaseDataProducer(Class<API_T> consumerType) {
+        this.consumerType = consumerType;
     }
 
-    public final void emitRoot(VectorSchemaRoot root) {
+    @SuppressWarnings("unchecked")
+    final void bind(DataPipeline.DataConsumer<?> consumer) {
 
-        //log.info("emitRoot");
-
-        if (this.consumer == null)
+        if (!consumerType.isAssignableFrom(consumer.dataInterface().getClass()))
             throw new EUnexpected();
 
-        consumer.onStart(root);
+        this.consumer = (DataPipeline.DataConsumer<API_T>) consumer;
     }
 
-    public final void emitBatch() {
-
-        //log.info("emitBatch");
-
-        if (this.consumer == null)
-            throw new EUnexpected();
-
-        consumer.onNext();
+    @Override
+    public Class<API_T> consumerType() {
+        return consumerType;
     }
 
-    public final void emitEnd() {
-
-        //log.info("emitEnd");
-
-        if (this.consumer == null)
-            throw new EUnexpected();
-
-        consumer.onComplete();
+    @Override
+    public final boolean consumerReady() {
+        return consumer.isReady();
     }
 
-    public final void emitFailed(Throwable error) {
-
-        //log.info("emitFailed");
-
-        if (this.consumer == null)
-            throw new EUnexpected();
-
-        consumer.onError(error);
+    @Override
+    public final API_T consumer() {
+        return consumer.dataInterface();
     }
 }
