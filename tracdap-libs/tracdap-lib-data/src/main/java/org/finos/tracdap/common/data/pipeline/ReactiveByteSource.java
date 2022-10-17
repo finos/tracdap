@@ -33,6 +33,8 @@ public class ReactiveByteSource
         DataPipeline.SourceStage,
         Flow.Subscriber<ByteBuf> {
 
+    private static final int BACKPRESSURE_HEADROOM = 256;
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final DataPipelineImpl pipeline;
@@ -67,9 +69,12 @@ public class ReactiveByteSource
             return;
         }
 
-        if (consumerReady() && nReceived == nRequested) {
-            nRequested += 1;
-            subscription.request(1);
+        if (consumerReady()) {
+            var headroom = BACKPRESSURE_HEADROOM - (nRequested - nReceived);
+            if (headroom > 0) {
+                nRequested += headroom;
+                subscription.request(headroom);
+            }
         }
     }
 
@@ -109,6 +114,11 @@ public class ReactiveByteSource
             this.subscription = subscription;
             consumer().onStart();
 
+            if (consumerReady()) {
+                nRequested += BACKPRESSURE_HEADROOM;
+                subscription.request(BACKPRESSURE_HEADROOM);
+            }
+
             return null;
         });
     }
@@ -125,8 +135,11 @@ public class ReactiveByteSource
             consumer().onNext(chunk);
 
             if (consumerReady()) {
-                nRequested += 1;
-                subscription.request(1);
+                var headroom = BACKPRESSURE_HEADROOM - (nRequested - nReceived);
+                if (headroom > 0) {
+                    nRequested += headroom;
+                    subscription.request(headroom);
+                }
             }
 
             return null;
