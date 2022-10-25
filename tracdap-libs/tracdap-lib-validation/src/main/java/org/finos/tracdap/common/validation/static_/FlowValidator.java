@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.validation.static_;
 
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
@@ -23,7 +24,12 @@ import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
@@ -204,10 +210,11 @@ public class FlowValidator {
                 .applyRepeated(FlowValidator::edgeConnection, FlowEdge.class, nodes)
                 .pop();
 
+        ctx.apply(FlowValidator::oneEdgePerTarget, FlowDefinition.class);
+        ctx.apply(FlowValidator::cyclicRedundancyCheck, FlowDefinition.class);
+
         // TODO: Flow consistency
-        // - Cyclic dependency check
-        // - Orphan / unreachable nodes
-        // - Duplicate edges
+        // - Unused outputs / nodes
         // - Consistent parameter types (same name => same type)
         // - Flow model schema matches input / output nodes and parameters (including case)
 
@@ -294,5 +301,116 @@ public class FlowValidator {
         }
 
         return ctx;
+    }
+
+    private static ValidationContext oneEdgePerTarget(FlowDefinition flow, ValidationContext ctx) {
+
+        Function<FlowSocket, String> socketKey = (FlowSocket socket) -> socket.getSocket().isEmpty()
+                ? socket.getNode() + '#' + socket.getSocket()
+                : socket.getNode();
+
+        var edgesByTarget = flow.getEdgesList().stream().collect(Collectors.toMap(
+                e -> socketKey.apply(e.getTarget()), e -> new ArrayList<FlowEdge>()));
+
+        for (var edge : flow.getEdgesList()) {
+            edgesByTarget.get(socketKey.apply(edge.getTarget())).add(edge);
+        }
+
+        for (var nodeEntry : flow.getNodesMap().entrySet()) {
+
+            var nodeName = nodeEntry.getKey();
+            var node = nodeEntry.getValue();
+
+            for (var target : incomingSockets(nodeName, node)) {
+
+                var incomingEdges = edgesByTarget.remove(target);
+
+                if (incomingEdges == null || incomingEdges.isEmpty())
+                    ctx.error(String.format("Target [%s] is not supplied by any edge", target));
+
+                else if (incomingEdges.size() > 1)
+                    ctx.error(String.format("Target [%s] is supplied by %d edges", target, incomingEdges.size()));
+            }
+        }
+
+        // TODO: remaining unused edges?
+
+        return ctx;
+    }
+
+    private static ValidationContext cyclicRedundancyCheck(FlowDefinition flow, ValidationContext ctx) {
+
+        // https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm
+
+        var remainingNodes = new HashMap<>(flow.getNodesMap());
+        var reachableNodes = new HashMap<String, FlowNode>();
+
+        var edgesBySource = flow.getEdgesList().stream().collect(Collectors.toMap(
+                e -> e.getSource().getNode(), e -> new ArrayList<FlowEdge>()));
+
+        var edgesByTarget = flow.getEdgesList().stream().collect(Collectors.toMap(
+                e -> e.getTarget().getNode(), e -> new ArrayList<FlowEdge>()));
+
+        for (var edge : flow.getEdgesList()) {
+            edgesBySource.get(edge.getSource().getNode()).add(edge);
+            edgesByTarget.get(edge.getTarget().getNode()).add(edge);
+        }
+
+        // Initial set of reachable flow nodes is just the input nodes
+        for (var node : remainingNodes.entrySet()) {
+            if (node.getValue().getNodeType() == FlowNodeType.INPUT_NODE)
+                reachableNodes.put(node.getKey(), node.getValue());
+        }
+
+        for (var node: reachableNodes.keySet())
+            remainingNodes.remove(node);
+
+        while (!reachableNodes.isEmpty()) {
+
+            var nodeKey = reachableNodes.keySet().stream().findAny();
+            var nodeName = nodeKey.get();
+
+            reachableNodes.remove(nodeName);
+
+            var sourceEdges = edgesBySource.remove(nodeName);
+
+            for (var edge : sourceEdges) {
+
+                var targetNodeName = edge.getTarget().getNode();
+                var targetEdges = edgesByTarget.get(targetNodeName);
+                targetEdges.remove(edge);
+
+                if (targetEdges.isEmpty()) {
+                    var targetNode = reachableNodes.remove(targetNodeName);
+                    reachableNodes.put(targetNodeName, targetNode);
+                }
+            }
+
+        }
+
+        // TODO: Check remaining
+
+        return ctx;
+    }
+
+    private static Iterable<String> incomingSockets(String nodeName, FlowNode node) {
+
+        switch (node.getNodeType()) {
+
+            case INPUT_NODE:
+                return List.of();
+
+            case OUTPUT_NODE:
+                return List.of(nodeName);
+
+            case MODEL_NODE:
+                return node.getModelStub().getInputsList()
+                        .stream()
+                        .map(socket -> nodeName + '#' + socket)
+                        .collect(Collectors.toList());
+
+            default:
+                throw new EUnexpected();  // todo: err msg
+        }
     }
 }
