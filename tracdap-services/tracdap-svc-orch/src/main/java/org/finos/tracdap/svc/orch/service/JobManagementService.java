@@ -171,16 +171,16 @@ public class JobManagementService {
         // No specialisation is needed to build the job config
         // This may change in the future, in which case add IJobLogic.buildJobConfig()
 
-        var jobConfigJson = ConfigParser.quoteConfig(jobState.jobConfig, ConfigFormat.YAML);
-        var sysConfigJson = ConfigParser.quoteConfig(jobState.sysConfig, ConfigFormat.YAML);
+        var jobConfigJson = ConfigParser.quoteConfig(jobState.jobConfig, ConfigFormat.JSON);
+        var sysConfigJson = ConfigParser.quoteConfig(jobState.sysConfig, ConfigFormat.JSON);
         execState = jobExecutor.writeFile(execState, "config", "job_config.json", jobConfigJson);
         execState = jobExecutor.writeFile(execState, "config", "sys_config.json", sysConfigJson);
 
         var launchCmd = LaunchCmd.trac();
 
         var launchArgs = List.of(
-                LaunchArg.string("--sys-config"), LaunchArg.path("config", "sys_config.yaml"),
-                LaunchArg.string("--job-config"), LaunchArg.path("config", "job_config.yaml"),
+                LaunchArg.string("--sys-config"), LaunchArg.path("config", "sys_config.json"),
+                LaunchArg.string("--job-config"), LaunchArg.path("config", "job_config.json"),
                 LaunchArg.string("--job-result-dir"), LaunchArg.path("result", "."),
                 LaunchArg.string("--job-result-format"), LaunchArg.string("json"),
                 LaunchArg.string("--scratch-dir"), LaunchArg.path("scratch", "."));
