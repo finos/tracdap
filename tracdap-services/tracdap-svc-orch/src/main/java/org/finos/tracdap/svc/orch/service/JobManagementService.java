@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.common.config.ConfigFormat;
+import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.exec.*;
 import org.finos.tracdap.common.validation.Validator;
@@ -27,13 +28,9 @@ import org.finos.tracdap.svc.orch.cache.IJobCache;
 import org.finos.tracdap.svc.orch.cache.JobState;
 
 import org.finos.tracdap.svc.orch.cache.Ticket;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.Message;
-import com.google.protobuf.util.JsonFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -174,16 +171,16 @@ public class JobManagementService {
         // No specialisation is needed to build the job config
         // This may change in the future, in which case add IJobLogic.buildJobConfig()
 
-        var jobConfigJson = encodeProto(jobState.jobConfig, ConfigFormat.JSON);
-        var sysConfigJson = encodeProto(jobState.sysConfig, ConfigFormat.JSON);
+        var jobConfigJson = ConfigParser.quoteConfig(jobState.jobConfig, ConfigFormat.YAML);
+        var sysConfigJson = ConfigParser.quoteConfig(jobState.sysConfig, ConfigFormat.YAML);
         execState = jobExecutor.writeFile(execState, "config", "job_config.json", jobConfigJson);
         execState = jobExecutor.writeFile(execState, "config", "sys_config.json", sysConfigJson);
 
         var launchCmd = LaunchCmd.trac();
 
         var launchArgs = List.of(
-                LaunchArg.string("--sys-config"), LaunchArg.path("config", "sys_config.json"),
-                LaunchArg.string("--job-config"), LaunchArg.path("config", "job_config.json"),
+                LaunchArg.string("--sys-config"), LaunchArg.path("config", "sys_config.yaml"),
+                LaunchArg.string("--job-config"), LaunchArg.path("config", "job_config.yaml"),
                 LaunchArg.string("--job-result-dir"), LaunchArg.path("result", "."),
                 LaunchArg.string("--job-result-format"), LaunchArg.string("json"),
                 LaunchArg.string("--scratch-dir"), LaunchArg.path("scratch", "."));
@@ -214,7 +211,7 @@ public class JobManagementService {
                 var jobResultFile = String.format("job_result_%s.json", jobKey);
                 var jobResultBytes = jobExecutor.readFile(execState, "result", jobResultFile);
 
-                jobState.jobResult = decodeProto(jobResultBytes, ConfigFormat.JSON, JobResult.class, JobResult.newBuilder());
+                jobState.jobResult = ConfigParser.parseConfig(jobResultBytes, ConfigFormat.JSON, JobResult.class);
 
                 // If the validator is extended to cover the config interface,
                 // The top level job result could be validated directly
@@ -225,12 +222,12 @@ public class JobManagementService {
                     validator.validateFixedObject(result.getValue());
                 }
             }
-            catch (EExecutorFailure | EValidation e) {
+            catch (EExecutorFailure | EConfigParse | EValidation e) {
 
                 log.error("Job [{}] succeeded but the response could not be processed", jobKey, e);
 
                 var errorMessage = e.getMessage();
-                var shortMessage = errorMessage.lines().findFirst().orElseGet(() -> "No details available");
+                var shortMessage = errorMessage.lines().findFirst().orElse("No details available");
 
                 jobState.statusCode = JobStatusCode.FAILED;
                 jobState.statusMessage = shortMessage;
@@ -318,72 +315,6 @@ public class JobManagementService {
 
                 log.error("Error handling failed: [{}] {}", jobKey, e.getMessage(), e);
             }
-        }
-    }
-
-
-    private <T extends Message> byte[] encodeProto(T message, ConfigFormat format) {
-
-        try {
-
-            switch (format) {
-
-                case JSON:
-
-                    return JsonFormat.printer().print(message).getBytes(StandardCharsets.UTF_8);
-
-                case PROTO:
-
-                    return message.toByteArray();
-
-                default:
-
-                    var message_ = String.format(
-                            "Failed sending job request to executor (request format [%s] is not supported)",
-                            format.name());
-
-                    throw new EExecutorFailure(message_);
-            }
-        }
-        catch (InvalidProtocolBufferException error) {
-
-            var message_ = "Failed sending job request to executor (request message is garbled)";
-            throw new EExecutorFailure(message_, error);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private <T extends Message> T decodeProto(
-            byte [] bytes, ConfigFormat format,
-            Class<T> clazz, Message.Builder builder) {
-
-        try {
-
-            switch (format) {
-
-                case JSON:
-                    var json = new String(bytes, StandardCharsets.UTF_8);
-                    JsonFormat.parser().merge(json, builder);
-                    return (T) builder.build();
-
-                case PROTO:
-
-                    builder.mergeFrom(bytes);
-                    return (T) builder.build();
-
-                default:
-
-                    var message = String.format(
-                            "Bad response from job executor (response format [%s] is not supported)",
-                            format.name());
-
-                    throw new EExecutorFailure(message);
-            }
-        }
-        catch (InvalidProtocolBufferException error) {
-
-            var message = "Bad response from job executor (response message is garbled)";
-            throw new EExecutorFailure(message, error);
         }
     }
 }
