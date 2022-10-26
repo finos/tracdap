@@ -318,9 +318,10 @@ class DataMapping:
         # As an optimisation, the column filter means columns will not be converted if they are not needed
         # E.g. if a model outputs lots of undeclared columns, there is no need to convert them
 
+        column_filter = DataConformance.column_filter(df.columns, schema)  # noqa
+
         if len(df) > 0:
 
-            column_filter = DataConformance.column_filter(df.columns, schema)  # noqa
             table = pa.Table.from_pandas(df, columns=column_filter, preserve_index=False)  # noqa
 
         # Special case handling for converting an empty dataframe
@@ -329,8 +330,10 @@ class DataMapping:
 
         else:
 
-            df_schema = pa.Schema.from_pandas(df, preserve_index=False)  # noqa
-            table = pa.Table.from_batches(list(), df_schema)  # noqa
+            empty_df = df.filter(column_filter) if column_filter else df
+            empty_schema = pa.Schema.from_pandas(empty_df, preserve_index=False)  # noqa
+
+            table = pa.Table.from_batches(list(), empty_schema)  # noqa
 
         # If there is no explict schema, give back the table exactly as it was received from Pandas
         # There could be an option here to infer and coerce for TRAC standard types
@@ -339,8 +342,13 @@ class DataMapping:
         if schema is None:
             DataConformance.check_duplicate_fields(table.schema.names, False)
             return table
+
+        # If a schema has been supplied, apply data conformance
+        # If column filtering has been applied, we also need to filter the pandas dtypes used for hinting
+
         else:
-            return DataConformance.conform_to_schema(table, schema, df.dtypes)
+            df_types = df.dtypes.filter(column_filter) if column_filter else df.dtypes
+            return DataConformance.conform_to_schema(table, schema, df_types)
 
 
 class DataConformance:
