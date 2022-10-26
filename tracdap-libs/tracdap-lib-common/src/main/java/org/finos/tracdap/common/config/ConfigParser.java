@@ -175,6 +175,8 @@ public class ConfigParser {
              var writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
 
             quoter.appendTo(config, writer);
+            writer.flush();
+
             return out.toByteArray();
         }
         catch (InvalidProtocolBufferException e) {
