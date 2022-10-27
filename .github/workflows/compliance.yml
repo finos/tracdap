@@ -207,7 +207,7 @@ jobs:
         run: |
           tracdap_version=`dev/version.sh`
           echo "tracdap_version = ${tracdap_version}"
-          echo "::set-output name=tracdap_version::${tracdap_version}"
+          echo "tracdap_version=${tracdap_version}" >> $GITHUB_OUTPUT
 
       - name: Fetch copmliance report artifacts
         uses: actions/download-artifact@v3

@@ -248,7 +248,7 @@ jobs:
         run: |
           tracdap_version=`dev/version.sh`
           echo "tracdap_version = ${tracdap_version}"
-          echo "::set-output name=tracdap_version::${tracdap_version}"
+          echo "tracdap_version=${tracdap_version}" >> $GITHUB_OUTPUT
 
       - name: Fetch platform and sandbox packages
         uses: actions/download-artifact@v3
@@ -361,7 +361,7 @@ jobs:
           
           tracdap_tag=`dev/version_tag.sh ${tracdap_version}`
           echo "tracdap_tag = ${tracdap_tag}"
-          echo "::set-output name=tracdap_tag::${tracdap_tag}"
+          echo "tracdap_tag=${tracdap_tag}" >> $GITHUB_OUTPUT
 
       - name: Fetch web API package
         uses: actions/download-artifact@v3
