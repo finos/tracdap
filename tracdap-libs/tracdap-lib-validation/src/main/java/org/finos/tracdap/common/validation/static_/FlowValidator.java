@@ -282,8 +282,8 @@ public class FlowValidator {
     private static ValidationContext oneEdgePerTarget(FlowDefinition flow, ValidationContext ctx) {
 
         Function<FlowSocket, String> socketKey = (FlowSocket socket) -> socket.getSocket().isEmpty()
-                ? socket.getNode() + '#' + socket.getSocket()
-                : socket.getNode();
+                ? socket.getNode()
+                : socket.getNode() + '.' + socket.getSocket();
 
         var edgesByTarget = flow.getEdgesList().stream().collect(Collectors.toMap(
                 e -> socketKey.apply(e.getTarget()), e -> new ArrayList<FlowEdge>()));
@@ -350,6 +350,9 @@ public class FlowValidator {
 
             var sourceEdges = edgesBySource.remove(nodeName);
 
+            if (sourceEdges == null)
+                continue;
+
             for (var edge : sourceEdges) {
 
                 var targetNodeName = edge.getTarget().getNode();
@@ -382,7 +385,7 @@ public class FlowValidator {
             case MODEL_NODE:
                 return node.getInputsList()
                         .stream()
-                        .map(socket -> nodeName + '#' + socket)
+                        .map(socket -> nodeName + '.' + socket)
                         .collect(Collectors.toList());
 
             default:
