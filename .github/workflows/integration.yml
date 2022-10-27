@@ -18,6 +18,7 @@ on:
 env:
   JAVA_VERSION: 11
   JAVA_DISTRIBUTION: zulu
+  PYTHON_VERSION: "3.10"
 
 
 jobs:
@@ -31,12 +32,12 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Set up Java
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -50,7 +51,7 @@ jobs:
 
       # If the tests fail, make the output available for download
       - name: Store failed test results
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: junit-test-results
@@ -67,12 +68,12 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Java - Setup
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -84,7 +85,7 @@ jobs:
         run: ./gradlew build -x test
 
       - name: Python - setup
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -103,7 +104,7 @@ jobs:
 
       # If the tests fail, make the output available for download
       - name: Store failed test results
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: junit-test-results
@@ -185,12 +186,12 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Set up Java
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -211,7 +212,7 @@ jobs:
 
       # If the tests fail, make the output available for download
       - name: Store failed test results
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: junit-test-results
