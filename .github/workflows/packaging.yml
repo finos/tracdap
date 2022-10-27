@@ -51,7 +51,7 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -91,7 +91,7 @@ jobs:
           zip -r tracdap-sandbox-${VERSION}.zip tracdap-sandbox-${VERSION}
 
       - name: Save packages
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: platform_packages
           path: |
@@ -149,7 +149,7 @@ jobs:
     steps:
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -158,7 +158,7 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -170,7 +170,7 @@ jobs:
         run: python tracdap-runtime/python/build_runtime.py --target codegen dist
 
       - name: Save artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: python_runtime_package
           path: tracdap-runtime/python/build/dist
@@ -184,13 +184,13 @@ jobs:
     steps:
 
       - name: Set up Node.js
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -217,7 +217,7 @@ jobs:
           npm pack ..
 
       - name: Save artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: web_api_package
           path: tracdap-api/packages/web/dist
@@ -239,7 +239,7 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -251,19 +251,19 @@ jobs:
           echo "::set-output name=tracdap_version::${tracdap_version}"
 
       - name: Fetch platform and sandbox packages
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: platform_packages
           path: .
 
       - name: Fetch Python runtime package
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: python_runtime_package
           path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/python_runtime_package
 
       - name: Fetch web API package
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: web_api_package
           path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/web_api_package
@@ -272,7 +272,7 @@ jobs:
         run: tar -cvzf tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/
 
       - name: Publish platform package
-        uses: actions/upload-release-asset@v1.0.1
+        uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -282,7 +282,7 @@ jobs:
           asset_content_type: application/gzip
 
       - name: Publish sandbox package
-        uses: actions/upload-release-asset@v1.0.1
+        uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -292,7 +292,7 @@ jobs:
           asset_content_type: application/zip
 
       - name: Publish API packages
-        uses: actions/upload-release-asset@v1.0.1
+        uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -313,7 +313,7 @@ jobs:
     steps:
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -323,7 +323,7 @@ jobs:
           pip install twine
 
       - name: Fetch Python runtime package
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: python_runtime_package
           path: tracdap_dist/
@@ -348,7 +348,7 @@ jobs:
 
       # fetch-depth = 0 is needed to get tags for version info
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -364,7 +364,7 @@ jobs:
           echo "::set-output name=tracdap_tag::${tracdap_tag}"
 
       - name: Fetch web API package
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: web_api_package
           path: tracdap_dist/
