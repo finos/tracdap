@@ -18,6 +18,7 @@ on:
 env:
   JAVA_VERSION: 11
   JAVA_DISTRIBUTION: zulu
+  PYTHON_VERSION: "3.10"
 
 
 jobs:
