@@ -34,4 +34,14 @@ public abstract class StreamingEncoder
     public DataPipeline.ArrowApi dataInterface() {
         return this;
     }
+
+    @Override
+    public boolean isReady() {
+        return consumerReady();
+    }
+
+    @Override
+    public void pump() {
+        /* no-op, immediate stage */
+    }
 }

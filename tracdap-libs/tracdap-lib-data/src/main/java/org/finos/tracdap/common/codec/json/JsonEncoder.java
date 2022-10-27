@@ -47,9 +47,6 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
 
     }
 
-    @Override public boolean isReady() { return true; }
-    @Override public void pump() {  /* no-op, immediate stage */ }
-
     @Override
     public void onStart(VectorSchemaRoot root) {
 

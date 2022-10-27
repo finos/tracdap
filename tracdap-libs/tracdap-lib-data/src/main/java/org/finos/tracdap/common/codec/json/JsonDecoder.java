@@ -58,9 +58,6 @@ public class JsonDecoder extends StreamingDecoder {
             vector.allocateNew();
     }
 
-    @Override public boolean isReady() { return true; }
-    @Override public void pump() {  /* no-op, immediate stage */ }
-
     @Override
     public void onStart() {
 

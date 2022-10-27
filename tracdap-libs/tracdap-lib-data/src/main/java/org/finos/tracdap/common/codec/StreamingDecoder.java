@@ -35,4 +35,14 @@ public abstract class StreamingDecoder
     public DataPipeline.StreamApi dataInterface() {
         return this;
     }
+
+    @Override
+    public boolean isReady() {
+        return consumerReady();
+    }
+
+    @Override
+    public void pump() {
+        /* no-op, immediate stage */
+    }
 }
