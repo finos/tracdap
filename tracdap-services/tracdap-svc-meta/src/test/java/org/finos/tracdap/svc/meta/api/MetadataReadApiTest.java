@@ -18,14 +18,17 @@ package org.finos.tracdap.svc.meta.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.metadata.MetadataConstants;
+import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.meta.TestData;
 
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -84,6 +87,25 @@ abstract class MetadataReadApiTest {
             readApi = platform.metaClientBlocking();
             writeApi = platform.metaClientTrustedBlocking();
         }
+    }
+
+    @Test
+    void platformInfo() {
+
+        var platformInfo = readApi.platformInfo(EmptyRequest.newBuilder().build());
+
+        var expectedVersion = VersionInfo.getComponentVersion(TracMetadataService.class);
+        Assertions.assertEquals(expectedVersion, platformInfo.getTracVersion());
+    }
+
+    @Test
+    void listTenants() {
+
+        var tenantsResponse = readApi.listTenants(EmptyRequest.newBuilder().build());
+        var tenants = tenantsResponse.getTenantsList();
+
+        Assertions.assertEquals(1, tenants.size());
+        Assertions.assertEquals(TEST_TENANT, tenants.get(0).getTenantName());
     }
 
     @ParameterizedTest
