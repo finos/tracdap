@@ -37,7 +37,7 @@ public class ElasticBuffer
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private static final int QUEUE_LIMIT = 4096;
+    private static final int QUEUE_LIMIT = 1024;
     private static final int QUEUE_SAFETY_LIMIT = 512;
 
     // The special buffer Unpooled.EMPTY_BUFFER can be (and is) sent out by upstream components

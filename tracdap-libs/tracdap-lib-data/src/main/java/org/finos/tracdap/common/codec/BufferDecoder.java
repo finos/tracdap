@@ -37,11 +37,9 @@ public abstract class BufferDecoder
 
     @Override
     public boolean isReady() {
+        // Buffer decoders will only ever receive on chunk, so they are always ready
         return true;
     }
 
-    @Override
-    public void pump() {
-
-    }
+    // Implementations must supply pump(), because BufferDecoder is not immediate
 }
