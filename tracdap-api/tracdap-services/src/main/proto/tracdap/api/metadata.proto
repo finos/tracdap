@@ -87,6 +87,18 @@ import "google/api/annotations.proto";
  */
 service TracMetadataApi {
 
+    rpc platformInfo(EmptyRequest) returns (PlatformInfoResponse) {
+        option (google.api.http) = {
+            get: "/trac/platform-info"
+        };
+    }
+
+    rpc listTenants(EmptyRequest) returns (ListTenantsResponse) {
+        option (google.api.http) = {
+            get: "/trac/list-tenants"
+        };
+    }
+
     /**
      * Create a new object in the TRAC metadata store.
      *
@@ -331,6 +343,29 @@ service TracMetadataApi {
         };
     }
 };
+
+
+message EmptyRequest {
+
+}
+
+message PlatformInfoResponse {
+
+    string tracVersion = 1;
+
+    string environmentName = 2;
+    bool nonProd = 3;
+}
+
+message ListTenantsResponse {
+
+    repeated TenantInfo tenants = 1;
+}
+
+message TenantInfo {
+
+    string tenantName = 1;
+}
 
 
 /**
