@@ -95,7 +95,18 @@ public class HubProcessor<T> implements Flow.Processor<T, T> {
             return;
         }
 
-        eventLoop.execute(() -> doNewSubscription(subscriber));
+        // NOTE: Do not defer onSubscribe() (i.e. doNewSubscription) to the event loop
+
+        // Deferring to the event loop can cause deadlocks in the unit tests
+        // This is because subscriptions may not be set up until after a streaming operation starts
+        // It may be possible to make this watertight with a more thorough review of the hub logic
+        // But, calling back to onSubscribe() synchronously is common practice, and avoids the issue
+
+        // This issue manifests in test code, where the server and client are on separate event loops
+        // However it indicates a race condition that could occur on the platform
+        // To be safe, call doNewSubscription() synchronously
+
+        doNewSubscription(subscriber);
     }
 
     private void doNewSubscription(Flow.Subscriber<? super T> subscriber) {
