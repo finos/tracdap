@@ -57,7 +57,7 @@ class DataRoundTripTest {
 
     private static final String BASIC_CSV_DATA = SampleData.BASIC_CSV_DATA_RESOURCE;
     private static final String BASIC_JSON_DATA = SampleData.BASIC_JSON_DATA_RESOURCE;
-    private static final String LARGE_CSV_DATA = "/large_csv_data_50000.csv";
+    private static final String LARGE_CSV_DATA = "/large_csv_data_100000.csv";
 
     private static final byte[] BASIC_CSV_CONTENT = TestResourceHelpers.loadResourceAsBytes(BASIC_CSV_DATA);
 
