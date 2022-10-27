@@ -51,7 +51,7 @@ jobs:
 
     # If the tests fail, make the output available for download
     - name: Store failed test results
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       if: failure()
       with:
         name: junit-test-results
