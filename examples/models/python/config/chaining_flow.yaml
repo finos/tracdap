@@ -9,15 +9,13 @@ nodes:
 
   model_1:
     nodeType: "MODEL_NODE"
-    modelStub:
-      inputs: [customer_loans, currency_data]
-      outputs: [preprocessed_data]
+    inputs: [customer_loans, currency_data]
+    outputs: [preprocessed_data]
 
   model_2:
     nodeType: "MODEL_NODE"
-    modelStub:
-      inputs: [preprocessed_data]
-      outputs: [profit_by_region]
+    inputs: [preprocessed_data]
+    outputs: [profit_by_region]
 
   profit_by_region:
     nodeType: "OUTPUT_NODE"
