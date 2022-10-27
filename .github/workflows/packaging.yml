@@ -272,7 +272,7 @@ jobs:
         run: tar -cvzf tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/
 
       - name: Publish platform package
-        uses: actions/upload-release-asset@v1.0.2
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -282,7 +282,7 @@ jobs:
           asset_content_type: application/gzip
 
       - name: Publish sandbox package
-        uses: actions/upload-release-asset@v1.0.2
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -292,7 +292,7 @@ jobs:
           asset_content_type: application/zip
 
       - name: Publish API packages
-        uses: actions/upload-release-asset@v1.0.2
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

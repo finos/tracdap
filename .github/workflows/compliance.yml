@@ -219,7 +219,7 @@ jobs:
         run: tar -cvzf tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz tracdap-compliance-reports-${{ steps.tracdap-version.outputs.tracdap_version }}/
 
       - name: Publish compliance reports
-        uses: actions/upload-release-asset@v1.0.2
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
