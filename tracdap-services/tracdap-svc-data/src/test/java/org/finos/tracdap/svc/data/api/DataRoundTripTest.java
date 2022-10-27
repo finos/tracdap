@@ -57,7 +57,7 @@ class DataRoundTripTest {
 
     private static final String BASIC_CSV_DATA = SampleData.BASIC_CSV_DATA_RESOURCE;
     private static final String BASIC_JSON_DATA = SampleData.BASIC_JSON_DATA_RESOURCE;
-    private static final String LARGE_CSV_DATA = "/large_csv_data_10000.csv";
+    private static final String LARGE_CSV_DATA = "/large_csv_data_50000.csv";
 
     private static final byte[] BASIC_CSV_CONTENT = TestResourceHelpers.loadResourceAsBytes(BASIC_CSV_DATA);
 
@@ -127,7 +127,15 @@ class DataRoundTripTest {
                 throw new RuntimeException("Test data not found");
 
             var testDataBytes = testDataStream.readAllBytes();
-            var testData = List.of(ByteString.copyFrom(testDataBytes));
+            var testData = new ArrayList<ByteString>();
+            var mb2 = 2 * 1024 * 1024;
+
+            for (var offset = 0; offset < testDataBytes.length; offset += mb2) {
+
+                var sliceSize = Math.min(mb2, testDataBytes.length - offset);
+                var slice = ByteString.copyFrom(testDataBytes, offset, sliceSize);
+                testData.add(slice);
+            }
 
             var mimeType = "text/csv";
 
@@ -167,7 +175,7 @@ class DataRoundTripTest {
             var integerField = roundTripData.get(1);
 
             for (var i = 0; i < integerField.size(); i++)
-                Assertions.assertEquals((long) i + 1, integerField.get(i));
+                Assertions.assertEquals((long) i % 10000 + 1, integerField.get(i));
         }
     }
 
