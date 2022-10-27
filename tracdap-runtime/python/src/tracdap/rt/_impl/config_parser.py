@@ -400,6 +400,13 @@ class ConfigQuoter:
 
     class _JsonEncoder(json.JSONEncoder):
 
+        def __init__(self, **kwargs):
+
+            super().__init__(**kwargs)
+
+            # Do not force-escape non-ascii characters, output UTF-8 instead
+            self.ensure_ascii = False
+
         def default(self, o: tp.Any) -> str:
 
             if isinstance(o, enum.Enum):
