@@ -46,8 +46,9 @@ public class FlowValidator {
 
     private static final Descriptors.Descriptor FLOW_NODE;
     private static final Descriptors.FieldDescriptor FN_NODE_TYPE;
+    private static final Descriptors.FieldDescriptor FN_INPUTS;
+    private static final Descriptors.FieldDescriptor FN_OUTPUTS;
     private static final Descriptors.FieldDescriptor FN_NODE_SEARCH;
-    private static final Descriptors.FieldDescriptor FN_MODEL_STUB;
 
     private static final Descriptors.Descriptor FLOW_EDGE;
     private static final Descriptors.FieldDescriptor FE_SOURCE;
@@ -56,11 +57,6 @@ public class FlowValidator {
     private static final Descriptors.Descriptor FLOW_SOCKET;
     private static final Descriptors.FieldDescriptor FS_NODE;
     private static final Descriptors.FieldDescriptor FS_SOCKET;
-
-    private static final Descriptors.Descriptor FLOW_MODEL_STUB;
-    private static final Descriptors.FieldDescriptor FMS_PARAMETERS;
-    private static final Descriptors.FieldDescriptor FMS_INPUTS;
-    private static final Descriptors.FieldDescriptor FMS_OUTPUTS;
 
     static {
 
@@ -73,8 +69,9 @@ public class FlowValidator {
 
         FLOW_NODE = FlowNode.getDescriptor();
         FN_NODE_TYPE = field(FLOW_NODE, FlowNode.NODETYPE_FIELD_NUMBER);
+        FN_INPUTS = field(FLOW_NODE, FlowNode.INPUTS_FIELD_NUMBER);
+        FN_OUTPUTS = field(FLOW_NODE, FlowNode.OUTPUTS_FIELD_NUMBER);
         FN_NODE_SEARCH = field(FLOW_NODE, FlowNode.NODESEARCH_FIELD_NUMBER);
-        FN_MODEL_STUB = field(FLOW_NODE, FlowNode.MODELSTUB_FIELD_NUMBER);
 
         FLOW_EDGE = FlowEdge.getDescriptor();
         FE_SOURCE = field(FLOW_EDGE, FlowEdge.SOURCE_FIELD_NUMBER);
@@ -83,11 +80,6 @@ public class FlowValidator {
         FLOW_SOCKET = FlowSocket.getDescriptor();
         FS_NODE = field(FLOW_SOCKET, FlowSocket.NODE_FIELD_NUMBER);
         FS_SOCKET = field(FLOW_SOCKET, FlowSocket.SOCKET_FIELD_NUMBER);
-
-        FLOW_MODEL_STUB = FlowModelStub.getDescriptor();
-        FMS_PARAMETERS = field(FLOW_MODEL_STUB, FlowModelStub.PARAMETERS_FIELD_NUMBER);
-        FMS_INPUTS = field(FLOW_MODEL_STUB, FlowModelStub.INPUTS_FIELD_NUMBER);
-        FMS_OUTPUTS = field(FLOW_MODEL_STUB, FlowModelStub.OUTPUTS_FIELD_NUMBER);
     }
 
     @Validator
@@ -129,17 +121,26 @@ public class FlowValidator {
                 .apply(CommonValidators::nonZeroEnum, FlowNodeType.class)
                 .pop();
 
-        ctx = ctx.push(FN_NODE_SEARCH)
-                .apply(CommonValidators::optional)
-                .apply(SearchValidator::searchExpression, SearchExpression.class)
-                .pop();
-
         var isModelNode = msg.getNodeType() == FlowNodeType.MODEL_NODE;
         var isModelNodeQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), FlowNodeType.MODEL_NODE.name());
 
-        ctx = ctx.push(FN_MODEL_STUB)
+        ctx = ctx.pushRepeated(FN_INPUTS)
                 .apply(CommonValidators.ifAndOnlyIf(isModelNode, isModelNodeQualifier))
-                .apply(FlowValidator::flowModelStub, FlowModelStub.class)
+                .applyRepeated(CommonValidators::identifier, String.class)
+                .applyRepeated(CommonValidators::notTracReserved, String.class)
+                .apply(CommonValidators::caseInsensitiveDuplicates)
+                .pop();
+
+        ctx = ctx.pushRepeated(FN_OUTPUTS)
+                .apply(CommonValidators.ifAndOnlyIf(isModelNode, isModelNodeQualifier))
+                .applyRepeated(CommonValidators::identifier, String.class)
+                .applyRepeated(CommonValidators::notTracReserved, String.class)
+                .apply(CommonValidators::caseInsensitiveDuplicates)
+                .pop();
+
+        ctx = ctx.push(FN_NODE_SEARCH)
+                .apply(CommonValidators::optional)
+                .apply(SearchValidator::searchExpression, SearchExpression.class)
                 .pop();
 
         return ctx;
@@ -172,31 +173,6 @@ public class FlowValidator {
         ctx = ctx.push(FS_SOCKET)
                 .apply(CommonValidators::optional)
                 .apply(CommonValidators::identifier)
-                .pop();
-
-        return ctx;
-    }
-
-    @Validator
-    public static ValidationContext flowModelStub(FlowModelStub msg, ValidationContext ctx) {
-
-        ctx = ctx.pushMap(FMS_PARAMETERS)
-                .applyMapKeys(CommonValidators::identifier)
-                .applyMapKeys(CommonValidators::notTracReserved)
-                .apply(CommonValidators::caseInsensitiveDuplicates)
-                .applyMapValues(TypeSystemValidator::typeDescriptor, TypeDescriptor.class)
-                .pop();
-
-        ctx = ctx.pushRepeated(FMS_INPUTS)
-                .applyRepeated(CommonValidators::identifier, String.class)
-                .applyRepeated(CommonValidators::notTracReserved, String.class)
-                .apply(CommonValidators::caseInsensitiveDuplicates)
-                .pop();
-
-        ctx = ctx.pushRepeated(FMS_OUTPUTS)
-                .applyRepeated(CommonValidators::identifier, String.class)
-                .applyRepeated(CommonValidators::notTracReserved, String.class)
-                .apply(CommonValidators::caseInsensitiveDuplicates)
                 .pop();
 
         return ctx;
@@ -283,8 +259,8 @@ public class FlowValidator {
 
             var inputOrOutput = ctx.field().equals(FE_SOURCE) ? "output" : "input";
             var modelSockets = ctx.field().equals(FE_SOURCE)
-                    ? node.getModelStub().getOutputsList()
-                    : node.getModelStub().getInputsList();
+                    ? node.getOutputsList()
+                    : node.getInputsList();
 
             if (!socket.hasField(FS_SOCKET)) {
 
@@ -404,7 +380,7 @@ public class FlowValidator {
                 return List.of(nodeName);
 
             case MODEL_NODE:
-                return node.getModelStub().getInputsList()
+                return node.getInputsList()
                         .stream()
                         .map(socket -> nodeName + '#' + socket)
                         .collect(Collectors.toList());
