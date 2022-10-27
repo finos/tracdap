@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class DataPipelineImpl implements DataPipeline {
@@ -39,6 +40,7 @@ public class DataPipelineImpl implements DataPipeline {
 
     private final IDataContext ctx;
     private final List<DataStage> stages;
+    private final AtomicBoolean pumpScheduled;
     private final CompletableFuture<Void> completion;
 
     private SourceStage sourceStage;
@@ -49,7 +51,9 @@ public class DataPipelineImpl implements DataPipeline {
 
         this.ctx = ctx;
         this.stages = new ArrayList<>();
+        this.pumpScheduled = new AtomicBoolean(false);
         this.completion = new CompletableFuture<>();
+
         this.started = false;
     }
 
@@ -68,6 +72,7 @@ public class DataPipelineImpl implements DataPipeline {
         sinkStage.connect();
 
         // Schedule running the data pump on the pipeline's event loop
+        pumpScheduled.set(true);
         ctx.eventLoopExecutor().execute(this::runDataPump);
 
         return completion;
@@ -76,13 +81,17 @@ public class DataPipelineImpl implements DataPipeline {
     void pumpData() {
 
         // Schedule running the data pump on the pipeline's event loop
-        ctx.eventLoopExecutor().execute(this::runDataPump);
+
+        var notAlreadyScheduled = pumpScheduled.compareAndSet(false, true);
+
+        if (notAlreadyScheduled)
+            ctx.eventLoopExecutor().execute(this::runDataPump);
     }
 
     private void runDataPump() {
 
         // The data pump makes one pass over all the stages in the pipeline, starting at the back
-        // Any stages that are in a ready state are pumped
+        // Stages are pumped if their consumer is ready to accept data
 
         // The feedback is that stages can request a pump if they have entered a ready state
         // This happens by a stage calling pumpData(), to schedule another pump on the event loop
@@ -97,28 +106,26 @@ public class DataPipelineImpl implements DataPipeline {
 
         try {
 
+            pumpScheduled.set(false);
+
             if (completion.isDone())
                 return;
 
-            var pipeReady = true;
+            var consumerReady = true;
 
             for (var i = stages.size() - 1; i >= 0; i--) {
 
                 var stage = stages.get(i);
 
+                // If a stage is complete, all preceding stages must also be complete
                 if (stage.isDone())
-                    continue;
+                    return;
 
-                var stageReady = stage.isReady();
-
-                if (pipeReady && stageReady)
+                if (consumerReady)
                     stage.pump();
 
-                pipeReady = stageReady;
+                consumerReady = stage.isReady();
             }
-
-            if (pipeReady && !sourceStage.isDone())
-                sourceStage.pump();
         }
         catch (Throwable error) {
             reportUnhandledError(error);
