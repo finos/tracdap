@@ -98,6 +98,12 @@ abstract class MetadataReadApiTest {
 
         var expectedVersion = VersionInfo.getComponentVersion(TracMetadataService.class);
         Assertions.assertEquals(expectedVersion, platformInfo.getTracVersion());
+
+        Assertions.assertEquals("UNIT_TEST", platformInfo.getEnvironment());
+        Assertions.assertFalse(platformInfo.getProduction());
+
+        Assertions.assertTrue(platformInfo.containsDeploymentInfo("region"));
+        Assertions.assertEquals("UK", platformInfo.getDeploymentInfoOrThrow("region"));
     }
 
     @Test
