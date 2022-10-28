@@ -113,7 +113,7 @@ abstract class MetadataReadApiTest {
         var tenants = tenantsResponse.getTenantsList();
 
         Assertions.assertEquals(1, tenants.size());
-        Assertions.assertEquals(TEST_TENANT, tenants.get(0).getTenantName());
+        Assertions.assertEquals(TEST_TENANT, tenants.get(0).getTenantCode());
     }
 
     @ParameterizedTest

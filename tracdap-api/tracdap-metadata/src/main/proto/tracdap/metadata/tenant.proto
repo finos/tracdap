@@ -23,5 +23,5 @@ option java_multiple_files = true;
 
 message TenantInfo {
 
-  string tenantName = 1;
+  string tenantCode = 1;
 }

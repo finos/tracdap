@@ -76,7 +76,7 @@ class JdbcTenantImpl {
         for (var tenantCode : currentTenantMap.keySet()) {
 
             var tenantInfo = TenantInfo.newBuilder()
-                    .setTenantName(tenantCode)
+                    .setTenantCode(tenantCode)
                     .build();
 
             tenantInfos.add(tenantInfo);
