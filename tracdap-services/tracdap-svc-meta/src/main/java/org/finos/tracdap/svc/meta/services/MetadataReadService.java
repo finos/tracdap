@@ -19,6 +19,7 @@ package org.finos.tracdap.svc.meta.services;
 import org.finos.tracdap.api.ListTenantsResponse;
 import org.finos.tracdap.api.PlatformInfoResponse;
 import org.finos.tracdap.common.util.VersionInfo;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.Tag;
@@ -32,10 +33,14 @@ import java.util.concurrent.CompletableFuture;
 
 public class MetadataReadService {
 
-    private final IMetadataDal dal;
+    private static final String ENVIRONMENT_NOT_SET = "ENVIRONMENT_NOT_SET";
 
-    public MetadataReadService(IMetadataDal dal) {
+    private final IMetadataDal dal;
+    private final PlatformConfig config;
+
+    public MetadataReadService(IMetadataDal dal, PlatformConfig platformConfig) {
         this.dal = dal;
+        this.config = platformConfig;
     }
 
     // Literally all of the read logic is in the DAL at present!
@@ -45,8 +50,19 @@ public class MetadataReadService {
 
         var tracVersion = VersionInfo.getComponentVersion(TracMetadataService.class);
 
+        var configInfo = config.getPlatformInfo();
+        var environment = configInfo.getEnvironment();
+        var production = configInfo.getProduction();    // defaults to false
+
+        // TODO: Validate environment is set during startup
+        if (environment.isBlank())
+            environment = ENVIRONMENT_NOT_SET;
+
         var response = PlatformInfoResponse.newBuilder()
                 .setTracVersion(tracVersion)
+                .setEnvironment(environment)
+                .setProduction(production)
+                .putAllDeploymentInfo(configInfo.getDeploymentInfoMap())
                 .build();
 
         return CompletableFuture.completedFuture(response);

@@ -109,7 +109,7 @@ public class TracMetadataService extends CommonServiceBase {
             // Set up services and APIs
             var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataDal.class);
 
-            var readService = new MetadataReadService(dalWithLogging);
+            var readService = new MetadataReadService(dalWithLogging, platformConfig);
             var writeService = new MetadataWriteService(dalWithLogging);
             var searchService = new MetadataSearchService(dalWithLogging);
 
