@@ -16,13 +16,16 @@
 
 package org.finos.tracdap.svc.meta.dal.jdbc;
 
+import org.finos.tracdap.api.TenantInfo;
 import org.finos.tracdap.common.exception.ETenantNotFound;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 class JdbcTenantImpl {
@@ -57,7 +60,32 @@ class JdbcTenantImpl {
         }
     }
 
-    short getTenantId(String tenant) {
+    List<TenantInfo>
+    listTenants(Connection conn) throws SQLException {
+
+        loadTenantMap(conn);
+
+        Map<String, Short> currentTenantMap;
+
+        synchronized (tenantLock) {
+            currentTenantMap = this.tenantMap;
+        }
+
+        var tenantInfos = new ArrayList<TenantInfo>();
+
+        for (var tenantCode : currentTenantMap.keySet()) {
+
+            var tenantInfo = TenantInfo.newBuilder()
+                    .setTenantName(tenantCode)
+                    .build();
+
+            tenantInfos.add(tenantInfo);
+        }
+
+        return tenantInfos;
+    }
+
+    short getTenantId(Connection conn, String tenant) throws SQLException {
 
         Map<String, Short> currentTenantMap;
 
@@ -66,6 +94,11 @@ class JdbcTenantImpl {
         }
 
         var tenantId = currentTenantMap.getOrDefault(tenant, null);
+
+        if (tenantId == null) {
+            loadTenantMap(conn);
+            tenantId = currentTenantMap.getOrDefault(tenant, null);
+        }
 
         if (tenantId == null) {
             var message = String.format("Unknown tenant [%s]", tenant);

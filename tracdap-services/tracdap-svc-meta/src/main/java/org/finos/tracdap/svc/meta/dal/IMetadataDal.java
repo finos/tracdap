@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.svc.meta.dal;
 
+import org.finos.tracdap.api.TenantInfo;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.TagSelector;
@@ -27,6 +28,8 @@ import java.util.concurrent.CompletableFuture;
 
 
 public interface IMetadataDal {
+
+    CompletableFuture<List<TenantInfo>> listTenants();
 
     CompletableFuture<Void> saveNewObject(String tenant, Tag tag);
 

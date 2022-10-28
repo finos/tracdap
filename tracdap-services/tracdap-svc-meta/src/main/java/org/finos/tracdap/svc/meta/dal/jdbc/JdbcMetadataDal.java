@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.svc.meta.dal.jdbc;
 
+import org.finos.tracdap.api.TenantInfo;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.exception.EStartup;
@@ -81,6 +82,12 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         // Noop
     }
 
+    @Override
+    public CompletableFuture<List<TenantInfo>> listTenants() {
+
+        return wrapTransaction(tenants::listTenants);
+    }
+
 
     // -----------------------------------------------------------------------------------------------------------------
     // SAVE METHODS
@@ -111,7 +118,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             prepareMappingTable(conn);
 
-            var tenantId = tenants.getTenantId(tenant);
+            var tenantId = tenants.getTenantId(conn, tenant);
 
             long[] objectPk = writeBatch.writeObjectId(conn, tenantId, parts);
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts);
@@ -141,7 +148,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             prepareMappingTable(conn);
 
-            var tenantId = tenants.getTenantId(tenant);
+            var tenantId = tenants.getTenantId(conn, tenant);
             var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
             checkObjectTypes(parts, objectType);
 
@@ -175,7 +182,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             prepareMappingTable(conn);
 
-            var tenantId = tenants.getTenantId(tenant);
+            var tenantId = tenants.getTenantId(conn, tenant);
             var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
             checkObjectTypes(parts, objectType);
 
@@ -209,7 +216,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             prepareMappingTable(conn);
 
-            var tenantId = tenants.getTenantId(tenant);
+            var tenantId = tenants.getTenantId(conn, tenant);
 
             writeBatch.writeObjectId(conn, tenantId, parts);
         },
@@ -236,7 +243,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             prepareMappingTable(conn);
 
-            var tenantId = tenants.getTenantId(tenant);
+            var tenantId = tenants.getTenantId(conn, tenant);
             var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
             checkObjectTypes(parts, objectType);
 
@@ -267,7 +274,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         return wrapTransaction(conn -> {
 
-            var tenantId = tenants.getTenantId(tenant);
+            var tenantId = tenants.getTenantId(conn, tenant);
             var objectType = readSingle.readObjectTypeById(conn, tenantId, parts.objectId[0]);
 
             checkObjectType(parts, objectType);
@@ -296,7 +303,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             prepareMappingTable(conn);
 
-            var tenantId = tenants.getTenantId(tenant);
+            var tenantId = tenants.getTenantId(conn, tenant);
             var objectType = readBatch.readObjectTypeById(conn, tenantId, parts.objectId);
 
             checkObjectTypes(parts, objectType);
@@ -426,7 +433,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
             prepareMappingTable(conn);
 
-            var tenantId = tenants.getTenantId(tenant);
+            var tenantId = tenants.getTenantId(conn, tenant);
             long[] tagPk = search.search(conn, tenantId, searchParameters);
 
             var tag = readBatch.readTagWithHeader(conn, tenantId, tagPk);
