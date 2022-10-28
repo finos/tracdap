@@ -92,7 +92,7 @@ abstract class MetadataReadApiTest {
     @Test
     void platformInfo() {
 
-        var platformInfo = readApi.platformInfo(EmptyRequest.newBuilder().build());
+        var platformInfo = readApi.platformInfo(PlatformInfoRequest.newBuilder().build());
 
         System.out.println("Running TRAC D.A.P. version " + platformInfo.getTracVersion());
 
@@ -103,7 +103,7 @@ abstract class MetadataReadApiTest {
     @Test
     void listTenants() {
 
-        var tenantsResponse = readApi.listTenants(EmptyRequest.newBuilder().build());
+        var tenantsResponse = readApi.listTenants(ListTenantsRequest.newBuilder().build());
         var tenants = tenantsResponse.getTenantsList();
 
         Assertions.assertEquals(1, tenants.size());

@@ -66,12 +66,12 @@ public class MetadataApiImpl {
         this.apiTrustLevel = apiTrustLevel;
     }
 
-    CompletableFuture<PlatformInfoResponse> platformInfo(EmptyRequest request) {
+    CompletableFuture<PlatformInfoResponse> platformInfo(PlatformInfoRequest request) {
 
         return readService.platformInfo();
     }
 
-    CompletableFuture<ListTenantsResponse> listTenants(EmptyRequest request) {
+    CompletableFuture<ListTenantsResponse> listTenants(ListTenantsRequest request) {
 
         return readService.listTenants();
     }
