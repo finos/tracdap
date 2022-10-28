@@ -94,6 +94,8 @@ abstract class MetadataReadApiTest {
 
         var platformInfo = readApi.platformInfo(EmptyRequest.newBuilder().build());
 
+        System.out.println("Running TRAC D.A.P. version " + platformInfo.getTracVersion());
+
         var expectedVersion = VersionInfo.getComponentVersion(TracMetadataService.class);
         Assertions.assertEquals(expectedVersion, platformInfo.getTracVersion());
     }
