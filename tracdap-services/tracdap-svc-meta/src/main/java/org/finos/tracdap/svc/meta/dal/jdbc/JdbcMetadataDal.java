@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.svc.meta.dal.jdbc;
 
-import org.finos.tracdap.api.TenantInfo;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.exception.EStartup;

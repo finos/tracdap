@@ -16,11 +16,7 @@
 
 package org.finos.tracdap.svc.meta.dal;
 
-import org.finos.tracdap.api.TenantInfo;
-import org.finos.tracdap.metadata.ObjectType;
-import org.finos.tracdap.metadata.Tag;
-import org.finos.tracdap.metadata.TagSelector;
-import org.finos.tracdap.metadata.SearchParameters;
+import org.finos.tracdap.metadata.*;
 
 import java.util.List;
 import java.util.UUID;

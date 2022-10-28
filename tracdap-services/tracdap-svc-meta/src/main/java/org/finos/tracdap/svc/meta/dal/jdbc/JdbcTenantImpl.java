@@ -16,8 +16,8 @@
 
 package org.finos.tracdap.svc.meta.dal.jdbc;
 
-import org.finos.tracdap.api.TenantInfo;
 import org.finos.tracdap.common.exception.ETenantNotFound;
+import org.finos.tracdap.metadata.TenantInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
