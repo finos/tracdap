@@ -354,8 +354,10 @@ message PlatformInfoResponse {
 
     string tracVersion = 1;
 
-    string environmentName = 2;
-    bool nonProd = 3;
+    string environment = 2;
+    bool production = 3;
+
+    map<string, string> deploymentInfo = 4;
 }
 
 message ListTenantsRequest {

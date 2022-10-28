@@ -25,8 +25,18 @@ message PlatformConfig {
 
   map<string, string> config = 1;
 
-  InstantMap instances = 2;
-  ServiceMap services = 3;
+  PlatformInfo platformInfo = 2;
+
+  InstantMap instances = 3;
+  ServiceMap services = 4;
+}
+
+message PlatformInfo {
+
+  string environment = 1;
+  bool production = 2;
+
+  map<string, string> deploymentInfo = 3;
 }
 
 
