@@ -66,6 +66,16 @@ public class MetadataApiImpl {
         this.apiTrustLevel = apiTrustLevel;
     }
 
+    CompletableFuture<PlatformInfoResponse> platformInfo(EmptyRequest request) {
+
+        return readService.platformInfo();
+    }
+
+    CompletableFuture<ListTenantsResponse> listTenants(EmptyRequest request) {
+
+        return readService.listTenants();
+    }
+
     CompletableFuture<TagHeader> createObject(MetadataWriteRequest request) {
 
         validateRequest(CREATE_OBJECT_METHOD, request);

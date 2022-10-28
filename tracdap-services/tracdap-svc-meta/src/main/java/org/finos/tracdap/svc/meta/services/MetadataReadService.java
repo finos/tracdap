@@ -16,9 +16,13 @@
 
 package org.finos.tracdap.svc.meta.services;
 
+import org.finos.tracdap.api.ListTenantsResponse;
+import org.finos.tracdap.api.PlatformInfoResponse;
+import org.finos.tracdap.common.util.VersionInfo;
 import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.Tag;
+import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 
 import java.util.List;
@@ -36,6 +40,25 @@ public class MetadataReadService {
 
     // Literally all of the read logic is in the DAL at present!
     // Which is fine, keep a thin logic class here anyway to have a consistent pattern
+
+    public CompletableFuture<PlatformInfoResponse> platformInfo() {
+
+        var tracVersion = VersionInfo.getComponentVersion(TracMetadataService.class);
+
+        var response = PlatformInfoResponse.newBuilder()
+                .setTracVersion(tracVersion)
+                .build();
+
+        return CompletableFuture.completedFuture(response);
+    }
+
+    public CompletableFuture<ListTenantsResponse> listTenants() {
+
+        return dal.listTenants().thenApply(tenants ->
+                ListTenantsResponse.newBuilder()
+                .addAllTenants(tenants)
+                .build());
+    }
 
     public CompletableFuture<Tag> readObject(String tenant, TagSelector selector) {
 

@@ -35,6 +35,9 @@ public class TracMetadataApi extends TracMetadataApiGrpc.TracMetadataApiImplBase
     private static final String SERVICE_NAME = TracMetadataApiGrpc.SERVICE_NAME.substring(TracMetadataApiGrpc.SERVICE_NAME.lastIndexOf(".") + 1);
     private static final Descriptors.ServiceDescriptor TRAC_METADATA_SERVICE = Metadata.getDescriptor().findServiceByName(SERVICE_NAME);
 
+    static final MethodDescriptor<EmptyRequest, PlatformInfoResponse> PLATFORM_INFO_METHOD = TracMetadataApiGrpc.getPlatformInfoMethod();
+    static final MethodDescriptor<EmptyRequest, ListTenantsResponse> LIST_TENANTS_METHOD = TracMetadataApiGrpc.getListTenantsMethod();
+
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TracMetadataApiGrpc.getCreateObjectMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TracMetadataApiGrpc.getUpdateObjectMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_TAG_METHOD = TracMetadataApiGrpc.getUpdateTagMethod();
@@ -60,6 +63,18 @@ public class TracMetadataApi extends TracMetadataApiGrpc.TracMetadataApiImplBase
 
         apiImpl = new MetadataApiImpl(TRAC_METADATA_SERVICE, readService, writeService, searchService, MetadataConstants.PUBLIC_API);
         grpcWrap = new GrpcServerWrap(getClass());
+    }
+
+    @Override
+    public void platformInfo(EmptyRequest request, StreamObserver<PlatformInfoResponse> response) {
+
+        grpcWrap.unaryCall(PLATFORM_INFO_METHOD, request, response, apiImpl::platformInfo);
+    }
+
+    @Override
+    public void listTenants(EmptyRequest request, StreamObserver<ListTenantsResponse> response) {
+
+        grpcWrap.unaryCall(LIST_TENANTS_METHOD, request, response, apiImpl::listTenants);
     }
 
     @Override
