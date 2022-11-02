@@ -102,8 +102,8 @@ jobs:
         run: |
           mkdir -p build/compliance/python-runtime-safety
           cd tracdap-runtime/python
-          safety check --full-report --not-bare --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
-          safety check --full-report --not-bare --json --output ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
+          safety check --full-report --output text ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
+          safety check --full-report --output json ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
 
       - name: License check
         run: |
