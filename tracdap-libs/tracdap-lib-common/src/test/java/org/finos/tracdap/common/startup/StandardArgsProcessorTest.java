@@ -148,7 +148,7 @@ class StandardArgsProcessorTest {
 
         var TASKS = List.of(StandardArgs.task("do_something", null, "desc"));
 
-        var command = "--config app.conf --task do_something:ARG";
+        var command = "--config app.conf --task do_something ARG";
         var commandArgs = command.split("\\s");
 
         var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS));
@@ -161,7 +161,7 @@ class StandardArgsProcessorTest {
 
         var TASKS = List.of(StandardArgs.task("do_something", "ARG_NAME", "desc"));
 
-        var command = "--config app.conf --task do_something:ARG_VALUE";
+        var command = "--config app.conf --task do_something ARG_VALUE";
         var commandArgs = command.split("\\s");
 
         var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS);
@@ -190,7 +190,7 @@ class StandardArgsProcessorTest {
 
         var TASKS = List.of(StandardArgs.task("do_something", "ARG_NAME", "desc"));
 
-        var command = "--config app.conf --task do_something:ARG1:ARG2";
+        var command = "--config app.conf --task do_something ARG1 ARG2";
         var commandArgs = command.split("\\s");
 
         var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS));
@@ -205,7 +205,7 @@ class StandardArgsProcessorTest {
                 StandardArgs.task("do_something", null, "desc"),
                 StandardArgs.task("do_something_else", "ARG_NAME", "desc"));
 
-        var command = "--config app.conf --task do_something --task do_something_else:ARG1 --task do_something_else:ARG2";
+        var command = "--config app.conf --task do_something --task do_something_else ARG1 --task do_something_else ARG2";
         var commandArgs = command.split("\\s");
 
         var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS);
