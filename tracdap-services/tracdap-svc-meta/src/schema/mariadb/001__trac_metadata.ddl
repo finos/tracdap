@@ -17,6 +17,7 @@ create table tenant (
 
     tenant_id smallint not null,
     tenant_code varchar(16) not null,
+    description varchar(4096) null,
 
     -- MariaDB does not allow primary key constraints to be named
     -- Supplying a name creates warnings in the deploy logs
