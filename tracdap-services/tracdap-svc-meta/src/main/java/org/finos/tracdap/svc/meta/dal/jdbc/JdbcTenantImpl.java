@@ -60,31 +60,6 @@ class JdbcTenantImpl {
         }
     }
 
-    List<TenantInfo>
-    listTenants(Connection conn) throws SQLException {
-
-        loadTenantMap(conn);
-
-        Map<String, Short> currentTenantMap;
-
-        synchronized (tenantLock) {
-            currentTenantMap = this.tenantMap;
-        }
-
-        var tenantInfos = new ArrayList<TenantInfo>();
-
-        for (var tenantCode : currentTenantMap.keySet()) {
-
-            var tenantInfo = TenantInfo.newBuilder()
-                    .setTenantCode(tenantCode)
-                    .build();
-
-            tenantInfos.add(tenantInfo);
-        }
-
-        return tenantInfos;
-    }
-
     short getTenantId(Connection conn, String tenant) throws SQLException {
 
         Map<String, Short> currentTenantMap;
@@ -107,5 +82,31 @@ class JdbcTenantImpl {
         }
 
         return tenantId;
+    }
+
+    List<TenantInfo>
+    listTenants(Connection conn) throws SQLException {
+
+        var query = "select tenant_code, description from tenant";
+
+        try (var stmt = conn.prepareStatement(query); var rs = stmt.executeQuery()) {
+
+            var tenants = new ArrayList<TenantInfo>();
+
+            while (rs.next()) {
+
+                var tenantCode = rs.getString(1);
+                var description = rs.getString(2);
+
+                var tenantInfo = TenantInfo.newBuilder()
+                        .setTenantCode(tenantCode)
+                        .setDescription(description)
+                        .build();
+
+                tenants.add(tenantInfo);
+            }
+
+            return tenants;
+        }
     }
 }
