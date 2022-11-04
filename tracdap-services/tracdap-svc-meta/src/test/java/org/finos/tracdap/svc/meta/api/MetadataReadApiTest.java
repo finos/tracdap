@@ -114,6 +114,10 @@ abstract class MetadataReadApiTest {
 
         Assertions.assertEquals(1, tenants.size());
         Assertions.assertEquals(TEST_TENANT, tenants.get(0).getTenantCode());
+
+        // Default description set up in org.finos.tracdap.test.helpers.PlatformTest
+        var expectedDescription = "Test tenant [" + TEST_TENANT + "]";
+        Assertions.assertEquals(expectedDescription, tenants.get(0).getDescription());
     }
 
     @ParameterizedTest

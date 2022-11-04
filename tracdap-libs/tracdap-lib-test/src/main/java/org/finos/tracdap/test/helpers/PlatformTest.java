@@ -286,8 +286,15 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         var databaseTasks = new ArrayList<StandardArgs.Task>();
         databaseTasks.add(StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK_NAME, "", ""));
 
-        for (var tenant : tenants)
-            databaseTasks.add(StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, tenant, ""));
+        for (var tenant : tenants) {
+
+            // Run both add and alter tenant tasks as part of the standard setup
+            // (just to run both tasks, not strictly necessary)
+
+            var description = "Test tenant [" + tenant + "]";
+            databaseTasks.add(StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, List.of(tenant, description), ""));
+            databaseTasks.add(StandardArgs.task(DeployMetaDB.ALTER_TENANT_TASK_NAME, List.of(tenant, description), ""));
+        }
 
         ServiceHelpers.runDbDeploy(tracDir, platformConfigUrl, keystoreKey, databaseTasks);
     }
