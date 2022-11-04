@@ -232,7 +232,8 @@ TRAC D.A.P. comes with a tool to help deploy the metadata database. It runs off 
 the platform services, so make sure to finish updating your configuration before running the tool.
 
 We need to perform two tasks to prepare the database: deploy the schema and create a tenant. Choose a
-tenant key that is meaningful for your project or business division.
+tenant code and description that is meaningful for your project or business division. The description
+can be altered later but the tenant code cannot.
 
 .. tab-set::
 
@@ -243,7 +244,9 @@ tenant key that is meaningful for your project or business division.
 
             cd /opt/trac/current
             bin/deploy-metadb run --task deploy_schema
-            bin/deploy-metadb run --task add_tenant:ACME_CORP
+            bin/deploy-metadb run --task add_tenant ACME_CORP "ACME Supplies Inc."
+
+            bin/deploy-metadb run --task alter_tenant ACME_CORP "ACME Mega Supplies Inc."
 
     .. tab-item:: Windows
         :sync: platform_windows
@@ -252,7 +255,9 @@ tenant key that is meaningful for your project or business division.
 
             cd /d C:\trac\tracdap-sandbox-<version>
             bin\deploy-metadb.bat run --task deploy_schema
-            bin\deploy-metadb.bat run --task add_tenant:ACME_CORP
+            bin\deploy-metadb.bat run --task add_tenant ACME_CORP "ACME Supplies Inc."
+
+            bin\deploy-metadb.bat run --task alter_tenant ACME_CORP "ACME Mega Supplies Inc."
 
 
 Start the services
