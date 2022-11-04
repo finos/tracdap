@@ -205,7 +205,7 @@ jobs:
           ./gradlew deploy-metadb:run --args="\
           --config ${{ matrix.database.TRAC_CONFIG_FILE }} \
           --task deploy_schema \
-          --task add_tenant:ACME_CORP"
+          --task add_tenant ACME_CORP 'ACME Supplies Inc.'"
 
       - name: Integration Tests
         run: ./gradlew integration -DintegrationTags="int-metadb"
