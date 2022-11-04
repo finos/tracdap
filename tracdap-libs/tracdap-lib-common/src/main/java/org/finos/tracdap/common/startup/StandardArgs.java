@@ -62,27 +62,39 @@ public class StandardArgs {
         return tasks;
     }
 
+    public static Task task(String taskName, String taskDescription) {
+        return new Task(taskName, List.of(), taskDescription);
+    }
+
     public static Task task(String taskName, String taskArg, String taskDescription) {
         return new Task(taskName, taskArg, taskDescription);
+    }
+
+    public static Task task(String taskName, List<String> taskArgs, String taskDescription) {
+        return new Task(taskName, taskArgs, taskDescription);
     }
 
     public static class Task {
 
         private final String taskName;
-        private final String taskArg;
+        private final List<String> taskArgs;
         private final String taskDescription;
 
-        public Task(String taskName, String taskArg, String taskDescription) {
+        Task(String taskName, List<String> taskArgs, String taskDescription) {
             this.taskName = taskName;
-            this.taskArg = taskArg;
-            this.taskDescription= taskDescription;
+            this.taskArgs = taskArgs != null ? taskArgs : List.of();
+            this.taskDescription = taskDescription;
         }
 
-        public Task(String taskName, String taskArg) {
+        Task(String taskName, String taskArg, String taskDescription) {
+            this (taskName, taskArg == null ? List.of() : List.of(taskArg), taskDescription);
+        }
+
+        Task(String taskName, String taskArg) {
             this(taskName, taskArg, null);
         }
 
-        public Task(String taskName) {
+        Task(String taskName) {
             this(taskName, null);
         }
 
@@ -91,11 +103,23 @@ public class StandardArgs {
         }
 
         public boolean hasArg() {
-            return taskArg != null;
+            return !taskArgs.isEmpty();
+        }
+
+        public int argCount() {
+            return taskArgs.size();
         }
 
         public String getTaskArg() {
-            return taskArg;
+            return taskArgs.isEmpty() ? null : taskArgs.get(0);
+        }
+
+        public String getTaskArg(int argIndex) {
+            return taskArgs.get(argIndex);
+        }
+
+        public List<String> getTaskArgList() {
+            return taskArgs;
         }
 
         public String getTaskDescription() {

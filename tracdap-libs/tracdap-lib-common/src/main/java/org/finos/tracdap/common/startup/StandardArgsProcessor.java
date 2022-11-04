@@ -23,6 +23,7 @@ import org.apache.commons.cli.*;
 import java.io.PrintWriter;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -134,7 +135,7 @@ public class StandardArgsProcessor {
 
                 var taskInfoFormat = "%-35s %s";
                 var taskUsage = task.hasArg()
-                        ? task.getTaskName() + ":" + task.getTaskArg()
+                        ? task.getTaskName() + " " + String.join(" ", task.getTaskArgList())
                         : task.getTaskName();
 
                 System.out.printf(taskInfoFormat, taskUsage, task.getTaskDescription());
@@ -160,21 +161,23 @@ public class StandardArgsProcessor {
             if (!taskMap.containsKey(taskName))
                 throw new EStartup(String.format("Unknown task: [%s]", taskName));
 
-            var taskDefinition = taskMap.get(taskName);
+            var taskDef = taskMap.get(taskName);
 
-            if (taskDefinition.hasArg()) {
+            if (taskDef.hasArg()) {
 
-                if (argIndex + 1 == taskArgs.length) {
+                if (taskDef.argCount() > taskArgs.length - argIndex - 1) {
+
                     var message = String.format(
-                            "Task [%s] requires argument [%s]",
-                            taskName, taskDefinition.getTaskArg());
+                            "Task [%s] requires %d argument(s): %s",
+                            taskName, taskDef.argCount(), String.join(" ", taskDef.getTaskArgList()));
+
                     throw new EStartup(message);
                 }
 
-                var taskArg = taskArgs[argIndex + 1];
-                argIndex++;
+                var args = Arrays.copyOfRange(taskArgs, argIndex + 1, argIndex + 1 + taskDef.argCount());
+                argIndex += taskDef.argCount();
 
-                var task = new StandardArgs.Task(taskName, taskArg);
+                var task = new StandardArgs.Task(taskName, Arrays.asList(args), "");
                 tasks.add(task);
             }
             else {
