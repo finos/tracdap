@@ -284,7 +284,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         log.info("Deploy database schema...");
 
         var databaseTasks = new ArrayList<StandardArgs.Task>();
-        databaseTasks.add(StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK_NAME, "", ""));
+        databaseTasks.add(StandardArgs.task(DeployMetaDB.DEPLOY_SCHEMA_TASK, "", ""));
 
         for (var tenant : tenants) {
 
@@ -292,8 +292,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             // (just to run both tasks, not strictly necessary)
 
             var description = "Test tenant [" + tenant + "]";
-            databaseTasks.add(StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK_NAME, List.of(tenant, description), ""));
-            databaseTasks.add(StandardArgs.task(DeployMetaDB.ALTER_TENANT_TASK_NAME, List.of(tenant, description), ""));
+            databaseTasks.add(StandardArgs.task(DeployMetaDB.ADD_TENANT_TASK, List.of(tenant, description), ""));
+            databaseTasks.add(StandardArgs.task(DeployMetaDB.ALTER_TENANT_TASK, List.of(tenant, description), ""));
         }
 
         ServiceHelpers.runDbDeploy(tracDir, platformConfigUrl, keystoreKey, databaseTasks);

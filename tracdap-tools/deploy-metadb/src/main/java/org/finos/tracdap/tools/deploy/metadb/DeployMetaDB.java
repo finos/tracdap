@@ -40,20 +40,20 @@ import java.util.Properties;
 public class DeployMetaDB {
 
     /** Task name for deploying the schema **/
-    public final static String DEPLOY_SCHEMA_TASK_NAME = "deploy_schema";
+    public final static String DEPLOY_SCHEMA_TASK = "deploy_schema";
 
     /** Task name for adding a tenant **/
-    public final static String ADD_TENANT_TASK_NAME = "add_tenant";
+    public final static String ADD_TENANT_TASK = "add_tenant";
 
     /** Task name for setting a tenant's description **/
-    public final static String ALTER_TENANT_TASK_NAME = "alter_tenant";
+    public final static String ALTER_TENANT_TASK = "alter_tenant";
 
     private final static String SCHEMA_LOCATION = "classpath:%s";
 
     private final static List<StandardArgs.Task> METADB_TASKS = List.of(
-            StandardArgs.task(DEPLOY_SCHEMA_TASK_NAME, "Deploy/update metadata database with the latest physical schema"),
-            StandardArgs.task(ADD_TENANT_TASK_NAME, List.of("CODE", "DESCRIPTION"), "Add a new tenant to the metadata database"),
-            StandardArgs.task(ALTER_TENANT_TASK_NAME, List.of("CODE", "DESCRIPTION"), "Alter the description for an existing tenant"));
+            StandardArgs.task(DEPLOY_SCHEMA_TASK, "Deploy/update metadata database with the latest physical schema"),
+            StandardArgs.task(ADD_TENANT_TASK, List.of("CODE", "DESCRIPTION"), "Add a new tenant to the metadata database"),
+            StandardArgs.task(ALTER_TENANT_TASK, List.of("CODE", "DESCRIPTION"), "Alter the description for an existing tenant"));
 
     private final Logger log;
     private final ConfigManager configManager;
@@ -96,13 +96,13 @@ public class DeployMetaDB {
 
             for (var task : tasks) {
 
-                if (DEPLOY_SCHEMA_TASK_NAME.equals(task.getTaskName()))
+                if (DEPLOY_SCHEMA_TASK.equals(task.getTaskName()))
                     deploySchema(dataSource, scriptsLocation);
 
-                else if (ADD_TENANT_TASK_NAME.equals(task.getTaskName()))
+                else if (ADD_TENANT_TASK.equals(task.getTaskName()))
                     addTenant(dataSource, task.getTaskArg(0), task.getTaskArg(1));
 
-                else if (ALTER_TENANT_TASK_NAME.equals(task.getTaskName()))
+                else if (ALTER_TENANT_TASK.equals(task.getTaskName()))
                     alterTenant(dataSource, task.getTaskArg(0), task.getTaskArg(1));
 
                 else
