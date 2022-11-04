@@ -200,12 +200,14 @@ jobs:
       - name: Build
         run: ./gradlew trac-svc-meta:build trac-svc-meta:testClasses deploy-metadb:build -x test
 
+      # The name and description of the test tenant are verified in one of the test cases so they need to match
+      # MetadataReapApiTest listTenants()
       - name: Prepare Database
         run: |
           ./gradlew deploy-metadb:run --args="\
           --config ${{ matrix.database.TRAC_CONFIG_FILE }} \
           --task deploy_schema \
-          --task add_tenant ACME_CORP 'ACME Supplies Inc.'"
+          --task add_tenant ACME_CORP 'Test tenant [ACME_CORP]'"
 
       - name: Integration Tests
         run: ./gradlew integration -DintegrationTags="int-metadb"

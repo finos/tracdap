@@ -19,7 +19,7 @@ config:
 
 
 platformInfo:
-  environment: UNIT_TEST
+  environment: TEST_ENVIRONMENT
   production: false
   deploymentInfo:
     region: UK
