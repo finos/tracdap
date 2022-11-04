@@ -45,11 +45,15 @@ public class DeployMetaDB {
     /** Task name for adding a tenant **/
     public final static String ADD_TENANT_TASK_NAME = "add_tenant";
 
+    /** Task name for setting a tenant's description **/
+    public final static String ALTER_TENANT_TASK_NAME = "alter_tenant";
+
     private final static String SCHEMA_LOCATION = "classpath:%s";
 
     private final static List<StandardArgs.Task> METADB_TASKS = List.of(
-            StandardArgs.task(DEPLOY_SCHEMA_TASK_NAME, null, "Deploy/update metadata database with the latest physical schema"),
-            StandardArgs.task(ADD_TENANT_TASK_NAME, "TENANT_CODE", "Add a new tenant to the metadata database"));
+            StandardArgs.task(DEPLOY_SCHEMA_TASK_NAME, "Deploy/update metadata database with the latest physical schema"),
+            StandardArgs.task(ADD_TENANT_TASK_NAME, List.of("CODE", "DESCRIPTION"), "Add a new tenant to the metadata database"),
+            StandardArgs.task(ALTER_TENANT_TASK_NAME, List.of("CODE", "DESCRIPTION"), "Alter the description for an existing tenant"));
 
     private final Logger log;
     private final ConfigManager configManager;
@@ -96,7 +100,10 @@ public class DeployMetaDB {
                     deploySchema(dataSource, scriptsLocation);
 
                 else if (ADD_TENANT_TASK_NAME.equals(task.getTaskName()))
-                    addTenant(dataSource, task.getTaskArg());
+                    addTenant(dataSource, task.getTaskArg(0), task.getTaskArg(1));
+
+                else if (ALTER_TENANT_TASK_NAME.equals(task.getTaskName()))
+                    alterTenant(dataSource, task.getTaskArg(0), task.getTaskArg(1));
 
                 else
                     throw new EStartup(String.format("Unknown task: [%s]", task.getTaskName()));
@@ -124,13 +131,13 @@ public class DeployMetaDB {
         flyway.migrate();
     }
 
-    private void addTenant(DataSource dataSource, String tenantCode) {
+    private void addTenant(DataSource dataSource, String tenantCode, String description) {
 
         log.info("Running task: Add tenant...");
         log.info("New tenant code: [{}]", tenantCode);
 
         var maxSelect = "select max(tenant_id) from tenant";
-        var insertTenant = "insert into tenant (tenant_id, tenant_code) values (?, ?)";
+        var insertTenant = "insert into tenant (tenant_id, tenant_code, description) values (?, ?, ?)";
 
         short nextId;
 
@@ -155,12 +162,48 @@ public class DeployMetaDB {
 
                 stmt.setShort(1, nextId);
                 stmt.setString(2, tenantCode);
+                stmt.setString(3, description);
                 stmt.execute();
             }
         }
         catch (SQLException e) {
 
-            throw new ETracPublic("Failed to create tenant: " + e.getMessage(), e);
+            throw new ETracPublic("Failed to add tenant: " + e.getMessage(), e);
+        }
+    }
+
+    private void alterTenant(DataSource dataSource, String tenantCode, String description) {
+
+        log.info("Running task: Alter tenant...");
+        log.info("Tenant code: [{}]", tenantCode);
+
+        var selectTenant = "select tenant_id from tenant where tenant_code = ?";
+        var updateTenant = "update tenant set description = ? where tenant_id = ?";
+
+        short tenantId;
+
+        try (var conn = dataSource.getConnection()) {
+
+            try (var stmt = conn.prepareStatement(selectTenant)) {
+
+                stmt.setString(1, tenantCode);
+
+                try (var rs = stmt.executeQuery()) {
+                    rs.next();
+                    tenantId = rs.getShort(1);
+                }
+            }
+
+            try (var stmt = conn.prepareStatement(updateTenant)) {
+
+                stmt.setString(1, description);
+                stmt.setShort(2, tenantId);
+                stmt.execute();
+            }
+        }
+        catch (SQLException e) {
+
+            throw new ETracPublic("Failed to alter tenant: " + e.getMessage(), e);
         }
 
     }
