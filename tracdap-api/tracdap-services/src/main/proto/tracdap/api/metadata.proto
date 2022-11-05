@@ -20,7 +20,6 @@ package tracdap.api;
 option java_package = "org.finos.tracdap.api";
 option java_multiple_files = true;
 
-import "tracdap/metadata/tenant.proto";
 import "tracdap/metadata/object_id.proto";
 import "tracdap/metadata/object.proto";
 import "tracdap/metadata/tag.proto";
