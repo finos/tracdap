@@ -16,6 +16,11 @@ config:
   logging: trac-logging.xml
 
 
+platformInfo:
+  environment: SANDBOX
+  production: false
+
+
 instances:
 
   meta:

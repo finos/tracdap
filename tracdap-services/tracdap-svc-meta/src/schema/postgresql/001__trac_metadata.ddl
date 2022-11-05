@@ -17,6 +17,7 @@ create table tenant (
 
     tenant_id smallint not null,
     tenant_code varchar(16) not null,
+    description varchar(4096) null,
 
     constraint pk_tenant primary key (tenant_id),
     constraint unq_tenant unique (tenant_code)

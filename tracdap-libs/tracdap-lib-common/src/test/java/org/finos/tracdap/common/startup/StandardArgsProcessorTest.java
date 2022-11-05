@@ -117,7 +117,7 @@ class StandardArgsProcessorTest {
     @Test
     void testTasks_taskList() {
 
-        var TASKS = List.of(StandardArgs.task("do_something", null, "desc"));
+        var TASKS = List.of(StandardArgs.task("do_something", "desc"));
 
         var command = "--task-list";
         var commandArgs = command.split("\\s");
@@ -130,7 +130,7 @@ class StandardArgsProcessorTest {
     @Test
     void testTasks_basicTask() {
 
-        var TASKS = List.of(StandardArgs.task("do_something", null, "desc"));
+        var TASKS = List.of(StandardArgs.task("do_something", "desc"));
 
         var command = "--config app.conf --task do_something";
         var commandArgs = command.split("\\s");
@@ -146,9 +146,9 @@ class StandardArgsProcessorTest {
     @Test
     void testTasks_basicTaskUnexpectedArg() {
 
-        var TASKS = List.of(StandardArgs.task("do_something", null, "desc"));
+        var TASKS = List.of(StandardArgs.task("do_something", "desc"));
 
-        var command = "--config app.conf --task do_something:ARG";
+        var command = "--config app.conf --task do_something ARG";
         var commandArgs = command.split("\\s");
 
         var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS));
@@ -161,7 +161,7 @@ class StandardArgsProcessorTest {
 
         var TASKS = List.of(StandardArgs.task("do_something", "ARG_NAME", "desc"));
 
-        var command = "--config app.conf --task do_something:ARG_VALUE";
+        var command = "--config app.conf --task do_something ARG_VALUE";
         var commandArgs = command.split("\\s");
 
         var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS);
@@ -190,7 +190,7 @@ class StandardArgsProcessorTest {
 
         var TASKS = List.of(StandardArgs.task("do_something", "ARG_NAME", "desc"));
 
-        var command = "--config app.conf --task do_something:ARG1:ARG2";
+        var command = "--config app.conf --task do_something ARG1 ARG2";
         var commandArgs = command.split("\\s");
 
         var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS));
@@ -202,10 +202,10 @@ class StandardArgsProcessorTest {
     void testTasks_multipleTasks() {
 
         var TASKS = List.of(
-                StandardArgs.task("do_something", null, "desc"),
+                StandardArgs.task("do_something", "desc"),
                 StandardArgs.task("do_something_else", "ARG_NAME", "desc"));
 
-        var command = "--config app.conf --task do_something --task do_something_else:ARG1 --task do_something_else:ARG2";
+        var command = "--config app.conf --task do_something --task do_something_else ARG1 --task do_something_else ARG2";
         var commandArgs = command.split("\\s");
 
         var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS);
@@ -218,6 +218,29 @@ class StandardArgsProcessorTest {
         assertEquals("ARG1", tasks.get(1).getTaskArg());
         assertEquals("do_something_else", tasks.get(2).getTaskName());
         assertEquals("ARG2", tasks.get(2).getTaskArg());
+    }
+
+    @Test
+    void testTasks_taskMultiArg() {
+
+        var TASKS = List.of(
+                StandardArgs.task("do_something", List.of("ARG1", "ARG2"), "desc"),
+                StandardArgs.task("do_something_else", "ARG3", "desc"));
+
+        var command = "--config app.conf --task do_something arg_1 arg_2 --task do_something_else arg_3";
+        var commandArgs = command.split("\\s");
+
+        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS);
+        var tasks = standardArgs.getTasks();
+
+        assertEquals(2, tasks.size());
+        assertEquals("do_something", tasks.get(0).getTaskName());
+        assertEquals(2, tasks.get(0).argCount());
+        assertEquals("arg_1", tasks.get(0).getTaskArg(0));
+        assertEquals("arg_2", tasks.get(0).getTaskArg(1));
+        assertEquals("do_something_else", tasks.get(1).getTaskName());
+        assertEquals(1, tasks.get(1).argCount());
+        assertEquals("arg_3", tasks.get(1).getTaskArg());
     }
 
     @Test

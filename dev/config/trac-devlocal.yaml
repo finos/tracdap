@@ -18,6 +18,11 @@ config:
   secret.url: secrets.p12
 
 
+platformInfo:
+  environment: DEV_LOCAL
+  production: false
+
+
 instances:
 
   meta:

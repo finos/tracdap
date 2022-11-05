@@ -17,12 +17,15 @@
 package org.finos.tracdap.svc.meta.dal.jdbc;
 
 import org.finos.tracdap.common.exception.ETenantNotFound;
+import org.finos.tracdap.metadata.TenantInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 class JdbcTenantImpl {
@@ -57,7 +60,7 @@ class JdbcTenantImpl {
         }
     }
 
-    short getTenantId(String tenant) {
+    short getTenantId(Connection conn, String tenant) throws SQLException {
 
         Map<String, Short> currentTenantMap;
 
@@ -68,11 +71,42 @@ class JdbcTenantImpl {
         var tenantId = currentTenantMap.getOrDefault(tenant, null);
 
         if (tenantId == null) {
+            loadTenantMap(conn);
+            tenantId = currentTenantMap.getOrDefault(tenant, null);
+        }
+
+        if (tenantId == null) {
             var message = String.format("Unknown tenant [%s]", tenant);
             log.error(message);
             throw new ETenantNotFound(message);
         }
 
         return tenantId;
+    }
+
+    List<TenantInfo>
+    listTenants(Connection conn) throws SQLException {
+
+        var query = "select tenant_code, description from tenant";
+
+        try (var stmt = conn.prepareStatement(query); var rs = stmt.executeQuery()) {
+
+            var tenants = new ArrayList<TenantInfo>();
+
+            while (rs.next()) {
+
+                var tenantCode = rs.getString(1);
+                var description = rs.getString(2);
+
+                var tenantInfo = TenantInfo.newBuilder()
+                        .setTenantCode(tenantCode)
+                        .setDescription(description)
+                        .build();
+
+                tenants.add(tenantInfo);
+            }
+
+            return tenants;
+        }
     }
 }

@@ -18,6 +18,13 @@ config:
   keystore.url: trac-unit.pfx
 
 
+platformInfo:
+  environment: TEST_ENVIRONMENT
+  production: false
+  deploymentInfo:
+    region: UK
+
+
 instances:
 
   meta:

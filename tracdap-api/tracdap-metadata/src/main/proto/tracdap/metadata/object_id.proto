@@ -172,3 +172,16 @@ message TagSelector {
     DatetimeValue tagAsOf = 8;
   }
 }
+
+
+/**
+ * Information about a tenant that is set up on the TRAC platform.
+ */
+message TenantInfo {
+
+  /** Unique code used to identify the tenant, required by most API calls. */
+  string tenantCode = 1;
+
+  /** A short description of the tenant, suitable for displaying to users in lists. */
+  string description = 2;
+}

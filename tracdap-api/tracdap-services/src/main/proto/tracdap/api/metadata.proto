@@ -88,6 +88,34 @@ import "google/api/annotations.proto";
 service TracMetadataApi {
 
     /**
+     * Get some general information about the TRAC platform.
+     *
+     * Information returned includes what environment you are connected to
+     * and what version of TRAC is running. Useful for displaying in "about"
+     * boxes in a UI or client tool, and for submitting error reports.
+     */
+    rpc platformInfo(PlatformInfoRequest) returns (PlatformInfoResponse) {
+        option (google.api.http) = {
+            get: "/trac/platform-info"
+        };
+    }
+
+    /**
+     * Get a list of tenants that the current user has access to.
+     *
+     * Information returned includes the available tenant codes, as well
+     * as human readable descriptions. Client tools that support multiple
+     * tenants and tenant switching will need to fetch this list.
+     *
+     * Only tenants accessible to the current user are returned.
+     */
+    rpc listTenants(ListTenantsRequest) returns (ListTenantsResponse) {
+        option (google.api.http) = {
+            get: "/trac/list-tenants"
+        };
+    }
+
+    /**
      * Create a new object in the TRAC metadata store.
      *
      * To create an object, supply a metadata write request with the tenant code,
@@ -331,6 +359,60 @@ service TracMetadataApi {
         };
     }
 };
+
+
+/**
+ * Request object for the platformInfo() API call.
+ *
+ * Currently the API call does not require any parameters.
+ */
+message PlatformInfoRequest {
+
+}
+
+/**
+ * Response object for the platformInfo() API call.
+ *
+ * Contains some general information about the TRAC platform.
+ */
+message PlatformInfoResponse {
+
+    /** Version string for the version of TRAC currently deployed in the platform. **/
+    string tracVersion = 1;
+
+    /** Name of the current TRAC environment. */
+    string environment = 2;
+
+    /** Flag indicating whether the current environment is a production environment or not. **/
+    bool production = 3;
+
+    /**
+     * Additional information about the current TRAC environment.
+     *
+     * The particular information relevant to a deployment of TRAC can vary between organizations.
+     * Useful information might include: region, business division, brand etc.
+     * This information is optional and may not be present for smaller deployments.
+     */
+    map<string, string> deploymentInfo = 4;
+}
+
+/**
+ * Request object for the listTenants() API call.
+ *
+ * Currently the API call does not require any parameters.
+ */
+message ListTenantsRequest {
+
+}
+
+/**
+ * Response object for the listTenants() API call.
+ */
+message ListTenantsResponse {
+
+    /** A list of TenantInfo objects, one for each tenant the current user has access to. **/
+    repeated metadata.TenantInfo tenants = 1;
+}
 
 
 /**

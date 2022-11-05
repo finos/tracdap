@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+# Environment settings are verified in one of the test cases so they need to match
+# MetadataReadApiTest platformInfo()
+platformInfo:
+  environment: TEST_ENVIRONMENT
+  production: false
+  deploymentInfo:
+    region: UK
+
 instances:
   meta:
     - scheme: http
