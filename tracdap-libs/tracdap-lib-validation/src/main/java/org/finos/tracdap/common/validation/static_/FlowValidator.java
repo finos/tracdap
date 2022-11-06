@@ -26,6 +26,7 @@ import com.google.protobuf.Descriptors;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -83,7 +84,7 @@ public class FlowValidator {
     }
 
     @Validator
-    public static ValidationContext flow(FlowDefinition msg, ValidationContext ctx) {
+    public static ValidationContext flow(FlowDefinition flow, ValidationContext ctx) {
 
         // Semantic checks look at each element in isolation
 
@@ -100,15 +101,20 @@ public class FlowValidator {
                 .applyRepeated(FlowValidator::flowEdge, FlowEdge.class)
                 .pop();
 
-        // Parameters, inputs & outputs on a flow have the same structure as a model
-        // They are validated the same way too
-
-        ctx = ModelValidator.modelSchema(FD_PARAMETERS, FD_INPUTS, FD_OUTPUTS, ctx);
-
         // Only apply consistency checks if all the individual items in the flow are semantically valid
 
         if (!ctx.failed())
             ctx = ctx.apply(FlowValidator::flowConsistency, FlowDefinition.class);
+
+        // If the flow declares an explicit schema this must be validated as well
+        // Parameters, inputs & outputs on a flow have the same structure as a model
+        // Inputs and outputs must match what is declared in the nodes
+
+        if (flow.getInputsCount() > 0 || flow.getOutputsCount() > 0 || flow.getParametersCount() > 0) {
+
+            ctx = ModelValidator.modelSchema(FD_PARAMETERS, FD_INPUTS, FD_OUTPUTS, ctx);
+            ctx = ctx.apply(FlowValidator::flowSchemaMatch, FlowDefinition.class);
+        }
 
         return ctx;
     }
@@ -178,6 +184,48 @@ public class FlowValidator {
         return ctx;
     }
 
+    private static ValidationContext flowSchemaMatch(FlowDefinition flow, ValidationContext ctx) {
+
+        // This implementation of the schema match check is case-sensitive
+        // It should be easy for users to ensure case matches within a single flow
+        // We can allow case-insensitive match when loading items into the flow for a job
+
+        var schemaInputs = new HashSet<>(flow.getInputsMap().keySet());
+        var schemaOutputs = new HashSet<>(flow.getOutputsMap().keySet());
+
+        // First check that every input and output node is declared explicitly
+
+        for (var nodeEntry : flow.getNodesMap().entrySet()) {
+
+            var nodeName = nodeEntry.getKey();
+            var node = nodeEntry.getValue();
+
+            if (node.getNodeType() == FlowNodeType.INPUT_NODE) {
+                var matched = schemaInputs.remove(nodeName);
+                if (!matched)
+                    ctx = ctx.error(String.format("Input node [%s] is missing from flow explicit inputs", nodeName));
+
+            }
+
+            if (node.getNodeType() == FlowNodeType.OUTPUT_NODE) {
+                var matched = schemaOutputs.remove(nodeName);
+                if (!matched)
+                    ctx = ctx.error(String.format("Output node [%s] is missing from flow explicit outputs", nodeName));
+
+            }
+        }
+
+        // Resport any additional inputs / outputs that do not correspond to nodes
+
+        for (var inputName : schemaInputs)
+            ctx = ctx.error(String.format("Flow explicit input [%s] does not correspond to an input node", inputName));
+
+        for (var outputName : schemaOutputs)
+            ctx = ctx.error(String.format("Flow explicit output [%s] does not correspond to an output node", outputName));
+
+        return ctx;
+    }
+
     private static ValidationContext flowConsistency(FlowDefinition msg, ValidationContext ctx) {
 
         var nodes = msg.getNodesMap();
@@ -191,8 +239,6 @@ public class FlowValidator {
 
         // TODO: Flow consistency
         // - Unused outputs / nodes
-        // - Consistent parameter types (same name => same type)
-        // - Flow model schema matches input / output nodes and parameters (including case)
 
         return ctx;
     }
