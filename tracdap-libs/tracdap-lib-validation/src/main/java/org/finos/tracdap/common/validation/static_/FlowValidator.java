@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.validation.static_;
 
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
@@ -23,7 +24,12 @@ import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
@@ -40,8 +46,9 @@ public class FlowValidator {
 
     private static final Descriptors.Descriptor FLOW_NODE;
     private static final Descriptors.FieldDescriptor FN_NODE_TYPE;
+    private static final Descriptors.FieldDescriptor FN_INPUTS;
+    private static final Descriptors.FieldDescriptor FN_OUTPUTS;
     private static final Descriptors.FieldDescriptor FN_NODE_SEARCH;
-    private static final Descriptors.FieldDescriptor FN_MODEL_STUB;
 
     private static final Descriptors.Descriptor FLOW_EDGE;
     private static final Descriptors.FieldDescriptor FE_SOURCE;
@@ -50,11 +57,6 @@ public class FlowValidator {
     private static final Descriptors.Descriptor FLOW_SOCKET;
     private static final Descriptors.FieldDescriptor FS_NODE;
     private static final Descriptors.FieldDescriptor FS_SOCKET;
-
-    private static final Descriptors.Descriptor FLOW_MODEL_STUB;
-    private static final Descriptors.FieldDescriptor FMS_PARAMETERS;
-    private static final Descriptors.FieldDescriptor FMS_INPUTS;
-    private static final Descriptors.FieldDescriptor FMS_OUTPUTS;
 
     static {
 
@@ -67,8 +69,9 @@ public class FlowValidator {
 
         FLOW_NODE = FlowNode.getDescriptor();
         FN_NODE_TYPE = field(FLOW_NODE, FlowNode.NODETYPE_FIELD_NUMBER);
+        FN_INPUTS = field(FLOW_NODE, FlowNode.INPUTS_FIELD_NUMBER);
+        FN_OUTPUTS = field(FLOW_NODE, FlowNode.OUTPUTS_FIELD_NUMBER);
         FN_NODE_SEARCH = field(FLOW_NODE, FlowNode.NODESEARCH_FIELD_NUMBER);
-        FN_MODEL_STUB = field(FLOW_NODE, FlowNode.MODELSTUB_FIELD_NUMBER);
 
         FLOW_EDGE = FlowEdge.getDescriptor();
         FE_SOURCE = field(FLOW_EDGE, FlowEdge.SOURCE_FIELD_NUMBER);
@@ -77,15 +80,10 @@ public class FlowValidator {
         FLOW_SOCKET = FlowSocket.getDescriptor();
         FS_NODE = field(FLOW_SOCKET, FlowSocket.NODE_FIELD_NUMBER);
         FS_SOCKET = field(FLOW_SOCKET, FlowSocket.SOCKET_FIELD_NUMBER);
-
-        FLOW_MODEL_STUB = FlowModelStub.getDescriptor();
-        FMS_PARAMETERS = field(FLOW_MODEL_STUB, FlowModelStub.PARAMETERS_FIELD_NUMBER);
-        FMS_INPUTS = field(FLOW_MODEL_STUB, FlowModelStub.INPUTS_FIELD_NUMBER);
-        FMS_OUTPUTS = field(FLOW_MODEL_STUB, FlowModelStub.OUTPUTS_FIELD_NUMBER);
     }
 
     @Validator
-    public static ValidationContext flow(FlowDefinition msg, ValidationContext ctx) {
+    public static ValidationContext flow(FlowDefinition flow, ValidationContext ctx) {
 
         // Semantic checks look at each element in isolation
 
@@ -102,15 +100,20 @@ public class FlowValidator {
                 .applyRepeated(FlowValidator::flowEdge, FlowEdge.class)
                 .pop();
 
-        // Parameters, inputs & outputs on a flow have the same structure as a model
-        // They are validated the same way too
-
-        ctx = ModelValidator.modelSchema(FD_PARAMETERS, FD_INPUTS, FD_OUTPUTS, ctx);
-
         // Only apply consistency checks if all the individual items in the flow are semantically valid
 
         if (!ctx.failed())
             ctx = ctx.apply(FlowValidator::flowConsistency, FlowDefinition.class);
+
+        // If the flow declares an explicit schema this must be validated as well
+        // Parameters, inputs & outputs on a flow have the same structure as a model
+        // Inputs and outputs must match what is declared in the nodes
+
+        if (flow.getInputsCount() > 0 || flow.getOutputsCount() > 0 || flow.getParametersCount() > 0) {
+
+            ctx = ModelValidator.modelSchema(FD_PARAMETERS, FD_INPUTS, FD_OUTPUTS, ctx);
+            ctx = ctx.apply(FlowValidator::flowSchemaMatch, FlowDefinition.class);
+        }
 
         return ctx;
     }
@@ -123,17 +126,26 @@ public class FlowValidator {
                 .apply(CommonValidators::nonZeroEnum, FlowNodeType.class)
                 .pop();
 
-        ctx = ctx.push(FN_NODE_SEARCH)
-                .apply(CommonValidators::optional)
-                .apply(SearchValidator::searchExpression, SearchExpression.class)
-                .pop();
-
         var isModelNode = msg.getNodeType() == FlowNodeType.MODEL_NODE;
         var isModelNodeQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), FlowNodeType.MODEL_NODE.name());
 
-        ctx = ctx.push(FN_MODEL_STUB)
+        ctx = ctx.pushRepeated(FN_INPUTS)
                 .apply(CommonValidators.ifAndOnlyIf(isModelNode, isModelNodeQualifier))
-                .apply(FlowValidator::flowModelStub, FlowModelStub.class)
+                .applyRepeated(CommonValidators::identifier, String.class)
+                .applyRepeated(CommonValidators::notTracReserved, String.class)
+                .apply(CommonValidators::caseInsensitiveDuplicates)
+                .pop();
+
+        ctx = ctx.pushRepeated(FN_OUTPUTS)
+                .apply(CommonValidators.ifAndOnlyIf(isModelNode, isModelNodeQualifier))
+                .applyRepeated(CommonValidators::identifier, String.class)
+                .applyRepeated(CommonValidators::notTracReserved, String.class)
+                .apply(CommonValidators::caseInsensitiveDuplicates)
+                .pop();
+
+        ctx = ctx.push(FN_NODE_SEARCH)
+                .apply(CommonValidators::optional)
+                .apply(SearchValidator::searchExpression, SearchExpression.class)
                 .pop();
 
         return ctx;
@@ -171,27 +183,44 @@ public class FlowValidator {
         return ctx;
     }
 
-    @Validator
-    public static ValidationContext flowModelStub(FlowModelStub msg, ValidationContext ctx) {
+    private static ValidationContext flowSchemaMatch(FlowDefinition flow, ValidationContext ctx) {
 
-        ctx = ctx.pushMap(FMS_PARAMETERS)
-                .applyMapKeys(CommonValidators::identifier)
-                .applyMapKeys(CommonValidators::notTracReserved)
-                .apply(CommonValidators::caseInsensitiveDuplicates)
-                .applyMapValues(TypeSystemValidator::typeDescriptor, TypeDescriptor.class)
-                .pop();
+        // This implementation of the schema match check is case-sensitive
+        // It should be easy for users to ensure case matches within a single flow
+        // We can allow case-insensitive match when loading items into the flow for a job
 
-        ctx = ctx.pushRepeated(FMS_INPUTS)
-                .applyRepeated(CommonValidators::identifier, String.class)
-                .applyRepeated(CommonValidators::notTracReserved, String.class)
-                .apply(CommonValidators::caseInsensitiveDuplicates)
-                .pop();
+        var schemaInputs = new HashSet<>(flow.getInputsMap().keySet());
+        var schemaOutputs = new HashSet<>(flow.getOutputsMap().keySet());
 
-        ctx = ctx.pushRepeated(FMS_OUTPUTS)
-                .applyRepeated(CommonValidators::identifier, String.class)
-                .applyRepeated(CommonValidators::notTracReserved, String.class)
-                .apply(CommonValidators::caseInsensitiveDuplicates)
-                .pop();
+        // First check that every input and output node is declared explicitly
+
+        for (var nodeEntry : flow.getNodesMap().entrySet()) {
+
+            var nodeName = nodeEntry.getKey();
+            var node = nodeEntry.getValue();
+
+            if (node.getNodeType() == FlowNodeType.INPUT_NODE) {
+                var matched = schemaInputs.remove(nodeName);
+                if (!matched)
+                    ctx = ctx.error(String.format("Input node [%s] is missing from flow explicit inputs", nodeName));
+
+            }
+
+            if (node.getNodeType() == FlowNodeType.OUTPUT_NODE) {
+                var matched = schemaOutputs.remove(nodeName);
+                if (!matched)
+                    ctx = ctx.error(String.format("Output node [%s] is missing from flow explicit outputs", nodeName));
+
+            }
+        }
+
+        // Resport any additional inputs / outputs that do not correspond to nodes
+
+        for (var inputName : schemaInputs)
+            ctx = ctx.error(String.format("Flow explicit input [%s] does not correspond to an input node", inputName));
+
+        for (var outputName : schemaOutputs)
+            ctx = ctx.error(String.format("Flow explicit output [%s] does not correspond to an output node", outputName));
 
         return ctx;
     }
@@ -204,12 +233,9 @@ public class FlowValidator {
                 .applyRepeated(FlowValidator::edgeConnection, FlowEdge.class, nodes)
                 .pop();
 
-        // TODO: Flow consistency
-        // - Cyclic dependency check
-        // - Orphan / unreachable nodes
-        // - Duplicate edges
-        // - Consistent parameter types (same name => same type)
-        // - Flow model schema matches input / output nodes and parameters (including case)
+        ctx.apply(FlowValidator::oneEdgePerTarget, FlowDefinition.class);
+        ctx.apply(FlowValidator::noUnusedNodes, FlowDefinition.class);
+        ctx.apply(FlowValidator::cyclicRedundancyCheck, FlowDefinition.class);
 
         return ctx;
     }
@@ -276,8 +302,8 @@ public class FlowValidator {
 
             var inputOrOutput = ctx.field().equals(FE_SOURCE) ? "output" : "input";
             var modelSockets = ctx.field().equals(FE_SOURCE)
-                    ? node.getModelStub().getOutputsList()
-                    : node.getModelStub().getInputsList();
+                    ? node.getOutputsList()
+                    : node.getInputsList();
 
             if (!socket.hasField(FS_SOCKET)) {
 
@@ -294,5 +320,161 @@ public class FlowValidator {
         }
 
         return ctx;
+    }
+
+    private static ValidationContext oneEdgePerTarget(FlowDefinition flow, ValidationContext ctx) {
+
+        var edgesByTarget = new HashMap<String, Integer>();
+
+        for (var edge : flow.getEdgesList()) {
+
+            var socketKey = socketKey(edge.getTarget());
+
+            if (!edgesByTarget.containsKey(socketKey))
+                edgesByTarget.put(socketKey, 1);
+            else
+                edgesByTarget.put(socketKey, edgesByTarget.get(socketKey) + 1);
+        }
+
+        for (var nodeEntry : flow.getNodesMap().entrySet()) {
+
+            var nodeName = nodeEntry.getKey();
+            var node = nodeEntry.getValue();
+
+            for (var target : incomingSockets(nodeName, node)) {
+
+                var incomingEdges = edgesByTarget.get(target);
+
+                if (incomingEdges == null || incomingEdges == 0)
+                    ctx.error(String.format("Target [%s] is not supplied by any edge", target));
+
+                else if (incomingEdges > 1)
+                    ctx.error(String.format("Target [%s] is supplied by %d edges", target, incomingEdges));
+            }
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext noUnusedNodes(FlowDefinition flow, ValidationContext ctx) {
+
+        var usedNodes = flow.getEdgesList().stream()
+                .map(FlowEdge::getSource)
+                .map(FlowSocket::getNode)
+                .collect(Collectors.toSet());
+
+        for (var nodeEntry : flow.getNodesMap().entrySet()) {
+
+            var nodeName = nodeEntry.getKey();
+            var node = nodeEntry.getValue();
+
+            if (node.getNodeType() == FlowNodeType.INPUT_NODE && !usedNodes.contains(nodeName))
+                ctx = ctx.error(String.format("Input node [%s] is not used", nodeName));
+
+            if (node.getNodeType() == FlowNodeType.MODEL_NODE && !usedNodes.contains(nodeName))
+                ctx = ctx.error(String.format("The outputs of model node [%s] are not used", nodeName));
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext cyclicRedundancyCheck(FlowDefinition flow, ValidationContext ctx) {
+
+        // https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm
+
+        var remainingNodes = new HashMap<>(flow.getNodesMap());
+        var reachableNodes = new HashMap<String, FlowNode>();
+
+        var edgesBySource = new HashMap<String, List<FlowEdge>>();
+        var edgesByTarget = new HashMap<String, List<FlowEdge>>();
+
+        for (var edge : flow.getEdgesList()) {
+
+            var sourceNode = edge.getSource().getNode();
+            var targetNode = edge.getTarget().getNode();
+
+            if (!edgesBySource.containsKey(sourceNode))
+                edgesBySource.put(sourceNode, new ArrayList<>());
+
+            if (!edgesByTarget.containsKey(targetNode))
+                edgesByTarget.put(targetNode, new ArrayList<>());
+
+            edgesBySource.get(sourceNode).add(edge);
+            edgesByTarget.get(targetNode).add(edge);
+        }
+
+        // Initial set of reachable flow nodes is just the input nodes
+        for (var node : remainingNodes.entrySet()) {
+            if (node.getValue().getNodeType() == FlowNodeType.INPUT_NODE)
+                reachableNodes.put(node.getKey(), node.getValue());
+        }
+
+        for (var node: reachableNodes.keySet())
+            remainingNodes.remove(node);
+
+        while (!reachableNodes.isEmpty()) {
+
+            var nodeKey = reachableNodes.keySet().stream().findAny();
+            var nodeName = nodeKey.get();
+
+            reachableNodes.remove(nodeName);
+
+            var sourceEdges = edgesBySource.remove(nodeName);
+
+            // Some nodes do not feed any other nodes, e.g. output nodes, or if there are errors in the flow
+            if (sourceEdges == null)
+                continue;
+
+            for (var edge : sourceEdges) {
+
+                var targetNodeName = edge.getTarget().getNode();
+                var targetEdges = edgesByTarget.get(targetNodeName);
+                targetEdges.remove(edge);
+
+                if (targetEdges.isEmpty()) {
+                    var targetNode = reachableNodes.remove(targetNodeName);
+                    reachableNodes.put(targetNodeName, targetNode);
+                    remainingNodes.remove(targetNodeName);
+                }
+            }
+
+        }
+
+        // Once the traversal is complete, add validation errors for any nodes that could not be reached
+
+        for (var node : remainingNodes.keySet()) {
+            ctx.error(String.format("Flow node [%s] is not reachable (this may indicate a cyclic dependency)", node));
+        }
+
+        return ctx;
+    }
+
+    private static String socketKey(FlowSocket socket) {
+
+        return socket.getSocket().isEmpty()
+                ? socket.getNode()
+                : socket.getNode() + '.' + socket.getSocket();
+    }
+
+    private static Iterable<String> incomingSockets(String nodeName, FlowNode node) {
+
+        switch (node.getNodeType()) {
+
+            case INPUT_NODE:
+                return List.of();
+
+            case OUTPUT_NODE:
+                return List.of(nodeName);
+
+            case MODEL_NODE:
+                return node.getInputsList()
+                        .stream()
+                        .map(socket -> nodeName + '.' + socket)
+                        .collect(Collectors.toList());
+
+            default:
+                // Nodes have already been through individual validation, which checks node type is set
+                throw new EUnexpected();
+        }
     }
 }

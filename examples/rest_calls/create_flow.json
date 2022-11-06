@@ -36,26 +36,14 @@
 
             "simulate_customer_transactions": {
                 "nodeType": "MODEL_NODE",
-                "modelStub": {
-                    "inputs": [ "initial_accounts", "economic_scenario" ],
-                    "outputs": [ "simulated_accounts" ],
-                    "parameters": {
-                        "number_of_months": { "basicType": "INTEGER" },
-                        "include_promotions": { "basicType": "BOOLEAN" }
-                    }
-                }
+                "inputs": [ "initial_accounts", "economic_scenario" ],
+                "outputs": [ "simulated_accounts" ]
             },
 
             "simulate_joiners_and_leavers": {
                 "nodeType": "MODEL_NODE",
-                "modelStub": {
-                    "inputs": [ "initial_accounts" ],
-                    "outputs": [ "simulated_accounts" ],
-                    "parameters": {
-                        "number_of_months": { "basicType": "INTEGER" },
-                        "include_promotions": { "basicType": "BOOLEAN" }
-                    }
-                }
+                "inputs": [ "initial_accounts" ],
+                "outputs": [ "simulated_accounts" ]
             },
 
             "simulated_accounts": {

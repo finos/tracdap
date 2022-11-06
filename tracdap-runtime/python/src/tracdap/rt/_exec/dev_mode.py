@@ -387,7 +387,7 @@ class DevModeTranslator:
             if node.nodeType == _meta.FlowNodeType.INPUT_NODE:
                 add_source(node_name, _meta.FlowSocket(node_name))
             if node.nodeType == _meta.FlowNodeType.MODEL_NODE:
-                for model_output in node.modelStub.outputs:
+                for model_output in node.outputs:
                     add_source(model_output, _meta.FlowSocket(node_name, model_output))
 
         # Include any edges defined explicitly in the flow
@@ -399,7 +399,7 @@ class DevModeTranslator:
             if node.nodeType == _meta.FlowNodeType.OUTPUT_NODE:
                 add_edge(_meta.FlowSocket(node_name))
             if node.nodeType == _meta.FlowNodeType.MODEL_NODE:
-                for model_input in node.modelStub.inputs:
+                for model_input in node.inputs:
                     add_edge(_meta.FlowSocket(node_name, model_input))
 
         if any(errors):
