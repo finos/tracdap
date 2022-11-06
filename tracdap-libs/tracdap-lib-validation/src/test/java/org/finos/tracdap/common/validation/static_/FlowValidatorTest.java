@@ -335,8 +335,6 @@ public class FlowValidatorTest extends BaseValidatorTest {
     @Test
     void basicFlow_danglingEdge_1() {
 
-        // Two edges provide input to model_1.input_1, this is not allowed
-
         var flow = FlowDefinition.newBuilder()
 
                 // Nodes
@@ -367,8 +365,6 @@ public class FlowValidatorTest extends BaseValidatorTest {
     @Test
     void basicFlow_danglingEdge_2() {
 
-        // Two edges provide input to model_1.input_1, this is not allowed
-
         var flow = FlowDefinition.newBuilder()
 
                 // Nodes
@@ -396,15 +392,12 @@ public class FlowValidatorTest extends BaseValidatorTest {
     }
 
     @Test
-    void basicFlow_twoEdgesOneSocket() {
-
-        // Two edges provide input to model_1.input_1, this is not allowed
+    void basicFlow_danglingEdge_3() {
 
         var flow = FlowDefinition.newBuilder()
 
                 // Nodes
                 .putNodes("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
-                .putNodes("input_2", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
                 .putNodes("model_1", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
                         .addInputs("input_1")
                         .addOutputs("output_1")
@@ -416,11 +409,12 @@ public class FlowValidatorTest extends BaseValidatorTest {
                         .setSource(FlowSocket.newBuilder().setNode("input_1"))
                         .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("input_1")))
                 .addEdges(FlowEdge.newBuilder()
-                        .setSource(FlowSocket.newBuilder().setNode("input_2"))
-                        .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("input_1")))
-                .addEdges(FlowEdge.newBuilder()
                         .setSource(FlowSocket.newBuilder().setNode("model_1").setSocket("output_1"))
                         .setTarget(FlowSocket.newBuilder().setNode("output_1")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("model_1").setSocket("output_1"))
+                        .setTarget(FlowSocket.newBuilder().setNode("output_2")))
+
                 .build();
 
         expectInvalid(flow);
@@ -473,6 +467,37 @@ public class FlowValidatorTest extends BaseValidatorTest {
                 .addEdges(FlowEdge.newBuilder()
                         .setTarget(FlowSocket.newBuilder().setNode("input_2"))
                         .setSource(FlowSocket.newBuilder().setNode("model_1").setSocket("input_2")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("model_1").setSocket("output_1"))
+                        .setTarget(FlowSocket.newBuilder().setNode("output_1")))
+                .build();
+
+        expectInvalid(flow);
+    }
+
+    @Test
+    void basicFlow_twoEdgesOneSocket() {
+
+        // Two edges provide input to model_1.input_1, this is not allowed
+
+        var flow = FlowDefinition.newBuilder()
+
+                // Nodes
+                .putNodes("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("input_2", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("model_1", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("input_1")
+                        .addOutputs("output_1")
+                        .build())
+                .putNodes("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+
+                // Edges
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("input_1"))
+                        .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("input_1")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("input_2"))
+                        .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("input_1")))
                 .addEdges(FlowEdge.newBuilder()
                         .setSource(FlowSocket.newBuilder().setNode("model_1").setSocket("output_1"))
                         .setTarget(FlowSocket.newBuilder().setNode("output_1")))
