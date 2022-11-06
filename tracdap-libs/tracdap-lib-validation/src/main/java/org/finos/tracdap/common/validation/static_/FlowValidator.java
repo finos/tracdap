@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
@@ -235,10 +234,8 @@ public class FlowValidator {
                 .pop();
 
         ctx.apply(FlowValidator::oneEdgePerTarget, FlowDefinition.class);
+        ctx.apply(FlowValidator::noUnusedNodes, FlowDefinition.class);
         ctx.apply(FlowValidator::cyclicRedundancyCheck, FlowDefinition.class);
-
-        // TODO: Flow consistency
-        // - Unused outputs / nodes
 
         return ctx;
     }
@@ -327,15 +324,16 @@ public class FlowValidator {
 
     private static ValidationContext oneEdgePerTarget(FlowDefinition flow, ValidationContext ctx) {
 
-        Function<FlowSocket, String> socketKey = (FlowSocket socket) -> socket.getSocket().isEmpty()
-                ? socket.getNode()
-                : socket.getNode() + '.' + socket.getSocket();
-
-        var edgesByTarget = flow.getEdgesList().stream().collect(Collectors.toMap(
-                e -> socketKey.apply(e.getTarget()), e -> new ArrayList<FlowEdge>()));
+        var edgesByTarget = new HashMap<String, Integer>();
 
         for (var edge : flow.getEdgesList()) {
-            edgesByTarget.get(socketKey.apply(edge.getTarget())).add(edge);
+
+            var socketKey = socketKey(edge.getTarget());
+
+            if (!edgesByTarget.containsKey(socketKey))
+                edgesByTarget.put(socketKey, 1);
+            else
+                edgesByTarget.put(socketKey, edgesByTarget.get(socketKey) + 1);
         }
 
         for (var nodeEntry : flow.getNodesMap().entrySet()) {
@@ -345,17 +343,37 @@ public class FlowValidator {
 
             for (var target : incomingSockets(nodeName, node)) {
 
-                var incomingEdges = edgesByTarget.remove(target);
+                var incomingEdges = edgesByTarget.get(target);
 
-                if (incomingEdges == null || incomingEdges.isEmpty())
+                if (incomingEdges == null || incomingEdges == 0)
                     ctx.error(String.format("Target [%s] is not supplied by any edge", target));
 
-                else if (incomingEdges.size() > 1)
-                    ctx.error(String.format("Target [%s] is supplied by %d edges", target, incomingEdges.size()));
+                else if (incomingEdges > 1)
+                    ctx.error(String.format("Target [%s] is supplied by %d edges", target, incomingEdges));
             }
         }
 
-        // TODO: remaining unused edges?
+        return ctx;
+    }
+
+    private static ValidationContext noUnusedNodes(FlowDefinition flow, ValidationContext ctx) {
+
+        var usedNodes = flow.getEdgesList().stream()
+                .map(FlowEdge::getSource)
+                .map(FlowSocket::getNode)
+                .collect(Collectors.toSet());
+
+        for (var nodeEntry : flow.getNodesMap().entrySet()) {
+
+            var nodeName = nodeEntry.getKey();
+            var node = nodeEntry.getValue();
+
+            if (node.getNodeType() == FlowNodeType.INPUT_NODE && !usedNodes.contains(nodeName))
+                ctx = ctx.error(String.format("Input node [%s] is not used", nodeName));
+
+            if (node.getNodeType() == FlowNodeType.MODEL_NODE && !usedNodes.contains(nodeName))
+                ctx = ctx.error(String.format("The outputs of model node [%s] are not used", nodeName));
+        }
 
         return ctx;
     }
@@ -367,15 +385,22 @@ public class FlowValidator {
         var remainingNodes = new HashMap<>(flow.getNodesMap());
         var reachableNodes = new HashMap<String, FlowNode>();
 
-        var edgesBySource = flow.getEdgesList().stream().collect(Collectors.toMap(
-                e -> e.getSource().getNode(), e -> new ArrayList<FlowEdge>()));
-
-        var edgesByTarget = flow.getEdgesList().stream().collect(Collectors.toMap(
-                e -> e.getTarget().getNode(), e -> new ArrayList<FlowEdge>()));
+        var edgesBySource = new HashMap<String, List<FlowEdge>>();
+        var edgesByTarget = new HashMap<String, List<FlowEdge>>();
 
         for (var edge : flow.getEdgesList()) {
-            edgesBySource.get(edge.getSource().getNode()).add(edge);
-            edgesByTarget.get(edge.getTarget().getNode()).add(edge);
+
+            var sourceNode = edge.getSource().getNode();
+            var targetNode = edge.getTarget().getNode();
+
+            if (!edgesBySource.containsKey(sourceNode))
+                edgesBySource.put(sourceNode, new ArrayList<>());
+
+            if (!edgesByTarget.containsKey(targetNode))
+                edgesByTarget.put(targetNode, new ArrayList<>());
+
+            edgesBySource.get(sourceNode).add(edge);
+            edgesByTarget.get(targetNode).add(edge);
         }
 
         // Initial set of reachable flow nodes is just the input nodes
@@ -396,6 +421,7 @@ public class FlowValidator {
 
             var sourceEdges = edgesBySource.remove(nodeName);
 
+            // Some nodes do not feed any other nodes, e.g. output nodes, or if there are errors in the flow
             if (sourceEdges == null)
                 continue;
 
@@ -408,14 +434,26 @@ public class FlowValidator {
                 if (targetEdges.isEmpty()) {
                     var targetNode = reachableNodes.remove(targetNodeName);
                     reachableNodes.put(targetNodeName, targetNode);
+                    remainingNodes.remove(targetNodeName);
                 }
             }
 
         }
 
-        // TODO: Check remaining
+        // Once the traversal is complete, add validation errors for any nodes that could not be reached
+
+        for (var node : remainingNodes.keySet()) {
+            ctx.error(String.format("Flow node [%s] is not reachable (this may indicate a cyclic dependency)", node));
+        }
 
         return ctx;
+    }
+
+    private static String socketKey(FlowSocket socket) {
+
+        return socket.getSocket().isEmpty()
+                ? socket.getNode()
+                : socket.getNode() + '.' + socket.getSocket();
     }
 
     private static Iterable<String> incomingSockets(String nodeName, FlowNode node) {
@@ -435,7 +473,8 @@ public class FlowValidator {
                         .collect(Collectors.toList());
 
             default:
-                throw new EUnexpected();  // todo: err msg
+                // Nodes have already been through individual validation, which checks node type is set
+                throw new EUnexpected();
         }
     }
 }
