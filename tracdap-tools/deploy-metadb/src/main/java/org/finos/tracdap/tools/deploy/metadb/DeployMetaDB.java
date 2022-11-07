@@ -48,7 +48,7 @@ public class DeployMetaDB {
     /** Task name for setting a tenant's description **/
     public final static String ALTER_TENANT_TASK = "alter_tenant";
 
-    private final static String SCHEMA_LOCATION = "classpath:%s";
+    private final static String SCHEMA_LOCATION = "classpath:%s/rollout";
 
     private final static List<StandardArgs.Task> METADB_TASKS = List.of(
             StandardArgs.task(DEPLOY_SCHEMA_TASK, "Deploy/update metadata database with the latest physical schema"),
