@@ -38,7 +38,7 @@ ext {
 
 
     // SQL (JDBC) drivers
-    h2_version = '2.1.212'
+    h2_version = '2.1.214'
     mysql_version = '8.0.30'
     mariadb_version = '2.7.5'             // Update to MariaDB 3.x driver series is a breaking change
     postgresql_version = '42.4.2'
@@ -49,7 +49,7 @@ ext {
     hikari_cp_version = '5.0.1'
 
     // Flyway (database deploy tool)
-    flyway_version = '8.5.3'
+    flyway_version = '9.7.0'
 
 
     // Plugins
