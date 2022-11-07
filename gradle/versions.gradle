@@ -49,7 +49,13 @@ ext {
     hikari_cp_version = '5.0.1'
 
     // Flyway (database deploy tool)
-    flyway_version = '9.7.0'
+
+    // NOTE: At version 9.3.1, Flyway introduced a dependency on com.electronwill.night-config:toml
+    // This is a GPL v2 project, which breaks licensing compliance
+    // For now, stick on version 9.3.0
+    // Issue raised with Flyway: https://github.com/flyway/flyway/issues/3565
+
+    flyway_version = '9.3.0'
 
 
     // Plugins
