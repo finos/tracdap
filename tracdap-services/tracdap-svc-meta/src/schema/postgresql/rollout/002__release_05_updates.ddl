@@ -23,5 +23,5 @@ alter table object_definition add meta_format int null;
 alter table object_definition add meta_version int null;
 update object_definition set meta_format = 1 where true;
 update object_definition set meta_version = 1 where true;
-alter table object_definition alter column meta_format int not null;
-alter table object_definition alter column meta_version int not null;
+alter table object_definition alter column meta_format set not null;
+alter table object_definition alter column meta_version set not null;
