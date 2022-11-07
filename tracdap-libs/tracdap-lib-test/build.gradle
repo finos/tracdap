@@ -42,6 +42,9 @@ dependencies {
     implementation group: 'io.netty', name: 'netty-handler-proxy', version: "$netty_version"
     implementation group: 'io.grpc', name: 'grpc-netty', version: "$grpc_version"
 
+    // Use Flyway to deploy schemas in test cases
+    implementation group: 'org.flywaydb', name: 'flyway-core', version: "$flyway_version"
+
     // Jackson uses runtime class resolution
     // Make sure classes needed for config parsing are always on the runtime classpath for tests
     api group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
