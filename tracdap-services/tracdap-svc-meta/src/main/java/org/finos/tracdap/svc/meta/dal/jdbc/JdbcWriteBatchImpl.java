@@ -82,8 +82,8 @@ class JdbcWriteBatchImpl {
                 "  object_version,\n" +
                 "  object_timestamp,\n" +
                 "  object_is_latest,\n" +
-                "  metadata_format,\n" +
-                "  metadata_version,\n" +
+                "  meta_format,\n" +
+                "  meta_version,\n" +
                 "  definition" +
                 ")\n" +
                 "values (?, ?, ?, ?, ?, ?, ?, ?)";
