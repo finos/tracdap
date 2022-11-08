@@ -64,9 +64,6 @@ dependencies {
     implementation group: 'com.google.protobuf', name: 'protobuf-java', version: "$proto_version"
     implementation group: 'com.google.protobuf', name: 'protobuf-java-util', version: "$proto_version"
 
-    // JWT auth
-    implementation group: 'com.auth0', name: 'java-jwt', version: "$jwt_version"
-
     awsRuntimeOnly project(':aws-config')
     gcpRuntimeOnly project(':gcp-config')
 
