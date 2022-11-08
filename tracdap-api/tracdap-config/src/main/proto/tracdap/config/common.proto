@@ -24,13 +24,30 @@ option java_multiple_files = true;
 enum ConfigFormat {
 
   CONFIG_FORMAT_NOT_SET = 0;
-  YAML = 1;
+  PROTO = 1;
   JSON = 2;
-  PROTO = 3;
+  YAML = 3;
 }
 
 
 message _ConfigFile {
 
   map<string, string> config = 1;
+}
+
+
+message PluginConfig {
+
+  string protocol = 1;
+  map<string, string> pluginProps = 2;
+  map<string, string> pluginSecrets = 3;
+}
+
+
+message AuthenticationConfig {
+
+  string jwtIssuer = 1;
+  optional sint32 jwtExpiry = 2;
+
+  optional PluginConfig provider = 3;
 }

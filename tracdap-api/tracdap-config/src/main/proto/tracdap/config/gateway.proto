@@ -20,10 +20,14 @@ package tracdap.config;
 option java_package = "org.finos.tracdap.config";
 option java_multiple_files = true;
 
+import "tracdap/config/common.proto";
+
 
 message GatewayConfig {
 
   map<string, string> config = 1;
+
+  AuthenticationConfig authentication = 6;
 
   repeated GwRoute routes = 2;
   GwServiceMap services = 3;
@@ -31,6 +35,7 @@ message GatewayConfig {
   uint32 port = 4;
   uint32 idleTimeout = 5;
 }
+
 
 message GwRoute {
 
