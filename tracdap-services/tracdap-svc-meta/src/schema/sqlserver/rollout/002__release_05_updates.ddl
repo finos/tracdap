@@ -19,9 +19,11 @@ alter table tenant add description varchar(4096) null;
 
 
 -- Record metadata format and version in the object definition table
+-- Use 'go' to apply alterations before attempting the update
 alter table object_definition add meta_format int null;
 alter table object_definition add meta_version int null;
-go;  -- Apply alterations before attempting the update
+go
+
 update object_definition set meta_format = 1 where true;
 update object_definition set meta_version = 1 where true;
 alter table object_definition alter column meta_format int not null;
