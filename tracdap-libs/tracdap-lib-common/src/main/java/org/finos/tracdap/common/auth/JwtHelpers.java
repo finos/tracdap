@@ -75,8 +75,11 @@ public class JwtHelpers {
                 return sessionInfo;
             }
 
-            var issueTime = Instant.ofEpochSecond(Long.parseLong(issueTimeStr.toString()));
-            var expiryTime = Instant.ofEpochSecond(Long.parseLong(expiryTimeStr.toString()));
+            // Note: calling "toString()" on claims will include JSON quoting in the output
+            // Use the asString / asLong / asType methods to avoid this behavior
+
+            var issueTime = Instant.ofEpochSecond(issueTimeStr.asLong());
+            var expiryTime = Instant.ofEpochSecond(expiryTimeStr.asLong());
 
             var sessionInfo = new SessionInfo();
             sessionInfo.setValid(true);
@@ -84,8 +87,8 @@ public class JwtHelpers {
             sessionInfo.setExpiryTime(expiryTime);
 
             var userInfo = new UserInfo();
-            userInfo.setUserId(userId.toString());
-            userInfo.setDisplayName(displayName != null ? displayName.toString() : userId.toString());
+            userInfo.setUserId(userId.asString());
+            userInfo.setDisplayName(displayName != null ? displayName.asString() : userId.asString());
             sessionInfo.setUserInfo(userInfo);
 
             return sessionInfo;
