@@ -19,11 +19,7 @@ alter table tenant add description varchar(4096) null;
 
 
 -- Record metadata format and version in the object definition table
--- SQL Server requires the 'go' command to apply alterations, but these error in the deploy tool
--- Using exec is a workaround
-alter table object_definition add meta_format int null;
-alter table object_definition add meta_version int null;
-exec('update object_definition set meta_format = 1 where true');
-exec('update object_definition set meta_version = 1 where true');
-alter table object_definition alter column meta_format int not null;
-alter table object_definition alter column meta_version int not null;
+-- SQL Server does not apply table alterations without the 'go' command, which breaks in the deploy tool
+-- Workaround for now is to set a column default (a value is always inserted by the metadata service)
+alter table object_definition add meta_format int not null default(1);
+alter table object_definition add meta_version int not null default(1);
