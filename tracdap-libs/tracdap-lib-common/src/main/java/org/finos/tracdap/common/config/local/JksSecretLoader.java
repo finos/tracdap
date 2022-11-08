@@ -107,6 +107,20 @@ public class JksSecretLoader implements ISecretLoader {
     }
 
     @Override
+    public boolean hasSecret(String secretName) {
+
+        try {
+            var entry = keystore.getEntry(secretName, new KeyStore.PasswordProtection(secretKey.toCharArray()));
+            return entry != null;
+        }
+        catch (GeneralSecurityException e) {
+            var message = String.format("Secret could not be found in the key store: [%s] %s", secretName, e.getMessage());
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EConfigLoad(message);
+        }
+    }
+
+    @Override
     public String loadPassword(String secretName) {
 
         try {
