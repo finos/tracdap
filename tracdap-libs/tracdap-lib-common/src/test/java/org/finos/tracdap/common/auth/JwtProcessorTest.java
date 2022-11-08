@@ -16,7 +16,7 @@
 
 package org.finos.tracdap.common.auth;
 
-import org.finos.tracdap.common.exception.EAuthorization;
+import org.finos.tracdap.config.AuthenticationConfig;
 
 import com.auth0.jwt.HeaderParams;
 import com.auth0.jwt.JWT;
@@ -30,19 +30,24 @@ import org.junit.jupiter.api.Test;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.SecureRandom;
-import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
 
 public class JwtProcessorTest {
 
+    static AuthenticationConfig authConfig;
     static KeyPair keyPair;
+
     JwtProcessor jwt;
 
     @BeforeAll
     static void createKeyPair() throws Exception {
+
+        authConfig = AuthenticationConfig.newBuilder()
+                .setJwtIssuer("https://trac.example.com/trac/platform")
+                .setJwtExpiry(7200)
+                .build();
 
         var keySize = 1024;
         var keyGen = KeyPairGenerator.getInstance("RSA");
@@ -56,7 +61,7 @@ public class JwtProcessorTest {
     @BeforeEach
     void setupJwt() {
 
-        jwt = JwtProcessor.useKeyPair(keyPair);
+        jwt = JwtProcessor.configure(authConfig, keyPair);
     }
 
     @Test
@@ -66,7 +71,7 @@ public class JwtProcessorTest {
         userInfo.setUserId("fb2876");
         userInfo.setDisplayName("Fred Blogs Jnr.");
 
-        var token = jwt.encodeToken(userInfo, Duration.of(1, ChronoUnit.HOURS));
+        var token = jwt.encodeToken(userInfo);
         var rtSession = jwt.decodeAndValidate(token);
         var rtUserInfo = rtSession.getUserInfo();
 
@@ -75,7 +80,7 @@ public class JwtProcessorTest {
     }
 
     @Test
-    void signatureMissing() throws Exception {
+    void signatureMissing() {
 
         var algorithm = Algorithm.none();
 
@@ -99,7 +104,8 @@ public class JwtProcessorTest {
         var token = tokenBuilder.sign(algorithm).trim();
 
         // Decoding an unsigned token should be an auth error
-        Assertions.assertThrows(EAuthorization.class, () -> jwt.decodeAndValidate(token));
+        var result = jwt.decodeAndValidate(token);
+        Assertions.assertFalse(result.isValid());
     }
 
     @Test
@@ -113,17 +119,47 @@ public class JwtProcessorTest {
         keyGen.initialize(keySize, random);
 
         var altKeyPair = keyGen.generateKeyPair();
-        var altJwt = JwtProcessor.useKeyPair(altKeyPair);
+
+        var altJwt = JwtProcessor.configure(authConfig, altKeyPair);
 
         var userInfo = new UserInfo();
         userInfo.setUserId("fb2876");
         userInfo.setDisplayName("Fred Blogs Jnr.");
 
-        var token = jwt.encodeToken(userInfo, Duration.of(1, ChronoUnit.HOURS));
-        var altToken = altJwt.encodeToken(userInfo, Duration.of(1, ChronoUnit.HOURS));
+        var token = jwt.encodeToken(userInfo);
+        var altToken = altJwt.encodeToken(userInfo);
 
-        Assertions.assertThrows(EAuthorization.class, () -> altJwt.decodeAndValidate(token));
-        Assertions.assertThrows(EAuthorization.class, () -> jwt.decodeAndValidate(altToken));
+        var result = altJwt.decodeAndValidate(token);
+        var altResult =  jwt.decodeAndValidate(altToken);
+
+        Assertions.assertFalse(result.isValid());
+        Assertions.assertFalse(altResult.isValid());
+    }
+
+    @Test
+    void differentIssuer() {
+
+        // Tokens created with different issuers should fail to decode and validated
+
+        var altAuthConfig = AuthenticationConfig.newBuilder()
+                .setJwtIssuer("https://alt.trac.example.com/trac/platform")
+                .setJwtExpiry(7200)
+                .build();
+
+        var altJwt = JwtProcessor.configure(altAuthConfig, keyPair);
+
+        var userInfo = new UserInfo();
+        userInfo.setUserId("fb2876");
+        userInfo.setDisplayName("Fred Blogs Jnr.");
+
+        var token = jwt.encodeToken(userInfo);
+        var altToken = altJwt.encodeToken(userInfo);
+
+        var result = altJwt.decodeAndValidate(token);
+        var altResult =  jwt.decodeAndValidate(altToken);
+
+        Assertions.assertFalse(result.isValid());
+        Assertions.assertFalse(altResult.isValid());
     }
 
     @Test
@@ -131,14 +167,22 @@ public class JwtProcessorTest {
 
         // Attempting to decode and validate after a token expires is an auth error
 
+        var altAuthConfig = AuthenticationConfig.newBuilder()
+                .setJwtIssuer("https://trac.example.com/trac/platform")
+                .setJwtExpiry(1)
+                .build();
+
+        var altJwt = JwtProcessor.configure(altAuthConfig, keyPair);
+
         var userInfo = new UserInfo();
         userInfo.setUserId("fb2876");
         userInfo.setDisplayName("Fred Blogs Jnr.");
 
-        var token = jwt.encodeToken(userInfo, Duration.of(1, ChronoUnit.SECONDS));
+        var token = altJwt.encodeToken(userInfo);
 
         Thread.sleep(2000);
 
-        Assertions.assertThrows(EAuthorization.class, () -> jwt.decodeAndValidate(token));
+        var result = altJwt.decodeAndValidate(token);
+        Assertions.assertFalse(result.isValid());
     }
 }

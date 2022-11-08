@@ -19,32 +19,29 @@ package org.finos.tracdap.common.auth;
 import com.auth0.jwt.HeaderParams;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
+import org.finos.tracdap.config.AuthenticationConfig;
 
 import java.security.KeyPair;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 
 
 public class JwtProcessor extends JwtValidator {
 
-    public static JwtProcessor useKeyPair(KeyPair keyPair) {
+    public static JwtProcessor configure(AuthenticationConfig authConfig, KeyPair keyPair) {
 
         var algorithm = chooseAlgorithm(keyPair);
-        return new JwtProcessor(algorithm);
+        return new JwtProcessor(authConfig, algorithm);
     }
 
-    JwtProcessor(Algorithm algorithm) {
-        super(algorithm);
+    JwtProcessor(AuthenticationConfig authConfig, Algorithm algorithm) {
+        super(authConfig, algorithm);
     }
 
-    public String encodeToken(UserInfo userInfo, Duration expiry) {
+    public String encodeToken(UserInfo userInfo) {
 
-        // TODO: Real issuer
-
-        var issuer = "trac_gateway";
         var issueTime = Instant.now();
-        var expiryTime = issueTime.plus(expiry);
+        var expiryTime = issueTime.plusSeconds(expiry);
 
         var header = Map.of(
                 HeaderParams.TYPE, "jwt",

@@ -16,12 +16,15 @@
 
 package org.finos.tracdap.common.auth;
 
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.RegisteredClaims;
-import com.auth0.jwt.algorithms.Algorithm;
-import com.auth0.jwt.exceptions.JWTDecodeException;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EUnexpected;
+
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.JWTVerifier;
+import com.auth0.jwt.RegisteredClaims;
+import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.exceptions.JWTVerificationException;
+import org.finos.tracdap.config.AuthenticationConfig;
 
 import java.security.KeyPair;
 import java.security.PublicKey;
@@ -36,23 +39,40 @@ public class JwtValidator {
 
     protected static final String JWT_NAME_CLAIM = "name";
 
-    protected final Algorithm algorithm;
+    private static final int DEFAULT_EXPIRY = 3600;
 
-    public static JwtValidator usePublicKey(PublicKey publicKey) {
+    protected final Algorithm algorithm;
+    protected final String issuer;
+    protected final int expiry;
+
+    private final JWTVerifier verifier;
+
+    public static JwtValidator configure(AuthenticationConfig authConfig, PublicKey publicKey) {
 
         var algorithm = chooseAlgorithm(publicKey);
-        return new JwtValidator(algorithm);
+
+        return new JwtValidator(authConfig, algorithm);
     }
 
-    JwtValidator(Algorithm algorithm) {
+    JwtValidator(AuthenticationConfig authConfig, Algorithm algorithm) {
+
         this.algorithm = algorithm;
+
+        this.issuer = authConfig.getJwtIssuer();
+        this.expiry = authConfig.hasJwtExpiry() ? authConfig.getJwtExpiry() : DEFAULT_EXPIRY;
+
+        this.verifier = JWT
+                .require(algorithm)
+                .withIssuer(issuer)
+                .build();
     }
 
     public SessionInfo decodeAndValidate(String token) {
 
         try {
 
-            var jwt = JWT.decode(token);
+            var jwt = verifier.verify(token);
+
             var userId = jwt.getClaim(RegisteredClaims.SUBJECT);
             var displayName = jwt.getClaim(JWT_NAME_CLAIM);
             var issueTimeStr = jwt.getClaim(RegisteredClaims.ISSUED_AT);
@@ -83,11 +103,13 @@ public class JwtValidator {
 
             return sessionInfo;
         }
-        catch (JWTDecodeException | NumberFormatException e) {
+        catch (JWTVerificationException | NumberFormatException e) {
+
+            var message = String.format("Authentication failed: %s", e.getMessage());
 
             var sessionInfo = new SessionInfo();
             sessionInfo.setValid(false);
-            sessionInfo.setErrorMessage(e.getMessage());
+            sessionInfo.setErrorMessage(message);
 
             return sessionInfo;
         }
