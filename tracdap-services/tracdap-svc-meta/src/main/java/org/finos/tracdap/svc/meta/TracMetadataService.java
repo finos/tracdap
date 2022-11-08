@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.svc.meta;
 
+import org.finos.tracdap.common.auth.AuthInterceptor;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.exception.EStartup;
@@ -116,12 +117,15 @@ public class TracMetadataService extends CommonServiceBase {
             var publicApi = new TracMetadataApi(readService, writeService, searchService);
             var trustedApi = new TrustedMetadataApi(readService, writeService, searchService);
 
+            var authentication = new AuthInterceptor();
+
             // Create the main server
 
             var servicePort = metaConfig.getPort();
 
             this.server = ServerBuilder
                     .forPort(servicePort)
+                    .intercept(authentication)
                     .addService(publicApi)
                     .addService(trustedApi)
                     .executor(executor)
