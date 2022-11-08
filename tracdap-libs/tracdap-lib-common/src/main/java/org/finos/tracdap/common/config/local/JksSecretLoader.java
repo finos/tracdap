@@ -18,13 +18,12 @@ package org.finos.tracdap.common.config.local;
 
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
+import org.finos.tracdap.common.config.CryptoHelpers;
 import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.startup.StartupLog;
 import org.slf4j.event.Level;
 
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.*;
@@ -111,41 +110,38 @@ public class JksSecretLoader implements ISecretLoader {
     public String loadPassword(String secretName) {
 
         try {
-
-            if (!ready) {
-                StartupLog.log(this, Level.ERROR, "JKS Secret loader has not been initialized");
-                throw new ETracInternal("JKS Secret loader has not been initialized");
-            }
-
-            var entry = keystore.getEntry(secretName, new KeyStore.PasswordProtection(secretKey.toCharArray()));
-
-            if (entry == null) {
-                var message = String.format("Secret is not present in the store: [%s]", secretName);
-                StartupLog.log(this, Level.ERROR, message);
-                throw new EConfigLoad(message);
-            }
-
-            if (!(entry instanceof KeyStore.SecretKeyEntry)) {
-                var message = String.format("Secret is not a secret key: [%s] is %s", secretName, entry.getClass().getSimpleName());
-                StartupLog.log(this, Level.ERROR, message);
-                throw new EConfigLoad(message);
-            }
-
-            var secret = (KeyStore.SecretKeyEntry) entry;
-            var algorithm = secret.getSecretKey().getAlgorithm();
-            var factory = SecretKeyFactory.getInstance(algorithm);
-
-            // Decode using based encryption
-            var keySpecType = PBEKeySpec.class;
-            var keySpec = (PBEKeySpec) factory.getKeySpec(secret.getSecretKey(), keySpecType);
-
-            var password = keySpec.getPassword();
-
-            return new String(password);
+            return CryptoHelpers.readTextEntry(keystore, secretName, secretKey);
         }
         catch (GeneralSecurityException e) {
+            var message = String.format("Password could not be retrieved from the key store: [%s] %s", secretName, e.getMessage());
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EConfigLoad(message, e);
+        }
+    }
 
-            var message = String.format("Secret could not be retrieved from the key store: [%s] %s", secretName, e.getMessage());
+    @Override
+    public PublicKey loadPublicKey(String secretName) {
+
+        try {
+            var base64 = CryptoHelpers.readTextEntry(keystore, secretName, secretKey);
+            return CryptoHelpers.decodePublicKey(base64, false);
+        }
+        catch (GeneralSecurityException e) {
+            var message = String.format("Public key could not be retrieved from the key store: [%s] %s", secretName, e.getMessage());
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EConfigLoad(message, e);
+        }
+    }
+
+    @Override
+    public PrivateKey loadPrivateKey(String secretName) {
+
+        try {
+            var base64 = CryptoHelpers.readTextEntry(keystore, secretName, secretKey);
+            return CryptoHelpers.decodePrivateKey(base64, false);
+        }
+        catch (GeneralSecurityException e) {
+            var message = String.format("Private key could not be retrieved from the key store: [%s] %s", secretName, e.getMessage());
             StartupLog.log(this, Level.ERROR, message);
             throw new EConfigLoad(message, e);
         }
