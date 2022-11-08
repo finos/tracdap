@@ -1,4 +1,16 @@
---  Copyright 2020 Accenture Global Solutions Limited
+--  Copyright 2022 Accenture Global Solutions Limited
+--
+--  Licensed under the Apache License, Version 2.0 (the "License");
+--  you may not use this file except in compliance with the License.
+--  You may obtain a copy of the License at
+--
+--      http://www.apache.org/licenses/LICENSE-2.0
+--
+--  Unless required by applicable law or agreed to in writing, software
+--  distributed under the License is distributed on an "AS IS" BASIS,
+--  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+--  See the License for the specific language governing permissions and
+--  limitations under the License.
 --
 --  Licensed under the Apache License, Version 2.0 (the "License");
 --  you may not use this file except in compliance with the License.
@@ -17,7 +29,6 @@ create table tenant (
 
     tenant_id smallint not null,
     tenant_code varchar(16) not null,
-    description varchar(4096) null,
 
     constraint pk_tenant primary key (tenant_id),
     constraint unq_tenant unique (tenant_code)
@@ -27,7 +38,7 @@ create table tenant (
 create table object_id (
 
     tenant_id smallint not null,
-    object_pk bigserial,
+    object_pk bigint not null auto_increment,
 
     object_type varchar(16) not null,
     object_id_hi bigint not null,
@@ -43,7 +54,7 @@ create unique index idx_object_unq on object_id (tenant_id, object_id_hi, object
 create table object_definition (
 
     tenant_id smallint not null,
-    definition_pk bigserial,
+    definition_pk bigint not null auto_increment,
 
     object_fk bigint not null,
     object_version int not null,
@@ -51,7 +62,7 @@ create table object_definition (
     object_superseded timestamp (6) null,
     object_is_latest boolean not null,
 
-    definition bytea not null,
+    definition blob not null,
 
     constraint pk_definition primary key (definition_pk),
     constraint fk_definition_object foreign key (object_fk) references object_id (object_pk),
@@ -64,7 +75,7 @@ create unique index idx_definition_unq on object_definition (tenant_id, object_f
 create table tag (
 
     tenant_id smallint not null,
-    tag_pk bigserial,
+    tag_pk bigint not null auto_increment,
 
     definition_fk bigint not null,
     tag_version int not null,
@@ -94,7 +105,7 @@ create table tag_attr (
 
     attr_value_boolean boolean null,
     attr_value_integer bigint null,
-    attr_value_float double precision null,
+    attr_value_float double null,
     attr_value_string varchar(4096) null,
     attr_value_decimal decimal (31, 10) null,
     attr_value_date date null,

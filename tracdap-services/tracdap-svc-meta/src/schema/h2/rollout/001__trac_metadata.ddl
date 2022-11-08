@@ -1,4 +1,16 @@
---  Copyright 2020 Accenture Global Solutions Limited
+--  Copyright 2022 Accenture Global Solutions Limited
+--
+--  Licensed under the Apache License, Version 2.0 (the "License");
+--  you may not use this file except in compliance with the License.
+--  You may obtain a copy of the License at
+--
+--      http://www.apache.org/licenses/LICENSE-2.0
+--
+--  Unless required by applicable law or agreed to in writing, software
+--  distributed under the License is distributed on an "AS IS" BASIS,
+--  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+--  See the License for the specific language governing permissions and
+--  limitations under the License.
 --
 --  Licensed under the Apache License, Version 2.0 (the "License");
 --  you may not use this file except in compliance with the License.
@@ -17,7 +29,6 @@ create table tenant (
 
     tenant_id smallint not null,
     tenant_code varchar(16) not null,
-    description varchar(4096) null,
 
     constraint pk_tenant primary key (tenant_id),
     constraint unq_tenant unique (tenant_code)
@@ -72,7 +83,7 @@ create table tag (
     tag_superseded timestamp (6) null,
     tag_is_latest boolean not null,
 
-    -- Duplicate fields from object ID/definition tables so they are available for searching
+    -- Make object type available for searching without a join
     object_type varchar(16) not null,
 
     constraint pk_tag primary key (tag_pk),
@@ -86,12 +97,12 @@ create unique index idx_tag_unq on tag (tenant_id, definition_fk, tag_version);
 create table tag_attr (
 
     tenant_id smallint not null,
-    tag_fk bigint not null,
 
+    tag_fk bigint not null,
     attr_name varchar(256) not null,
-    attr_type varchar(16) not null,
     attr_index int not null,
 
+    attr_type varchar(16) not null,
     attr_value_boolean boolean null,
     attr_value_integer bigint null,
     attr_value_float double null,

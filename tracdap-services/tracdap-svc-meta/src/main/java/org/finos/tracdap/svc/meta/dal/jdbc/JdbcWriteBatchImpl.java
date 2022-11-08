@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.svc.meta.dal.jdbc;
 
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.exception.ETracInternal;
@@ -81,9 +82,11 @@ class JdbcWriteBatchImpl {
                 "  object_version,\n" +
                 "  object_timestamp,\n" +
                 "  object_is_latest,\n" +
+                "  meta_format,\n" +
+                "  meta_version,\n" +
                 "  definition" +
                 ")\n" +
-                "values (?, ?, ?, ?, ?, ?)";
+                "values (?, ?, ?, ?, ?, ?, ?, ?)";
 
         // Only request generated key columns if the driver supports it
         var keySupport = dialect.supportsGeneratedKeys();
@@ -95,12 +98,18 @@ class JdbcWriteBatchImpl {
 
                 var sqlTimestamp = java.sql.Timestamp.from(parts.objectTimestamp[i]);
 
+                // Metadata format can be used to support alternate encoding, e.g. JSON
+                // Metadata version tracks breaking changes to the metadata model
+                // Currently there is no support for reading back other formats or old versions
+
                 stmt.setShort(1, tenantId);
                 stmt.setLong(2, objectPk[i]);
                 stmt.setInt(3, parts.objectVersion[i]);
                 stmt.setTimestamp(4, sqlTimestamp);
                 stmt.setBoolean(5, true);
-                stmt.setBytes(6, parts.definition[i].toByteArray());
+                stmt.setInt(6, MetadataConstants.PROTO_METADATA_FORMAT);
+                stmt.setInt(7, MetadataConstants.CURRENT_METADATA_VERSION);
+                stmt.setBytes(8, parts.definition[i].toByteArray());
 
                 stmt.addBatch();
             }

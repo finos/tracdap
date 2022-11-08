@@ -22,19 +22,23 @@ import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 import org.finos.tracdap.svc.meta.dal.jdbc.JdbcMetadataDal;
 
+import org.flywaydb.core.Flyway;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.*;
 
 import javax.sql.DataSource;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Properties;
-import java.util.Scanner;
 import java.util.UUID;
 
 import static org.finos.tracdap.test.meta.TestData.TEST_TENANT;
 
 
 public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback, AfterAllCallback {
+
+    private static final String SCRIPT_LOCATION = "tracdap-services/tracdap-svc-meta/src/schema/h2/rollout";
 
     private static final String JDBC_URL_TEMPLATE = "mem:%s;DB_CLOSE_DELAY=-1";
 
@@ -52,25 +56,37 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
         props.setProperty("unit.dialect", "H2");
         props.setProperty("unit.h2.user", "trac");
         props.setProperty("unit.h2.pass", "trac");
-        props.setProperty("unit.pool.size", "1");
+        props.setProperty("unit.pool.size", "2");
 
         source = JdbcSetup.createDatasource(props, "unit");
 
-        var inputStream = JdbcUnit.class.getResourceAsStream("/h2/001__trac_metadata.ddl");
-        var scanner = new Scanner(inputStream, StandardCharsets.UTF_8.name()).useDelimiter("\\A");
-        var deployScript = scanner.next();
+        // Find project root dir
+        var tracRepoDir = Paths.get(".").toAbsolutePath();
+        while (!Files.exists(tracRepoDir.resolve("tracdap-api")))
+            tracRepoDir = tracRepoDir.getParent();
 
-        try (var conn = source.getConnection(); var stmt = conn.createStatement()) {
+        var scriptLocation = "filesystem:" + tracRepoDir.resolve(SCRIPT_LOCATION);
 
-            System.out.println("SQL >>> Deploying database schema");
+        // Use Flyway to deploy the schema
+        var flyway = Flyway.configure()
+                .dataSource(source)
+                .locations(scriptLocation)
+                .sqlMigrationPrefix("")
+                .sqlMigrationSuffixes(".sql", ".ddl", ".dml")
+                .load();
 
-            for (var deployCommand : deployScript.split(";"))
-                if (!deployCommand.isBlank()) {
-                    System.out.println("SQL >>>\n\n" + deployCommand.strip() + "\n");
-                    stmt.execute(deployCommand);
-                }
+        flyway.migrate();
 
-            stmt.execute(String.format("insert into tenant (tenant_id, tenant_code) values (1, '%s')", TEST_TENANT));
+        // Create the test tenant
+        var tenantStmt = "insert into tenant (tenant_id, tenant_code, description) values (?, ?, ?)";
+
+        try (var conn = source.getConnection(); var stmt = conn.prepareStatement(tenantStmt)) {
+
+            stmt.setShort(1, (short) 1);
+            stmt.setString(2, TEST_TENANT);
+            stmt.setString(3, "Test tenant");
+
+            stmt.execute();
         }
     }
 
