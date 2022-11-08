@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.config;
 
+import org.finos.tracdap.common.exception.EConfigLoad;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -143,5 +144,75 @@ public class CryptoHelpersTest {
 
         Assertions.assertEquals(publicKey, rtPublicKey);
         Assertions.assertEquals(privateKey, rtPrivateKey);
+    }
+
+
+    // Error cases
+
+    @Test
+    void missingSecret() throws Exception {
+
+        var secretKey = "qdierj-ejcuw-ejcude";
+        var keystore = KeyStore.getInstance("PKCS12");
+        keystore.load(null, secretKey.toCharArray());
+
+        var payload = "A bilge rat and a parrot";
+
+        CryptoHelpers.writeTextEntry(keystore, "my_secret", payload, secretKey);
+
+        Assertions.assertThrows(EConfigLoad.class, () ->
+                CryptoHelpers.readTextEntry(keystore, "different_secret", secretKey));
+    }
+
+    @Test
+    void decodeGarbled() {
+
+        Assertions.assertThrows(EConfigLoad.class, () ->  CryptoHelpers.decodePublicKey("asdfpasdfasef", false));
+        Assertions.assertThrows(EConfigLoad.class, () -> CryptoHelpers.decodePrivateKey("asdfasdfasdf", false));
+
+        Assertions.assertThrows(EConfigLoad.class, () ->  CryptoHelpers.decodePublicKey("asdfpasdfasef", true));
+        Assertions.assertThrows(EConfigLoad.class, () -> CryptoHelpers.decodePrivateKey("asdfasdfasdf", true));
+    }
+
+    @Test
+    void decodeWrongKeyType() throws Exception {
+
+        var keySize = 256;
+        var keyGen = KeyPairGenerator.getInstance("EC");
+        var random = SecureRandom.getInstance("SHA1PRNG");
+
+        keyGen.initialize(keySize, random);
+
+        var keyPair = keyGen.generateKeyPair();
+
+        var publicKey = keyPair.getPublic();
+        var publicEncoded = CryptoHelpers.encodePublicKey(publicKey, false);
+
+        var privateKey = keyPair.getPrivate();
+        var privateEncoded = CryptoHelpers.encodePrivateKey(privateKey, false);
+
+        Assertions.assertThrows(EConfigLoad.class, () ->  CryptoHelpers.decodePublicKey(privateEncoded, false));
+        Assertions.assertThrows(EConfigLoad.class, () -> CryptoHelpers.decodePrivateKey(publicEncoded, false));
+    }
+
+    @Test
+    void decodeWrongEncoding() throws Exception {
+
+        var keySize = 256;
+        var keyGen = KeyPairGenerator.getInstance("EC");
+        var random = SecureRandom.getInstance("SHA1PRNG");
+
+        keyGen.initialize(keySize, random);
+
+        var keyPair = keyGen.generateKeyPair();
+
+        var publicKey = keyPair.getPublic();
+        var publicEncoded = CryptoHelpers.encodePublicKey(publicKey, true);
+
+        var privateKey = keyPair.getPrivate();
+        var privateEncoded = CryptoHelpers.encodePrivateKey(privateKey, true);
+
+        Assertions.assertThrows(EConfigLoad.class, () ->  CryptoHelpers.decodePublicKey(publicEncoded, false));
+        Assertions.assertThrows(EConfigLoad.class, () -> CryptoHelpers.decodePrivateKey(privateEncoded, false));
     }
 }

@@ -35,169 +35,205 @@ public class CryptoHelpers {
 
     public static String readTextEntry(KeyStore keystore, String alias, String secretKey) throws GeneralSecurityException {
 
-        var entry = keystore.getEntry(alias, new KeyStore.PasswordProtection(secretKey.toCharArray()));
+        try {
 
-        if (entry == null) {
-            var message = String.format("Secret is not present in the store: [%s]", alias);
-            StartupLog.log(CryptoHelpers.class, Level.ERROR, message);
-            throw new EConfigLoad(message);
+            var entry = keystore.getEntry(alias, new KeyStore.PasswordProtection(secretKey.toCharArray()));
+
+            if (entry == null) {
+                var message = String.format("Secret is not present in the store: [%s]", alias);
+                StartupLog.log(CryptoHelpers.class, Level.ERROR, message);
+                throw new EConfigLoad(message);
+            }
+
+            if (!(entry instanceof KeyStore.SecretKeyEntry)) {
+                var message = String.format("Secret is not a secret key: [%s] is %s", alias, entry.getClass().getSimpleName());
+                StartupLog.log(CryptoHelpers.class, Level.ERROR, message);
+                throw new EConfigLoad(message);
+            }
+
+            var secret = (KeyStore.SecretKeyEntry) entry;
+            var algorithm = secret.getSecretKey().getAlgorithm();
+            var factory = SecretKeyFactory.getInstance(algorithm);
+
+            // Decode using password based encryption
+            var keySpecType = PBEKeySpec.class;
+            var keySpec = (PBEKeySpec) factory.getKeySpec(secret.getSecretKey(), keySpecType);
+
+            var password = keySpec.getPassword();
+
+            return new String(password);
         }
-
-        if (!(entry instanceof KeyStore.SecretKeyEntry)) {
-            var message = String.format("Secret is not a secret key: [%s] is %s", alias, entry.getClass().getSimpleName());
-            StartupLog.log(CryptoHelpers.class, Level.ERROR, message);
-            throw new EConfigLoad(message);
+        catch (IllegalArgumentException | GeneralSecurityException e) {
+            var message = String.format("Failed to read secret [%s]: %s", alias, e.getMessage());
+            throw new EConfigLoad(message, e);
         }
-
-        var secret = (KeyStore.SecretKeyEntry) entry;
-        var algorithm = secret.getSecretKey().getAlgorithm();
-        var factory = SecretKeyFactory.getInstance(algorithm);
-
-        // Decode using password based encryption
-        var keySpecType = PBEKeySpec.class;
-        var keySpec = (PBEKeySpec) factory.getKeySpec(secret.getSecretKey(), keySpecType);
-
-        var password = keySpec.getPassword();
-
-        return new String(password);
     }
 
     public static void writeTextEntry(KeyStore keystore, String alias, String text, String secretKey) throws GeneralSecurityException {
 
-        var protection = new KeyStore.PasswordProtection(secretKey.toCharArray());
-        var factory = SecretKeyFactory.getInstance("PBE");
+        try {
 
-        var spec = new PBEKeySpec(text.toCharArray());
-        var secret = factory.generateSecret(spec);
-        var entry = new KeyStore.SecretKeyEntry(secret);
+            var protection = new KeyStore.PasswordProtection(secretKey.toCharArray());
+            var factory = SecretKeyFactory.getInstance("PBE");
 
-        keystore.setEntry(alias, entry, protection);
-    }
+            var spec = new PBEKeySpec(text.toCharArray());
+            var secret = factory.generateSecret(spec);
+            var entry = new KeyStore.SecretKeyEntry(secret);
 
-    public static String encodePublicKey(PublicKey key, boolean mime) throws GeneralSecurityException {
-
-        var factory = KeyFactory.getInstance(key.getAlgorithm());
-
-        var spec = factory.getKeySpec(key, X509EncodedKeySpec.class);
-        var encoded = spec.getEncoded();
-
-        if (mime) {
-            var base64 = Base64.getMimeEncoder(80, "\n".getBytes()).encodeToString(encoded);
-            return "-----BEGIN PUBLIC KEY-----\n" +
-                    base64 + "\n" +
-                    "-----END PUBLIC KEY-----\n";
+            keystore.setEntry(alias, entry, protection);
         }
-        else {
-            return Base64.getEncoder().encodeToString(encoded);
+        catch (IllegalArgumentException | GeneralSecurityException e) {
+            var message = String.format("Failed to write secret [%s]: %s", alias, e.getMessage());
+            throw new EConfigLoad(message, e);
         }
     }
 
-    public static String encodePrivateKey(PrivateKey key, boolean mime) throws GeneralSecurityException {
+    public static String encodePublicKey(PublicKey key, boolean mime) {
 
-        var factory = KeyFactory.getInstance(key.getAlgorithm());
+        try {
 
-        var spec = factory.getKeySpec(key, PKCS8EncodedKeySpec.class);
-        var encoded = spec.getEncoded();
+            var factory = KeyFactory.getInstance(key.getAlgorithm());
 
-        if (mime) {
-            var base64 = Base64.getMimeEncoder(80, "\n".getBytes()).encodeToString(encoded);
-            return "-----BEGIN PRIVATE KEY-----\n" +
-                    base64 + "\n" +
-                    "-----END PRIVATE KEY-----\n";
+            var spec = factory.getKeySpec(key, X509EncodedKeySpec.class);
+            var encoded = spec.getEncoded();
+
+            if (mime) {
+                var base64 = Base64.getMimeEncoder(80, "\n".getBytes()).encodeToString(encoded);
+                return "-----BEGIN PUBLIC KEY-----\n" +
+                        base64 + "\n" +
+                        "-----END PUBLIC KEY-----\n";
+            }
+            else {
+                return Base64.getEncoder().encodeToString(encoded);
+            }
         }
-        else {
-            return Base64.getEncoder().encodeToString(encoded);
+        catch (IllegalArgumentException | GeneralSecurityException e) {
+            var message = String.format("Failed to encode public key: " + e.getMessage());
+            throw new EConfigLoad(message, e);
         }
     }
 
-    public static PublicKey decodePublicKey(String key, boolean mime) throws GeneralSecurityException {
+    public static String encodePrivateKey(PrivateKey key, boolean mime) {
 
-        byte[] encoded;
+        try {
 
-        if (mime) {
+            var factory = KeyFactory.getInstance(key.getAlgorithm());
 
-            var base64 = key
-                    .replace("-----BEGIN PUBLIC KEY-----", "")
-                    .replaceAll("\\r", "")
-                    .replaceAll("\\n", "")
-                    .replace("-----END PUBLIC KEY-----", "");
+            var spec = factory.getKeySpec(key, PKCS8EncodedKeySpec.class);
+            var encoded = spec.getEncoded();
 
-            encoded = Base64.getMimeDecoder().decode(base64);
-        }
-        else {
-            encoded = Base64.getDecoder().decode(key);
-        }
-
-        // Search for the algorithm to decode the key
-        // This might be slow, but the assumption is keys are loaded rarely (normally just on startup)
-        // Putting in config for algorithms to match keys, with the right naming convention...
-        // Auto-detecting will give a much easier deployment experience
-
-        for (var algorithm : KEY_FACTORY_ALGORITHMS) {
-
-            try {
-
-                var spec = new X509EncodedKeySpec(encoded);
-                var factory = KeyFactory.getInstance(algorithm);
-
-                return factory.generatePublic(spec);
-            }
-            catch (Exception e) {
-                if (e instanceof InvalidKeySpecException)
-                    continue;
-                throw e;
+            if (mime) {
+                var base64 = Base64.getMimeEncoder(80, "\n".getBytes()).encodeToString(encoded);
+                return "-----BEGIN PRIVATE KEY-----\n" +
+                        base64 + "\n" +
+                        "-----END PRIVATE KEY-----\n";
+            } else {
+                return Base64.getEncoder().encodeToString(encoded);
             }
         }
-
-        var algos = String.join(", ", KEY_FACTORY_ALGORITHMS);
-        var message = String.format("Failed to decode public key (available algorithms are %s)", algos);
-
-        throw new EConfigLoad(message);
+        catch (IllegalArgumentException | GeneralSecurityException e) {
+            var message = String.format("Failed to encode private key: " + e.getMessage());
+            throw new EConfigLoad(message, e);
+        }
     }
 
-    public static PrivateKey decodePrivateKey(String key, boolean mime) throws GeneralSecurityException {
+    public static PublicKey decodePublicKey(String key, boolean mime) {
 
-        byte[] encoded;
+        try {
 
-        if (mime) {
+            byte[] encoded;
 
-            var base64 = key
-                    .replace("-----BEGIN PRIVATE KEY-----", "")
-                    .replaceAll("\\r", "")
-                    .replaceAll("\\n", "")
-                    .replace("-----END PRIVATE KEY-----", "");
+            if (mime) {
 
-            encoded = Base64.getMimeDecoder().decode(base64);
-        }
-        else {
-            encoded = Base64.getDecoder().decode(key);
-        }
+                var base64 = key
+                        .replace("-----BEGIN PUBLIC KEY-----", "")
+                        .replaceAll("\\r", "")
+                        .replaceAll("\\n", "")
+                        .replace("-----END PUBLIC KEY-----", "");
 
-        // Search for the algorithm to decode the key
-        // This might be slow, but the assumption is keys are loaded rarely (normally just on startup)
-        // Putting in config for algorithms to match keys, with the right naming convention...
-        // Auto-detecting will give a much easier deployment experience
-
-        for (var algorithm : KEY_FACTORY_ALGORITHMS) {
-
-            try {
-
-                var spec = new PKCS8EncodedKeySpec(encoded);
-                var factory = KeyFactory.getInstance(algorithm);
-
-                return factory.generatePrivate(spec);
+                encoded = Base64.getMimeDecoder().decode(base64);
+            } else {
+                encoded = Base64.getDecoder().decode(key);
             }
-            catch (Exception e) {
-                if (e instanceof InvalidKeySpecException)
-                    continue;
-                throw e;
+
+            // Search for the algorithm to decode the key
+            // This might be slow, but the assumption is keys are loaded rarely (normally just on startup)
+            // Putting in config for algorithms to match keys, with the right naming convention...
+            // Auto-detecting will give a much easier deployment experience
+
+            for (var algorithm : KEY_FACTORY_ALGORITHMS) {
+
+                try {
+
+                    var spec = new X509EncodedKeySpec(encoded);
+                    var factory = KeyFactory.getInstance(algorithm);
+
+                    return factory.generatePublic(spec);
+                } catch (Exception e) {
+                    if (e instanceof InvalidKeySpecException)
+                        continue;
+                    throw e;
+                }
             }
+
+            var algos = String.join(", ", KEY_FACTORY_ALGORITHMS);
+            var message = String.format("Failed to decode public key: No suitable algorithm (available algorithms are %s)", algos);
+
+            throw new EConfigLoad(message);
         }
+        catch (IllegalArgumentException | GeneralSecurityException e) {
+            var message = String.format("Failed to decode public key: " + e.getMessage());
+            throw new EConfigLoad(message, e);
+        }
+    }
 
-        var algos = String.join(", ", KEY_FACTORY_ALGORITHMS);
-        var message = String.format("Failed to decode public key (available algorithms are %s)", algos);
+    public static PrivateKey decodePrivateKey(String key, boolean mime) {
 
-        throw new EConfigLoad(message);
+        try {
+            byte[] encoded;
+
+            if (mime) {
+
+                var base64 = key
+                        .replace("-----BEGIN PRIVATE KEY-----", "")
+                        .replaceAll("\\r", "")
+                        .replaceAll("\\n", "")
+                        .replace("-----END PRIVATE KEY-----", "");
+
+                encoded = Base64.getMimeDecoder().decode(base64);
+            } else {
+                encoded = Base64.getDecoder().decode(key);
+            }
+
+            // Search for the algorithm to decode the key
+            // This might be slow, but the assumption is keys are loaded rarely (normally just on startup)
+            // Putting in config for algorithms to match keys, with the right naming convention...
+            // Auto-detecting will give a much easier deployment experience
+
+            for (var algorithm : KEY_FACTORY_ALGORITHMS) {
+
+                try {
+
+                    var spec = new PKCS8EncodedKeySpec(encoded);
+                    var factory = KeyFactory.getInstance(algorithm);
+
+                    return factory.generatePrivate(spec);
+                } catch (Exception e) {
+                    if (e instanceof InvalidKeySpecException)
+                        continue;
+                    throw e;
+                }
+            }
+
+            var algos = String.join(", ", KEY_FACTORY_ALGORITHMS);
+            var message = String.format("Failed to decode public key: No suitable algorithm (available algorithms are %s)", algos);
+
+            throw new EConfigLoad(message);
+        }
+        catch (IllegalArgumentException | GeneralSecurityException e) {
+            var message = String.format("Failed to decode private key: " + e.getMessage());
+            throw new EConfigLoad(message, e);
+        }
     }
 
     private static final List<String> KEY_FACTORY_ALGORITHMS = List.of("EC", "RSA", "DSA", "DiffieHellman");
