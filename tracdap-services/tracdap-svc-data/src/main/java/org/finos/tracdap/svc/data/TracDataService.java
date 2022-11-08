@@ -142,7 +142,9 @@ public class TracDataService extends CommonServiceBase {
             var fileSvc = new FileService(dataSvcConfig, storage, metaClient);
             var publicApi = new TracDataApi(dataSvc, fileSvc);
 
-            var authentication = new AuthInterceptor();
+            var authentication = AuthInterceptor.setupAuth(
+                    platformConfig.getAuthentication(),
+                    configManager);
 
             // Create the main server
 

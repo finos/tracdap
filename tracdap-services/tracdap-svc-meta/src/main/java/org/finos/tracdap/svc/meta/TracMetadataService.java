@@ -117,7 +117,9 @@ public class TracMetadataService extends CommonServiceBase {
             var publicApi = new TracMetadataApi(readService, writeService, searchService);
             var trustedApi = new TrustedMetadataApi(readService, writeService, searchService);
 
-            var authentication = new AuthInterceptor();
+            var authentication = AuthInterceptor.setupAuth(
+                    platformConfig.getAuthentication(),
+                    configManager);
 
             // Create the main server
 

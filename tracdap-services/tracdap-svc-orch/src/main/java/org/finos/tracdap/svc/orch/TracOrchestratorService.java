@@ -130,7 +130,9 @@ public class TracOrchestratorService extends CommonServiceBase {
             var orchestrator = new JobApiService(jobLifecycle, jobCache);
             var orchestratorApi = new TracOrchestratorApi(orchestrator);
 
-            var authentication = new AuthInterceptor();
+            var authentication = AuthInterceptor.setupAuth(
+                    platformConfig.getAuthentication(),
+                    configManager);
 
             this.server = NettyServerBuilder
                     .forPort(orchestratorConfig.getPort())
