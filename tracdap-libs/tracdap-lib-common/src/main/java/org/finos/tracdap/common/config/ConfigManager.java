@@ -32,6 +32,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.Map;
 import java.util.Properties;
 
@@ -129,6 +131,20 @@ public class ConfigManager {
      */
     public URI configRoot() {
         return rootConfigDir;
+    }
+
+    /**
+     * Allow client code to resolve config files explicitly
+     *
+     * <p>This is not normally needed by the TRAC services, which read config though this class.
+     * But some of the utility programs can use this method to find config files for updating.
+     *
+     * @param relativePath Relative URL of the config file to resolve
+     * @return The resolved absolute URL of the config file
+     */
+    public URI resolveConfigFile(URI relativePath) {
+
+        return resolveUrl(relativePath);
     }
 
 
@@ -275,6 +291,15 @@ public class ConfigManager {
         return loadRootConfigObject(configClass, /* leniency = */ false);
     }
 
+    public boolean hasSecret(String secretName) {
+
+        // If secrets are not enabled, hasSecret() should always return false
+        if (secrets == null) {
+            return false;
+        }
+
+        return secrets.hasSecret(secretName);
+    }
 
     public String loadPassword(String secretName) {
 
@@ -285,6 +310,28 @@ public class ConfigManager {
         }
 
         return secrets.loadPassword(secretName);
+    }
+
+    public PublicKey loadPublicKey(String secretName) {
+
+        if (secrets == null) {
+            var message = String.format("Secrets are not enabled, to use secrets set secret.type in [%s]", rootConfigFile);
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EStartup(message);
+        }
+
+        return secrets.loadPublicKey(secretName);
+    }
+
+    public PrivateKey loadPrivateKey(String secretName) {
+
+        if (secrets == null) {
+            var message = String.format("Secrets are not enabled, to use secrets set secret.type in [%s]", rootConfigFile);
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EStartup(message);
+        }
+
+        return secrets.loadPrivateKey(secretName);
     }
 
 

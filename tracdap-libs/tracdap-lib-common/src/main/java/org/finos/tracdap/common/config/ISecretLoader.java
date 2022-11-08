@@ -19,6 +19,9 @@ package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.exception.EStartup;
 
+import java.security.PrivateKey;
+import java.security.PublicKey;
+
 /**
  * Tech stack abstraction interface for loading secrets, certificates and other sensitive configuration items.
  *
@@ -47,6 +50,14 @@ public interface ISecretLoader {
     void init(ConfigManager configManager);
 
     /**
+     * Test whether a secret with the given name exists in the secret store
+     *
+     * @param secretName The name of the secret to check for
+     * @return True if the secret exists, false otherwise
+     */
+    boolean hasSecret(String secretName);
+
+    /**
      * Load a password from the secret loader as a text string.
      *
      * @param secretName The unique name of the secret to load
@@ -54,4 +65,30 @@ public interface ISecretLoader {
      * @throws EStartup There was a problem loading the secret
      */
     String loadPassword(String secretName);
+
+    /**
+     * Load a public key, which may be part of a public / private key pair
+     *
+     * <p>Public and private keys are stored separately, rather than as part of a key pair.
+     * This is to deal with limitations in several secret services (including JKS) that do
+     * not have a good way of dealing with structured secrets. Instead the key is encoded as
+     * bytes and stored as a blob.</p>
+     *
+     * @param secretName Name of the secret holding the public key
+     * @return A PublicKey object
+     */
+    PublicKey loadPublicKey(String secretName);
+
+    /**
+     * Load a private key, which may be part of a public / private key pair
+     *
+     * <p>Public and private keys are stored separately, rather than as part of a key pair.
+     * This is to deal with limitations in several secret services (including JKS) that do
+     * not have a good way of dealing with structured secrets. Instead the key is encoded as
+     * bytes and stored as a blob.</p>
+     *
+     * @param secretName Name of the secret holding the private key
+     * @return A PrivateKey object
+     */
+    PrivateKey loadPrivateKey(String secretName);
 }
