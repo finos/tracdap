@@ -22,6 +22,9 @@ import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.GrpcClientAuth;
+import org.finos.tracdap.common.auth.JwtProcessor;
+import org.finos.tracdap.common.auth.UserInfo;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.startup.StandardArgs;
@@ -47,6 +50,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.KeyPair;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -76,6 +80,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final boolean startMeta;
     private final boolean startData;
     private final boolean startOrch;
+
+    private String authToken;
 
     private PlatformTest(
             String testConfig, List<String> tenants, String storageFormat,
@@ -139,32 +145,32 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private ManagedChannel orchChannel;
 
     public TracMetadataApiGrpc.TracMetadataApiFutureStub metaClientFuture() {
-        var userCreds = new GrpcClientAuth("");
+        var userCreds = new GrpcClientAuth(authToken);
         return TracMetadataApiGrpc.newFutureStub(metaChannel).withCallCredentials(userCreds);
     }
 
     public TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClientBlocking() {
-        var userCreds = new GrpcClientAuth("");
+        var userCreds = new GrpcClientAuth(authToken);
         return TracMetadataApiGrpc.newBlockingStub(metaChannel).withCallCredentials(userCreds);
     }
 
     public TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClientTrustedBlocking() {
-        var userCreds = new GrpcClientAuth("");
+        var userCreds = new GrpcClientAuth(authToken);
         return TrustedMetadataApiGrpc.newBlockingStub(metaChannel).withCallCredentials(userCreds);
     }
 
     public TracDataApiGrpc.TracDataApiStub dataClient() {
-        var userCreds = new GrpcClientAuth("");
+        var userCreds = new GrpcClientAuth(authToken);
         return TracDataApiGrpc.newStub(dataChannel).withCallCredentials(userCreds);
     }
 
     public TracDataApiGrpc.TracDataApiBlockingStub dataClientBlocking() {
-        var userCreds = new GrpcClientAuth("");
+        var userCreds = new GrpcClientAuth(authToken);
         return TracDataApiGrpc.newBlockingStub(dataChannel).withCallCredentials(userCreds);
     }
 
     public TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClientBlocking() {
-        var userCreds = new GrpcClientAuth("");
+        var userCreds = new GrpcClientAuth(authToken);
         return TracOrchestratorApiGrpc.newBlockingStub(orchChannel).withCallCredentials(userCreds);
     }
 
@@ -295,10 +301,39 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         log.info("Running auth tool to set up root authentication keys...");
 
+        // Running the auth tool will create the secrets file and add the public / private keys for auth
+
         var authTasks = new ArrayList<StandardArgs.Task>();
         authTasks.add(StandardArgs.task(AuthTool.SIGNING_KEY_TASK, List.of("EC", "256"), ""));
-
         ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, keystoreKey, authTasks);
+
+        // Authentication is mandatory, so we need to build a token in order to test at the API level
+        // To create a valid token, we need to get the auth signing keys out of the secrets file
+        // Tokens must be signed with the same key used by the platform services
+
+        var pluginMgr = new PluginManager();
+        pluginMgr.initConfigPlugins();
+
+        var configMgr = new ConfigManager(
+                platformConfigUrl.toString(),
+                Paths.get(platformConfigUrl.toString()).getParent(),
+                pluginMgr, keystoreKey);
+
+        configMgr.prepareSecrets();
+
+        var platformConfig = configMgr.loadRootConfigObject(PlatformConfig.class);
+        var authConfig = platformConfig.getAuthentication();
+
+        var publicKey = configMgr.loadPublicKey(ConfigKeys.TRAC_AUTH_PUBLIC_KEY);
+        var privateKey = configMgr.loadPrivateKey(ConfigKeys.TRAC_AUTH_PRIVATE_KEY);
+        var keyPair = new KeyPair(publicKey, privateKey);
+        var jwt = JwtProcessor.configure(authConfig, keyPair);
+
+        var userInfo = new UserInfo();
+        userInfo.setUserId("platform_testing");
+        userInfo.setDisplayName("Platform testing user");
+
+        authToken = jwt.encodeToken(userInfo);
     }
 
     void prepareDatabase() {
