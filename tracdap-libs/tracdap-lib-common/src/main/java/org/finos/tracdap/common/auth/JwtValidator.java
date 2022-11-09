@@ -81,7 +81,7 @@ public class JwtValidator {
             if (userId == null || issueTimeStr == null || expiryTimeStr == null) {
                 var sessionInfo = new SessionInfo();
                 sessionInfo.setValid(false);
-                sessionInfo.setErrorMessage("Missing required authentication details");
+                sessionInfo.setErrorMessage("Authentication failed: Missing required details");
                 return sessionInfo;
             }
 

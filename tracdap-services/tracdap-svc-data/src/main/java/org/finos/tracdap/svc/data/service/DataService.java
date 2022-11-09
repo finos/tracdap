@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.auth.GrpcClientAuth;
 import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
@@ -97,10 +98,12 @@ public class DataService {
     public CompletionStage<TagHeader> createDataset(
             DataWriteRequest request,
             Flow.Publisher<ByteBuf> contentStream,
-            IExecutionContext execCtx) {
+            IExecutionContext execCtx,
+            String authToken) {
 
         var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
         var state = new RequestState();
+        state.authToken = authToken;
         var objectTimestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         // Look up the requested data codec
@@ -145,11 +148,14 @@ public class DataService {
     public CompletionStage<TagHeader> updateDataset(
             DataWriteRequest request,
             Flow.Publisher<ByteBuf> contentStream,
-            IExecutionContext execCtx) {
+            IExecutionContext execCtx,
+            String authToken) {
 
         var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
         var state = new RequestState();
+        state.authToken = authToken;
         var prior = new RequestState();
+        prior.authToken = authToken;
         var objectTimestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         // Look up the requested data codec
@@ -200,10 +206,12 @@ public class DataService {
             DataReadRequest request,
             CompletableFuture<SchemaDefinition> schema,
             Flow.Subscriber<ByteBuf> contentStream,
-            IExecutionContext execCtx) {
+            IExecutionContext execCtx,
+            String authToken) {
 
         var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
         var state = new RequestState();
+        state.authToken = authToken;
 
         var codec = codecManager.getCodec(request.getFormat());
         var codecOptions = Map.<String, String>of();
@@ -233,10 +241,11 @@ public class DataService {
 
     private CompletionStage<Void> loadMetadata(String tenant, TagSelector dataSelector, RequestState state) {
 
+        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
         var request = MetadataBuilders.requestForSelector(tenant, dataSelector);
 
         return grpcWrap
-                .unaryCall(READ_OBJECT_METHOD, request, metaClient::readObject)
+                .unaryCall(READ_OBJECT_METHOD, request, client::readObject)
                 .thenAccept(tag -> {
                     state.dataId = tag.getHeader();
                     state.data = tag.getDefinition().getData();
@@ -248,10 +257,11 @@ public class DataService {
 
     private CompletionStage<Void> loadStorageAndExternalSchema(String tenant, RequestState state) {
 
+        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
         var request = MetadataBuilders.requestForBatch(tenant, state.data.getStorageId(), state.data.getSchemaId());
 
         return grpcWrap
-                .unaryCall(READ_BATCH_METHOD, request, metaClient::readBatch)
+                .unaryCall(READ_BATCH_METHOD, request, client::readBatch)
                 .thenAccept(response -> {
 
                     var storageTag = response.getTag(0);
@@ -267,10 +277,11 @@ public class DataService {
 
     private CompletionStage<Void> loadStorageAndEmbeddedSchema(String tenant, RequestState state) {
 
+        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
         var request = MetadataBuilders.requestForSelector(tenant, state.data.getStorageId());
 
         return grpcWrap
-                .unaryCall(READ_OBJECT_METHOD, request, metaClient::readObject)
+                .unaryCall(READ_OBJECT_METHOD, request, client::readObject)
                 .thenAccept(tag -> {
 
                     state.storageId = tag.getHeader();
@@ -283,6 +294,8 @@ public class DataService {
 
     private CompletionStage<SchemaDefinition> resolveSchema(DataWriteRequest request, RequestState state) {
 
+        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
+
         if (request.hasSchema()) {
             state.schema = request.getSchema();
             return CompletableFuture.completedFuture(state.schema);
@@ -292,7 +305,7 @@ public class DataService {
 
             var schemaReq = MetadataBuilders.requestForSelector(request.getTenant(), request.getSchemaId());
 
-            return grpcWrap.unaryCall(READ_OBJECT_METHOD, schemaReq, metaClient::readObject)
+            return grpcWrap.unaryCall(READ_OBJECT_METHOD, schemaReq, client::readObject)
                     .thenApply(tag -> state.schema = tag.getDefinition().getSchema());
         }
 
@@ -327,19 +340,23 @@ public class DataService {
 
     private CompletionStage<Void> preallocateIds(DataWriteRequest request, RequestState state) {
 
+        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
+
         var preAllocDataReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.DATA);
         var preAllocStorageReq = MetadataBuilders.preallocateRequest(request.getTenant(), ObjectType.STORAGE);
 
         return CompletableFuture.completedFuture(0)
 
-                .thenCompose(x -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, preAllocDataReq, metaClient::preallocateId))
+                .thenCompose(x -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, preAllocDataReq, client::preallocateId))
                 .thenAccept(dataId -> state.preAllocDataId = dataId)
 
-                .thenCompose(x -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, preAllocStorageReq, metaClient::preallocateId))
+                .thenCompose(x -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, preAllocStorageReq, client::preallocateId))
                 .thenAccept(storageId -> state.preAllocStorageId = storageId);
     }
 
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state) {
+
+        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
 
         var priorStorageId = selectorFor(state.preAllocStorageId);
         var storageReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
@@ -348,12 +365,14 @@ public class DataService {
         var dataReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
 
         return grpcWrap
-                .unaryCall(CREATE_PREALLOCATED_METHOD, storageReq, metaClient::createPreallocatedObject)
+                .unaryCall(CREATE_PREALLOCATED_METHOD, storageReq, client::createPreallocatedObject)
                 .thenCompose(x -> grpcWrap
-                        .unaryCall(CREATE_PREALLOCATED_METHOD, dataReq, metaClient::createPreallocatedObject));
+                        .unaryCall(CREATE_PREALLOCATED_METHOD, dataReq, client::createPreallocatedObject));
     }
 
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state, RequestState prior) {
+
+        var client = metaClient.withCallCredentials(new GrpcClientAuth(state.authToken));
 
         var priorStorageId = selectorFor(prior.storageId);
         var storageReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorStorageId, state.storage, state.storageTags);
@@ -362,9 +381,9 @@ public class DataService {
         var dataReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
 
         return grpcWrap
-                .unaryCall(UPDATE_OBJECT_METHOD, storageReq, metaClient::updateObject)
+                .unaryCall(UPDATE_OBJECT_METHOD, storageReq, client::updateObject)
                 .thenCompose(x -> grpcWrap
-                        .unaryCall(UPDATE_OBJECT_METHOD, dataReq, metaClient::updateObject));
+                        .unaryCall(UPDATE_OBJECT_METHOD, dataReq, client::updateObject));
     }
 
     private RequestState buildMetadata(DataWriteRequest request, RequestState state, OffsetDateTime objectTimestamp) {

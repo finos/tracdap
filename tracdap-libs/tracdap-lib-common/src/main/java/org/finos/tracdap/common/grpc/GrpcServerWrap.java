@@ -44,7 +44,7 @@ public class GrpcServerWrap {
 
         try {
 
-            var userInfo = AuthConstants.AUTH_CONTEXT_KEY.get();
+            var userInfo = AuthConstants.USER_INFO_KEY.get();
 
             log.info("API CALL START: [{}] [{} <{}>]",
                     method.getBareMethodName(),
@@ -71,7 +71,7 @@ public class GrpcServerWrap {
 
         try {
 
-            var userInfo = AuthConstants.AUTH_CONTEXT_KEY.get();
+            var userInfo = AuthConstants.USER_INFO_KEY.get();
 
             log.info("API CALL START: [{}] [{} <{}>] (server streaming)",
                     method.getBareMethodName(),
@@ -103,7 +103,7 @@ public class GrpcServerWrap {
 
         try {
 
-            var userInfo = AuthConstants.AUTH_CONTEXT_KEY.get();
+            var userInfo = AuthConstants.USER_INFO_KEY.get();
 
             log.info("API CALL START: [{}] [{} <{}>] (client streaming)",
                     method.getBareMethodName(),

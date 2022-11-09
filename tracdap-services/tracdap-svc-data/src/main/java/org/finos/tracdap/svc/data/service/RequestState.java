@@ -24,6 +24,8 @@ import java.util.List;
 
 class RequestState {
 
+    String authToken;
+
     Instant objectTimestamp;
 
     List<TagUpdate> dataTags;

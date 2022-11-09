@@ -23,10 +23,14 @@ import io.grpc.Metadata;
 public class AuthConstants {
 
     public static final String AUTHORIZATION = "authorization";
+    public static final String USER_INFO = "user_info";
 
     public static final Metadata.Key<String> AUTH_METADATA_KEY =
             Metadata.Key.of(AUTHORIZATION, Metadata.ASCII_STRING_MARSHALLER);
 
-    public static final Context.Key<UserInfo> AUTH_CONTEXT_KEY =
+    public static final Context.Key<UserInfo> USER_INFO_KEY =
+            Context.key(USER_INFO);
+
+    public static final Context.Key<String> AUTH_TOKEN_KEY =
             Context.key(AUTHORIZATION);
 }

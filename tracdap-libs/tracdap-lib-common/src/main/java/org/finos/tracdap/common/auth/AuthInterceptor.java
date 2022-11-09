@@ -81,7 +81,7 @@ public class AuthInterceptor implements ServerInterceptor {
 
         if (!sessionInfo.isValid()) {
 
-            log.error("Authentication failed: {}", sessionInfo.getErrorMessage());
+            log.error(sessionInfo.getErrorMessage());
 
             var status = Status.UNAUTHENTICATED.withDescription(sessionInfo.getErrorMessage());
             var trailers = new Metadata();
@@ -93,7 +93,10 @@ public class AuthInterceptor implements ServerInterceptor {
         // Put the user info object into the context to make it available in the service implementation
 
         var userInfo = sessionInfo.getUserInfo();
-        var ctx = Context.current().withValue(AuthConstants.AUTH_CONTEXT_KEY, userInfo);
+
+        var ctx = Context.current()
+                .withValue(AuthConstants.AUTH_TOKEN_KEY, token)
+                .withValue(AuthConstants.USER_INFO_KEY, userInfo);
 
         return Contexts.interceptCall(ctx, call, headers, next);
     }
