@@ -16,21 +16,23 @@
 
 package org.finos.tracdap.test.helpers;
 
+import io.grpc.*;
 import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
+import org.finos.tracdap.common.auth.GrpcClientAuth;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.config.InstanceConfig;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.tools.auth.AuthTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
 import org.finos.tracdap.test.config.ConfigHelpers;
-import io.grpc.ManagedChannel;
 import io.grpc.netty.NettyChannelBuilder;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
@@ -137,27 +139,33 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private ManagedChannel orchChannel;
 
     public TracMetadataApiGrpc.TracMetadataApiFutureStub metaClientFuture() {
-        return TracMetadataApiGrpc.newFutureStub(metaChannel);
+        var userCreds = new GrpcClientAuth("");
+        return TracMetadataApiGrpc.newFutureStub(metaChannel).withCallCredentials(userCreds);
     }
 
     public TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClientBlocking() {
-        return TracMetadataApiGrpc.newBlockingStub(metaChannel);
+        var userCreds = new GrpcClientAuth("");
+        return TracMetadataApiGrpc.newBlockingStub(metaChannel).withCallCredentials(userCreds);
     }
 
     public TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClientTrustedBlocking() {
-        return TrustedMetadataApiGrpc.newBlockingStub(metaChannel);
+        var userCreds = new GrpcClientAuth("");
+        return TrustedMetadataApiGrpc.newBlockingStub(metaChannel).withCallCredentials(userCreds);
     }
 
     public TracDataApiGrpc.TracDataApiStub dataClient() {
-        return TracDataApiGrpc.newStub(dataChannel);
+        var userCreds = new GrpcClientAuth("");
+        return TracDataApiGrpc.newStub(dataChannel).withCallCredentials(userCreds);
     }
 
     public TracDataApiGrpc.TracDataApiBlockingStub dataClientBlocking() {
-        return TracDataApiGrpc.newBlockingStub(dataChannel);
+        var userCreds = new GrpcClientAuth("");
+        return TracDataApiGrpc.newBlockingStub(dataChannel).withCallCredentials(userCreds);
     }
 
     public TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClientBlocking() {
-        return TracOrchestratorApiGrpc.newBlockingStub(orchChannel);
+        var userCreds = new GrpcClientAuth("");
+        return TracOrchestratorApiGrpc.newBlockingStub(orchChannel).withCallCredentials(userCreds);
     }
 
     public Path storageRootDir() {
@@ -174,6 +182,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         findDirectories();
         prepareConfig();
         preparePlugins();
+
+        prepareAuth();
 
         if (runDbDeploy)
             prepareDatabase();
@@ -247,7 +257,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
                 testConfig, tracDir,
                 substitutions);
 
-        keystoreKey = "";  // not yet used
+        // Used for storing and accessing secrets
+        // Core auth setup is mandatory and needs this to be set
+        keystoreKey = "d7xbeK-julOi8-bBwd9k";
 
 
         var plugins = new PluginManager();
@@ -277,6 +289,16 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         finally {
             proc.destroy();
         }
+    }
+
+    void prepareAuth() {
+
+        log.info("Running auth tool to set up root authentication keys...");
+
+        var authTasks = new ArrayList<StandardArgs.Task>();
+        authTasks.add(StandardArgs.task(AuthTool.SIGNING_KEY_TASK, List.of("EC", "256"), ""));
+
+        ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, keystoreKey, authTasks);
     }
 
     void prepareDatabase() {

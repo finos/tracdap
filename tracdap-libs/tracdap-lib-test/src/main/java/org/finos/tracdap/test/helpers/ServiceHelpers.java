@@ -22,6 +22,7 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
+import org.finos.tracdap.tools.auth.AuthTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 
@@ -32,6 +33,20 @@ import java.util.List;
 
 
 public class ServiceHelpers {
+
+    public static void runAuthTool(Path workingDir, URL configPath, String keystoreKey, List<StandardArgs.Task> tasks) {
+
+        // Do not use secrets during start up for the auth tool
+        // The auth tool is often used to create the secrets file
+
+        var startup = Startup.useConfigFile(AuthTool.class, workingDir, configPath.toString(), keystoreKey);
+        startup.runStartupSequence(/* useSecrets = */ false);
+
+        var config = startup.getConfig();
+        var authTool = new AuthTool(config, keystoreKey);
+
+        authTool.runTasks(tasks);
+    }
 
     public static void runDbDeploy(Path workingDir, URL configPath, String keystoreKey, List<StandardArgs.Task> tasks) {
 
