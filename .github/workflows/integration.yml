@@ -204,6 +204,14 @@ jobs:
       - name: Build
         run: ./gradlew trac-svc-meta:build trac-svc-meta:testClasses deploy-metadb:build -x test
 
+      # Auth tool will also create the secrets file if it doesn't exist
+      - name: Prepare Auth Keys
+        run: |
+          ./gradlew auth-tool:run --args="\
+          --config ${{ env.TRAC_CONFIG_FILE }} \
+          --secret-key ${{ env.TRAC_SECRET_KEY }} \
+          --task signing_key EC 256"
+
       # The name and description of the test tenant are verified in one of the test cases so they need to match
       # MetadataReapApiTest listTenants()
       - name: Prepare Database
@@ -213,13 +221,6 @@ jobs:
           --secret-key ${{ env.TRAC_SECRET_KEY }} \
           --task deploy_schema \
           --task add_tenant ACME_CORP 'Test tenant [ACME_CORP]'"
-
-      - name: Prepare Auth Keys
-        run: |
-          ./gradlew auth-tool:run --args="\
-          --config ${{ env.TRAC_CONFIG_FILE }} \
-          --secret-key ${{ env.TRAC_SECRET_KEY }} \
-          --task signing_key EC 256"
 
       - name: Integration Tests
         run: ./gradlew integration -DintegrationTags="int-metadb"
