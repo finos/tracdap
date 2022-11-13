@@ -14,3 +14,6 @@
 
 # Config loader supporting local files is available as part of the core implementation
 org.finos.tracdap.common.config.local.LocalConfigPlugin
+
+# Include a number of common auth providers as part of the core implementation
+org.finos.tracdap.common.auth.standard.StandardAuthPlugin

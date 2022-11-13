@@ -14,32 +14,34 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.gateway.auth.basic;
+package org.finos.tracdap.common.auth.standard;
+
+import org.finos.tracdap.common.auth.JwtProcessor;
+import org.finos.tracdap.common.auth.UserInfo;
+import org.finos.tracdap.common.auth.IAuthProvider;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
-import org.finos.tracdap.common.auth.JwtHelpers;
-import org.finos.tracdap.common.auth.UserInfo;
-import org.finos.tracdap.gateway.auth.AuthProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.Properties;
 
-public class BasicAuthProvider implements AuthProvider {
+
+public class BasicAuthProvider implements IAuthProvider {
 
     private static final Logger log = LoggerFactory.getLogger(BasicAuthProvider.class);
 
     private static final String BASIC_AUTH_PREFIX = "basic ";
 
-    // TODO: Single copy of this taken from config
-    private static final Duration TOKEN_EXPIRY = Duration.of(6, ChronoUnit.HOURS);
+    public BasicAuthProvider(Properties properties) {
+
+    }
 
     @Override
-    public String newAuth(ChannelHandlerContext ctx, HttpRequest req) {
+    public String newAuth(ChannelHandlerContext ctx, HttpRequest req, JwtProcessor jwtProcessor) {
 
         log.info("AUTHENTICATION: Using basic authentication");
 
@@ -58,7 +60,7 @@ public class BasicAuthProvider implements AuthProvider {
     }
 
     @Override
-    public String translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo) {
+    public String translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo, JwtProcessor jwtProcessor) {
 
         var prefixEnd = Math.min(BASIC_AUTH_PREFIX.length(), authInfo.length());
         var prefix = authInfo.substring(0, prefixEnd);
@@ -66,7 +68,7 @@ public class BasicAuthProvider implements AuthProvider {
         // If the authorization header is not understood, trigger a new auth workflow
         if (!prefix.equalsIgnoreCase(BASIC_AUTH_PREFIX)) {
             log.warn("Invalid authorization header, re-authorization required");
-            return newAuth(ctx, req);
+            return newAuth(ctx, req, jwtProcessor);
         }
 
         var basicAuthData = authInfo.substring(BASIC_AUTH_PREFIX.length());
@@ -77,19 +79,19 @@ public class BasicAuthProvider implements AuthProvider {
         // Separator must be found and cannot be at position zero (i.e. no empty usernames)
         if (separator < 1) {
             log.warn("Invalid authorization header, re-authorization required");
-            return newAuth(ctx, req);
+            return newAuth(ctx, req, jwtProcessor);
         }
 
         var user = userAndPass.substring(0, separator);
         var pass = userAndPass.substring(separator + 1);
 
         if (!checkPassword(user, pass)) {
-            return newAuth(ctx, req);
+            return newAuth(ctx, req, jwtProcessor);
         }
 
         var userInfo = getUserInfo(user);
 
-        return JwtHelpers.encodeToken(userInfo, TOKEN_EXPIRY);
+        return jwtProcessor.encodeToken(userInfo);
     }
 
     private boolean checkPassword(String user, String pass) {
