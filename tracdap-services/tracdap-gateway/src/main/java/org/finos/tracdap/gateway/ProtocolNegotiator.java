@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.gateway.routing;
+package org.finos.tracdap.gateway;
 
 import org.finos.tracdap.common.auth.JwtProcessor;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.GatewayConfig;
 import org.finos.tracdap.gateway.auth.Http1AuthHandler;
-import org.finos.tracdap.gateway.auth.IAuthProvider;
+import org.finos.tracdap.common.auth.IAuthProvider;
 import org.finos.tracdap.gateway.exec.Route;
 
 import io.netty.channel.*;
@@ -30,6 +30,8 @@ import io.netty.handler.codec.http2.*;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AsciiString;
 
+import org.finos.tracdap.gateway.routing.Http1Router;
+import org.finos.tracdap.gateway.routing.Http2Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 
-public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
+public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
     private static final String PROTOCOL_SELECTOR_HANDLER = "protocol_selector";
     private static final String HTTP_1_INITIALIZER = "http_1_initializer";
@@ -61,7 +63,7 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
     private final Supplier<ChannelInboundHandlerAdapter> http2Handler;
 
 
-    public HttpProtocolNegotiator(
+    public ProtocolNegotiator(
             GatewayConfig config, List<Route> routes,
             IAuthProvider authProvider, JwtProcessor jwtProcessor) {
 

@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.gateway.auth;
 
+import org.finos.tracdap.common.auth.IAuthProvider;
 import org.finos.tracdap.common.auth.JwtProcessor;
 
 import io.netty.channel.ChannelDuplexHandler;
@@ -126,10 +127,10 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
             log.debug("AUTHENTICATION: Required");
 
-            var token = provider.newAuth(ctx, req, jwtProcessor);
+            var userInfo = provider.newAuth(ctx, req);
 
-            if (token != null)
-                authInfo = BEARER_AUTH_PREFIX + token;
+            if (userInfo != null)
+                authInfo = BEARER_AUTH_PREFIX + jwtProcessor.encodeToken(userInfo);
             else
                 return false;
         }
@@ -141,10 +142,10 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
             log.trace("AUTHENTICATION: Translation required");
 
-            var token = provider.translateAuth(ctx, req, authInfo, jwtProcessor);
+            var userInfo = provider.translateAuth(ctx, req, authInfo);
 
-            if (token != null)
-                authInfo = BEARER_AUTH_PREFIX + token;
+            if (userInfo != null)
+                authInfo = BEARER_AUTH_PREFIX + jwtProcessor.encodeToken(userInfo);
             else
                 return false;
         }
@@ -156,9 +157,10 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
             log.warn("AUTHENTICATION: Previous login is no longer valid: {}", session.getErrorMessage());
 
-            token = provider.newAuth(ctx, req, jwtProcessor);
-            if (token == null)
+            var userInfo = provider.newAuth(ctx, req);
+            if (userInfo == null)
                 return false;
+            token = jwtProcessor.encodeToken(userInfo);
             session = jwtProcessor.decodeAndValidate(token);
         }
 

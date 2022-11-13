@@ -23,7 +23,7 @@ import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.config.GatewayConfig;
-import org.finos.tracdap.gateway.auth.IAuthProvider;
+import org.finos.tracdap.common.auth.IAuthProvider;
 import org.finos.tracdap.gateway.config.helpers.ConfigTranslator;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.exec.RouteBuilder;
@@ -34,7 +34,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
-import org.finos.tracdap.gateway.routing.HttpProtocolNegotiator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,7 +109,7 @@ public class TracPlatformGateway extends CommonServiceBase {
             var jwtProcessor = setupJwtAuth(configManager);
 
             // The protocol negotiator is the top level initializer for new inbound connections
-            var protocolNegotiator = new HttpProtocolNegotiator(
+            var protocolNegotiator = new ProtocolNegotiator(
                     gatewayConfig, routes,
                     authProvider, jwtProcessor);
 
