@@ -84,11 +84,28 @@ public class BasicAuthProvider implements IAuthProvider {
         var user = userAndPass.substring(0, separator);
         var pass = userAndPass.substring(separator + 1);
 
+        // Basic auth store not implemented yet
+        // Should be a dedicated keystore for users
+        // Users can be added with auth-tool
+        var status = new HttpResponseStatus(HttpResponseStatus.FORBIDDEN.code(), "Basic auth not implemented yet");
+        var headers = new DefaultHttpHeaders();
+        var response = new DefaultHttpResponse(
+                req.protocolVersion(),
+                status,
+                headers);
+
+        ctx.writeAndFlush(response);
+        ctx.close();
+        return null;
+
+        /* real implementation would be this
+
         if (!checkPassword(user, pass)) {
             return newAuth(ctx, req);
         }
 
         return getUserInfo(user);
+         */
     }
 
     private boolean checkPassword(String user, String pass) {
@@ -96,6 +113,7 @@ public class BasicAuthProvider implements IAuthProvider {
         // TODO: Real auth using a local source
 
         log.info("AUTHENTICATION: Succeeded [{}]", user);
+
         return true;
     }
 
