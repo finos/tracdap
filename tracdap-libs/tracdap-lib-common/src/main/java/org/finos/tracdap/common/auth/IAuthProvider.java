@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.gateway.auth;
-
-import org.finos.tracdap.common.auth.JwtProcessor;
+package org.finos.tracdap.common.auth;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
