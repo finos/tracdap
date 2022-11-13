@@ -12,6 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+config:
+  secret.type: PKCS12
+  secret.url: secrets.p12
+
+authentication:
+
+  jwtIssuer: http://localhost:8080/
+  jwtExpiry: 7200
+
+  provider:
+    protocol: guest
+    properties:
+      userId: guest
+      userName: Guest User
+
 port: 8080
 
 routes:
