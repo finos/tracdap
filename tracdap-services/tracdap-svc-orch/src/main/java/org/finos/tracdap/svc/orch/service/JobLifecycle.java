@@ -20,7 +20,7 @@ import org.finos.tracdap.api.MetadataBatchRequest;
 import org.finos.tracdap.api.MetadataBatchResponse;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
-import org.finos.tracdap.common.exception.EInputValidation;
+import org.finos.tracdap.common.auth.GrpcClientAuth;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.GrpcClientWrap;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -117,8 +117,10 @@ public class JobLifecycle {
                 .addAllSelector(orderedSelectors)
                 .build();
 
+        var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
+
         return grpcWrap
-                .unaryCall(READ_BATCH_METHOD, batchRequest, metaClient::readBatch)
+                .unaryCall(READ_BATCH_METHOD, batchRequest, client::readBatch)
                 .thenCompose(batchResponse -> loadResourcesResponse(jobState, orderedKeys, batchResponse));
     }
 
@@ -194,7 +196,8 @@ public class JobLifecycle {
             JobState jobState, Instant jobTimestamp,
             String resultKey, MetadataWriteRequest idRequest) {
 
-        var preallocateResult = grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, idRequest, metaClient::preallocateId);
+        var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
+        var preallocateResult = grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, idRequest, client::preallocateId);
 
         return preallocateResult.thenApply(preallocatedId -> {
 
@@ -264,9 +267,10 @@ public class JobLifecycle {
                 .addAllTagUpdates(freeJobAttrs)
                 .build();
 
+        var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
         var grpcCall = grpcWrap.unaryCall(
                 CREATE_OBJECT_METHOD, jobWriteReq,
-                metaClient::createObject);
+                client::createObject);
 
         return grpcCall.thenApply(header -> {
 
@@ -299,26 +303,28 @@ public class JobLifecycle {
         for (var update : metaUpdates) {
 
             var update_ = applyJobAttrs(jobState, update);
-            updateResult = updateResult.thenCompose(x -> saveResultMetadata(update_));
+            updateResult = updateResult.thenCompose(x -> saveResultMetadata(jobState, update_));
         }
 
-        updateResult = updateResult.thenCompose(x -> saveResultMetadata(jobUpdate));
+        updateResult = updateResult.thenCompose(x -> saveResultMetadata(jobState, jobUpdate));
 
         return updateResult.thenApply(x -> null);
     }
 
-    private CompletionStage<TagHeader> saveResultMetadata(MetadataWriteRequest update) {
+    private CompletionStage<TagHeader> saveResultMetadata(JobState jobState, MetadataWriteRequest update) {
+
+        var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
 
         if (!update.hasDefinition())
-            return grpcWrap.unaryCall(UPDATE_TAG_METHOD, update, metaClient::updateTag);
+            return grpcWrap.unaryCall(UPDATE_TAG_METHOD, update, client::updateTag);
 
         if (!update.hasPriorVersion())
-            return grpcWrap.unaryCall(CREATE_OBJECT_METHOD, update, metaClient::createObject);
+            return grpcWrap.unaryCall(CREATE_OBJECT_METHOD, update, client::createObject);
 
         if (update.getPriorVersion().getObjectVersion() < MetadataConstants.OBJECT_FIRST_VERSION)
-            return grpcWrap.unaryCall(CREATE_PREALLOCATED_OBJECT_METHOD, update, metaClient::createPreallocatedObject);
+            return grpcWrap.unaryCall(CREATE_PREALLOCATED_OBJECT_METHOD, update, client::createPreallocatedObject);
         else
-            return grpcWrap.unaryCall(UPDATE_OBJECT_METHOD, update, metaClient::updateObject);
+            return grpcWrap.unaryCall(UPDATE_OBJECT_METHOD, update, client::updateObject);
     }
 
     private MetadataWriteRequest buildJobSucceededUpdate(JobState jobState) {
