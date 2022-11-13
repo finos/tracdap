@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.svc.meta.services;
 
+import org.finos.tracdap.common.auth.AuthConstants;
+import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -35,9 +37,6 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.TAG_FIRST_VERS
 
 public class MetadataWriteService {
 
-    private static final String GUEST_USER_ID = "guest";
-    private static final String GUEST_USER_NAME = "Guest User";
-
     private final Validator validator = new Validator();
     private final IMetadataDal dal;
 
@@ -51,6 +50,10 @@ public class MetadataWriteService {
             List<TagUpdate> tagUpdates) {
 
         var objectId = UUID.randomUUID();
+
+        var userInfo = AuthConstants.USER_INFO_KEY.get();
+        var userId = userInfo.getUserId();
+        var userName = userInfo.getDisplayName();
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var newHeader = TagHeader.newBuilder()
@@ -70,8 +73,8 @@ public class MetadataWriteService {
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
 
         // Apply the common controlled trac_ tags for newly created objects
-        var createAttrs = commonCreateAttrs(timestamp, GUEST_USER_ID, GUEST_USER_NAME);
-        var updateAttrs = commonUpdateAttrs(timestamp, GUEST_USER_ID, GUEST_USER_NAME);
+        var createAttrs = commonCreateAttrs(timestamp, userId, userName);
+        var updateAttrs = commonUpdateAttrs(timestamp, userId, userName);
         newTag = TagUpdateService.applyTagUpdates(newTag, createAttrs);
         newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
 
@@ -85,20 +88,24 @@ public class MetadataWriteService {
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
 
+        var userInfo = AuthConstants.USER_INFO_KEY.get();
+
         return dal.loadObject(tenant, priorVersion)
 
                 .thenCompose(priorTag ->
-                updateObject(tenant, priorTag, definition, tagUpdates));
+                updateObject(tenant, userInfo, priorTag, definition, tagUpdates));
     }
 
     private CompletableFuture<TagHeader> updateObject(
-            String tenant, Tag priorTag,
+            String tenant, UserInfo userInfo, Tag priorTag,
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
 
         // Validate version increment on the object
         validator.validateVersion(definition, priorTag.getDefinition());
 
+        var userId = userInfo.getUserId();
+        var userName = userInfo.getDisplayName();
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var oldHeader = priorTag.getHeader();
@@ -118,7 +125,7 @@ public class MetadataWriteService {
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
 
         // Apply the common controlled trac_ tags for updated objects
-        var commonAttrs = commonUpdateAttrs(timestamp, GUEST_USER_ID, GUEST_USER_NAME);
+        var commonAttrs = commonUpdateAttrs(timestamp, userId, userName);
         newTag = TagUpdateService.applyTagUpdates(newTag, commonAttrs);
 
         return dal.saveNewVersion(tenant, newTag)
@@ -181,6 +188,10 @@ public class MetadataWriteService {
 
         // In this case priorVersion refers to the preallocated ID
         var objectId = UUID.fromString(priorVersion.getObjectId());
+
+        var userInfo = AuthConstants.USER_INFO_KEY.get();
+        var userId = userInfo.getUserId();
+        var userName = userInfo.getDisplayName();
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var newHeader = TagHeader.newBuilder()
@@ -200,8 +211,8 @@ public class MetadataWriteService {
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
 
         // Apply the common controlled trac_ tags for newly created objects
-        var createAttrs = commonCreateAttrs(timestamp, GUEST_USER_ID, GUEST_USER_NAME);
-        var updateAttrs = commonUpdateAttrs(timestamp, GUEST_USER_ID, GUEST_USER_NAME);
+        var createAttrs = commonCreateAttrs(timestamp, userId, userName);
+        var updateAttrs = commonUpdateAttrs(timestamp, userId, userName);
         newTag = TagUpdateService.applyTagUpdates(newTag, createAttrs);
         newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
 
