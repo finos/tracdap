@@ -14,8 +14,19 @@
 
 config:
   logging: trac-logging.xml
-  keystore.type: PKCS12
-  keystore.url: trac-unit.pfx
+  secret.type: PKCS12
+  secret.url: trac-unit.pfx
+
+
+platformInfo:
+  environment: TEST_ENVIRONMENT
+  production: false
+  deploymentInfo:
+    region: UK
+
+
+authentication:
+  jwtIssuer: http://localhost/
 
 
 instances:
