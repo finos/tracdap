@@ -26,8 +26,8 @@ authentication:
   provider:
     protocol: guest
     properties:
-      user_id: guest
-      user_name: Guest User
+      userId: guest
+      userName: Guest User
 
 
 port: 8080

@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.auth.standard;
 
-import org.finos.tracdap.common.auth.JwtProcessor;
 import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.auth.IAuthProvider;
@@ -33,8 +32,8 @@ public class GuestAuthProvider implements IAuthProvider {
 
     private static final Logger log = LoggerFactory.getLogger(GuestAuthProvider.class);
 
-    public static final String USER_ID_CONFIG_KEY = "user_id";
-    public static final String USER_NAME_CONFIG_KEY = "user_name";
+    public static final String USER_ID_CONFIG_KEY = "userId";
+    public static final String USER_NAME_CONFIG_KEY = "userName";
 
     private final String guestId;
     private final String guestName;
