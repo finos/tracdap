@@ -31,6 +31,7 @@ import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 import io.netty.util.ReferenceCountUtil;
 
 import org.finos.tracdap.common.auth.SessionInfo;
+import org.finos.tracdap.common.auth.UserInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,8 +41,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.stream.Collectors;
 
 
 public class Http1AuthHandler extends ChannelDuplexHandler {
@@ -84,15 +83,9 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
                 return;
             }
 
-            // New request, start in an unauthorized state
-            authOk = false;
-
-            // Look for any auth information that is in the request
+            // If this is a new request, check authentication before proceeding
             var req = (HttpRequest) msg;
-            var headers = req.headers();
-            var authInfo = getAuthToken(headers);
-
-            authOk = doAuthenticate(ctx, req, authInfo);
+            authOk = doAuthenticate(ctx, req);
 
             if (authOk) {
                 ReferenceCountUtil.retain(req);
@@ -120,37 +113,36 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         ctx.write(msg, promise);
     }
 
-    private boolean doAuthenticate(ChannelHandlerContext ctx, HttpRequest req, String authInfo) {
+    private boolean doAuthenticate(ChannelHandlerContext ctx, HttpRequest req) {
 
-        // If there is no auth token at all, trigger a new auth workflow
-        if (authInfo == null) {
+        var headers = req.headers();
+        var token = AuthHelpers.getAuthToken(headers);
 
-            log.debug("AUTHENTICATION: Required");
+        if (token == null) {
 
-            var userInfo = provider.newAuth(ctx, req);
+            UserInfo userInfo;
+
+            if (headers.contains(HttpHeaderNames.AUTHORIZATION)) {
+
+                log.trace("AUTHENTICATION: Provided (translation required)");
+
+                var authInfo = headers.get(HttpHeaderNames.AUTHORIZATION);
+                userInfo = provider.translateAuth(ctx, req, authInfo);
+            }
+            else {
+
+                log.debug("AUTHENTICATION: Required");
+
+                userInfo = provider.newAuth(ctx, req);
+            }
 
             if (userInfo != null)
-                authInfo = BEARER_AUTH_PREFIX + jwtProcessor.encodeToken(userInfo);
+                token = jwtProcessor.encodeToken(userInfo);
             else
                 return false;
         }
 
-        var prefixEnd = Math.min(BEARER_AUTH_PREFIX.length(), authInfo.length());
-        var prefix = authInfo.substring(0, prefixEnd);
 
-        if (!prefix.equalsIgnoreCase(BEARER_AUTH_PREFIX)) {
-
-            log.trace("AUTHENTICATION: Translation required");
-
-            var userInfo = provider.translateAuth(ctx, req, authInfo);
-
-            if (userInfo != null)
-                authInfo = BEARER_AUTH_PREFIX + jwtProcessor.encodeToken(userInfo);
-            else
-                return false;
-        }
-
-        var token = authInfo.substring(BEARER_AUTH_PREFIX.length());
         var session = jwtProcessor.decodeAndValidate(token);
 
         if (!session.isValid()) {
@@ -179,35 +171,9 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         return true;
     }
 
-    private String getAuthToken(HttpHeaders headers) {
-
-        if (headers.contains(HttpHeaderNames.AUTHORIZATION)) {
-
-            return headers.get(HttpHeaderNames.AUTHORIZATION);
-        }
-
-        if (headers.contains(HttpHeaderNames.COOKIE)) {
-
-            var cookieData = headers.getAll(HttpHeaderNames.COOKIE);
-
-            var cookies = cookieData.stream()
-                    .map(ServerCookieDecoder.STRICT::decodeAll)
-                    .flatMap(List::stream)
-                    .collect(Collectors.toList());
-
-            var authCookie = cookies.stream()
-                    .filter(c -> HttpHeaderNames.AUTHORIZATION.toString().equals(c.name().toLowerCase()))
-                    .findFirst();
-
-            if (authCookie.isPresent()) {
-                return BEARER_AUTH_PREFIX + authCookie.get().value();
-            }
-        }
-
-        return null;
-    }
-
     private void setTargetCookies(HttpRequest req) {
+
+        req.headers().set(HttpHeaderNames.AUTHORIZATION, BEARER_AUTH_PREFIX + this.sessionToken);
 
         setTargetCookie(req, HttpHeaderNames.AUTHORIZATION, sessionToken);
     }
