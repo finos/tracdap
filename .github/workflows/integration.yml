@@ -214,6 +214,13 @@ jobs:
           --task deploy_schema \
           --task add_tenant ACME_CORP 'Test tenant [ACME_CORP]'"
 
+      - name: Prepare Auth Keys
+        run: |
+          ./gradlew auth-tool:run --args="\
+          --config ${{ env.TRAC_CONFIG_FILE }} \
+          --secret-key ${{ env.TRAC_SECRET_KEY }} \
+          --task signing_key EC 256"
+
       - name: Integration Tests
         run: ./gradlew integration -DintegrationTags="int-metadb"
 
