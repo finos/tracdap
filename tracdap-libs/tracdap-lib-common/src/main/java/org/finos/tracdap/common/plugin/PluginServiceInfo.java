@@ -36,6 +36,9 @@ public class PluginServiceInfo {
     /** Standard service type for secret-loading services **/
     public static final String SECRETS_SERVICE_TYPE = "SECRETS";
 
+    /** Standard service type for secret-loading services **/
+    public static final String AUTH_SERVICE_TYPE = "AUTH";
+
     /** Standard service type for file storage services **/
     public static final String FILE_STORAGE_SERVICE_TYPE = "FILE_STORAGE";
 
@@ -60,7 +63,8 @@ public class PluginServiceInfo {
             Map.entry("org.finos.tracdap.common.codec.ICodec", FORMAT_SERVICE_TYPE),
             Map.entry("org.finos.tracdap.common.storage.IFileStorage", FILE_STORAGE_SERVICE_TYPE),
             Map.entry("org.finos.tracdap.common.storage.IDataStorage", DATA_STORAGE_SERVICE_TYPE),
-            Map.entry("org.finos.tracdap.common.exec.IBatchExecutor", EXECUTION_SERVICE_TYPE));
+            Map.entry("org.finos.tracdap.common.exec.IBatchExecutor", EXECUTION_SERVICE_TYPE),
+            Map.entry("org.finos.tracdap.gateway.auth.IAuthProvider", AUTH_SERVICE_TYPE));
 
     private final Class<?> serviceClass;
     private final String serviceName;

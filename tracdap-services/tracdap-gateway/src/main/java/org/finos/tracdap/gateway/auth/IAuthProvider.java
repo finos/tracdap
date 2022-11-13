@@ -16,11 +16,13 @@
 
 package org.finos.tracdap.gateway.auth;
 
+import org.finos.tracdap.common.auth.JwtProcessor;
+
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 
 
-public interface AuthProvider {
+public interface IAuthProvider {
 
     /**
      * Start a new authentication workflow, assuming no prior details
@@ -37,10 +39,11 @@ public interface AuthProvider {
      *
      * @param ctx Netty channel handler context
      * @param req Incoming HTTP/1 request to be authenticated
+     * @param jwtProcessor JWT signing and validation, encoding and decoding
      *
      * @return A JWT token, or null if the authentication workflow is deferred or failed
      */
-    String newAuth(ChannelHandlerContext ctx, HttpRequest req);
+    String newAuth(ChannelHandlerContext ctx, HttpRequest req, JwtProcessor jwtProcessor);
 
     /**
      * Translate credentials from an alternate authorization format
@@ -62,8 +65,9 @@ public interface AuthProvider {
      * @param ctx Netty channel handler context
      * @param req Incoming HTTP/1 request to be authenticated
      * @param authInfo Contents of the authentication header / cookie / metadata field
+     * @param jwtProcessor JWT signing and validation, encoding and decoding
      *
      * @return A JWT token, or null if the authentication workflow is deferred or failed
      */
-    String translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo);
+    String translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo, JwtProcessor jwtProcessor);
 }
