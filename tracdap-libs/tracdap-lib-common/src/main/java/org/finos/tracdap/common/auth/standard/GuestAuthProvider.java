@@ -54,7 +54,7 @@ public class GuestAuthProvider implements IAuthProvider {
     }
 
     @Override
-    public String newAuth(ChannelHandlerContext ctx, HttpRequest req, JwtProcessor jwtProcessor) {
+    public UserInfo newAuth(ChannelHandlerContext ctx, HttpRequest req) {
 
         log.info("AUTHENTICATION: Using guest authentication [{}]", guestId);
 
@@ -62,11 +62,11 @@ public class GuestAuthProvider implements IAuthProvider {
         user.setUserId(guestId);
         user.setDisplayName(guestName);
 
-        return jwtProcessor.encodeToken(user);
+        return user;
     }
 
     @Override
-    public String translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo, JwtProcessor jwtProcessor) {
+    public UserInfo translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo) {
         return null;
     }
 }

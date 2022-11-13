@@ -26,7 +26,7 @@ public interface IAuthProvider {
      * Start a new authentication workflow, assuming no prior details
      *
      * <p>If the auth provider can authenticate directly using only data in the
-     * incoming request, it should create and return and encoded JWT token.</p>
+     * incoming request, it should create and return a new UserInfo object.</p>
      *
      * <p>If an asynchronous workflow is required, the provider should make any
      * required requests and return null. The provider is also responsible for
@@ -37,11 +37,10 @@ public interface IAuthProvider {
      *
      * @param ctx Netty channel handler context
      * @param req Incoming HTTP/1 request to be authenticated
-     * @param jwtProcessor JWT signing and validation, encoding and decoding
      *
-     * @return A JWT token, or null if the authentication workflow is deferred or failed
+     * @return A UserInfo object, or null if the authentication workflow is deferred or failed
      */
-    String newAuth(ChannelHandlerContext ctx, HttpRequest req, JwtProcessor jwtProcessor);
+    UserInfo newAuth(ChannelHandlerContext ctx, HttpRequest req);
 
     /**
      * Translate credentials from an alternate authorization format
@@ -51,7 +50,7 @@ public interface IAuthProvider {
      * synchronously or asynchronously.</p>
      *
      * <p>If the auth provider can translate the data in authInfo directly using only
-     * the information it has available, it should create and return and encoded JWT token.</p>
+     * the information it has available, it should return a decoded UserInfo object.</p>
      *
      * <p>If an asynchronous workflow is required, the provider should make any
      * required requests and return null. The provider is also responsible for
@@ -63,9 +62,8 @@ public interface IAuthProvider {
      * @param ctx Netty channel handler context
      * @param req Incoming HTTP/1 request to be authenticated
      * @param authInfo Contents of the authentication header / cookie / metadata field
-     * @param jwtProcessor JWT signing and validation, encoding and decoding
      *
-     * @return A JWT token, or null if the authentication workflow is deferred or failed
+     * @return A UserInfo object, or null if the authentication workflow is deferred or failed
      */
-    String translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo, JwtProcessor jwtProcessor);
+    UserInfo translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo);
 }

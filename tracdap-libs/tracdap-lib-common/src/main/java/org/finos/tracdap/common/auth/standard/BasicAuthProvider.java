@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.common.auth.standard;
 
-import org.finos.tracdap.common.auth.JwtProcessor;
 import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.common.auth.IAuthProvider;
 
@@ -41,7 +40,7 @@ public class BasicAuthProvider implements IAuthProvider {
     }
 
     @Override
-    public String newAuth(ChannelHandlerContext ctx, HttpRequest req, JwtProcessor jwtProcessor) {
+    public UserInfo newAuth(ChannelHandlerContext ctx, HttpRequest req) {
 
         log.info("AUTHENTICATION: Using basic authentication");
 
@@ -60,7 +59,7 @@ public class BasicAuthProvider implements IAuthProvider {
     }
 
     @Override
-    public String translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo, JwtProcessor jwtProcessor) {
+    public UserInfo translateAuth(ChannelHandlerContext ctx, HttpRequest req, String authInfo) {
 
         var prefixEnd = Math.min(BASIC_AUTH_PREFIX.length(), authInfo.length());
         var prefix = authInfo.substring(0, prefixEnd);
@@ -68,7 +67,7 @@ public class BasicAuthProvider implements IAuthProvider {
         // If the authorization header is not understood, trigger a new auth workflow
         if (!prefix.equalsIgnoreCase(BASIC_AUTH_PREFIX)) {
             log.warn("Invalid authorization header, re-authorization required");
-            return newAuth(ctx, req, jwtProcessor);
+            return newAuth(ctx, req);
         }
 
         var basicAuthData = authInfo.substring(BASIC_AUTH_PREFIX.length());
@@ -79,19 +78,17 @@ public class BasicAuthProvider implements IAuthProvider {
         // Separator must be found and cannot be at position zero (i.e. no empty usernames)
         if (separator < 1) {
             log.warn("Invalid authorization header, re-authorization required");
-            return newAuth(ctx, req, jwtProcessor);
+            return newAuth(ctx, req);
         }
 
         var user = userAndPass.substring(0, separator);
         var pass = userAndPass.substring(separator + 1);
 
         if (!checkPassword(user, pass)) {
-            return newAuth(ctx, req, jwtProcessor);
+            return newAuth(ctx, req);
         }
 
-        var userInfo = getUserInfo(user);
-
-        return jwtProcessor.encodeToken(userInfo);
+        return getUserInfo(user);
     }
 
     private boolean checkPassword(String user, String pass) {
