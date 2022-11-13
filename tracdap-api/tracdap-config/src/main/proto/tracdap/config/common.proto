@@ -39,8 +39,8 @@ message _ConfigFile {
 message PluginConfig {
 
   string protocol = 1;
-  map<string, string> pluginProps = 2;
-  map<string, string> pluginSecrets = 3;
+  map<string, string> properties = 2;
+  map<string, string> secrets = 3;
 }
 
 

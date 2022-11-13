@@ -16,6 +16,8 @@
 
 package org.finos.tracdap.common.plugin;
 
+import org.finos.tracdap.config.PluginConfig;
+
 import java.util.List;
 import java.util.Properties;
 
@@ -24,6 +26,8 @@ public interface IPluginManager {
     List<String> availableProtocols(Class<?> serviceClass);
 
     boolean isServiceAvailable(Class<?> serviceClass, String protocol);
+
+    <T> T createService(Class<T> serviceClass, PluginConfig pluginConfig);
 
     <T> T createService(Class<T> serviceClass, String protocol);
 
