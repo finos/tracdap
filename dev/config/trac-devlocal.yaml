@@ -23,6 +23,10 @@ platformInfo:
   production: false
 
 
+authentication:
+  jwtIssuer: http://localhost:8080/
+
+
 instances:
 
   meta:
