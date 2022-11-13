@@ -16,8 +16,11 @@
 
 package org.finos.tracdap.gateway.routing;
 
+import org.finos.tracdap.common.auth.JwtProcessor;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.GatewayConfig;
+import org.finos.tracdap.gateway.auth.Http1AuthHandler;
+import org.finos.tracdap.gateway.auth.IAuthProvider;
 import org.finos.tracdap.gateway.exec.Route;
 
 import io.netty.channel.*;
@@ -42,6 +45,7 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
     private static final String HTTP_1_INITIALIZER = "http_1_initializer";
     private static final String HTTP_1_KEEPALIVE = "http_1_keepalive";
     private static final String HTTP_1_TIMEOUT = "http_1_timeout";
+    private static final String HTTP_1_AUTH= "http_1_auth";
 
     private static final int MAX_TIMEOUT = 3600;
     private static final int DEFAULT_TIMEOUT = 60;
@@ -49,13 +53,17 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final int idleTimeout;
+    private final IAuthProvider authProvider;
+    private final JwtProcessor jwtProcessor;
 
     private final AtomicInteger nextConnectionId = new AtomicInteger();
     private final Supplier<ChannelInboundHandlerAdapter> http1Handler;
     private final Supplier<ChannelInboundHandlerAdapter> http2Handler;
 
 
-    public HttpProtocolNegotiator(GatewayConfig config, List<Route> routes) {
+    public HttpProtocolNegotiator(
+            GatewayConfig config, List<Route> routes,
+            IAuthProvider authProvider, JwtProcessor jwtProcessor) {
 
         int idleTimeout;
 
@@ -67,6 +75,9 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
         }
 
         this.idleTimeout = idleTimeout;
+
+        this.authProvider = authProvider;
+        this.jwtProcessor = jwtProcessor;
 
         this.http1Handler = () -> new Http1Router(routes, nextConnectionId.getAndIncrement());
         this.http2Handler = () -> new Http2Router(config.getRoutesList());
@@ -112,6 +123,9 @@ public class HttpProtocolNegotiator extends ChannelInitializer<SocketChannel> {
             // The main Http1Router is responsible for handling the idle events
             var idleHandler = new IdleStateHandler(MAX_TIMEOUT, MAX_TIMEOUT, idleTimeout, TimeUnit.SECONDS);
             pipeline.addAfter(HTTP_1_KEEPALIVE, HTTP_1_TIMEOUT, idleHandler);
+
+            var authHandler = new Http1AuthHandler(authProvider, jwtProcessor);
+            pipeline.addAfter(HTTP_1_TIMEOUT, HTTP_1_AUTH, authHandler);
 
             // The main Http1Router instance
             pipeline.addLast(http1Handler.get());

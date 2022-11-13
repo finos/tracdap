@@ -16,22 +16,28 @@
 
 package org.finos.tracdap.gateway.auth;
 
+import org.finos.tracdap.common.auth.JwtProcessor;
+
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.cookie.*;
+import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http.cookie.Cookie;
 import io.netty.handler.codec.http.cookie.DefaultCookie;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 import io.netty.util.ReferenceCountUtil;
 
-import org.finos.tracdap.common.auth.JwtHelpers;
+import org.finos.tracdap.common.auth.SessionInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -44,16 +50,23 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
     private static final Duration TOKEN_REFRESH_TIME = Duration.of(1, ChronoUnit.HOURS);
     private static final Duration TOKEN_EXPIRY = Duration.of(6, ChronoUnit.HOURS);
 
+    private static final String TRAC_USER_ID_COOKIE = "trac_user_id";
+    private static final String TRAC_USER_NAME_COOKIE = "trac_user_name";
+    private static final String TRAC_SESSION_EXPIRY_UTC = "trac_session_expiry_utc";
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final AuthProvider provider;
+    private final IAuthProvider provider;
+    private final JwtProcessor jwtProcessor;
 
     private boolean authOk = false;
     private String sessionToken;
+    private SessionInfo sessionInfo;
 
 
-    public Http1AuthHandler(AuthProvider provider) {
+    public Http1AuthHandler(IAuthProvider provider, JwtProcessor jwtProcessor) {
         this.provider = provider;
+        this.jwtProcessor = jwtProcessor;
     }
 
     @Override
@@ -101,7 +114,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         }
 
         var resp = (HttpResponse) msg;
-        setAuthToken(resp);
+        setClientCookies(resp);
 
         ctx.write(msg, promise);
     }
@@ -113,7 +126,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
             log.debug("AUTHENTICATION: Required");
 
-            var token = provider.newAuth(ctx, req);
+            var token = provider.newAuth(ctx, req, jwtProcessor);
 
             if (token != null)
                 authInfo = BEARER_AUTH_PREFIX + token;
@@ -128,7 +141,7 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
 
             log.trace("AUTHENTICATION: Translation required");
 
-            var token = provider.translateAuth(ctx, req, authInfo);
+            var token = provider.translateAuth(ctx, req, authInfo, jwtProcessor);
 
             if (token != null)
                 authInfo = BEARER_AUTH_PREFIX + token;
@@ -137,26 +150,29 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         }
 
         var token = authInfo.substring(BEARER_AUTH_PREFIX.length());
-        var session = JwtHelpers.decodeAndValidate(token);
+        var session = jwtProcessor.decodeAndValidate(token);
 
         if (!session.isValid()) {
 
             log.warn("AUTHENTICATION: Previous login is no longer valid: {}", session.getErrorMessage());
 
-            token = provider.newAuth(ctx, req);
+            token = provider.newAuth(ctx, req, jwtProcessor);
             if (token == null)
                 return false;
-            session = JwtHelpers.decodeAndValidate(token);
+            session = jwtProcessor.decodeAndValidate(token);
         }
 
         if (session.getIssueTime().plus(TOKEN_REFRESH_TIME).isAfter(Instant.now())) {
 
-            token = JwtHelpers.encodeToken(session.getUserInfo(), TOKEN_EXPIRY);
+            token = jwtProcessor.encodeToken(session.getUserInfo());
         }
 
         log.trace("AUTHENTICATION: Succeeded");
 
         this.sessionToken = token;
+        this.sessionInfo = session;
+
+        setTargetCookies(req);
 
         return true;
     }
@@ -189,24 +205,42 @@ public class Http1AuthHandler extends ChannelDuplexHandler {
         return null;
     }
 
-    private void setAuthToken(HttpResponse resp) {
+    private void setTargetCookies(HttpRequest req) {
 
-        try {
+        setTargetCookie(req, HttpHeaderNames.AUTHORIZATION, sessionToken);
+    }
 
-            var authInfo = sessionToken;
-            resp.headers().set(HttpHeaderNames.AUTHORIZATION, authInfo);
+    private void setTargetCookie(HttpRequest req, CharSequence cookieName, String cookieValue) {
 
-            var authCookie = new DefaultCookie(HttpHeaderNames.AUTHORIZATION.toString(), authInfo);
-            authCookie.setMaxAge(Cookie.UNDEFINED_MAX_AGE);  // remove cookie on browser close
-            authCookie.setSameSite(CookieHeaderNames.SameSite.Strict);
-            authCookie.setSecure(true);
-            authCookie.setHttpOnly(false);  // allow JavaScript to see the auth token
+        var cookie = new DefaultCookie(cookieName.toString(), cookieValue);
+        cookie.setMaxAge(TOKEN_EXPIRY.getSeconds());
+        cookie.setSameSite(CookieHeaderNames.SameSite.Strict);
+        cookie.setSecure(true);
+        cookie.setHttpOnly(true);
 
-            resp.headers().add(HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode(authCookie));
-        }
-        catch (Throwable e) {
-            log.error(e.getMessage(), e);
-            throw e;
-        }
+        req.headers().add(HttpHeaderNames.COOKIE, ClientCookieEncoder.STRICT.encode(cookie));
+    }
+
+    private void setClientCookies(HttpResponse resp) {
+
+        setClientCookie(resp, HttpHeaderNames.AUTHORIZATION, sessionToken);
+        setClientCookie(resp, TRAC_USER_ID_COOKIE, sessionInfo.getUserInfo().getUserId());
+
+        var displayName = URLEncoder.encode(sessionInfo.getUserInfo().getDisplayName(), StandardCharsets.US_ASCII);
+        setClientCookie(resp, TRAC_USER_NAME_COOKIE, displayName);
+
+        var expiryUtc = DateTimeFormatter.ISO_INSTANT.format(sessionInfo.getExpiryTime());
+        setClientCookie(resp, TRAC_SESSION_EXPIRY_UTC, expiryUtc);
+    }
+
+    private void setClientCookie(HttpResponse resp, CharSequence cookieName, String cookieValue) {
+
+        var cookie = new DefaultCookie(cookieName.toString(), cookieValue);
+        cookie.setMaxAge(Cookie.UNDEFINED_MAX_AGE);  // remove cookie on browser close
+        cookie.setSameSite(CookieHeaderNames.SameSite.Strict);
+        cookie.setSecure(true);
+        cookie.setHttpOnly(false);  // allow access to JavaScript
+
+        resp.headers().add(HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode(cookie));
     }
 }
