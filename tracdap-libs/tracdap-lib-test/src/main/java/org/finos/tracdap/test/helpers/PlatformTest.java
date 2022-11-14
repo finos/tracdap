@@ -64,6 +64,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     public static final String STORAGE_ROOT_DIR = "storage_root";
     public static final String DEFAULT_STORAGE_FORMAT = "ARROW_FILE";
 
+    private static final String SECRET_KEY_ENV_VAR = "TRAC_SECRET_KEY";
+    private static final String SECRET_KEY_DEFAULT = "d7xbeK-julOi8-bBwd9k";
+
     private static final boolean IS_WINDOWS = System.getProperty("os.name").toLowerCase().contains("windows");
     private static final String PYTHON_EXE = IS_WINDOWS ? "python.exe" : "python";
     private static final String VENV_BIN_SUBDIR = IS_WINDOWS ? "Scripts" : "bin";
@@ -133,7 +136,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private Path tracExecDir;
     private Path tracRepoDir;
     private URL platformConfigUrl;
-    private String keystoreKey;
+    private String secretKey;
     private PlatformConfig platformConfig;
 
     private TracMetadataService metaSvc;
@@ -263,10 +266,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
                 testConfig, tracDir,
                 substitutions);
 
-        // Used for storing and accessing secrets
-        // Core auth setup is mandatory and needs this to be set
-        keystoreKey = "d7xbeK-julOi8-bBwd9k";
-
+        // The Secret key is used for storing and accessing secrets
+        // If secrets are set up externally, a key can be passed in the env to access the secret store
+        // Otherwise the default is used, which is fine if the store is being initialised here
+        var env = System.getenv();
+        secretKey = env.getOrDefault(SECRET_KEY_ENV_VAR, SECRET_KEY_DEFAULT);
 
         var plugins = new PluginManager();
         plugins.initConfigPlugins();
@@ -305,7 +309,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         var authTasks = new ArrayList<StandardArgs.Task>();
         authTasks.add(StandardArgs.task(AuthTool.SIGNING_KEY_TASK, List.of("EC", "256"), ""));
-        ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, keystoreKey, authTasks);
+        ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, secretKey, authTasks);
 
         // Authentication is mandatory, so we need to build a token in order to test at the API level
         // To create a valid token, we need to get the auth signing keys out of the secrets file
@@ -317,7 +321,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         var configMgr = new ConfigManager(
                 platformConfigUrl.toString(),
                 Paths.get(platformConfigUrl.toString()).getParent(),
-                pluginMgr, keystoreKey);
+                pluginMgr, secretKey);
 
         configMgr.prepareSecrets();
 
@@ -353,7 +357,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             databaseTasks.add(StandardArgs.task(DeployMetaDB.ALTER_TENANT_TASK, List.of(tenant, description), ""));
         }
 
-        ServiceHelpers.runDbDeploy(tracDir, platformConfigUrl, keystoreKey, databaseTasks);
+        ServiceHelpers.runDbDeploy(tracDir, platformConfigUrl, secretKey, databaseTasks);
     }
 
     void preparePlugins() throws Exception {
@@ -412,13 +416,13 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     void startServices() {
 
         if (startMeta)
-            metaSvc = ServiceHelpers.startService(TracMetadataService.class, tracDir, platformConfigUrl, keystoreKey);
+            metaSvc = ServiceHelpers.startService(TracMetadataService.class, tracDir, platformConfigUrl, secretKey);
 
         if (startData)
-            dataSvc = ServiceHelpers.startService(TracDataService.class, tracDir, platformConfigUrl, keystoreKey);
+            dataSvc = ServiceHelpers.startService(TracDataService.class, tracDir, platformConfigUrl, secretKey);
 
         if (startOrch)
-            orchSvc = ServiceHelpers.startService(TracOrchestratorService.class, tracDir, platformConfigUrl, keystoreKey);
+            orchSvc = ServiceHelpers.startService(TracOrchestratorService.class, tracDir, platformConfigUrl, secretKey);
     }
 
     void stopServices() {
