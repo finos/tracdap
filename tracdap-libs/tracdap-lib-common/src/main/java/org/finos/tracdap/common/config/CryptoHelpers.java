@@ -141,6 +141,20 @@ public class CryptoHelpers {
         }
     }
 
+    public static boolean containsAttribute(
+            KeyStore keystore, String alias, String attrName)
+            throws EConfigLoad {
+
+        try {
+            var attrAlias = alias + "$" + attrName;
+            return keystore.containsAlias(attrAlias);
+        }
+        catch (GeneralSecurityException e) {
+            var message = String.format("Failed to read secret [%s]: %s", alias, e.getMessage());
+            throw new EConfigLoad(message, e);
+        }
+    }
+
     public static String readAttribute(
             KeyStore keystore, String secretKey,
             String alias, String attrName)
