@@ -24,6 +24,10 @@ public class ConfigKeys {
     public static final String SECRET_KEY_KEY = "secret.key";
     public static final String SECRET_KEY_ENV = "SECRET_KEY";
 
+    public static final String USER_DB_TYPE = "users.type";
+    public static final String USER_DB_URL = "users.url";
+    public static final String USER_DB_KEY = "users.key";
+
     public static final String TRAC_AUTH_PUBLIC_KEY = "trac_auth_public_key";
     public static final String TRAC_AUTH_PRIVATE_KEY = "trac_auth_private_key";
 }

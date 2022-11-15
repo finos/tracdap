@@ -38,19 +38,9 @@ import java.util.Map;
 
 public class CryptoHelpers {
 
-    private static final Map<String, String> NO_ATTRIBUTES = Map.of();
-
     public static void writeTextEntry(
             KeyStore keystore, String secretKey,
             String alias, String text)
-            throws EConfigLoad {
-
-        writeTextEntry(keystore, secretKey, alias, text, NO_ATTRIBUTES);
-    }
-
-    public static void writeTextEntry(
-            KeyStore keystore, String secretKey,
-            String alias, String text, Map<String, String> attributes)
             throws EConfigLoad {
 
         try {
@@ -62,14 +52,53 @@ public class CryptoHelpers {
             var secret = factory.generateSecret(spec);
             var entry = new KeyStore.SecretKeyEntry(secret);
 
-            for (var attr : attributes.entrySet()) {
-                entry.getAttributes().add(new PKCS12Attribute(attr.getKey(), attr.getValue()));
-            }
-
             keystore.setEntry(alias, entry, protection);
         }
         catch (IllegalArgumentException | GeneralSecurityException e) {
             var message = String.format("Failed to write secret [%s]: %s", alias, e.getMessage());
+            throw new EConfigLoad(message, e);
+        }
+    }
+
+    public static void writeTextEntry(
+            KeyStore keystore, String secretKey,
+            String alias, String text, Map<String, String> attributes)
+            throws EConfigLoad {
+
+        writeTextEntry(keystore, secretKey, alias, text);
+
+        for (var attr : attributes.entrySet()) {
+
+            var attrAlias = alias + "$" + attr.getKey();
+            writeTextEntry(keystore, secretKey, attrAlias, attr.getValue());
+        }
+    }
+
+    public static void deleteEntry(
+            KeyStore keystore, String alias)
+            throws EConfigLoad {
+
+        try {
+
+            if (keystore.containsAlias(alias)) {
+                keystore.deleteEntry(alias);
+            }
+        }
+        catch (GeneralSecurityException e) {
+            var message = String.format("Failed to read secret [%s]: %s", alias, e.getMessage());
+            throw new EConfigLoad(message, e);
+        }
+    }
+
+    public static boolean containsEntry(
+            KeyStore keystore, String alias)
+            throws EConfigLoad {
+
+        try {
+            return keystore.containsAlias(alias);
+        }
+        catch (GeneralSecurityException e) {
+            var message = String.format("Failed to read secret [%s]: %s", alias, e.getMessage());
             throw new EConfigLoad(message, e);
         }
     }
@@ -117,29 +146,8 @@ public class CryptoHelpers {
             String alias, String attrName)
             throws EConfigLoad {
 
-        try {
-
-            var entry = keystore.getEntry(alias, new KeyStore.PasswordProtection(secretKey.toCharArray()));
-
-            if (entry == null) {
-                var message = String.format("Secret is not present in the store: [%s]", alias);
-                StartupLog.log(CryptoHelpers.class, Level.ERROR, message);
-                throw new EConfigLoad(message);
-            }
-
-            var attributes = entry.getAttributes();
-
-            for (var attr : attributes) {
-                if (attr.getName().equals(attrName))
-                    return attr.getValue();
-            }
-
-            return null;
-        }
-        catch (IllegalArgumentException | GeneralSecurityException e) {
-            var message = String.format("Failed to read secret [%s]: %s", alias, e.getMessage());
-            throw new EConfigLoad(message, e);
-        }
+        var attrAlias = alias + "$" + attrName;
+        return readTextEntry(keystore, secretKey, attrAlias);
     }
 
     public static String encodeSSHA512(String password, byte[] salt) {

@@ -308,7 +308,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         // Running the auth tool will create the secrets file and add the public / private keys for auth
 
         var authTasks = new ArrayList<StandardArgs.Task>();
-        authTasks.add(StandardArgs.task(AuthTool.SIGNING_KEY_TASK, List.of("EC", "256"), ""));
+        authTasks.add(StandardArgs.task(AuthTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
         ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, secretKey, authTasks);
 
         // Authentication is mandatory, so we need to build a token in order to test at the API level
