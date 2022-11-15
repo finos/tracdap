@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.config;
 
+import org.finos.tracdap.common.config.local.JksSecretLoader;
 import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.plugin.IPluginManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -122,6 +123,41 @@ public class ConfigManager {
         StartupLog.log(this, Level.INFO, String.format("Using secrets: [%s] %s", secretType, secretUrl));
 
         this.secrets = secretLoaderForProtocol(secretType, configMap);
+    }
+
+    public ISecretLoader getUserDb() {
+
+        var config = loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
+
+        if (!config.containsConfig(ConfigKeys.USER_DB_TYPE)) {
+            var template = "TRAC user database is not enabled (set config key [%s] to turn it on)";
+            var message = String.format(template, ConfigKeys.USER_DB_TYPE);
+            throw new EStartup(message);
+        }
+
+        if (!config.containsConfig(ConfigKeys.USER_DB_URL)) {
+            var message = "Missing required config key [" + ConfigKeys.USER_DB_URL + "]";
+            throw new EStartup(message);
+        }
+
+        var userDbType = config.getConfigOrThrow(ConfigKeys.USER_DB_TYPE);
+        var userDbUrl = config.getConfigOrThrow(ConfigKeys.USER_DB_URL);
+        var userDbSecret = config.getConfigOrDefault(ConfigKeys.USER_DB_KEY, "");
+
+        var userDbPath = Paths.get(resolveConfigFile(URI.create(userDbUrl)));
+        var userDbKey = userDbSecret.isEmpty()
+                ? secretKey
+                : loadPassword(userDbSecret);
+
+        var userDbProps = new Properties();
+        userDbProps.put(ConfigKeys.SECRET_TYPE_KEY, userDbType);
+        userDbProps.put(ConfigKeys.SECRET_URL_KEY, userDbPath.toString());
+        userDbProps.put(ConfigKeys.SECRET_KEY_KEY, userDbKey);
+
+        var userDb = new JksSecretLoader(userDbProps);
+        userDb.init(this);
+
+        return userDb;
     }
 
     /**
