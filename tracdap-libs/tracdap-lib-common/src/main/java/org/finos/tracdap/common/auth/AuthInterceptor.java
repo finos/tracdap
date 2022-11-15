@@ -69,8 +69,14 @@ public class AuthInterceptor implements ServerInterceptor {
         var token = headers.get(AuthConstants.AUTH_METADATA_KEY);
 
         if (token == null) {
+
             log.error("No authentication provided");
-            throw new StatusRuntimeException(Status.UNAUTHENTICATED.withDescription("No authentication provided"));
+
+            var status = Status.UNAUTHENTICATED.withDescription("No authentication provided");
+            var trailers = new Metadata();
+
+            call.close(status, trailers);
+            return new ServerCall.Listener<>() {};
         }
 
         // Expect BEARER auth scheme, but also allow raw JSON tokens
@@ -94,6 +100,7 @@ public class AuthInterceptor implements ServerInterceptor {
             var trailers = new Metadata();
 
             call.close(status, trailers);
+            return new ServerCall.Listener<>() {};
         }
 
         // Authentication succeeded!
