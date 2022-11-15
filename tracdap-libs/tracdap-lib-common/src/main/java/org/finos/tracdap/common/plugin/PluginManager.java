@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.plugin;
 
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.startup.StartupLog;
@@ -126,11 +127,17 @@ public class PluginManager implements IPluginManager {
     }
 
     @Override
-    public <T> T createService(Class<T> serviceClass, PluginConfig pluginConfig) {
+    public <T> T createService(Class<T> serviceClass, ConfigManager configManager, PluginConfig pluginConfig) {
 
         var protocol = pluginConfig.getProtocol();
         var properties = new Properties();
         properties.putAll(pluginConfig.getPropertiesMap());
+
+        for (var secret : pluginConfig.getSecretsMap().entrySet()) {
+            var secretKey = secret.getKey();
+            var secretValue = configManager.loadPassword(secret.getValue());
+            properties.put(secretKey, secretValue);
+        }
 
         return createService(serviceClass, protocol, properties);
     }
