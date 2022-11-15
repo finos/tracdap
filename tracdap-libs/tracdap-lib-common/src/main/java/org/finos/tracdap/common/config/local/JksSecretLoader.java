@@ -110,8 +110,7 @@ public class JksSecretLoader implements ISecretLoader {
     public boolean hasSecret(String secretName) {
 
         try {
-            var entry = keystore.getEntry(secretName, new KeyStore.PasswordProtection(secretKey.toCharArray()));
-            return entry != null;
+            return keystore.containsAlias(secretName);
         }
         catch (GeneralSecurityException e) {
             var message = String.format("Secret could not be found in the key store: [%s] %s", secretName, e.getMessage());
@@ -128,6 +127,38 @@ public class JksSecretLoader implements ISecretLoader {
         }
         catch (EConfigLoad e) {
             var message = String.format("Password could not be retrieved from the key store: [%s] %s", secretName, e.getMessage());
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EConfigLoad(message, e);
+        }
+    }
+
+    @Override
+    public boolean hasAttr(String secretName, String attrName) {
+
+        try {
+            return CryptoHelpers.containsAttribute(keystore, secretName, attrName);
+        }
+        catch (EConfigLoad e) {
+
+            var message = String.format("Password could not be retrieved from the key store: [%s, %s] %s",
+                    secretName, attrName, e.getMessage());
+
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EConfigLoad(message, e);
+        }
+    }
+
+    @Override
+    public String loadAttr(String secretName, String attrName) {
+
+        try {
+            return CryptoHelpers.readAttribute(keystore, secretKey, secretName, attrName);
+        }
+        catch (EConfigLoad e) {
+
+            var message = String.format("Attribute could not be retrieved from the key store: [%s, %s] %s",
+                    secretName, attrName, e.getMessage());
+
             StartupLog.log(this, Level.ERROR, message);
             throw new EConfigLoad(message, e);
         }

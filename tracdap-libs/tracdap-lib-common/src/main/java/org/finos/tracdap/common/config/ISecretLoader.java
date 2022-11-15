@@ -67,6 +67,26 @@ public interface ISecretLoader {
     String loadPassword(String secretName);
 
     /**
+     * Test whether a particular secret has an attribute with the given name
+     *
+     * @param secretName The secret to look for attributes on
+     * @param attrName The name of the attribute to look for
+     *
+     * @return True if the secret has an attribute with the given name, false otherwise
+     */
+    boolean hasAttr(String secretName, String attrName);
+
+    /**
+     * Get an attribute associated with a particular secret
+     *
+     * @param secretName The secret to get attributes for
+     * @param attrName The name of the attribute to retrieve
+     *
+     * @return The value of the attribute, or null if the attribute doesn't exist
+     */
+    String loadAttr(String secretName, String attrName);
+
+    /**
      * Load a public key, which may be part of a public / private key pair
      *
      * <p>Public and private keys are stored separately, rather than as part of a key pair.
