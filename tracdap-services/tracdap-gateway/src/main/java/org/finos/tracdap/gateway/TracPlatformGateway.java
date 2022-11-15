@@ -103,7 +103,10 @@ public class TracPlatformGateway extends CommonServiceBase {
             log.info("Starting the gateway server on port {}...", proxyPort);
 
             var authProviderConfig = gatewayConfig.getAuthentication().getProvider();
-            var authProvider = pluginManager.createService(IAuthProvider.class, authProviderConfig);
+            var authProvider = pluginManager.createService(IAuthProvider.class, configManager, authProviderConfig);
+
+            if (authProvider.wantTracUsers())
+                authProvider.setTracUsers(configManager.getUserDb());
 
             // JWT processor is responsible for signing and validating auth tokens
             var jwtProcessor = setupJwtAuth(configManager);
