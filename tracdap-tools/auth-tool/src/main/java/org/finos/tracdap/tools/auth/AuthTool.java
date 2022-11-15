@@ -63,6 +63,9 @@ public class AuthTool {
             StandardArgs.task(ADD_USER, "Add a new user to the TRAC user database"),
             StandardArgs.task(DELETE_USER, "USER_ID", "Add a new user to the TRAC user database"));
 
+    // Must match what is used by auth providers
+    private static final String DISPLAY_NAME_ATTR = "displayName";
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final ConfigManager configManager;
@@ -178,33 +181,31 @@ public class AuthTool {
         var config = configManager.loadRootConfigObject(GatewayConfig.class);
 
         if (!config.containsConfig(ConfigKeys.USER_DB_TYPE)) {
-            var template = "TRAC user database is not enabled (set [%s] in auth provider properties to turn it on)";
+            var template = "TRAC user database is not enabled (set config key [%s] to turn it on)";
             var message = String.format(template, ConfigKeys.USER_DB_TYPE);
             log.error(message);
             throw new EStartup(message);
         }
 
         if (!config.containsConfig(ConfigKeys.USER_DB_URL)) {
-            var message = "Missing required property [" + ConfigKeys.USER_DB_URL + "] in auth provider properties";
-            log.error(message);
-            throw new EStartup(message);
-        }
-
-        if (!config.containsConfig(ConfigKeys.USER_DB_KEY)) {
-            var message = "Missing required secret [" + ConfigKeys.USER_DB_KEY + "] in auth provider secrets";
+            var message = "Missing required config key [" + ConfigKeys.USER_DB_URL + "]";
             log.error(message);
             throw new EStartup(message);
         }
 
         var userDbType = config.getConfigOrThrow(ConfigKeys.USER_DB_TYPE);
         var userDbUrl = config.getConfigOrThrow(ConfigKeys.USER_DB_URL);
-        var userDbSecret = config.getConfigOrThrow(ConfigKeys.USER_DB_KEY);
+        var userDbSecret = config.getConfigOrDefault(ConfigKeys.USER_DB_KEY, "");
 
         String userDbKey;
 
         var secrets = loadKeystore(secretType, keystorePath, secretKey, false);
 
-        if (CryptoHelpers.containsEntry(secrets, userDbSecret)) {
+        if (userDbSecret.isEmpty()) {
+
+            userDbKey = secretKey;
+        }
+        else if (CryptoHelpers.containsEntry(secrets, userDbSecret)) {
 
             userDbKey = CryptoHelpers.readTextEntry(secrets, secretKey, userDbSecret);
         }
@@ -237,11 +238,19 @@ public class AuthTool {
         random.nextBytes(salt);
 
         var hash = CryptoHelpers.encodeSSHA512(password, salt);
-        var attrs = Map.of("displayname", userName);
+        var attrs = Map.of(DISPLAY_NAME_ATTR, userName);
 
         var userDb = loadUserDb();
 
-        CryptoHelpers.writeTextEntry(userDb, secretKey, userId, hash, attrs);
+        var config = configManager.loadRootConfigObject(GatewayConfig.class);
+        var secrets = loadKeystore(secretType, keystorePath, secretKey, false);
+
+        var userDbSecret = config.getConfigOrDefault(ConfigKeys.USER_DB_KEY, "");
+        var userDbKey = userDbSecret.isEmpty()
+                ? secretKey
+                : CryptoHelpers.readTextEntry(secrets, secretKey, userDbSecret);
+
+        CryptoHelpers.writeTextEntry(userDb, userDbKey, userId, hash, attrs);
 
         saveUserDb(userDb);
     }
