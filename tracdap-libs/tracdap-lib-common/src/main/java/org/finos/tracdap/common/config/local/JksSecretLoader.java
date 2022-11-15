@@ -124,9 +124,9 @@ public class JksSecretLoader implements ISecretLoader {
     public String loadPassword(String secretName) {
 
         try {
-            return CryptoHelpers.readTextEntry(keystore, secretName, secretKey);
+            return CryptoHelpers.readTextEntry(keystore, secretKey, secretName);
         }
-        catch (GeneralSecurityException e) {
+        catch (EConfigLoad e) {
             var message = String.format("Password could not be retrieved from the key store: [%s] %s", secretName, e.getMessage());
             StartupLog.log(this, Level.ERROR, message);
             throw new EConfigLoad(message, e);
@@ -137,10 +137,10 @@ public class JksSecretLoader implements ISecretLoader {
     public PublicKey loadPublicKey(String secretName) {
 
         try {
-            var base64 = CryptoHelpers.readTextEntry(keystore, secretName, secretKey);
+            var base64 = CryptoHelpers.readTextEntry(keystore, secretKey, secretName);
             return CryptoHelpers.decodePublicKey(base64, false);
         }
-        catch (GeneralSecurityException e) {
+        catch (EConfigLoad e) {
             var message = String.format("Public key could not be retrieved from the key store: [%s] %s", secretName, e.getMessage());
             StartupLog.log(this, Level.ERROR, message);
             throw new EConfigLoad(message, e);
@@ -151,10 +151,10 @@ public class JksSecretLoader implements ISecretLoader {
     public PrivateKey loadPrivateKey(String secretName) {
 
         try {
-            var base64 = CryptoHelpers.readTextEntry(keystore, secretName, secretKey);
+            var base64 = CryptoHelpers.readTextEntry(keystore, secretKey, secretName);
             return CryptoHelpers.decodePrivateKey(base64, false);
         }
-        catch (GeneralSecurityException e) {
+        catch (EConfigLoad e) {
             var message = String.format("Private key could not be retrieved from the key store: [%s] %s", secretName, e.getMessage());
             StartupLog.log(this, Level.ERROR, message);
             throw new EConfigLoad(message, e);

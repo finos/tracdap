@@ -151,8 +151,8 @@ public class AuthTool {
             var publicEncoded = CryptoHelpers.encodePublicKey(keyPair.getPublic(), false);
             var privateEncoded = CryptoHelpers.encodePrivateKey(keyPair.getPrivate(), false);
 
-            CryptoHelpers.writeTextEntry(keystore, ConfigKeys.TRAC_AUTH_PUBLIC_KEY, publicEncoded, secretKey);
-            CryptoHelpers.writeTextEntry(keystore, ConfigKeys.TRAC_AUTH_PRIVATE_KEY, privateEncoded, secretKey);
+            CryptoHelpers.writeTextEntry(keystore, secretKey, ConfigKeys.TRAC_AUTH_PUBLIC_KEY, publicEncoded);
+            CryptoHelpers.writeTextEntry(keystore, secretKey, ConfigKeys.TRAC_AUTH_PRIVATE_KEY, privateEncoded);
 
             var keystoreBackup = keystorePath.getParent().resolve((keystorePath.getFileSystem() + ".upd~"));
 

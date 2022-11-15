@@ -17,23 +17,66 @@
 package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.exception.EConfigLoad;
+import org.finos.tracdap.common.exception.ETracInternal;
+import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.startup.StartupLog;
 
 import org.slf4j.event.Level;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 
 
 public class CryptoHelpers {
 
-    public static String readTextEntry(KeyStore keystore, String alias, String secretKey) throws GeneralSecurityException {
+    private static final Map<String, String> NO_ATTRIBUTES = Map.of();
+
+    public static void writeTextEntry(
+            KeyStore keystore, String secretKey,
+            String alias, String text)
+            throws EConfigLoad {
+
+        writeTextEntry(keystore, secretKey, alias, text, NO_ATTRIBUTES);
+    }
+
+    public static void writeTextEntry(
+            KeyStore keystore, String secretKey,
+            String alias, String text, Map<String, String> attributes)
+            throws EConfigLoad {
+
+        try {
+
+            var protection = new KeyStore.PasswordProtection(secretKey.toCharArray());
+            var factory = SecretKeyFactory.getInstance("PBE");
+
+            var spec = new PBEKeySpec(text.toCharArray());
+            var secret = factory.generateSecret(spec);
+            var entry = new KeyStore.SecretKeyEntry(secret);
+
+            for (var attr : attributes.entrySet()) {
+                entry.getAttributes().add(new PKCS12Attribute(attr.getKey(), attr.getValue()));
+            }
+
+            keystore.setEntry(alias, entry, protection);
+        }
+        catch (IllegalArgumentException | GeneralSecurityException e) {
+            var message = String.format("Failed to write secret [%s]: %s", alias, e.getMessage());
+            throw new EConfigLoad(message, e);
+        }
+    }
+
+    public static String readTextEntry(
+            KeyStore keystore, String secretKey, String alias)
+            throws EConfigLoad {
 
         try {
 
@@ -69,24 +112,90 @@ public class CryptoHelpers {
         }
     }
 
-    public static void writeTextEntry(KeyStore keystore, String alias, String text, String secretKey) throws GeneralSecurityException {
+    public static String readAttribute(
+            KeyStore keystore, String secretKey,
+            String alias, String attrName)
+            throws EConfigLoad {
 
         try {
 
-            var protection = new KeyStore.PasswordProtection(secretKey.toCharArray());
-            var factory = SecretKeyFactory.getInstance("PBE");
+            var entry = keystore.getEntry(alias, new KeyStore.PasswordProtection(secretKey.toCharArray()));
 
-            var spec = new PBEKeySpec(text.toCharArray());
-            var secret = factory.generateSecret(spec);
-            var entry = new KeyStore.SecretKeyEntry(secret);
+            if (entry == null) {
+                var message = String.format("Secret is not present in the store: [%s]", alias);
+                StartupLog.log(CryptoHelpers.class, Level.ERROR, message);
+                throw new EConfigLoad(message);
+            }
 
-            keystore.setEntry(alias, entry, protection);
+            var attributes = entry.getAttributes();
+
+            for (var attr : attributes) {
+                if (attr.getName().equals(attrName))
+                    return attr.getValue();
+            }
+
+            return null;
         }
         catch (IllegalArgumentException | GeneralSecurityException e) {
-            var message = String.format("Failed to write secret [%s]: %s", alias, e.getMessage());
+            var message = String.format("Failed to read secret [%s]: %s", alias, e.getMessage());
             throw new EConfigLoad(message, e);
         }
     }
+
+    public static String encodeSSHA512(String password, byte[] salt) {
+
+        // Output hash string in Modular Crypt Format
+        // https://en.wikipedia.org/wiki/Crypt_(C)
+
+        try {
+
+            var hasher = MessageDigest.getInstance("SHA-512");
+            hasher.update(password.getBytes(StandardCharsets.UTF_8));
+            hasher.update(salt);
+
+            var scheme = 6;
+            var hash = hasher.digest();
+
+            var b64 = Base64.getEncoder().withoutPadding();
+            var encodedSalt = b64.encodeToString(salt);
+            var encodedHash = b64.encodeToString(hash);
+
+            return String.format("$%d$%s$%s", scheme, encodedSalt, encodedHash);
+        }
+        catch (NoSuchAlgorithmException e) {
+            throw new EUnexpected(e);
+        }
+    }
+
+    public static boolean validateSSHA512(String phc, String password) {
+
+        try {
+
+            var phcSections = phc.split("\\$");
+
+            if (phcSections.length != 4 || !"6".equals(phcSections[1]))
+                throw new ETracInternal("Invalid password hash");
+
+            var encodedSalt = phcSections[2];
+            var encodedHash = phcSections[3];
+
+            var b64 = Base64.getDecoder();
+            var originalSalt = b64.decode(encodedSalt);
+            var originalHash = b64.decode(encodedHash);
+
+            var hasher = MessageDigest.getInstance("SHA-512");
+            hasher.update(password.getBytes(StandardCharsets.UTF_8));
+            hasher.update(originalSalt);
+
+            var hash = hasher.digest();
+
+            return Arrays.equals(hash, originalHash);
+        }
+        catch (NoSuchAlgorithmException e) {
+            throw new EUnexpected(e);
+        }
+    }
+
 
     public static String encodePublicKey(PublicKey key, boolean mime) {
 

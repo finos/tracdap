@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.exception.EConfigLoad;
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +28,28 @@ import java.security.SecureRandom;
 public class CryptoHelpersTest {
 
     @Test
+    void passwordHashing() {
+
+        var password = "aKpeLiBuh-as£ASDF";
+
+        var random = new SecureRandom();
+        var salt = new byte[16];
+        random.nextBytes(salt);
+
+        var hash = CryptoHelpers.encodeSSHA512(password, salt);
+
+        Assertions.assertTrue(CryptoHelpers.validateSSHA512(hash, password));
+        Assertions.assertFalse(CryptoHelpers.validateSSHA512(hash, "wrong_password"));
+    }
+
+    @Test
+    void passwordHashing_invalid() {
+
+        Assertions.assertThrows(ETracInternal.class, () ->
+                CryptoHelpers.validateSSHA512("invalid_hash", "any_password"));
+    }
+
+    @Test
     void roundTrip_password() throws Exception {
 
         var secretKey = "qdierj-ejcuw-ejcude";
@@ -35,8 +58,8 @@ public class CryptoHelpersTest {
 
         var payload = "A bilge rat and a parrot";
 
-        CryptoHelpers.writeTextEntry(keystore, "my_secret", payload, secretKey);
-        var rtPayload = CryptoHelpers.readTextEntry(keystore, "my_secret", secretKey);
+        CryptoHelpers.writeTextEntry(keystore, secretKey, "my_secret", payload);
+        var rtPayload = CryptoHelpers.readTextEntry(keystore, secretKey, "my_secret");
 
         Assertions.assertEquals(payload, rtPayload);
     }
@@ -133,11 +156,11 @@ public class CryptoHelpersTest {
         var encodedPublic = CryptoHelpers.encodePublicKey(publicKey, false);
         var encodedPrivate = CryptoHelpers.encodePrivateKey(privateKey, false);
 
-        CryptoHelpers.writeTextEntry(keystore, "public_key", encodedPublic, secretKey);
-        CryptoHelpers.writeTextEntry(keystore, "private_key", encodedPrivate, secretKey);
+        CryptoHelpers.writeTextEntry(keystore, secretKey, "public_key", encodedPublic);
+        CryptoHelpers.writeTextEntry(keystore, secretKey, "private_key", encodedPrivate);
 
-        var rtEncodedPublic = CryptoHelpers.readTextEntry(keystore, "public_key", secretKey);
-        var rtEncodedPrivate = CryptoHelpers.readTextEntry(keystore, "private_key", secretKey);
+        var rtEncodedPublic = CryptoHelpers.readTextEntry(keystore, secretKey, "public_key");
+        var rtEncodedPrivate = CryptoHelpers.readTextEntry(keystore, secretKey, "private_key");
 
         var rtPublicKey = CryptoHelpers.decodePublicKey(rtEncodedPublic, false);
         var rtPrivateKey = CryptoHelpers.decodePrivateKey(rtEncodedPrivate, false);
@@ -158,10 +181,10 @@ public class CryptoHelpersTest {
 
         var payload = "A bilge rat and a parrot";
 
-        CryptoHelpers.writeTextEntry(keystore, "my_secret", payload, secretKey);
+        CryptoHelpers.writeTextEntry(keystore, secretKey, "my_secret", payload);
 
         Assertions.assertThrows(EConfigLoad.class, () ->
-                CryptoHelpers.readTextEntry(keystore, "different_secret", secretKey));
+                CryptoHelpers.readTextEntry(keystore, secretKey, "different_secret"));
     }
 
     @Test
