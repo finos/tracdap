@@ -27,6 +27,8 @@ import org.slf4j.LoggerFactory;
 
 public class AuthInterceptor implements ServerInterceptor {
 
+    private static final String BEARER_AUTH_PREFIX = "bearer ";
+
     private static final Logger log = LoggerFactory.getLogger(AuthInterceptor.class);
 
     private final JwtValidator jwt;
@@ -67,11 +69,16 @@ public class AuthInterceptor implements ServerInterceptor {
         var token = headers.get(AuthConstants.AUTH_METADATA_KEY);
 
         if (token == null) {
-
             log.error("No authentication provided");
+            throw new StatusRuntimeException(Status.UNAUTHENTICATED.withDescription("No authentication provided"));
+        }
 
-            var trailers = new Metadata();
-            call.close(Status.UNAUTHENTICATED, trailers);
+        // Expect BEARER auth scheme, but also allow raw JSON tokens
+
+        if (token.length() >= BEARER_AUTH_PREFIX.length()) {
+            var prefix = token.substring(0, BEARER_AUTH_PREFIX.length());
+            if (prefix.equalsIgnoreCase(BEARER_AUTH_PREFIX))
+                token = token.substring(BEARER_AUTH_PREFIX.length());
         }
 
         var sessionInfo = jwt.decodeAndValidate(token);
