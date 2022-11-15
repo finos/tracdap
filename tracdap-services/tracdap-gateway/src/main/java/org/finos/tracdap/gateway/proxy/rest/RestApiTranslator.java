@@ -185,9 +185,8 @@ public class RestApiTranslator<TRequest extends Message, TRequestBody extends Me
             case UNAVAILABLE:
                 return HttpResponseStatus.SERVICE_UNAVAILABLE;
 
-            // TODO: case UNAUTHENTICATED:
-            // How should this feed back to the client?
-            // HTTP 401 might trigger browser authentication
+            case UNAUTHENTICATED:
+                return HttpResponseStatus.UNAUTHORIZED;
 
             case PERMISSION_DENIED:
                 return HttpResponseStatus.FORBIDDEN;
