@@ -210,7 +210,7 @@ jobs:
           ./gradlew auth-tool:run --args="\
           --config ${{ env.TRAC_CONFIG_FILE }} \
           --secret-key ${{ env.TRAC_SECRET_KEY }} \
-          --task signing_key EC 256"
+          --task create_root_auth_key EC 256"
 
       # The name and description of the test tenant are verified in one of the test cases so they need to match
       # MetadataReapApiTest listTenants()
