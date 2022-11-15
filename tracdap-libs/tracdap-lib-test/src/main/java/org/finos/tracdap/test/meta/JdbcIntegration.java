@@ -36,7 +36,7 @@ import java.util.Properties;
 public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, AfterEachCallback, AfterAllCallback {
 
     private static final String TRAC_CONFIG_FILE = "TRAC_CONFIG_FILE";
-    private static final String TRAC_KEYSTORE_KEY = "TRAC_KEYSTORE_KEY";
+    private static final String TRAC_SECRET_KEY = "TRAC_SECRET_KEY";
 
     private JdbcDialect dialect;
     private DataSource source;
@@ -51,7 +51,7 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
         var env = System.getenv();
         var workingDir = Paths.get(".").toAbsolutePath().normalize();
         var configFile = env.get(TRAC_CONFIG_FILE);
-        var keystoreKey = env.get(TRAC_KEYSTORE_KEY);
+        var keystoreKey = env.get(TRAC_SECRET_KEY);
 
         if (configFile == null || configFile.isBlank())
             throw new EStartup("Missing environment variable for integration testing: " + TRAC_CONFIG_FILE);

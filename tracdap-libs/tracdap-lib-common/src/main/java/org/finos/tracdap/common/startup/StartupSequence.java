@@ -67,6 +67,11 @@ public class StartupSequence {
     /** Run the startup sequence **/
     public void runStartupSequence() {
 
+        runStartupSequence(true);
+    }
+
+    public void runStartupSequence(boolean useSecrets) {
+
         if (doPrintBanner)
             printBanner(serviceClass);
 
@@ -79,7 +84,9 @@ public class StartupSequence {
         printFirstLogLine();
 
         plugins.initRegularPlugins();
-        config.prepareSecrets();
+
+        if (useSecrets)
+            config.prepareSecrets();
 
         sequenceComplete = true;
     }

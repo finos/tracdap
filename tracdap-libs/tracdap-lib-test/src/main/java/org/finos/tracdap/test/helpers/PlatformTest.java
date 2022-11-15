@@ -16,21 +16,26 @@
 
 package org.finos.tracdap.test.helpers;
 
+import io.grpc.*;
 import org.finos.tracdap.api.TracDataApiGrpc;
 import org.finos.tracdap.api.TracMetadataApiGrpc;
 import org.finos.tracdap.api.TracOrchestratorApiGrpc;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
+import org.finos.tracdap.common.auth.GrpcClientAuth;
+import org.finos.tracdap.common.auth.JwtProcessor;
+import org.finos.tracdap.common.auth.UserInfo;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.config.InstanceConfig;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.tools.auth.AuthTool;
 import org.finos.tracdap.tools.deploy.metadb.DeployMetaDB;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
 import org.finos.tracdap.test.config.ConfigHelpers;
-import io.grpc.ManagedChannel;
 import io.grpc.netty.NettyChannelBuilder;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
@@ -45,6 +50,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.KeyPair;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -57,6 +63,9 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     public static final String TRAC_EXEC_DIR = "TRAC_EXEC_DIR";
     public static final String STORAGE_ROOT_DIR = "storage_root";
     public static final String DEFAULT_STORAGE_FORMAT = "ARROW_FILE";
+
+    private static final String SECRET_KEY_ENV_VAR = "TRAC_SECRET_KEY";
+    private static final String SECRET_KEY_DEFAULT = "d7xbeK-julOi8-bBwd9k";
 
     private static final boolean IS_WINDOWS = System.getProperty("os.name").toLowerCase().contains("windows");
     private static final String PYTHON_EXE = IS_WINDOWS ? "python.exe" : "python";
@@ -74,6 +83,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private final boolean startMeta;
     private final boolean startData;
     private final boolean startOrch;
+
+    private String authToken;
 
     private PlatformTest(
             String testConfig, List<String> tenants, String storageFormat,
@@ -125,7 +136,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private Path tracExecDir;
     private Path tracRepoDir;
     private URL platformConfigUrl;
-    private String keystoreKey;
+    private String secretKey;
     private PlatformConfig platformConfig;
 
     private TracMetadataService metaSvc;
@@ -137,27 +148,33 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private ManagedChannel orchChannel;
 
     public TracMetadataApiGrpc.TracMetadataApiFutureStub metaClientFuture() {
-        return TracMetadataApiGrpc.newFutureStub(metaChannel);
+        var userCreds = new GrpcClientAuth(authToken);
+        return TracMetadataApiGrpc.newFutureStub(metaChannel).withCallCredentials(userCreds);
     }
 
     public TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClientBlocking() {
-        return TracMetadataApiGrpc.newBlockingStub(metaChannel);
+        var userCreds = new GrpcClientAuth(authToken);
+        return TracMetadataApiGrpc.newBlockingStub(metaChannel).withCallCredentials(userCreds);
     }
 
     public TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClientTrustedBlocking() {
-        return TrustedMetadataApiGrpc.newBlockingStub(metaChannel);
+        var userCreds = new GrpcClientAuth(authToken);
+        return TrustedMetadataApiGrpc.newBlockingStub(metaChannel).withCallCredentials(userCreds);
     }
 
     public TracDataApiGrpc.TracDataApiStub dataClient() {
-        return TracDataApiGrpc.newStub(dataChannel);
+        var userCreds = new GrpcClientAuth(authToken);
+        return TracDataApiGrpc.newStub(dataChannel).withCallCredentials(userCreds);
     }
 
     public TracDataApiGrpc.TracDataApiBlockingStub dataClientBlocking() {
-        return TracDataApiGrpc.newBlockingStub(dataChannel);
+        var userCreds = new GrpcClientAuth(authToken);
+        return TracDataApiGrpc.newBlockingStub(dataChannel).withCallCredentials(userCreds);
     }
 
     public TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClientBlocking() {
-        return TracOrchestratorApiGrpc.newBlockingStub(orchChannel);
+        var userCreds = new GrpcClientAuth(authToken);
+        return TracOrchestratorApiGrpc.newBlockingStub(orchChannel).withCallCredentials(userCreds);
     }
 
     public Path storageRootDir() {
@@ -174,6 +191,8 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         findDirectories();
         prepareConfig();
         preparePlugins();
+
+        prepareAuth();
 
         if (runDbDeploy)
             prepareDatabase();
@@ -247,8 +266,11 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
                 testConfig, tracDir,
                 substitutions);
 
-        keystoreKey = "";  // not yet used
-
+        // The Secret key is used for storing and accessing secrets
+        // If secrets are set up externally, a key can be passed in the env to access the secret store
+        // Otherwise the default is used, which is fine if the store is being initialised here
+        var env = System.getenv();
+        secretKey = env.getOrDefault(SECRET_KEY_ENV_VAR, SECRET_KEY_DEFAULT);
 
         var plugins = new PluginManager();
         plugins.initConfigPlugins();
@@ -279,6 +301,45 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         }
     }
 
+    void prepareAuth() {
+
+        log.info("Running auth tool to set up root authentication keys...");
+
+        // Running the auth tool will create the secrets file and add the public / private keys for auth
+
+        var authTasks = new ArrayList<StandardArgs.Task>();
+        authTasks.add(StandardArgs.task(AuthTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
+        ServiceHelpers.runAuthTool(tracDir, platformConfigUrl, secretKey, authTasks);
+
+        // Authentication is mandatory, so we need to build a token in order to test at the API level
+        // To create a valid token, we need to get the auth signing keys out of the secrets file
+        // Tokens must be signed with the same key used by the platform services
+
+        var pluginMgr = new PluginManager();
+        pluginMgr.initConfigPlugins();
+
+        var configMgr = new ConfigManager(
+                platformConfigUrl.toString(),
+                Paths.get(platformConfigUrl.toString()).getParent(),
+                pluginMgr, secretKey);
+
+        configMgr.prepareSecrets();
+
+        var platformConfig = configMgr.loadRootConfigObject(PlatformConfig.class);
+        var authConfig = platformConfig.getAuthentication();
+
+        var publicKey = configMgr.loadPublicKey(ConfigKeys.TRAC_AUTH_PUBLIC_KEY);
+        var privateKey = configMgr.loadPrivateKey(ConfigKeys.TRAC_AUTH_PRIVATE_KEY);
+        var keyPair = new KeyPair(publicKey, privateKey);
+        var jwt = JwtProcessor.configure(authConfig, keyPair);
+
+        var userInfo = new UserInfo();
+        userInfo.setUserId("platform_testing");
+        userInfo.setDisplayName("Platform testing user");
+
+        authToken = jwt.encodeToken(userInfo);
+    }
+
     void prepareDatabase() {
 
         log.info("Deploy database schema...");
@@ -296,7 +357,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
             databaseTasks.add(StandardArgs.task(DeployMetaDB.ALTER_TENANT_TASK, List.of(tenant, description), ""));
         }
 
-        ServiceHelpers.runDbDeploy(tracDir, platformConfigUrl, keystoreKey, databaseTasks);
+        ServiceHelpers.runDbDeploy(tracDir, platformConfigUrl, secretKey, databaseTasks);
     }
 
     void preparePlugins() throws Exception {
@@ -355,13 +416,13 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     void startServices() {
 
         if (startMeta)
-            metaSvc = ServiceHelpers.startService(TracMetadataService.class, tracDir, platformConfigUrl, keystoreKey);
+            metaSvc = ServiceHelpers.startService(TracMetadataService.class, tracDir, platformConfigUrl, secretKey);
 
         if (startData)
-            dataSvc = ServiceHelpers.startService(TracDataService.class, tracDir, platformConfigUrl, keystoreKey);
+            dataSvc = ServiceHelpers.startService(TracDataService.class, tracDir, platformConfigUrl, secretKey);
 
         if (startOrch)
-            orchSvc = ServiceHelpers.startService(TracOrchestratorService.class, tracDir, platformConfigUrl, keystoreKey);
+            orchSvc = ServiceHelpers.startService(TracOrchestratorService.class, tracDir, platformConfigUrl, secretKey);
     }
 
     void stopServices() {

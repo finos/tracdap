@@ -71,6 +71,7 @@
         <packageUrl regex="true">^pkg:maven/org\.yaml/snakeyaml@.*$</packageUrl>
         <vulnerabilityName>CVE-2022-38752</vulnerabilityName>
         <vulnerabilityName>CVE-2022-38751</vulnerabilityName>
+        <vulnerabilityName>CVE-2022-41854</vulnerabilityName>
     </suppress>
 
     <!-- This error is fixed in Jackson version 2.14-rc1 -->

@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.data;
 
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
+import org.finos.tracdap.common.auth.AuthInterceptor;
 import org.finos.tracdap.config.DataServiceConfig;
 import org.finos.tracdap.config.PlatformConfig;
 
@@ -141,10 +142,15 @@ public class TracDataService extends CommonServiceBase {
             var fileSvc = new FileService(dataSvcConfig, storage, metaClient);
             var publicApi = new TracDataApi(dataSvc, fileSvc);
 
+            var authentication = AuthInterceptor.setupAuth(
+                    platformConfig.getAuthentication(),
+                    configManager);
+
             // Create the main server
 
             this.server = NettyServerBuilder
                     .forPort(dataSvcConfig.getPort())
+                    .intercept(authentication)
                     .addService(publicApi)
 
                     .channelType(channelType)

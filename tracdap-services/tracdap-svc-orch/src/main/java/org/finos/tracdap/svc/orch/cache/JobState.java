@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.orch.cache;
 
 import org.finos.tracdap.api.JobRequest;
+import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
@@ -35,6 +36,8 @@ import java.util.Map;
 public class JobState implements Serializable, Cloneable {
 
     public String tenant;
+    public UserInfo owner;
+    public String ownerToken;
 
     public JobRequest jobRequest;
     public String jobKey;

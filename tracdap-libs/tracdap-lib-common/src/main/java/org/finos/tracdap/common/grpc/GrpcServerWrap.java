@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.grpc;
 
+import org.finos.tracdap.common.auth.AuthConstants;
 import org.finos.tracdap.common.concurrent.Flows;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
@@ -43,7 +44,12 @@ public class GrpcServerWrap {
 
         try {
 
-            log.info("API CALL START: [{}]", method.getBareMethodName());
+            var userInfo = AuthConstants.USER_INFO_KEY.get();
+
+            log.info("API CALL START: [{}] [{} <{}>]",
+                    method.getBareMethodName(),
+                    userInfo.getDisplayName(),
+                    userInfo.getUserId());
 
             methodImpl.apply(request).handle((result, error) ->
                     handleResult(method, responseObserver, result, error));
@@ -65,7 +71,12 @@ public class GrpcServerWrap {
 
         try {
 
-            log.info("API CALL START: [{}] (server streaming)", method.getBareMethodName());
+            var userInfo = AuthConstants.USER_INFO_KEY.get();
+
+            log.info("API CALL START: [{}] [{} <{}>] (server streaming)",
+                    method.getBareMethodName(),
+                    userInfo.getDisplayName(),
+                    userInfo.getUserId());
 
             var resultPublisher = methodImpl.apply(request);
 
@@ -92,7 +103,12 @@ public class GrpcServerWrap {
 
         try {
 
-            log.info("API CALL START: [{}] (client streaming)", method.getBareMethodName());
+            var userInfo = AuthConstants.USER_INFO_KEY.get();
+
+            log.info("API CALL START: [{}] [{} <{}>] (client streaming)",
+                    method.getBareMethodName(),
+                    userInfo.getDisplayName(),
+                    userInfo.getUserId());
 
             var requestStream = Flows.<TRequest>passThrough();
 

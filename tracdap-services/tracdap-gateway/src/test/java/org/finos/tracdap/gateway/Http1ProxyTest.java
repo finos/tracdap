@@ -16,15 +16,20 @@
 
 package org.finos.tracdap.gateway;
 
+import org.finos.tracdap.common.startup.StandardArgs;
 import org.finos.tracdap.common.startup.Startup;
 
 import io.netty.handler.codec.http.*;
+import org.finos.tracdap.test.helpers.ServiceHelpers;
+import org.finos.tracdap.tools.auth.AuthTool;
 import org.junit.jupiter.api.*;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 import static io.netty.util.NetUtil.LOCALHOST;
 
@@ -52,6 +57,18 @@ public class Http1ProxyTest {
     @BeforeAll
     public static void setupServer() throws Exception {
 
+        // Set up auth keys
+
+        var secretKey = "very-secret";
+
+        var configFile = Http1ProxyTest.class.getResource(HTTP1_PROXY_TEST_CONFIG);
+        Assertions.assertNotNull(configFile);
+
+        var authTasks = new ArrayList<StandardArgs.Task>();
+        authTasks.add(StandardArgs.task(AuthTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
+        ServiceHelpers.runAuthTool(rootDir, configFile, secretKey, authTasks);
+
+
         // Gradle sometimes runs tests out of the sub-project folder instead of the root
         // Find the top level root dir, we need it as a base for content, config files etc.
 
@@ -77,15 +94,12 @@ public class Http1ProxyTest {
 
         // Start the gateway
 
-        var configFile = Http1ProxyTest.class.getResource(HTTP1_PROXY_TEST_CONFIG);
-        Assertions.assertNotNull(configFile);
-
         var configPath = rootDir
                 .relativize(Paths.get(configFile.toURI()).toAbsolutePath())
                 .toString()
                 .replace("\\", "/");
 
-        var startup = Startup.useConfigFile(TracPlatformGateway.class, rootDir, configPath, "");
+        var startup = Startup.useConfigFile(TracPlatformGateway.class, rootDir, configPath, secretKey);
         startup.runStartupSequence();
 
         var plugins = startup.getPlugins();

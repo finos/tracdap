@@ -16,10 +16,12 @@
 
 package org.finos.tracdap.common.plugin;
 
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EPluginNotAvailable;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.startup.StartupLog;
 
+import org.finos.tracdap.config.PluginConfig;
 import org.slf4j.event.Level;
 
 import java.util.*;
@@ -125,6 +127,22 @@ public class PluginManager implements IPluginManager {
     }
 
     @Override
+    public <T> T createService(Class<T> serviceClass, ConfigManager configManager, PluginConfig pluginConfig) {
+
+        var protocol = pluginConfig.getProtocol();
+        var properties = new Properties();
+        properties.putAll(pluginConfig.getPropertiesMap());
+
+        for (var secret : pluginConfig.getSecretsMap().entrySet()) {
+            var secretKey = secret.getKey();
+            var secretValue = configManager.loadPassword(secret.getValue());
+            properties.put(secretKey, secretValue);
+        }
+
+        return createService(serviceClass, protocol, properties);
+    }
+
+    @Override
     public <T> T createService(Class<T> serviceClass, String protocol) {
 
         return createService(serviceClass, protocol, new Properties());
@@ -137,6 +155,15 @@ public class PluginManager implements IPluginManager {
 
         if (!PluginServiceInfo.SERVICE_TYPES.containsKey(serviceClass.getName()))
             throw new EUnexpected();
+
+        if (protocol.isBlank()) {
+
+            var serviceType = PluginServiceInfo.SERVICE_TYPES.get(serviceClass.getName());
+            var message = String.format("Protocol not specified for [%s] plugin", serviceType);
+
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EPluginNotAvailable(message);
+        }
 
         if (!plugins.containsKey(pluginKey)) {
 

@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+config:
+  secret.type: PKCS12
+  secret.url: secrets.pfx
 
 # Environment settings are verified in one of the test cases so they need to match
 # MetadataReadApiTest platformInfo()
@@ -20,6 +23,9 @@ platformInfo:
   production: false
   deploymentInfo:
     region: UK
+
+authentication:
+  jwtIssuer: http://localhost/
 
 instances:
   meta:

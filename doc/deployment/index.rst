@@ -15,3 +15,4 @@ Deployment
     sandbox
     platform
     metadata_store
+    authentication

@@ -182,6 +182,15 @@ public class RestApiTranslator<TRequest extends Message, TRequestBody extends Me
 
         switch (grpcCode) {
 
+            case UNAVAILABLE:
+                return HttpResponseStatus.SERVICE_UNAVAILABLE;
+
+            case UNAUTHENTICATED:
+                return HttpResponseStatus.UNAUTHORIZED;
+
+            case PERMISSION_DENIED:
+                return HttpResponseStatus.FORBIDDEN;
+
             case INVALID_ARGUMENT:
                 return HttpResponseStatus.BAD_REQUEST;
 

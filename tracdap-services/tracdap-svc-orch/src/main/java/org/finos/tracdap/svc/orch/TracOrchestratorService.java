@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.orch;
 
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
+import org.finos.tracdap.common.auth.AuthInterceptor;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
@@ -129,8 +130,15 @@ public class TracOrchestratorService extends CommonServiceBase {
             var orchestrator = new JobApiService(jobLifecycle, jobCache);
             var orchestratorApi = new TracOrchestratorApi(orchestrator);
 
-            this.server = NettyServerBuilder.forPort(orchestratorConfig.getPort())
+            var authentication = AuthInterceptor.setupAuth(
+                    platformConfig.getAuthentication(),
+                    configManager);
+
+            this.server = NettyServerBuilder
+                    .forPort(orchestratorConfig.getPort())
+                    .intercept(authentication)
                     .addService(orchestratorApi)
+
                     .channelType(channelType)
                     .bossEventLoopGroup(bossGroup)
                     .workerEventLoopGroup(nettyGroup)

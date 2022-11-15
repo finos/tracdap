@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
+import org.finos.tracdap.common.auth.GrpcClientAuth;
 import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
 
@@ -37,6 +38,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http2.*;
 
 import io.netty.util.concurrent.EventExecutor;
+import org.finos.tracdap.gateway.auth.AuthHelpers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,6 +110,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                 if (!callStateMap.containsKey(stream)) {
 
                     var method = lookupMethod(headersFrame);
+                    var headers = headersFrame.headers();
 
                     if (method == null) {
 
@@ -124,15 +127,21 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                     else {
 
                         log.info("PROXY REST CALL: {} {} -> {}",
-                                headersFrame.headers().method(),
-                                headersFrame.headers().path(),
+                                headers.method(),
+                                headers.path(),
                                 method.grpcMethod.getFullMethodName());
 
                         var callState = new RestApiCallState();
                         callState.method = method;
                         callState.requestHeaders = new DefaultHttp2Headers();
                         callState.requestContent = ctx.alloc().compositeBuffer();
+                        callState.options = CallOptions.DEFAULT;
                         callState.stream = stream;
+
+                        var authToken = AuthHelpers.getAuthToken(headers);
+
+                        if (authToken != null)
+                            callState.options = callState.options.withCallCredentials(new GrpcClientAuth(authToken));
 
                         callStateMap.put(stream, callState);
                     }
@@ -208,8 +217,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                 proxyRequest = method.translator.translateRequest(restUrlPath);
             }
 
-            var options = CallOptions.DEFAULT;
-            var serviceCall = serviceChannel.newCall(method.grpcMethod, options);
+            var serviceCall = serviceChannel.newCall(method.grpcMethod, callState.options);
             var proxyCall = ClientCalls.futureUnaryCall(serviceCall, proxyRequest);
 
             var callback = new UnaryCallback<>(method, callState, ctx);
@@ -269,7 +277,6 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                 content.writeBytes(json.getBytes(StandardCharsets.UTF_8));
 
                 var headers = new DefaultHttp2Headers();
-                // TODO: Set status ok and other required fields
                 headers.status(HttpResponseStatus.OK.toString());
                 headers.set(HttpHeaderNames.CONTENT_TYPE, "application/json; charset=UTF-8");
                 headers.setInt(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
@@ -291,8 +298,6 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
             log.error("PROXY REST CALL FAILED: {} {}", method.grpcMethod.getFullMethodName(), error.getMessage());
 
-            HttpResponse response;
-
             if (error instanceof StatusRuntimeException) {
 
                 var grpcError = (StatusRuntimeException) error;
@@ -307,9 +312,6 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                 var httpContent = "Unexpected error in REST proxy communicating with gRPC service";
 
                 sendErrorResponse(callState.stream, ctx, httpCode, httpContent);
-
-//                ctx.close();
-//                serviceChannel.shutdown();
             }
 
         }
@@ -353,6 +355,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
         Http2Headers requestHeaders;
         CompositeByteBuf requestContent;
+        CallOptions options;
 
         Http2FrameStream stream;
         boolean receiving = false;

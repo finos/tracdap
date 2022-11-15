@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.config;
 
+import org.finos.tracdap.common.config.local.JksSecretLoader;
 import org.finos.tracdap.common.exception.EConfigLoad;
 import org.finos.tracdap.common.plugin.IPluginManager;
 import org.finos.tracdap.common.exception.EStartup;
@@ -32,6 +33,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.Map;
 import java.util.Properties;
 
@@ -122,6 +125,41 @@ public class ConfigManager {
         this.secrets = secretLoaderForProtocol(secretType, configMap);
     }
 
+    public ISecretLoader getUserDb() {
+
+        var config = loadRootConfigObject(_ConfigFile.class, /* leniency = */ true);
+
+        if (!config.containsConfig(ConfigKeys.USER_DB_TYPE)) {
+            var template = "TRAC user database is not enabled (set config key [%s] to turn it on)";
+            var message = String.format(template, ConfigKeys.USER_DB_TYPE);
+            throw new EStartup(message);
+        }
+
+        if (!config.containsConfig(ConfigKeys.USER_DB_URL)) {
+            var message = "Missing required config key [" + ConfigKeys.USER_DB_URL + "]";
+            throw new EStartup(message);
+        }
+
+        var userDbType = config.getConfigOrThrow(ConfigKeys.USER_DB_TYPE);
+        var userDbUrl = config.getConfigOrThrow(ConfigKeys.USER_DB_URL);
+        var userDbSecret = config.getConfigOrDefault(ConfigKeys.USER_DB_KEY, "");
+
+        var userDbPath = Paths.get(resolveConfigFile(URI.create(userDbUrl)));
+        var userDbKey = userDbSecret.isEmpty()
+                ? secretKey
+                : loadPassword(userDbSecret);
+
+        var userDbProps = new Properties();
+        userDbProps.put(ConfigKeys.SECRET_TYPE_KEY, userDbType);
+        userDbProps.put(ConfigKeys.SECRET_URL_KEY, userDbPath.toString());
+        userDbProps.put(ConfigKeys.SECRET_KEY_KEY, userDbKey);
+
+        var userDb = new JksSecretLoader(userDbProps);
+        userDb.init(this);
+
+        return userDb;
+    }
+
     /**
      * Get the root config directory, used for resolving relative URLs.
      *
@@ -129,6 +167,20 @@ public class ConfigManager {
      */
     public URI configRoot() {
         return rootConfigDir;
+    }
+
+    /**
+     * Allow client code to resolve config files explicitly
+     *
+     * <p>This is not normally needed by the TRAC services, which read config though this class.
+     * But some of the utility programs can use this method to find config files for updating.
+     *
+     * @param relativePath Relative URL of the config file to resolve
+     * @return The resolved absolute URL of the config file
+     */
+    public URI resolveConfigFile(URI relativePath) {
+
+        return resolveUrl(relativePath);
     }
 
 
@@ -275,6 +327,15 @@ public class ConfigManager {
         return loadRootConfigObject(configClass, /* leniency = */ false);
     }
 
+    public boolean hasSecret(String secretName) {
+
+        // If secrets are not enabled, hasSecret() should always return false
+        if (secrets == null) {
+            return false;
+        }
+
+        return secrets.hasSecret(secretName);
+    }
 
     public String loadPassword(String secretName) {
 
@@ -285,6 +346,28 @@ public class ConfigManager {
         }
 
         return secrets.loadPassword(secretName);
+    }
+
+    public PublicKey loadPublicKey(String secretName) {
+
+        if (secrets == null) {
+            var message = String.format("Secrets are not enabled, to use secrets set secret.type in [%s]", rootConfigFile);
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EStartup(message);
+        }
+
+        return secrets.loadPublicKey(secretName);
+    }
+
+    public PrivateKey loadPrivateKey(String secretName) {
+
+        if (secrets == null) {
+            var message = String.format("Secrets are not enabled, to use secrets set secret.type in [%s]", rootConfigFile);
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EStartup(message);
+        }
+
+        return secrets.loadPrivateKey(secretName);
     }
 
 

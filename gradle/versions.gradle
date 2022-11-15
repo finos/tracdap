@@ -35,6 +35,7 @@ ext {
     slf4j_version = '1.7.36'
     log4j_version = '2.17.2'
     commons_cli_version = "1.5.0"
+    jwt_version = "4.2.1"
 
 
     // SQL (JDBC) drivers

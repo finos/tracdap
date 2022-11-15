@@ -17,6 +17,7 @@
 package org.finos.tracdap.svc.orch.service;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.auth.AuthConstants;
 import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.exception.EUnexpected;
@@ -106,6 +107,9 @@ public class JobApiService {
 
         var jobState = new JobState();
         jobState.tenant = request.getTenant();
+        jobState.owner = AuthConstants.USER_INFO_KEY.get();
+        jobState.ownerToken = AuthConstants.AUTH_TOKEN_KEY.get();
+
         jobState.jobType = request.getJob().getJobType();
         jobState.definition = request.getJob();
         jobState.jobRequest = request;

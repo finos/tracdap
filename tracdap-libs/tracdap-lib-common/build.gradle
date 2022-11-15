@@ -42,9 +42,13 @@ dependencies {
     // Netty - common lib includes helpers to translate to/from equivalent JDK types
     api group: 'io.netty', name: 'netty-common', version: "$netty_version"
     api group: 'io.netty', name: 'netty-buffer', version: "$netty_version"
+    api group: 'io.netty', name: 'netty-handler-proxy', version: "$netty_version"
 
     // CLI is implemented with Apache Commons CLI
     implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"
+
+    // JWT auth
+    implementation group: 'com.auth0', name: 'java-jwt', version: "$jwt_version"
 
     // Config parser uses Jackson for YAML and JSON
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"

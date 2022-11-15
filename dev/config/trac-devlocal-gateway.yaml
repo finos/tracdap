@@ -14,6 +14,20 @@
 
 config:
   logging: trac-logging.xml
+  secret.type: PKCS12
+  secret.url: secrets.p12
+
+
+authentication:
+
+  jwtIssuer: http://localhost:8080/
+  jwtExpiry: 7200
+
+  provider:
+    protocol: guest
+    properties:
+      userId: guest
+      userName: Guest User
 
 
 port: 8080

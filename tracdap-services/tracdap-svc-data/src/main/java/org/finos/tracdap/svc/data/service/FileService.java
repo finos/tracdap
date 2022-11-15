@@ -18,6 +18,7 @@ package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
+import org.finos.tracdap.common.auth.GrpcClientAuth;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.DataServiceConfig;
@@ -90,11 +91,13 @@ public class FileService {
             String tenant, List<TagUpdate> tags,
             String name, String mimeType, Long expectedSize,
             Flow.Publisher<ByteBuf> contentStream,
-            IExecutionContext execContext) {
+            IExecutionContext execContext,
+            String authToken) {
 
         var state = new RequestState();
         state.fileTags = tags;           // File tags requested by the client
         state.storageTags = List.of();   // Storage tags is empty to start with
+        state.authToken = authToken;
 
         // This timestamp is set in the storage definition to timestamp storage incarnations/copies
         // It is also used in the physical storage path
@@ -110,11 +113,13 @@ public class FileService {
 
         state.objectTimestamp = Instant.now();
 
+        var client = metaApi.withCallCredentials(new GrpcClientAuth(state.authToken));
+
         return CompletableFuture.completedFuture(null)
 
                 // Call meta svc to preallocate file object ID
                 .thenApply(x -> preallocateRequest(tenant, ObjectType.FILE))
-                .thenCompose(req -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, req, metaApi::preallocateId))
+                .thenCompose(req -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, req, client::preallocateId))
                 .thenAccept(fileId -> state.preAllocFileId = fileId)
 
                 // Preallocate ID comes back with version 0, bump to get ID for first real version
@@ -122,7 +127,7 @@ public class FileService {
 
                 // Also pre-allocate for storage
                 .thenApply(x -> preallocateRequest(tenant, ObjectType.STORAGE))
-                .thenCompose(req -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, req, metaApi::preallocateId))
+                .thenCompose(req -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, req, client::preallocateId))
                 .thenAccept(storageId -> state.preAllocStorageId = storageId)
                 .thenAccept(x -> state.storageId = bumpVersion(state.preAllocStorageId))
 
@@ -155,13 +160,16 @@ public class FileService {
             TagSelector priorVersion,
             String name, String mimeType, Long expectedSize,
             Flow.Publisher<ByteBuf> contentStream,
-            IExecutionContext execContext) {
+            IExecutionContext execContext,
+            String authToken) {
 
         var state = new RequestState();
         var prior = new RequestState();
         state.fileTags = tags;           // File tags requested by the client
         state.storageTags = List.of();   // Storage tags is empty to start with
         state.objectTimestamp = Instant.now();
+        state.authToken = authToken;
+        prior.authToken = authToken;
 
         return CompletableFuture.completedFuture(null)
 
@@ -203,9 +211,11 @@ public class FileService {
             String tenant, TagSelector selector,
             CompletableFuture<FileDefinition> definition,
             Flow.Subscriber<ByteBuf> content,
-            IExecutionContext execCtx) {
+            IExecutionContext execCtx,
+            String authToken) {
 
         var state = new RequestState();
+        state.authToken = authToken;
 
         CompletableFuture.completedFuture(null)
 
@@ -221,10 +231,11 @@ public class FileService {
 
     private CompletionStage<Void> loadMetadata(String tenant, TagSelector fileSelector, RequestState state) {
 
+        var client = metaApi.withCallCredentials(new GrpcClientAuth(state.authToken));
         var request = requestForSelector(tenant, fileSelector);
 
         return grpcWrap
-                .unaryCall(READ_OBJECT_METHOD, request, metaApi::readObject)
+                .unaryCall(READ_OBJECT_METHOD, request, client::readObject)
                 .thenAccept(tag -> {
                     state.fileId = tag.getHeader();
                     state.file = tag.getDefinition().getFile();
@@ -234,10 +245,11 @@ public class FileService {
 
     private CompletionStage<Void> loadStorageMetadata(String tenant, RequestState state) {
 
+        var client = metaApi.withCallCredentials(new GrpcClientAuth(state.authToken));
         var request = requestForSelector(tenant, state.file.getStorageId());
 
         return grpcWrap
-                .unaryCall(READ_OBJECT_METHOD, request, metaApi::readObject)
+                .unaryCall(READ_OBJECT_METHOD, request, client::readObject)
                 .thenAccept(tag -> {
 
                     state.storageId = tag.getHeader();
@@ -247,6 +259,8 @@ public class FileService {
 
     private CompletionStage<TagHeader> saveMetadata(String tenant, RequestState state) {
 
+        var client = metaApi.withCallCredentials(new GrpcClientAuth(state.authToken));
+
         var priorStorageId = selectorFor(state.preAllocStorageId);
         var storageReq = buildCreateObjectReq(tenant, priorStorageId, state.storage, state.storageTags);
 
@@ -254,12 +268,14 @@ public class FileService {
         var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
 
         return grpcWrap
-                .unaryCall(CREATE_PREALLOCATED_METHOD, storageReq, metaApi::createPreallocatedObject)
+                .unaryCall(CREATE_PREALLOCATED_METHOD, storageReq, client::createPreallocatedObject)
                 .thenCompose(x -> grpcWrap
-                .unaryCall(CREATE_PREALLOCATED_METHOD, fileReq, metaApi::createPreallocatedObject));
+                .unaryCall(CREATE_PREALLOCATED_METHOD, fileReq, client::createPreallocatedObject));
     }
 
     private CompletionStage<TagHeader> saveMetadata(String tenant, RequestState state, RequestState prior) {
+
+        var client = metaApi.withCallCredentials(new GrpcClientAuth(state.authToken));
 
         var priorStorageId = selectorFor(prior.storageId);
         var storageReq = buildCreateObjectReq(tenant, priorStorageId, state.storage, state.storageTags);
@@ -268,9 +284,9 @@ public class FileService {
         var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
 
         return grpcWrap
-                .unaryCall(UPDATE_OBJECT_METHOD, storageReq, metaApi::updateObject)
+                .unaryCall(UPDATE_OBJECT_METHOD, storageReq, client::updateObject)
                 .thenCompose(x -> grpcWrap
-                .unaryCall(UPDATE_OBJECT_METHOD, fileReq, metaApi::updateObject));
+                .unaryCall(UPDATE_OBJECT_METHOD, fileReq, client::updateObject));
     }
 
     private CompletionStage<Long> writeDataItem(
