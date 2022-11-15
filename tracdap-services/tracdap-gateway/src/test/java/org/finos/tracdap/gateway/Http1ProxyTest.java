@@ -65,7 +65,7 @@ public class Http1ProxyTest {
         Assertions.assertNotNull(configFile);
 
         var authTasks = new ArrayList<StandardArgs.Task>();
-        authTasks.add(StandardArgs.task(AuthTool.SIGNING_KEY_TASK, List.of("EC", "256"), ""));
+        authTasks.add(StandardArgs.task(AuthTool.CREATE_ROOT_AUTH_KEY, List.of("EC", "256"), ""));
         ServiceHelpers.runAuthTool(rootDir, configFile, secretKey, authTasks);
 
 
