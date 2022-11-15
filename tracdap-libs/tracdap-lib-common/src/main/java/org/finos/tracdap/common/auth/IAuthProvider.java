@@ -18,9 +18,24 @@ package org.finos.tracdap.common.auth;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
+import org.finos.tracdap.common.config.ISecretLoader;
 
 
 public interface IAuthProvider {
+
+    /**
+     * Indicates whether this auth provider wants to use the TRAC internal user database
+     *
+     * @return True if this provider uses the TRAC internal user database, false otherwise
+     */
+    boolean wantTracUsers();
+
+    /**
+     * Provides access to the TRAC internal user database, for providers that require it
+     *
+     * @param userDb A reference to the TRAC internal user database
+     */
+    void setTracUsers(ISecretLoader userDb);
 
     /**
      * Start a new authentication workflow, assuming no prior details

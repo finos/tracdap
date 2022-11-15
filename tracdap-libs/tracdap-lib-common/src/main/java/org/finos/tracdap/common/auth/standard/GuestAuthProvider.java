@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.auth.standard;
 
 import org.finos.tracdap.common.auth.UserInfo;
+import org.finos.tracdap.common.config.ISecretLoader;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.auth.IAuthProvider;
 
@@ -50,6 +51,16 @@ public class GuestAuthProvider implements IAuthProvider {
 
         guestId = properties.getProperty(USER_ID_CONFIG_KEY);
         guestName = properties.getProperty(USER_NAME_CONFIG_KEY);
+    }
+
+    @Override
+    public boolean wantTracUsers() {
+        return false;
+    }
+
+    @Override
+    public void setTracUsers(ISecretLoader userDb) {
+        // no-op
     }
 
     @Override

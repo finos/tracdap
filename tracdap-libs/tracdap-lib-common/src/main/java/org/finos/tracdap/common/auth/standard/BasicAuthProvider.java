@@ -21,6 +21,8 @@ import org.finos.tracdap.common.auth.IAuthProvider;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
+import org.finos.tracdap.common.config.CryptoHelpers;
+import org.finos.tracdap.common.config.ISecretLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,8 +37,22 @@ public class BasicAuthProvider implements IAuthProvider {
 
     private static final String BASIC_AUTH_PREFIX = "basic ";
 
+    private static final String DISPLAY_NAME_ATTR = "displayName";
+
+    private ISecretLoader userDb;
+
     public BasicAuthProvider(Properties properties) {
 
+    }
+
+    @Override
+    public boolean wantTracUsers() {
+        return true;
+    }
+
+    @Override
+    public void setTracUsers(ISecretLoader userDb) {
+        this.userDb = userDb;
     }
 
     @Override
@@ -84,46 +100,41 @@ public class BasicAuthProvider implements IAuthProvider {
         var user = userAndPass.substring(0, separator);
         var pass = userAndPass.substring(separator + 1);
 
-        // Basic auth store not implemented yet
-        // Should be a dedicated keystore for users
-        // Users can be added with auth-tool
-        var status = new HttpResponseStatus(HttpResponseStatus.FORBIDDEN.code(), "Basic auth not implemented yet");
-        var headers = new DefaultHttpHeaders();
-        var response = new DefaultHttpResponse(
-                req.protocolVersion(),
-                status,
-                headers);
-
-        ctx.writeAndFlush(response);
-        ctx.close();
-        return null;
-
-        /* real implementation would be this
-
         if (!checkPassword(user, pass)) {
             return newAuth(ctx, req);
         }
 
         return getUserInfo(user);
-         */
     }
 
     private boolean checkPassword(String user, String pass) {
 
-        // TODO: Real auth using a local source
+        if (!userDb.hasSecret(user)) {
 
-        log.info("AUTHENTICATION: Succeeded [{}]", user);
+            log.warn("AUTHENTICATION: Failed [{}] user not found", user);
+            return false;
+        }
 
-        return true;
+        var passwordHash = userDb.loadPassword(user);
+        var passwordOk = CryptoHelpers.validateSSHA512(passwordHash, pass);
+
+        if (passwordOk)
+            log.info("AUTHENTICATION: Succeeded [{}]", user);
+        else
+            log.warn("AUTHENTICATION: Failed [{}] wrong password", user);
+
+        return passwordOk;
     }
 
     private UserInfo getUserInfo(String user) {
 
-        // TODO: Real info using a local source
+        var displayName = userDb.hasAttr(user, DISPLAY_NAME_ATTR)
+                ? userDb.loadAttr(user, DISPLAY_NAME_ATTR)
+                : user;
 
         var userInfo = new UserInfo();
         userInfo.setUserId(user);
-        userInfo.setDisplayName("The user called " + user);
+        userInfo.setDisplayName(displayName);
 
         return userInfo;
     }
