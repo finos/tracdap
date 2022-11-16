@@ -76,17 +76,23 @@ PID_FILE="\${PID_DIR}/${applicationName}.pid"
 # If the PID directory is not writable, don't even try to start
 if [ ! -w "\${PID_DIR}" ]; then
     echo "PID directory is not writable: \${PID_DIR}"
-    exit -1
+    exit 255
 fi
 
 
 # If CONFIG_FILE is relative, look in the config folder
-if [ "\${CONFIG_FILE}" != "" ] && [ "\${CONFIG_FILE:0:1}" != "/" ]; then
-    if [ "\${CONFIG_FILE:0:4}" == "etc/" ]; then
-        CONFIG_FILE="\${APP_HOME}/\${CONFIG_FILE}"
-    else
-        CONFIG_FILE="\${CONFIG_DIR}/\${CONFIG_FILE}"
-    fi
+if [ "\${CONFIG_FILE}" != "" ]; then    
+    case "\${CONFIG_FILE}" in
+        /*)
+            # CONFIG_FILE is absolute
+            ;;
+        etc/*)
+            CONFIG_FILE="\${APP_HOME}/\${CONFIG_FILE}"
+            ;;
+        *)
+            CONFIG_FILE="\${CONFIG_DIR}/\${CONFIG_FILE}"
+            ;;
+    esac
 fi
 
 
@@ -103,7 +109,7 @@ if [ -n "\$JAVA_HOME" ] ; then
 
     if [ ! -x "\$JAVA_CMD" ] ; then
         echo "JAVA_HOME does not contain a valid Java installation: [\${JAVA_HOME}]"
-        exit -1
+        exit 255
     fi
 
 else
@@ -112,7 +118,7 @@ else
 
     if [ ! -x "\$JAVA_CMD" ] ; then
         echo "JAVA_HOME is not set and no 'java' command could be found in PATH"
-        exit -1
+        exit 255
     fi
 
 fi
@@ -169,14 +175,14 @@ run() {
 
     echo "Running application: \${APPLICATION_NAME}"
 
-    if [ "\${CONFIG_FILE}" == "" ]; then
+    if [ "\${CONFIG_FILE}" = "" ]; then
         echo "Missing required environment variable CONFIG_FILE"
-        exit -1
+        exit 255
     fi
 
     if [ -f \${PID_FILE} ]; then
       echo "Application is already running, try \$0 [stop|kill]"
-      exit -1
+      exit 255
     fi
 
     echo "Java location: [\${JAVA_CMD}]"
@@ -197,14 +203,14 @@ start() {
 
     echo "Starting application: \${APPLICATION_NAME}"
 
-    if [ "\${CONFIG_FILE}" == "" ]; then
+    if [ "\${CONFIG_FILE}" = "" ]; then
         echo "Missing required environment variable CONFIG_FILE"
-        exit -1
+        exit 255
     fi
 
     if [ -f \${PID_FILE} ]; then
       echo "Application is already running, try \$0 [stop|kill]"
-      exit -1
+      exit 255
     fi
 
     echo "Java location: [\${JAVA_CMD}]"
@@ -234,7 +240,7 @@ start() {
         echo \$PID > "\${PID_FILE}"
     else
         echo "\${APPLICATION_NAME} failed to start"
-        exit -1
+        exit 255
     fi
 }
 
