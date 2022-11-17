@@ -20,6 +20,7 @@ package tracdap.config;
 option java_package = "org.finos.tracdap.config";
 option java_multiple_files = true;
 
+import "tracdap/metadata/common.proto";
 import "tracdap/config/common.proto";
 
 
@@ -27,9 +28,11 @@ message PlatformConfig {
 
   map<string, string> config = 1;
 
+  PlatformInfo platformInfo = 2;
+
   AuthenticationConfig authentication = 5;
 
-  PlatformInfo platformInfo = 2;
+  MetadataConfig metadata = 6;
 
   InstantMap instances = 3;
   ServiceMap services = 4;
@@ -71,9 +74,6 @@ message ServiceMap {
 message MetaServiceConfig {
 
   uint32 port = 1;
-
-  string dalType = 2;
-  map<string, string> dalProps = 3;
 }
 
 
@@ -94,6 +94,13 @@ message OrchServiceConfig {
   ExecutorConfig executor = 2;
 
   map<string, RepositoryConfig> repositories = 3;
+}
+
+message MetadataConfig {
+
+  PluginConfig database = 1;
+
+  metadata.MetadataFormat format = 2;
 }
 
 message StorageConfig {
