@@ -2,9 +2,9 @@
   "config": {
     "logging": "log-test.xml"
   },
-  "services": {
-    "meta": {
-      "dalType": "JDBC"
+  "metadata": {
+    "database": {
+      "protocol": "JDBC"
     }
   }
 }
