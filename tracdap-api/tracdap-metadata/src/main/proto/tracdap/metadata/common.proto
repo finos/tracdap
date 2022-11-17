@@ -37,6 +37,28 @@ enum MetadataFormat {
 
 
 /**
+ * Explicit versioning of the metadata schema.
+ *
+ * A strictly increasing enumeration of metadata versions.
+ * The special value CURRENT is always set to the latest version and used by default,
+ * in API calls, config files and for storing in the metadata database.
+ *
+ * TRAC can use this information identify and handle old metadata found in the metadata database.
+ * In future it may also be possible to request old metadata versions in API calls,
+ * or to run upgrades of metadata stored in an older metadata format.
+ */
+enum MetadataVersion {
+
+  option allow_alias = true;
+
+  METADATA_VERSION_NOT_SET = 0;
+  V1 = 1;
+
+  CURRENT = 1;
+}
+
+
+/**
  * Information about a tenant that is set up on the TRAC platform.
  */
 message TenantInfo {

@@ -107,8 +107,8 @@ class JdbcWriteBatchImpl {
                 stmt.setInt(3, parts.objectVersion[i]);
                 stmt.setTimestamp(4, sqlTimestamp);
                 stmt.setBoolean(5, true);
-                stmt.setInt(6, MetadataConstants.PROTO_METADATA_FORMAT);
-                stmt.setInt(7, MetadataConstants.CURRENT_METADATA_VERSION);
+                stmt.setInt(6, MetadataFormat.PROTO.getNumber());
+                stmt.setInt(7, MetadataVersion.CURRENT.getNumber());
                 stmt.setBytes(8, parts.definition[i].toByteArray());
 
                 stmt.addBatch();

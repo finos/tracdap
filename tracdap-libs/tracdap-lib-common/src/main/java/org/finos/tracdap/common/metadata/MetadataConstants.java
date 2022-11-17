@@ -26,12 +26,6 @@ import java.util.regex.Pattern;
 
 public class MetadataConstants {
 
-    // Constants for metadata format and version
-    // Format could become an enum defined in the metadata model
-    // Version should be incremented every time there is a breaking change in the metadata model
-    public static final int PROTO_METADATA_FORMAT = 1;
-    public static final int CURRENT_METADATA_VERSION = 1;
-
     public static final int OBJECT_FIRST_VERSION = 1;
     public static final int TAG_FIRST_VERSION = 1;
 
