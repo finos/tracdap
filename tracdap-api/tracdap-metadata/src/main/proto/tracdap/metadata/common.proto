@@ -15,30 +15,35 @@
  */
 
 syntax = 'proto3';
-package tracdap.config;
+package tracdap.metadata;
 
-option java_package = "org.finos.tracdap.config";
+option java_package = "org.finos.tracdap.metadata";
 option java_multiple_files = true;
 
 
-message _ConfigFile {
+/**
+ * Available formats for representing the TRAC metadata.
+ *
+ * Use for communication between components, config files
+ * metadata stored in the metadata database.
+ */
+enum MetadataFormat {
 
-  map<string, string> config = 1;
+  METADATA_FORMAT_NOT_SET = 0;
+  PROTO = 1;
+  JSON = 2;
+  YAML = 3;
 }
 
 
-message PluginConfig {
+/**
+ * Information about a tenant that is set up on the TRAC platform.
+ */
+message TenantInfo {
 
-  string protocol = 1;
-  map<string, string> properties = 2;
-  map<string, string> secrets = 3;
-}
+  /** Unique code used to identify the tenant, required by most API calls. */
+  string tenantCode = 1;
 
-
-message AuthenticationConfig {
-
-  string jwtIssuer = 1;
-  optional sint32 jwtExpiry = 2;
-
-  optional PluginConfig provider = 3;
+  /** A short description of the tenant, suitable for displaying to users in lists. */
+  string description = 2;
 }
