@@ -26,6 +26,19 @@ platformInfo:
 
 authentication:
   jwtIssuer: http://localhost/
+  jwtExpiry: 7200
+
+metadata:
+  format: PROTO
+  database:
+    protocol: JDBC
+    properties:
+      dialect: POSTGRESQL
+      jdbcUrl: //metadb:5432/trac
+      postgresql.user: trac_admin
+      postgresql.password: trac_admin
+      pool.size: 2
+      pool.overflow: 5
 
 instances:
   meta:
@@ -33,17 +46,6 @@ instances:
       host: localhost
       port: 8081
 
-
 services:
   meta:
-
     port: 8081
-
-    dalType: JDBC
-    dalProps:
-      dialect: POSTGRESQL
-      jdbcUrl: //metadb:5432/trac
-      postgresql.user: trac_admin
-      postgresql.password: trac_admin
-      pool.size: 2
-      pool.overflow: 5

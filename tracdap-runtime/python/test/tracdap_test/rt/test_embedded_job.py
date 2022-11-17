@@ -37,10 +37,12 @@ class ModelApiTest(unittest.TestCase):
 
         sys_config = config.RuntimeConfig(
             repositories={
-                "tutorials": config.RepositoryConfig(
-                    repoType="local",
-                    repoUrl=str(_ROOT_DIR.joinpath("examples/models/python")))
-            })
+                "tutorials": config.PluginConfig(
+                    protocol="local",
+                    properties={
+                        "repoUrl": str(_ROOT_DIR.joinpath("examples/models/python"))
+                    })},
+            storage=config.StorageConfig())
 
         job_id = str(uuid.uuid4())
         job_timestamp = meta.DatetimeValue(isoDatetime=dt.datetime.utcnow().isoformat())
@@ -62,10 +64,12 @@ class ModelApiTest(unittest.TestCase):
 
         sys_config = config.RuntimeConfig(
             repositories={
-                "tutorials": config.RepositoryConfig(
-                    repoType="local",
-                    repoUrl=str(_ROOT_DIR.joinpath("examples/models/python")))
-            })
+                "tutorials": config.PluginConfig(
+                    protocol="local",
+                    properties={
+                        "repoUrl": str(_ROOT_DIR.joinpath("examples/models/python"))
+                    })},
+            storage=config.StorageConfig())
 
         try:
             rt = embed.create_runtime(sys_config)  # noqa

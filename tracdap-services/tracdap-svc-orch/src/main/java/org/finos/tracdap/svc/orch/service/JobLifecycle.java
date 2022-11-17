@@ -29,7 +29,6 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.RuntimeConfig;
-import org.finos.tracdap.config.StorageSettings;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.orch.cache.JobState;
 import org.finos.tracdap.svc.orch.jobs.JobLogic;
@@ -230,11 +229,8 @@ public class JobLifecycle {
                 .build();
 
         jobState.sysConfig = RuntimeConfig.newBuilder()
-                .setStorageSettings(StorageSettings.newBuilder()
-                .setDefaultStorage(platformConfig.getServices().getData().getDefaultStorageKey())
-                .setDefaultFormat(platformConfig.getServices().getData().getDefaultStorageFormat()))
-                .putAllStorage(platformConfig.getServices().getData().getStorageMap())
-                .putAllRepositories(platformConfig.getServices().getOrch().getRepositoriesMap())
+                .setStorage(platformConfig.getStorage())
+                .putAllRepositories(platformConfig.getRepositoriesMap())
                 .build();
 
         return jobState;

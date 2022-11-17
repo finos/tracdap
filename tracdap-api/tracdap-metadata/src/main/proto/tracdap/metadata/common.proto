@@ -1,0 +1,71 @@
+/*
+ * Copyright 2022 Accenture Global Solutions Limited
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = 'proto3';
+package tracdap.metadata;
+
+option java_package = "org.finos.tracdap.metadata";
+option java_multiple_files = true;
+
+
+/**
+ * Available formats for representing the TRAC metadata.
+ *
+ * Use for communication between components, config files
+ * metadata stored in the metadata database.
+ */
+enum MetadataFormat {
+
+  METADATA_FORMAT_NOT_SET = 0;
+  PROTO = 1;
+  JSON = 2;
+  YAML = 3;
+}
+
+
+/**
+ * Explicit versioning of the metadata schema.
+ *
+ * A strictly increasing enumeration of metadata versions.
+ * The special value CURRENT is always set to the latest version and used by default,
+ * in API calls, config files and for storing in the metadata database.
+ *
+ * TRAC can use this information identify and handle old metadata found in the metadata database.
+ * In future it may also be possible to request old metadata versions in API calls,
+ * or to run upgrades of metadata stored in an older metadata format.
+ */
+enum MetadataVersion {
+
+  option allow_alias = true;
+
+  METADATA_VERSION_NOT_SET = 0;
+  V1 = 1;
+
+  CURRENT = 1;
+}
+
+
+/**
+ * Information about a tenant that is set up on the TRAC platform.
+ */
+message TenantInfo {
+
+  /** Unique code used to identify the tenant, required by most API calls. */
+  string tenantCode = 1;
+
+  /** A short description of the tenant, suitable for displaying to users in lists. */
+  string description = 2;
+}

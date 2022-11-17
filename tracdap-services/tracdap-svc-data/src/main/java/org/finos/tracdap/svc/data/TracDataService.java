@@ -18,7 +18,7 @@ package org.finos.tracdap.svc.data;
 
 import org.finos.tracdap.api.TrustedMetadataApiGrpc;
 import org.finos.tracdap.common.auth.AuthInterceptor;
-import org.finos.tracdap.config.DataServiceConfig;
+import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.config.PlatformConfig;
 
 import org.finos.tracdap.common.codec.CodecManager;
@@ -32,6 +32,7 @@ import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
 import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.common.storage.StorageManager;
+import org.finos.tracdap.config.StorageConfig;
 import org.finos.tracdap.svc.data.api.TracDataApi;
 import org.finos.tracdap.svc.data.service.DataService;
 import org.finos.tracdap.svc.data.service.FileService;
@@ -77,7 +78,8 @@ public class TracDataService extends CommonServiceBase {
     protected void doStartup(Duration startupTimeout) {
 
         PlatformConfig platformConfig;
-        DataServiceConfig dataSvcConfig;
+        StorageConfig storageConfig;
+        ServiceConfig dataSvcConfig;
 
         // Force initialization of Arrow MemoryUtil, rather than waiting until the first API call
         // This can fail on Java versions >= 16 if the java.nio module is not marked as open
@@ -96,6 +98,7 @@ public class TracDataService extends CommonServiceBase {
             log.info("Loading TRAC platform config...");
 
             platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+            storageConfig = platformConfig.getStorage();
             dataSvcConfig = platformConfig.getServices().getData();
 
             // TODO: Config validation
@@ -131,15 +134,15 @@ public class TracDataService extends CommonServiceBase {
 
             var formats = new CodecManager(pluginManager);
             var storage = new StorageManager(pluginManager);
-            storage.initStorage(dataSvcConfig.getStorageMap(), formats);
+            storage.initStorage(platformConfig.getStorage(), formats);
 
             // Check default storage and format are available
-            checkDefaultStorageAndFormat(storage, formats, dataSvcConfig);
+            checkDefaultStorageAndFormat(storage, formats, storageConfig);
 
             var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
 
-            var dataSvc = new DataService(dataSvcConfig, arrowAllocator, storage, formats, metaClient);
-            var fileSvc = new FileService(dataSvcConfig, storage, metaClient);
+            var dataSvc = new DataService(storageConfig, arrowAllocator, storage, formats, metaClient);
+            var fileSvc = new FileService(storageConfig, storage, metaClient);
             var publicApi = new TracDataApi(dataSvc, fileSvc);
 
             var authentication = AuthInterceptor.setupAuth(
@@ -172,23 +175,23 @@ public class TracDataService extends CommonServiceBase {
         }
     }
 
-    private void checkDefaultStorageAndFormat(IStorageManager storage, ICodecManager formats, DataServiceConfig config) {
+    private void checkDefaultStorageAndFormat(IStorageManager storage, ICodecManager formats, StorageConfig config) {
 
         try {
 
-            storage.getFileStorage(config.getDefaultStorageKey());
-            storage.getDataStorage(config.getDefaultStorageKey());
-            formats.getCodec(config.getDefaultStorageFormat());
+            storage.getFileStorage(config.getDefaultBucket());
+            storage.getDataStorage(config.getDefaultBucket());
+            formats.getCodec(config.getDefaultFormat());
         }
         catch (EStorageConfig e) {
 
-            var msg = String.format("Storage not configured for default storage key: [%s]", config.getDefaultStorageKey());
+            var msg = String.format("Storage not configured for default storage key: [%s]", config.getDefaultBucket());
             log.error(msg);
             throw new EStartup(msg, e);
         }
         catch (EPluginNotAvailable e) {
 
-            var msg = String.format("Codec not available for default storage format: [%s]", config.getDefaultStorageFormat());
+            var msg = String.format("Codec not available for default storage format: [%s]", config.getDefaultFormat());
             log.error(msg);
             throw new EStartup(msg, e);
         }

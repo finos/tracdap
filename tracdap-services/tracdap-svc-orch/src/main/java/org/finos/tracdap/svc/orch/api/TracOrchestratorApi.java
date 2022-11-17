@@ -39,7 +39,7 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     private static final MethodDescriptor<JobRequest, JobStatus> SUBMIT_JOB_METHOD = TracOrchestratorApiGrpc.getSubmitJobMethod();
     private static final MethodDescriptor<JobStatusRequest, JobStatus> CHECK_JOB_METHOD = TracOrchestratorApiGrpc.getCheckJobMethod();
     private static final MethodDescriptor<JobStatusRequest, JobStatus> FOLLOW_JOB_METHOD = TracOrchestratorApiGrpc.getFollowJobMethod();
-    private static final MethodDescriptor<TagSelector, JobStatus> CANCEL_JOB_METHOD = TracOrchestratorApiGrpc.getCancelJobMethod();
+    private static final MethodDescriptor<JobStatusRequest, JobStatus> CANCEL_JOB_METHOD = TracOrchestratorApiGrpc.getCancelJobMethod();
 
     private final Validator validator;
     private final JobApiService orchestrator;
@@ -82,7 +82,7 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     }
 
     @Override
-    public void cancelJob(TagSelector request, StreamObserver<JobStatus> responseObserver) {
+    public void cancelJob(JobStatusRequest request, StreamObserver<JobStatus> responseObserver) {
         super.cancelJob(request, responseObserver);
     }
 

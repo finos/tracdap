@@ -1,15 +1,16 @@
 
 storage:
 
-  example_data:
-    instances:
-      - storageType: LOCAL
-        storageProps:
-          rootPath: ../data
-
-storageSettings:
-  defaultStorage: example_data
+  defaultBucket: example_data
   defaultFormat: CSV
+
+  buckets:
+
+    example_data:
+      protocol: LOCAL
+      properties:
+        rootPath: ../data
+
 
 sparkSettings:
 

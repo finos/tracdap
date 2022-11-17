@@ -39,12 +39,12 @@ class ImportModelTest(unittest.TestCase):
             .resolve()
 
         repos = {
-            "unit_test_repo": cfg.RepositoryConfig(
-                repoType="local",
-                repoUrl=str(current_repo_url))
+            "unit_test_repo": cfg.PluginConfig(
+                protocol="local",
+                properties={"repoUrl": str(current_repo_url)})
         }
 
-        self.sys_config = cfg.RuntimeConfig(repositories=repos)
+        self.sys_config = cfg.RuntimeConfig(repositories=repos, storage=cfg.StorageConfig())
 
     def test_import_model_job(self):
 

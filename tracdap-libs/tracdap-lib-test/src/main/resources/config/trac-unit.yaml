@@ -27,6 +27,47 @@ platformInfo:
 
 authentication:
   jwtIssuer: http://localhost/
+  jwtExpiry: 7200
+
+
+metadata:
+  format: PROTO
+  database:
+    protocol: JDBC
+    properties:
+      dialect: H2
+      jdbcUrl: ${TRAC_DIR}/trac.meta
+      h2.user: trac
+      h2.pass: trac
+      h2.schema: public
+      pool.size: 10
+      pool.overflow: 5
+
+
+storage:
+
+  defaultBucket: UNIT_TEST_STORAGE
+  defaultFormat: ARROW_FILE
+
+  buckets:
+
+    UNIT_TEST_STORAGE:
+      protocol: LOCAL
+      properties:
+        rootPath: ${TRAC_STORAGE_DIR}
+
+
+repositories:
+  UNIT_TEST_REPO:
+    protocol: git
+    properties:
+      repoUrl: ${CURRENT_GIT_ORIGIN}
+
+
+executor:
+  protocol: LOCAL
+  properties:
+    venvPath: ${TRAC_EXEC_DIR}/venv
 
 
 instances:
@@ -52,39 +93,8 @@ services:
   meta:
     port: 8081
 
-    dalType: JDBC
-    dalProps:
-      dialect: H2
-      jdbcUrl: ${TRAC_DIR}/trac.meta
-      h2.user: trac
-      h2.pass: trac
-      h2.schema: public
-      pool.size: 10
-      pool.overflow: 5
-
   data:
     port: 8082
 
-    defaultStorageKey: UNIT_TEST_STORAGE
-    defaultStorageFormat: ARROW_FILE
-
-    storage:
-
-      UNIT_TEST_STORAGE:
-        instances:
-          - storageType: LOCAL
-            storageProps:
-              rootPath: ${TRAC_STORAGE_DIR}
-
   orch:
     port: 8083
-
-    repositories:
-      UNIT_TEST_REPO:
-        repoType: git
-        repoUrl: ${CURRENT_GIT_ORIGIN}
-
-    executor:
-      executorType: LOCAL
-      executorProps:
-        venvPath: ${TRAC_EXEC_DIR}/venv

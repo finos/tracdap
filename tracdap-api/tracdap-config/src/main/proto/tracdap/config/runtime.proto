@@ -20,6 +20,7 @@ package tracdap.config;
 option java_package = "org.finos.tracdap.config";
 option java_multiple_files = true;
 
+import "tracdap/config/common.proto";
 import "tracdap/config/platform.proto";
 
 
@@ -27,17 +28,10 @@ message RuntimeConfig {
 
   map<string, string> config = 1;
 
-  map<string, StorageConfig> storage = 2;
-  map<string, RepositoryConfig> repositories = 3;
+  StorageConfig storage = 2;
+  map<string, PluginConfig> repositories = 3;
 
-  StorageSettings storageSettings = 4;
   SparkSettings sparkSettings = 5;
-}
-
-message StorageSettings {
-
-  string defaultStorage = 1;
-  string defaultFormat = 2;
 }
 
 message SparkSettings {

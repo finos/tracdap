@@ -77,10 +77,10 @@ public class DeployMetaDB {
     public void runDeployment(List<StandardArgs.Task> tasks) {
 
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-        var metaConfig = platformConfig.getServices().getMeta();
 
+        var metaDbConfig = platformConfig.getMetadata().getDatabase();
         var dalProps = new Properties();
-        dalProps.putAll(metaConfig.getDalPropsMap());
+        dalProps.putAll(metaDbConfig.getPropertiesMap());
 
         var dialect = JdbcSetup.getSqlDialect(dalProps, "");
 

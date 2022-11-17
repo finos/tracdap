@@ -93,10 +93,10 @@ public class TracMetadataService extends CommonServiceBase {
             // Use the -db library to set up a datasource
             // Handles different SQL dialects and authentication mechanisms etc.
             var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-            var metaConfig = platformConfig.getServices().getMeta();
 
+            var metaDbConfig = platformConfig.getMetadata().getDatabase();
             var dalProps = new Properties();
-            dalProps.putAll(metaConfig.getDalPropsMap());
+            dalProps.putAll(metaDbConfig.getPropertiesMap());
 
             var dialect = JdbcSetup.getSqlDialect(dalProps, "");
             dataSource = JdbcSetup.createDatasource(dalProps, "");
@@ -123,7 +123,8 @@ public class TracMetadataService extends CommonServiceBase {
 
             // Create the main server
 
-            var servicePort = metaConfig.getPort();
+            var metaSvcConfig = platformConfig.getServices().getMeta();
+            var servicePort = metaSvcConfig.getPort();
 
             this.server = ServerBuilder
                     .forPort(servicePort)

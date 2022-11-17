@@ -22,12 +22,11 @@ import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.CommonServiceBase;
-import org.finos.tracdap.config.OrchServiceConfig;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.svc.orch.api.TracOrchestratorApi;
 import org.finos.tracdap.svc.orch.cache.IJobCache;
 import org.finos.tracdap.svc.orch.cache.local.LocalJobCache;
-import org.finos.tracdap.common.exec.ExecutionManager;
 import org.finos.tracdap.common.exec.IBatchExecutor;
 import org.finos.tracdap.svc.orch.service.JobApiService;
 
@@ -81,7 +80,7 @@ public class TracOrchestratorService extends CommonServiceBase {
     protected void doStartup(Duration startupTimeout) {
 
         PlatformConfig platformConfig;
-        OrchServiceConfig orchestratorConfig;
+        ServiceConfig orchestratorConfig;
 
         try {
             log.info("Loading TRAC platform config...");
@@ -117,9 +116,9 @@ public class TracOrchestratorService extends CommonServiceBase {
             jobCache = new LocalJobCache();
             // jobCache = InterfaceLogging.wrap(jobCache, IJobCache.class);
 
-            var executors = new ExecutionManager(pluginManager);
-            executors.initExecutor(orchestratorConfig.getExecutor());
-            jobExecCtrl = executors.getExecutor();
+            jobExecCtrl = pluginManager.createService(
+                    IBatchExecutor.class, configManager,
+                    platformConfig.getExecutor());
 
             jobMonitor = new JobManagementService(
                     jobLifecycle, jobCache,

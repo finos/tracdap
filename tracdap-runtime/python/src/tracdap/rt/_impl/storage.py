@@ -129,28 +129,27 @@ class StorageManager:
         self.__log = _util.logger_for_object(self)
         self.__file_storage: tp.Dict[str, IFileStorage] = dict()
         self.__data_storage: tp.Dict[str, IDataStorage] = dict()
-        self.__settings = sys_config.storageSettings
+        self.__settings = sys_config.storage
 
         storage_options = dict()
 
-        for storage_key, storage_config in sys_config.storage.items():
+        for storage_key, storage_config in sys_config.storage.buckets.items():
             self.create_storage(storage_key, storage_config, storage_options)
 
     def default_storage_key(self):
-        return self.__settings.defaultStorage
+        return self.__settings.defaultBucket
 
     def default_storage_format(self):
         return self.__settings.defaultFormat
 
-    def create_storage(self, storage_key: str, storage_config: _cfg.StorageConfig, storage_options: dict = None):
+    def create_storage(self, storage_key: str, storage_config: _cfg.PluginConfig, storage_options: dict = None):
 
         if storage_config is None:
             err = f"Missing config for storage key [{storage_key}]"
             self.__log.error(err)
             raise _ex.EStorageConfig(err)
 
-        storage_instance = storage_config.instances[0]  # Just use the first storage instance
-        storage_type = storage_instance.storageType
+        storage_type = storage_config.protocol
 
         file_impl = self.__file_impls.get(storage_type)
         data_impl = self.__data_impls.get(storage_type)
@@ -160,8 +159,8 @@ class StorageManager:
             self.__log.error(err)
             raise _ex.EStorageConfig(err)
 
-        file_storage = file_impl(storage_instance, storage_options)
-        data_storage = data_impl(storage_instance, file_storage)
+        file_storage = file_impl(storage_config, storage_options)
+        data_storage = data_impl(storage_config, file_storage)
 
         self.__file_storage[storage_key] = file_storage
         self.__data_storage[storage_key] = data_storage
@@ -201,7 +200,7 @@ class StorageManager:
 class CommonDataStorage(IDataStorage):
 
     def __init__(
-            self, config: _cfg.StorageInstance, file_storage: IFileStorage,
+            self, config: _cfg.PluginConfig, file_storage: IFileStorage,
             pushdown_pandas: bool = False, pushdown_spark: bool = False):
 
         self.__log = _util.logger_for_object(self)
@@ -222,7 +221,7 @@ class CommonDataStorage(IDataStorage):
             format_code = FormatManager.primary_format_code(storage_format)
             format_options = storage_options.copy() if storage_options else dict()
 
-            for prop_key, prop_value in self.__config.storageProps.items():
+            for prop_key, prop_value in self.__config.properties.items():
                 if prop_key.startswith(f"{format_code}."):
                     format_prop_key = prop_key[len(format_code) + 1:]
                     format_options[format_prop_key] = prop_value
@@ -388,12 +387,12 @@ FormatManager.register_data_format(
 
 class LocalFileStorage(IFileStorage):
 
-    def __init__(self, config: _cfg.StorageInstance, options: dict = None):
+    def __init__(self, config: _cfg.PluginConfig, options: dict = None):
 
         self._log = _util.logger_for_object(self)
         self._options = options or {}
 
-        root_path_config = config.storageProps.get("rootPath")  # TODO: Config / constants
+        root_path_config = config.properties.get("rootPath")  # TODO: Config / constants
 
         if not root_path_config or root_path_config.isspace():
             err = f"Storage root path not set"
@@ -622,7 +621,7 @@ class LocalFileStorage(IFileStorage):
 
 class LocalDataStorage(CommonDataStorage):
 
-    def __init__(self, storage_config: _cfg.StorageInstance, file_storage: LocalFileStorage):
+    def __init__(self, storage_config: _cfg.PluginConfig, file_storage: LocalFileStorage):
         super().__init__(storage_config, file_storage, pushdown_pandas=True, pushdown_spark=True)
 
 

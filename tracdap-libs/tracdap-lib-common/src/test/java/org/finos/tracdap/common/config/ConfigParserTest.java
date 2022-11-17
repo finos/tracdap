@@ -18,8 +18,8 @@ package org.finos.tracdap.common.config;
 
 import org.finos.tracdap.common.config.test.TestConfigPlugin;
 import org.finos.tracdap.common.exception.EConfigParse;
-import org.finos.tracdap.config.MetaServiceConfig;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.config.PluginConfig;
 import org.finos.tracdap.test.helpers.TestResourceHelpers;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -53,10 +53,10 @@ public class ConfigParserTest {
         Assertions.assertNotNull(configObject);
         Assertions.assertInstanceOf(PlatformConfig.class, configObject);
 
-        var metaSvcConfig = configObject.getServices().getMeta();
+        var metaDbConfig = configObject.getMetadata().getDatabase();
 
-        Assertions.assertInstanceOf(MetaServiceConfig.class, metaSvcConfig);
-        Assertions.assertEquals("JDBC", metaSvcConfig.getDalType());
+        Assertions.assertInstanceOf(PluginConfig.class, metaDbConfig);
+        Assertions.assertEquals("JDBC", metaDbConfig.getProtocol());
     }
 
     @Test
@@ -96,10 +96,10 @@ public class ConfigParserTest {
         Assertions.assertNotNull(configObject);
         Assertions.assertInstanceOf(PlatformConfig.class, configObject);
 
-        var metaSvcConfig = configObject.getServices().getMeta();
+        var metaDbConfig = configObject.getMetadata().getDatabase();
 
-        Assertions.assertInstanceOf(MetaServiceConfig.class, metaSvcConfig);
-        Assertions.assertEquals("JDBC", metaSvcConfig.getDalType());
+        Assertions.assertInstanceOf(PluginConfig.class, metaDbConfig);
+        Assertions.assertEquals("JDBC", metaDbConfig.getProtocol());
     }
 
     @Test

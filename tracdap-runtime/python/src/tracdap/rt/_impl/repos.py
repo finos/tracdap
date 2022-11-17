@@ -29,7 +29,7 @@ from tracdap.rt.ext.repos import *
 
 class IntegratedSource(IModelRepository):
 
-    def __init__(self, repo_config: _cfg.RepositoryConfig):
+    def __init__(self, repo_config: _cfg.PluginConfig):
         self._repo_config = repo_config
 
     def checkout_key(self, model_def: _meta.ModelDefinition):
@@ -53,8 +53,14 @@ class IntegratedSource(IModelRepository):
 
 class LocalRepository(IModelRepository):
 
-    def __init__(self, repo_config: _cfg.RepositoryConfig):
+    REPO_URL_KEY = "repoUrl"
+
+    def __init__(self, repo_config: _cfg.PluginConfig):
         self._repo_config = repo_config
+        self._repo_url = self._repo_config.properties[self.REPO_URL_KEY]
+
+        if not self._repo_url:
+            raise _ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in local repository config")
 
     def checkout_key(self, model_def: _meta.ModelDefinition):
         return "trac_local"
@@ -63,7 +69,7 @@ class LocalRepository(IModelRepository):
             self, model_def: _meta.ModelDefinition,
             checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
 
-        checkout_path = pathlib.Path(self._repo_config.repoUrl).joinpath(model_def.path)
+        checkout_path = pathlib.Path(self._repo_url).joinpath(model_def.path)
 
         return checkout_path
 
@@ -77,11 +83,16 @@ class LocalRepository(IModelRepository):
 
 class GitRepository(IModelRepository):
 
+    REPO_URL_KEY = "repoUrl"
     GIT_TIMEOUT_SECONDS = 30
 
-    def __init__(self, repo_config: _cfg.RepositoryConfig):
+    def __init__(self, repo_config: _cfg.PluginConfig):
         self._repo_config = repo_config
         self._log = _util.logger_for_object(self)
+        self._repo_url = self._repo_config.properties.get(self.REPO_URL_KEY)
+
+        if not self._repo_url:
+            raise _ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in Git repository config")
 
     def checkout_key(self, model_def: _meta.ModelDefinition):
         return model_def.version
@@ -100,7 +111,7 @@ class GitRepository(IModelRepository):
 
         git_cmds = [
             ["init"],
-            ["remote", "add", "origin", self._repo_config.repoUrl],
+            ["remote", "add", "origin", self._repo_url],
             ["fetch", "--depth=1", "origin", model_def.version],
             ["reset", "--hard", "FETCH_HEAD"]]
 
@@ -158,14 +169,14 @@ class GitRepository(IModelRepository):
 
 class RepositoryManager:
 
-    __repo_types: tp.Dict[str, tp.Callable[[_cfg.RepositoryConfig], IModelRepository]] = {
+    __repo_types: tp.Dict[str, tp.Callable[[_cfg.PluginConfig], IModelRepository]] = {
         "integrated": IntegratedSource,
         "local": LocalRepository,
         "git": GitRepository
     }
 
     @classmethod
-    def register_repo_type(cls, repo_type: str, loader_class: tp.Callable[[_cfg.RepositoryConfig], IModelRepository]):
+    def register_repo_type(cls, repo_type: str, loader_class: tp.Callable[[_cfg.PluginConfig], IModelRepository]):
         cls.__repo_types[repo_type] = loader_class
 
     def __init__(self, sys_config: _cfg.RuntimeConfig):
@@ -175,15 +186,15 @@ class RepositoryManager:
 
         for repo_name, repo_config in sys_config.repositories.items():
 
-            if repo_config.repoType not in self.__repo_types:
+            if repo_config.protocol not in self.__repo_types:
 
-                msg = f"Model repository type [{repo_config.repoType}] is not recognised" \
+                msg = f"Model repository type [{repo_config.protocol}] is not recognised" \
                     + " (this could indicate a missing model repository plugin)"
 
                 self._log.error(msg)
                 raise _ex.EModelRepoConfig(msg)
 
-            loader_class = self.__repo_types[repo_config.repoType]
+            loader_class = self.__repo_types[repo_config.protocol]
             loader = loader_class(repo_config)
             self._loaders[repo_name] = loader
 

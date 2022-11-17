@@ -265,12 +265,12 @@ class LocalStorageTest(DataStorageTestSuite):
 
         cls.storage_root = tempfile.TemporaryDirectory()
 
-        storage_instance = _cfg.StorageInstance(
-            storageType="LOCAL",
-            storageProps={"rootPath": cls.storage_root.name})
+        bucket_config = _cfg.PluginConfig(
+            protocol="LOCAL",
+            properties={"rootPath": cls.storage_root.name})
 
-        file_storage = _storage.LocalFileStorage(storage_instance)
-        data_storage = _storage.CommonDataStorage(storage_instance, file_storage)
+        file_storage = _storage.LocalFileStorage(bucket_config)
+        data_storage = _storage.CommonDataStorage(bucket_config, file_storage)
 
         cls.file_storage = file_storage
 
@@ -299,14 +299,14 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
         cls.storage = LocalStorageTest.make_storage()
         cls.storage_format = "CSV"
 
-        test_lib_storage_instance = _cfg.StorageInstance(
-            storageType="LOCAL",
-            storageProps={"rootPath": str(_TEST_DATA_DIR)})
+        test_lib_storage_config = _cfg.PluginConfig(
+            protocol="LOCAL",
+            properties={"rootPath": str(_TEST_DATA_DIR)})
 
-        test_lib_file_storage = _storage.LocalFileStorage(test_lib_storage_instance)
-        test_lib_data_storage = _storage.CommonDataStorage(test_lib_storage_instance, test_lib_file_storage)
+        test_lib_file_storage = _storage.LocalFileStorage(test_lib_storage_config)
+        test_lib_data_storage = _storage.CommonDataStorage(test_lib_storage_config, test_lib_file_storage)
 
-        cls.test_lib_storage_instance_cfg = test_lib_storage_instance
+        cls.test_lib_storage_instance_cfg = test_lib_storage_config
         cls.test_lib_storage = test_lib_data_storage
 
     @classmethod
@@ -416,9 +416,9 @@ class LocalCsvStorageTest(unittest.TestCase, LocalStorageTest):
     def test_date_format_props(self):
 
         test_lib_storage_instance = copy.deepcopy(self.test_lib_storage_instance_cfg)
-        test_lib_storage_instance.storageProps["csv.lenient_csv_parser"] = "true"
-        test_lib_storage_instance.storageProps["csv.date_format"] = "%d/%m/%Y"
-        test_lib_storage_instance.storageProps["csv.datetime_format"] = "%d/%m/%Y %H:%M:%S"
+        test_lib_storage_instance.properties["csv.lenient_csv_parser"] = "true"
+        test_lib_storage_instance.properties["csv.date_format"] = "%d/%m/%Y"
+        test_lib_storage_instance.properties["csv.datetime_format"] = "%d/%m/%Y %H:%M:%S"
 
         test_lib_file_storage = _storage.LocalFileStorage(test_lib_storage_instance)
         test_lib_data_storage = _storage.CommonDataStorage(test_lib_storage_instance, test_lib_file_storage)

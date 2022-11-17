@@ -21,15 +21,6 @@ option java_package = "org.finos.tracdap.config";
 option java_multiple_files = true;
 
 
-enum ConfigFormat {
-
-  CONFIG_FORMAT_NOT_SET = 0;
-  PROTO = 1;
-  JSON = 2;
-  YAML = 3;
-}
-
-
 message _ConfigFile {
 
   map<string, string> config = 1;

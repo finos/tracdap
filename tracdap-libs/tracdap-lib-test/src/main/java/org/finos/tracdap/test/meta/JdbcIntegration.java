@@ -58,10 +58,10 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
 
         var configManager = Startup.quickConfig(workingDir, configFile, keystoreKey);
         var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
-        var metaConfig = platformConfig.getServices().getMeta();
 
+        var metaDbConfig = platformConfig.getMetadata().getDatabase();
         var dalProps = new Properties();
-        dalProps.putAll(metaConfig.getDalPropsMap());
+        dalProps.putAll(metaDbConfig.getPropertiesMap());
 
         dialect = JdbcSetup.getSqlDialect(dalProps, "");
         source = JdbcSetup.createDatasource(dalProps, "");

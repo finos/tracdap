@@ -26,21 +26,13 @@ platformInfo:
 
 authentication:
   jwtIssuer: http://localhost/
+  jwtExpiry: 7200
 
-instances:
-  meta:
-    - scheme: http
-      host: localhost
-      port: 8081
-
-
-services:
-  meta:
-
-    port: 8081
-
-    dalType: JDBC
-    dalProps:
+metadata:
+  format: PROTO
+  database:
+    protocol: JDBC
+    properties:
       dialect: SQLSERVER
       jdbcUrl: //metadb:1433
       sqlserver.databaseName: master
@@ -48,3 +40,13 @@ services:
       sqlserver.password: tR4c_aDm!n
       pool.size: 2
       pool.overflow: 5
+
+instances:
+  meta:
+    - scheme: http
+      host: localhost
+      port: 8081
+
+services:
+  meta:
+    port: 8081
