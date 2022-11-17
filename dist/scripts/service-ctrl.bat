@@ -180,7 +180,11 @@ goto :main
 
     set CWD=%cd%
     cd "%RUN_DIR%"
-    "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" %*
+    if "%SECRET_KEY%" == "" (
+        "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" %*
+    ) else (
+        "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" --secret-key "%SECRET_KEY%" %*
+    )
     set RESULT=%errorlevel%
     cd "%CWD%"
 
@@ -207,7 +211,11 @@ exit /b %RESULT%
     echo Config file: [%CONFIG_FILE%]
     echo.
 
-    start "%APPLICATION_NAME%" /D "%RUN_DIR%" /B "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" %*
+    if "%SECRET_KEY%" == "" (
+        start "%APPLICATION_NAME%" /D "%RUN_DIR%" /B "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" %*
+    ) else (
+        start "%APPLICATION_NAME%" /D "%RUN_DIR%" /B "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" --secret-key "%SECRET_KEY%" %*
+    )
 
     @rem Look up PID using WMIC, name='java.exe' stops wmic from finding itself
     @rem findstr filters out blank lines, which are included in the output

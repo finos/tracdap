@@ -195,7 +195,11 @@ run() {
 
     CWD=`pwd`
     cd "\${RUN_DIR}"
-    "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \$@
+    if [ "\${SECRET_KEY}" = "" ]; then
+        "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \$@
+    else
+        "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" --secret-key "\${SECRET_KEY}" \$@
+    fi
     cd "\${CWD}"
 }
 
@@ -223,7 +227,11 @@ start() {
 
     CWD=`pwd`
     cd "\${RUN_DIR}"
-    "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \$@ &
+    if [ "\${SECRET_KEY}" = "" ]; then
+        "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" \$@ &
+    else
+        "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" --secret-key "\${SECRET_KEY}" \$@ &
+    fi
     PID=\$!
     cd "\${CWD}"
 
