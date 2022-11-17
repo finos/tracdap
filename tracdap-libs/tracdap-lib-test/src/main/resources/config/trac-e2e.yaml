@@ -27,6 +27,21 @@ platformInfo:
 
 authentication:
   jwtIssuer: http://localhost/
+  jwtExpiry: 7200
+
+
+metadata:
+  format: PROTO
+  database:
+    protocol: JDBC
+    properties:
+      dialect: H2
+      jdbcUrl: ${TRAC_DIR}/trac.meta
+      h2.user: trac
+      h2.pass: trac
+      h2.schema: public
+      pool.size: 10
+      pool.overflow: 5
 
 
 instances:
@@ -51,16 +66,6 @@ services:
 
   meta:
     port: 8081
-
-    dalType: JDBC
-    dalProps:
-      dialect: H2
-      jdbcUrl: ${TRAC_DIR}/trac.meta
-      h2.user: trac
-      h2.pass: trac
-      h2.schema: public
-      pool.size: 10
-      pool.overflow: 5
 
   data:
     port: 8082
