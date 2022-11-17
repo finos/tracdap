@@ -44,6 +44,38 @@ metadata:
       pool.overflow: 5
 
 
+storage:
+
+  defaultBucket: UNIT_TEST_STORAGE
+  defaultFormat: ${STORAGE_FORMAT}
+
+  buckets:
+
+    UNIT_TEST_STORAGE:
+      protocol: LOCAL
+      properties:
+        rootPath: ${TRAC_STORAGE_DIR}
+
+
+repositories:
+
+  TRAC_LOCAL_REPO:
+    protocol: local
+    properties:
+      repoUrl: ${TRAC_LOCAL_REPO}
+
+  TRAC_GIT_REPO:
+    protocol: git
+    properties:
+      repoUrl: ${TRAC_GIT_REPO}
+
+
+executor:
+  protocol: LOCAL
+  properties:
+    venvPath: ${TRAC_EXEC_DIR}/venv
+
+
 instances:
 
   meta:
@@ -70,31 +102,5 @@ services:
   data:
     port: 8082
 
-    defaultStorageKey: UNIT_TEST_STORAGE
-    defaultStorageFormat: ${STORAGE_FORMAT}
-
-    storage:
-
-      UNIT_TEST_STORAGE:
-        instances:
-          - storageType: LOCAL
-            storageProps:
-              rootPath: ${TRAC_STORAGE_DIR}
-
   orch:
     port: 8083
-
-    repositories:
-
-      TRAC_LOCAL_REPO:
-        repoType: local
-        repoUrl: ${TRAC_LOCAL_REPO}
-
-      TRAC_GIT_REPO:
-        repoType: git
-        repoUrl: ${TRAC_GIT_REPO}
-
-    executor:
-      executorType: LOCAL
-      executorProps:
-        venvPath: ${TRAC_EXEC_DIR}/venv
