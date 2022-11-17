@@ -34,6 +34,12 @@ message PlatformConfig {
 
   MetadataConfig metadata = 6;
 
+  StorageConfig storage = 7;
+
+  map<string, PluginConfig> repositories = 8;
+
+  PluginConfig executor = 9;
+
   InstantMap instances = 3;
   ServiceMap services = 4;
 }
@@ -46,6 +52,24 @@ message PlatformInfo {
 
   map<string, string> deploymentInfo = 3;
 }
+
+
+message MetadataConfig {
+
+  PluginConfig database = 1;
+
+  metadata.MetadataFormat format = 2;
+}
+
+
+message StorageConfig {
+
+  map<string, PluginConfig> buckets = 1;
+
+  string defaultBucket = 2;
+  string defaultFormat = 3;
+}
+
 
 
 message InstantMap {
@@ -62,67 +86,14 @@ message InstanceConfig {
   uint32 port = 3;
 }
 
-
 message ServiceMap {
 
-  MetaServiceConfig meta = 1;
-  DataServiceConfig data = 2;
-  OrchServiceConfig orch = 3;
+  ServiceConfig meta = 1;
+  ServiceConfig data = 2;
+  ServiceConfig orch = 3;
 }
 
-
-message MetaServiceConfig {
+message ServiceConfig {
 
   uint32 port = 1;
-}
-
-
-message DataServiceConfig  {
-
-  uint32 port = 1;
-
-  string defaultStorageKey = 2;
-  string defaultStorageFormat = 3;
-
-  map<string, StorageConfig> storage = 4;
-}
-
-message OrchServiceConfig {
-
-  uint32 port = 1;
-
-  ExecutorConfig executor = 2;
-
-  map<string, RepositoryConfig> repositories = 3;
-}
-
-message MetadataConfig {
-
-  PluginConfig database = 1;
-
-  metadata.MetadataFormat format = 2;
-}
-
-message StorageConfig {
-
-  repeated StorageInstance instances = 1;
-}
-
-message StorageInstance {
-
-  string storageType = 1;
-  map<string, string> storageProps = 2;
-}
-
-message RepositoryConfig {
-
-  string repoType = 1;
-  string repoUrl = 2;
-  map<string, string> repoProps = 3;
-}
-
-message ExecutorConfig {
-
-  string executorType = 1;
-  map<string, string> executorProps = 2;
 }
