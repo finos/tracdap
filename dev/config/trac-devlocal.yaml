@@ -42,6 +42,36 @@ metadata:
       pool.overflow: 5
 
 
+storage:
+
+  defaultBucket: STORAGE1
+  defaultFormat: ARROW_FILE
+
+  buckets:
+
+    STORAGE1:
+      protocol: LOCAL
+      properties:
+        rootPath: ./build/run
+
+
+repositories:
+
+  # Add your own repositories in here to load models into TRAC
+  example_repo:
+    protocol: git
+    properties:
+      repoUrl: https://github.com/finos/tracdap
+
+
+executor:
+
+  protocol: LOCAL
+  properties:
+    # Set this to the venv of your local TRAC execution environment
+    venvPath: C:\Dev\trac\venv
+
+
 instances:
 
   meta:
@@ -68,29 +98,5 @@ services:
   data:
     port: 8082
 
-    defaultStorageKey: STORAGE1
-    defaultStorageFormat: ARROW_FILE
-
-    storage:
-
-      STORAGE1:
-        instances:
-          - storageType: LOCAL
-            storageProps:
-              rootPath: ./build/run
-
   orch:
     port: 8083
-
-    repositories:
-
-      # Add your own repositories in here to load models into TRAC
-      example_repo:
-        repoType: git
-        repoUrl: https://github.com/finos/tracdap
-
-    executor:
-      executorType: LOCAL
-      executorProps:
-        # Set this to the venv of your local TRAC execution environment
-        venvPath: C:\Dev\trac\venv
