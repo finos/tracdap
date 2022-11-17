@@ -40,58 +40,55 @@ public class StorageManager implements IStorageManager {
         this.storage = new HashMap<>();
     }
 
-    public void initStorage(Map<String, StorageConfig> storageConfigMap, ICodecManager formats) {
+    public void initStorage(StorageConfig storageConfig, ICodecManager formats) {
 
         log.info("Configuring storage...");
 
-        for (var store: storageConfigMap.entrySet()) {
+        for (var bucket: storageConfig.getBucketsMap().entrySet()) {
 
-            var storageKey = store.getKey();
-            var config = store.getValue();
+            var bucketKey = bucket.getKey();
+            var bucketConfig = bucket.getValue();
             var backend = new StorageBackend();
 
-            for (var instanceConfig : config.getInstancesList()) {
+            var protocol = bucketConfig.getProtocol();
+            var rawProps = bucketConfig.getPropertiesMap();
+            var props = new Properties();
+            props.put(PROP_STORAGE_KEY, bucketKey);
+            props.putAll(rawProps);
 
-                var protocol = instanceConfig.getStorageType();
-                var rawProps = instanceConfig.getStoragePropsMap();
-                var props = new Properties();
-                props.put(PROP_STORAGE_KEY, storageKey);
-                props.putAll(rawProps);
+            log.info("Attach storage: [{}] (protocol: {})", bucketKey, protocol);
 
-                log.info("Attach storage: [{}] (protocol: {})", storageKey, protocol);
+            if (plugins.isServiceAvailable(IFileStorage.class, protocol)) {
 
-                if (plugins.isServiceAvailable(IFileStorage.class, protocol)) {
+                var fileInstance = plugins.createService(IFileStorage.class, protocol, props);
+                backend.fileInstances.add(fileInstance);
+            }
 
-                    var fileInstance = plugins.createService(IFileStorage.class, protocol, props);
-                    backend.fileInstances.add(fileInstance);
-                }
+            if (plugins.isServiceAvailable(IDataStorage.class, protocol)) {
 
-                if (plugins.isServiceAvailable(IDataStorage.class, protocol)) {
+                var dataInstance = plugins.createService(IDataStorage.class, protocol, props);
+                backend.dataInstances.add(dataInstance);
+            }
+            else if (!backend.fileInstances.isEmpty()) {
 
-                    var dataInstance = plugins.createService(IDataStorage.class, protocol, props);
+                log.info("Using flat data storage (datasets will be saved as files)");
+
+                for (var fileInstance : backend.fileInstances) {
+                    var dataInstance = new FlatDataStorage(fileInstance, formats);
                     backend.dataInstances.add(dataInstance);
-                }
-                else if (!backend.fileInstances.isEmpty()) {
-
-                    log.info("Using flat data storage (datasets will be saved as files)");
-
-                    for (var fileInstance : backend.fileInstances) {
-                        var dataInstance = new FlatDataStorage(fileInstance, formats);
-                        backend.dataInstances.add(dataInstance);
-                    }
-                }
-
-                if (backend.fileInstances.isEmpty() && backend.dataInstances.isEmpty()) {
-
-                    var message = String.format("No plugin found to support storage protocol [%s]", protocol);
-                    var error = new EStartup(message);
-
-                    log.error(message, error);
-                    throw error;
                 }
             }
 
-            storage.put(storageKey, backend);
+            if (backend.fileInstances.isEmpty() && backend.dataInstances.isEmpty()) {
+
+                var message = String.format("No plugin found to support storage protocol [%s]", protocol);
+                var error = new EStartup(message);
+
+                log.error(message, error);
+                throw error;
+            }
+
+            storage.put(bucketKey, backend);
         }
     }
 

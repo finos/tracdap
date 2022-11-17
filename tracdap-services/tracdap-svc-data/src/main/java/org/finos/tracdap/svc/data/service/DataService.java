@@ -21,7 +21,7 @@ import org.finos.tracdap.common.auth.GrpcClientAuth;
 import org.finos.tracdap.common.data.ArrowSchema;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
-import org.finos.tracdap.config.DataServiceConfig;
+import org.finos.tracdap.config.StorageConfig;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.codec.ICodec;
 import org.finos.tracdap.common.codec.ICodecManager;
@@ -70,7 +70,7 @@ public class DataService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final DataServiceConfig config;
+    private final StorageConfig storageConfig;
     private final BufferAllocator arrowAllocator;
     private final IStorageManager storageManager;
     private final ICodecManager codecManager;
@@ -82,13 +82,13 @@ public class DataService {
     private final GrpcClientWrap grpcWrap = new GrpcClientWrap(getClass());
 
     public DataService(
-            DataServiceConfig config,
+            StorageConfig storageConfig,
             BufferAllocator arrowAllocator,
             IStorageManager storageManager,
             ICodecManager codecManager,
             TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient) {
 
-        this.config = config;
+        this.storageConfig = storageConfig;
         this.arrowAllocator = arrowAllocator;
         this.storageManager = storageManager;
         this.codecManager = codecManager;
@@ -591,8 +591,8 @@ public class DataService {
 
     private StorageItem buildStorageItem(String storagePath, OffsetDateTime objectTimestamp) {
 
-        var storageKey = config.getDefaultStorageKey();
-        var storageFormat = config.getDefaultStorageFormat();
+        var storageBucket = storageConfig.getDefaultBucket();
+        var storageFormat = storageConfig.getDefaultFormat();
 
         // For the time being, data has one incarnation and a single storage copy
 
@@ -601,7 +601,7 @@ public class DataService {
         var copy = StorageCopy.newBuilder()
                 .setCopyStatus(CopyStatus.COPY_AVAILABLE)
                 .setCopyTimestamp(MetadataCodec.encodeDatetime(objectTimestamp))
-                .setStorageKey(storageKey)
+                .setStorageKey(storageBucket)
                 .setStoragePath(storagePath)
                 .setStorageFormat(storageFormat);
 

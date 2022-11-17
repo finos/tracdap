@@ -21,7 +21,7 @@ import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub
 import org.finos.tracdap.common.auth.GrpcClientAuth;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.metadata.MetadataUtil;
-import org.finos.tracdap.config.DataServiceConfig;
+import org.finos.tracdap.config.StorageConfig;
 import org.finos.tracdap.metadata.*;
 
 import org.finos.tracdap.common.concurrent.IExecutionContext;
@@ -69,7 +69,7 @@ public class FileService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final DataServiceConfig config;
+    private final StorageConfig storageConfig;
     private final IStorageManager storageManager;
     private final TrustedMetadataApiFutureStub metaApi;
 
@@ -78,11 +78,11 @@ public class FileService {
     private final Random random = new Random();
 
     public FileService(
-            DataServiceConfig config,
+            StorageConfig storageConfig,
             IStorageManager storageManager,
             TrustedMetadataApiFutureStub metaApi) {
 
-        this.config = config;
+        this.storageConfig = storageConfig;
         this.storageManager = storageManager;
         this.metaApi = metaApi;
     }
@@ -134,7 +134,7 @@ public class FileService {
                 // Build definition objects
                 .thenAccept(x -> state.file = createFileDef(state.fileId, name, mimeType, state.storageId))
                 .thenAccept(x -> state.storage = createStorageDef(
-                        config.getDefaultStorageKey(),  state.objectTimestamp,
+                        storageConfig.getDefaultBucket(),  state.objectTimestamp,
                         state.fileId, name, mimeType))
 
                 // Write file content stream to the storage layer
@@ -183,7 +183,7 @@ public class FileService {
                 // Build definition objects
                 .thenAccept(x -> state.file = updateFileDef(prior.file, state.fileId, name, mimeType))
                 .thenAccept(x -> state.storage = updateStorageDef(
-                        prior.storage, config.getDefaultStorageKey(), state.objectTimestamp,
+                        prior.storage, storageConfig.getDefaultBucket(), state.objectTimestamp,
                         state.fileId, name, mimeType))
 
                 .thenAccept(x -> validator.validateVersion(state.file, prior.file))
