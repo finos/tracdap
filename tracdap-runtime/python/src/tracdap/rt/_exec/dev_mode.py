@@ -160,7 +160,11 @@ class DevModeTranslator:
 
         # Add the integrated model repo trac_integrated
 
-        sys_config.repositories["trac_integrated"] = _cfg.RepositoryConfig("integrated")
+        integrated_repo_config = _cfg.PluginConfig(
+            protocol="integrated",
+            properties={})
+
+        sys_config.repositories["trac_integrated"] = integrated_repo_config
 
         return sys_config
 
@@ -169,48 +173,44 @@ class DevModeTranslator:
             cls, sys_config: _cfg.RuntimeConfig,
             sys_config_path: tp.Optional[pathlib.Path]):
 
-        storage_map = copy.deepcopy(sys_config.storage)
+        storage_config = copy.deepcopy(sys_config.storage)
 
-        for key, storage in storage_map.items():
-            storage_set = copy.copy(storage)
-            storage_set.instances = []
+        for bucket_key, bucket_config in storage_config.buckets.items():
 
-            for instance in storage.instances:
+            if bucket_config.protocol != "LOCAL":
+                continue
 
-                if instance.storageType != "LOCAL":
-                    continue
+            if "rootPath" not in bucket_config.properties:
+                continue
 
-                if "rootPath" not in instance.storageProps:
-                    continue
+            root_path = pathlib.Path(bucket_config.properties["rootPath"])
 
-                root_path = pathlib.Path(instance.storageProps["rootPath"])
+            if root_path.is_absolute():
+                continue
 
-                if root_path.is_absolute():
-                    continue
+            cls._log.info(f"Resolving relative path for [{bucket_key}] local storage...")
 
-                cls._log.info(f"Resolving relative path for [{key}] local storage...")
-
-                if sys_config_path is not None:
-                    absolute_path = sys_config_path.joinpath(root_path).resolve()
-                    if absolute_path.exists():
-                        cls._log.info(f"Resolved [{root_path}] -> [{absolute_path}]")
-                        instance.storageProps["rootPath"] = str(absolute_path)
-                        continue
-
-                cwd = pathlib.Path.cwd()
-                absolute_path = cwd.joinpath(root_path).resolve()
-
+            if sys_config_path is not None:
+                absolute_path = sys_config_path.joinpath(root_path).resolve()
                 if absolute_path.exists():
                     cls._log.info(f"Resolved [{root_path}] -> [{absolute_path}]")
-                    instance.storageProps["rootPath"] = str(absolute_path)
+                    bucket_config.properties["rootPath"] = str(absolute_path)
                     continue
 
-                msg = f"Failed to resolve relative storage path [{root_path}]"
-                cls._log.error(msg)
-                raise _ex.EConfigParse(msg)
+            cwd = pathlib.Path.cwd()
+            absolute_path = cwd.joinpath(root_path).resolve()
+
+            if absolute_path.exists():
+                cls._log.info(f"Resolved [{root_path}] -> [{absolute_path}]")
+                bucket_config.properties["rootPath"] = str(absolute_path)
+                continue
+
+            msg = f"Failed to resolve relative storage path [{root_path}]"
+            cls._log.error(msg)
+            raise _ex.EConfigParse(msg)
 
         sys_config = copy.copy(sys_config)
-        sys_config.storage = storage_map
+        sys_config.storage = storage_config
 
         return sys_config
 
@@ -620,8 +620,8 @@ class DevModeTranslator:
 
         if isinstance(data_value, str):
             storage_path = data_value
-            storage_key = sys_config.storageSettings.defaultStorage
-            storage_format = cls.infer_format(storage_path, sys_config.storageSettings)
+            storage_key = sys_config.storage.defaultBucket
+            storage_format = cls.infer_format(storage_path, sys_config.storage)
             snap_version = 1
 
         elif isinstance(data_value, dict):
@@ -631,8 +631,8 @@ class DevModeTranslator:
             if not storage_path:
                 raise _ex.EConfigParse(f"Invalid configuration for input [{data_key}] (missing required value 'path'")
 
-            storage_key = data_value.get("storageKey") or sys_config.storageSettings.defaultStorage
-            storage_format = data_value.get("format") or cls.infer_format(storage_path, sys_config.storageSettings)
+            storage_key = data_value.get("storageKey") or sys_config.storage.defaultBucket
+            storage_format = data_value.get("format") or cls.infer_format(storage_path, sys_config.storage)
             snap_version = 1
 
         else:
@@ -672,12 +672,12 @@ class DevModeTranslator:
         return data_obj, storage_obj
 
     @staticmethod
-    def infer_format(storage_path: str, storage_settings: _cfg.StorageSettings):
+    def infer_format(storage_path: str, storage_config: _cfg.StorageConfig):
 
         if re.match(r'.*\.\w+$', storage_path):
             return _storage.FormatManager.format_for_extension(pathlib.Path(storage_path).suffix)
         else:
-            return storage_settings.defaultFormat
+            return storage_config.defaultFormat
 
     @classmethod
     def _generate_input_definition(

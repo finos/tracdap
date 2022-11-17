@@ -85,7 +85,7 @@ class ImportModelTest(unittest.TestCase):
     def test_load_integrated_ok(self):
 
         sys_config = config.RuntimeConfig()
-        sys_config.repositories["trac_integrated"] = config.RepositoryConfig(repoType="integrated")
+        sys_config.repositories["trac_integrated"] = config.PluginConfig(protocol="integrated")
 
         stub_model_def = meta.ModelDefinition(
             language="python",
@@ -112,7 +112,9 @@ class ImportModelTest(unittest.TestCase):
             .joinpath("../../../../../..") \
             .resolve()
 
-        example_repo_config = config.RepositoryConfig(repoType="local", repoUrl=str(example_repo_url))
+        example_repo_config = config.PluginConfig(
+            protocol="local",
+            properties={"repoUrl": str(example_repo_url)})
 
         sys_config = config.RuntimeConfig()
         sys_config.repositories["example_repo"] = example_repo_config
@@ -138,9 +140,9 @@ class ImportModelTest(unittest.TestCase):
 
     def test_load_git_ok(self):
 
-        example_repo_config = config.RepositoryConfig(
-            repoType="git",
-            repoUrl=self.repo_url)
+        example_repo_config = config.PluginConfig(
+            protocol="git",
+            properties={"repoUrl": self.repo_url})
 
         sys_config = config.RuntimeConfig()
         sys_config.repositories["example_repo"] = example_repo_config
