@@ -37,6 +37,7 @@ for running code in TRAC, both on the platform and using the local development s
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :caption: examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_1
+    :language: python
     :lines: 15 - 20
     :linenos:
     :lineno-start: 15
@@ -48,6 +49,7 @@ are defined in the correct format.
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_2
+    :language: python
     :lines: 21 - 27
     :linenos:
     :lineno-start: 21
@@ -58,6 +60,7 @@ required in order for the model to be valid.
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_3
+    :language: python
     :lines: 28 - 33
     :linenos:
     :lineno-start: 28
@@ -69,6 +72,7 @@ TRAC platform.
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_part_4
+    :language: python
     :lines: 34 - 40
     :linenos:
     :lineno-start: 34
@@ -108,6 +112,7 @@ For our Hello World model, we only need to supply a single parameter in the job 
 .. literalinclude:: ../../../examples/models/python/config/hello_world.yaml
     :caption: examples/models/python/config/hello_world.yaml
     :name: hello_world_job_config
+    :language: yaml
     :lines: 2-
 
 Since this model is not using a Spark session or any storage, there is nothing that needs
@@ -132,6 +137,7 @@ this, but the model will fail to deploy)!
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :caption: examples/models/python/src/tutorial/hello_world.py
     :name: hello_world_py_launch
+    :language: python
     :lines: 42-
     :linenos:
     :lineno-start: 42
