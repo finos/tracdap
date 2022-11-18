@@ -278,9 +278,7 @@ elliptic curve (EC) or RSA. Elliptic curve keys are considered to give better se
 performance at lower key sizes. For this reason we recommended EC 256 keys.
 
 The *auth-tool* will write the secret to the secret store configured in the platform configuration.
-If this is a local keystore file, the file will be created if it does not already exist. Running the
-command a second time will replace the root authentication key, which will invalidate any existing
-JWT tokens.
+If this is a local keystore file, the file will be created if it does not already exist.
 
 .. tab-set::
 
@@ -299,6 +297,10 @@ JWT tokens.
 
             cd /d C:\trac\tracdap-sandbox-<version>
             bin\auth-tool.bat run --task create_root_auth_key EC 256
+
+.. note::
+    Running the *create_root_auth_key* command a second time will replace the root authentication key,
+    which will invalidate any existing JWT tokens.
 
 
 **Deploy MetaDB**
