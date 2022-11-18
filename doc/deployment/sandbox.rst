@@ -260,8 +260,48 @@ useful for specifying system settings, such as JAVA_HOME to select a particular 
 or JAVA_OPTS to control the JVM memory parameters. You can also control some of the TRAC options here,
 e.g. setting CONFIG_FILE will tell trac to load a different root config file.
 
-Metadata setup
---------------
+Setup tools
+-----------
+
+TRAC D.A.P. comes with a few tools to simplify the deployment. There are two we need to use for a
+sandbox setup, *auth-tool* and *deploy-metadb*.
+
+**Auth Tool**
+
+The auth tool is used to manage secrets, certificates and other sensitive configuration. It can also
+be used to manage users if you are using a local user database. For the sandbox setup we need a minimum
+of one secret, the root authentication key. This key is used by TRAC to sign and verify its internal JWT
+tokens.
+
+The auth-tool utility can be used to generate the root signing key, the available key types are
+elliptic curve (EC) or RSA. Elliptic curve keys are considered to give better security with better
+performance at lower key sizes. For this reason we recommended EC 256 keys.
+
+The *auth-tool* will write the secret to the secret store configured in the platform configuration.
+If this is a local keystore file, the file will be created if it does not already exist. Running the
+command a second time will replace the root authentication key, which will invalidate any existing
+JWT tokens.
+
+.. tab-set::
+
+    .. tab-item:: Linux / macOS
+        :sync: platform_linux
+
+        .. code-block:: shell
+
+            cd /opt/trac/current
+            bin/auth-tool run --task create_root_auth_key EC 256
+
+    .. tab-item:: Windows
+        :sync: platform_windows
+
+        .. code-block:: batch
+
+            cd /d C:\trac\tracdap-sandbox-<version>
+            bin\auth-tool.bat run --task create_root_auth_key EC 256
+
+
+**Deploy MetaDB**
 
 TRAC D.A.P. comes with a tool to help deploy the metadata database. It runs off the same configuration as
 the platform services, so make sure to finish updating your configuration before running the tool.
@@ -298,7 +338,7 @@ can be altered later but the tenant code cannot.
 Start the services
 ------------------
 
-Once the configuration is done and the metadata database is prepared, all that remains is to start the services:
+Once the configuration is done and the setup tools have be run, all that remains is to start the services:
 
 .. tab-set::
 
@@ -341,6 +381,6 @@ The service control scripts provide several commands which may be helpful:
 * kill_all - Find and kill all running instances of the service
 * run - Run the service in the foreground
 
-.. note:
+.. note::
     The *run* option requires a separate console for each service and will terminate the service on Ctrl-C.
     For this configuration, it is recommended to enable logging to stdout in trac-logging.xml.
