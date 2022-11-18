@@ -154,19 +154,23 @@ The model can be launched locally using :py:func:`launch_model() <tracdap.rt.lau
 Configure local data
 --------------------
 
-A little bit more config is needed to pass data into a model running locally. In the *sys_config* file,
-we need to define a data store. This example config sets up one storage location called *example_data*.
-Since we are going to use a local disk, the storage type is *LOCAL*. The *rootPath* property says where
-this storage location will be on disk - a relative path is taken relative to the *sys_config* file by
-default, or you can specify an absolute path here to avoid confusion.
+To pass data into the local model, a little bit more config is needed in the *sys_config* file
+to define a storage bucket. In TRAC storage buckets can be any storage location that can hold
+files. This would be bucket storage on a cloud platform, but you can also use local disks or other
+storage protocols such as network storage or HDFS, so long as the right storage plugins are available.
 
-The default storage location is where output data will be saved. In this example we have only one storage
-location, which is used for both inputs and outputs, so we mark that as the default.
+This example sets up one storage bucket called *example_data*. Since we are going to use a local disk,
+the storage protocol is *LOCAL*. The *rootPath* property says where this storage bucket will be on disk -
+a relative path is taken relative to the *sys_config* file by default, or you can specify an absolute path
+here to avoid confusion.
+
+The default bucket is also where output data will be saved. In this example we have only one storage
+bucket configured, which is used for both inputs and outputs, so we mark that as the default.
 
 .. literalinclude:: ../../../examples/models/python/config/sys_config.yaml
     :caption: examples/models/python/config/sys_config.yaml
     :name: sys_config.yaml
-    :lines: 2-11
+    :lines: 2-12
 
 In the *job_config* file we need to specify what data to use for the model inputs and outputs. Each
 input named in the model must have an entry in the inputs section, and each output in the outputs
