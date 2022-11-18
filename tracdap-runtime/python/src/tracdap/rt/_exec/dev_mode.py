@@ -49,6 +49,11 @@ class DevModeTranslator:
 
         cls._log.info(f"Applying dev mode config translation to system config")
 
+        # TODO: In code gen, default object types to a new object unless the field is marked as optional
+        # This would match the general semantics of protobuf
+        if sys_config.storage is None:
+            sys_config.storage = _cfg.StorageConfig()
+
         sys_config = cls._add_integrated_repo(sys_config)
         sys_config = cls._resolve_relative_storage_root(sys_config, config_dir)
 

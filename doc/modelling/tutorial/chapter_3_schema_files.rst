@@ -9,6 +9,7 @@ under *examples/models/python*.
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/schema_files.py
     :caption: schema_files.py
+    :language: python
     :name: schema_files.py
     :lines: 15-
 

@@ -25,7 +25,7 @@ platformInfo:
 
 authentication:
   jwtIssuer: http://localhost:8080/
-  jwtExpiry: 7200
+  jwtExpiry: 86400
 
 
 metadata:

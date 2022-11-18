@@ -139,71 +139,102 @@ point at a Nexus server hosted inside your network.
 Quick configuration
 -------------------
 
-The sandbox deployment comes with some example configuration to use as a starting point. Before editing
+The sandbox deployment comes with some example configuration to use as a starting point. Below is a
+quick walk through of the major sections and what they all do, for a standalone sandbox most of these
+settings can be left as they are, with just the locations of key resources to be filled in. Before editing
 these configuration files, it is recommended to take a copy as a backup, in case you need to refer to it
 later.
 
 **Platform configuration**
 
-The sample platform configuration is already set up to use the H2 database, but you need to specify a path
-where the database file will be stored:
+The config section refers to other configuration files or sources. The example config includes a logging
+config file and a local secret store using the PKCS12 format. We'll set up the secret store later using
+the TRAC setup tools.
 
-.. code-block:: yaml
+.. literalinclude:: ../../dist/template/etc/trac-platform.yaml
+    :caption: etc/trac-platform.yaml
+    :name: trac_platform_yaml_config
+    :language: yaml
+    :lines: 15 - 18
 
-    dalType: JDBC
-    dalProps:
-      dialect: H2
-      jdbcUrl: /path/to/trac/metadata/trac.meta
-      ...
+.. note::
+    Relative file names or URLs in the config section will be taken relative to the main config file.
 
-The configuration also contains an example for using local data storage. You need to specify a path.
+The *platformInfo* section allows you to specify some information about the TRAC environment.
+This is made available to clients and can be shown in UIs and client apps, so users know which
+environment they are connected to.
 
-.. code-block:: yaml
+.. literalinclude:: ../../dist/template/etc/trac-platform.yaml
+    :name: trac_platform_yaml_platform_info
+    :language: yaml
+    :lines: 21 - 23
 
-    storage:
+The *authentication* section controls the platform's internal authentication mechanism, which uses JWT.
+This is to allow the platform to validate user tokens and to let different platform services talk to each other.
 
-      ACME_SALES_DATA:
-        instances:
-          - storageType: LOCAL
-            storageProps:
-              rootPath: /path/to/trac/data
+The task of actually logging users in and obtaining their details is handled by the gateway component, so the
+configuration for this is in the gateway config file. The JWT details supplied here need to match what is in
+the gateway config file.
 
-Pay particular attention to the storage key, which is *ACME_SALES_DATA* in this example.
-The storage key is a unique identifier for a storage location, you may want to give it
-a meaningful name, for example relating to your project or business division.
+.. literalinclude:: ../../dist/template/etc/trac-platform.yaml
+    :name: trac_platform_yaml_authentication
+    :language: yaml
+    :lines: 26 - 28
 
-You will also need to set a default storage location and format. If you only have one storage
-location, that must be set as the default. If you want to store data in CSV format (not advised),
-you can also change the default storage format to *CSV*.
+The *metadata* section describes how and where the TRAC metadata will be stored. The current implementation
+uses SQL to store metadata and several common SQL dialects are supported. The default sandbox config uses the
+H2 embedded database for the simplest possible setup, you just need to add the path for the metadata folder
+created above. For examples of how to configure other SQL dialects, see the deployment docs for the
+:doc:`metadata store </deployment/metadata_store>`.
 
-.. code-block:: yaml
 
-    data:
+.. literalinclude:: ../../dist/template/etc/trac-platform.yaml
+    :name: trac_platform_yaml_metadata
+    :language: yaml
+    :lines: 31 - 43
 
-      defaultStorageKey: ACME_SALES_DATA
-      defaultStorageFormat: ARROW_FILE
+The *storage* section allows you to configure one or more storage buckets to hold primary data. In TRAC,
+a "bucket" is any storage location that can hold files, which could be a cloud storage bucket on a cloud
+platform but can also be a local folder. Other protocols such as network storage or HDFS can also be
+supported with the appropriate storage plugins.
 
-The example config contains the TRAC repository as an example, you should replace this with
-your own model repository and choose a meaningful repository key. You can add multiple
-repositories if required, so long as each one has a unique key.
+The *defaultBucket* and *defaultFormat* settings tell TRAC where to store new data by default. These defaults
+can be changed later, data that is already written will be picked up using the correct location and format.
 
-.. code-block:: yaml
+The sample configuration contains one storage bucket, you just need to specify a path.
 
-    repositories:
+.. literalinclude:: ../../dist/template/etc/trac-platform.yaml
+    :name: trac_platform_yaml_storage
+    :language: yaml
+    :lines: 46 - 57
 
-      sales_model_repo:
-        repoType: git
-        repoUrl: https://github.com/acme_corp/sales_model_repo
+.. note::
+    Pay particular attention to the bucket key, which is *STORAGE1* in this example.
+    The bucket key is a unique identifier for a storage location, you may want to give it
+    a meaningful name, for example relating to your project or business division.
+
+The repositories section let's you configure model repositories, that TRAC will access to load
+models into the platform. The sample config includes the TRAC repository as an example, you
+should replace this with your own model repository and choose a meaningful repository key.
+You can add multiple repositories if required, so long as each one has a unique key.
+
+.. literalinclude:: ../../dist/template/etc/trac-platform.yaml
+    :name: trac_platform_yaml_repositories
+    :language: yaml
+    :lines: 60 - 66
 
 The last thing you need to add in the platform config is an executor. The example config is already set up
 with a local executor, so you just need to add the path for the VENV you built in the deployment step.
 
-.. code-block:: yaml
+.. literalinclude:: ../../dist/template/etc/trac-platform.yaml
+    :name: trac_platform_yaml_executor
+    :language: yaml
+    :lines: 68 - 72
 
-    executor:
-      executorType: LOCAL
-      executorProps:
-        venvPath: /path/to/trac/tracdap-sandbox-<version>/venv
+There are two more sections in the platform config, *services* and *instances*. The *services* section sets
+up the service properties for each service, most importantly the ports they should run on. The *instances*
+section lists the instances of each service. For a sandbox setup there is no need to alter these sections.
+
 
 **Gateway configuration**
 
@@ -213,9 +244,13 @@ useful for web applications in a dev / test scenario, because it provides a dire
 API and avoids CORS issues. If you want to use this capability, look in the gateway config and you will find
 an example of setting up an additional HTTP route. You can add as many HTTP routes as you need.
 
+The example configuration uses *guest* authentication, which logs all users in as "guest" without requiring
+a password. To set up real user logins, see the deployment docs for :doc:`authentication </deployment/authentication>`.
+
 **Logging**
 
 Logging is provided using log4j, the example configuration writes to the local log/ directory by default.
+
 
 **Environment**
 
@@ -225,8 +260,74 @@ useful for specifying system settings, such as JAVA_HOME to select a particular 
 or JAVA_OPTS to control the JVM memory parameters. You can also control some of the TRAC options here,
 e.g. setting CONFIG_FILE will tell trac to load a different root config file.
 
-Metadata setup
---------------
+For sandbox setups, the main variable to set in this file is *SECRET_KEY*. This is the master key for
+the TRAC secret store, that unlocks all the other secrets in the configuration. In production setups
+this key should not be stored in a file, but passed in through the environment using a scheduling tool,
+or as part of a containerized job setup.
+
+.. tab-set::
+
+    .. tab-item:: Linux / macOS
+        :sync: platform_linux
+
+        .. code-block:: shell
+            :caption: etc/env.sh
+
+            SECRET_KEY=a_very_secret_password
+
+    .. tab-item:: Windows
+        :sync: platform_windows
+
+        .. code-block:: batch
+            :caption: etc\\env.bat
+
+            set SECRET_KEY=a_very_secret_password
+
+
+Setup tools
+-----------
+
+TRAC D.A.P. comes with a few tools to simplify the deployment. There are two we need to use for a
+sandbox setup, *auth-tool* and *deploy-metadb*.
+
+**Auth Tool**
+
+The *auth-tool* utility is used to manage secrets, certificates and other sensitive configuration.
+It can also be used to manage users if you are using a local user database. The tool will write secrets
+to the secret store configured in the platform configuration. If this is a local keystore file and it
+does not exist then it will be created. Make sure you have set the *SECRET_KEY* environment variable
+before using *auth-tool*.
+
+For the sandbox setup we need a minimum of one secret, the root authentication key.
+This key is used by TRAC to sign and verify its internal JWT tokens.
+The available key types for the root authentication key are elliptic curve (EC) or RSA.
+Elliptic curve keys are considered to give better security with better performance at lower key sizes,
+so for this reason we recommended EC 256 keys.
+
+.. tab-set::
+
+    .. tab-item:: Linux / macOS
+        :sync: platform_linux
+
+        .. code-block:: shell
+
+            cd /opt/trac/current
+            bin/auth-tool run --task create_root_auth_key EC 256
+
+    .. tab-item:: Windows
+        :sync: platform_windows
+
+        .. code-block:: batch
+
+            cd /d C:\trac\tracdap-sandbox-<version>
+            bin\auth-tool.bat run --task create_root_auth_key EC 256
+
+.. note::
+    Running the *create_root_auth_key* command a second time will replace the root authentication key,
+    which will invalidate any existing JWT tokens.
+
+
+**Deploy MetaDB**
 
 TRAC D.A.P. comes with a tool to help deploy the metadata database. It runs off the same configuration as
 the platform services, so make sure to finish updating your configuration before running the tool.
@@ -263,7 +364,7 @@ can be altered later but the tenant code cannot.
 Start the services
 ------------------
 
-Once the configuration is done and the metadata database is prepared, all that remains is to start the services:
+Once the configuration is done and the setup tools have be run, all that remains is to start the services:
 
 .. tab-set::
 
@@ -306,6 +407,6 @@ The service control scripts provide several commands which may be helpful:
 * kill_all - Find and kill all running instances of the service
 * run - Run the service in the foreground
 
-.. note:
+.. note::
     The *run* option requires a separate console for each service and will terminate the service on Ctrl-C.
     For this configuration, it is recommended to enable logging to stdout in trac-logging.xml.

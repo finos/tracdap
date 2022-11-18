@@ -15,12 +15,16 @@ TRAC supports multiple authentication providers and more can be added using the 
 The JWT mechanism is owned by the platform, and cannot be extended.
 
 
-Root Signing Key
-----------------
+Root Authentication Key
+-----------------------
 
-The authentication system requires a root signing key, that is used by the platform to sign
+The authentication system requires a root authentication key, that is used by the platform to sign
 and validate JWT tokens. In order to set up the key you must have secrets configured, in both
 the platform and gateway config files.
+
+.. note::
+    If you have already set up your root authentication key as described in the
+    :ref:`sandbox quick start guide <deployment/sandbox:Setup Tools>` then you can skip this step.
 
 You will also need to add an authentication block in both config files, specifying the issuer
 and expiry times for JWT tokens. If you know the DNS address that TRAC will be served from you
@@ -42,6 +46,9 @@ secret store. The available key types are elliptic curve (EC) or RSA. Elliptic c
 considered to give better security with better performance at lower key sizes. For this reason
 we recommended EC 256 keys.
 
+Make sure you have set the *SECRET_KEY* environment variable before running *auth_tool*. For
+sandbox deployments, this can be set in *etc/env.sh* (or *etc\\env.bat* on Windows).
+
 .. tab-set::
 
     .. tab-item:: Linux / macOS
@@ -60,20 +67,20 @@ we recommended EC 256 keys.
             cd /d C:\trac\tracdap-sandbox-<version>
             bin\auth-tool.bat run --task create_root_auth_key EC 256
 
+.. note::
+    Running the *create_root_auth_key* command a second time will replace the root authentication key,
+    which will invalidate any existing JWT tokens.
 
 Providers
 ---------
 
 You need to configure one provider in the authentication section of the gateway config file.
 
-.. note::
-    The JWT settings are still needed in the authentication section of the gateway config file,
-    do not remove them!
-
 **Guest Provider**
 ^^^^^^^^^^^^^^^^^^
 
 The guest provider logs everyone in as guest, without prompting for credentials.
+This is the default provider set up in the sandbox example configuration.
 The user ID and name can be set as properties of the provider.
 
 .. code-block:: yaml
@@ -91,11 +98,9 @@ The user ID and name can be set as properties of the provider.
 ^^^^^^^^^^^^^^^^^^
 
 The basic provider uses HTTP basic authentication, which typically causes the browser
-authentication window to appear when users try to access pages in a browser.
-
-To use the basic provider, you must configure the TRAC user database. This is set up in the
-config section of the gateway config file. The provider must also be set up in the authentication
-section with protocol 'basic', it does not require any other properties.
+authentication window to appear when users try to access pages in a browser. To use
+the basic provider you will need to enable TRAC's built in user database, by adding
+these settings into the *config* section of the gateway config file.
 
 .. code-block:: yaml
 
@@ -104,15 +109,9 @@ section with protocol 'basic', it does not require any other properties.
       users.url: local_users.p12
       users.key: local_users_key
 
-
-    authentication:
-
-      provider:
-        protocol: basic
-
-Before you can use the TRAC user database, you will need to initialize it and add at least one user.
-The auth-tool utility will let you do this. The add_user command is interactive and will ask for
-details to create a user.
+You will need to initialize the user database and add at least one user. The *auth-tool* utility will let
+you do this. The add_user command is interactive and will ask for details to create a user. You can remove
+users later using the *delete_user* command.
 
 .. tab-set::
 
@@ -137,3 +136,14 @@ details to create a user.
             bin\auth-tool.bat run --task add_user
 
             bin\auth-tool.bat run --task delete_user <user_id>
+
+Once the user database is created you can enable the basic authentication provider. To do this,
+replace the provider section in the authentication block of the gateway config file and set the
+protocol to basic. Currently the basic provider does not require any other properties.
+
+.. code-block:: yaml
+
+    authentication:
+
+      provider:
+        protocol: basic
