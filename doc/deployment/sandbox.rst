@@ -260,6 +260,30 @@ useful for specifying system settings, such as JAVA_HOME to select a particular 
 or JAVA_OPTS to control the JVM memory parameters. You can also control some of the TRAC options here,
 e.g. setting CONFIG_FILE will tell trac to load a different root config file.
 
+For sandbox setups, the main variable to set in this file is *SECRET_KEY*. This is the master key for
+the TRAC secret store, that unlocks all the other secrets in the configuration. In production setups
+this key should not be stored in a file, but passed in through the environment using a scheduling tool,
+or as part of a containerized job setup.
+
+.. tab-set::
+
+    .. tab-item:: Linux / macOS
+        :sync: platform_linux
+
+        .. code-block:: shell
+            :caption: etc/env.sh
+
+            SECRET_KEY=a_very_secret_password
+
+    .. tab-item:: Windows
+        :sync: platform_windows
+
+        .. code-block:: batch
+            :caption: etc\\env.bat
+
+            set SECRET_KEY=a_very_secret_password
+
+
 Setup tools
 -----------
 
@@ -268,17 +292,17 @@ sandbox setup, *auth-tool* and *deploy-metadb*.
 
 **Auth Tool**
 
-The auth tool is used to manage secrets, certificates and other sensitive configuration. It can also
-be used to manage users if you are using a local user database. For the sandbox setup we need a minimum
-of one secret, the root authentication key. This key is used by TRAC to sign and verify its internal JWT
-tokens.
+The *auth-tool* utility is used to manage secrets, certificates and other sensitive configuration.
+It can also be used to manage users if you are using a local user database. The tool will write secrets
+to the secret store configured in the platform configuration. If this is a local keystore file and it
+does not exist then it will be created. Make sure you have set the *SECRET_KEY* environment variable
+before using *auth-tool*.
 
-The auth-tool utility can be used to generate the root signing key, the available key types are
-elliptic curve (EC) or RSA. Elliptic curve keys are considered to give better security with better
-performance at lower key sizes. For this reason we recommended EC 256 keys.
-
-The *auth-tool* will write the secret to the secret store configured in the platform configuration.
-If this is a local keystore file, the file will be created if it does not already exist.
+For the sandbox setup we need a minimum of one secret, the root authentication key.
+This key is used by TRAC to sign and verify its internal JWT tokens.
+The available key types for the root authentication key are elliptic curve (EC) or RSA.
+Elliptic curve keys are considered to give better security with better performance at lower key sizes,
+so for this reason we recommended EC 256 keys.
 
 .. tab-set::
 
