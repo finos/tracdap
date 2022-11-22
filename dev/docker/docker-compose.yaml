@@ -26,7 +26,6 @@ services:
       - /opt/trac/current/run:mode=1777
     volumes:
       - ./etc:/opt/trac/current/etc:ro
-      - ./log:/opt/trac/current/log
 
   tracdap-svc-meta:
     build:
@@ -38,7 +37,6 @@ services:
     volumes:
       - ./etc:/opt/trac/current/etc:ro
       - ./state/metadata:/opt/trac/metadata
-      - ./log:/opt/trac/current/log
 
   tracdap-svc-data:
     build:
@@ -50,7 +48,6 @@ services:
     volumes:
       - ./etc:/opt/trac/current/etc:ro
       - ./state/data:/opt/trac/data
-      - ./log:/opt/trac/current/log
 
   tracdap-svc-orch:
     build:
@@ -61,4 +58,3 @@ services:
       - /opt/trac/current/run:mode=1777
     volumes:
       - ./etc:/opt/trac/current/etc:ro
-      - ./log:/opt/trac/current/log

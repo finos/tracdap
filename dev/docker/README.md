@@ -89,7 +89,6 @@ docker run --rm \
     --user "$(id -u):$(id -g)" \
     --mount "type=bind,source=$(pwd)/etc,target=/opt/trac/current/etc,readonly" \
     --mount "type=bind,source=$(pwd)/state/metadata,target=/opt/trac/metadata" \
-    --mount "type=bind,source=$(pwd)/log,target=/opt/trac/current/log" \
     --mount "type=tmpfs,target=/opt/trac/current/run,tmpfs-mode=1777" \
     deploy-metadb --task deploy_schema
 ```
