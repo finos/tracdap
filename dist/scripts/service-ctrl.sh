@@ -73,8 +73,14 @@ APPLICATION_CLASS="$mainClassName"
 
 PID_FILE="\${PID_DIR}/${applicationName}.pid"
 
-# If the PID directory is not writable, don't even try to start
-if [ ! -w "\${PID_DIR}" ]; then
+# If the PID directory does not exist, don't even try to start
+if [ ! -d "\${PID_DIR}" ]; then
+    echo "PID directory does not exist: \${PID_DIR}"
+    exit 255
+fi
+
+# All operations (except run) ruquire the PID directory to be writable
+if [ "\$1" != "run" ] && [ ! -w "\${PID_DIR}" ]; then
     echo "PID directory is not writable: \${PID_DIR}"
     exit 255
 fi
