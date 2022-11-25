@@ -36,8 +36,11 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
     private static final Descriptors.ServiceDescriptor TRUSTED_METADATA_SERVICE = MetadataTrusted.getDescriptor().findServiceByName(SERVICE_NAME);
 
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreateObjectMethod();
+    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> CREATE_BATCH_METHOD = TrustedMetadataApiGrpc.getCreateBatchMethod();
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getUpdateObjectMethod();
+    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> UPDATE_BATCH_METHOD = TrustedMetadataApiGrpc.getUpdateBatchMethod();
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_TAG_METHOD = TrustedMetadataApiGrpc.getUpdateTagMethod();
+    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> UPDATE_BATCH_TAG_METHOD = TrustedMetadataApiGrpc.getUpdateBatchTagMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> PREALLOCATE_ID_METHOD = TrustedMetadataApiGrpc.getPreallocateIdMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_PREALLOCATED_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectMethod();
 
@@ -68,15 +71,33 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
     }
 
     @Override
+    public void createBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
+
+        grpcWrap.unaryCall(CREATE_BATCH_METHOD, request, response, apiImpl::createBatch);
+    }
+
+    @Override
     public void updateObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
         grpcWrap.unaryCall(UPDATE_OBJECT_METHOD, request, response, apiImpl::updateObject);
     }
 
     @Override
+    public void updateBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
+
+        grpcWrap.unaryCall(UPDATE_BATCH_METHOD, request, response, apiImpl::updateBatch);
+    }
+
+    @Override
     public void updateTag(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
         grpcWrap.unaryCall(UPDATE_TAG_METHOD, request, response, apiImpl::updateTag);
+    }
+
+    @Override
+    public void updateBatchTag(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
+
+        grpcWrap.unaryCall(UPDATE_BATCH_TAG_METHOD, request, response, apiImpl::updateBatchTag);
     }
 
     @Override

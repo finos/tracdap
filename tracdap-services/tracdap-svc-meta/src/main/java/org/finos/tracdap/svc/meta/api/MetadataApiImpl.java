@@ -94,6 +94,12 @@ public class MetadataApiImpl {
                 request.getTagUpdatesList());
     }
 
+    CompletableFuture<MetadataWriteBatchResponse> createBatch(MetadataWriteBatchRequest request) {
+        validateRequest(CREATE_BATCH_METHOD, request);
+
+        return null;  // TODO
+    }
+
     CompletableFuture<TagHeader> updateObject(MetadataWriteRequest request) {
 
         validateRequest(UPDATE_OBJECT_METHOD, request);
@@ -113,6 +119,12 @@ public class MetadataApiImpl {
                 request.getTagUpdatesList());
     }
 
+    CompletableFuture<MetadataWriteBatchResponse> updateBatch(MetadataWriteBatchRequest request) {
+        validateRequest(UPDATE_BATCH_METHOD, request);
+
+        return null;  // TODO
+    }
+
     CompletableFuture<TagHeader> updateTag(MetadataWriteRequest request) {
 
         validateRequest(UPDATE_TAG_METHOD, request);
@@ -121,6 +133,12 @@ public class MetadataApiImpl {
                 request.getTenant(),
                 request.getPriorVersion(),
                 request.getTagUpdatesList());
+    }
+
+    CompletableFuture<MetadataWriteBatchResponse> updateBatchTag(MetadataWriteBatchRequest request) {
+        validateRequest(UPDATE_BATCH_METHOD, request);
+
+        return null;  // TODO
     }
 
     CompletableFuture<TagHeader> preallocateId(MetadataWriteRequest request) {
