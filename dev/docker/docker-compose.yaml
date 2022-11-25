@@ -20,20 +20,14 @@ services:
   tracdap-gateway:
     build:
       dockerfile: tracdap-gateway.Dockerfile
-    ports:
-      - "8080:8080"
-    tmpfs:
-      - /opt/trac/current/run:mode=1777
+    network_mode: host
     volumes:
       - ./etc:/opt/trac/current/etc:ro
 
   tracdap-svc-meta:
     build:
       dockerfile: tracdap-svc-meta.Dockerfile
-    ports:
-      - "8081:8081"
-    tmpfs:
-      - /opt/trac/current/run:mode=1777
+    network_mode: host
     volumes:
       - ./etc:/opt/trac/current/etc:ro
       - ./state/metadata:/opt/trac/metadata
@@ -41,20 +35,14 @@ services:
   tracdap-svc-data:
     build:
       dockerfile: tracdap-svc-data.Dockerfile
-    ports:
-      - "8082:8082"
-    tmpfs:
-      - /opt/trac/current/run:mode=1777
+    network_mode: host
     volumes:
       - ./etc:/opt/trac/current/etc:ro
       - ./state/data:/opt/trac/data
 
   tracdap-svc-orch:
     build:
-      dockerfile: tracdap-svc-orch.Dockerfile
-    ports:
-      - "8083:8083"
-    tmpfs:
-      - /opt/trac/current/run:mode=1777
+      dockerfile: tracdap-svc-orch-local.Dockerfile
+    network_mode: host
     volumes:
       - ./etc:/opt/trac/current/etc:ro

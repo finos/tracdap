@@ -73,14 +73,6 @@ set APPLICATION_CLASS=$mainClassName
 
 set PID_FILE=%PID_DIR%${applicationName}.pid
 
-@rem If the PID directory is not writable, don't even try to start
-echo. > "%PID_DIR%${applicationName}.test"
-del "%PID_DIR%${applicationName}.test"
-if errorlevel 1 (
-    echo "PID directory is not writable: %PID_DIR%"
-    exit /b 1
-)
-
 
 @rem If CONFIG_FILE is relative, look in the config folder
 if not "%CONFIG_FILE%" == "" (
@@ -401,6 +393,21 @@ exit /b 0
         shift
     goto arg_loop
     :arg_loop_done
+
+    if not "%CMD%" == "run" (
+        @rem If the PID directory is not writable, don't even try to start
+        echo. > "%PID_DIR%${applicationName}.test"
+        del "%PID_DIR%${applicationName}.test"
+        if errorlevel 1 (
+            echo "PID directory is not writable: %PID_DIR%"
+            exit /b 1
+        )
+    ) else (
+        if not exist "%PID_DIR%" (
+            echo "PID directory does not exist: %PID_DIR%"
+            exit /b 1
+        )
+    )
 
     if "%CMD%" == "run" (
         echo %ARGS%

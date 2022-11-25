@@ -19,5 +19,6 @@ tracdap-platform/*/*
 !tracdap-platform/*/bin
 !tracdap-platform/*/plugins
 !tracdap-platform/*/plugins_ext
+!tracdap-platform/*/run
 
 tracdap-platform/*/*/.keep
