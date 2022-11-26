@@ -102,7 +102,7 @@ public class TracMetadataService extends CommonServiceBase {
             dataSource = JdbcSetup.createDatasource(dalProps, "");
 
             // Construct the DAL using a direct executor, as per the comments above
-            dal = new JdbcMetadataDal(dialect, dataSource, Runnable::run);
+            dal = new JdbcMetadataDal(dialect, dataSource);
             dal.startup();
 
             executor = createPrimaryExecutor(dalProps);

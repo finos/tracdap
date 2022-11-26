@@ -28,7 +28,6 @@ import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 
 public class MetadataReadService {
@@ -43,10 +42,10 @@ public class MetadataReadService {
         this.config = platformConfig;
     }
 
-    // Literally all of the read logic is in the DAL at present!
+    // Literally all the read logic is in the DAL at present!
     // Which is fine, keep a thin logic class here anyway to have a consistent pattern
 
-    public CompletableFuture<PlatformInfoResponse> platformInfo() {
+    public PlatformInfoResponse platformInfo() {
 
         var tracVersion = VersionInfo.getComponentVersion(TracMetadataService.class);
 
@@ -58,35 +57,34 @@ public class MetadataReadService {
         if (environment.isBlank())
             environment = ENVIRONMENT_NOT_SET;
 
-        var response = PlatformInfoResponse.newBuilder()
+        return  PlatformInfoResponse.newBuilder()
                 .setTracVersion(tracVersion)
                 .setEnvironment(environment)
                 .setProduction(production)
                 .putAllDeploymentInfo(configInfo.getDeploymentInfoMap())
                 .build();
-
-        return CompletableFuture.completedFuture(response);
     }
 
-    public CompletableFuture<ListTenantsResponse> listTenants() {
+    public ListTenantsResponse listTenants() {
+        
+        var tenantInfoList = dal.listTenants();
 
-        return dal.listTenants().thenApply(tenants ->
-                ListTenantsResponse.newBuilder()
-                .addAllTenants(tenants)
-                .build());
+        return ListTenantsResponse.newBuilder()
+            .addAllTenants(tenantInfoList)
+            .build();
     }
 
-    public CompletableFuture<Tag> readObject(String tenant, TagSelector selector) {
+    public Tag readObject(String tenant, TagSelector selector) {
 
         return dal.loadObject(tenant, selector);
     }
 
-    public CompletableFuture<List<Tag>> readObjects(String tenant, List<TagSelector> selectors) {
+    public List<Tag> readObjects(String tenant, List<TagSelector> selectors) {
 
         return dal.loadObjects(tenant, selectors);
     }
 
-    public CompletableFuture<Tag> loadTag(
+    public Tag loadTag(
             String tenant, ObjectType objectType,
             UUID objectId, int objectVersion, int tagVersion) {
 
@@ -100,7 +98,7 @@ public class MetadataReadService {
         return dal.loadObject(tenant, selector);
     }
 
-    public CompletableFuture<Tag> loadLatestTag(
+    public Tag loadLatestTag(
             String tenant, ObjectType objectType,
             UUID objectId, int objectVersion) {
 
@@ -114,7 +112,7 @@ public class MetadataReadService {
         return dal.loadObject(tenant, selector);
     }
 
-    public CompletableFuture<Tag> loadLatestObject(
+    public Tag loadLatestObject(
             String tenant, ObjectType objectType,
             UUID objectId) {
 

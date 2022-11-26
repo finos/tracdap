@@ -29,7 +29,6 @@ import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.PUBLIC_WRITABLE_OBJECT_TYPES;
 import static org.finos.tracdap.svc.meta.api.TracMetadataApi.*;
@@ -66,17 +65,17 @@ public class MetadataApiImpl {
         this.apiTrustLevel = apiTrustLevel;
     }
 
-    CompletableFuture<PlatformInfoResponse> platformInfo(PlatformInfoRequest request) {
+    PlatformInfoResponse platformInfo(PlatformInfoRequest request) {
 
         return readService.platformInfo();
     }
 
-    CompletableFuture<ListTenantsResponse> listTenants(ListTenantsRequest request) {
+    ListTenantsResponse listTenants(ListTenantsRequest request) {
 
         return readService.listTenants();
     }
 
-    CompletableFuture<TagHeader> createObject(MetadataWriteRequest request) {
+    TagHeader createObject(MetadataWriteRequest request) {
 
         validateRequest(CREATE_OBJECT_METHOD, request);
 
@@ -85,7 +84,7 @@ public class MetadataApiImpl {
         if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
             var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
             var status = Status.PERMISSION_DENIED.withDescription(message);
-            return CompletableFuture.failedFuture(status.asRuntimeException());
+            throw status.asRuntimeException();
         }
 
         return writeService.createObject(
@@ -94,7 +93,7 @@ public class MetadataApiImpl {
                 request.getTagUpdatesList());
     }
 
-    CompletableFuture<TagHeader> updateObject(MetadataWriteRequest request) {
+    TagHeader updateObject(MetadataWriteRequest request) {
 
         validateRequest(UPDATE_OBJECT_METHOD, request);
 
@@ -103,7 +102,7 @@ public class MetadataApiImpl {
         if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
             var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
             var status = Status.PERMISSION_DENIED.withDescription(message);
-            return CompletableFuture.failedFuture(status.asRuntimeException());
+            throw status.asRuntimeException();
         }
 
         return writeService.updateObject(
@@ -113,7 +112,7 @@ public class MetadataApiImpl {
                 request.getTagUpdatesList());
     }
 
-    CompletableFuture<TagHeader> updateTag(MetadataWriteRequest request) {
+    TagHeader updateTag(MetadataWriteRequest request) {
 
         validateRequest(UPDATE_TAG_METHOD, request);
 
@@ -123,7 +122,7 @@ public class MetadataApiImpl {
                 request.getTagUpdatesList());
     }
 
-    CompletableFuture<TagHeader> preallocateId(MetadataWriteRequest request) {
+    TagHeader preallocateId(MetadataWriteRequest request) {
 
         validateRequest(PREALLOCATE_ID_METHOD, request);
 
@@ -133,7 +132,7 @@ public class MetadataApiImpl {
         return writeService.preallocateId(tenant, objectType);
     }
 
-    CompletableFuture<TagHeader> createPreallocatedObject(MetadataWriteRequest request) {
+    TagHeader createPreallocatedObject(MetadataWriteRequest request) {
 
         validateRequest(CREATE_PREALLOCATED_OBJECT_METHOD, request);
 
@@ -144,23 +143,22 @@ public class MetadataApiImpl {
                 request.getTagUpdatesList());
     }
 
-    CompletableFuture<Tag> readObject(MetadataReadRequest request) {
+    Tag readObject(MetadataReadRequest request) {
 
         validateRequest(READ_OBJECT_METHOD, request);
 
         return readService.readObject(request.getTenant(), request.getSelector());
     }
 
-    CompletableFuture<MetadataBatchResponse> readBatch(MetadataBatchRequest request) {
+    MetadataBatchResponse readBatch(MetadataBatchRequest request) {
 
         validateRequest(READ_BATCH_METHOD, request);
 
-        return readService
-                .readObjects(request.getTenant(), request.getSelectorList())
-                .thenApply(tags -> MetadataBatchResponse.newBuilder().addAllTag(tags).build());
+        var tags = readService.readObjects(request.getTenant(), request.getSelectorList());
+        return MetadataBatchResponse.newBuilder().addAllTag(tags).build();
     }
 
-    CompletableFuture<MetadataSearchResponse> search(MetadataSearchRequest request) {
+    MetadataSearchResponse search(MetadataSearchRequest request) {
 
         validateRequest(SEARCH_METHOD, request);
 
@@ -169,13 +167,12 @@ public class MetadataApiImpl {
 
         var searchResult = searchService.search(tenant, searchParams);
 
-        return searchResult
-                .thenApply(resultList -> MetadataSearchResponse.newBuilder()
-                .addAllSearchResult(resultList)
-                .build());
+        return MetadataSearchResponse.newBuilder()
+                .addAllSearchResult(searchResult)
+                .build();
     }
 
-    CompletableFuture<Tag> getObject(MetadataGetRequest request) {
+    Tag getObject(MetadataGetRequest request) {
 
         validateRequest(GET_OBJECT_METHOD, request);
 
@@ -188,7 +185,7 @@ public class MetadataApiImpl {
         return readService.loadTag(tenant, objectType, objectId, objectVersion, tagVersion);
     }
 
-    CompletableFuture<Tag> getLatestObject(MetadataGetRequest request) {
+    Tag getLatestObject(MetadataGetRequest request) {
 
         validateRequest(GET_LATEST_OBJECT_METHOD, request);
 
@@ -199,7 +196,7 @@ public class MetadataApiImpl {
         return readService.loadLatestObject(tenant, objectType, objectId);
     }
 
-    CompletableFuture<Tag> getLatestTag(MetadataGetRequest request) {
+    Tag getLatestTag(MetadataGetRequest request) {
 
         validateRequest(GET_LATEST_TAG_METHOD, request);
 

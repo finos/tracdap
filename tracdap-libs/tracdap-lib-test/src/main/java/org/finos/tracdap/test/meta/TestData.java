@@ -28,8 +28,6 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 
@@ -481,20 +479,6 @@ public class TestData {
                 .putAttrs("data_classification", dataClassification)
                 .build();
     }
-
-    public static <T> T unwrap(CompletableFuture<T> future) throws Exception {
-
-        try {
-            return future.get();
-        }
-        catch (ExecutionException e) {
-            var cause = e.getCause();
-            if (cause instanceof Exception)
-                throw (Exception) cause;
-            throw e;
-        }
-    }
-
 
     // Create Java objects according to the TRAC type system
 

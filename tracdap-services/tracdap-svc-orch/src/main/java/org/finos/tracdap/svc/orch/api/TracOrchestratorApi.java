@@ -21,12 +21,10 @@ import com.google.protobuf.Message;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.grpc.GrpcServerWrap;
 import org.finos.tracdap.common.validation.Validator;
-import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.svc.orch.service.JobApiService;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
 
-import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
 
@@ -87,8 +85,8 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     }
 
     private <TReq extends Message, TResp extends Message>
-    Function<TReq, CompletionStage<TResp>>
-    apiFunc(MethodDescriptor<TReq, TResp> method, Function<TReq, CompletionStage<TResp>> func) {
+    Function<TReq, TResp>
+    apiFunc(MethodDescriptor<TReq, TResp> method, Function<TReq, TResp> func) {
 
         var protoMethod = TRAC_ORCHESTRATOR_SERVICE.findMethodByName(method.getBareMethodName());
 

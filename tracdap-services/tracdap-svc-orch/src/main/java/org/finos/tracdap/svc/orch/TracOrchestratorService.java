@@ -109,7 +109,7 @@ public class TracOrchestratorService extends CommonServiceBase {
             serviceGroup = new NioEventLoopGroup(CONCURRENT_REQUESTS, new DefaultThreadFactory("orch-svc"));
 
             prepareMetadataClientChannel(platformConfig, clientChannelType);
-            var metaClient = TrustedMetadataApiGrpc.newFutureStub(clientChannel);
+            var metaClient = TrustedMetadataApiGrpc.newBlockingStub(clientChannel);
 
             var jobLifecycle = new JobLifecycle(platformConfig, metaClient);
 

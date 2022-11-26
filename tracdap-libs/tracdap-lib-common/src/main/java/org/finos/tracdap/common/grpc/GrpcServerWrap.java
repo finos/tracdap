@@ -40,6 +40,30 @@ public class GrpcServerWrap {
     void unaryCall(
             MethodDescriptor<TRequest, TResponse> method,
             TRequest request, StreamObserver<TResponse> responseObserver,
+            Function<TRequest, TResponse> methodImpl) {
+
+        try {
+
+            var userInfo = AuthConstants.USER_INFO_KEY.get();
+
+            log.info("API CALL START: [{}] [{} <{}>]",
+                    method.getBareMethodName(),
+                    userInfo.getDisplayName(),
+                    userInfo.getUserId());
+
+            var result = methodImpl.apply(request);
+            handleResult(method, responseObserver, result, null);
+        }
+        catch (Exception error) {
+
+            handleResult(method, responseObserver, null, error);
+        }
+    }
+
+    public <TRequest, TResponse>
+    void unaryAsync(
+            MethodDescriptor<TRequest, TResponse> method,
+            TRequest request, StreamObserver<TResponse> responseObserver,
             Function<TRequest, CompletionStage<TResponse>> methodImpl) {
 
         try {

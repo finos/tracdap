@@ -75,7 +75,7 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
         if (testClass.isEmpty() || !IDalTestable.class.isAssignableFrom(testClass.get()))
             Assertions.fail("JUnit extension for DAL testing requires the test class to implement IDalTestable");
 
-        var dal = new JdbcMetadataDal(dialect, source, Runnable::run);
+        var dal = new JdbcMetadataDal(dialect, source);
         dal.startup();
 
         this.dal = dal;
