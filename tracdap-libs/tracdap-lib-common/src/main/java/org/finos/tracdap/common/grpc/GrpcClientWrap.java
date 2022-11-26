@@ -36,6 +36,25 @@ public class GrpcClientWrap {
     }
 
     public <TRequest, TResponse>
+    TResponse unaryCall(
+            MethodDescriptor<TRequest, TResponse> method, TRequest request,
+            Function<TRequest, TResponse> methodImpl) {
+
+        try {
+
+            log.info("CLIENT CALL START: [{}]", methodDisplayName(method));
+
+            var result = methodImpl.apply(request);
+
+            return handleResult(method, result, null);
+        }
+        catch (Exception error) {
+
+            return handleResult(method, null, error);
+        }
+    }
+
+    public <TRequest, TResponse>
     CompletionStage<TResponse> unaryAsync(
             MethodDescriptor<TRequest, TResponse> method, TRequest request,
             Function<TRequest, ListenableFuture<TResponse>> methodImpl) {
@@ -50,13 +69,7 @@ public class GrpcClientWrap {
         }
         catch (Exception error) {
 
-            var grpcError = GrpcErrorMapping.processError(error);
-
-            log.error("CLIENT CALL FAILED: [{}] {}",
-                    methodDisplayName(method),
-                    grpcError.getMessage(), grpcError);
-
-            return CompletableFuture.failedFuture(grpcError);
+            return CompletableFuture.supplyAsync(() -> handleResult(method, null, error));
         }
     }
 
