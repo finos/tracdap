@@ -25,7 +25,6 @@ import org.finos.tracdap.svc.orch.service.JobApiService;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
 
-import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
 
@@ -54,7 +53,7 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     @Override
     public void validateJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
 
-        grpcWrap.unaryAsync(
+        grpcWrap.unaryCall(
                 VALIDATE_JOB_METHOD, request, responseObserver,
                 apiFunc(VALIDATE_JOB_METHOD, orchestrator::validateJob));
     }
@@ -62,7 +61,7 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     @Override
     public void submitJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
 
-        grpcWrap.unaryAsync(
+        grpcWrap.unaryCall(
                 SUBMIT_JOB_METHOD, request, responseObserver,
                 apiFunc(SUBMIT_JOB_METHOD, orchestrator::submitJob));
     }
@@ -70,7 +69,7 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     @Override
     public void checkJob(JobStatusRequest request, StreamObserver<JobStatus> responseObserver) {
 
-        grpcWrap.unaryAsync(
+        grpcWrap.unaryCall(
                 CHECK_JOB_METHOD, request, responseObserver,
                 apiFunc(CHECK_JOB_METHOD, orchestrator::checkJob));
     }
@@ -86,8 +85,8 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     }
 
     private <TReq extends Message, TResp extends Message>
-    Function<TReq, CompletionStage<TResp>>
-    apiFunc(MethodDescriptor<TReq, TResp> method, Function<TReq, CompletionStage<TResp>> func) {
+    Function<TReq, TResp>
+    apiFunc(MethodDescriptor<TReq, TResp> method, Function<TReq, TResp> func) {
 
         var protoMethod = TRAC_ORCHESTRATOR_SERVICE.findMethodByName(method.getBareMethodName());
 
