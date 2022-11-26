@@ -29,7 +29,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.OBJECT_FIRST_VERSION;
 import static org.finos.tracdap.common.metadata.MetadataConstants.TAG_FIRST_VERSION;
@@ -44,7 +43,7 @@ public class MetadataWriteService {
         this.dal = dal;
     }
 
-    public CompletableFuture<TagHeader> createObject(
+    public TagHeader createObject(
             String tenant,
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
@@ -78,25 +77,25 @@ public class MetadataWriteService {
         newTag = TagUpdateService.applyTagUpdates(newTag, createAttrs);
         newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
 
-        return dal.saveNewObject(tenant, newTag)
-                .thenApply(_ok -> newHeader);
+        dal.saveNewObject(tenant, newTag);
+
+        return newHeader;
     }
 
 
-    public CompletableFuture<TagHeader> updateObject(
+    public TagHeader updateObject(
             String tenant, TagSelector priorVersion,
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
 
         var userInfo = AuthConstants.USER_INFO_KEY.get();
 
-        return dal.loadObject(tenant, priorVersion)
+        var priorTag = dal.loadObject(tenant, priorVersion);
 
-                .thenCompose(priorTag ->
-                updateObject(tenant, userInfo, priorTag, definition, tagUpdates));
+        return updateObject(tenant, userInfo, priorTag, definition, tagUpdates);
     }
 
-    private CompletableFuture<TagHeader> updateObject(
+    private TagHeader updateObject(
             String tenant, UserInfo userInfo, Tag priorTag,
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
@@ -128,21 +127,21 @@ public class MetadataWriteService {
         var commonAttrs = commonUpdateAttrs(timestamp, userId, userName);
         newTag = TagUpdateService.applyTagUpdates(newTag, commonAttrs);
 
-        return dal.saveNewVersion(tenant, newTag)
-                .thenApply(_ok -> newHeader);
+        dal.saveNewVersion(tenant, newTag);
+
+        return newHeader;
     }
 
-    public CompletableFuture<TagHeader> updateTag(
+    public TagHeader updateTag(
             String tenant, TagSelector priorVersion,
             List<TagUpdate> tagUpdates) {
 
-        return dal.loadObject(tenant, priorVersion)
+        var priorTag = dal.loadObject(tenant, priorVersion);
 
-                .thenCompose(priorTag ->
-                updateTag(tenant, priorTag, tagUpdates));
+        return updateTag(tenant, priorTag, tagUpdates);
     }
 
-    private CompletableFuture<TagHeader> updateTag(
+    private TagHeader updateTag(
             String tenant, Tag priorTag,
             List<TagUpdate> tagUpdates) {
 
@@ -161,11 +160,12 @@ public class MetadataWriteService {
 
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
 
-        return dal.saveNewTag(tenant, newTag)
-                .thenApply(_ok -> newHeader);
+        dal.saveNewTag(tenant, newTag);
+
+        return newHeader;
     }
 
-    public CompletableFuture<TagHeader> preallocateId(String tenant, ObjectType objectType) {
+    public TagHeader preallocateId(String tenant, ObjectType objectType) {
 
         // New random ID
         var objectId = UUID.randomUUID();
@@ -177,11 +177,12 @@ public class MetadataWriteService {
                 .build();
 
         // Save as a preallocated ID in the DAL
-        return dal.preallocateObjectId(tenant, objectType, objectId)
-                .thenApply(_ok -> preallocatedHeader);
+        dal.preallocateObjectId(tenant, objectType, objectId);
+
+        return preallocatedHeader;
     }
 
-    public CompletableFuture<TagHeader> createPreallocatedObject(
+    public TagHeader createPreallocatedObject(
             String tenant, TagSelector priorVersion,
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
@@ -216,8 +217,9 @@ public class MetadataWriteService {
         newTag = TagUpdateService.applyTagUpdates(newTag, createAttrs);
         newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
 
-        return dal.savePreallocatedObject(tenant, newTag)
-                .thenApply(_ok -> newHeader);
+        dal.savePreallocatedObject(tenant, newTag);
+
+        return newHeader;
     }
 
     private List<TagUpdate> commonCreateAttrs(
