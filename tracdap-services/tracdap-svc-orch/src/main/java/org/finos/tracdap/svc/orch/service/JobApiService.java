@@ -22,14 +22,11 @@ import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataUtil;
-
 import org.finos.tracdap.svc.orch.cache.IJobCache;
 import org.finos.tracdap.svc.orch.cache.JobState;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 
 public class JobApiService {
@@ -47,42 +44,36 @@ public class JobApiService {
         this.jobCache = jobCache;
     }
 
-    public CompletableFuture<JobStatus> validateJob(JobRequest request) {
+    public JobStatus validateJob(JobRequest request) {
 
         var jobState = newJob(request);
 
-        return CompletableFuture.completedFuture(jobState)
+        jobStatus(jobState, JobStatusCode.PREPARING);
 
-                .thenApply(s -> jobStatus(s, JobStatusCode.PREPARING))
+        jobState = jobLifecycle.assembleAndValidate(jobState);
 
-                .thenCompose(jobLifecycle::assembleAndValidate)
+        jobStatus(jobState, JobStatusCode.VALIDATED);
 
-                .thenApply(s -> jobStatus(s, JobStatusCode.VALIDATED))
-
-                .thenApply(this::reportStatus);
+        return reportStatus(jobState);
     }
 
-    public CompletableFuture<JobStatus> submitJob(JobRequest request) {
+    public JobStatus submitJob(JobRequest request) {
 
         var jobState = newJob(request);
 
-        return CompletableFuture.completedFuture(jobState)
+        jobStatus(jobState, JobStatusCode.PREPARING);
 
-                .thenApply(s -> jobStatus(s, JobStatusCode.PREPARING))
+        jobState = jobLifecycle.assembleAndValidate(jobState);
 
-                .thenCompose(jobLifecycle::assembleAndValidate)
+        jobStatus(jobState, JobStatusCode.VALIDATED);
+        jobStatus(jobState, JobStatusCode.PENDING);
 
-                .thenApply(s -> jobStatus(s, JobStatusCode.VALIDATED))
-                .thenApply(s -> jobStatus(s, JobStatusCode.PENDING))
+        jobState = jobLifecycle.saveInitialMetadata(jobState);
+        jobState = submitForExecution(jobState);
 
-                .thenCompose(jobLifecycle::saveInitialMetadata)
+        return reportStatus(jobState);    }
 
-                .thenCompose(this::submitForExecution)
-
-                .thenApply(this::reportStatus);
-    }
-
-    public CompletionStage<JobStatus> checkJob(JobStatusRequest request) {
+    public JobStatus checkJob(JobStatusRequest request) {
 
         // TODO: Keys for other selector types
         if (!request.getSelector().hasObjectVersion())
@@ -98,9 +89,7 @@ public class JobApiService {
             throw new EMetadataNotFound(message);
         }
 
-        var jobStatus = reportStatus(jobState);
-
-        return CompletableFuture.completedFuture(jobStatus);
+        return reportStatus(jobState);
     }
 
     private JobState newJob(JobRequest request) {
@@ -123,7 +112,7 @@ public class JobApiService {
         return jobState;
     }
 
-    private CompletionStage<JobState> submitForExecution(JobState jobState) {
+    private JobState submitForExecution(JobState jobState) {
 
         var jobKey = MetadataUtil.objectKey(jobState.jobId);
 
@@ -139,7 +128,7 @@ public class JobApiService {
 
             jobCache.createJob(jobKey, jobState, ctx.ticket());
 
-            return CompletableFuture.completedFuture(jobState);
+            return jobState;
         }
     }
 

@@ -41,8 +41,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
@@ -62,44 +60,44 @@ public class JobLifecycle {
     private final Logger log = LoggerFactory.getLogger(JobLifecycle.class);
 
     private final PlatformConfig platformConfig;
-    private final TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient;
+    private final TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient;
     private final GrpcClientWrap grpcWrap;
 
     public JobLifecycle(
             PlatformConfig platformConfig,
-            TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub metaClient) {
+            TrustedMetadataApiGrpc.TrustedMetadataApiBlockingStub metaClient) {
 
         this.platformConfig = platformConfig;
         this.metaClient = metaClient;
         this.grpcWrap = new GrpcClientWrap(getClass());
     }
 
-    CompletionStage<JobState> assembleAndValidate(JobState jobState) {
+    JobState assembleAndValidate(JobState jobState) {
 
-        return CompletableFuture.completedFuture(jobState)
+        jobState = loadResources(jobState);
+        jobState = allocateResultIds(jobState);
+        jobState = buildJobConfig(jobState);
 
-                .thenCompose(this::loadResources)
-                .thenCompose(this::allocateResultIds)
-                .thenApply(this::buildJobConfig);
+        return jobState;
 
         // static validate
         // semantic validate
     }
 
-    CompletionStage<JobState> loadResources(JobState jobState) {
+    JobState loadResources(JobState jobState) {
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
         var resources = jobLogic.requiredMetadata(jobState.definition);
 
         if (resources.isEmpty()) {
             log.info("No additional metadata required");
-            return CompletableFuture.completedFuture(jobState);
+            return jobState;
         }
 
         return loadResources(jobState, resources);
     }
 
-    CompletionStage<JobState> loadResources(JobState jobState, List<TagSelector> resources) {
+    JobState loadResources(JobState jobState, List<TagSelector> resources) {
 
         log.info("Loading additional required metadata...");
 
@@ -117,13 +115,12 @@ public class JobLifecycle {
                 .build();
 
         var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
+        var batchResponse = grpcWrap.unaryCall(READ_BATCH_METHOD, batchRequest, client::readBatch);
 
-        return grpcWrap
-                .unaryAsync(READ_BATCH_METHOD, batchRequest, client::readBatch)
-                .thenCompose(batchResponse -> loadResourcesResponse(jobState, orderedKeys, batchResponse));
+        return loadResourcesResponse(jobState, orderedKeys, batchResponse);
     }
 
-    CompletionStage<JobState> loadResourcesResponse(
+    JobState loadResourcesResponse(
             JobState jobState, List<String> mappingKeys,
             MetadataBatchResponse batchResponse) {
 
@@ -156,10 +153,10 @@ public class JobLifecycle {
         if (!extraResources.isEmpty())
             return loadResources(jobState, extraResources);
 
-        return CompletableFuture.completedFuture(jobState);
+        return jobState;
     }
 
-    CompletionStage<JobState> allocateResultIds(JobState jobState) {
+    JobState allocateResultIds(JobState jobState) {
 
         // TODO: Single job timestamp - requires changes in meta svc for this to actually be used
         // meta svc must accept object timestamps as out-of-band gRPC metadata for trusted API calls
@@ -181,30 +178,26 @@ public class JobLifecycle {
             jobState.resultMapping.put(priorId.getKey(), resultId);
         }
 
-        CompletionStage<JobState> state_ = CompletableFuture.completedFuture(jobState);
-
         for (var idRequest : newResultIds.entrySet()) {
 
-            state_ = state_.thenCompose(s -> allocateResultId(s, jobTimestamp, idRequest.getKey(), idRequest.getValue()));
+            jobState = allocateResultId(jobState, jobTimestamp, idRequest.getKey(), idRequest.getValue());
         }
 
-        return state_.thenApply(this::setResultIds);
+        return setResultIds(jobState);
     }
 
-    CompletionStage<JobState> allocateResultId(
+    JobState allocateResultId(
             JobState jobState, Instant jobTimestamp,
             String resultKey, MetadataWriteRequest idRequest) {
 
         var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
-        var preallocateResult = grpcWrap.unaryAsync(PREALLOCATE_ID_METHOD, idRequest, client::preallocateId);
 
-        return preallocateResult.thenApply(preallocatedId -> {
+        var preallocatedId = grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, idRequest, client::preallocateId);
+        var resultId = MetadataUtil.nextObjectVersion(preallocatedId, jobTimestamp);
 
-            var resultId = MetadataUtil.nextObjectVersion(preallocatedId, jobTimestamp);
-            jobState.resultMapping.put(resultKey, resultId);
+        jobState.resultMapping.put(resultKey, resultId);
 
-            return jobState;
-        });
+        return jobState;
     }
 
     JobState setResultIds(JobState jobState) {
@@ -236,7 +229,7 @@ public class JobLifecycle {
         return jobState;
     }
 
-    CompletionStage<JobState> saveInitialMetadata(JobState jobState) {
+    JobState saveInitialMetadata(JobState jobState) {
 
         var jobObj = ObjectDefinition.newBuilder()
                 .setObjectType(ObjectType.JOB)
@@ -264,23 +257,22 @@ public class JobLifecycle {
                 .build();
 
         var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
-        var grpcCall = grpcWrap.unaryAsync(
+
+        var jobId = grpcWrap.unaryCall(
                 CREATE_OBJECT_METHOD, jobWriteReq,
                 client::createObject);
 
-        return grpcCall.thenApply(header -> {
+        jobState.jobId = jobId;
 
-            jobState.jobId = header;
+        jobState.jobConfig = jobState.jobConfig
+                .toBuilder()
+                .setJobId(jobId)
+                .build();
 
-            jobState.jobConfig = jobState.jobConfig.toBuilder()
-                    .setJobId(header)
-                    .build();
-
-            return jobState;
-        });
+        return jobState;
     }
 
-    CompletionStage<Void> processJobResult(JobState jobState) {
+    void processJobResult(JobState jobState) {
 
         log.info("Record job result [{}]: {}", jobState.jobKey, jobState.statusCode);
 
@@ -294,33 +286,29 @@ public class JobLifecycle {
                 ? buildJobSucceededUpdate(jobState)
                 : buildJobFailedUpdate(jobState);
 
-        CompletionStage<?> updateResult = CompletableFuture.completedFuture(0);
-
         for (var update : metaUpdates) {
 
             var update_ = applyJobAttrs(jobState, update);
-            updateResult = updateResult.thenCompose(x -> saveResultMetadata(jobState, update_));
+            saveResultMetadata(jobState, update_);
         }
 
-        updateResult = updateResult.thenCompose(x -> saveResultMetadata(jobState, jobUpdate));
-
-        return updateResult.thenApply(x -> null);
+        saveResultMetadata(jobState, jobUpdate);
     }
 
-    private CompletionStage<TagHeader> saveResultMetadata(JobState jobState, MetadataWriteRequest update) {
+    private TagHeader saveResultMetadata(JobState jobState, MetadataWriteRequest update) {
 
         var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
 
         if (!update.hasDefinition())
-            return grpcWrap.unaryAsync(UPDATE_TAG_METHOD, update, client::updateTag);
+            return grpcWrap.unaryCall(UPDATE_TAG_METHOD, update, client::updateTag);
 
         if (!update.hasPriorVersion())
-            return grpcWrap.unaryAsync(CREATE_OBJECT_METHOD, update, client::createObject);
+            return grpcWrap.unaryCall(CREATE_OBJECT_METHOD, update, client::createObject);
 
         if (update.getPriorVersion().getObjectVersion() < MetadataConstants.OBJECT_FIRST_VERSION)
-            return grpcWrap.unaryAsync(CREATE_PREALLOCATED_OBJECT_METHOD, update, client::createPreallocatedObject);
+            return grpcWrap.unaryCall(CREATE_PREALLOCATED_OBJECT_METHOD, update, client::createPreallocatedObject);
         else
-            return grpcWrap.unaryAsync(UPDATE_OBJECT_METHOD, update, client::updateObject);
+            return grpcWrap.unaryCall(UPDATE_OBJECT_METHOD, update, client::updateObject);
     }
 
     private MetadataWriteRequest buildJobSucceededUpdate(JobState jobState) {
