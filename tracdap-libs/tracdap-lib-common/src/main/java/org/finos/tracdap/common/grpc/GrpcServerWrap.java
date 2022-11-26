@@ -37,7 +37,7 @@ public class GrpcServerWrap {
     }
 
     public <TRequest, TResponse>
-    void unaryCall(
+    void unaryAsync(
             MethodDescriptor<TRequest, TResponse> method,
             TRequest request, StreamObserver<TResponse> responseObserver,
             Function<TRequest, CompletionStage<TResponse>> methodImpl) {

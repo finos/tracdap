@@ -21,7 +21,6 @@ import com.google.protobuf.Message;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.grpc.GrpcServerWrap;
 import org.finos.tracdap.common.validation.Validator;
-import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.svc.orch.service.JobApiService;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
@@ -55,7 +54,7 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     @Override
     public void validateJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
 
-        grpcWrap.unaryCall(
+        grpcWrap.unaryAsync(
                 VALIDATE_JOB_METHOD, request, responseObserver,
                 apiFunc(VALIDATE_JOB_METHOD, orchestrator::validateJob));
     }
@@ -63,7 +62,7 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     @Override
     public void submitJob(JobRequest request, StreamObserver<JobStatus> responseObserver) {
 
-        grpcWrap.unaryCall(
+        grpcWrap.unaryAsync(
                 SUBMIT_JOB_METHOD, request, responseObserver,
                 apiFunc(SUBMIT_JOB_METHOD, orchestrator::submitJob));
     }
@@ -71,7 +70,7 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
     @Override
     public void checkJob(JobStatusRequest request, StreamObserver<JobStatus> responseObserver) {
 
-        grpcWrap.unaryCall(
+        grpcWrap.unaryAsync(
                 CHECK_JOB_METHOD, request, responseObserver,
                 apiFunc(CHECK_JOB_METHOD, orchestrator::checkJob));
     }

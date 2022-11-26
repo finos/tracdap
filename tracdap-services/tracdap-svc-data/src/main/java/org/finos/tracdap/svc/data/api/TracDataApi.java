@@ -34,7 +34,6 @@ import com.google.protobuf.Message;
 import io.grpc.MethodDescriptor;
 import io.grpc.stub.StreamObserver;
 import io.netty.buffer.ByteBuf;
-import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -90,7 +89,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void createSmallDataset(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        grpcWrap.unaryCall(CREATE_SMALL_DATASET_METHOD, request, responseObserver, this::createSmallDataset);
+        grpcWrap.unaryAsync(CREATE_SMALL_DATASET_METHOD, request, responseObserver, this::createSmallDataset);
     }
 
     @Override
@@ -102,7 +101,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void updateSmallDataset(DataWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        grpcWrap.unaryCall(UPDATE_SMALL_DATASET_METHOD, request, responseObserver, this::updateSmallDataset);
+        grpcWrap.unaryAsync(UPDATE_SMALL_DATASET_METHOD, request, responseObserver, this::updateSmallDataset);
     }
 
     @Override
@@ -114,7 +113,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void readSmallDataset(DataReadRequest request, StreamObserver<DataReadResponse> responseObserver) {
 
-        grpcWrap.unaryCall(READ_SMALL_DATASET_METHOD, request, responseObserver, this::readSmallDataset);
+        grpcWrap.unaryAsync(READ_SMALL_DATASET_METHOD, request, responseObserver, this::readSmallDataset);
     }
 
     @Override
@@ -126,7 +125,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void createSmallFile(FileWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        grpcWrap.unaryCall(CREATE_SMALL_FILE_METHOD, request, responseObserver, this::createSmallFile);
+        grpcWrap.unaryAsync(CREATE_SMALL_FILE_METHOD, request, responseObserver, this::createSmallFile);
     }
 
     @Override
@@ -138,7 +137,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void updateSmallFile(FileWriteRequest request, StreamObserver<TagHeader> responseObserver) {
 
-        grpcWrap.unaryCall(UPDATE_SMALL_FILE_METHOD, request, responseObserver, this::updateSSmallFile);
+        grpcWrap.unaryAsync(UPDATE_SMALL_FILE_METHOD, request, responseObserver, this::updateSSmallFile);
     }
 
     @Override
@@ -150,7 +149,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     @Override
     public void readSmallFile(FileReadRequest request, StreamObserver<FileReadResponse> responseObserver) {
 
-        grpcWrap.unaryCall(READ_SMALL_FILE_METHOD, request, responseObserver, this::readSmallFile);
+        grpcWrap.unaryAsync(READ_SMALL_FILE_METHOD, request, responseObserver, this::readSmallFile);
     }
 
 
