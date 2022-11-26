@@ -98,7 +98,7 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
         if (testClass.isEmpty() || !IDalTestable.class.isAssignableFrom(testClass.get()))
             Assertions.fail("JUnit extension for DAL testing requires the test class to implement IDalTestable");
 
-        var dal = new JdbcMetadataDal(JdbcDialect.H2, source, Runnable::run);
+        var dal = new JdbcMetadataDal(JdbcDialect.H2, source);
         dal.startup();
 
         this.dal = dal;
