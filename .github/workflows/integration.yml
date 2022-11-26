@@ -202,7 +202,7 @@ jobs:
           cache: gradle
 
       - name: Build
-        run: ./gradlew trac-svc-meta:build trac-svc-meta:testClasses deploy-metadb:build -x test
+        run: ./gradlew build -x test
 
       # Auth tool will also create the secrets file if it doesn't exist
       - name: Prepare Auth Keys
