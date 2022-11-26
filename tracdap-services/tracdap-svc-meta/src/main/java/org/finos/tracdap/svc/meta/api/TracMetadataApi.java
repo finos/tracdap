@@ -68,66 +68,66 @@ public class TracMetadataApi extends TracMetadataApiGrpc.TracMetadataApiImplBase
     @Override
     public void platformInfo(PlatformInfoRequest request, StreamObserver<PlatformInfoResponse> response) {
 
-        grpcWrap.unaryAsync(PLATFORM_INFO_METHOD, request, response, apiImpl::platformInfo);
+        grpcWrap.unaryCall(PLATFORM_INFO_METHOD, request, response, apiImpl::platformInfo);
     }
 
     @Override
     public void listTenants(ListTenantsRequest request, StreamObserver<ListTenantsResponse> response) {
 
-        grpcWrap.unaryAsync(LIST_TENANTS_METHOD, request, response, apiImpl::listTenants);
+        grpcWrap.unaryCall(LIST_TENANTS_METHOD, request, response, apiImpl::listTenants);
     }
 
     @Override
     public void createObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
-        grpcWrap.unaryAsync(CREATE_OBJECT_METHOD, request, response, apiImpl::createObject);
+        grpcWrap.unaryCall(CREATE_OBJECT_METHOD, request, response, apiImpl::createObject);
     }
 
     @Override
     public void updateObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
-        grpcWrap.unaryAsync(UPDATE_OBJECT_METHOD, request, response, apiImpl::updateObject);
+        grpcWrap.unaryCall(UPDATE_OBJECT_METHOD, request, response, apiImpl::updateObject);
     }
 
     @Override
     public void updateTag(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
-        grpcWrap.unaryAsync(UPDATE_TAG_METHOD, request, response, apiImpl::updateTag);
+        grpcWrap.unaryCall(UPDATE_TAG_METHOD, request, response, apiImpl::updateTag);
     }
 
     @Override
     public void readObject(MetadataReadRequest request, StreamObserver<Tag> response) {
 
-        grpcWrap.unaryAsync(READ_OBJECT_METHOD, request, response, apiImpl::readObject);
+        grpcWrap.unaryCall(READ_OBJECT_METHOD, request, response, apiImpl::readObject);
     }
 
     @Override
     public void readBatch(MetadataBatchRequest request, StreamObserver<MetadataBatchResponse> response) {
 
-        grpcWrap.unaryAsync(READ_BATCH_METHOD, request, response, apiImpl::readBatch);
+        grpcWrap.unaryCall(READ_BATCH_METHOD, request, response, apiImpl::readBatch);
     }
 
     @Override
     public void search(MetadataSearchRequest request, StreamObserver<MetadataSearchResponse> response) {
 
-        grpcWrap.unaryAsync(SEARCH_METHOD, request, response, apiImpl::search);
+        grpcWrap.unaryCall(SEARCH_METHOD, request, response, apiImpl::search);
     }
 
     @Override
     public void getObject(MetadataGetRequest request, StreamObserver<Tag> response) {
 
-        grpcWrap.unaryAsync(GET_OBJECT_METHOD, request, response, apiImpl::getObject);
+        grpcWrap.unaryCall(GET_OBJECT_METHOD, request, response, apiImpl::getObject);
     }
 
     @Override
     public void getLatestObject(MetadataGetRequest request, StreamObserver<Tag> response) {
 
-        grpcWrap.unaryAsync(GET_LATEST_OBJECT_METHOD, request, response, apiImpl::getLatestObject);
+        grpcWrap.unaryCall(GET_LATEST_OBJECT_METHOD, request, response, apiImpl::getLatestObject);
     }
 
     @Override
     public void getLatestTag(MetadataGetRequest request, StreamObserver<Tag> response) {
 
-        grpcWrap.unaryAsync(GET_LATEST_TAG_METHOD, request, response, apiImpl::getLatestTag);
+        grpcWrap.unaryCall(GET_LATEST_TAG_METHOD, request, response, apiImpl::getLatestTag);
     }
 }
