@@ -119,7 +119,7 @@ public class JobLifecycle {
         var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
 
         return grpcWrap
-                .unaryCall(READ_BATCH_METHOD, batchRequest, client::readBatch)
+                .unaryAsync(READ_BATCH_METHOD, batchRequest, client::readBatch)
                 .thenCompose(batchResponse -> loadResourcesResponse(jobState, orderedKeys, batchResponse));
     }
 
@@ -196,7 +196,7 @@ public class JobLifecycle {
             String resultKey, MetadataWriteRequest idRequest) {
 
         var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
-        var preallocateResult = grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, idRequest, client::preallocateId);
+        var preallocateResult = grpcWrap.unaryAsync(PREALLOCATE_ID_METHOD, idRequest, client::preallocateId);
 
         return preallocateResult.thenApply(preallocatedId -> {
 
@@ -264,7 +264,7 @@ public class JobLifecycle {
                 .build();
 
         var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
-        var grpcCall = grpcWrap.unaryCall(
+        var grpcCall = grpcWrap.unaryAsync(
                 CREATE_OBJECT_METHOD, jobWriteReq,
                 client::createObject);
 
@@ -312,15 +312,15 @@ public class JobLifecycle {
         var client = metaClient.withCallCredentials(new GrpcClientAuth(jobState.ownerToken));
 
         if (!update.hasDefinition())
-            return grpcWrap.unaryCall(UPDATE_TAG_METHOD, update, client::updateTag);
+            return grpcWrap.unaryAsync(UPDATE_TAG_METHOD, update, client::updateTag);
 
         if (!update.hasPriorVersion())
-            return grpcWrap.unaryCall(CREATE_OBJECT_METHOD, update, client::createObject);
+            return grpcWrap.unaryAsync(CREATE_OBJECT_METHOD, update, client::createObject);
 
         if (update.getPriorVersion().getObjectVersion() < MetadataConstants.OBJECT_FIRST_VERSION)
-            return grpcWrap.unaryCall(CREATE_PREALLOCATED_OBJECT_METHOD, update, client::createPreallocatedObject);
+            return grpcWrap.unaryAsync(CREATE_PREALLOCATED_OBJECT_METHOD, update, client::createPreallocatedObject);
         else
-            return grpcWrap.unaryCall(UPDATE_OBJECT_METHOD, update, client::updateObject);
+            return grpcWrap.unaryAsync(UPDATE_OBJECT_METHOD, update, client::updateObject);
     }
 
     private MetadataWriteRequest buildJobSucceededUpdate(JobState jobState) {

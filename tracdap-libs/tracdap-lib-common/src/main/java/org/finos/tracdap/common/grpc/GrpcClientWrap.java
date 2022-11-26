@@ -36,7 +36,7 @@ public class GrpcClientWrap {
     }
 
     public <TRequest, TResponse>
-    CompletionStage<TResponse> unaryCall(
+    CompletionStage<TResponse> unaryAsync(
             MethodDescriptor<TRequest, TResponse> method, TRequest request,
             Function<TRequest, ListenableFuture<TResponse>> methodImpl) {
 

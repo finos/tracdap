@@ -245,7 +245,7 @@ public class DataService {
         var request = MetadataBuilders.requestForSelector(tenant, dataSelector);
 
         return grpcWrap
-                .unaryCall(READ_OBJECT_METHOD, request, client::readObject)
+                .unaryAsync(READ_OBJECT_METHOD, request, client::readObject)
                 .thenAccept(tag -> {
                     state.dataId = tag.getHeader();
                     state.data = tag.getDefinition().getData();
@@ -261,7 +261,7 @@ public class DataService {
         var request = MetadataBuilders.requestForBatch(tenant, state.data.getStorageId(), state.data.getSchemaId());
 
         return grpcWrap
-                .unaryCall(READ_BATCH_METHOD, request, client::readBatch)
+                .unaryAsync(READ_BATCH_METHOD, request, client::readBatch)
                 .thenAccept(response -> {
 
                     var storageTag = response.getTag(0);
@@ -281,7 +281,7 @@ public class DataService {
         var request = MetadataBuilders.requestForSelector(tenant, state.data.getStorageId());
 
         return grpcWrap
-                .unaryCall(READ_OBJECT_METHOD, request, client::readObject)
+                .unaryAsync(READ_OBJECT_METHOD, request, client::readObject)
                 .thenAccept(tag -> {
 
                     state.storageId = tag.getHeader();
@@ -305,7 +305,7 @@ public class DataService {
 
             var schemaReq = MetadataBuilders.requestForSelector(request.getTenant(), request.getSchemaId());
 
-            return grpcWrap.unaryCall(READ_OBJECT_METHOD, schemaReq, client::readObject)
+            return grpcWrap.unaryAsync(READ_OBJECT_METHOD, schemaReq, client::readObject)
                     .thenApply(tag -> state.schema = tag.getDefinition().getSchema());
         }
 
@@ -347,10 +347,10 @@ public class DataService {
 
         return CompletableFuture.completedFuture(0)
 
-                .thenCompose(x -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, preAllocDataReq, client::preallocateId))
+                .thenCompose(x -> grpcWrap.unaryAsync(PREALLOCATE_ID_METHOD, preAllocDataReq, client::preallocateId))
                 .thenAccept(dataId -> state.preAllocDataId = dataId)
 
-                .thenCompose(x -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, preAllocStorageReq, client::preallocateId))
+                .thenCompose(x -> grpcWrap.unaryAsync(PREALLOCATE_ID_METHOD, preAllocStorageReq, client::preallocateId))
                 .thenAccept(storageId -> state.preAllocStorageId = storageId);
     }
 
@@ -365,9 +365,9 @@ public class DataService {
         var dataReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
 
         return grpcWrap
-                .unaryCall(CREATE_PREALLOCATED_METHOD, storageReq, client::createPreallocatedObject)
+                .unaryAsync(CREATE_PREALLOCATED_METHOD, storageReq, client::createPreallocatedObject)
                 .thenCompose(x -> grpcWrap
-                        .unaryCall(CREATE_PREALLOCATED_METHOD, dataReq, client::createPreallocatedObject));
+                        .unaryAsync(CREATE_PREALLOCATED_METHOD, dataReq, client::createPreallocatedObject));
     }
 
     private CompletionStage<TagHeader> saveMetadata(DataWriteRequest request, RequestState state, RequestState prior) {
@@ -381,9 +381,9 @@ public class DataService {
         var dataReq = MetadataBuilders.buildCreateObjectReq(request.getTenant(), priorDataId, state.data, state.dataTags);
 
         return grpcWrap
-                .unaryCall(UPDATE_OBJECT_METHOD, storageReq, client::updateObject)
+                .unaryAsync(UPDATE_OBJECT_METHOD, storageReq, client::updateObject)
                 .thenCompose(x -> grpcWrap
-                        .unaryCall(UPDATE_OBJECT_METHOD, dataReq, client::updateObject));
+                        .unaryAsync(UPDATE_OBJECT_METHOD, dataReq, client::updateObject));
     }
 
     private RequestState buildMetadata(DataWriteRequest request, RequestState state, OffsetDateTime objectTimestamp) {
