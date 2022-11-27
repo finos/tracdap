@@ -202,7 +202,7 @@ jobs:
           cache: gradle
 
       - name: Build
-        run: ./gradlew trac-svc-meta:testClasses -x test
+        run: ./gradlew trac-svc-meta:testClasses
 
       # Auth tool will also create the secrets file if it doesn't exist
       - name: Prepare Auth Keys
