@@ -21,6 +21,7 @@ import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.*;
 
 import java.util.ArrayList;
@@ -31,6 +32,13 @@ import java.util.stream.Collectors;
 
 
 public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
+
+    @Override
+    public JobDefinition applyTransform(JobDefinition job, PlatformConfig platformConfig) {
+
+        // No transformations currently required
+        return job;
+    }
 
     @Override
     public List<TagSelector> requiredMetadata(JobDefinition job) {
