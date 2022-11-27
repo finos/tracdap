@@ -89,9 +89,14 @@ message ImportModelJob {
 
   string language = 1;
   string repository = 2;
-  string path = 3;
-  string entryPoint = 4;
+
+  optional string packageGroup = 7;
+  string package = 8;
   string version = 5;
+
+  string entryPoint = 4;
+
+  string path = 3;
 
   repeated TagUpdate modelAttrs = 6;
 }
