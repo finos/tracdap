@@ -13,12 +13,10 @@
 #  limitations under the License.
 
 import tempfile
-import typing as tp
 import unittest
 import pathlib
 import subprocess as sp
 
-import tracdap.rt.api as api
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
 import tracdap.rt._impl.api_hook as api_hook  # noqa
@@ -27,7 +25,7 @@ import tracdap.rt._impl.repos as repos  # noqa
 import tracdap.rt._impl.util as util  # noqa
 
 
-class ImportModelTest(unittest.TestCase):
+class ModelRepositoriesTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -52,12 +50,46 @@ class ImportModelTest(unittest.TestCase):
 
         util.try_clean_dir(self.scratch_dir, remove=True)
 
-    def test_load_integrated_ok(self):
+    def test_checkout_git(self):
+
+        sys_config = config.RuntimeConfig()
+        sys_config.repositories["git_test"] = config.PluginConfig(
+            protocol="git",
+            properties={
+                "repoUrl": "https://github.com/finos/tracdap",
+                "token": "ghe_UNUSED_TOKEN"})
+
+        model_def = meta.ModelDefinition(
+            language="python",
+            repository="git_test",
+            packageGroup="finos",
+            package="tracdap",
+            version="v0.5.0",
+            entryPoint="tutorial.hello_world.HelloWorldModel",
+            path="examples/models/python/src"
+        )
+
+        repo_mgr = repos.RepositoryManager(sys_config)
+        repo = repo_mgr.get_repository("git_test")
+
+        checkout_key = repo.checkout_key(model_def)
+        checkout_subdir = pathlib.Path(checkout_key)
+
+        checkout_dir = self.scratch_dir.joinpath(model_def.repository, checkout_subdir)
+        checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
+
+        package_dir = repo.do_checkout(model_def, checkout_dir)
+
+        self.assertTrue(package_dir.joinpath("tutorial/hello_world.py").exists())
+
+    def test_checkout_pypi(self):
 
         sys_config = config.RuntimeConfig()
         sys_config.repositories["pypi_test"] = config.PluginConfig(
             protocol="pypi",
-            properties={"pip-index": "https://abc-TOKEN@pypi.python.org/pypi"})
+            properties={
+                "pip-index": "https://pypi.python.org/pypi",
+                "token": "pypi_UNUSED_TOKEN"})
 
         model_def = meta.ModelDefinition(
             language="python",
@@ -77,3 +109,5 @@ class ImportModelTest(unittest.TestCase):
         checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
         package_dir = repo.do_checkout(model_def, checkout_dir)
+
+        self.assertTrue(package_dir.joinpath("tracdap").exists())

@@ -32,6 +32,45 @@ import tracdap.rt._impl.util as _util
 from tracdap.rt.ext.repos import *
 
 
+# Helper functions for handling credentials supplied via HTTP(S) URLs
+
+__REPO_TOKEN_KEY = "token"
+__REPO_USER_KEY = "username"
+__REPO_PASS_KEY = "password"
+
+
+def _get_credentials(url: urllib.parse.ParseResult, properties: tp.Dict[str, str]):
+
+    if __REPO_TOKEN_KEY in properties:
+        return properties[__REPO_TOKEN_KEY]
+
+    if __REPO_USER_KEY in properties and __REPO_PASS_KEY in properties:
+        username = properties[__REPO_USER_KEY]
+        password = properties[__REPO_PASS_KEY]
+        return f"{username}:{password}"
+
+    if url.username:
+        credentials_sep = url.netloc.index("@")
+        return url.netloc[:credentials_sep]
+
+    return None
+
+
+def _apply_credentials(url: urllib.parse.ParseResult, credentials: str):
+
+    if credentials is None:
+        return url
+
+    if url.username is None:
+        location = f"{credentials}@{url.netloc}"
+
+    else:
+        location_sep = url.netloc.index("@")
+        location = f"{credentials}@{url.netloc[location_sep:]}"
+
+    return url._replace(netloc=location)
+
+
 class IntegratedSource(IModelRepository):
 
     def __init__(self, repo_config: _cfg.PluginConfig):
@@ -92,12 +131,19 @@ class GitRepository(IModelRepository):
     GIT_TIMEOUT_SECONDS = 30
 
     def __init__(self, repo_config: _cfg.PluginConfig):
+
         self._repo_config = repo_config
         self._log = _util.logger_for_object(self)
-        self._repo_url = self._repo_config.properties.get(self.REPO_URL_KEY)
 
-        if not self._repo_url:
+        repo_url_prop = self._repo_config.properties.get(self.REPO_URL_KEY)
+
+        if not repo_url_prop:
             raise _ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in Git repository config")
+
+        repo_url = urllib.parse.urlparse(repo_url_prop)
+        credentials = _get_credentials(repo_url, repo_config.properties)
+
+        self._repo_url = _apply_credentials(repo_url, credentials)
 
     def checkout_key(self, model_def: _meta.ModelDefinition):
         return model_def.version
@@ -110,13 +156,17 @@ class GitRepository(IModelRepository):
 
     def do_checkout(self, model_def: _meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
 
-        self._log.info(f"Git checkout {model_def.repository} {model_def.version} -> {checkout_dir}")
+        self._log.info(
+            f"Git checkout: repo = [{model_def.repository}], " +
+            f"group = [{model_def.packageGroup}], package = [{model_def.package}], version = [{model_def.version}]")
+
+        self._log.info(f"Checkout location: [{checkout_dir}]")
 
         git_cli = ["git", "-C", str(checkout_dir)]
 
         git_cmds = [
             ["init"],
-            ["remote", "add", "origin", self._repo_url],
+            ["remote", "add", "origin", self._repo_url.geturl()],
             ["fetch", "--depth=1", "origin", model_def.version],
             ["reset", "--hard", "FETCH_HEAD"]]
 
@@ -164,11 +214,11 @@ class GitRepository(IModelRepository):
                 for line in cmd_err:
                     self._log.error(line)
 
-                error_msg = f"Git checkout failed for {model_def.repository} {model_def.version}"
+                error_msg = f"Git checkout failed for {model_def.package} {model_def.version}"
                 self._log.error(error_msg)
                 raise _ex.EModelRepo(error_msg)
 
-        self._log.info(f"Git checkout succeeded for {model_def.repository} {model_def.version}")
+        self._log.info(f"Git checkout succeeded for {model_def.package} {model_def.version}")
 
         return self.package_path(model_def, checkout_dir)
 
@@ -179,9 +229,6 @@ class PyPiRepository(IModelRepository):
 
     PIP_INDEX_KEY = "pip-index"
     PIP_INDEX_URL_KEY = "pip-index-url"
-    REPO_TOKEN_KEY = "token"
-    REPO_USER_KEY = "username"
-    REPO_PASS_KEY = "password"
 
     def __init__(self, repo_config: _cfg.PluginConfig):
 
@@ -201,38 +248,13 @@ class PyPiRepository(IModelRepository):
 
         return checkout_dir
 
-    def get_repo_credentials(self, url, properties):
-
-        if self.REPO_TOKEN_KEY in self._repo_config.properties:
-            return properties[self.REPO_TOKEN_KEY]
-
-        if self.REPO_USER_KEY in properties and self.REPO_PASS_KEY in properties:
-            username = properties[self.REPO_USER_KEY]
-            password = properties[self.REPO_PASS_KEY]
-            return f"{username}:{password}"
-
-        if url.username:
-            credentials_sep = url.netloc.index("@")
-            return url.netloc[:credentials_sep]
-
-        return None
-
-    @staticmethod
-    def apply_credentials(url, credentials):
-
-        if credentials is None:
-            return url
-
-        if url.username is None:
-            location = f"{credentials}@{url.netloc}"
-
-        else:
-            location_sep = url.netloc.index("@")
-            location = f"{credentials}@{url.netloc[location_sep:]}"
-
-        return url._replace(netloc=location)
-
     def do_checkout(self, model_def: _meta.ModelDefinition, checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
+
+        self._log.info(
+            f"PyPI checkout: repo = [{model_def.repository}], " +
+            f"package = [{model_def.package}], version = [{model_def.version}]")
+
+        self._log.info(f"Checkout location: [{checkout_dir}]")
 
         repo_props = self._repo_config.properties
         pip_index = repo_props.get(self.PIP_INDEX_KEY)
@@ -244,14 +266,12 @@ class PyPiRepository(IModelRepository):
         json_package_path = self.JSON_PACKAGE_PATH.format(json_root_url.path, model_def.package, model_def.version)
         json_package_url = json_root_url._replace(path=json_package_path)
 
-        credentials = self.get_repo_credentials(json_root_url, self._repo_config.properties)
-        json_root_url = self.apply_credentials(json_package_url, credentials)
+        credentials = _get_credentials(json_root_url, self._repo_config.properties)
+        json_root_url = _apply_credentials(json_package_url, credentials)
 
         json_headers = {"accept": "application/json"}
 
-        self._log.info(
-            f"Checkout {_util.log_safe_url(json_root_url)}, " +
-            f"package = [{model_def.package}], version = [{model_def.version}]")
+        self._log.info(f"Package query: {_util.log_safe_url(json_root_url)}")
 
         package_req = requests.get(json_package_url.geturl(), headers=json_headers)
 
@@ -265,7 +285,7 @@ class PyPiRepository(IModelRepository):
         package_info = package_obj.get("info") or {}
         summary = package_info.get("summary") or "(summary not available)"
 
-        self._log.info(summary)
+        self._log.info(f"Package summary: {summary}")
 
         urls = package_obj.get("urls") or []
         bdist_urls = list(filter(lambda d: d.get("packagetype") == "bdist_wheel", urls))
@@ -284,7 +304,7 @@ class PyPiRepository(IModelRepository):
         package_filename = package_url_info.get("filename")
         package_url = urllib.parse.urlparse(package_url_info.get("url"))
 
-        package_url = self.apply_credentials(package_url, credentials)
+        package_url = _apply_credentials(package_url, credentials)
 
         self._log.info(f"Downloading [{package_filename}]")
 
