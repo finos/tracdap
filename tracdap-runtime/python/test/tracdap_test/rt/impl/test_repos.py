@@ -89,7 +89,8 @@ class ModelRepositoriesTest(unittest.TestCase):
             protocol="pypi",
             properties={
                 "pip-index": "https://pypi.python.org/pypi",
-                "token": "pypi_UNUSED_TOKEN"})
+                "username": "pypi_TEST_USER",
+                "password": "pypi_TEST_PASSWORD"})
 
         model_def = meta.ModelDefinition(
             language="python",
