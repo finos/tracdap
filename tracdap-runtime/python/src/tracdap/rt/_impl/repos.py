@@ -227,8 +227,8 @@ class PyPiRepository(IModelRepository):
 
     JSON_PACKAGE_PATH = "{}/{}/{}/json"
 
-    PIP_INDEX_KEY = "pip-index"
-    PIP_INDEX_URL_KEY = "pip-index-url"
+    PIP_INDEX_KEY = "pipIndex"
+    PIP_INDEX_URL_KEY = "pipIndexUrl"
 
     def __init__(self, repo_config: _cfg.PluginConfig):
 

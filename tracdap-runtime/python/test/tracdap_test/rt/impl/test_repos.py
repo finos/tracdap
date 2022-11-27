@@ -88,7 +88,7 @@ class ModelRepositoriesTest(unittest.TestCase):
         sys_config.repositories["pypi_test"] = config.PluginConfig(
             protocol="pypi",
             properties={
-                "pip-index": "https://pypi.python.org/pypi",
+                "pipIndex": "https://pypi.python.org/pypi",
                 "username": "pypi_TEST_USER",
                 "password": "pypi_TEST_PASSWORD"})
 
