@@ -17,12 +17,14 @@
 package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.MetadataWriteRequest;
+import org.finos.tracdap.common.exception.EExecutorValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
-import org.finos.tracdap.config.TagUpdateList;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.*;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +33,52 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.*;
 
 
 public class ImportModelJob implements IJobLogic {
+
+    @Override
+    public JobDefinition applyTransform(JobDefinition job, PlatformConfig platformConfig) {
+
+        // Fill in package and packageGroup properties for models using Git repos
+
+        // TODO: This is very specialized logic
+        // The intent is to set TRAC_MODEL_PACKAGE and TRAC_MODEL_PACKAGE_GROUP for models stored in Git
+        // A more explicit solution would be better, e.g. explicit settings in the repo config
+
+        if (!job.getImportModel().getPackage().isBlank())
+            return job;
+
+        var repoKey = job.getImportModel().getRepository();
+
+        if (!platformConfig.containsRepositories(repoKey)) {
+            var message = String.format("Import job refers to model repository [%s] which is not defined in the platform configuration", repoKey);
+            throw new EExecutorValidation(message);
+        }
+
+        var repoConfig = platformConfig.getRepositoriesOrThrow(repoKey);
+
+        if (!repoConfig.getProtocol().equalsIgnoreCase("git"))
+            return job;
+
+        if (!repoConfig.containsProperties("repoUrl")){
+            var message = String.format("Git configuration for [%s] is missing required property [repoUrl]", repoKey);
+            throw new EExecutorValidation(message);
+        }
+
+        var repoUrlProp = repoConfig.getPropertiesOrThrow("repoUrl");
+        var repoUrl = URI.create(repoUrlProp);
+        var repoPathSegments = repoUrl.getPath().split("[/\\\\]");
+
+        var importDef = job.getImportModel().toBuilder();
+
+        if (repoPathSegments.length >= 1)
+            importDef.setPackage(repoPathSegments[repoPathSegments.length - 1]);
+
+        if (repoPathSegments.length >= 2)
+            importDef.setPackageGroup(repoPathSegments[repoPathSegments.length - 2]);
+
+        return job.toBuilder()
+                .setImportModel(importDef)
+                .build();
+    }
 
     @Override
     public List<TagSelector> requiredMetadata(JobDefinition job) {
@@ -91,50 +139,55 @@ public class ImportModelJob implements IJobLogic {
         var modelObj = jobResult.getResultsOrThrow(modelKey);
         var modelDef = modelObj.getModel();
 
-        var modelAttrs = jobResult
-                .getAttrsOrDefault(modelKey, TagUpdateList.newBuilder().build())
-                .getAttrsList();
-
-        var suppliedAttrs = jobConfig.getJob()
-                .getImportModel()
-                .getModelAttrsList();
-
-        var controlledAttrs = List.of(
-
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_MODEL_LANGUAGE)
-                        .setValue(encodeValue(modelDef.getLanguage()))
-                        .build(),
-
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_MODEL_REPOSITORY)
-                        .setValue(encodeValue(modelDef.getRepository()))
-                        .build(),
-
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_MODEL_PATH)
-                        .setValue(encodeValue(modelDef.getPath()))
-                        .build(),
-
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_MODEL_ENTRY_POINT)
-                        .setValue(encodeValue(modelDef.getEntryPoint()))
-                        .build(),
-
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_MODEL_VERSION)
-                        .setValue(encodeValue(modelDef.getVersion()))
-                        .build());
-
         var modelReq = MetadataWriteRequest.newBuilder()
                 .setTenant(tenant)
                 .setObjectType(ObjectType.MODEL)
-                .setDefinition(modelObj)
-                .addAllTagUpdates(modelAttrs)
-                .addAllTagUpdates(suppliedAttrs)
-                .addAllTagUpdates(controlledAttrs)
-                .build();
+                .setDefinition(modelObj);
 
-        return List.of(modelReq);
+        // Add attrs defined in the model code
+        if (jobResult.containsAttrs(modelKey)) {
+            var modelAttrs = jobResult.getAttrsOrThrow(modelKey).getAttrsList();
+            modelReq.addAllTagUpdates(modelAttrs);
+        }
+
+        // Add attrs defined in the job
+        var suppliedAttrs = jobConfig.getJob().getImportModel().getModelAttrsList();
+        modelReq.addAllTagUpdates(suppliedAttrs);
+
+        // Add controlled attrs for models
+
+        modelReq.addTagUpdates(TagUpdate.newBuilder()
+                .setAttrName(TRAC_MODEL_LANGUAGE)
+                .setValue(encodeValue(modelDef.getLanguage())));
+
+        modelReq.addTagUpdates(TagUpdate.newBuilder()
+                .setAttrName(TRAC_MODEL_REPOSITORY)
+                .setValue(encodeValue(modelDef.getRepository()))
+                .build());
+
+        if (modelDef.hasPackageGroup()) {
+
+            modelReq.addTagUpdates(TagUpdate.newBuilder()
+                    .setAttrName(TRAC_MODEL_PACKAGE_GROUP)
+                    .setValue(encodeValue(modelDef.getPackageGroup()))
+                    .build());
+        }
+
+        modelReq.addTagUpdates(TagUpdate.newBuilder()
+                .setAttrName(TRAC_MODEL_PACKAGE)
+                .setValue(encodeValue(modelDef.getPackage()))
+                .build());
+
+        modelReq.addTagUpdates(TagUpdate.newBuilder()
+                .setAttrName(TRAC_MODEL_VERSION)
+                .setValue(encodeValue(modelDef.getVersion()))
+                .build());
+
+        modelReq.addTagUpdates(TagUpdate.newBuilder()
+                .setAttrName(TRAC_MODEL_ENTRY_POINT)
+                .setValue(encodeValue(modelDef.getEntryPoint()))
+                .build());
+
+        return List.of(modelReq.build());
     }
 }

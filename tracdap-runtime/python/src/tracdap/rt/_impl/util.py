@@ -18,6 +18,8 @@ import datetime as dt
 import logging
 import pathlib
 import platform
+import urllib.parse
+
 import sys
 import typing as tp
 import uuid
@@ -287,3 +289,44 @@ def try_clean_dir(dir_path: pathlib.Path, remove: bool = False) -> bool:
             return clean_ok
         except Exception:  # noqa
             return False
+
+
+def log_safe(param: tp.Any):
+
+    if isinstance(param, urllib.parse.ParseResult) or isinstance(param, urllib.parse.ParseResultBytes):
+        return log_safe_url(param)
+
+    if isinstance(param, str):
+        try:
+            url = urllib.parse.urlparse(param)
+            return log_safe_url(url)
+        except ValueError:
+            return param
+
+    return param
+
+
+def log_safe_url(url: tp.Union[str, urllib.parse.ParseResult, urllib.parse.ParseResultBytes]):
+
+    if isinstance(url, str):
+        url = urllib.parse.urlparse(url)
+
+    if url.password:
+
+        user_sep = url.netloc.index(":")
+        pass_sep = url.netloc.index("@")
+
+        user = url.netloc[:user_sep]
+        safe_location = f"{user}:*****@{url.netloc[pass_sep + 1:]}"
+
+        return url._replace(netloc=safe_location).geturl()
+
+    elif url.username:
+
+        separator = url.netloc.index("@")
+        safe_location = f"*****@{url.netloc[separator + 1:]}"
+
+        return url._replace(netloc=safe_location).geturl()
+
+    else:
+        return url.geturl()

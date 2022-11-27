@@ -78,14 +78,14 @@ message ModelDefinition {
 
     string language = 1;
     string repository = 2;
-    string path = 3;
 
-    // string package = 4;
-    reserved 4;
-    reserved "package";
+    optional string packageGroup = 10;
+    string package = 11;
+    string version = 6;
 
     string entryPoint = 5;
-    string version = 6;
+
+    string path = 3;
 
     map<string, ModelParameter> parameters = 7;
     map<string, ModelInputSchema> inputs = 8;

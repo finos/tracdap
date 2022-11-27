@@ -74,6 +74,7 @@ public class JobLifecycle {
 
     JobState assembleAndValidate(JobState jobState) {
 
+        jobState = applyTransform(jobState);
         jobState = loadResources(jobState);
         jobState = allocateResultIds(jobState);
         jobState = buildJobConfig(jobState);
@@ -82,6 +83,15 @@ public class JobLifecycle {
 
         // static validate
         // semantic validate
+    }
+
+    JobState applyTransform(JobState jobState) {
+
+        var logic = JobLogic.forJobType(jobState.jobType);
+
+        jobState.definition = logic.applyTransform(jobState.definition, platformConfig);
+
+        return jobState;
     }
 
     JobState loadResources(JobState jobState) {

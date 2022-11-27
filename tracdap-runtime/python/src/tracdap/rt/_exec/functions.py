@@ -480,6 +480,18 @@ class SaveDataFunc(NodeFunction[None], _LoadSaveDataFunc):
             storage_options=options, overwrite=False)
 
 
+def _model_def_for_import(import_details: meta.ImportModelJob):
+
+    return meta.ModelDefinition(
+        language=import_details.language,
+        repository=import_details.repository,
+        packageGroup=import_details.packageGroup,
+        package=import_details.package,
+        version=import_details.version,
+        entryPoint=import_details.entryPoint,
+        path=import_details.path)
+
+
 class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
 
     def __init__(self, node: ImportModelNode, models: _models.ModelLoader):
@@ -490,12 +502,7 @@ class ImportModelFunc(NodeFunction[meta.ObjectDefinition]):
 
     def _execute(self, ctx: NodeContext) -> meta.ObjectDefinition:
 
-        stub_model_def = meta.ModelDefinition(
-            language=self.node.import_details.language,
-            repository=self.node.import_details.repository,
-            path=self.node.import_details.path,
-            entryPoint=self.node.import_details.entryPoint,
-            version=self.node.import_details.version)
+        stub_model_def = _model_def_for_import(self.node.import_details)
 
         model_class = self._models.load_model_class(self.node.model_scope, stub_model_def)
         model_scan = self._models.scan_model(model_class)
@@ -516,12 +523,7 @@ class ImportAttrsFunc(NodeFunction[_config.TagUpdateList]):
 
     def _execute(self, ctx: NodeContext) -> _config.TagUpdateList:
 
-        stub_model_def = meta.ModelDefinition(
-            language=self.node.import_details.language,
-            repository=self.node.import_details.repository,
-            path=self.node.import_details.path,
-            entryPoint=self.node.import_details.entryPoint,
-            version=self.node.import_details.version)
+        stub_model_def = _model_def_for_import(self.node.import_details)
 
         model_class = self._models.load_model_class(self.node.model_scope, stub_model_def)
         return self._models.scan_model_attrs(model_class)
