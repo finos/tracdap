@@ -31,6 +31,7 @@ import io.grpc.Status;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.BiFunction;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.PUBLIC_WRITABLE_OBJECT_TYPES;
 import static org.finos.tracdap.svc.meta.api.TracMetadataApi.*;
@@ -96,22 +97,10 @@ public class MetadataApiImpl {
     }
 
     MetadataWriteBatchResponse createBatch(MetadataWriteBatchRequest request) {
+
         validateRequest(CREATE_BATCH_METHOD, request);
 
-        List<TagUpdate> tags = request.getBatchTagUpdatesList();
-        List<TagHeader> tagHeaders = new ArrayList<>();
-
-        for (MetadataWriteRequest rawRequest : request.getRequestsList()) {
-            MetadataWriteRequest r = addTagsToRequest(rawRequest, tags);
-
-            TagHeader tagHeader = createObject(r);
-
-            tagHeaders.add(tagHeader);
-        }
-
-        MetadataWriteBatchResponse.Builder builder = MetadataWriteBatchResponse.newBuilder();
-        builder.addAllIds(tagHeaders);
-        return builder.build();
+        return runWriteBatch(request, MetadataApiImpl::createObject);
     }
 
     TagHeader updateObject(MetadataWriteRequest request) {
@@ -134,9 +123,10 @@ public class MetadataApiImpl {
     }
 
     MetadataWriteBatchResponse updateBatch(MetadataWriteBatchRequest request) {
+
         validateRequest(UPDATE_BATCH_METHOD, request);
 
-        return null;  // TODO
+        return runWriteBatch(request, MetadataApiImpl::updateObject);
     }
 
     TagHeader updateTag(MetadataWriteRequest request) {
@@ -150,9 +140,10 @@ public class MetadataApiImpl {
     }
 
     MetadataWriteBatchResponse updateBatchTag(MetadataWriteBatchRequest request) {
-        validateRequest(UPDATE_BATCH_METHOD, request);
 
-        return null;  // TODO
+        validateRequest(UPDATE_BATCH_TAG_METHOD, request);
+
+        return runWriteBatch(request, MetadataApiImpl::updateTag);
     }
 
     TagHeader preallocateId(MetadataWriteRequest request) {
@@ -239,6 +230,26 @@ public class MetadataApiImpl {
         var objectVersion = request.getObjectVersion();
 
         return readService.loadLatestTag(tenant, objectType, objectId, objectVersion);
+    }
+
+    private MetadataWriteBatchResponse runWriteBatch(
+            MetadataWriteBatchRequest request,
+            BiFunction<MetadataApiImpl, MetadataWriteRequest, TagHeader> operation
+    ) {
+        List<TagUpdate> tags = request.getBatchTagUpdatesList();
+        List<TagHeader> tagHeaders = new ArrayList<>();
+
+        for (MetadataWriteRequest rawRequest : request.getRequestsList()) {
+            MetadataWriteRequest r = addTagsToRequest(rawRequest, tags);
+
+            TagHeader tagHeader = operation.apply(this, r);
+
+            tagHeaders.add(tagHeader);
+        }
+
+        MetadataWriteBatchResponse.Builder builder = MetadataWriteBatchResponse.newBuilder();
+        builder.addAllIds(tagHeaders);
+        return builder.build();
     }
 
     private MetadataWriteRequest addTagsToRequest(MetadataWriteRequest rawRequest, List<TagUpdate> tags) {
