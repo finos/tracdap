@@ -20,6 +20,8 @@ plugins {
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
+apply from: "${rootProject.projectDir.path}/gradle/plugins.gradle"
+
 
 description = "TRAC D.A.P. metadata service, stateless service component to answer the TRAC metadata API"
 
@@ -77,8 +79,10 @@ dependencies {
     testImplementation group: 'com.h2database', name: 'h2', version: "$h2_version"
 }
 
-ext.pluginDependency("AWS_CONFIG", project(":aws-config"))
-ext.pluginDependency("GCP_CONFIG", project(":gcp-config"))
+// Add any plugin dependencies enabled at build time
+// Note SQL driver plugins are enabled in tracdap-lib-db
+ext.enableBuildTimePlugins(["config"])
+
 
 // Bring DDL files into test JAR as resources
 processTestResources {

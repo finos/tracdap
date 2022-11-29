@@ -20,6 +20,7 @@ plugins {
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
+apply from: "${rootProject.projectDir.path}/gradle/plugins.gradle"
 
 
 description = "TRAC D.A.P. data service, stateless service component to answer the TRAC data API"
@@ -77,8 +78,9 @@ dependencies {
     }
 }
 
-ext.pluginDependency("AWS_CONFIG", project(":aws-config"))
-ext.pluginDependency("GCP_CONFIG", project(":gcp-config"))
+// Add any plugin dependencies enabled at build time
+ext.enableBuildTimePlugins(["config", "storage"])
+
 
 distributions {
     main {
