@@ -20,6 +20,7 @@ plugins {
 
 apply from: "${rootProject.projectDir.path}/gradle/base-java.gradle"
 apply from: "${rootProject.projectDir.path}/gradle/functions.gradle"
+apply from: "${rootProject.projectDir.path}/gradle/plugins.gradle"
 
 
 description = "Deploy tool for the TRAC D.A.P. metadata store (SQL backend)"
@@ -79,23 +80,18 @@ dependencies {
     // Other DBs just require the database driver JAR, which will be pulled in by -lib-db
 }
 
-sourceSets.each { dialect ->
 
-    if (dialect.name != "main" && dialect.name != "test") {
+// Mirror handling of SQL drivers from -lib-db, for Flyway extensions
 
-        def key = (String) "sql_${dialect.name}"
-        def buildDriver = isFeatureEnabled(key)
+ext.DEPEND_sql_h2 = sourceSets.h2.runtimeClasspath
+ext.DEPEND_sql_mysql = sourceSets.mysql.runtimeClasspath
+ext.DEPEND_sql_mariadb = sourceSets.mariadb.runtimeClasspath
+ext.DEPEND_sql_postgresql = sourceSets.postgresql.runtimeClasspath
+ext.DEPEND_sql_sqlserver = sourceSets.sqlserver.runtimeClasspath
+ext.DEPEND_sql_oracle = sourceSets.oracle.runtimeClasspath
 
-        if (buildDriver) {
+ext.enableBuildTimePlugins(["sql"])
 
-            println("Enabling Flyway support for SQL driver: ${dialect.name}")
-
-            dependencies {
-                runtimeOnly dialect.runtimeClasspath
-            }
-        }
-    }
-}
 
 distributions {
     main {
