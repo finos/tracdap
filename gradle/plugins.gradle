@@ -53,6 +53,20 @@ ext {
     BUILD_sql_sqlserver = false
     BUILD_sql_oracle = false
 
-    BUILD_aws_config = false
     BUILD_gcp_config = false
+
+    BUILD_aws_config = false
+    BUILD_aws_storage = true
+
+
+    // These DEPEND_ flags say what gets pulled in for each plugin
+
+    // Note the SQL driver dependencies are listed in tracdap-lib-db
+    // (because they refer to individual source sets)
+
+    DEPEND_gcp_config = project(":gcp-config")
+
+    // AWS config project needs updating to AWS SDK v2
+    // DEPEND_aws_config = project(":aws-config")
+    DEPEND_aws_storage = project(":aws-storage")
 }
