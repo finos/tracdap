@@ -30,8 +30,8 @@ import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.math.BigDecimal;
@@ -49,10 +49,54 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 
 
-class DataRoundTripTest {
+abstract class DataRoundTripTest {
 
-    private static final String TRAC_UNIT_CONFIG = "config/trac-unit.yaml";
-    private static final String TEST_TENANT = "ACME_CORP";
+    public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
+    public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
+    public static final String TEST_TENANT = "ACME_CORP";
+
+    protected static IExecutionContext execContext;
+    protected static TracDataApiGrpc.TracDataApiStub dataClient;
+
+    // Include this test case as a unit test
+    static class UnitTest extends DataRoundTripTest {
+
+        @RegisterExtension
+        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+                .addTenant(TEST_TENANT)
+                .startMeta()
+                .startData()
+                .build();
+
+        @BeforeAll
+        static void setup() {
+            execContext = new ExecutionContext(new DefaultEventExecutor());
+            dataClient = platform.dataClient();
+        }
+    }
+
+    // Include this test case for integration against different database backends
+    @org.junit.jupiter.api.Tag("integration")
+    @Tag("int-storage")
+    static class IntegrationTest extends DataRoundTripTest {
+
+        private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
+
+        @RegisterExtension
+        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+                .addTenant(TEST_TENANT)
+                .startMeta()
+                .startData()
+                .build();
+
+        @BeforeAll
+        static void setup() {
+            execContext = new ExecutionContext(new DefaultEventExecutor());
+            dataClient = platform.dataClient();
+        }
+    }
+
+
     private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
 
     private static final String BASIC_CSV_DATA = SampleData.BASIC_CSV_DATA_RESOURCE;
@@ -65,16 +109,6 @@ class DataRoundTripTest {
             SampleData.BASIC_TABLE_SCHEMA,
             List.of(ByteString.copyFrom(BASIC_CSV_CONTENT)));
 
-
-    @RegisterExtension
-    private static final PlatformTest platform = PlatformTest.forConfig(TRAC_UNIT_CONFIG)
-            .addTenant(TEST_TENANT)
-            .startMeta()
-            .startData()
-            .build();
-
-    IExecutionContext execContext = new ExecutionContext(new DefaultEventExecutor());
-    TracDataApiGrpc.TracDataApiStub dataClient = platform.dataClient();
 
     @Test
     void roundTrip_arrowStream() throws Exception {
