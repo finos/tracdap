@@ -17,18 +17,18 @@
 package org.finos.tracdap.common.storage;
 
 import org.finos.tracdap.common.exception.*;
+
 import org.slf4j.Logger;
 
-import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.nio.file.*;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
+
 
 public class StorageErrors {
 
@@ -64,16 +64,6 @@ public class StorageErrors {
         // These errors have special parameterization for their error messages
         CHUNK_NOT_FULLY_WRITTEN,
     }
-
-    private static final List<Map.Entry<Class<? extends Exception>, ExplicitError>> EXCEPTION_CLASS_MAP = List.of(
-            Map.entry(NoSuchFileException.class, NO_SUCH_FILE_EXCEPTION),
-            Map.entry(FileAlreadyExistsException.class, FILE_ALREADY_EXISTS_EXCEPTION),
-            Map.entry(DirectoryNotEmptyException.class, DIRECTORY_NOT_FOUND_EXCEPTION),
-            Map.entry(NotDirectoryException.class, NOT_DIRECTORY_EXCEPTION),
-            Map.entry(AccessDeniedException.class, ACCESS_DENIED_EXCEPTION),
-            Map.entry(SecurityException.class, SECURITY_EXCEPTION),
-            // IOException must be last in the list, not to obscure most specific exceptions
-            Map.entry(IOException.class, IO_EXCEPTION));
 
     private static final Map<ExplicitError, String> ERROR_MESSAGE_MAP = Map.ofEntries(
             Map.entry(STORAGE_PATH_NULL_OR_BLANK, "Requested storage path is null or blank: %s %s [%s]"),
@@ -125,12 +115,18 @@ public class StorageErrors {
 
             Map.entry(CHUNK_NOT_FULLY_WRITTEN, EStorageCommunication.class));
 
-    private final Logger log;
+    private final List<Map.Entry<Class<? extends Exception>, StorageErrors.ExplicitError>> exceptionClassMap;
     private final String storageKey;
+    private final Logger log;
 
-    public StorageErrors(Logger log, String storageKey) {
-        this.log = log;
+    protected StorageErrors(
+            List<Map.Entry<Class<? extends Exception>, StorageErrors.ExplicitError>> exceptionClassMap,
+            String storageKey,
+            Logger log) {
+
+        this.exceptionClassMap = exceptionClassMap;
         this.storageKey = storageKey;
+        this.log = log;
     }
 
     public ETrac handleException(Throwable e, String storagePath, String operationName) {
@@ -140,7 +136,7 @@ public class StorageErrors {
             return (ETrac) e;
 
         // Look in the map of error types to see if e is an expected exception
-        for (var error : EXCEPTION_CLASS_MAP) {
+        for (var error : exceptionClassMap) {
 
             var errorClass = error.getKey();
 

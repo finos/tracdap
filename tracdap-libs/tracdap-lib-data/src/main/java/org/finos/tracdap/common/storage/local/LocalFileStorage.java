@@ -63,7 +63,7 @@ public class LocalFileStorage implements IFileStorage {
 
         this.storageKey = config.getProperty(IStorageManager.PROP_STORAGE_KEY);
 
-        this.errors = new StorageErrors(log, storageKey);
+        this.errors = new LocalStorageErrors(storageKey, log);
 
         // TODO: Robust config handling
 

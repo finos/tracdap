@@ -68,7 +68,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             Path absolutePath, ByteBufAllocator allocator,
             OrderedEventExecutor executor) {
 
-        this.errors = new StorageErrors(log, storageKey);
+        this.errors = new LocalStorageErrors(storageKey, log);
         this.storagePath = storagePath;
 
         this.absolutePath = absolutePath;
