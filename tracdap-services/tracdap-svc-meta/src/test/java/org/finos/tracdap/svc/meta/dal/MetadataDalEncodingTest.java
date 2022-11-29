@@ -22,7 +22,6 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 
 import java.math.BigDecimal;
 import java.time.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.UUID;
 
 import org.finos.tracdap.test.meta.IDalTestable;
@@ -58,38 +57,36 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
     static class IntegrationTest extends MetadataDalEncodingTest {}
 
     @Test
-    void roundTrip_ok() throws Exception {
+    void roundTrip_ok() {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
-        var future = CompletableFuture.completedFuture(0)
-                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
-                .thenCompose(x -> dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1));
+        dal.saveNewObject(TEST_TENANT, origTag);
+        var result = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
 
-        assertEquals(origTag, unwrap(future));
+        assertEquals(origTag, result);
     }
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
                 names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
-    void roundTrip_allObjectTypesOk(ObjectType objectType) throws Exception {
+    void roundTrip_allObjectTypesOk(ObjectType objectType) {
 
         var origTag = dummyTagForObjectType(objectType);
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
-        var future = CompletableFuture.completedFuture(0)
-                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, origTag))
-                .thenCompose(x -> dal.loadTag(TEST_TENANT, objectType, origId, 1, 1));
+        dal.saveNewObject(TEST_TENANT, origTag);
+        var result = dal.loadTag(TEST_TENANT, objectType, origId, 1, 1);
 
-        assertEquals(origTag, unwrap(future));
+        assertEquals(origTag, result);
     }
 
     @ParameterizedTest
     @EnumSource(value = BasicType.class, mode = EnumSource.Mode.EXCLUDE,
                 names = {"BASIC_TYPE_NOT_SET", "UNRECOGNIZED", "ARRAY", "MAP"})
-    void roundTrip_allAttrTypesOk(BasicType attrType) throws Exception {
+    void roundTrip_allAttrTypesOk(BasicType attrType) {
 
         var origDef = dummyDataDef();
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
@@ -102,11 +99,10 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
                 .putAttrs(attrName, MetadataCodec.encodeNativeObject(attrValue))
                 .build();
 
-        var future = CompletableFuture.completedFuture(0)
-                .thenCompose(x -> dal.saveNewObject(TEST_TENANT, testTag))
-                .thenCompose(x -> dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1));
+        dal.saveNewObject(TEST_TENANT, testTag);
+        var result = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
 
-        assertEquals(testTag, unwrap(future));
+        assertEquals(testTag, result);
     }
 
     @Test
@@ -153,7 +149,7 @@ abstract class MetadataDalEncodingTest implements IDalTestable {
                 return truncateMicrosecondPrecision(dateTime);
 
             default:
-                throw new RuntimeException("Test object not available for basic type " + basicType.toString());
+                throw new RuntimeException("Test object not available for basic type " + basicType);
         }
     }
 

@@ -82,7 +82,8 @@ public class MetadataConstants {
 
     public static final String TRAC_MODEL_LANGUAGE = "trac_model_language";
     public static final String TRAC_MODEL_REPOSITORY = "trac_model_repository";
-    public static final String TRAC_MODEL_PATH = "trac_model_path";
-    public static final String TRAC_MODEL_ENTRY_POINT = "trac_model_entry_point";
+    public static final String TRAC_MODEL_PACKAGE_GROUP = "trac_model_package_group";
+    public static final String TRAC_MODEL_PACKAGE = "trac_model_package";
     public static final String TRAC_MODEL_VERSION = "trac_model_version";
+    public static final String TRAC_MODEL_ENTRY_POINT = "trac_model_entry_point";
 }

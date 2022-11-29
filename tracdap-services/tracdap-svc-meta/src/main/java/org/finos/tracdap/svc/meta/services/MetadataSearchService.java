@@ -21,7 +21,6 @@ import org.finos.tracdap.metadata.SearchParameters;
 import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 
 public class MetadataSearchService {
@@ -32,7 +31,7 @@ public class MetadataSearchService {
         this.dal = dal;
     }
 
-    public CompletableFuture<List<Tag>>
+    public List<Tag>
     search(String tenant, SearchParameters searchParameters) {
 
         // Validation currently in the API layer

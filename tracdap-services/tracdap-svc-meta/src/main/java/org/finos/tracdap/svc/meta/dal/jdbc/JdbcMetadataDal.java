@@ -32,8 +32,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 
@@ -48,9 +46,9 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     private final JdbcSearchImpl search;
 
 
-    public JdbcMetadataDal(JdbcDialect dialect, DataSource dataSource, Executor executor) {
+    public JdbcMetadataDal(JdbcDialect dialect, DataSource dataSource) {
 
-        super(dialect, dataSource, executor);
+        super(dialect, dataSource);
 
         log = LoggerFactory.getLogger(getClass());
 
@@ -82,7 +80,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     }
 
     @Override
-    public CompletableFuture<List<TenantInfo>> listTenants() {
+    public List<TenantInfo> listTenants() {
 
         return wrapTransaction(tenants::listTenants);
     }
@@ -98,22 +96,22 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
 
     @Override
-    public CompletableFuture<Void> saveNewObject(String tenant, Tag tag) {
+    public void saveNewObject(String tenant, Tag tag) {
 
         var parts = separateParts(tag);
-        return saveNewObjects(tenant, parts);
+        saveNewObjects(tenant, parts);
     }
 
     @Override
-    public CompletableFuture<Void> saveNewObjects(String tenant, List<Tag> tags) {
+    public void saveNewObjects(String tenant, List<Tag> tags) {
 
         var parts = separateParts(tags);
-        return saveNewObjects(tenant, parts);
+        saveNewObjects(tenant, parts);
     }
 
-    private CompletableFuture<Void> saveNewObjects(String tenant, ObjectParts parts) {
+    private void saveNewObjects(String tenant, ObjectParts parts) {
 
-        return wrapTransaction(conn -> {
+        wrapTransaction(conn -> {
 
             prepareMappingTable(conn);
 
@@ -128,22 +126,22 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     }
 
     @Override
-    public CompletableFuture<Void> saveNewVersion(String tenant, Tag tag) {
+    public void saveNewVersion(String tenant, Tag tag) {
 
         var parts = separateParts(tag);
-        return saveNewVersions(tenant, parts);
+        saveNewVersions(tenant, parts);
     }
 
     @Override
-    public CompletableFuture<Void> saveNewVersions(String tenant, List<Tag> tags) {
+    public void saveNewVersions(String tenant, List<Tag> tags) {
 
         var parts = separateParts(tags);
-        return saveNewVersions(tenant, parts);
+        saveNewVersions(tenant, parts);
     }
 
-    private CompletableFuture<Void> saveNewVersions(String tenant, ObjectParts parts) {
+    private void saveNewVersions(String tenant, ObjectParts parts) {
 
-        return wrapTransaction(conn -> {
+        wrapTransaction(conn -> {
 
             prepareMappingTable(conn);
 
@@ -162,22 +160,22 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     }
 
     @Override
-    public CompletableFuture<Void> saveNewTag(String tenant, Tag tag) {
+    public void saveNewTag(String tenant, Tag tag) {
 
         var parts = separateParts(tag);
-        return saveNewTags(tenant, parts);
+        saveNewTags(tenant, parts);
     }
 
     @Override
-    public CompletableFuture<Void> saveNewTags(String tenant, List<Tag> tags) {
+    public void saveNewTags(String tenant, List<Tag> tags) {
 
         var parts = separateParts(tags);
-        return saveNewTags(tenant, parts);
+        saveNewTags(tenant, parts);
     }
 
-    private CompletableFuture<Void> saveNewTags(String tenant, ObjectParts parts) {
+    private void saveNewTags(String tenant, ObjectParts parts) {
 
-        return wrapTransaction(conn -> {
+        wrapTransaction(conn -> {
 
             prepareMappingTable(conn);
 
@@ -196,22 +194,22 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     }
 
     @Override
-    public CompletableFuture<Void> preallocateObjectId(String tenant, ObjectType objectType, UUID objectId) {
+    public void preallocateObjectId(String tenant, ObjectType objectType, UUID objectId) {
 
         var parts = separateParts(objectType, objectId);
-        return preallocateObjectIds(tenant, parts);
+        preallocateObjectIds(tenant, parts);
     }
 
     @Override
-    public CompletableFuture<Void> preallocateObjectIds(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds) {
+    public void preallocateObjectIds(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds) {
 
         var parts = separateParts(objectTypes, objectIds);
-        return preallocateObjectIds(tenant, parts);
+        preallocateObjectIds(tenant, parts);
     }
 
-    private CompletableFuture<Void> preallocateObjectIds(String tenant, ObjectParts parts) {
+    private void preallocateObjectIds(String tenant, ObjectParts parts) {
 
-        return wrapTransaction(conn -> {
+        wrapTransaction(conn -> {
 
             prepareMappingTable(conn);
 
@@ -223,22 +221,22 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     }
 
     @Override
-    public CompletableFuture<Void> savePreallocatedObject(String tenant, Tag tag) {
+    public void savePreallocatedObject(String tenant, Tag tag) {
 
         var parts = separateParts(tag);
-        return savePreallocatedObjects(tenant, parts);
+        savePreallocatedObjects(tenant, parts);
     }
 
     @Override
-    public CompletableFuture<Void> savePreallocatedObjects(String tenant, List<Tag> tags) {
+    public void savePreallocatedObjects(String tenant, List<Tag> tags) {
 
         var parts = separateParts(tags);
-        return savePreallocatedObjects(tenant, parts);
+        savePreallocatedObjects(tenant, parts);
     }
 
-    private CompletableFuture<Void> savePreallocatedObjects(String tenant, ObjectParts parts) {
+    private void savePreallocatedObjects(String tenant, ObjectParts parts) {
 
-        return wrapTransaction(conn -> {
+        wrapTransaction(conn -> {
 
             prepareMappingTable(conn);
 
@@ -266,7 +264,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     // We want these multiple queries to complete in < 100 ms for a fluid user experience
     // So, optimising the common case of loading a single item makes sense
 
-    @Override public CompletableFuture<Tag>
+    @Override public Tag
     loadObject(String tenant, TagSelector selector) {
 
         var parts = selectorParts(selector);
@@ -293,7 +291,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     // This can be used both by the platform (e.g. to set up a job) and applications / UI (e.g. to display a job)
     // Latency remains important, optimisations are in ReadBatchImpl
 
-    @Override public CompletableFuture<List<Tag>>
+    @Override public List<Tag>
     loadObjects(String tenant, List<TagSelector> selectors) {
 
         var parts = selectorParts(selectors);
@@ -321,7 +319,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     // LOAD METHODS (LEGACY)
     // -----------------------------------------------------------------------------------------------------------------
 
-    @Override public CompletableFuture<Tag>
+    @Override public Tag
     loadTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion, int tagVersion) {
 
         var selector = TagSelector.newBuilder()
@@ -334,7 +332,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         return loadObject(tenant, selector);
     }
 
-    @Override public CompletableFuture<Tag>
+    @Override public Tag
     loadLatestTag(String tenant, ObjectType objectType, UUID objectId, int objectVersion) {
 
         var selector = TagSelector.newBuilder()
@@ -347,7 +345,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         return loadObject(tenant, selector);
     }
 
-    @Override public CompletableFuture<Tag>
+    @Override public Tag
     loadLatestVersion(String tenant, ObjectType objectType, UUID objectId) {
 
         var selector = TagSelector.newBuilder()
@@ -360,7 +358,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         return loadObject(tenant, selector);
     }
 
-    @Override public CompletableFuture<List<Tag>>
+    @Override public List<Tag>
     loadTags(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds, List<Integer> objectVersions, List<Integer> tagVersions) {
 
         var selectors = new ArrayList<TagSelector>(objectIds.size());
@@ -380,7 +378,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         return loadObjects(tenant, selectors);
     }
 
-    @Override public CompletableFuture<List<Tag>>
+    @Override public List<Tag>
     loadLatestTags(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds, List<Integer> objectVersions) {
 
         var selectors = new ArrayList<TagSelector>(objectIds.size());
@@ -400,7 +398,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         return loadObjects(tenant, selectors);
     }
 
-    @Override public CompletableFuture<List<Tag>>
+    @Override public List<Tag>
     loadLatestVersions(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds) {
 
         var selectors = new ArrayList<TagSelector>(objectIds.size());
@@ -425,7 +423,7 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     // SEARCH METHODS
     // -----------------------------------------------------------------------------------------------------------------
 
-    @Override public CompletableFuture<List<Tag>>
+    @Override public List<Tag>
     search(String tenant, SearchParameters searchParameters) {
 
         return wrapTransaction(conn -> {

@@ -119,7 +119,7 @@ public class FileService {
 
                 // Call meta svc to preallocate file object ID
                 .thenApply(x -> preallocateRequest(tenant, ObjectType.FILE))
-                .thenCompose(req -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, req, client::preallocateId))
+                .thenCompose(req -> grpcWrap.unaryAsync(PREALLOCATE_ID_METHOD, req, client::preallocateId))
                 .thenAccept(fileId -> state.preAllocFileId = fileId)
 
                 // Preallocate ID comes back with version 0, bump to get ID for first real version
@@ -127,7 +127,7 @@ public class FileService {
 
                 // Also pre-allocate for storage
                 .thenApply(x -> preallocateRequest(tenant, ObjectType.STORAGE))
-                .thenCompose(req -> grpcWrap.unaryCall(PREALLOCATE_ID_METHOD, req, client::preallocateId))
+                .thenCompose(req -> grpcWrap.unaryAsync(PREALLOCATE_ID_METHOD, req, client::preallocateId))
                 .thenAccept(storageId -> state.preAllocStorageId = storageId)
                 .thenAccept(x -> state.storageId = bumpVersion(state.preAllocStorageId))
 
@@ -235,7 +235,7 @@ public class FileService {
         var request = requestForSelector(tenant, fileSelector);
 
         return grpcWrap
-                .unaryCall(READ_OBJECT_METHOD, request, client::readObject)
+                .unaryAsync(READ_OBJECT_METHOD, request, client::readObject)
                 .thenAccept(tag -> {
                     state.fileId = tag.getHeader();
                     state.file = tag.getDefinition().getFile();
@@ -249,7 +249,7 @@ public class FileService {
         var request = requestForSelector(tenant, state.file.getStorageId());
 
         return grpcWrap
-                .unaryCall(READ_OBJECT_METHOD, request, client::readObject)
+                .unaryAsync(READ_OBJECT_METHOD, request, client::readObject)
                 .thenAccept(tag -> {
 
                     state.storageId = tag.getHeader();
@@ -268,9 +268,9 @@ public class FileService {
         var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
 
         return grpcWrap
-                .unaryCall(CREATE_PREALLOCATED_METHOD, storageReq, client::createPreallocatedObject)
+                .unaryAsync(CREATE_PREALLOCATED_METHOD, storageReq, client::createPreallocatedObject)
                 .thenCompose(x -> grpcWrap
-                .unaryCall(CREATE_PREALLOCATED_METHOD, fileReq, client::createPreallocatedObject));
+                .unaryAsync(CREATE_PREALLOCATED_METHOD, fileReq, client::createPreallocatedObject));
     }
 
     private CompletionStage<TagHeader> saveMetadata(String tenant, RequestState state, RequestState prior) {
@@ -284,9 +284,9 @@ public class FileService {
         var fileReq = buildCreateObjectReq(tenant, priorFileId, state.file, state.fileTags);
 
         return grpcWrap
-                .unaryCall(UPDATE_OBJECT_METHOD, storageReq, client::updateObject)
+                .unaryAsync(UPDATE_OBJECT_METHOD, storageReq, client::updateObject)
                 .thenCompose(x -> grpcWrap
-                .unaryCall(UPDATE_OBJECT_METHOD, fileReq, client::updateObject));
+                .unaryAsync(UPDATE_OBJECT_METHOD, fileReq, client::updateObject));
     }
 
     private CompletionStage<Long> writeDataItem(

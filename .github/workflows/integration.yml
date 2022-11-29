@@ -44,7 +44,7 @@ jobs:
           cache: gradle
 
       - name: Build
-        run: ./gradlew build -x test
+        run: ./gradlew testClasses
 
       - name: Slow tests
         run: ./gradlew integration -DintegrationTags="slow"
@@ -82,7 +82,7 @@ jobs:
           cache: gradle
 
       - name: Java - Build platform
-        run: ./gradlew build -x test
+        run: ./gradlew testClasses
 
       - name: Python - setup
         uses: actions/setup-python@v4
@@ -202,7 +202,7 @@ jobs:
           cache: gradle
 
       - name: Build
-        run: ./gradlew trac-svc-meta:build trac-svc-meta:testClasses deploy-metadb:build -x test
+        run: ./gradlew trac-svc-meta:testClasses
 
       # Auth tool will also create the secrets file if it doesn't exist
       - name: Prepare Auth Keys
@@ -223,7 +223,7 @@ jobs:
           --task add_tenant ACME_CORP 'Test tenant [ACME_CORP]'"
 
       - name: Integration Tests
-        run: ./gradlew integration -DintegrationTags="int-metadb"
+        run: ./gradlew trac-svc-meta:integration -DintegrationTags="int-metadb"
 
       # If the tests fail, make the output available for download
       - name: Store failed test results

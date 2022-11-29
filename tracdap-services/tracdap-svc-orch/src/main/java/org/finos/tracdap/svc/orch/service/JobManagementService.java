@@ -235,7 +235,7 @@ public class JobManagementService {
         }
 
         // This is what publishes metadata for the job to the metadata service
-        jobLifecycle.processJobResult(jobState).toCompletableFuture().join();
+        jobLifecycle.processJobResult(jobState);
 
         // Only once the results are recorded, update the cache and remove the physical job
         jobCache.updateJob(jobKey, jobState, ticket);

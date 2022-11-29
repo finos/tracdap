@@ -20,6 +20,7 @@ package org.finos.tracdap.svc.orch.jobs;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.*;
 
 import java.time.Instant;
@@ -27,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 
 public interface IJobLogic {
+
+    JobDefinition applyTransform(JobDefinition job, PlatformConfig platformConfig);
 
     List<TagSelector> requiredMetadata(JobDefinition job);
 

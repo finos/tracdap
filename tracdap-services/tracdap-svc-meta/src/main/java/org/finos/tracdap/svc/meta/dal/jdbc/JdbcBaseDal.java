@@ -24,8 +24,6 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 
 class JdbcBaseDal {
@@ -33,12 +31,10 @@ class JdbcBaseDal {
     protected final IDialect dialect;
 
     private final DataSource source;
-    private final Executor executor;
 
-    JdbcBaseDal(JdbcDialect dialect, DataSource source, Executor executor) {
+    JdbcBaseDal(JdbcDialect dialect, DataSource source) {
         this.dialect = Dialect.dialectFor(dialect);
         this.source = source;
-        this.executor = executor;
     }
 
     IDialect getDialect() {
@@ -60,43 +56,37 @@ class JdbcBaseDal {
         }
     }
 
-    <TResult> CompletableFuture<TResult>
-    wrapTransaction(JdbcFunction<TResult> func, JdbcErrorHandler... errorHandlers) {
+    <TResult> TResult wrapTransaction(JdbcFunction<TResult> func, JdbcErrorHandler... errorHandlers) {
 
-        return CompletableFuture.supplyAsync(() -> {
+        try (var conn = source.getConnection()) {
 
-            try (var conn = source.getConnection()) {
+            conn.setAutoCommit(false);
 
-                conn.setAutoCommit(false);
+            var result = func.apply(conn);
+            conn.commit();
 
-                var result = func.apply(conn);
-                conn.commit();
+            return result;
+        }
+        catch (SQLException error) {
 
-                return result;
-            }
-            catch (SQLException error) {
+            // TODO: Logging?
 
-                // TODO: Logging?
+            var code = dialect.mapErrorCode(error);
 
-                var code = dialect.mapErrorCode(error);
+            // If the error code is not recognised, throw an internal error type
+            JdbcError.handleUnknownError(error, code, dialect);
 
-                // If the error code is not recognised, throw an internal error type
-                JdbcError.handleUnknownError(error, code, dialect);
+            for (JdbcErrorHandler handler: errorHandlers)
+                handler.handle(error, code);
 
-                for (JdbcErrorHandler handler: errorHandlers)
-                    handler.handle(error, code);
-
-                // If the error code is not handled, throw an internal error type
-                throw JdbcError.unhandledError(error, code);
-            }
-
-        }, executor);
+            // If the error code is not handled, throw an internal error type
+            throw JdbcError.unhandledError(error, code);
+        }
     }
 
-    CompletableFuture<Void>
-    wrapTransaction(JdbcAction func, JdbcErrorHandler... errorHandlers) {
+    void wrapTransaction(JdbcAction func, JdbcErrorHandler... errorHandlers) {
 
-        return wrapTransaction(conn -> {func.apply(conn); return null;}, errorHandlers);
+        wrapTransaction(conn -> {func.apply(conn); return null;}, errorHandlers);
     }
 
     @FunctionalInterface
