@@ -63,6 +63,7 @@ abstract class DataRoundTripTest {
 
         @RegisterExtension
         private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+                .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .startMeta()
                 .startData()
@@ -84,6 +85,7 @@ abstract class DataRoundTripTest {
 
         @RegisterExtension
         private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+                .runDbDeploy(true)
                 .addTenant(TEST_TENANT)
                 .startMeta()
                 .startData()
