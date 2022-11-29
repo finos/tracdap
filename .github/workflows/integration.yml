@@ -27,7 +27,7 @@ jobs:
   slow-tests:
 
     # Disable for S3 testing
-    if: false()
+    if: ${{ false }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -66,7 +66,7 @@ jobs:
   end-to-end:
 
     # Disable for S3 testing
-    if: false()
+    if: ${{ false }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -122,7 +122,7 @@ jobs:
   int-metadb:
 
     # Disable for S3 testing
-    if: false()
+    if: ${{ false }}
 
     runs-on: ubuntu-latest
 
