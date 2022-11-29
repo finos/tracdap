@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
-import org.finos.tracdap.common.config.IConfigLoader;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.plugin.PluginServiceInfo;
 import org.finos.tracdap.common.plugin.TracPlugin;
