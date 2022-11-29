@@ -36,7 +36,7 @@ metadata:
     protocol: JDBC
     properties:
       dialect: H2
-      jdbcUrl: ./trac.meta
+      jdbcUrl: ${TRAC_DIR}/trac.meta
       h2.user: trac
       h2.pass: trac
       h2.schema: public
