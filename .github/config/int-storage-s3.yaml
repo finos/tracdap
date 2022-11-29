@@ -13,7 +13,6 @@
 # limitations under the License.
 
 config:
-  logging: trac-logging.xml
   secret.type: PKCS12
   secret.url: secrets.p12
 
