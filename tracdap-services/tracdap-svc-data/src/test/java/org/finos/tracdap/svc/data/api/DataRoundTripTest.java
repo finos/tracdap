@@ -77,7 +77,7 @@ abstract class DataRoundTripTest {
     }
 
     // Include this test case for integration against different database backends
-    @org.junit.jupiter.api.Tag("integration")
+    @Tag("integration")
     @Tag("int-storage")
     static class IntegrationTest extends DataRoundTripTest {
 

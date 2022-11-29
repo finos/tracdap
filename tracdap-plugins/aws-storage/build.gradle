@@ -38,4 +38,6 @@ dependencies {
     // Force the version of Jackson (only latest stable will ever pass compliance)
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "$jackson_databind_version"
+
+    testImplementation project(path: ':tracdap-lib-data', configuration: 'testSuite')
 }
