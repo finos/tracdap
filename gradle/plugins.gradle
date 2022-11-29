@@ -56,7 +56,7 @@ ext {
     BUILD_gcp_config = false
 
     BUILD_aws_config = false
-    BUILD_aws_storage = true
+    BUILD_aws_storage = false
 
 
     // These DEPEND_ flags say what gets pulled in for each plugin
