@@ -33,7 +33,7 @@ import java.util.Properties;
 import java.util.Random;
 
 
-public class FileStorageReadWriteStability {
+public class FileStorageStabilityTest {
 
     /* >>> Test suite for IFileStorage - read/write operations, stability tests
 
