@@ -616,6 +616,7 @@ message MetadataBatchResponse {
  * @see TracMetadataApi
  */
 message MetadataWriteBatchResponse {
+
     repeated metadata.TagHeader ids = 1;
 };
 

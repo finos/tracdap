@@ -28,6 +28,8 @@ import com.google.protobuf.Message;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.PUBLIC_WRITABLE_OBJECT_TYPES;
@@ -96,7 +98,20 @@ public class MetadataApiImpl {
     MetadataWriteBatchResponse createBatch(MetadataWriteBatchRequest request) {
         validateRequest(CREATE_BATCH_METHOD, request);
 
-        return null;  // TODO
+        List<TagUpdate> tags = request.getBatchTagUpdatesList();
+        List<TagHeader> tagHeaders = new ArrayList<>();
+
+        for (MetadataWriteRequest rawRequest : request.getRequestsList()) {
+            MetadataWriteRequest r = addTagsToRequest(rawRequest, tags);
+
+            TagHeader tagHeader = createObject(r);
+
+            tagHeaders.add(tagHeader);
+        }
+
+        MetadataWriteBatchResponse.Builder builder = MetadataWriteBatchResponse.newBuilder();
+        builder.addAllIds(tagHeaders);
+        return builder.build();
     }
 
     TagHeader updateObject(MetadataWriteRequest request) {
@@ -224,6 +239,12 @@ public class MetadataApiImpl {
         var objectVersion = request.getObjectVersion();
 
         return readService.loadLatestTag(tenant, objectType, objectId, objectVersion);
+    }
+
+    private MetadataWriteRequest addTagsToRequest(MetadataWriteRequest rawRequest, List<TagUpdate> tags) {
+        MetadataWriteRequest.Builder builder = MetadataWriteRequest.newBuilder(rawRequest);
+        builder.addAllTagUpdates(tags);
+        return builder.build();
     }
 
     private <TReq extends Message>
