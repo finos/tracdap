@@ -35,7 +35,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 
-import static org.finos.tracdap.common.storage.local.LocalFileErrors.ExplicitError.*;
+import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
 
 public class LocalFileStorage implements IFileStorage {
@@ -54,7 +54,7 @@ public class LocalFileStorage implements IFileStorage {
     static final String READ_OPERATION = "read";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
-    private final LocalFileErrors errors;
+    private final StorageErrors errors;
 
     private final String storageKey;
     private final Path rootPath;
@@ -63,7 +63,7 @@ public class LocalFileStorage implements IFileStorage {
 
         this.storageKey = config.getProperty(IStorageManager.PROP_STORAGE_KEY);
 
-        this.errors = new LocalFileErrors(log, storageKey);
+        this.errors = new StorageErrors(log, storageKey);
 
         // TODO: Robust config handling
 

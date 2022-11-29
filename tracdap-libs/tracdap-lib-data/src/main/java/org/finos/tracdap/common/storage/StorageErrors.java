@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.storage.local;
+package org.finos.tracdap.common.storage;
 
 import org.finos.tracdap.common.exception.*;
 import org.slf4j.Logger;
@@ -28,11 +28,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static org.finos.tracdap.common.storage.local.LocalFileErrors.ExplicitError.*;
+import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
-public class LocalFileErrors {
+public class StorageErrors {
 
-    enum ExplicitError {
+    public enum ExplicitError {
 
         // Validation failures
         STORAGE_PATH_NULL_OR_BLANK,
@@ -128,12 +128,12 @@ public class LocalFileErrors {
     private final Logger log;
     private final String storageKey;
 
-    LocalFileErrors(Logger log, String storageKey) {
+    public StorageErrors(Logger log, String storageKey) {
         this.log = log;
         this.storageKey = storageKey;
     }
 
-    ETrac handleException(Throwable e, String storagePath, String operationName) {
+    public ETrac handleException(Throwable e, String storagePath, String operationName) {
 
         // Error of type ETrac means the error is already handled
         if (e instanceof ETrac)
@@ -155,7 +155,7 @@ public class LocalFileErrors {
         return exception(UNKNOWN_ERROR, e, storagePath, operationName);
     }
 
-    ETrac explicitError(ExplicitError error, String path, String operation) {
+    public ETrac explicitError(ExplicitError error, String path, String operation) {
 
         try {
 
@@ -178,7 +178,7 @@ public class LocalFileErrors {
         }
     }
 
-    ETrac exception(ExplicitError error, Throwable cause, String path, String operation) {
+    public ETrac exception(ExplicitError error, Throwable cause, String path, String operation) {
 
         try {
 
@@ -201,7 +201,7 @@ public class LocalFileErrors {
         }
     }
 
-    ETrac chunkNotFullyWritten(int chunkBytes, int writtenBytes) {
+    public ETrac chunkNotFullyWritten(int chunkBytes, int writtenBytes) {
 
         try {
 
