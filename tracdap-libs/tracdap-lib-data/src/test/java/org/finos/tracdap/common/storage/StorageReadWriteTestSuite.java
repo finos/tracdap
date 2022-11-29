@@ -16,24 +16,17 @@
 
 package org.finos.tracdap.common.storage;
 
-import org.apache.arrow.memory.RootAllocator;
-import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
-import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStorageRequest;
 import org.finos.tracdap.common.exception.EValidationGap;
-import org.finos.tracdap.common.storage.local.LocalFileStorage;
 import org.finos.tracdap.common.concurrent.Flows;
 
 import io.netty.buffer.*;
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.concurrent.DefaultEventExecutor;
-import io.netty.util.concurrent.DefaultThreadFactory;
 
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.OS;
-import org.junit.jupiter.api.io.TempDir;
 
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
@@ -43,10 +36,8 @@ import static org.mockito.Mockito.*;
 
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
-import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -56,7 +47,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
-public class FileStorageReadWriteTest {
+public abstract class StorageReadWriteTestSuite {
 
     /* >>> Test suite for IFileStorage - read/write operations, functional and stability tests
 
@@ -70,26 +61,14 @@ public class FileStorageReadWriteTest {
     tests. This can allow for finer grained control, particularly when testing corner cases and error conditions.
      */
 
+    // Unit test implementation for local storage is in LocalStorageReadWriteTest
+
     public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
     public static final Duration ASYNC_DELAY = Duration.ofMillis(100);
 
-    @TempDir
-    Path storageDir;
-    IFileStorage storage;
-    IExecutionContext execContext;
-    IDataContext dataContext;
-
-    @BeforeEach
-    void setupStorage() {
-
-        var storageProps = new Properties();
-        storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
-        storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
-        storage = new LocalFileStorage(storageProps);
-
-        execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
-        dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());
-    }
+    protected IFileStorage storage;
+    protected IExecutionContext execContext;
+    protected IDataContext dataContext;
 
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -121,7 +100,7 @@ public class FileStorageReadWriteTest {
         var random = new Random();
         random.nextBytes(bytes);
 
-        FileStorageReadWriteTest.roundTripTest(
+        StorageReadWriteTestSuite.roundTripTest(
                 storagePath, List.of(bytes),
                 storage, dataContext);
     }
@@ -142,7 +121,7 @@ public class FileStorageReadWriteTest {
         var random = new Random();
         bytes.forEach(random::nextBytes);
 
-        FileStorageReadWriteTest.roundTripTest(
+        StorageReadWriteTestSuite.roundTripTest(
                 storagePath, bytes,
                 storage, dataContext);
     }
@@ -153,7 +132,7 @@ public class FileStorageReadWriteTest {
         var storagePath = "test_file.dat";
         var emptyBytes = new byte[0];
 
-        FileStorageReadWriteTest.roundTripTest(
+        StorageReadWriteTestSuite.roundTripTest(
                 storagePath, List.of(emptyBytes),
                 storage, dataContext);
     }

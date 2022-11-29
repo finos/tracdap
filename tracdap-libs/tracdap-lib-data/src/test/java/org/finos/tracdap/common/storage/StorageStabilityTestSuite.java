@@ -16,24 +16,16 @@
 
 package org.finos.tracdap.common.storage;
 
-import org.apache.arrow.memory.RootAllocator;
-import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
-import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IDataContext;
-import org.finos.tracdap.common.storage.local.LocalFileStorage;
-import io.netty.util.concurrent.DefaultEventExecutor;
-import io.netty.util.concurrent.DefaultThreadFactory;
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Path;
+import org.junit.jupiter.api.*;
+
 import java.util.List;
-import java.util.Properties;
 import java.util.Random;
 
 
-public class FileStorageStabilityTest {
+public abstract class StorageStabilityTestSuite {
 
     /* >>> Test suite for IFileStorage - read/write operations, stability tests
 
@@ -47,23 +39,10 @@ public class FileStorageStabilityTest {
     tests. This can allow for finer grained control, particularly when testing corner cases and error conditions.
      */
 
-    @TempDir
-    static Path storageDir;
-    static IFileStorage storage;
-    static IExecutionContext execContext;
-    static IDataContext dataContext;
+    protected static IFileStorage storage;
+    protected static IExecutionContext execContext;
+    protected static IDataContext dataContext;
 
-    @BeforeAll
-    static void setupStorage() {
-
-        var storageProps = new Properties();
-        storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
-        storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
-        storage = new LocalFileStorage(storageProps);
-
-        execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
-        dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());
-    }
 
     // Running the rapid fire round trip test may flush out some less common stability issues and resource leaks.
     // Of course there is no guarantee errors will be caught, but in practice this test has been helpful...
@@ -89,7 +68,7 @@ public class FileStorageStabilityTest {
         var random = new Random();
         bytes.forEach(random::nextBytes);
 
-        FileStorageReadWriteTest.roundTripTest(
+        StorageReadWriteTestSuite.roundTripTest(
                 storagePath, bytes,
                 storage, dataContext);
     }

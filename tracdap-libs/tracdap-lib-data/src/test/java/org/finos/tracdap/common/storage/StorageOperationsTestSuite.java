@@ -16,33 +16,23 @@
 
 package org.finos.tracdap.common.storage;
 
-import org.apache.arrow.memory.RootAllocator;
-import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
-import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStorageRequest;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EValidationGap;
-import org.finos.tracdap.common.storage.local.LocalFileStorage;
 import org.finos.tracdap.common.concurrent.Flows;
 
 import io.netty.buffer.*;
-import io.netty.util.concurrent.DefaultEventExecutor;
-import io.netty.util.concurrent.DefaultThreadFactory;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
-import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Properties;
 import java.util.concurrent.*;
 import java.util.function.BiFunction;
 
@@ -52,7 +42,7 @@ import static org.finos.tracdap.test.storage.StorageTestHelpers.makeFile;
 import static org.finos.tracdap.test.storage.StorageTestHelpers.makeSmallFile;
 
 
-public class FileStorageOperationsTest {
+public abstract class StorageOperationsTestSuite {
 
     /* >>> Test suite for IFileStorage - file system operations, functional tests
 
@@ -66,26 +56,13 @@ public class FileStorageOperationsTest {
     tests. This can allow for finer grained control, particularly when testing corner cases and error conditions.
      */
 
+    // Unit test implementation for local storage is in LocalStorageOperationsTest
+
     public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
 
-    IFileStorage storage;
-    IExecutionContext execContext;
-    IDataContext dataContext;
-
-    @TempDir
-    Path storageDir;
-
-    @BeforeEach
-    void setupStorage() {
-
-        var storageProps = new Properties();
-        storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
-        storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
-        storage = new LocalFileStorage(storageProps);
-
-        execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
-        dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());
-    }
+    protected IFileStorage storage;
+    protected IExecutionContext execContext;
+    protected IDataContext dataContext;
 
 
     // -----------------------------------------------------------------------------------------------------------------
