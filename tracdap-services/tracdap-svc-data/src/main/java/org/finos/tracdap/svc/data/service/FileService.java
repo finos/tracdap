@@ -16,15 +16,18 @@
 
 package org.finos.tracdap.svc.data.service;
 
+import org.apache.arrow.memory.BufferAllocator;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.TrustedMetadataApiGrpc.TrustedMetadataApiFutureStub;
 import org.finos.tracdap.common.auth.GrpcClientAuth;
+import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.config.StorageConfig;
 import org.finos.tracdap.metadata.*;
 
-import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.exception.EDataSize;
 import org.finos.tracdap.common.grpc.GrpcClientWrap;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -70,6 +73,7 @@ public class FileService {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final StorageConfig storageConfig;
+    private final BufferAllocator arrowAllocator;
     private final IStorageManager storageManager;
     private final TrustedMetadataApiFutureStub metaApi;
 
@@ -79,10 +83,12 @@ public class FileService {
 
     public FileService(
             StorageConfig storageConfig,
+            BufferAllocator arrowAllocator,
             IStorageManager storageManager,
             TrustedMetadataApiFutureStub metaApi) {
 
         this.storageConfig = storageConfig;
+        this.arrowAllocator = arrowAllocator;
         this.storageManager = storageManager;
         this.metaApi = metaApi;
     }
@@ -91,13 +97,15 @@ public class FileService {
             String tenant, List<TagUpdate> tags,
             String name, String mimeType, Long expectedSize,
             Flow.Publisher<ByteBuf> contentStream,
-            IExecutionContext execContext,
+            IExecutionContext execCtx,
             String authToken) {
 
         var state = new RequestState();
         state.fileTags = tags;           // File tags requested by the client
         state.storageTags = List.of();   // Storage tags is empty to start with
         state.authToken = authToken;
+
+        var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
 
         // This timestamp is set in the storage definition to timestamp storage incarnations/copies
         // It is also used in the physical storage path
@@ -141,7 +149,7 @@ public class FileService {
                 .thenCompose(x -> writeDataItem(
                         state.storage,
                         state.file.getDataItem(),
-                        contentStream, execContext))
+                        contentStream, dataCtx))
 
                 // Check and record size from storage in file definition
                 .thenApply(size -> checkSize(size, expectedSize))
@@ -160,7 +168,7 @@ public class FileService {
             TagSelector priorVersion,
             String name, String mimeType, Long expectedSize,
             Flow.Publisher<ByteBuf> contentStream,
-            IExecutionContext execContext,
+            IExecutionContext execCtx,
             String authToken) {
 
         var state = new RequestState();
@@ -170,6 +178,8 @@ public class FileService {
         state.objectTimestamp = Instant.now();
         state.authToken = authToken;
         prior.authToken = authToken;
+
+        var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
 
         return CompletableFuture.completedFuture(null)
 
@@ -192,7 +202,7 @@ public class FileService {
                 .thenCompose(x -> writeDataItem(
                         state.storage,
                         state.file.getDataItem(),
-                        contentStream, execContext))
+                        contentStream, dataCtx))
 
                 // Check and record size from storage in file definition
                 .thenApply(size -> checkSize(size, expectedSize))
@@ -217,13 +227,15 @@ public class FileService {
         var state = new RequestState();
         state.authToken = authToken;
 
+        var dataCtx = new DataContext(execCtx.eventLoopExecutor(), arrowAllocator);
+
         CompletableFuture.completedFuture(null)
 
                 .thenCompose(x -> loadMetadata(tenant, selector, state))
 
                 .thenAccept(x -> definition.complete(state.file))
 
-                .thenApply(x -> readFile(state.file, state.storage, execCtx))
+                .thenApply(x -> readFile(state.file, state.storage, dataCtx))
                 .thenAccept(byteStream -> byteStream.subscribe(content))
 
                 .exceptionally(error -> Helpers.reportError(error, definition, content));
@@ -291,7 +303,7 @@ public class FileService {
 
     private CompletionStage<Long> writeDataItem(
             StorageDefinitionOrBuilder storageDef, String dataItem,
-            Flow.Publisher<ByteBuf> contentStream, IExecutionContext execContext) {
+            Flow.Publisher<ByteBuf> contentStream, IDataContext dataContext) {
 
         var storageItem = storageDef.getDataItemsOrThrow(dataItem);
 
@@ -316,28 +328,28 @@ public class FileService {
         var storagePath = copy.getStoragePath();
         var storageDir = storagePath.substring(0, storagePath.lastIndexOf(BACKSLASH));
 
-        var mkdir = storage.mkdir(storageDir, true, execContext);
+        var mkdir = storage.mkdir(storageDir, true, dataContext);
 
         // Finally, kick off the file write operation
 
         return mkdir.thenComposeAsync(x ->
-                doWriteDataItem(storage, storagePath, contentStream, execContext),
-                execContext.eventLoopExecutor());
+                doWriteDataItem(storage, storagePath, contentStream, dataContext),
+                dataContext.eventLoopExecutor());
     }
 
     private CompletionStage<Long> doWriteDataItem(
             IFileStorage storage, String storagePath,
-            Flow.Publisher<ByteBuf> contentStream, IExecutionContext execContext) {
+            Flow.Publisher<ByteBuf> contentStream, IDataContext dataContext) {
 
         var signal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, signal, execContext);
+        var writer = storage.writer(storagePath, signal, dataContext);
         contentStream.subscribe(writer);
         return signal;
     }
 
     private Flow.Publisher<ByteBuf> readFile(
             FileDefinition fileDef, StorageDefinition storageDef,
-            IExecutionContext execCtx) {
+            IDataContext dataContext) {
 
         var dataItem = fileDef.getDataItem();
         var storageItem = storageDef.getDataItemsOrThrow(dataItem);
@@ -349,7 +361,7 @@ public class FileService {
         var storagePath = copy.getStoragePath();
 
         var storage = storageManager.getFileStorage(storageKey);
-        return storage.reader(storagePath, execCtx);
+        return storage.reader(storagePath, dataContext);
     }
 
     private long checkSize(long actualSize, Long expectedSize) {

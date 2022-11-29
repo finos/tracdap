@@ -16,8 +16,11 @@
 
 package org.finos.tracdap.common.storage;
 
+import org.apache.arrow.memory.RootAllocator;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.storage.local.LocalFileStorage;
 import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -48,6 +51,7 @@ public class FileStorageReadWriteStability {
     static Path storageDir;
     static IFileStorage storage;
     static IExecutionContext execContext;
+    static IDataContext dataContext;
 
     @BeforeAll
     static void setupStorage() {
@@ -58,6 +62,7 @@ public class FileStorageReadWriteStability {
         storage = new LocalFileStorage(storageProps);
 
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
+        dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());
     }
 
     // Running the rapid fire round trip test may flush out some less common stability issues and resource leaks.
@@ -86,6 +91,6 @@ public class FileStorageReadWriteStability {
 
         FileStorageReadWriteTest.roundTripTest(
                 storagePath, bytes,
-                storage, execContext);
+                storage, dataContext);
     }
 }

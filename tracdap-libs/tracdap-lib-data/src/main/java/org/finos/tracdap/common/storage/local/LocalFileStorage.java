@@ -17,6 +17,7 @@
 package org.finos.tracdap.common.storage.local;
 
 import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.storage.*;
 
@@ -345,7 +346,7 @@ public class LocalFileStorage implements IFileStorage {
     }
 
     @Override
-    public Flow.Publisher<ByteBuf> reader(String storagePath, IExecutionContext execContext) {
+    public Flow.Publisher<ByteBuf> reader(String storagePath, IDataContext dataContext) {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, READ_OPERATION, storagePath);
 
@@ -354,14 +355,14 @@ public class LocalFileStorage implements IFileStorage {
         return new LocalFileReader(
                 storageKey, storagePath,
                 absolutePath, ByteBufAllocator.DEFAULT,
-                execContext.eventLoopExecutor());
+                dataContext.eventLoopExecutor());
     }
 
     @Override
     public Flow.Subscriber<ByteBuf> writer(
             String storagePath,
             CompletableFuture<Long> signal,
-            IExecutionContext execContext) {
+            IDataContext dataContext) {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, WRITE_OPERATION, storagePath);
 
@@ -370,7 +371,7 @@ public class LocalFileStorage implements IFileStorage {
         return new LocalFileWriter(
                 storageKey, storagePath,
                 absolutePath, signal,
-                execContext.eventLoopExecutor());
+                dataContext.eventLoopExecutor());
     }
 
     private Path resolvePath(String storagePath, boolean allowRootDir, String operationName) {

@@ -142,7 +142,7 @@ public class TracDataService extends CommonServiceBase {
             var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
 
             var dataSvc = new DataService(storageConfig, arrowAllocator, storage, formats, metaClient);
-            var fileSvc = new FileService(storageConfig, storage, metaClient);
+            var fileSvc = new FileService(storageConfig, arrowAllocator, storage, metaClient);
             var publicApi = new TracDataApi(dataSvc, fileSvc);
 
             var authentication = AuthInterceptor.setupAuth(

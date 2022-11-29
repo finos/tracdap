@@ -18,6 +18,7 @@ package org.finos.tracdap.common.storage;
 
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import io.netty.buffer.ByteBuf;
+import org.finos.tracdap.common.data.IDataContext;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -40,10 +41,10 @@ public interface IFileStorage {
 
     Flow.Publisher<ByteBuf> reader(
             String storagePath,
-            IExecutionContext execContext);
+            IDataContext dataContext);
 
     Flow.Subscriber<ByteBuf> writer(
             String storagePath,
             CompletableFuture<Long> signal,
-            IExecutionContext execContext);
+            IDataContext dataContext);
 }

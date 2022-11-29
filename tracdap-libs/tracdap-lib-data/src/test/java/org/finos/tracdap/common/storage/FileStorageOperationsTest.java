@@ -16,8 +16,11 @@
 
 package org.finos.tracdap.common.storage;
 
+import org.apache.arrow.memory.RootAllocator;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStorageRequest;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EValidationGap;
@@ -67,6 +70,7 @@ public class FileStorageOperationsTest {
 
     IFileStorage storage;
     IExecutionContext execContext;
+    IDataContext dataContext;
 
     @TempDir
     Path storageDir;
@@ -80,6 +84,7 @@ public class FileStorageOperationsTest {
         storage = new LocalFileStorage(storageProps);
 
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
+        dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());
     }
 
 
@@ -335,7 +340,7 @@ public class FileStorageOperationsTest {
         var testStart = Instant.now();
         Thread.sleep(10);  // Let time elapse before/after the test calls
 
-        var reader = storage.reader("test_file.txt", execContext);
+        var reader = storage.reader("test_file.txt", dataContext);
         var collect = Flows.fold(
                 reader, (composite, buf) -> composite.addComponent(true, buf),
                 ByteBufAllocator.DEFAULT.compositeBuffer());

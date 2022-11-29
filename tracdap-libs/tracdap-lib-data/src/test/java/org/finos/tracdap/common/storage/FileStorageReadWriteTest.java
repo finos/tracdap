@@ -16,8 +16,11 @@
 
 package org.finos.tracdap.common.storage;
 
+import org.apache.arrow.memory.RootAllocator;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStorageRequest;
 import org.finos.tracdap.common.exception.EValidationGap;
 import org.finos.tracdap.common.storage.local.LocalFileStorage;
@@ -74,6 +77,7 @@ public class FileStorageReadWriteTest {
     Path storageDir;
     IFileStorage storage;
     IExecutionContext execContext;
+    IDataContext dataContext;
 
     @BeforeEach
     void setupStorage() {
@@ -84,6 +88,7 @@ public class FileStorageReadWriteTest {
         storage = new LocalFileStorage(storageProps);
 
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
+        dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());
     }
 
 
@@ -103,7 +108,7 @@ public class FileStorageReadWriteTest {
 
         var haikuBytes = haiku.getBytes(StandardCharsets.UTF_8);
 
-        roundTripTest(storagePath, List.of(haikuBytes), storage, execContext);
+        roundTripTest(storagePath, List.of(haikuBytes), storage, dataContext);
     }
 
     @Test
@@ -118,7 +123,7 @@ public class FileStorageReadWriteTest {
 
         FileStorageReadWriteTest.roundTripTest(
                 storagePath, List.of(bytes),
-                storage, execContext);
+                storage, dataContext);
     }
 
     @Test
@@ -139,7 +144,7 @@ public class FileStorageReadWriteTest {
 
         FileStorageReadWriteTest.roundTripTest(
                 storagePath, bytes,
-                storage, execContext);
+                storage, dataContext);
     }
 
     @Test
@@ -150,12 +155,12 @@ public class FileStorageReadWriteTest {
 
         FileStorageReadWriteTest.roundTripTest(
                 storagePath, List.of(emptyBytes),
-                storage, execContext);
+                storage, dataContext);
     }
 
     static void roundTripTest(
             String storagePath, List<byte[]> originalBytes,
-            IFileStorage storage, IExecutionContext execContext) throws Exception {
+            IFileStorage storage, IDataContext dataContext) throws Exception {
 
         var originalBuffers = originalBytes.stream().map(bytes ->
                 ByteBufAllocator.DEFAULT
@@ -163,7 +168,7 @@ public class FileStorageReadWriteTest {
                 .writeBytes(bytes));
 
         var writeSignal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, writeSignal, execContext);
+        var writer = storage.writer(storagePath, writeSignal, dataContext);
         Flows.publish(originalBuffers).subscribe(writer);
 
         waitFor(Duration.ofHours(1), writeSignal);
@@ -171,7 +176,7 @@ public class FileStorageReadWriteTest {
         // Make sure the write operation did not report an error before trying to read
         Assertions.assertDoesNotThrow(() -> resultOf(writeSignal));
 
-        var reader = storage.reader(storagePath, execContext);
+        var reader = storage.reader(storagePath, dataContext);
         var readResult = Flows.fold(
                 reader, (composite, buf) -> composite.addComponent(true, buf),
                 ByteBufAllocator.DEFAULT.compositeBuffer());
@@ -222,7 +227,7 @@ public class FileStorageReadWriteTest {
         var contentStream = Flows.publish(Stream.of(content));
 
         var writeSignal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, writeSignal, execContext);
+        var writer = storage.writer(storagePath, writeSignal, dataContext);
 
         Assertions.assertThrows(EStorageRequest.class, () -> {
 
@@ -243,19 +248,19 @@ public class FileStorageReadWriteTest {
 
         var contentStream = Flows.publish(Stream.of(content));
         var writeSignal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, writeSignal, execContext);
+        var writer = storage.writer(storagePath, writeSignal, dataContext);
         contentStream.subscribe(writer);
 
         waitFor(TEST_TIMEOUT, writeSignal);
 
-        var exists = storage.exists(storagePath, execContext);
+        var exists = storage.exists(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, exists);
 
         Assertions.assertTrue(resultOf(exists));
 
         var contentStream2 = Flows.publish(Stream.of(content));
         var writeSignal2 = new CompletableFuture<Long>();
-        var writer2 = storage.writer(storagePath, writeSignal2, execContext);
+        var writer2 = storage.writer(storagePath, writeSignal2, dataContext);
 
         Assertions.assertThrows(EStorageRequest.class, () -> {
 
@@ -282,11 +287,11 @@ public class FileStorageReadWriteTest {
 
         var writeSignal1 = new CompletableFuture<Long>();
         Assertions.assertThrows(EValidationGap.class, () ->
-                storage.writer(absolutePath, writeSignal1, execContext));
+                storage.writer(absolutePath, writeSignal1, dataContext));
 
         var writeSignal2 = new CompletableFuture<Long>();
         Assertions.assertThrows(EValidationGap.class, () ->
-                storage.writer(invalidPath, writeSignal2, execContext));
+                storage.writer(invalidPath, writeSignal2, dataContext));
     }
 
     @Test
@@ -297,7 +302,7 @@ public class FileStorageReadWriteTest {
         var writeSignal = new CompletableFuture<Long>();
 
         Assertions.assertThrows(EValidationGap.class, () ->
-                storage.writer(storagePath, writeSignal, execContext));
+                storage.writer(storagePath, writeSignal, dataContext));
     }
 
     @Test
@@ -308,7 +313,7 @@ public class FileStorageReadWriteTest {
         var writeSignal = new CompletableFuture<Long>();
 
         Assertions.assertThrows(EValidationGap.class, () ->
-                storage.writer(storagePath, writeSignal, execContext));
+                storage.writer(storagePath, writeSignal, dataContext));
     }
 
     @Test
@@ -316,7 +321,7 @@ public class FileStorageReadWriteTest {
 
         var storagePath = "missing_file.txt";
 
-        var reader = storage.reader(storagePath, execContext);
+        var reader = storage.reader(storagePath, dataContext);
 
         Assertions.assertThrows(EStorageRequest.class, () -> {
 
@@ -345,10 +350,10 @@ public class FileStorageReadWriteTest {
                 : "nul\0char";
 
         Assertions.assertThrows(EValidationGap.class, () ->
-                storage.reader(absolutePath, execContext));
+                storage.reader(absolutePath, dataContext));
 
         Assertions.assertThrows(EValidationGap.class, () ->
-                storage.reader(invalidPath, execContext));
+                storage.reader(invalidPath, dataContext));
     }
 
     @Test
@@ -357,7 +362,7 @@ public class FileStorageReadWriteTest {
         var storagePath = ".";
 
         Assertions.assertThrows(EValidationGap.class, () ->
-                storage.reader(storagePath, execContext));
+                storage.reader(storagePath, dataContext));
     }
 
     @Test
@@ -366,7 +371,7 @@ public class FileStorageReadWriteTest {
         var storagePath = "../some_file.txt";
 
         Assertions.assertThrows(EValidationGap.class, () ->
-                storage.reader(storagePath, execContext));
+                storage.reader(storagePath, dataContext));
     }
 
 
@@ -419,7 +424,7 @@ public class FileStorageReadWriteTest {
                 .collect(Collectors.toList());
 
         var writeSignal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, writeSignal, execContext);
+        var writer = storage.writer(storagePath, writeSignal, dataContext);
         Flows.publish(chunks).subscribe(writer);
 
         waitFor(TEST_TIMEOUT, writeSignal);
@@ -435,10 +440,10 @@ public class FileStorageReadWriteTest {
 
         // Set up a dir in storage
 
-        var mkdir = storage.mkdir("some_dir", false, execContext);
+        var mkdir = storage.mkdir("some_dir", false, dataContext);
         waitFor(TEST_TIMEOUT, mkdir);
 
-        var dirExists = storage.exists("some_dir", execContext);
+        var dirExists = storage.exists("some_dir", dataContext);
         waitFor(TEST_TIMEOUT, dirExists);
         Assertions.assertTrue(resultOf(dirExists));
 
@@ -446,13 +451,13 @@ public class FileStorageReadWriteTest {
 
         var storagePath = "some_dir/some_file.txt";
         var writeSignal = new CompletableFuture<Long>();
-        storage.writer(storagePath, writeSignal, execContext);
+        storage.writer(storagePath, writeSignal, dataContext);
 
         // Allow some time in case the writer is going to do anything
         Thread.sleep(ASYNC_DELAY.toMillis());
 
         // File should not have been created as onSubscribe has not been called
-        var fileExists = storage.exists(storagePath, execContext);
+        var fileExists = storage.exists(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, fileExists);
         Assertions.assertFalse(resultOf(fileExists));
     }
@@ -467,7 +472,7 @@ public class FileStorageReadWriteTest {
         var chunk = Unpooled.wrappedBuffer(bytes);
 
         var writerSignal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, writerSignal, execContext);
+        var writer = storage.writer(storagePath, writerSignal, dataContext);
 
         // First subscription to the writer, everything should proceed normally
 
@@ -488,7 +493,7 @@ public class FileStorageReadWriteTest {
         Assertions.assertDoesNotThrow(() -> resultOf(writerSignal));
 
         // File should now be visible in storage
-        var size = storage.size(storagePath, execContext);
+        var size = storage.size(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, size);
         Assertions.assertEquals(bytes.length, resultOf(size));
     }
@@ -499,7 +504,7 @@ public class FileStorageReadWriteTest {
         var storagePath = "test_file.dat";
 
         var writerSignal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, writerSignal, execContext);
+        var writer = storage.writer(storagePath, writerSignal, dataContext);
 
         // Subscribe to the writer, it should call subscription.request()
         // Request call may be immediate or async
@@ -533,7 +538,7 @@ public class FileStorageReadWriteTest {
         // If there is a partially written file,
         // the writer should remove it as part of the error cleanup
 
-        var exists = storage.exists(storagePath, execContext);
+        var exists = storage.exists(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, exists);
 
         Assertions.assertFalse(resultOf(exists));
@@ -549,7 +554,7 @@ public class FileStorageReadWriteTest {
         var chunk0 = Unpooled.wrappedBuffer(bytes0);
 
         var writerSignal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, writerSignal, execContext);
+        var writer = storage.writer(storagePath, writerSignal, dataContext);
 
         // Subscribe to the writer, it should call subscription.request()
         // Request call may be immediate or async
@@ -588,7 +593,7 @@ public class FileStorageReadWriteTest {
         // If there is a partially written file,
         // the writer should remove it as part of the error cleanup
 
-        var exists = storage.exists(storagePath, execContext);
+        var exists = storage.exists(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, exists);
 
         Assertions.assertFalse(resultOf(exists));
@@ -605,7 +610,7 @@ public class FileStorageReadWriteTest {
 
         // Set up a writer and send it a chunk
         var writerSignal1 = new CompletableFuture<Long>();
-        var writer1 = storage.writer(storagePath, writerSignal1, execContext);
+        var writer1 = storage.writer(storagePath, writerSignal1, dataContext);
         var subscription1 = mock(Flow.Subscription.class);
         var chunk1 = Unpooled.wrappedBuffer(bytes);
 
@@ -622,14 +627,14 @@ public class FileStorageReadWriteTest {
         Assertions.assertThrows(CompletionException.class, () -> resultOf(writerSignal1, false));
 
         // File should not exist in storage after an aborted write
-        var exists1 = storage.exists(storagePath, execContext);
+        var exists1 = storage.exists(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, exists1);
         Assertions.assertFalse(resultOf(exists1));
 
         // Set up a second writer to retry the same operation
         // This time, send the chunk and an onComplete() message
         var writerSignal2 = new CompletableFuture<Long>();
-        var writer2 = storage.writer(storagePath, writerSignal2, execContext);
+        var writer2 = storage.writer(storagePath, writerSignal2, dataContext);
         var subscription2 = mock(Flow.Subscription.class);
         var chunk2 = Unpooled.wrappedBuffer(bytes);
 
@@ -643,7 +648,7 @@ public class FileStorageReadWriteTest {
         Assertions.assertDoesNotThrow(() -> resultOf(writerSignal2));
 
         // File should now be visible in storage
-        var size2 = storage.size(storagePath, execContext);
+        var size2 = storage.size(storagePath, dataContext);
         waitFor(TEST_TIMEOUT, size2);
         Assertions.assertEquals(dataSize, resultOf(size2));
     }
@@ -662,7 +667,7 @@ public class FileStorageReadWriteTest {
         random.nextBytes(originalBytes);
         originalContent.writeBytes(originalBytes);
 
-        var write = makeFile(storagePath, originalContent, storage, execContext);
+        var write = makeFile(storagePath, originalContent, storage, dataContext);
         waitFor(TEST_TIMEOUT, write);
 
         // request a million chunks - way more than needed
@@ -693,7 +698,7 @@ public class FileStorageReadWriteTest {
 
         // Create a reader and read using the mocked subscriber
 
-        var reader = storage.reader(storagePath, execContext);
+        var reader = storage.reader(storagePath, dataContext);
         reader.subscribe(subscriber);
 
         // onSubscribe should be received
@@ -714,22 +719,22 @@ public class FileStorageReadWriteTest {
     void testRead_subscribeLate() throws Exception {
 
         var storagePath = "some_file.txt";
-        var writeSignal = makeSmallFile(storagePath, storage, execContext);
+        var writeSignal = makeSmallFile(storagePath, storage, dataContext);
         waitFor(TEST_TIMEOUT, writeSignal);
 
         // Create a reader but do not subscribe to it
         // Reader should not try to access the file
 
-        var reader = storage.reader(storagePath, execContext);
+        var reader = storage.reader(storagePath, dataContext);
 
         // Use another reader to read the file - should be ok
-        var content = readFile(storagePath, storage, execContext);
+        var content = readFile(storagePath, storage, dataContext);
         waitFor(TEST_TIMEOUT, content);
         Assertions.assertTrue(resultOf(content).readableBytes() > 0);
         resultOf(content).release();
 
         // Delete the file
-        var rm = storage.rm(storagePath, false, execContext);
+        var rm = storage.rm(storagePath, false, dataContext);
         waitFor(TEST_TIMEOUT, rm);
 
         // Now try subscribing to the reader - should result in a storage request error
@@ -744,7 +749,7 @@ public class FileStorageReadWriteTest {
     void testRead_subscribeTwice() throws Exception {
 
         var storagePath = "some_file.txt";
-        var writeSignal = makeSmallFile(storagePath, storage, execContext);
+        var writeSignal = makeSmallFile(storagePath, storage, dataContext);
         waitFor(TEST_TIMEOUT, writeSignal);
 
         // Two subscribers that just record their subscriptions
@@ -762,7 +767,7 @@ public class FileStorageReadWriteTest {
         doAnswer(invocation -> subscription2.complete(invocation.getArgument(0)))
             .when(subscriber2).onSubscribe(any(Flow.Subscription.class));
 
-        var reader = storage.reader(storagePath, execContext);
+        var reader = storage.reader(storagePath, dataContext);
         reader.subscribe(subscriber1);
         reader.subscribe(subscriber2);
 
@@ -792,7 +797,7 @@ public class FileStorageReadWriteTest {
     void testRead_cancelImmediately() throws Exception {
 
         var storagePath = "some_file.txt";
-        var writeSignal = makeSmallFile(storagePath, storage, execContext);
+        var writeSignal = makeSmallFile(storagePath, storage, dataContext);
         waitFor(TEST_TIMEOUT, writeSignal);
 
         // A subscriber that cancels as soon as it receives onSubscribe
@@ -810,7 +815,7 @@ public class FileStorageReadWriteTest {
         // Read using the mocked subscriber
         // No error should be thrown as a result of the cancel
 
-        var reader = storage.reader(storagePath, execContext);
+        var reader = storage.reader(storagePath, dataContext);
         reader.subscribe(subscriber);
 
         // Expected sequence of calls into the subscriber
@@ -839,7 +844,7 @@ public class FileStorageReadWriteTest {
         random.nextBytes(originalBytes);
         originalContent.writeBytes(originalBytes);
 
-        var writeSignal = makeFile(storagePath, originalContent, storage, execContext);
+        var writeSignal = makeFile(storagePath, originalContent, storage, dataContext);
         waitFor(TEST_TIMEOUT, writeSignal);
 
         // A subscriber that will read one chunk and then cancel the subscription
@@ -864,7 +869,7 @@ public class FileStorageReadWriteTest {
 
         // Create a reader and read using the mocked subscriber
 
-        var reader = storage.reader(storagePath, execContext);
+        var reader = storage.reader(storagePath, dataContext);
         reader.subscribe(subscriber);
 
         // Expected sequence of calls into the subscriber
@@ -881,7 +886,7 @@ public class FileStorageReadWriteTest {
 
         // Now do a regular read and make sure the whole content comes back
 
-        var retryRead = readFile(storagePath, storage, execContext);
+        var retryRead = readFile(storagePath, storage, dataContext);
 
         waitFor(TEST_TIMEOUT, retryRead);
         var content = resultOf(retryRead);
@@ -907,7 +912,7 @@ public class FileStorageReadWriteTest {
         random.nextBytes(originalBytes);
         originalContent.writeBytes(originalBytes);
 
-        var writeSignal = makeFile(storagePath, originalContent, storage, execContext);
+        var writeSignal = makeFile(storagePath, originalContent, storage, dataContext);
         waitFor(TEST_TIMEOUT, writeSignal);
 
         // A subscriber that will read one chunk and then cancel the subscription
@@ -932,7 +937,7 @@ public class FileStorageReadWriteTest {
 
         // Create a reader and read using the mocked subscriber
 
-        var reader = storage.reader(storagePath, execContext);
+        var reader = storage.reader(storagePath, dataContext);
         reader.subscribe(subscriber);
 
         // Expected sequence of calls into the subscriber
@@ -950,11 +955,11 @@ public class FileStorageReadWriteTest {
 
         // Now delete the file
 
-        var rm = storage.rm(storagePath, false, execContext);
+        var rm = storage.rm(storagePath, false, dataContext);
 
         waitFor(TEST_TIMEOUT, rm);
 
-        var exists = storage.exists(storagePath, execContext);
+        var exists = storage.exists(storagePath, dataContext);
 
         waitFor(TEST_TIMEOUT, exists);
         Assertions.assertFalse(resultOf(exists));
