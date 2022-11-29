@@ -60,7 +60,7 @@ ext {
 
 
     // Plugins
-    aws_sdk_version = '1.12.267'
+    aws_sdk_version = '2.18.25'
     gcp_sdk_version = '2.6.1'
     gcp_sdk_http_client_version = '1.41.8'  // Force Google HTTP client version needed for compliance
 
