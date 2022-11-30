@@ -125,7 +125,20 @@ public class MetadataApiImpl {
 
         validateRequest(UPDATE_BATCH_METHOD, request);
 
-        return runWriteBatch(request, MetadataApiImpl::updateObject);
+        List<MetadataWriteRequest> requestsList = request.getRequestsList();
+
+        for (MetadataWriteRequest rq : requestsList) {
+            validateObjectType(rq.getObjectType());
+        }
+
+        List<TagHeader> tagHeaders = writeService.updateObjects(
+                request.getTenant(),
+                requestsList,
+                request.getBatchTagUpdatesList()
+        );
+        return MetadataWriteBatchResponse.newBuilder()
+                .addAllIds(tagHeaders)
+                .build();
     }
 
     private void validateObjectType(ObjectType objectType) {
