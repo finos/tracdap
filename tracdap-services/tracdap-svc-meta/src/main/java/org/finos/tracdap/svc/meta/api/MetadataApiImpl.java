@@ -28,10 +28,8 @@ import com.google.protobuf.Message;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.BiFunction;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.PUBLIC_WRITABLE_OBJECT_TYPES;
 import static org.finos.tracdap.svc.meta.api.TracMetadataApi.*;
@@ -163,7 +161,16 @@ public class MetadataApiImpl {
 
         validateRequest(UPDATE_BATCH_TAG_METHOD, request);
 
-        return runWriteBatch(request, MetadataApiImpl::updateTag);
+        List<MetadataWriteRequest> requestsList = request.getRequestsList();
+
+        List<TagHeader> tagHeaders = writeService.updateBatchTag(
+                request.getTenant(),
+                requestsList,
+                request.getBatchTagUpdatesList()
+        );
+        return MetadataWriteBatchResponse.newBuilder()
+                .addAllIds(tagHeaders)
+                .build();
     }
 
     TagHeader preallocateId(MetadataWriteRequest request) {
@@ -250,32 +257,6 @@ public class MetadataApiImpl {
         var objectVersion = request.getObjectVersion();
 
         return readService.loadLatestTag(tenant, objectType, objectId, objectVersion);
-    }
-
-    private MetadataWriteBatchResponse runWriteBatch(
-            MetadataWriteBatchRequest request,
-            BiFunction<MetadataApiImpl, MetadataWriteRequest, TagHeader> operation
-    ) {
-        List<TagUpdate> tags = request.getBatchTagUpdatesList();
-        List<TagHeader> tagHeaders = new ArrayList<>();
-
-        for (MetadataWriteRequest rawRequest : request.getRequestsList()) {
-            MetadataWriteRequest r = addTagsToRequest(rawRequest, tags);
-
-            TagHeader tagHeader = operation.apply(this, r);
-
-            tagHeaders.add(tagHeader);
-        }
-
-        MetadataWriteBatchResponse.Builder builder = MetadataWriteBatchResponse.newBuilder();
-        builder.addAllIds(tagHeaders);
-        return builder.build();
-    }
-
-    private MetadataWriteRequest addTagsToRequest(MetadataWriteRequest rawRequest, List<TagUpdate> tags) {
-        MetadataWriteRequest.Builder builder = MetadataWriteRequest.newBuilder(rawRequest);
-        builder.addAllTagUpdates(tags);
-        return builder.build();
     }
 
     private <TReq extends Message>

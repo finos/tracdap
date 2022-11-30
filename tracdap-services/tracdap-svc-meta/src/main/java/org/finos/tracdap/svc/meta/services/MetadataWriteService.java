@@ -51,7 +51,7 @@ public class MetadataWriteService {
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
 
-        Tag newTag = prepareObjectToCreate(definition, tagUpdates);
+        Tag newTag = prepareCreateObject(definition, tagUpdates);
 
         dal.saveNewObject(tenant, newTag);
 
@@ -68,7 +68,7 @@ public class MetadataWriteService {
             tagUpdates.addAll(batchTagUpdates);
 
             newTags.add(
-                prepareObjectToCreate(
+                prepareCreateObject(
                     request.getDefinition(),
                     tagUpdates
                 )
@@ -80,7 +80,7 @@ public class MetadataWriteService {
         return newTags.stream().map(Tag::getHeader).collect(Collectors.toList());
     }
 
-    private Tag prepareObjectToCreate(ObjectDefinition definition, List<TagUpdate> tagUpdates) {
+    private Tag prepareCreateObject(ObjectDefinition definition, List<TagUpdate> tagUpdates) {
         var objectId = UUID.randomUUID();
 
         var userInfo = AuthConstants.USER_INFO_KEY.get();
@@ -122,7 +122,7 @@ public class MetadataWriteService {
 
         var priorTag = dal.loadObject(tenant, priorVersion);
 
-        Tag newTag = prepareObjectToUpdate(userInfo, priorTag, definition, tagUpdates);
+        Tag newTag = prepareUpdateObject(userInfo, priorTag, definition, tagUpdates);
 
         dal.saveNewVersion(tenant, newTag);
 
@@ -148,7 +148,7 @@ public class MetadataWriteService {
             tagUpdates.addAll(batchTagUpdates);
 
             newTags.add(
-                    prepareObjectToUpdate(
+                    prepareUpdateObject(
                             userInfo,
                             priorTags.get(i),
                             r.getDefinition(),
@@ -162,7 +162,7 @@ public class MetadataWriteService {
         return newTags.stream().map(Tag::getHeader).collect(Collectors.toList());
     }
 
-    private Tag prepareObjectToUpdate(UserInfo userInfo, Tag priorTag, ObjectDefinition definition, List<TagUpdate> tagUpdates) {
+    private Tag prepareUpdateObject(UserInfo userInfo, Tag priorTag, ObjectDefinition definition, List<TagUpdate> tagUpdates) {
         // Validate version increment on the object
         validator.validateVersion(definition, priorTag.getDefinition());
 
@@ -199,13 +199,43 @@ public class MetadataWriteService {
 
         var priorTag = dal.loadObject(tenant, priorVersion);
 
-        return updateTag(tenant, priorTag, tagUpdates);
+        Tag newTag = prepareUpdateTag(priorTag, tagUpdates);
+
+        dal.saveNewTag(tenant, newTag);
+
+        return newTag.getHeader();
     }
 
-    private TagHeader updateTag(
-            String tenant, Tag priorTag,
-            List<TagUpdate> tagUpdates) {
+    public List<TagHeader> updateBatchTag(
+            String tenant,
+            List<MetadataWriteRequest> requests,
+            List<TagUpdate> batchTagUpdates) {
 
+        List<TagSelector> priorVersions = requests.stream()
+                .map(MetadataWriteRequest::getPriorVersion)
+                .collect(Collectors.toList());
+        var priorTags = dal.loadObjects(tenant, priorVersions);
+
+        List<Tag> newTags = new ArrayList<>();
+        for (int i = 0; i < requests.size(); i++) {
+            MetadataWriteRequest r = requests.get(i);
+            List<TagUpdate> tagUpdates = r.getTagUpdatesList();
+            tagUpdates.addAll(batchTagUpdates);
+
+            newTags.add(
+                    prepareUpdateTag(
+                            priorTags.get(i),
+                            tagUpdates
+                    )
+            );
+        }
+
+        dal.saveNewTags(tenant, newTags);
+
+        return newTags.stream().map(Tag::getHeader).collect(Collectors.toList());
+    }
+
+    private static Tag prepareUpdateTag(Tag priorTag, List<TagUpdate> tagUpdates) {
         var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
 
         var oldHeader = priorTag.getHeader();
@@ -220,10 +250,7 @@ public class MetadataWriteService {
                 .build();
 
         newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
-
-        dal.saveNewTag(tenant, newTag);
-
-        return newHeader;
+        return newTag;
     }
 
     public TagHeader preallocateId(String tenant, ObjectType objectType) {
