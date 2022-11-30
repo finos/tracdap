@@ -23,14 +23,14 @@ import org.slf4j.Logger;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
 
-public class StorageErrors {
+public abstract class StorageErrors {
 
     public enum ExplicitError {
 
@@ -78,7 +78,7 @@ public class StorageErrors {
 
             Map.entry(NO_SUCH_FILE_EXCEPTION, "File not found in storage layer: %s %s [%s]"),
             Map.entry(FILE_ALREADY_EXISTS_EXCEPTION, "File already exists in storage layer: %s %s [%s]"),
-            Map.entry(DIRECTORY_NOT_FOUND_EXCEPTION, "Directory is not empty in storage layer: %s %s [%s]"),
+            Map.entry(DIRECTORY_NOT_FOUND_EXCEPTION, "Directory not found in storage layer: %s %s [%s]"),
             Map.entry(NOT_DIRECTORY_EXCEPTION, "Path is not a directory in storage layer: %s %s [%s]"),
             Map.entry(ACCESS_DENIED_EXCEPTION, "Access denied in storage layer: %s %s [%s]"),
             Map.entry(SECURITY_EXCEPTION, "Access denied in storage layer: %s %s [%s]"),
@@ -115,40 +115,31 @@ public class StorageErrors {
 
             Map.entry(CHUNK_NOT_FULLY_WRITTEN, EStorageCommunication.class));
 
-    private final List<Map.Entry<Class<? extends Exception>, StorageErrors.ExplicitError>> exceptionClassMap;
     private final String storageKey;
     private final Logger log;
 
-    protected StorageErrors(
-            List<Map.Entry<Class<? extends Exception>, StorageErrors.ExplicitError>> exceptionClassMap,
-            String storageKey,
-            Logger log) {
+    protected StorageErrors(String storageKey, Logger log) {
 
-        this.exceptionClassMap = exceptionClassMap;
         this.storageKey = storageKey;
         this.log = log;
     }
 
+    protected abstract ExplicitError checkKnownExceptions(Throwable e);
+
     public ETrac handleException(Throwable e, String storagePath, String operationName) {
+
+        if (e instanceof CompletionException && e.getCause() != null)
+            e = e.getCause();
 
         // Error of type ETrac means the error is already handled
         if (e instanceof ETrac)
             return (ETrac) e;
 
-        // Look in the map of error types to see if e is an expected exception
-        for (var error : exceptionClassMap) {
+        var knownException = checkKnownExceptions(e);
 
-            var errorClass = error.getKey();
-
-            if (errorClass.isInstance(e)) {
-
-                var explicitError = error.getValue();
-                return exception(explicitError, e, storagePath, operationName);
-            }
-        }
-
-        // Last fallback - report an unknown error in the storage layer
-        return exception(UNKNOWN_ERROR, e, storagePath, operationName);
+        return knownException != null
+                ? exception(knownException, e, storagePath, operationName)
+                : exception(UNKNOWN_ERROR, e, storagePath, operationName);
     }
 
     public ETrac explicitError(ExplicitError error, String path, String operation) {

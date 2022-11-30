@@ -41,6 +41,22 @@ public class LocalStorageErrors extends StorageErrors {
 
     public LocalStorageErrors(String storageKey, Logger log) {
 
-        super(EXCEPTION_CLASS_MAP, storageKey, log);
+        super(storageKey, log);
+    }
+
+    @Override
+    protected ExplicitError checkKnownExceptions(Throwable e) {
+
+        // Look in the map of error types to see if e is an expected exception
+        for (var error : EXCEPTION_CLASS_MAP) {
+
+            var errorClass = error.getKey();
+
+            if (errorClass.isInstance(e)) {
+                return error.getValue();
+            }
+        }
+
+        return null;
     }
 }
