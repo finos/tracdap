@@ -16,12 +16,14 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
+import org.finos.tracdap.common.concurrent.ExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
+import org.finos.tracdap.common.storage.StorageReadWriteTestSuite;
+
 import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import org.apache.arrow.memory.RootAllocator;
-import org.finos.tracdap.common.concurrent.ExecutionContext;
-import org.finos.tracdap.common.data.DataContext;
-import org.finos.tracdap.common.storage.StorageOperationsTestSuite;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +37,7 @@ import java.util.Random;
 
 @Tag("integration")
 @Tag("int-storage")
-public class S3StorageOperationsTest extends StorageOperationsTestSuite {
+public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
 
     static Properties storageProps;
     static String testDir;
