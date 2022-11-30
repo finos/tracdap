@@ -42,17 +42,6 @@ public class LocalFileStorage implements IFileStorage {
 
     public static final String CONFIG_ROOT_PATH = "rootPath";
 
-    private static final String BACKSLASH = "/";
-
-    private static final String EXISTS_OPERATION = "exists";
-    private static final String SIZE_OPERATION = "size";
-    private static final String STAT_OPERATION = "stat";
-    private static final String LS_OPERATION = "ls";
-    private static final String MKDIR_OPERATION = "mkdir";
-    private static final String RM_OPERATION = "rm";
-    static final String WRITE_OPERATION = "write";
-    static final String READ_OPERATION = "read";
-
     private final Logger log = LoggerFactory.getLogger(getClass());
     private final StorageErrors errors;
 

@@ -27,6 +27,18 @@ import java.util.concurrent.Flow;
 
 public interface IFileStorage {
 
+    String EXISTS_OPERATION = "exists";
+    String SIZE_OPERATION = "size";
+    String STAT_OPERATION = "stat";
+    String LS_OPERATION = "ls";
+    String MKDIR_OPERATION = "mkdir";
+    String RM_OPERATION = "rm";
+    String WRITE_OPERATION = "write";
+    String READ_OPERATION = "read";
+
+    String BACKSLASH = "/";
+
+
     CompletionStage<Boolean> exists(String storagePath, IExecutionContext execContext);
 
     CompletionStage<Long> size(String storagePath, IExecutionContext execContext);
