@@ -81,14 +81,7 @@ public class MetadataApiImpl {
     TagHeader createObject(MetadataWriteRequest request) {
 
         validateRequest(CREATE_OBJECT_METHOD, request);
-
-        var objectType = request.getObjectType();
-
-        if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
-            var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
-            var status = Status.PERMISSION_DENIED.withDescription(message);
-            throw status.asRuntimeException();
-        }
+        validateObjectType(request.getObjectType());
 
         return writeService.createObject(
                 request.getTenant(),
@@ -100,20 +93,26 @@ public class MetadataApiImpl {
 
         validateRequest(CREATE_BATCH_METHOD, request);
 
-        return runWriteBatch(request, MetadataApiImpl::createObject);
+        List<MetadataWriteRequest> requestsList = request.getRequestsList();
+
+        for (MetadataWriteRequest rq : requestsList) {
+            validateObjectType(rq.getObjectType());
+        }
+
+        List<TagHeader> tagHeaders = writeService.createObjects(
+                request.getTenant(),
+                requestsList,
+                request.getBatchTagUpdatesList()
+        );
+        return MetadataWriteBatchResponse.newBuilder()
+                .addAllIds(tagHeaders)
+                .build();
     }
 
     TagHeader updateObject(MetadataWriteRequest request) {
 
         validateRequest(UPDATE_OBJECT_METHOD, request);
-
-        var objectType = request.getObjectType();
-
-        if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
-            var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
-            var status = Status.PERMISSION_DENIED.withDescription(message);
-            throw status.asRuntimeException();
-        }
+        validateObjectType(request.getObjectType());
 
         return writeService.updateObject(
                 request.getTenant(),
@@ -127,6 +126,14 @@ public class MetadataApiImpl {
         validateRequest(UPDATE_BATCH_METHOD, request);
 
         return runWriteBatch(request, MetadataApiImpl::updateObject);
+    }
+
+    private void validateObjectType(ObjectType objectType) {
+        if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
+            var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
+            var status = Status.PERMISSION_DENIED.withDescription(message);
+            throw status.asRuntimeException();
+        }
     }
 
     TagHeader updateTag(MetadataWriteRequest request) {

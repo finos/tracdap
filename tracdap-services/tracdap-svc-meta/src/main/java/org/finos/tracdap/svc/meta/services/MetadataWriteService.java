@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.svc.meta.services;
 
+import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.auth.AuthConstants;
 import org.finos.tracdap.common.auth.UserInfo;
 import org.finos.tracdap.metadata.*;
@@ -27,8 +28,10 @@ import org.finos.tracdap.svc.meta.dal.IMetadataDal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.OBJECT_FIRST_VERSION;
 import static org.finos.tracdap.common.metadata.MetadataConstants.TAG_FIRST_VERSION;
@@ -48,6 +51,37 @@ public class MetadataWriteService {
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
 
+        Tag newTag = prepareObjectToCreate(definition, tagUpdates);
+
+        dal.saveNewObject(tenant, newTag);
+
+        return newTag.getHeader();
+    }
+
+    public List<TagHeader> createObjects(
+            String tenant,
+            List<MetadataWriteRequest> requests,
+            List<TagUpdate> batchTagUpdates) {
+        List<Tag> newTags = new ArrayList<>();
+
+        for (MetadataWriteRequest request : requests) {
+            List<TagUpdate> tagUpdates = request.getTagUpdatesList();
+            tagUpdates.addAll(batchTagUpdates);
+
+            newTags.add(
+                prepareObjectToCreate(
+                    request.getDefinition(),
+                    tagUpdates
+                )
+            );
+        }
+
+        dal.saveNewObjects(tenant, newTags);
+
+        return newTags.stream().map(Tag::getHeader).collect(Collectors.toList());
+    }
+
+    private Tag prepareObjectToCreate(ObjectDefinition definition, List<TagUpdate> tagUpdates) {
         var objectId = UUID.randomUUID();
 
         var userInfo = AuthConstants.USER_INFO_KEY.get();
@@ -77,9 +111,7 @@ public class MetadataWriteService {
         newTag = TagUpdateService.applyTagUpdates(newTag, createAttrs);
         newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
 
-        dal.saveNewObject(tenant, newTag);
-
-        return newHeader;
+        return newTag;
     }
 
 
