@@ -45,6 +45,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -301,7 +302,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         }
     }
 
-    void prepareAuth() {
+    void prepareAuth() throws URISyntaxException {
 
         log.info("Running auth tool to set up root authentication keys...");
 
@@ -320,7 +321,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         var configMgr = new ConfigManager(
                 platformConfigUrl.toString(),
-                Paths.get(platformConfigUrl.toString()).getParent(),
+                Paths.get(platformConfigUrl.toURI()).getParent(),
                 pluginMgr, secretKey);
 
         configMgr.prepareSecrets();
