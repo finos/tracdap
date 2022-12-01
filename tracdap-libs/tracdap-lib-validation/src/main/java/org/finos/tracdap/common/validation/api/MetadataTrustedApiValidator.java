@@ -20,7 +20,6 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
-import org.finos.tracdap.common.validation.static_.CommonValidators;
 
 
 @Validator(type = ValidationType.STATIC, serviceFile = MetadataTrusted.class, serviceName = TrustedMetadataApiGrpc.SERVICE_NAME)
@@ -37,7 +36,12 @@ public class MetadataTrustedApiValidator {
 
     @Validator(method = "createObject")
     public static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.createObject(msg, ctx, MetadataApiValidator.TRUSTED_API);
+        return MetadataApiValidator.createObject(msg, ctx, MetadataApiValidator.TRUSTED_API, true);
+    }
+
+    @Validator(method = "createBatch")
+    public static ValidationContext createBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.createBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
     }
 
     @Validator(method = "updateObject")

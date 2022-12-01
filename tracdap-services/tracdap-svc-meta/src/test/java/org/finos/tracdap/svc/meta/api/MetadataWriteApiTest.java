@@ -33,6 +33,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -306,6 +308,87 @@ abstract class MetadataWriteApiTest {
         assertDoesNotThrow(() -> trustedApi.createObject(writeRequest));
     }
 
+    // -----------------------------------------------------------------------------------------------------------------
+    // CREATE BATCH
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+            names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
+    void createBatch_trustedTypesOk(ObjectType objectType) {
+
+        createBatch_ok(objectType, request -> trustedApi.createBatch(request));
+    }
+
+    void createBatch_ok(ObjectType objectType, Function<MetadataWriteBatchRequest, MetadataWriteBatchResponse> saveApiCall) {
+        List<MetadataWriteRequest> requests = new ArrayList<>();
+        List<Tag> tagsToSave = new ArrayList<>();
+
+        for (int i = 0; i < 7; i++) {
+            var objToSave = TestData.dummyDefinitionForType(objectType);
+            var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
+            var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+
+            requests.add(
+                    MetadataWriteRequest.newBuilder()
+                    .setObjectType(objectType)
+                    .setDefinition(objToSave)
+                    .addAllTagUpdates(tagUpdates)
+                    .build()
+                    );
+            tagsToSave.add(tagToSave);
+        }
+
+        var writeRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addAllRequests(requests)
+                .build();
+
+
+        var tagHeaders = saveApiCall.apply(writeRequest).getIdsList();
+        assertEquals(7, tagHeaders.size());
+
+        for (int i = 0; i < tagHeaders.size(); i++) {
+            var tagHeader = tagHeaders.get(i);
+            var tagToSave = tagsToSave.get(i);
+
+            var objectId = UUID.fromString(tagHeader.getObjectId());
+
+            assertEquals(objectType, tagHeader.getObjectType());
+            assertNotNull(objectId);
+            assertNotEquals(new UUID(0, 0), objectId);
+            assertEquals(1, tagHeader.getObjectVersion());
+            assertEquals(1, tagHeader.getTagVersion());
+
+            var expectedTag = tagToSave.toBuilder()
+                    .setHeader(tagHeader)
+                    .build();
+
+            var readRequest = MetadataReadRequest.newBuilder()
+                    .setTenant(TEST_TENANT)
+                    .setSelector(TagSelector.newBuilder()
+                            .setObjectType(objectType)
+                            .setObjectId(objectId.toString())
+                            .setObjectVersion(1)
+                            .setTagVersion(1))
+                    .build();
+
+            var tagFromStore = readApi.readObject(readRequest);
+
+            assertEquals(expectedTag.getHeader(), tagFromStore.getHeader());
+            assertEquals(expectedTag.getDefinition(), tagFromStore.getDefinition());
+
+            for (var attr : expectedTag.getAttrsMap().keySet())
+                assertEquals(expectedTag.getAttrsOrThrow(attr), tagFromStore.getAttrsOrThrow(attr));
+
+            assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));
+            assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_USER_ID));
+            assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_USER_NAME));
+            assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_UPDATE_TIME));
+            assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_ID));
+            assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_NAME));
+        }
+    }
 
     // -----------------------------------------------------------------------------------------------------------------
     // UPDATE OBJECT

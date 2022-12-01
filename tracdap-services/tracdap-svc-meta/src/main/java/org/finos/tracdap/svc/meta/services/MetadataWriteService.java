@@ -64,7 +64,7 @@ public class MetadataWriteService {
             List<TagUpdate> batchTagUpdates) {
         List<Tag> newTags = new ArrayList<>();
         for (MetadataWriteRequest request : requests) {
-            List<TagUpdate> tagUpdates = request.getTagUpdatesList();
+            List<TagUpdate> tagUpdates = new ArrayList<>(request.getTagUpdatesList());
             tagUpdates.addAll(batchTagUpdates);
 
             newTags.add(
