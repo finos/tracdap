@@ -52,10 +52,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 
@@ -255,13 +252,25 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
         // Substitutions are used by template config files in test resources
         // But it is harmless to apply them to fully defined config files as well
-        var substitutions = Map.of(
+
+        // The substitutions have some special handling in PlatformTest to set them up
+        var staticSubstitutions = Map.of(
                 "${TRAC_DIR}", tracDir.toString().replace("\\", "\\\\"),
                 "${TRAC_STORAGE_DIR}", tracStorageDir.toString().replace("\\", "\\\\"),
-                "${STORAGE_FORMAT}", storageFormat,
+                "${TRAC_STORAGE_FORMAT}", storageFormat,
                 "${TRAC_EXEC_DIR}", tracExecDir.toString().replace("\\", "\\\\"),
                 "${TRAC_LOCAL_REPO}", tracRepoDir.toString(),
                 "${TRAC_GIT_REPO}", currentGitOrigin);
+
+        var substitutions = new HashMap<>(staticSubstitutions);
+
+        // Also allow developers to put whatever substitutions they need into the environment
+        for (var envVar : System.getenv().entrySet()) {
+            if (envVar.getKey().startsWith("TRAC_") && !substitutions.containsKey(envVar.getKey())) {
+                var key = String.format("${%s}", envVar.getKey());
+                substitutions.put(key, envVar.getValue());
+            }
+        }
 
         platformConfigUrl = ConfigHelpers.prepareConfig(
                 testConfig, tracDir,
