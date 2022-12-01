@@ -320,6 +320,47 @@ abstract class MetadataWriteApiTest {
         createBatch_ok(objectType, request -> trustedApi.createBatch(request));
     }
 
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
+            names = {"SCHEMA", "FLOW", "CUSTOM"})
+    void createBatch_publicTypesOk(ObjectType objectType) {
+
+        // All object types should be either in this test, or publicTypesNotAllowed
+
+        createBatch_ok(objectType, request -> publicApi.createBatch(request));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+            names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "SCHEMA", "FLOW", "CUSTOM"})
+    void createBatch_publicTypesNotAllowed(ObjectType objectType) {
+
+        List<MetadataWriteRequest> requests = new ArrayList<>();
+
+        for (int i = 0; i < 7; i++) {
+            var objToSave = TestData.dummyDefinitionForType(objectType);
+            var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
+            var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+
+            requests.add(
+                    MetadataWriteRequest.newBuilder()
+                            .setObjectType(objectType)
+                            .setDefinition(objToSave)
+                            .addAllTagUpdates(tagUpdates)
+                            .build()
+            );
+        }
+
+        var writeRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addAllRequests(requests)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createBatch(writeRequest));
+        assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
+    }
+
     void createBatch_ok(ObjectType objectType, Function<MetadataWriteBatchRequest, MetadataWriteBatchResponse> saveApiCall) {
         List<MetadataWriteRequest> requests = new ArrayList<>();
         List<Tag> tagsToSave = new ArrayList<>();
@@ -390,6 +431,171 @@ abstract class MetadataWriteApiTest {
         }
     }
 
+    @Test
+    void createBatch_inconsistentType() {
+
+        // This test is about sending an invalid request, i.e. the payload does not match the write request
+
+        // Make sure both types are allowed on the public API, so we don't get permission denied
+
+        List<MetadataWriteRequest> requests = new ArrayList<>();
+
+        for (int i = 0; i < 7; i++) {
+            var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
+            var tagToSave = TestData.dummyTag(objToSave, TestData.NO_HEADER);
+            var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+
+            // Request to save a MODEL, even though the definition is for DATA
+            requests.add(
+                MetadataWriteRequest.newBuilder()
+                    .setObjectType(ObjectType.FLOW)
+                    .setDefinition(objToSave)
+                    .addAllTagUpdates(tagUpdates)
+                    .build()
+            );
+        }
+
+        var writeRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addAllRequests(requests)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createBatch(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.createBatch(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
+    }
+
+    @Test
+    void createBatch_invalidContent() {
+        List<MetadataWriteRequest> requests = new ArrayList<>();
+
+        for (int i = 0; i < 7; i++) {
+            var validFlow = TestData.dummyFlowDef();
+
+            // Create a flow with an invalid node graph, this should get picked up by the validation layer
+
+            var brokenEdges = validFlow.getFlow().toBuilder()
+                    .addEdges(FlowEdge.newBuilder()
+                            .setTarget(FlowSocket.newBuilder().setNode("another_absent_node").setSocket("missing_socket"))
+                            .setSource(FlowSocket.newBuilder().setNode("node_totally_not_present")))
+                    .build();
+
+            var invalidFlow = validFlow.toBuilder()
+                    .setFlow(brokenEdges)
+                    .build();
+
+            var tagToSave = TestData.dummyTag(invalidFlow, TestData.NO_HEADER);
+            var tagUpdates = TestData.tagUpdatesForAttrs(tagToSave.getAttrsMap());
+
+            // Try to save the flow with a broken graph, should fail validation
+            requests.add(
+                    MetadataWriteRequest.newBuilder()
+                    .setObjectType(ObjectType.FLOW)
+                    .setDefinition(invalidFlow)
+                    .addAllTagUpdates(tagUpdates)
+                    .build()
+            );
+        }
+
+        var writeRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addAllRequests(requests)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createBatch(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.createBatch(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
+    }
+
+    @Test
+    void createBatch_invalidAttrs() {
+        List<MetadataWriteRequest> requests = new ArrayList<>();
+
+        for (int i = 0; i < 7; i++) {
+
+            var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
+            var validTag = TestData.dummyTag(objToSave, TestData.NO_HEADER);
+
+            var invalidTag = validTag.toBuilder()
+                    .putAttrs("${escape_key}", MetadataCodec.encodeValue(1.0))
+                    .build();
+
+            var tagUpdates = TestData.tagUpdatesForAttrs(invalidTag.getAttrsMap());
+
+            // Request to save a MODEL, even though the definition is for DATA
+            requests.add(
+                    MetadataWriteRequest.newBuilder()
+                    .setObjectType(ObjectType.CUSTOM)
+                    .setDefinition(objToSave)
+                    .addAllTagUpdates(tagUpdates)
+                    .build()
+            );
+        }
+
+        var writeRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addAllRequests(requests)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createBatch(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+
+        // noinspection ResultOfMethodCallIgnored
+        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.createBatch(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
+    }
+
+    @Test
+    void createBatch_reservedAttrs() {
+        List<MetadataWriteRequest> requests = new ArrayList<>();
+
+        for (int i = 0; i < 7; i++) {
+            var objToSave = TestData.dummyDefinitionForType(ObjectType.CUSTOM);
+            var validTag = TestData.dummyTag(objToSave, TestData.NO_HEADER);
+
+            var invalidTag = validTag.toBuilder()
+                    .putAttrs("trac_anything_reserved", MetadataCodec.encodeValue(1.0))
+                    .build();
+
+            var tagUpdates = TestData.tagUpdatesForAttrs(invalidTag.getAttrsMap());
+
+            // Request to save a MODEL, even though the definition is for DATA
+            requests.add(
+                    MetadataWriteRequest.newBuilder()
+                    .setObjectType(ObjectType.CUSTOM)
+                    .setDefinition(objToSave)
+                    .addAllTagUpdates(tagUpdates)
+                    .build()
+            );
+        }
+
+        var writeRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addAllRequests(requests)
+                .build();
+
+        // Setting reserved attributes is allowed through the trusted API but not the public API
+
+        // At present this is enforced through validation, so it should come back as INVALID_ATTRIBUTE
+        // In the future if public/trusted APIs are unified and reserved attrs are managed with permissions,
+        // Then the result would be PERMISSION_DENIED instead
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createBatch(writeRequest));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+
+        assertDoesNotThrow(() -> trustedApi.createBatch(writeRequest));
+    }
+    
     // -----------------------------------------------------------------------------------------------------------------
     // UPDATE OBJECT
     // -----------------------------------------------------------------------------------------------------------------
