@@ -73,6 +73,9 @@ public class CsvDecoder extends BufferDecoder {
     @Override
     public void onBuffer(ByteBuf buffer) {
 
+        if (log.isTraceEnabled())
+            log.trace("CSV DECODER: onBuffer()");
+
         // Sanity check, should never happen
         if (isDone() || this.buffer != null) {
             var error = new ETracInternal("CSV data parsed twice (this is a bug)");
@@ -138,6 +141,10 @@ public class CsvDecoder extends BufferDecoder {
     public void onError(Throwable error) {
 
         try {
+
+            if (log.isTraceEnabled())
+                log.trace("CSV DECODER: onError()");
+
             markAsDone();
             consumer().onError(error);
         }

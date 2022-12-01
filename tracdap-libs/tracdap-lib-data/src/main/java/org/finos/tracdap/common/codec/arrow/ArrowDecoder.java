@@ -51,6 +51,9 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
     @Override
     public void onBuffer(ByteBuf buffer) {
 
+        if (log.isTraceEnabled())
+            log.trace("ARROW DECODER: onBuffer()");
+
         if (buffer.readableBytes() == 0) {
             var error = new EDataCorruption("Arrow data file is empty");
             log.error(error.getMessage(), error);
@@ -81,6 +84,10 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
     public void onError(Throwable error) {
 
         try  {
+
+            if (log.isTraceEnabled())
+                log.trace("ARROW DECODER: onError()");
+
             markAsDone();
             consumer().onError(error);
         }

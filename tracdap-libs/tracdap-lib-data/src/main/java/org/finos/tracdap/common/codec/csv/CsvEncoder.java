@@ -54,6 +54,9 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
 
         try {
 
+            if (log.isTraceEnabled())
+                log.trace("CSV ENCODER: onStart()");
+
             consumer().onStart();
 
             this.root = root;
@@ -91,6 +94,9 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
 
         try {
 
+            if (log.isTraceEnabled())
+                log.trace("CSV ENCODER: onNext()");
+
             var nRows = root.getRowCount();
             var nCols = actualSchema.getFields().size();
 
@@ -123,6 +129,9 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
 
         try {
 
+            if (log.isTraceEnabled())
+                log.trace("CSV ENCODER: onComplete()");
+
             // Tell Jackson to end the main array of records
             generator.writeEndArray();
 
@@ -152,6 +161,10 @@ public class CsvEncoder extends StreamingEncoder implements AutoCloseable {
     public void onError(Throwable error) {
 
         try {
+
+            if (log.isTraceEnabled())
+                log.trace("CSV ENCODER: onError()");
+
             markAsDone();
             consumer().onError(error);
         }

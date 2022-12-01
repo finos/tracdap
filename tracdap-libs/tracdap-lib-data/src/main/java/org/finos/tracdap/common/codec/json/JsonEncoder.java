@@ -52,6 +52,9 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
 
         try {
 
+            if (log.isTraceEnabled())
+                log.trace("JSON ENCODER: onStart()");
+
             consumer().onStart();
 
             this.root = root;
@@ -80,6 +83,9 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
     public void onNext() {
 
         try {
+
+            if (log.isTraceEnabled())
+                log.trace("JSON ENCODER: onNext()");
 
             var nRows = root.getRowCount();
             var nCols = arrowSchema.getFields().size();
@@ -116,6 +122,9 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
 
         try {
 
+            if (log.isTraceEnabled())
+                log.trace("JSON ENCODER: onComplete()");
+
             // Tell Jackson to end the main array of records
             generator.writeEndArray();
 
@@ -146,6 +155,10 @@ public class JsonEncoder extends StreamingEncoder implements AutoCloseable {
     public void onError(Throwable error) {
 
         try {
+
+            if (log.isTraceEnabled())
+                log.trace("JSON ENCODER: onError()");
+
             markAsDone();
             consumer().onError(error);
         }
