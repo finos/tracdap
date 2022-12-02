@@ -118,7 +118,14 @@ public class TracDataService extends CommonServiceBase {
             var channelType = NioServerSocketChannel.class;
             var clientChannelType = NioSocketChannel.class;
 
-            var serviceThreads = Runtime.getRuntime().availableProcessors() * 2;
+            // In an ideal setup, all processing is async on the EL with streaming data chunks
+            // So we want 1 EL per core with 1 core free for OS / other tasks
+            // Minimum of 2 ELs in the case of a single-core or dual-core host
+            // Some storage plugins may not allow this pattern, in which case worker threads may be needed
+            // This setting should probably be a default, with the option override in config
+
+            var serviceThreads = Math.max(Runtime.getRuntime().availableProcessors() - 1, 2);
+
             serviceGroup = new NioEventLoopGroup(serviceThreads, new DefaultThreadFactory("data-svc"));
             bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("data-boss"));
 
