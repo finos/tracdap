@@ -152,12 +152,12 @@ public class MetadataApiValidator {
     @Validator(method = "updateObject")
     public static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        return updateObject(msg, ctx, PUBLIC_API);
+        return updateObject(msg, ctx, PUBLIC_API, true);
     }
 
-    static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust) {
+    static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust, boolean tenantRequired) {
 
-        ctx = createOrUpdate(ctx, true, apiTrust, true);
+        ctx = createOrUpdate(ctx, true, apiTrust, tenantRequired);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::required)
@@ -170,6 +170,33 @@ public class MetadataApiValidator {
                 .apply(CommonValidators::required)
                 .apply(ObjectValidator::objectType, ObjectDefinition.class, msg.getObjectType())
                 .applyRegistered()
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "updateBatch")
+    public static ValidationContext updateBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+
+        return updateBatch(msg, ctx, PUBLIC_API);
+    }
+
+    static ValidationContext updateBatch(MetadataWriteBatchRequest msg, ValidationContext ctx, boolean apiTrust) {
+        ctx = ctx.push(BWR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.pushRepeated(BWR_REQUESTS)
+                .apply(CommonValidators::listNotEmpty)
+                .applyRepeated((MetadataWriteRequest r, ValidationContext c) ->
+                        MetadataApiValidator.updateObject(r, c, apiTrust, false), MetadataWriteRequest.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(BWR_BATCH_TAG_UPDATES)
+                .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                // Only allow reserved attrs for requests on the trusted API
+                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, (apiTrust == TRUSTED_API))
                 .pop();
 
         return ctx;

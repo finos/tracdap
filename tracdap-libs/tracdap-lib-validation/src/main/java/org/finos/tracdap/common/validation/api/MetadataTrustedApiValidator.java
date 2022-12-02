@@ -46,7 +46,12 @@ public class MetadataTrustedApiValidator {
 
     @Validator(method = "updateObject")
     public static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.updateObject(msg, ctx, MetadataApiValidator.TRUSTED_API);
+        return MetadataApiValidator.updateObject(msg, ctx, MetadataApiValidator.TRUSTED_API, true);
+    }
+
+    @Validator(method = "updateBatch")
+    public static ValidationContext updateBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.updateBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
     }
 
     @Validator(method = "updateTag")

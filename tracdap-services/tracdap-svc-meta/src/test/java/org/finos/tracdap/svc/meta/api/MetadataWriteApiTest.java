@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.finos.tracdap.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -1089,6 +1090,156 @@ abstract class MetadataWriteApiTest {
         assertDoesNotThrow(() -> trustedApi.updateObject(v2WriteRequest));
     }
 
+    // -----------------------------------------------------------------------------------------------------------------
+    // UPDATE BATCH
+    // -----------------------------------------------------------------------------------------------------------------
+
+    // Versioned types, as listed in MetadataConstants.VERSIONED_OBJECT_TYPES
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
+            names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
+    void updateBatch_trustedTypesOk(ObjectType objectType) {
+
+        updateBatch_ok(objectType, request -> trustedApi.updateBatch(request));
+    }
+
+    // Versioned types that are also publicly writable
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
+            names = {"SCHEMA", "CUSTOM"})
+    void updateBatch_publicTypesOk(ObjectType objectType) {
+
+        updateBatch_ok(objectType, request -> publicApi.updateBatch(request));
+    }
+
+    // Versioned types that are not publicly writable
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
+            names = {"DATA", "FILE", "STORAGE"})
+    void updateBatch_publicTypesNotAllowed(ObjectType objectType) {
+        List<MetadataWriteRequest> requests = new ArrayList<>();
+
+        for (int i = 0; i < 7; i++) {
+            var v1SavedTag = updateObject_prepareV1(objectType);
+            var v1Selector = selectorForTag(v1SavedTag);
+
+            var v2Obj = TestData.dummyVersionForType(v1SavedTag.getDefinition());
+
+            requests.add(
+                    MetadataWriteRequest.newBuilder()
+                    .setObjectType(objectType)
+                    .setPriorVersion(v1Selector)
+                    .setDefinition(v2Obj)
+                    .build()
+            );
+        }
+
+        var v2WriteRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addAllRequests(requests)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateBatch(v2WriteRequest));
+        assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
+    }
+
+    void updateBatch_ok(ObjectType objectType, Function<MetadataWriteBatchRequest, MetadataWriteBatchResponse> saveApiCall) {
+        class RequestData {
+            MetadataWriteRequest writeRequest;
+            UUID v1ObjectId;
+            ObjectDefinition v2Obj;
+            Tag v1SavedTag;
+            String v2NewAttrName;
+            Value v2NewAttrValue;
+
+        }
+        List<RequestData> requests = new ArrayList<>();
+
+        for (int i = 0; i < 7; i++) {
+            var r = new RequestData();
+
+            r.v1SavedTag = updateObject_prepareV1(objectType);
+            var v1Selector = selectorForTag(r.v1SavedTag);
+            r.v1ObjectId = UUID.fromString(r.v1SavedTag.getHeader().getObjectId());
+
+            r.v2Obj = TestData.dummyVersionForType(r.v1SavedTag.getDefinition());
+
+            r.v2NewAttrName = "update_batch_v2_attr_" + objectType.name();
+            r.v2NewAttrValue = MetadataCodec.encodeValue(1.0);
+            var v2AttrUpdate = TagUpdate.newBuilder()
+                    .setAttrName(r.v2NewAttrName)
+                    .setValue(r.v2NewAttrValue)
+                    .build();
+
+            r.writeRequest = MetadataWriteRequest.newBuilder()
+                            .setObjectType(objectType)
+                            .setPriorVersion(v1Selector)
+                            .setDefinition(r.v2Obj)
+                            .addTagUpdates(v2AttrUpdate)
+                            .build();
+            requests.add(r);
+        }
+
+        var updateRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addAllRequests(
+                        requests.stream().map(r -> r.writeRequest).collect(Collectors.toList())
+                )
+                .build();
+
+        var v2TagHeaders = saveApiCall.apply(updateRequest).getIdsList();
+
+        assertEquals(7, v2TagHeaders.size());
+
+        for (int i = 0; i < v2TagHeaders.size(); i++) {
+            var v2TagHeader = v2TagHeaders.get(i);
+            var r = requests.get(i);
+
+            var v2ObjectId = UUID.fromString(v2TagHeader.getObjectId());
+
+            assertEquals(r.v1ObjectId, v2ObjectId);
+            assertEquals(2, v2TagHeader.getObjectVersion());
+            assertEquals(1, v2TagHeader.getTagVersion());
+
+            var expectedTag = Tag.newBuilder()
+                    .setHeader(v2TagHeader)
+                    .setDefinition(r.v2Obj)
+                    .putAllAttrs(r.v1SavedTag.getAttrsMap())
+                    .putAttrs(r.v2NewAttrName, r.v2NewAttrValue)
+                    .build();
+
+            var readRequest = MetadataReadRequest.newBuilder()
+                    .setTenant(TEST_TENANT)
+                    .setSelector(TagSelector.newBuilder()
+                            .setObjectType(objectType)
+                            .setObjectId(v2ObjectId.toString())
+                            .setObjectVersion(2)
+                            .setTagVersion(1))
+                    .build();
+
+            var tagFromStore = readApi.readObject(readRequest);
+
+            assertEquals(expectedTag.getHeader(), tagFromStore.getHeader());
+            assertEquals(expectedTag.getDefinition(), tagFromStore.getDefinition());
+
+            for (var attr : expectedTag.getAttrsMap().keySet()) {
+
+                // trac_update_  attrs are set on the original tag and changed by the update operation
+                if (attr.startsWith("trac_update_"))
+                    continue;
+
+                assertEquals(expectedTag.getAttrsOrThrow(attr), tagFromStore.getAttrsOrThrow(attr));
+            }
+
+            assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));
+            assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_USER_ID));
+            assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_USER_NAME));
+            assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_UPDATE_TIME));
+            assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_ID));
+            assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_NAME));
+        }
+    }
 
     // -----------------------------------------------------------------------------------------------------------------
     // UPDATE TAG
