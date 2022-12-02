@@ -1651,6 +1651,153 @@ abstract class MetadataWriteApiTest {
         assertDoesNotThrow(() -> trustedApi.updateTag(t2WriteRequest));
     }
 
+    // -----------------------------------------------------------------------------------------------------------------
+    // UPDATE BATCH TAG
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @ParameterizedTest
+    @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
+            names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
+    void updateBatchTag_AllTypesOk(ObjectType objectType) {
+        class RequestData {
+            MetadataWriteRequest writeRequest;
+
+            UUID v1ObjectId;
+            Tag v1SavedTag;
+
+            String t2AttrName;
+            TagUpdate t2Update;
+            public Tag t2SavedTag;
+            TagSelector t2Selector;
+
+            public String t3AttrName;
+            public MetadataWriteRequest t3WriteRequest;
+            public TagUpdate t3Update;
+
+        }
+        List<RequestData> requests = new ArrayList<>();
+
+        for (int i = 0; i < 7; i++) {
+            var r = new RequestData();
+
+            r.v1SavedTag = updateObject_prepareV1(objectType);
+            var v1Selector = selectorForTag(r.v1SavedTag);
+            r.v1ObjectId = UUID.fromString(r.v1SavedTag.getHeader().getObjectId());
+
+            // Write tag update via the trusted API
+
+            r.t2AttrName = "extra_attr_v2";
+            r.t2Update = TagUpdate.newBuilder()
+                    .setAttrName("extra_attr_v2")
+                    .setValue(MetadataCodec.encodeValue("First extra attr"))
+                    .build();
+
+            r.writeRequest = MetadataWriteRequest.newBuilder()
+                    .setObjectType(objectType)
+                    .setPriorVersion(v1Selector)
+                    .addTagUpdates(r.t2Update)
+                    .build();
+
+            requests.add(r);
+        }
+
+        var t2WriteRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addAllRequests(
+                        requests.stream().map(r -> r.writeRequest).collect(Collectors.toList())
+                )
+                .build();
+
+        var t2headers = trustedApi.updateBatchTag(t2WriteRequest).getIdsList();
+
+        assertEquals(7, t2headers.size());
+
+        for (int i = 0; i < 7; i++) {
+            var r = requests.get(i);
+            var t2header = t2headers.get(i);
+
+            assertEquals(objectType, t2header.getObjectType());
+            assertEquals(r.v1ObjectId, UUID.fromString(t2header.getObjectId()));
+            assertEquals(1, t2header.getObjectVersion());
+            assertEquals(2, t2header.getTagVersion());
+
+            var t2ExpectedTag = r.v1SavedTag.toBuilder()
+                    .setHeader(t2header)
+                    .putAttrs(r.t2AttrName, r.t2Update.getValue())
+                    .build();
+
+            var t2MetadataReadRequest = MetadataReadRequest.newBuilder()
+                    .setTenant(TEST_TENANT)
+                    .setSelector(TagSelector.newBuilder()
+                            .setObjectType(objectType)
+                            .setObjectId(r.v1ObjectId.toString())
+                            .setObjectVersion(1)
+                            .setTagVersion(2))
+                    .build();
+
+            r.t2SavedTag = readApi.readObject(t2MetadataReadRequest);
+            r.t2Selector = selectorForTag(r.t2SavedTag);
+
+            assertEquals(t2ExpectedTag, r.t2SavedTag);
+        }
+
+        // Write tag update via the public API
+        for (int i = 0; i < 7; i++) {
+            var r = requests.get(i);
+            var t2header = t2headers.get(i);
+
+            r.t3AttrName = "extra_attr_v3";
+            r.t3Update = TagUpdate.newBuilder()
+                    .setAttrName("extra_attr_v3")
+                    .setValue(MetadataCodec.encodeValue("Second extra attr"))
+                    .build();
+
+            r.t3WriteRequest = MetadataWriteRequest.newBuilder()
+                    .setObjectType(objectType)
+                    .setPriorVersion(r.t2Selector)
+                    .addTagUpdates(r.t3Update)
+                    .build();
+        }
+
+        var t3WriteRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addAllRequests(
+                        requests.stream().map(r -> r.t3WriteRequest).collect(Collectors.toList())
+                )
+                .build();
+
+        var t3Headers = publicApi.updateBatchTag(t3WriteRequest).getIdsList();
+
+        assertEquals(7, t3Headers.size());
+
+        for (int i = 0; i < 7; i++) {
+            var r = requests.get(i);
+            var t3Header = t3Headers.get(i);
+
+            assertEquals(objectType, t3Header.getObjectType());
+            assertEquals(r.v1ObjectId, UUID.fromString(t3Header.getObjectId()));
+            assertEquals(1, t3Header.getObjectVersion());
+            assertEquals(3, t3Header.getTagVersion());
+
+            var t3MetadataReadRequest = MetadataReadRequest.newBuilder()
+                    .setTenant(TEST_TENANT)
+                    .setSelector(TagSelector.newBuilder()
+                            .setObjectType(objectType)
+                            .setObjectId(r.v1ObjectId.toString())
+                            .setObjectVersion(1)
+                            .setTagVersion(3))
+                    .build();
+
+            var t3ExpectedTag = r.t2SavedTag.toBuilder()
+                    .setHeader(t3Header)
+                    .putAttrs(r.t3AttrName, r.t3Update.getValue())
+                    .build();
+
+            var t3SavedTag = readApi.readObject(t3MetadataReadRequest);
+
+            assertEquals(t3ExpectedTag, t3SavedTag);
+        }
+    }
 
     // -----------------------------------------------------------------------------------------------------------------
     // PREALLOCATION

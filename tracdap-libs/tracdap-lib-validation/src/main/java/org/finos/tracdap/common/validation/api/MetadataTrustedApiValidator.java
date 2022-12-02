@@ -56,7 +56,12 @@ public class MetadataTrustedApiValidator {
 
     @Validator(method = "updateTag")
     public static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.updateTag(msg, ctx, MetadataApiValidator.TRUSTED_API);
+        return MetadataApiValidator.updateTag(msg, ctx, MetadataApiValidator.TRUSTED_API, true);
+    }
+
+    @Validator(method = "updateBatchTag")
+    public static ValidationContext updateBatchTag(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.updateBatchTag(msg, ctx, MetadataApiValidator.TRUSTED_API);
     }
 
     @Validator(method = "preallocateId")
