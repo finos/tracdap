@@ -17,15 +17,17 @@
 package org.finos.tracdap.common.storage;
 
 import org.finos.tracdap.common.concurrent.IExecutionContext;
-import io.netty.buffer.ByteBuf;
 import org.finos.tracdap.common.data.IDataContext;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.EventLoopGroup;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
 
-public interface IFileStorage {
+public interface IFileStorage extends AutoCloseable {
 
     String EXISTS_OPERATION = "exists";
     String SIZE_OPERATION = "size";
@@ -38,6 +40,13 @@ public interface IFileStorage {
 
     String BACKSLASH = "/";
 
+
+    void start(EventLoopGroup eventLoopGroup);
+
+    void stop();
+
+    @Override
+    default void close() { stop(); }
 
     CompletionStage<Boolean> exists(String storagePath, IExecutionContext execContext);
 

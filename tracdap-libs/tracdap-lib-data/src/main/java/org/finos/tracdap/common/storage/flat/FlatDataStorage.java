@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.storage.flat;
 
+import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.codec.ICodec;
 import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.common.concurrent.Flows;
@@ -41,6 +42,18 @@ public class FlatDataStorage implements IDataStorage {
     public FlatDataStorage(IFileStorage fileStorage, ICodecManager formats) {
         this.fileStorage = fileStorage;
         this.formats = formats;
+    }
+
+    @Override
+    public void start(EventLoopGroup eventLoopGroup) {
+
+        // No-op
+    }
+
+    @Override
+    public void stop() {
+
+        // No-op
     }
 
     @Override

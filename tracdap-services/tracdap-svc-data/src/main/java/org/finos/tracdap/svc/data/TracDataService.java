@@ -65,8 +65,9 @@ public class TracDataService extends CommonServiceBase {
     private final ConfigManager configManager;
 
     private EventLoopGroup bossGroup;
-    private EventLoopGroup workerGroup;
+    private EventLoopGroup serviceGroup;
     private ManagedChannel clientChannel;
+    private StorageManager storage;
     private Server server;
 
     public TracDataService(PluginManager plugins, ConfigManager config) {
@@ -117,11 +118,11 @@ public class TracDataService extends CommonServiceBase {
             var channelType = NioServerSocketChannel.class;
             var clientChannelType = NioSocketChannel.class;
 
-            var workerThreads = Runtime.getRuntime().availableProcessors() * 2;
-            workerGroup = new NioEventLoopGroup(workerThreads, new DefaultThreadFactory("data-svc"));
+            var serviceThreads = Runtime.getRuntime().availableProcessors() * 2;
+            serviceGroup = new NioEventLoopGroup(serviceThreads, new DefaultThreadFactory("data-svc"));
             bossGroup = new NioEventLoopGroup(1, new DefaultThreadFactory("data-boss"));
 
-            var execRegister = new ExecutionRegister(workerGroup);
+            var execRegister = new ExecutionRegister(serviceGroup);
 
             // TODO: Review setup of Arrow allocator, inc. interaction with Netty / Protobuf allocators
 
@@ -133,17 +134,17 @@ public class TracDataService extends CommonServiceBase {
             var arrowAllocator = new RootAllocator(arrowAllocatorConfig);
 
             var formats = new CodecManager(pluginManager);
-            var storage = new StorageManager(pluginManager);
-            storage.initStorage(platformConfig.getStorage(), formats);
+            storage = new StorageManager(pluginManager);
+            storage.initStorage(platformConfig.getStorage(), formats, serviceGroup);
 
             // Check default storage and format are available
             checkDefaultStorageAndFormat(storage, formats, storageConfig);
 
             var metaClient = prepareMetadataClient(platformConfig, clientChannelType);
 
-            var dataSvc = new DataService(storageConfig, arrowAllocator, storage, formats, metaClient);
             var fileSvc = new FileService(storageConfig, arrowAllocator, storage, metaClient);
-            var publicApi = new TracDataApi(dataSvc, fileSvc);
+            var dataSvc = new DataService(storageConfig, arrowAllocator, storage, formats, metaClient);
+            var dataApi = new TracDataApi(dataSvc, fileSvc);
 
             var authentication = AuthInterceptor.setupAuth(
                     platformConfig.getAuthentication(),
@@ -153,13 +154,18 @@ public class TracDataService extends CommonServiceBase {
 
             this.server = NettyServerBuilder
                     .forPort(dataSvcConfig.getPort())
-                    .intercept(authentication)
-                    .addService(publicApi)
 
+                    // Netty setup
                     .channelType(channelType)
                     .bossEventLoopGroup(bossGroup)
-                    .workerEventLoopGroup(workerGroup)
+                    .workerEventLoopGroup(serviceGroup)
                     .directExecutor()
+
+                    // Services
+                    .addService(dataApi)
+
+                    // Interceptors
+                    .intercept(authentication)
                     .intercept(execRegister.registerExecContext())
 
                     .build();
@@ -219,11 +225,11 @@ public class TracDataService extends CommonServiceBase {
         var clientChannelBuilder = NettyChannelBuilder
                 .forAddress(metaInstance.getHost(), metaInstance.getPort())
                 .channelType(channelType)
-                .eventLoopGroup(workerGroup)
+                .eventLoopGroup(serviceGroup)
                 .directExecutor()
                 .usePlaintext();
 
-        clientChannel = EventLoopChannel.wrapChannel(clientChannelBuilder, workerGroup);
+        clientChannel = EventLoopChannel.wrapChannel(clientChannelBuilder, serviceGroup);
 
         return TrustedMetadataApiGrpc.newFutureStub(clientChannel);
     }
@@ -245,10 +251,16 @@ public class TracDataService extends CommonServiceBase {
             return clientChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
+        var storageDown = shutdownResource("Storage service", deadline, remaining -> {
+
+            storage.close();
+            return true;
+        });
+
         var workersDown = shutdownResource("Worker thread pool", deadline, remaining -> {
 
-            workerGroup.shutdownGracefully(0, remaining.toMillis(), TimeUnit.MILLISECONDS);
-            return workerGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+            serviceGroup.shutdownGracefully(0, remaining.toMillis(), TimeUnit.MILLISECONDS);
+            return serviceGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
         var bossDown = shutdownResource("Boss thread pool", deadline, remaining -> {
@@ -257,7 +269,7 @@ public class TracDataService extends CommonServiceBase {
             return bossGroup.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
-        if (serverDown && clientDown && workersDown && bossDown)
+        if (serverDown && clientDown && storageDown && workersDown && bossDown)
             return 0;
 
         if (!serverDown)

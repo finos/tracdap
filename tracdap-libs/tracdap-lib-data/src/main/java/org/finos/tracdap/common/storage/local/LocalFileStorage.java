@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.storage.local;
 
+import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
@@ -60,6 +61,12 @@ public class LocalFileStorage implements IFileStorage {
         this.rootPath = Paths.get(rootDirProp)
                 .toAbsolutePath()
                 .normalize();
+    }
+
+    @Override
+    public void start(EventLoopGroup eventLoopGroup) {
+
+        // These are just checks, no need to initialize anything
 
         if (!Files.exists(this.rootPath)) {
             var err = String.format("Storage root path does not exist: %s [%s]", storageKey, rootPath);
@@ -84,6 +91,12 @@ public class LocalFileStorage implements IFileStorage {
         }
 
         logFsInfo();
+    }
+
+    @Override
+    public void stop() {
+
+        // No-op
     }
 
     private void logFsInfo() {
