@@ -33,6 +33,7 @@ dependencies {
     api project(':tracdap-lib-data')
 
     implementation group: 'software.amazon.awssdk', name: 'aws-core', version: "$aws_sdk_version"
+    implementation group: 'software.amazon.awssdk', name: 'netty-nio-client', version: "$aws_sdk_version"
     implementation group: 'software.amazon.awssdk', name: 's3', version: "$aws_sdk_version"
 
     // Force the version of Jackson (only latest stable will ever pass compliance)
