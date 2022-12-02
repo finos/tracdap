@@ -22,17 +22,17 @@ import java.util.Properties;
 
 public class StorageEnvProps {
 
-    public static final String AWS_REGION = "AWS_REGION";
-    public static final String AWS_S3_BUCKET = "AWS_S3_BUCKET";
-    public static final String AWS_ACCESS_KEY_ID = "AWS_ACCESS_KEY_ID";
-    public static final String AWS_SECRET_ACCESS_KEY = "AWS_SECRET_ACCESS_KEY";
+    public static final String TRAC_AWS_REGION = "TRAC_AWS_REGION";
+    public static final String TRAC_AWS_BUCKET = "TRAC_AWS_BUCKET";
+    public static final String TRAC_AWS_ACCESS_KEY_ID = "TRAC_AWS_ACCESS_KEY_ID";
+    public static final String TRAC_AWS_SECRET_ACCESS_KEY = "TRAC_AWS_SECRET_ACCESS_KEY";
 
     public static Properties readStorageEnvProps() {
 
-        var region = System.getenv(AWS_REGION);
-        var bucket = System.getenv(AWS_S3_BUCKET);
-        var accessKeyId = System.getenv(AWS_ACCESS_KEY_ID);
-        var secretAccessKey = System.getenv(AWS_SECRET_ACCESS_KEY);
+        var region = System.getenv(TRAC_AWS_REGION);
+        var bucket = System.getenv(TRAC_AWS_BUCKET);
+        var accessKeyId = System.getenv(TRAC_AWS_ACCESS_KEY_ID);
+        var secretAccessKey = System.getenv(TRAC_AWS_SECRET_ACCESS_KEY);
 
         var storageProps = new Properties();
         storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");

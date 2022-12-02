@@ -16,16 +16,16 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
+import io.netty.channel.DefaultEventLoopGroup;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultEventExecutor;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import org.apache.arrow.memory.RootAllocator;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.storage.StorageOperationsTestSuite;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.*;
 
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -41,6 +41,7 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
     static String testDir;
     static S3ObjectStorage setup;
 
+    static EventLoopGroup elg;
     static ExecutionContext setupExecCtx;
 
     @BeforeAll
@@ -57,7 +58,10 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
 
         storageProps = StorageEnvProps.readStorageEnvProps();
 
+        elg = new NioEventLoopGroup(2);
+
         setup = new S3ObjectStorage(storageProps);
+        setup.start(elg);
         setup.mkdir(testDir.substring(1), true, setupExecCtx);
     }
 
@@ -69,11 +73,26 @@ public class S3StorageOperationsTest extends StorageOperationsTestSuite {
 
         storageProps.put(S3ObjectStorage.PATH_PROPERTY, testDir);
         storage = new S3ObjectStorage(storageProps);
+        storage.start(elg);
+    }
+
+    @AfterEach
+    void tearDown() {
+        storage.stop();
+        storage = null;
     }
 
     @AfterAll
     static void tearDownStorage() {
 
-        setup.rm(testDir, true, setupExecCtx);
+        setup.rm(testDir.substring(1), true, setupExecCtx)
+                .toCompletableFuture()
+                .join();
+
+        setup.stop();
+        setup = null;
+
+        elg.shutdownGracefully();
+        elg = null;
     }
 }
