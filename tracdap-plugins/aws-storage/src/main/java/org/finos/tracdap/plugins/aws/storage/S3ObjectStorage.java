@@ -145,7 +145,7 @@ public class S3ObjectStorage implements IFileStorage {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, EXISTS_OPERATION, storagePath);
 
-        var fileObjectKey = joinPath(storagePath, true, EXISTS_OPERATION);
+        var fileObjectKey = resolvePath(storagePath, true, EXISTS_OPERATION);
         var dirObjectKey = fileObjectKey + "/";
 
         return existsImpl(fileObjectKey, execContext).thenCompose(found -> found
@@ -189,7 +189,7 @@ public class S3ObjectStorage implements IFileStorage {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, SIZE_OPERATION, storagePath);
 
-        var objectKey = joinPath(storagePath, true, SIZE_OPERATION);
+        var objectKey = resolvePath(storagePath, true, SIZE_OPERATION);
 
         var request = HeadObjectRequest.builder()
             .bucket(this.bucket)
@@ -210,7 +210,7 @@ public class S3ObjectStorage implements IFileStorage {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, STAT_OPERATION, storagePath);
 
-        var objectKey = joinPath(storagePath, true, STAT_OPERATION);
+        var objectKey = resolvePath(storagePath, true, STAT_OPERATION);
 
         return dirProcessing(objectKey, STAT_OPERATION, k_ -> statImpl(k_, execContext), execContext);
 
@@ -275,7 +275,7 @@ public class S3ObjectStorage implements IFileStorage {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, LS_OPERATION, dirPath);
 
-        var objectKey = joinPath(dirPath, true, SIZE_OPERATION);
+        var objectKey = resolvePath(dirPath, true, SIZE_OPERATION);
 
         var request = ListObjectsRequest.builder()
             .bucket(bucket)
@@ -344,7 +344,7 @@ public class S3ObjectStorage implements IFileStorage {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, MKDIR_OPERATION, storagePath);
 
-        var bucketKey = joinPath(storagePath, false, MKDIR_OPERATION) + "/";
+        var bucketKey = resolvePath(storagePath, false, MKDIR_OPERATION) + "/";
 
         var request = PutObjectRequest.builder()
                 .bucket(bucket)
@@ -371,7 +371,7 @@ public class S3ObjectStorage implements IFileStorage {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, RM_OPERATION, storagePath);
 
-        var fileKey = joinPath(storagePath, false, RM_OPERATION);
+        var fileKey = resolvePath(storagePath, false, RM_OPERATION);
         var dirKey = fileKey + "/";
 
         return existsImpl(fileKey, execContext).thenComposeAsync(exists -> exists
@@ -406,7 +406,7 @@ public class S3ObjectStorage implements IFileStorage {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, READ_OPERATION, storagePath);
 
-        var objectKey = joinPath(storagePath, false, READ_OPERATION);
+        var objectKey = resolvePath(storagePath, false, READ_OPERATION);
 
         return new S3ObjectReader(
                 storageKey, storagePath, bucket, objectKey,
@@ -418,14 +418,14 @@ public class S3ObjectStorage implements IFileStorage {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, WRITE_OPERATION, storagePath);
 
-        var objectKey = joinPath(storagePath, false, WRITE_OPERATION);
+        var objectKey = resolvePath(storagePath, false, WRITE_OPERATION);
 
         return new S3ObjectWriter(
                 storageKey, storagePath, bucket, objectKey,
                 client, signal, dataContext.eventLoopExecutor(), errors);
     }
 
-    private String joinPath(String requestedPath, boolean allowRootDir, String operationName) {
+    private String resolvePath(String requestedPath, boolean allowRootDir, String operationName) {
 
         try {
 
@@ -452,9 +452,12 @@ public class S3ObjectStorage implements IFileStorage {
 
             // For bucket storage, do not use "/" for the root path
             // Otherwise everything gets put in a folder called "/"
-            var leadingSlash = absolutePath.toString();
 
-            return leadingSlash.substring(1);
+            var objectKey = absolutePath.toString();
+
+            return objectKey.startsWith("/")
+                    ? objectKey.substring(1)
+                    : objectKey;
         }
         catch (StoragePathException e) {
 
