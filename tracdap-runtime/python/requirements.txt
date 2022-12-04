@@ -33,6 +33,13 @@ pandas >= 1.2.0, < 2.0.0
 pyspark >= 2.4.0, < 3.3.0
 
 
+# Plugin dependencies
+# Install all of these for development
+# Dependencies in the dist package are controlled as optional features
+
+boto3 >= 1.26.22, < 2.0
+
+
 
 # Tools for building and packaging the Python runtime
 
