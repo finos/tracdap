@@ -9,7 +9,6 @@ on:
   push:
     branches:
       - main
-      - feature/aws_storage
 
   # Allow manual triggering of integration tests
   workflow_dispatch:
@@ -25,9 +24,6 @@ env:
 jobs:
 
   slow-tests:
-
-    # Disable for S3 testing
-    if: ${{ false }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -64,9 +60,6 @@ jobs:
 
 
   end-to-end:
-
-    # Disable for S3 testing
-    if: ${{ false }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -120,9 +113,6 @@ jobs:
 
 
   int-metadb:
-
-    # Disable for S3 testing
-    if: ${{ false }}
 
     runs-on: ubuntu-latest
 
@@ -246,6 +236,10 @@ jobs:
 
 
   int-storage:
+
+    # Storage integration tests not available in CI yet
+    # (test cases must be run manually until CI resources are available)
+    if: ${{ false }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 5

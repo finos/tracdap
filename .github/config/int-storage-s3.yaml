@@ -54,7 +54,11 @@ storage:
     STORAGE_INTEGRATION:
       protocol: S3
       properties:
-        bucket: ${S3_BUCKET}
+        region: ${TRAC_AWS_REGION}
+        bucket: ${TRAC_AWS_BUCKET}
+        path: int-storage-s3
+        accessKeyId: ${TRAC_AWS_ACCESS_KEY_ID}
+        secretAccessKey: ${TRAC_AWS_SECRET_ACCESS_KEY}
 
 
 repositories:
