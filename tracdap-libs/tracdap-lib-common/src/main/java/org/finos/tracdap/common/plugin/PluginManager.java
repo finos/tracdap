@@ -69,7 +69,7 @@ public class PluginManager implements IPluginManager {
                     registerServices(plugin, configServices);
                 }
             }
-            catch (NoClassDefFoundError e) {
+            catch (ServiceConfigurationError e) {
                 // continue
             }
         }
@@ -99,7 +99,7 @@ public class PluginManager implements IPluginManager {
                     registerServices(plugin, regularServices);
                 }
             }
-            catch (NoClassDefFoundError e) {
+            catch (ServiceConfigurationError e) {
                 // continue
             }
         }
