@@ -16,3 +16,4 @@ Deployment
     platform
     metadata_store
     authentication
+    storage

@@ -133,7 +133,7 @@ jobs:
               DB_PORT: 3306,
               DB_OPTIONS: '--health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3',
               BUILD_sql_mysql: true,
-              TRAC_CONFIG_FILE: '.github/config/trac-int-mysql.yaml',
+              TRAC_CONFIG_FILE: '.github/config/int-metadb-mysql.yaml',
               TRAC_SECRET_KEY: wDeq3x-NjaLL7,
               MYSQL_DATABASE: trac,
               MYSQL_USER: trac_admin,
@@ -145,7 +145,7 @@ jobs:
               DB_PORT: 3306,
               DB_OPTIONS: '--health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3',
               BUILD_sql_mariadb: true,
-              TRAC_CONFIG_FILE: '.github/config/trac-int-mariadb.yaml',
+              TRAC_CONFIG_FILE: '.github/config/int-metadb-mariadb.yaml',
               TRAC_SECRET_KEY: uYhnKwq8+esS,
               MYSQL_DATABASE: trac,
               MYSQL_USER: trac_admin,
@@ -157,7 +157,7 @@ jobs:
               DB_PORT: 5432,
               DB_OPTIONS: '--health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5',
               BUILD_sql_postgresql: true,
-              TRAC_CONFIG_FILE: '.github/config/trac-int-postgresql.yaml',
+              TRAC_CONFIG_FILE: '.github/config/int-metadb-postgresql.yaml',
               TRAC_SECRET_KEY: hjXks83bX=wxMr,
               POSTGRES_DB: trac,
               POSTGRES_USER: trac_admin,
@@ -168,7 +168,7 @@ jobs:
               DB_PORT: 1433,
               DB_OPTIONS: '-e "NO_DB_OPTIONS=not_used"',  # docker run -e flag sets an env variable, passing '' causes errors
               BUILD_sql_sqlserver: true,
-              TRAC_CONFIG_FILE: '.github/config/trac-int-sqlserver.yaml',
+              TRAC_CONFIG_FILE: '.github/config/int-metadb-sqlserver.yaml',
               TRAC_SECRET_KEY: unHkj>weN2jSl,
               MSSQL_PID: Developer,
               ACCEPT_EULA: Y,
@@ -224,6 +224,74 @@ jobs:
 
       - name: Integration Tests
         run: ./gradlew trac-svc-meta:integration -DintegrationTags="int-metadb"
+
+      # If the tests fail, make the output available for download
+      - name: Store failed test results
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: junit-test-results
+          path: build/modules/*/reports/**
+          retention-days: 7
+
+
+  int-storage:
+
+    # Storage integration tests not available in CI yet
+    # (test cases must be run manually until CI resources are available)
+    if: ${{ false }}
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    strategy:
+
+      # Try to finish all jobs - it can be helpful to see if some succeed and others fail
+      fail-fast: false
+
+      matrix:
+
+        storage:
+
+          - { PROTOCOL: S3,
+              BUILD_aws_storage: true,
+              TRAC_CONFIG_FILE: '.github/config/int-storage-s3.yaml',
+              TRAC_SECRET_KEY: storage_s3_secrets,
+              S3_BUCKET: not-configured }
+
+
+    env: ${{ matrix.storage }}
+
+    steps:
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Build
+        run: ./gradlew testClasses
+
+      # Auth tool will also create the secrets file if it doesn't exist
+      - name: Prepare Auth Keys
+        run: |
+          ./gradlew auth-tool:run --args="\
+          --config ${{ env.TRAC_CONFIG_FILE }} \
+          --secret-key ${{ env.TRAC_SECRET_KEY }} \
+          --task create_root_auth_key EC 256"
+
+      # No need to prepare DB, it is done by the platform test setup
+
+      - name: Integration Tests
+        run: ./gradlew integration -DintegrationTags="int-storage"
 
       # If the tests fail, make the output available for download
       - name: Store failed test results

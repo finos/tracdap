@@ -75,8 +75,12 @@ project(":auth-tool").projectDir = file("tracdap-tools/auth-tool")
 
 // Plugins
 
-include 'aws-config'
-project(":aws-config").projectDir = file("tracdap-plugins/aws-config")
+// AWS config plugin still uses AWS v1 API - needs porting to V2
+//include 'aws-config'
+//project(":aws-config").projectDir = file("tracdap-plugins/aws-config")
+
+include 'aws-storage'
+project(":aws-storage").projectDir = file("tracdap-plugins/aws-storage")
 
 include 'gcp-config'
 project(":gcp-config").projectDir = file("tracdap-plugins/gcp-config")

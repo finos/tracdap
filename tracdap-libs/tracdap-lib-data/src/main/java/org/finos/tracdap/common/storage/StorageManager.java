@@ -22,13 +22,16 @@ import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EStorageConfig;
 import org.finos.tracdap.common.plugin.IPluginManager;
 import org.finos.tracdap.common.storage.flat.FlatDataStorage;
+
+import io.netty.channel.EventLoopGroup;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 
-public class StorageManager implements IStorageManager {
+public class StorageManager implements IStorageManager, AutoCloseable {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -40,7 +43,7 @@ public class StorageManager implements IStorageManager {
         this.storage = new HashMap<>();
     }
 
-    public void initStorage(StorageConfig storageConfig, ICodecManager formats) {
+    public void initStorage(StorageConfig storageConfig, ICodecManager formats, EventLoopGroup eventLoopGroup) {
 
         log.info("Configuring storage...");
 
@@ -61,12 +64,16 @@ public class StorageManager implements IStorageManager {
             if (plugins.isServiceAvailable(IFileStorage.class, protocol)) {
 
                 var fileInstance = plugins.createService(IFileStorage.class, protocol, props);
+                fileInstance.start(eventLoopGroup);
+
                 backend.fileInstances.add(fileInstance);
             }
 
             if (plugins.isServiceAvailable(IDataStorage.class, protocol)) {
 
                 var dataInstance = plugins.createService(IDataStorage.class, protocol, props);
+                dataInstance.start(eventLoopGroup);
+
                 backend.dataInstances.add(dataInstance);
             }
             else if (!backend.fileInstances.isEmpty()) {
@@ -74,7 +81,10 @@ public class StorageManager implements IStorageManager {
                 log.info("Using flat data storage (datasets will be saved as files)");
 
                 for (var fileInstance : backend.fileInstances) {
+
                     var dataInstance = new FlatDataStorage(fileInstance, formats);
+                    dataInstance.start(eventLoopGroup);
+
                     backend.dataInstances.add(dataInstance);
                 }
             }
@@ -89,6 +99,49 @@ public class StorageManager implements IStorageManager {
             }
 
             storage.put(bucketKey, backend);
+        }
+    }
+
+    @Override
+    public void close() {
+
+        for (var storage : this.storage.entrySet()) {
+
+            var backend = storage.getValue();
+
+            log.info("Detach storage: [{}]", storage.getKey());
+
+            // For errors during shutdown, log the error and continue shutting down other instances
+            // Don't propagate the error, that can only prevent shutdown being called for other resources
+
+            for (var dataImpl : backend.dataInstances) {
+
+                try {
+
+                    dataImpl.close();
+                }
+                catch (Exception error) {
+
+                    log.error(
+                        "There was an error shutting down the storage backend: [{}] {}",
+                        storage.getKey(), error.getMessage(), error);
+                }
+            }
+
+            for (var fileImpl : backend.fileInstances) {
+
+                try {
+
+                    fileImpl.close();
+                }
+                catch (Exception error) {
+
+                    log.error(
+                            "There was an error shutting down the storage backend: [{}] {}",
+                            storage.getKey(), error.getMessage(), error);
+                }
+            }
+
         }
     }
 

@@ -1,0 +1,104 @@
+# Copyright 2022 Accenture Global Solutions Limited
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+config:
+  secret.type: PKCS12
+  secret.url: secrets.p12
+
+
+platformInfo:
+  environment: TEST_ENVIRONMENT
+  production: false
+  deploymentInfo:
+    region: UK
+
+
+authentication:
+  jwtIssuer: http://localhost/
+  jwtExpiry: 7200
+
+
+# Stick with H2 database for storage integration testing
+metadata:
+  format: PROTO
+  database:
+    protocol: JDBC
+    properties:
+      dialect: H2
+      jdbcUrl: ${TRAC_DIR}/trac.meta
+      h2.user: trac
+      h2.pass: trac
+      h2.schema: public
+      pool.size: 10
+      pool.overflow: 5
+
+
+storage:
+
+  defaultBucket: STORAGE_INTEGRATION
+  defaultFormat: ARROW_FILE
+
+  buckets:
+
+    STORAGE_INTEGRATION:
+      protocol: S3
+      properties:
+        region: ${TRAC_AWS_REGION}
+        bucket: ${TRAC_AWS_BUCKET}
+        path: int-storage-s3
+        accessKeyId: ${TRAC_AWS_ACCESS_KEY_ID}
+        secretAccessKey: ${TRAC_AWS_SECRET_ACCESS_KEY}
+
+
+repositories:
+  UNIT_TEST_REPO:
+    protocol: git
+    properties:
+      repoUrl: ${CURRENT_GIT_ORIGIN}
+
+
+executor:
+  protocol: LOCAL
+  properties:
+    venvPath: ${TRAC_EXEC_DIR}/venv
+
+
+instances:
+
+  meta:
+    - scheme: http
+      host: localhost
+      port: 8081
+
+  data:
+    - scheme: http
+      host: localhost
+      port: 8082
+
+  orch:
+    - scheme: http
+      host: localhost
+      port: 8083
+
+
+services:
+
+  meta:
+    port: 8081
+
+  data:
+    port: 8082
+
+  orch:
+    port: 8083

@@ -47,7 +47,7 @@ metadata:
 storage:
 
   defaultBucket: UNIT_TEST_STORAGE
-  defaultFormat: ${STORAGE_FORMAT}
+  defaultFormat: ${TRAC_STORAGE_FORMAT}
 
   buckets:
 

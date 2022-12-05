@@ -16,7 +16,9 @@
 
 package org.finos.tracdap.test.storage;
 
+import org.apache.arrow.memory.RootAllocator;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.storage.IFileStorage;
 import org.finos.tracdap.common.concurrent.Flows;
 
@@ -34,8 +36,11 @@ public class StorageTestHelpers {
             String storagePath, ByteBuf content,
             IFileStorage storage, IExecutionContext execContext) {
 
+        var allocator = new RootAllocator();
+        var dataCtx = new DataContext(execContext.eventLoopExecutor(), allocator);
+
         var signal = new CompletableFuture<Long>();
-        var writer = storage.writer(storagePath, signal, execContext);
+        var writer = storage.writer(storagePath, signal, dataCtx);
 
         Flows.publish(Stream.of(content)).subscribe(writer);
 
@@ -60,7 +65,10 @@ public class StorageTestHelpers {
             IFileStorage storage,
             IExecutionContext execContext) {
 
-        var reader = storage.reader(storagePath, execContext);
+        var allocator = new RootAllocator();
+        var dataCtx = new DataContext(execContext.eventLoopExecutor(), allocator);
+
+        var reader = storage.reader(storagePath, dataCtx);
 
         return Flows.fold(
                 reader, (composite, buf) -> ((CompositeByteBuf) composite).addComponent(true, buf),

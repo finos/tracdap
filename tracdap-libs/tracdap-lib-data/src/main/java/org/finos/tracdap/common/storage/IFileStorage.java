@@ -17,14 +17,36 @@
 package org.finos.tracdap.common.storage;
 
 import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.IDataContext;
+
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.EventLoopGroup;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
 
-public interface IFileStorage {
+public interface IFileStorage extends AutoCloseable {
+
+    String EXISTS_OPERATION = "exists";
+    String SIZE_OPERATION = "size";
+    String STAT_OPERATION = "stat";
+    String LS_OPERATION = "ls";
+    String MKDIR_OPERATION = "mkdir";
+    String RM_OPERATION = "rm";
+    String WRITE_OPERATION = "write";
+    String READ_OPERATION = "read";
+
+    String BACKSLASH = "/";
+
+
+    void start(EventLoopGroup eventLoopGroup);
+
+    void stop();
+
+    @Override
+    default void close() { stop(); }
 
     CompletionStage<Boolean> exists(String storagePath, IExecutionContext execContext);
 
@@ -40,10 +62,10 @@ public interface IFileStorage {
 
     Flow.Publisher<ByteBuf> reader(
             String storagePath,
-            IExecutionContext execContext);
+            IDataContext dataContext);
 
     Flow.Subscriber<ByteBuf> writer(
             String storagePath,
             CompletableFuture<Long> signal,
-            IExecutionContext execContext);
+            IDataContext dataContext);
 }

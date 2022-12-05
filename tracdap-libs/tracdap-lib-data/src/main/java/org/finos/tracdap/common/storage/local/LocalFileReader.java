@@ -20,6 +20,7 @@ import org.finos.tracdap.common.exception.EUnexpected;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.util.concurrent.OrderedEventExecutor;
+import org.finos.tracdap.common.storage.StorageErrors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +33,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.finos.tracdap.common.storage.local.LocalFileErrors.ExplicitError.DUPLICATE_SUBSCRIPTION;
+import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.DUPLICATE_SUBSCRIPTION;
 import static org.finos.tracdap.common.storage.local.LocalFileStorage.READ_OPERATION;
 import static java.nio.file.StandardOpenOption.*;
 
@@ -42,7 +43,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
     private static final int DEFAULT_CHUNK_SIZE = 4096;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
-    private final LocalFileErrors errors;
+    private final StorageErrors errors;
     private final String storagePath;
 
     private final Path absolutePath;
@@ -67,7 +68,7 @@ public class LocalFileReader implements Flow.Publisher<ByteBuf> {
             Path absolutePath, ByteBufAllocator allocator,
             OrderedEventExecutor executor) {
 
-        this.errors = new LocalFileErrors(log, storageKey);
+        this.errors = new LocalStorageErrors(storageKey, log);
         this.storagePath = storagePath;
 
         this.absolutePath = absolutePath;

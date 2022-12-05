@@ -76,8 +76,8 @@ Providers
 
 You need to configure one provider in the authentication section of the gateway config file.
 
-**Guest Provider**
-^^^^^^^^^^^^^^^^^^
+Guest Provider
+^^^^^^^^^^^^^^
 
 The guest provider logs everyone in as guest, without prompting for credentials.
 This is the default provider set up in the sandbox example configuration.
@@ -94,8 +94,8 @@ The user ID and name can be set as properties of the provider.
           userName: Guest User
 
 
-**Basic Provider**
-^^^^^^^^^^^^^^^^^^
+Basic Provider
+^^^^^^^^^^^^^^
 
 The basic provider uses HTTP basic authentication, which typically causes the browser
 authentication window to appear when users try to access pages in a browser. To use

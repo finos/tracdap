@@ -44,21 +44,33 @@ public class PluginManager implements IPluginManager {
 
         StartupLog.log(this, Level.INFO, "Loading config plugins...");
 
-        var availablePlugins = ServiceLoader.load(ITracPlugin.class);
+        var availablePlugins = ServiceLoader.load(ITracPlugin.class).iterator();
 
-        for (var plugin: availablePlugins) {
+        while (availablePlugins.hasNext()) {
 
-            var services = plugin.serviceInfo();
+            try {
 
-            var configServices = services.stream()
-                    .filter(si -> CONFIG_SERVICE_TYPES.contains(si.serviceType()))
-                    .collect(Collectors.toList());
+                // Handling to allow for plugins that fail to load due to missing dependencies
+                // This happens in the sandbox, e.g. if -svc-meta detects a plugin from -svc-data
+                // We could log warnings here, noisy in normal use but helpful if plugins are failing to load
+                // Perhaps add a switch to turn on extra logging for plugin load?
 
-            if (!configServices.isEmpty()) {
+                var plugin = availablePlugins.next();
+                var services = plugin.serviceInfo();
 
-                StartupLog.log(this, Level.INFO, String.format("Plugin: [%s]", plugin.pluginName()));
+                var configServices = services.stream()
+                        .filter(si -> CONFIG_SERVICE_TYPES.contains(si.serviceType()))
+                        .collect(Collectors.toList());
 
-                registerServices(plugin, configServices);
+                if (!configServices.isEmpty()) {
+
+                    StartupLog.log(this, Level.INFO, String.format("Plugin: [%s]", plugin.pluginName()));
+
+                    registerServices(plugin, configServices);
+                }
+            }
+            catch (ServiceConfigurationError e) {
+                // continue
             }
         }
     }
@@ -67,21 +79,28 @@ public class PluginManager implements IPluginManager {
 
         StartupLog.log(this, Level.INFO, "Loading plugins...");
 
-        var availablePlugins = ServiceLoader.load(ITracPlugin.class);
+        var availablePlugins = ServiceLoader.load(ITracPlugin.class).iterator();
 
-        for (var plugin: availablePlugins) {
+        while (availablePlugins.hasNext()) {
 
-            var services = plugin.serviceInfo();
+            try {
 
-            var regularServices = services.stream()
-                    .filter(si -> ! CONFIG_SERVICE_TYPES.contains(si.serviceType()))
-                    .collect(Collectors.toList());
+                var plugin = availablePlugins.next();
+                var services = plugin.serviceInfo();
 
-            if (!regularServices.isEmpty()) {
+                var regularServices = services.stream()
+                        .filter(si -> !CONFIG_SERVICE_TYPES.contains(si.serviceType()))
+                        .collect(Collectors.toList());
 
-                StartupLog.log(this, Level.INFO, String.format("Plugin: [%s]", plugin.pluginName()));
+                if (!regularServices.isEmpty()) {
 
-                registerServices(plugin, regularServices);
+                    StartupLog.log(this, Level.INFO, String.format("Plugin: [%s]", plugin.pluginName()));
+
+                    registerServices(plugin, regularServices);
+                }
+            }
+            catch (ServiceConfigurationError e) {
+                // continue
             }
         }
     }

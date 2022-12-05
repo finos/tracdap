@@ -63,6 +63,9 @@ public class JsonDecoder extends StreamingDecoder {
 
         try {
 
+            if (log.isTraceEnabled())
+                log.trace("JSON DECODER: onStart()");
+
             var factory = new JsonFactory();
             var tableHandler = new JsonTableHandler(root, batch -> consumer().onNext(), BATCH_SIZE, CASE_INSENSITIVE);
 
@@ -82,6 +85,9 @@ public class JsonDecoder extends StreamingDecoder {
     public void onNext(ByteBuf chunk) {
 
         try {
+
+            if (log.isTraceEnabled())
+                log.trace("JSON DECODER: onNext()");
 
             var bytes = new byte[chunk.readableBytes()];
             chunk.readBytes(bytes);
@@ -141,6 +147,9 @@ public class JsonDecoder extends StreamingDecoder {
 
         try {
 
+            if (log.isTraceEnabled())
+                log.trace("JSON DECODER: onComplete()");
+
             if (bytesConsumed == 0) {
                 var error = new EDataCorruption("JSON data is empty");
                 log.error(error.getMessage(), error);
@@ -160,6 +169,10 @@ public class JsonDecoder extends StreamingDecoder {
     public void onError(Throwable error) {
 
         try {
+
+            if (log.isTraceEnabled())
+                log.trace("JSON DECODER: onError()");
+
             // TODO: Should datapipeline handle this?
             consumer().onError(error);
         }
