@@ -72,6 +72,7 @@
         <vulnerabilityName>CVE-2022-38752</vulnerabilityName>
         <vulnerabilityName>CVE-2022-38751</vulnerabilityName>
         <vulnerabilityName>CVE-2022-41854</vulnerabilityName>
+        <vulnerabilityName>CVE-2022-1471</vulnerabilityName>
     </suppress>
 
     <!-- More spurious errors being reported in SonaType -->
