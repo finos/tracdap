@@ -69,6 +69,7 @@ def addVersionInfo(SourceSet sourceSet, String serviceName) {
     }
 }
 
+
 def isFeatureEnabled(String key) {
 
     def env = System.getenv()
@@ -89,14 +90,39 @@ def isFeatureEnabled(String key) {
     return false
 }
 
-def pluginDependency(String pluginName, Project pluginProject) {
 
-    if (isFeatureEnabled(pluginName)) {
+def enableBuildTimePlugins(List<String> filters) {
 
-        println("Enabling plugin: ${pluginName}")
+    for (key in ext.properties.keySet()) {
+
+        // Look for BUILD flags only
+        if (!key.startsWith("BUILD_"))
+            continue
+
+        var plugin = key.substring("BUILD_".length())
+        var words = plugin.split("_")
+
+        // Only look at plugins included in the filter
+        // (Do not put every plugin on every service)
+        if (!words.any {w -> filters.contains(w)})
+            continue
+
+        // Only look at plugins that are build-time enabled
+        if (!isFeatureEnabled(plugin))
+            continue
+
+        var dependencyKey = "DEPEND_" + plugin
+        var dependency = ext.properties.get(dependencyKey)
+
+        if (dependency == null) {
+            println("Plugin ${plugin} could not be enabled (no DEPEND_ key defined in plugins.gradle)")
+            continue
+        }
+
+        println("Enabling plugin: ${plugin}")
 
         dependencies {
-            runtimeOnly pluginProject
+            runtimeOnly dependency
         }
     }
 }
@@ -106,5 +132,5 @@ ext {
     addVersionInfo = { SourceSet sourceSet, String name -> this.addVersionInfo(sourceSet, name) }
     getVersionFromGit = { -> getVersionFromGit() }
     isFeatureEnabled = { String key -> this.isFeatureEnabled(key) }
-    pluginDependency = { String name, Project project -> pluginDependency(name, project) }
+    enableBuildTimePlugins = { List<String> filters -> enableBuildTimePlugins(filters) }
 }

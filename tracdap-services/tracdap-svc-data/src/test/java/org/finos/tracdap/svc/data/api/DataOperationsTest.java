@@ -22,7 +22,6 @@ import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.Futures;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.metadata.MetadataCodec;
-import org.finos.tracdap.common.metadata.PartKeys;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.test.data.SampleData;
 import com.google.protobuf.ByteString;
@@ -30,19 +29,18 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.Vector;
-import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
 import static org.finos.tracdap.common.metadata.MetadataUtil.selectorForLatest;
@@ -53,25 +51,62 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 
-public class DatasetRwOperationsTest {
+abstract class DataOperationsTest {
 
     // Functional test cases for dataset operations in the data API
     // (createDataset, updateDataset, readDataset)
 
-    private static final String TRAC_UNIT_CONFIG = "config/trac-unit.yaml";
-    private static final String TEST_TENANT = "ACME_CORP";
-    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+    public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
+    public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
+    public static final String TEST_TENANT = "ACME_CORP";
+    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
 
-    @RegisterExtension
-    private static final PlatformTest platform = PlatformTest.forConfig(TRAC_UNIT_CONFIG)
-            .addTenant(TEST_TENANT)
-            .startMeta()
-            .startData()
-            .build();
+    protected IExecutionContext execContext;
+    protected TracMetadataApiGrpc.TracMetadataApiFutureStub metaClient;
+    protected TracDataApiGrpc.TracDataApiStub dataClient;
 
-    IExecutionContext execContext = new ExecutionContext(new DefaultEventExecutor());
-    TracMetadataApiGrpc.TracMetadataApiFutureStub metaClient = platform.metaClientFuture();
-    TracDataApiGrpc.TracDataApiStub dataClient = platform.dataClient();
+
+    // Include this test case as a unit test
+    static class UnitTest extends DataOperationsTest {
+
+        @RegisterExtension
+        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+                .runDbDeploy(true)
+                .addTenant(TEST_TENANT)
+                .startMeta()
+                .startData()
+                .build();
+
+        @BeforeEach
+        void setup() {
+            execContext = new ExecutionContext(new DefaultEventExecutor());
+            metaClient = platform.metaClientFuture();
+            dataClient = platform.dataClient();
+        }
+    }
+
+    // Include this test case for integration against different database backends
+    @org.junit.jupiter.api.Tag("integration")
+    @Tag("int-storage")
+    static class IntegrationTest extends DataOperationsTest {
+
+        private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
+
+        @RegisterExtension
+        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+                .runDbDeploy(true)
+                .addTenant(TEST_TENANT)
+                .startMeta()
+                .startData()
+                .build();
+
+        @BeforeEach
+        void setup() {
+            execContext = new ExecutionContext(new DefaultEventExecutor());
+            metaClient = platform.metaClientFuture();
+            dataClient = platform.dataClient();
+        }
+    }
 
     // Reuse sample data from the test lib
 
@@ -130,51 +165,27 @@ public class DatasetRwOperationsTest {
         waitFor(TEST_TIMEOUT, createDataset);
         var dataId = resultOf(createDataset);
 
-        // Get data and storage def
+        // Use the Data API to read and check the data
+        // API tests cannot inspect the storage directly
 
-        var readDataDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(dataId)));
-        waitFor(TEST_TIMEOUT, readDataDef);
-        var dataTag = resultOf(readDataDef);
-        var dataDef = dataTag.getDefinition().getData();
+        var request = readRequest(dataId);
+        var readDataset = DataApiTestHelpers.serverStreaming(dataClient::readDataset, request, execContext);
+        waitFor(TEST_TIMEOUT, readDataset);
+        var responseList = resultOf(readDataset);
 
-        var readStorageDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(dataDef.getStorageId())));
-        waitFor(TEST_TIMEOUT, readStorageDef);
-        var storageTag = resultOf(readStorageDef);
-        var storageDef = storageTag.getDefinition().getStorage();
+        // First response message should contain metadata only, with an empty buffer
+        var response0 = responseList.get(0);
+        Assertions.assertEquals(ByteString.EMPTY, response0.getContent());
 
-        // Get the storage path out of the metadata
-
-        var rootPartKey = PartKeys.opaqueKey(PartKeys.ROOT);
-        var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
-        var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
-
-        var storageRoot = platform.storageRootDir();
-        var copyDir = storageRoot.resolve(copy.getStoragePath());
-
-        var copyFiles = Files.walk(copyDir)
-                .filter(p -> !p.equals(copyDir))  // Do not include the copyDir in the file list
-                .collect(Collectors.toList());
-
-        // Data should be stored in one piece (even if chunking is implemented, dataset is too small to chunk up)
-
-        Assertions.assertEquals(1, copyFiles.size());
-
-        var copyFile = copyFiles.get(0);
-
-        // Check the file exists
-
-        Assertions.assertTrue(Files.isRegularFile(copyFile));
-        Assertions.assertTrue(Files.size(copyFile) > 0);
-
-        // Decode data directly from the file in storage and check against the original
-        // For this test case, data is stored in arrow file format
-
-        var channel = Files.newByteChannel(copyFile, StandardOpenOption.READ);
-        var storedData = DataApiTestHelpers.decodeArrowFile(dataDef.getSchema(), channel);
+        // The remainder of the list should contain the file content
+        var content = responseList.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
 
         var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA, List.of(BASIC_CSV_CONTENT));
+        var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
 
-        assertDataEqual(originalData, storedData);
+        assertDataEqual(originalData, responseData);
     }
 
     @Test
@@ -241,51 +252,28 @@ public class DatasetRwOperationsTest {
         waitFor(TEST_TIMEOUT, createDataset);
         var dataId = resultOf(createDataset);
 
-        // Get data and storage def
+        // Use the Data API to read and check the data
+        // API tests cannot inspect the storage directly
 
-        var readDataDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(dataId)));
-        waitFor(TEST_TIMEOUT, readDataDef);
-        var dataTag = resultOf(readDataDef);
-        var dataDef = dataTag.getDefinition().getData();
+        var request = readRequest(dataId);
+        var readDataset = DataApiTestHelpers.serverStreaming(dataClient::readDataset, request, execContext);
+        waitFor(TEST_TIMEOUT, readDataset);
+        var responseList = resultOf(readDataset);
 
-        var readStorageDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(dataDef.getStorageId())));
-        waitFor(TEST_TIMEOUT, readStorageDef);
-        var storageTag = resultOf(readStorageDef);
-        var storageDef = storageTag.getDefinition().getStorage();
+        // First response message should contain metadata only, with an empty buffer
+        var response0 = responseList.get(0);
+        Assertions.assertEquals(ByteString.EMPTY, response0.getContent());
 
-        // Get the storage path out of the metadata
-
-        var rootPartKey = PartKeys.opaqueKey(PartKeys.ROOT);
-        var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
-        var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
-
-        var storageRoot = platform.storageRootDir();
-        var copyDir = storageRoot.resolve(copy.getStoragePath());
-
-        var copyFiles = Files.walk(copyDir)
-                .filter(p -> !p.equals(copyDir))  // Do not include the copyDir in the file list
-                .collect(Collectors.toList());
-
-        // Data should be stored in one piece (even if chunking is implemented, dataset is too small to chunk up)
-
-        Assertions.assertEquals(1, copyFiles.size());
-
-        var copyFile = copyFiles.get(0);
-
-        // Check the file exists
-
-        Assertions.assertTrue(Files.isRegularFile(copyFile));
-        Assertions.assertTrue(Files.size(copyFile) > 0);
-
-        // Decode data directly from the file in storage and check against the original
-        // For this test case, data is stored in arrow file format
-
-        var channel = Files.newByteChannel(copyFile, StandardOpenOption.READ);
-        var storedData = DataApiTestHelpers.decodeArrowFile(dataDef.getSchema(), channel);
+        // The remainder of the list should contain the file content
+        var content = responseList.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
 
         var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA, List.of(BASIC_CSV_CONTENT));
+        var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
 
-        assertDataEqual(originalData, storedData);
+        assertDataEqual(originalData, responseData);
+
 
         // Check the metadata as well
 
@@ -696,51 +684,27 @@ public class DatasetRwOperationsTest {
 
         // Now check the V2 data
 
-        // Get data and storage def
+        // Use the Data API to read and check the data
+        // API tests cannot inspect the storage directly
 
-        var readDataDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(v2Id)));
-        waitFor(TEST_TIMEOUT, readDataDef);
-        var dataTag = resultOf(readDataDef);
-        var dataDef = dataTag.getDefinition().getData();
+        var v2Request = readRequest(v2Id);
+        var readDataset = DataApiTestHelpers.serverStreaming(dataClient::readDataset, v2Request, execContext);
+        waitFor(TEST_TIMEOUT, readDataset);
+        var responseList = resultOf(readDataset);
 
-        var readStorageDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(dataDef.getStorageId())));
-        waitFor(TEST_TIMEOUT, readStorageDef);
-        var storageTag = resultOf(readStorageDef);
-        var storageDef = storageTag.getDefinition().getStorage();
+        // First response message should contain metadata only, with an empty buffer
+        var response0 = responseList.get(0);
+        Assertions.assertEquals(ByteString.EMPTY, response0.getContent());
 
-        // Get the storage path out of the metadata
-
-        var rootPartKey = PartKeys.opaqueKey(PartKeys.ROOT);
-        var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
-        var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
-
-        var storageRoot = platform.storageRootDir();
-        var copyDir = storageRoot.resolve(copy.getStoragePath());
-
-        var copyFiles = Files.walk(copyDir)
-                .filter(p -> !p.equals(copyDir))  // Do not include the copyDir in the file list
-                .collect(Collectors.toList());
-
-        // Data should be stored in one piece (even if chunking is implemented, dataset is too small to chunk up)
-
-        Assertions.assertEquals(1, copyFiles.size());
-
-        var copyFile = copyFiles.get(0);
-
-        // Check the file exists
-
-        Assertions.assertTrue(Files.isRegularFile(copyFile));
-        Assertions.assertTrue(Files.size(copyFile) > 0);
-
-        // Decode data directly from the file in storage and check against the original
-        // For this test case, data is stored in arrow file format
-
-        var channel = Files.newByteChannel(copyFile, StandardOpenOption.READ);
-        var storedData = DataApiTestHelpers.decodeArrowFile(dataDef.getSchema(), channel);
+        // The remainder of the list should contain the file content
+        var content = responseList.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
 
         var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA_V2, List.of(BASIC_CSV_CONTENT_V2));
+        var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
 
-        assertDataEqual(originalData, storedData);
+        assertDataEqual(originalData, responseData);
     }
 
     @Test
@@ -850,51 +814,27 @@ public class DatasetRwOperationsTest {
 
         // Now check the V2 data
 
-        // Get data and storage def
+        // Use the Data API to read and check the data
+        // API tests cannot inspect the storage directly
 
-        var readDataDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(v2Id)));
-        waitFor(TEST_TIMEOUT, readDataDef);
-        var dataTag = resultOf(readDataDef);
-        var dataDef = dataTag.getDefinition().getData();
+        var v2Request = readRequest(v2Id);
+        var readDataset = DataApiTestHelpers.serverStreaming(dataClient::readDataset, v2Request, execContext);
+        waitFor(TEST_TIMEOUT, readDataset);
+        var responseList = resultOf(readDataset);
 
-        var readStorageDef = Futures.javaFuture(metaClient.readObject(metaReadRequest(dataDef.getStorageId())));
-        waitFor(TEST_TIMEOUT, readStorageDef);
-        var storageTag = resultOf(readStorageDef);
-        var storageDef = storageTag.getDefinition().getStorage();
+        // First response message should contain metadata only, with an empty buffer
+        var response0 = responseList.get(0);
+        Assertions.assertEquals(ByteString.EMPTY, response0.getContent());
 
-        // Get the storage path out of the metadata
-
-        var rootPartKey = PartKeys.opaqueKey(PartKeys.ROOT);
-        var delta = dataDef.getPartsOrThrow(rootPartKey).getSnap().getDeltas(0);
-        var copy = storageDef.getDataItemsOrThrow(delta.getDataItem()).getIncarnations(0).getCopies(0);
-
-        var storageRoot = platform.storageRootDir();
-        var copyDir = storageRoot.resolve(copy.getStoragePath());
-
-        var copyFiles = Files.walk(copyDir)
-                .filter(p -> !p.equals(copyDir))  // Do not include the copyDir in the file list
-                .collect(Collectors.toList());
-
-        // Data should be stored in one piece (even if chunking is implemented, dataset is too small to chunk up)
-
-        Assertions.assertEquals(1, copyFiles.size());
-
-        var copyFile = copyFiles.get(0);
-
-        // Check the file exists
-
-        Assertions.assertTrue(Files.isRegularFile(copyFile));
-        Assertions.assertTrue(Files.size(copyFile) > 0);
-
-        // Decode data directly from the file in storage and check against the original
-        // For this test case, data is stored in arrow file format
-
-        var channel = Files.newByteChannel(copyFile, StandardOpenOption.READ);
-        var storedData = DataApiTestHelpers.decodeArrowFile(dataDef.getSchema(), channel);
+        // The remainder of the list should contain the file content
+        var content = responseList.stream().skip(1)
+                .map(DataReadResponse::getContent)
+                .reduce(ByteString.EMPTY, ByteString::concat);
 
         var originalData = DataApiTestHelpers.decodeCsv(BASIC_SCHEMA_V2, List.of(BASIC_CSV_CONTENT_V2));
+        var responseData = DataApiTestHelpers.decodeCsv(response0.getSchema(), List.of(content));
 
-        assertDataEqual(originalData, storedData);
+        assertDataEqual(originalData, responseData);
 
         // Check the metadata as well
 

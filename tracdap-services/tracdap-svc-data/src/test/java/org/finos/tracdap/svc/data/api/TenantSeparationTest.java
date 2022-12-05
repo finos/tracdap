@@ -25,6 +25,8 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.test.helpers.PlatformTest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
@@ -36,24 +38,63 @@ import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-public class TenantSeparationTest {
+abstract class TenantSeparationTest {
 
-    private static final String TRAC_UNIT_CONFIG = "config/trac-unit.yaml";
-    private static final String TEST_TENANT = "ACME_CORP";
-    private static final String TEST_TENANT_2 = "SOME_OTHER_CORP";
-    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+    public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
+    public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
+    public static final String TEST_TENANT = "ACME_CORP";
+    public static final String TEST_TENANT_2 = "SOME_OTHER_CORP";
+    public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
 
-    @RegisterExtension
-    private static final PlatformTest platform = PlatformTest.forConfig(TRAC_UNIT_CONFIG)
-            .addTenant(TEST_TENANT)
-            .addTenant(TEST_TENANT_2)
-            .startMeta()
-            .startData()
-            .build();
+    protected IExecutionContext execContext;
+    protected TracMetadataApiGrpc.TracMetadataApiFutureStub metaClient;
+    protected TracDataApiGrpc.TracDataApiStub dataClient;
 
-    IExecutionContext execContext = new ExecutionContext(new DefaultEventExecutor());
-    TracMetadataApiGrpc.TracMetadataApiFutureStub metaClient = platform.metaClientFuture();
-    TracDataApiGrpc.TracDataApiStub dataClient = platform.dataClient();
+
+    // Include this test case as a unit test
+    static class UnitTest extends TenantSeparationTest {
+
+        @RegisterExtension
+        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_UNIT)
+                .runDbDeploy(true)
+                .addTenant(TEST_TENANT)
+                .addTenant(TEST_TENANT_2)
+                .startMeta()
+                .startData()
+                .build();
+
+        @BeforeEach
+        void setup() {
+            execContext = new ExecutionContext(new DefaultEventExecutor());
+            metaClient = platform.metaClientFuture();
+            dataClient = platform.dataClient();
+        }
+    }
+
+    // Include this test case for integration against different database backends
+    @org.junit.jupiter.api.Tag("integration")
+    @Tag("int-storage")
+    static class IntegrationTest extends TenantSeparationTest {
+
+        private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
+
+        @RegisterExtension
+        private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
+                .runDbDeploy(true)
+                .addTenant(TEST_TENANT)
+                .addTenant(TEST_TENANT_2)
+                .startMeta()
+                .startData()
+                .build();
+
+        @BeforeEach
+        void setup() {
+            execContext = new ExecutionContext(new DefaultEventExecutor());
+            metaClient = platform.metaClientFuture();
+            dataClient = platform.dataClient();
+        }
+    }
+
 
     @Test
     void testCreateFile_tenantOmitted() {

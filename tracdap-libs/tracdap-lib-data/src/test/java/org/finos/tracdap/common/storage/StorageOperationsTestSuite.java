@@ -16,30 +16,23 @@
 
 package org.finos.tracdap.common.storage;
 
-import org.finos.tracdap.common.concurrent.ExecutionContext;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStorageRequest;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EValidationGap;
-import org.finos.tracdap.common.storage.local.LocalFileStorage;
 import org.finos.tracdap.common.concurrent.Flows;
 
 import io.netty.buffer.*;
-import io.netty.util.concurrent.DefaultEventExecutor;
-import io.netty.util.concurrent.DefaultThreadFactory;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
-import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Properties;
 import java.util.concurrent.*;
 import java.util.function.BiFunction;
 
@@ -49,7 +42,7 @@ import static org.finos.tracdap.test.storage.StorageTestHelpers.makeFile;
 import static org.finos.tracdap.test.storage.StorageTestHelpers.makeSmallFile;
 
 
-public class FileStorageOperationsTest {
+public abstract class StorageOperationsTestSuite {
 
     /* >>> Test suite for IFileStorage - file system operations, functional tests
 
@@ -63,24 +56,13 @@ public class FileStorageOperationsTest {
     tests. This can allow for finer grained control, particularly when testing corner cases and error conditions.
      */
 
+    // Unit test implementation for local storage is in LocalStorageOperationsTest
+
     public static final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
 
-    IFileStorage storage;
-    IExecutionContext execContext;
-
-    @TempDir
-    Path storageDir;
-
-    @BeforeEach
-    void setupStorage() {
-
-        var storageProps = new Properties();
-        storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
-        storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, storageDir.toString());
-        storage = new LocalFileStorage(storageProps);
-
-        execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
-    }
+    protected IFileStorage storage;
+    protected IExecutionContext execContext;
+    protected IDataContext dataContext;
 
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -335,7 +317,7 @@ public class FileStorageOperationsTest {
         var testStart = Instant.now();
         Thread.sleep(10);  // Let time elapse before/after the test calls
 
-        var reader = storage.reader("test_file.txt", execContext);
+        var reader = storage.reader("test_file.txt", dataContext);
         var collect = Flows.fold(
                 reader, (composite, buf) -> composite.addComponent(true, buf),
                 ByteBufAllocator.DEFAULT.compositeBuffer());
@@ -533,12 +515,12 @@ public class FileStorageOperationsTest {
         // Corner case - dir with an extension, file without extension
 
 
-        var prepare = storage.mkdir("test_dir", false, execContext)
-                .thenCompose(x -> storage.mkdir("test_dir/child_1.dat", false, execContext))
-                .thenCompose(x -> makeSmallFile("test_dir/child_2_file", storage, execContext));
+        var prepare = storage.mkdir("ls_extensions", false, execContext)
+                .thenCompose(x -> storage.mkdir("ls_extensions/child_1.dat", false, execContext))
+                .thenCompose(x -> makeSmallFile("ls_extensions/child_2_file", storage, execContext));
         waitFor(TEST_TIMEOUT, prepare);
 
-        var ls = storage.ls("test_dir", execContext);
+        var ls = storage.ls("ls_extensions", execContext);
         waitFor(TEST_TIMEOUT, ls);
 
         var dirStat = resultOf(ls);
@@ -549,11 +531,11 @@ public class FileStorageOperationsTest {
         var child2 = dirStat.entries.stream().filter(e -> e.fileName.equals("child_2_file")).findFirst();
 
         Assertions.assertTrue(child1.isPresent());
-        Assertions.assertEquals("test_dir/child_1.dat", child1.get().storagePath);
+        Assertions.assertEquals("ls_extensions/child_1.dat", child1.get().storagePath);
         Assertions.assertEquals(FileType.DIRECTORY, child1.get().fileType);
 
         Assertions.assertTrue(child2.isPresent());
-        Assertions.assertEquals("test_dir/child_2_file", child2.get().storagePath);
+        Assertions.assertEquals("ls_extensions/child_2_file", child2.get().storagePath);
         Assertions.assertEquals(FileType.FILE, child2.get().fileType);
     }
 
@@ -562,12 +544,12 @@ public class FileStorageOperationsTest {
 
         // Storage path should be accepted with or without trailing slash
 
-        var prepare = storage.mkdir("test_dir", false, execContext)
-                .thenCompose(x -> makeSmallFile("test_dir/some_file.txt", storage, execContext));
+        var prepare = storage.mkdir("ls_trailing_slash", false, execContext)
+                .thenCompose(x -> makeSmallFile("ls_trailing_slash/some_file.txt", storage, execContext));
         waitFor(TEST_TIMEOUT, prepare);
 
-        var ls1 = storage.ls("test_dir", execContext);
-        var ls2 = storage.ls("test_dir/", execContext);
+        var ls1 = storage.ls("ls_trailing_slash", execContext);
+        var ls2 = storage.ls("ls_trailing_slash/", execContext);
         waitFor(TEST_TIMEOUT, ls1, ls2);
 
         var dirStat1 = resultOf(ls1);
@@ -591,7 +573,7 @@ public class FileStorageOperationsTest {
 
         var dirStat = resultOf(ls);
 
-        Assertions.assertEquals(2, dirStat.entries.size());
+        Assertions.assertTrue(dirStat.entries.size() >= 2);
 
         var child1 = dirStat.entries.stream().filter(e -> e.fileName.equals("test_dir")).findFirst();
         var child2 = dirStat.entries.stream().filter(e -> e.fileName.equals("test_file.txt")).findFirst();

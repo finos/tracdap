@@ -52,6 +52,9 @@ public abstract class ArrowEncoder extends StreamingEncoder implements DataPipel
 
         try {
 
+            if (log.isTraceEnabled())
+                log.trace("ARROW ENCODER: onStart()");
+
             this.root = root;
             this.writer = createWriter(root);
 
@@ -70,6 +73,10 @@ public abstract class ArrowEncoder extends StreamingEncoder implements DataPipel
     public void onNext() {
 
         try {  // This will release the batch
+
+            if (log.isTraceEnabled())
+                log.trace("ARROW ENCODER: onNext()");
+
             writer.writeBatch();
         }
         catch (IOException e) {
@@ -84,6 +91,9 @@ public abstract class ArrowEncoder extends StreamingEncoder implements DataPipel
     public void onComplete() {
 
         try {
+
+            if (log.isTraceEnabled())
+                log.trace("ARROW ENCODER: onComplete()");
 
             markAsDone();
 
@@ -110,6 +120,10 @@ public abstract class ArrowEncoder extends StreamingEncoder implements DataPipel
     public void onError(Throwable error) {
 
         try {
+
+            if (log.isTraceEnabled())
+                log.trace("ARROW ENCODER: onError()");
+
             markAsDone();
             consumer().onError(error);
         }

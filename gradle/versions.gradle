@@ -28,8 +28,8 @@ ext {
 
     // Data technologies
     arrow_version = '9.0.0'
-    jackson_version = '2.13.4'
-    jackson_databind_version = '2.13.4'
+    jackson_version = '2.14.1'
+    jackson_databind_version = '2.14.1'
 
     // Util libraries
     slf4j_version = '1.7.36'
@@ -60,7 +60,14 @@ ext {
 
 
     // Plugins
-    aws_sdk_version = '1.12.267'
+
+    aws_sdk_version = '2.18.25'
+
+    // AWS SDK uses Reactive Streams
+    // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
+    reactive_streams_version = '1.0.4'
+
+
     gcp_sdk_version = '2.6.1'
     gcp_sdk_http_client_version = '1.41.8'  // Force Google HTTP client version needed for compliance
 

@@ -66,51 +66,15 @@ dependencies {
 }
 
 
-// Skeleton tasks for packing plugins
+// set up dependencies for SQL driver plugins
+// Done here because there isn't an obvious way to reference source sets in plugins.gradle
+ext.DEPEND_sql_h2 = sourceSets.h2.runtimeClasspath
+ext.DEPEND_sql_mysql = sourceSets.mysql.runtimeClasspath
+ext.DEPEND_sql_mariadb = sourceSets.mariadb.runtimeClasspath
+ext.DEPEND_sql_postgresql = sourceSets.postgresql.runtimeClasspath
+ext.DEPEND_sql_sqlserver = sourceSets.sqlserver.runtimeClasspath
+ext.DEPEND_sql_oracle = sourceSets.oracle.runtimeClasspath
 
-configurations {
-    packPlugins
-}
-
-task packPlugins {
-
-}
-
-def packPlugin(SourceSet dialect) {
-
-    def pluginDir = "${rootProject.buildDir.path}/plugins/sql.${dialect.name}"
-    mkdir(pluginDir)
-
-    copy {
-        from dialect.runtimeClasspath
-        into pluginDir
-    }
-}
-
-
-// Lock for the enabled driver plugins and switch them on
-
-sourceSets.each { dialect ->
-
-    if (dialect.name != "main" && dialect.name != "test") {
-
-        // Only build drivers that are enabled in gradle/plugins.gradle or using the matching env variable
-
-        def key = (String) "sql_${dialect.name}"
-        def buildDriver = isFeatureEnabled(key)
-
-        if (buildDriver) {
-
-            println("Enabling SQL driver: ${dialect.name}")
-
-            // API dependency allows drivers to be used by linking the sql-drivers project
-            dependencies {
-                runtimeOnly dialect.runtimeClasspath
-            }
-
-            // packPlugin task is used to build plugins for deployment or distribution
-            tasks.create("packPlugin_sql.${dialect.name}", { -> packPlugin(dialect) })
-            tasks.packPlugins.dependsOn("packPlugin_sql.${dialect.name}")
-        }
-    }
-}
+// Enable build time dependencies for SQL
+// Done here because the DEPEND_ variables aren't visible in the application projects (-svc-meta, deploy-metadb)
+ext.enableBuildTimePlugins(["sql"])

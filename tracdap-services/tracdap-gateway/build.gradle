@@ -41,10 +41,6 @@ application {
 
 ext.addVersionInfo(sourceSets.getByName("main"), "TRAC Platform Gateway")
 
-sourceSets {
-    aws {}
-    gcp {}
-}
 
 dependencies {
 
@@ -64,11 +60,8 @@ dependencies {
     implementation group: 'com.google.protobuf', name: 'protobuf-java', version: "$proto_version"
     implementation group: 'com.google.protobuf', name: 'protobuf-java-util', version: "$proto_version"
 
-    awsRuntimeOnly project(':aws-config')
-    gcpRuntimeOnly project(':gcp-config')
 
     // Test
-
 
     testImplementation project(':tracdap-lib-test')
 
@@ -81,8 +74,9 @@ dependencies {
     }
 }
 
-ext.pluginDependency("AWS_CONFIG", project(":aws-config"))
-ext.pluginDependency("GCP_CONFIG", project(":gcp-config"))
+// Add any plugin dependencies enabled at build time
+ext.enableBuildTimePlugins(["config"])
+
 
 distributions {
     main {

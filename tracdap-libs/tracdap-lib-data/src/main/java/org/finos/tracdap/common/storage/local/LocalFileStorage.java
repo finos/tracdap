@@ -16,7 +16,9 @@
 
 package org.finos.tracdap.common.storage.local;
 
+import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
+import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.storage.*;
 
@@ -34,26 +36,15 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 
-import static org.finos.tracdap.common.storage.local.LocalFileErrors.ExplicitError.*;
+import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
 
 public class LocalFileStorage implements IFileStorage {
 
     public static final String CONFIG_ROOT_PATH = "rootPath";
 
-    private static final String BACKSLASH = "/";
-
-    private static final String EXISTS_OPERATION = "exists";
-    private static final String SIZE_OPERATION = "size";
-    private static final String STAT_OPERATION = "stat";
-    private static final String LS_OPERATION = "ls";
-    private static final String MKDIR_OPERATION = "mkdir";
-    private static final String RM_OPERATION = "rm";
-    static final String WRITE_OPERATION = "write";
-    static final String READ_OPERATION = "read";
-
     private final Logger log = LoggerFactory.getLogger(getClass());
-    private final LocalFileErrors errors;
+    private final StorageErrors errors;
 
     private final String storageKey;
     private final Path rootPath;
@@ -62,7 +53,7 @@ public class LocalFileStorage implements IFileStorage {
 
         this.storageKey = config.getProperty(IStorageManager.PROP_STORAGE_KEY);
 
-        this.errors = new LocalFileErrors(log, storageKey);
+        this.errors = new LocalStorageErrors(storageKey, log);
 
         // TODO: Robust config handling
 
@@ -70,6 +61,12 @@ public class LocalFileStorage implements IFileStorage {
         this.rootPath = Paths.get(rootDirProp)
                 .toAbsolutePath()
                 .normalize();
+    }
+
+    @Override
+    public void start(EventLoopGroup eventLoopGroup) {
+
+        // These are just checks, no need to initialize anything
 
         if (!Files.exists(this.rootPath)) {
             var err = String.format("Storage root path does not exist: %s [%s]", storageKey, rootPath);
@@ -94,6 +91,12 @@ public class LocalFileStorage implements IFileStorage {
         }
 
         logFsInfo();
+    }
+
+    @Override
+    public void stop() {
+
+        // No-op
     }
 
     private void logFsInfo() {
@@ -345,7 +348,7 @@ public class LocalFileStorage implements IFileStorage {
     }
 
     @Override
-    public Flow.Publisher<ByteBuf> reader(String storagePath, IExecutionContext execContext) {
+    public Flow.Publisher<ByteBuf> reader(String storagePath, IDataContext dataContext) {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, READ_OPERATION, storagePath);
 
@@ -354,14 +357,14 @@ public class LocalFileStorage implements IFileStorage {
         return new LocalFileReader(
                 storageKey, storagePath,
                 absolutePath, ByteBufAllocator.DEFAULT,
-                execContext.eventLoopExecutor());
+                dataContext.eventLoopExecutor());
     }
 
     @Override
     public Flow.Subscriber<ByteBuf> writer(
             String storagePath,
             CompletableFuture<Long> signal,
-            IExecutionContext execContext) {
+            IDataContext dataContext) {
 
         log.info("STORAGE OPERATION: {} {} [{}]", storageKey, WRITE_OPERATION, storagePath);
 
@@ -370,7 +373,7 @@ public class LocalFileStorage implements IFileStorage {
         return new LocalFileWriter(
                 storageKey, storagePath,
                 absolutePath, signal,
-                execContext.eventLoopExecutor());
+                dataContext.eventLoopExecutor());
     }
 
     private Path resolvePath(String storagePath, boolean allowRootDir, String operationName) {

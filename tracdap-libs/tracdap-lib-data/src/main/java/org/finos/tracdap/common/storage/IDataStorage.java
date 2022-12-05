@@ -20,12 +20,20 @@ import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.IDataContext;
 import org.finos.tracdap.metadata.StorageCopy;
 
+import io.netty.channel.EventLoopGroup;
 import org.apache.arrow.vector.types.pojo.Schema;
 
 import java.util.concurrent.CompletableFuture;
 
 
-public interface IDataStorage {
+public interface IDataStorage extends AutoCloseable {
+
+    void start(EventLoopGroup eventLoopGroup);
+
+    void stop();
+
+    @Override
+    default void close() { stop(); }
 
     DataPipeline pipelineReader(
             StorageCopy storageCopy,

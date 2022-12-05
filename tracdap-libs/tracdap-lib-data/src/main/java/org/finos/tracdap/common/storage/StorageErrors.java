@@ -14,25 +14,25 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.storage.local;
+package org.finos.tracdap.common.storage;
 
 import org.finos.tracdap.common.exception.*;
+
 import org.slf4j.Logger;
 
-import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.nio.file.*;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
-import static org.finos.tracdap.common.storage.local.LocalFileErrors.ExplicitError.*;
+import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
-public class LocalFileErrors {
 
-    enum ExplicitError {
+public abstract class StorageErrors {
+
+    public enum ExplicitError {
 
         // Validation failures
         STORAGE_PATH_NULL_OR_BLANK,
@@ -65,16 +65,6 @@ public class LocalFileErrors {
         CHUNK_NOT_FULLY_WRITTEN,
     }
 
-    private static final List<Map.Entry<Class<? extends Exception>, ExplicitError>> EXCEPTION_CLASS_MAP = List.of(
-            Map.entry(NoSuchFileException.class, NO_SUCH_FILE_EXCEPTION),
-            Map.entry(FileAlreadyExistsException.class, FILE_ALREADY_EXISTS_EXCEPTION),
-            Map.entry(DirectoryNotEmptyException.class, DIRECTORY_NOT_FOUND_EXCEPTION),
-            Map.entry(NotDirectoryException.class, NOT_DIRECTORY_EXCEPTION),
-            Map.entry(AccessDeniedException.class, ACCESS_DENIED_EXCEPTION),
-            Map.entry(SecurityException.class, SECURITY_EXCEPTION),
-            // IOException must be last in the list, not to obscure most specific exceptions
-            Map.entry(IOException.class, IO_EXCEPTION));
-
     private static final Map<ExplicitError, String> ERROR_MESSAGE_MAP = Map.ofEntries(
             Map.entry(STORAGE_PATH_NULL_OR_BLANK, "Requested storage path is null or blank: %s %s [%s]"),
             Map.entry(STORAGE_PATH_NOT_RELATIVE, "Requested storage path is not a relative path: %s %s [%s]"),
@@ -88,7 +78,7 @@ public class LocalFileErrors {
 
             Map.entry(NO_SUCH_FILE_EXCEPTION, "File not found in storage layer: %s %s [%s]"),
             Map.entry(FILE_ALREADY_EXISTS_EXCEPTION, "File already exists in storage layer: %s %s [%s]"),
-            Map.entry(DIRECTORY_NOT_FOUND_EXCEPTION, "Directory is not empty in storage layer: %s %s [%s]"),
+            Map.entry(DIRECTORY_NOT_FOUND_EXCEPTION, "Directory not found in storage layer: %s %s [%s]"),
             Map.entry(NOT_DIRECTORY_EXCEPTION, "Path is not a directory in storage layer: %s %s [%s]"),
             Map.entry(ACCESS_DENIED_EXCEPTION, "Access denied in storage layer: %s %s [%s]"),
             Map.entry(SECURITY_EXCEPTION, "Access denied in storage layer: %s %s [%s]"),
@@ -125,37 +115,34 @@ public class LocalFileErrors {
 
             Map.entry(CHUNK_NOT_FULLY_WRITTEN, EStorageCommunication.class));
 
-    private final Logger log;
     private final String storageKey;
+    private final Logger log;
 
-    LocalFileErrors(Logger log, String storageKey) {
-        this.log = log;
+    protected StorageErrors(String storageKey, Logger log) {
+
         this.storageKey = storageKey;
+        this.log = log;
     }
 
-    ETrac handleException(Throwable e, String storagePath, String operationName) {
+    protected abstract ExplicitError checkKnownExceptions(Throwable e);
+
+    public ETrac handleException(Throwable e, String storagePath, String operationName) {
+
+        if (e instanceof CompletionException && e.getCause() != null)
+            e = e.getCause();
 
         // Error of type ETrac means the error is already handled
         if (e instanceof ETrac)
             return (ETrac) e;
 
-        // Look in the map of error types to see if e is an expected exception
-        for (var error : EXCEPTION_CLASS_MAP) {
+        var knownException = checkKnownExceptions(e);
 
-            var errorClass = error.getKey();
-
-            if (errorClass.isInstance(e)) {
-
-                var explicitError = error.getValue();
-                return exception(explicitError, e, storagePath, operationName);
-            }
-        }
-
-        // Last fallback - report an unknown error in the storage layer
-        return exception(UNKNOWN_ERROR, e, storagePath, operationName);
+        return knownException != null
+                ? exception(knownException, e, storagePath, operationName)
+                : exception(UNKNOWN_ERROR, e, storagePath, operationName);
     }
 
-    ETrac explicitError(ExplicitError error, String path, String operation) {
+    public ETrac explicitError(ExplicitError error, String path, String operation) {
 
         try {
 
@@ -178,7 +165,7 @@ public class LocalFileErrors {
         }
     }
 
-    ETrac exception(ExplicitError error, Throwable cause, String path, String operation) {
+    public ETrac exception(ExplicitError error, Throwable cause, String path, String operation) {
 
         try {
 
@@ -201,7 +188,7 @@ public class LocalFileErrors {
         }
     }
 
-    ETrac chunkNotFullyWritten(int chunkBytes, int writtenBytes) {
+    public ETrac chunkNotFullyWritten(int chunkBytes, int writtenBytes) {
 
         try {
 
