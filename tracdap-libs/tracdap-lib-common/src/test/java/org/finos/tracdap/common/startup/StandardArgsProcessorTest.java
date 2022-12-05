@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class StandardArgsProcessorTest {
 
     private static final String APP_NAME = "Test App";
+    private static final String SECRET_KEY_ENV_VAR = "TRAC_SECRET_KEY";
 
     @Test
     void testArgs_ok() {
@@ -46,7 +47,7 @@ class StandardArgsProcessorTest {
     @Test
     void testArgs_envVariables_ok() {
 
-        Map<String, String> envVariables = Collections.singletonMap("SECRET_KEY", "Mellon");
+        Map<String, String> envVariables = Collections.singletonMap(SECRET_KEY_ENV_VAR, "Mellon");
 
         var command = "--config etc/my_config.props";
         var commandArgs = command.split("\\s");
@@ -59,9 +60,9 @@ class StandardArgsProcessorTest {
     }
 
     @Test
-    void testArgs_argsBeatConfig_ok() {
+    void testArgs_argsBeatEnvVariables_ok() {
 
-        Map<String, String> envVariables = Collections.singletonMap("SECRET_KEY", "Fruit");
+        Map<String, String> envVariables = Collections.singletonMap(SECRET_KEY_ENV_VAR, "Fruit");
 
         var command = "--config etc/my_config.props --secret-key Mellon";
         var commandArgs = command.split("\\s");
