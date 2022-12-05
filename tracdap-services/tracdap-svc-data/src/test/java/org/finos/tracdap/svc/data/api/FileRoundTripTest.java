@@ -81,11 +81,14 @@ abstract class FileRoundTripTest  {
     }
 
     // Include this test case for integration against different database backends
-    @org.junit.jupiter.api.Tag("integration")
+    @Tag("integration")
     @Tag("int-storage")
     static class IntegrationTest extends FileRoundTripTest {
 
-        private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR);
+        // Slow unit tests count as integration, so fall back to using the unit test config
+        private static final String TRAC_CONFIG_ENV_FILE = System.getenv(TRAC_CONFIG_ENV_VAR) != null
+                ? System.getenv(TRAC_CONFIG_ENV_VAR)
+                : TRAC_CONFIG_UNIT;
 
         @RegisterExtension
         private static final PlatformTest platform = PlatformTest.forConfig(TRAC_CONFIG_ENV_FILE)
