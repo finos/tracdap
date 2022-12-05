@@ -90,6 +90,19 @@ jobs:
           cd build/dist
           zip -r tracdap-sandbox-${VERSION}.zip tracdap-sandbox-${VERSION}
 
+      - name: Assemble plugins package
+        run: |
+          VERSION=`dev/version.sh`
+          mkdir -p build/dist/tracdap-plugins-${VERSION}
+          for PLUGIN in build/plugins/*/install/*; do
+            PLUGIN_NAME=`basename ${PLUGIN}`
+            mkdir build/dist/tracdap-plugins-${VERSION}/${PLUGIN_NAME}
+            cp ${PLUGIN}/*.jar build/dist/tracdap-plugins-${VERSION}/${PLUGIN_NAME}/
+            cp ${PLUGIN}/lib/*.jar build/dist/tracdap-plugins-${VERSION}/${PLUGIN_NAME}/
+          done
+          cd build/dist
+          tar -czvf tracdap-plugins-${VERSION}.tgz tracdap-plugins-${VERSION}/*
+
       - name: Save packages
         uses: actions/upload-artifact@v3
         with:
@@ -290,6 +303,16 @@ jobs:
           asset_path: tracdap-sandbox-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
           asset_name: tracdap-sandbox-${{ steps.tracdap-version.outputs.tracdap_version }}.zip
           asset_content_type: application/zip
+
+      - name: Publish plugins package
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: tracdap-plugins-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
+          asset_name: tracdap-plugins-${{ steps.tracdap-version.outputs.tracdap_version }}.tgz
+          asset_content_type: application/gzip
 
       - name: Publish API packages
         uses: actions/upload-release-asset@v1
