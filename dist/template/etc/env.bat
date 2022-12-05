@@ -28,7 +28,7 @@
 @rem PLUGINS_ENABLED - Whether to load plugins from PLUGIN_DIR, defaults to true
 @rem PLUGINS_EXT_DIR - Location for external plugins, JARs in this folder will be added to the classpath
 @rem PLUGINS_EXT_ENABLED - Whether to load plugins from PLUGIN_EXT_DIR, defaults to false
-@rem SECRET_KEY - Location of the JKS secret key
+@rem SECRET_KEY - Value of the secret key
 
 @rem JAVA_HOME - Use a specific JVM
 @rem JAVA_OPTS - Java options passed to the JVM on startup

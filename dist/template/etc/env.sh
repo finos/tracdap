@@ -23,7 +23,7 @@
 # PLUGINS_ENABLED - Whether to load plugins from PLUGIN_DIR, defaults to true
 # PLUGINS_EXT_DIR - Location for external plugins, JARs in this folder will be added to the classpath
 # PLUGINS_EXT_ENABLED - Whether to load plugins from PLUGIN_EXT_DIR, defaults to false
-# SECRET_KEY - Location of the JKS secret key
+# SECRET_KEY - Value of the secret key
 
 # JAVA_HOME - Use a specific JVM
 # JAVA_OPTS - Java options passed to the JVM on startup
