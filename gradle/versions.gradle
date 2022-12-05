@@ -60,7 +60,14 @@ ext {
 
 
     // Plugins
+
     aws_sdk_version = '2.18.25'
+
+    // AWS SDK uses Reactive Streams
+    // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
+    reactive_streams_version = '1.0.4'
+
+
     gcp_sdk_version = '2.6.1'
     gcp_sdk_http_client_version = '1.41.8'  // Force Google HTTP client version needed for compliance
 

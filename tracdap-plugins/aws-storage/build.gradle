@@ -36,6 +36,10 @@ dependencies {
     implementation group: 'software.amazon.awssdk', name: 'netty-nio-client', version: "$aws_sdk_version"
     implementation group: 'software.amazon.awssdk', name: 's3', version: "$aws_sdk_version"
 
+    // AWS SDK uses Reactive Streams
+    // Only the latest version has a good license (MIT-0, prior versions were Creative Commons)
+    implementation group: 'org.reactivestreams', name: 'reactive-streams', version: "$reactive_streams_version"
+
     // Force the version of Jackson (only latest stable will ever pass compliance)
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "$jackson_version"
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "$jackson_databind_version"
