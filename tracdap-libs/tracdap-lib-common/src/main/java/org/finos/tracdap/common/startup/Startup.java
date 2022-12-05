@@ -36,7 +36,7 @@ public class Startup {
         StartupSequence.printBanner(serviceClass);
 
         var componentName = VersionInfo.getComponentName(serviceClass);
-        var standardArgs = StandardArgsProcessor.processArgs(componentName, args, tasks);
+        var standardArgs = StandardArgsProcessor.processArgs(componentName, args, tasks, null);
 
         return new StartupSequence(serviceClass, standardArgs, false);
     }
