@@ -43,7 +43,11 @@ class S3ObjectStorage(IFileStorage):
 
     REGION_PROPERTY = "region"
     BUCKET_PROPERTY = "bucket"
-    PATH_PROPERTY = "path"
+    PREFIX_PROPERTY = "prefix"
+
+    CREDENTIALS_PROPERTY = "credentials"
+    CREDENTIALS_DEFAULT = "default"
+    CREDENTIALS_STATIC = "static"
 
     ACCESS_KEY_ID_PROPERTY = "accessKeyId"
     SECRET_ACCESS_KEY_PROPERTY = "secretAccessKey"
@@ -57,16 +61,37 @@ class S3ObjectStorage(IFileStorage):
 
         self._region = config.properties[self.REGION_PROPERTY]
         self._bucket = config.properties[self.BUCKET_PROPERTY]
-        self._rootPath = config.properties[self.PATH_PROPERTY] if self.PATH_PROPERTY in config.properties else ""
+        self._prefix = config.properties[self.PREFIX_PROPERTY] if self.PREFIX_PROPERTY in config.properties else ""
 
-        access_key_id = config.properties[self.ACCESS_KEY_ID_PROPERTY]
-        secret_access_key = config.properties[self.SECRET_ACCESS_KEY_PROPERTY]
+        credentials_params = self.setup_credentials(config.properties)
 
         self.__client = boto3.client(
             service_name="s3",
             region_name=self._region,
-            aws_access_key_id=access_key_id,
-            aws_secret_access_key=secret_access_key)
+            **credentials_params)
+
+    def setup_credentials(self, properties: dict):
+
+        mechanism = properties[self.CREDENTIALS_PROPERTY] if self.CREDENTIALS_PROPERTY in properties else self.CREDENTIALS_DEFAULT
+
+        if mechanism.lower() == self.CREDENTIALS_DEFAULT:
+            self._log.info(f"Using [{self.CREDENTIALS_DEFAULT}] credentials mechanism")
+            return {}
+
+        if mechanism.lower() == self.CREDENTIALS_STATIC:
+
+            access_key_id = properties[self.ACCESS_KEY_ID_PROPERTY]
+            secret_access_key = properties[self.SECRET_ACCESS_KEY_PROPERTY]
+
+            self._log.info(
+                f"Using [{self.CREDENTIALS_STATIC}] credentials mechanism, " +
+                f"access key id = [{access_key_id}]")
+
+            return {"aws_access_key_id": access_key_id, "aws_secret_access_key": secret_access_key}
+
+        message = f"Unrecognised credentials mechanism: [{mechanism}]"
+        self._log.error(message)
+        raise _ex.EStartup(message)
 
     def exists(self, storage_path: str) -> bool:
 
@@ -246,10 +271,10 @@ class S3ObjectStorage(IFileStorage):
 
     def _resolve_path(self, storage_path: str) -> str:
 
-        if self._rootPath is None or self._rootPath.strip() == "":
+        if self._prefix is None or self._prefix.strip() == "":
             return storage_path
 
-        separator = "" if self._rootPath.endswith("/") else "/"
-        full_path = self._rootPath + separator + storage_path
+        separator = "" if self._prefix.endswith("/") else "/"
+        full_path = self._prefix + separator + storage_path
 
         return full_path[1:] if full_path.startswith("/") else full_path
