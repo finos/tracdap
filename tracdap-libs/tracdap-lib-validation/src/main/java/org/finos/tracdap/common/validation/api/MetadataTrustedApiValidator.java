@@ -39,9 +39,9 @@ public class MetadataTrustedApiValidator {
         return MetadataApiValidator.createObject(msg, ctx, MetadataApiValidator.TRUSTED_API, true);
     }
 
-    @Validator(method = "createBatch")
-    public static ValidationContext createBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.createBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
+    @Validator(method = "createObjectBatch")
+    public static ValidationContext createObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.createObjectBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
     }
 
     @Validator(method = "updateObject")
@@ -49,9 +49,9 @@ public class MetadataTrustedApiValidator {
         return MetadataApiValidator.updateObject(msg, ctx, MetadataApiValidator.TRUSTED_API, true);
     }
 
-    @Validator(method = "updateBatch")
-    public static ValidationContext updateBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.updateBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
+    @Validator(method = "updateObjectBatch")
+    public static ValidationContext updateObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.updateObjectBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
     }
 
     @Validator(method = "updateTag")
@@ -59,9 +59,9 @@ public class MetadataTrustedApiValidator {
         return MetadataApiValidator.updateTag(msg, ctx, MetadataApiValidator.TRUSTED_API, true);
     }
 
-    @Validator(method = "updateBatchTag")
-    public static ValidationContext updateBatchTag(MetadataWriteBatchRequest msg, ValidationContext ctx) {
-        return MetadataApiValidator.updateBatchTag(msg, ctx, MetadataApiValidator.TRUSTED_API);
+    @Validator(method = "updateTagBatch")
+    public static ValidationContext updateTagBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.updateTagBatch(msg, ctx, MetadataApiValidator.TRUSTED_API);
     }
 
     @Validator(method = "preallocateId")

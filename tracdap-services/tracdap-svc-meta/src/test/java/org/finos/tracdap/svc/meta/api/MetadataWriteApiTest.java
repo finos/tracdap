@@ -316,25 +316,25 @@ abstract class MetadataWriteApiTest {
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
             names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
-    void createBatch_trustedTypesOk(ObjectType objectType) {
+    void createObjectBatch_trustedTypesOk(ObjectType objectType) {
 
-        createBatch_ok(objectType, request -> trustedApi.createBatch(request));
+        createObjectBatch_ok(objectType, request -> trustedApi.createObjectBatch(request));
     }
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
             names = {"SCHEMA", "FLOW", "CUSTOM"})
-    void createBatch_publicTypesOk(ObjectType objectType) {
+    void createObjectBatch_publicTypesOk(ObjectType objectType) {
 
         // All object types should be either in this test, or publicTypesNotAllowed
 
-        createBatch_ok(objectType, request -> publicApi.createBatch(request));
+        createObjectBatch_ok(objectType, request -> publicApi.createObjectBatch(request));
     }
 
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
             names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED", "SCHEMA", "FLOW", "CUSTOM"})
-    void createBatch_publicTypesNotAllowed(ObjectType objectType) {
+    void createObjectBatch_publicTypesNotAllowed(ObjectType objectType) {
 
         List<MetadataWriteRequest> requests = new ArrayList<>();
 
@@ -358,11 +358,11 @@ abstract class MetadataWriteApiTest {
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createBatch(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObjectBatch(writeRequest));
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
     }
 
-    void createBatch_ok(ObjectType objectType, Function<MetadataWriteBatchRequest, MetadataWriteBatchResponse> saveApiCall) {
+    void createObjectBatch_ok(ObjectType objectType, Function<MetadataWriteBatchRequest, MetadataWriteBatchResponse> saveApiCall) {
         List<MetadataWriteRequest> requests = new ArrayList<>();
         List<Tag> tagsToSave = new ArrayList<>();
 
@@ -433,7 +433,7 @@ abstract class MetadataWriteApiTest {
     }
 
     @Test
-    void createBatch_inconsistentType() {
+    void createObjectBatch_inconsistentType() {
 
         // This test is about sending an invalid request, i.e. the payload does not match the write request
 
@@ -462,16 +462,16 @@ abstract class MetadataWriteApiTest {
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createBatch(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createObjectBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.createBatch(writeRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.createObjectBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
-    void createBatch_invalidContent() {
+    void createObjectBatch_invalidContent() {
         List<MetadataWriteRequest> requests = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
@@ -508,16 +508,16 @@ abstract class MetadataWriteApiTest {
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createBatch(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createObjectBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.createBatch(writeRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.createObjectBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
-    void createBatch_invalidAttrs() {
+    void createObjectBatch_invalidAttrs() {
         List<MetadataWriteRequest> requests = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
@@ -547,16 +547,16 @@ abstract class MetadataWriteApiTest {
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createBatch(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObjectBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
         // noinspection ResultOfMethodCallIgnored
-        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.createBatch(writeRequest));
+        var error2 = assertThrows(StatusRuntimeException.class, () -> trustedApi.createObjectBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error2.getStatus().getCode());
     }
 
     @Test
-    void createBatch_reservedAttrs() {
+    void createObjectBatch_reservedAttrs() {
         List<MetadataWriteRequest> requests = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
@@ -591,10 +591,10 @@ abstract class MetadataWriteApiTest {
         // Then the result would be PERMISSION_DENIED instead
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createBatch(writeRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.createObjectBatch(writeRequest));
         assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
 
-        assertDoesNotThrow(() -> trustedApi.createBatch(writeRequest));
+        assertDoesNotThrow(() -> trustedApi.createObjectBatch(writeRequest));
     }
     
     // -----------------------------------------------------------------------------------------------------------------
@@ -1098,25 +1098,25 @@ abstract class MetadataWriteApiTest {
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
             names = {"DATA", "FILE", "STORAGE", "SCHEMA", "CUSTOM"})
-    void updateBatch_trustedTypesOk(ObjectType objectType) {
+    void updateObjectBatch_trustedTypesOk(ObjectType objectType) {
 
-        updateBatch_ok(objectType, request -> trustedApi.updateBatch(request));
+        updateObjectBatch_ok(objectType, request -> trustedApi.updateObjectBatch(request));
     }
 
     // Versioned types that are also publicly writable
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
             names = {"SCHEMA", "CUSTOM"})
-    void updateBatch_publicTypesOk(ObjectType objectType) {
+    void updateObjectBatch_publicTypesOk(ObjectType objectType) {
 
-        updateBatch_ok(objectType, request -> publicApi.updateBatch(request));
+        updateObjectBatch_ok(objectType, request -> publicApi.updateObjectBatch(request));
     }
 
     // Versioned types that are not publicly writable
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.INCLUDE,
             names = {"DATA", "FILE", "STORAGE"})
-    void updateBatch_publicTypesNotAllowed(ObjectType objectType) {
+    void updateObjectBatch_publicTypesNotAllowed(ObjectType objectType) {
         List<MetadataWriteRequest> requests = new ArrayList<>();
 
         for (int i = 0; i < 7; i++) {
@@ -1140,11 +1140,11 @@ abstract class MetadataWriteApiTest {
                 .build();
 
         // noinspection ResultOfMethodCallIgnored
-        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateBatch(v2WriteRequest));
+        var error = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObjectBatch(v2WriteRequest));
         assertEquals(Status.Code.PERMISSION_DENIED, error.getStatus().getCode());
     }
 
-    void updateBatch_ok(ObjectType objectType, Function<MetadataWriteBatchRequest, MetadataWriteBatchResponse> saveApiCall) {
+    void updateObjectBatch_ok(ObjectType objectType, Function<MetadataWriteBatchRequest, MetadataWriteBatchResponse> saveApiCall) {
         class RequestData {
             MetadataWriteRequest writeRequest;
             UUID v1ObjectId;
@@ -1658,7 +1658,7 @@ abstract class MetadataWriteApiTest {
     @ParameterizedTest
     @EnumSource(value = ObjectType.class, mode = EnumSource.Mode.EXCLUDE,
             names = {"OBJECT_TYPE_NOT_SET", "UNRECOGNIZED"})
-    void updateBatchTag_AllTypesOk(ObjectType objectType) {
+    void updateTagBatch_AllTypesOk(ObjectType objectType) {
         class RequestData {
             MetadataWriteRequest writeRequest;
 
@@ -1708,7 +1708,7 @@ abstract class MetadataWriteApiTest {
                 )
                 .build();
 
-        var t2headers = trustedApi.updateBatchTag(t2WriteRequest).getIdsList();
+        var t2headers = trustedApi.updateTagBatch(t2WriteRequest).getIdsList();
 
         assertEquals(7, t2headers.size());
 
@@ -1766,7 +1766,7 @@ abstract class MetadataWriteApiTest {
                 )
                 .build();
 
-        var t3Headers = publicApi.updateBatchTag(t3WriteRequest).getIdsList();
+        var t3Headers = publicApi.updateTagBatch(t3WriteRequest).getIdsList();
 
         assertEquals(7, t3Headers.size());
 

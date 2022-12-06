@@ -67,11 +67,12 @@ service TrustedMetadataApi {
    * This call behaves identically to the equivalent public API call, without the
    * restriction on which types of object can be saved.
    *
-   * @see TracMetadataApi.createBatch()
+   * @see TracMetadataApi.createObjectBatch()
+   * @see TracMetadataApi.createObject()
    */
-  rpc createBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+  rpc createObjectBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
     option (google.api.http) = {
-      post: "/{tenant}/trusted/create-batch"
+      post: "/{tenant}/trusted/create-object-batch"
       body: "*"
     };
   }
@@ -99,11 +100,12 @@ service TrustedMetadataApi {
    * can be used with any type of object that supports versioning (currently DATA
    * and CUSTOM).
    *
-   * @see TracMetadataApi.updateBatch()
+   * @see TracMetadataApi.updateObjectBatch()
+   * @see TracMetadataApi.updateObject()
    */
-  rpc updateBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+  rpc updateObjectBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
     option (google.api.http) = {
-      post: "/{tenant}/trusted/update-batch"
+      post: "/{tenant}/trusted/update-object-batch"
       body: "*"
     };
   }
@@ -129,9 +131,10 @@ service TrustedMetadataApi {
    * can be used with any type of object that supports versioning (currently DATA
    * and CUSTOM).
    *
-   * @see TracMetadataApi.updateBatchTag()
+   * @see TracMetadataApi.updateTagBatch()
+   * @see TracMetadataApi.updateTag()
    */
-  rpc updateBatchTag (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+  rpc updateTagBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
     option (google.api.http) = {
       post: "/{tenant}/trusted/update-batch-tag"
       body: "*"

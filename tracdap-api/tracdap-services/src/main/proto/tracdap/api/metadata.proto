@@ -172,12 +172,13 @@ service TracMetadataApi {
      * Error conditions include: Invalid request, unknown tenant, object type does
      * not match the supplied definition, validation failure.
      *
+     * @see TracMetadataApi.createObject()
      * @see tracdap.metadata.ObjectDefinition
      * @see tracdap.metadata.TagUpdate
      */
-    rpc createBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+    rpc createObjectBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
         option (google.api.http) = {
-            post: "/{tenant}/create-batch"
+            post: "/{tenant}/create-object-batch"
             body: "*"
         };
     }
@@ -247,12 +248,13 @@ service TracMetadataApi {
      * ID or version, wrong object type (not the same as the prior version), object
      * version is superseded.
      *
+     * @see TracMetadataApi.updateBatch()
      * @see tracdap.metadata.ObjectDefinition
      * @see tracdap.metadata.TagUpdate
      */
-    rpc updateBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+    rpc updateObjectBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
         option (google.api.http) = {
-            post: "/{tenant}/update-batch"
+            post: "/{tenant}/update-object-batch"
             body: "*"
         };
     }
@@ -303,10 +305,11 @@ service TracMetadataApi {
      * ID, object version or tag version, wrong object type (does not match what
      * is stored in TRAC), tag version is superseded.
      *
+     * @see TracMetadataApi.updateTag()
      * @see tracdap.metadata.ObjectDefinition
      * @see tracdap.metadata.TagUpdate
      */
-    rpc updateBatchTag (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+    rpc updateTagBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
         option (google.api.http) = {
             post: "/{tenant}/update-batch-tag"
             body: "*"

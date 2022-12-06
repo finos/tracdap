@@ -36,11 +36,11 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
     private static final Descriptors.ServiceDescriptor TRUSTED_METADATA_SERVICE = MetadataTrusted.getDescriptor().findServiceByName(SERVICE_NAME);
 
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreateObjectMethod();
-    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> CREATE_BATCH_METHOD = TrustedMetadataApiGrpc.getCreateBatchMethod();
+    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> CREATE_OBJECT_BATCH_METHOD = TrustedMetadataApiGrpc.getCreateObjectBatchMethod();
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_OBJECT_METHOD = TrustedMetadataApiGrpc.getUpdateObjectMethod();
-    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> UPDATE_BATCH_METHOD = TrustedMetadataApiGrpc.getUpdateBatchMethod();
+    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> UPDATE_OBJECT_BATCH_METHOD = TrustedMetadataApiGrpc.getUpdateObjectBatchMethod();
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_TAG_METHOD = TrustedMetadataApiGrpc.getUpdateTagMethod();
-    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> UPDATE_BATCH_TAG_METHOD = TrustedMetadataApiGrpc.getUpdateBatchTagMethod();
+    private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> UPDATE_TAG_BATCH_METHOD = TrustedMetadataApiGrpc.getUpdateTagBatchMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> PREALLOCATE_ID_METHOD = TrustedMetadataApiGrpc.getPreallocateIdMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_PREALLOCATED_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectMethod();
 
@@ -71,9 +71,9 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
     }
 
     @Override
-    public void createBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
+    public void createObjectBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
 
-        grpcWrap.unaryCall(CREATE_BATCH_METHOD, request, response, apiImpl::createBatch);
+        grpcWrap.unaryCall(CREATE_OBJECT_BATCH_METHOD, request, response, apiImpl::createObjectBatch);
     }
 
     @Override
@@ -83,9 +83,9 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
     }
 
     @Override
-    public void updateBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
+    public void updateObjectBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
 
-        grpcWrap.unaryCall(UPDATE_BATCH_METHOD, request, response, apiImpl::updateBatch);
+        grpcWrap.unaryCall(UPDATE_OBJECT_BATCH_METHOD, request, response, apiImpl::updateObjectBatch);
     }
 
     @Override
@@ -95,9 +95,9 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
     }
 
     @Override
-    public void updateBatchTag(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
+    public void updateTagBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
 
-        grpcWrap.unaryCall(UPDATE_BATCH_TAG_METHOD, request, response, apiImpl::updateBatchTag);
+        grpcWrap.unaryCall(UPDATE_TAG_BATCH_METHOD, request, response, apiImpl::updateTagBatch);
     }
 
     @Override

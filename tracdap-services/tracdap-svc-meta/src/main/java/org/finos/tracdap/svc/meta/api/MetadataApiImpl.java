@@ -28,7 +28,6 @@ import com.google.protobuf.Message;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 
-import java.util.List;
 import java.util.UUID;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.PUBLIC_WRITABLE_OBJECT_TYPES;
@@ -87,9 +86,9 @@ public class MetadataApiImpl {
                 request.getTagUpdatesList());
     }
 
-    MetadataWriteBatchResponse createBatch(MetadataWriteBatchRequest request) {
+    MetadataWriteBatchResponse createObjectBatch(MetadataWriteBatchRequest request) {
 
-        validateRequest(CREATE_BATCH_METHOD, request);
+        validateRequest(CREATE_OBJECT_BATCH_METHOD, request);
 
         var requestsList = request.getRequestsList();
 
@@ -119,9 +118,9 @@ public class MetadataApiImpl {
                 request.getTagUpdatesList());
     }
 
-    MetadataWriteBatchResponse updateBatch(MetadataWriteBatchRequest request) {
+    MetadataWriteBatchResponse updateObjectBatch(MetadataWriteBatchRequest request) {
 
-        validateRequest(UPDATE_BATCH_METHOD, request);
+        validateRequest(UPDATE_OBJECT_BATCH_METHOD, request);
 
         var requestsList = request.getRequestsList();
 
@@ -157,13 +156,13 @@ public class MetadataApiImpl {
                 request.getTagUpdatesList());
     }
 
-    MetadataWriteBatchResponse updateBatchTag(MetadataWriteBatchRequest request) {
+    MetadataWriteBatchResponse updateTagBatch(MetadataWriteBatchRequest request) {
 
-        validateRequest(UPDATE_BATCH_TAG_METHOD, request);
+        validateRequest(UPDATE_TAG_BATCH_METHOD, request);
 
         var requestsList = request.getRequestsList();
 
-        var tagHeaders = writeService.updateBatchTag(
+        var tagHeaders = writeService.updateTagBatch(
                 request.getTenant(),
                 requestsList,
                 request.getBatchTagUpdatesList()

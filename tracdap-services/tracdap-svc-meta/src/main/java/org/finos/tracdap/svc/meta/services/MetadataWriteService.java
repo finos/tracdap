@@ -206,7 +206,7 @@ public class MetadataWriteService {
         return newTag.getHeader();
     }
 
-    public List<TagHeader> updateBatchTag(
+    public List<TagHeader> updateTagBatch(
             String tenant,
             List<MetadataWriteRequest> requests,
             List<TagUpdate> batchTagUpdates) {

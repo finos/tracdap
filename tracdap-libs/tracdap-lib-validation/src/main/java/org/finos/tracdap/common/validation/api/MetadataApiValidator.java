@@ -122,13 +122,13 @@ public class MetadataApiValidator {
         return ctx;
     }
 
-    @Validator(method = "createBatch")
-    public static ValidationContext createBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+    @Validator(method = "createObjectBatch")
+    public static ValidationContext createObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
 
-        return createBatch(msg, ctx, PUBLIC_API);
+        return createObjectBatch(msg, ctx, PUBLIC_API);
     }
 
-    static ValidationContext createBatch(MetadataWriteBatchRequest msg, ValidationContext ctx, boolean apiTrust) {
+    static ValidationContext createObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx, boolean apiTrust) {
         ctx = ctx.push(BWR_TENANT)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::identifier)
@@ -175,13 +175,13 @@ public class MetadataApiValidator {
         return ctx;
     }
 
-    @Validator(method = "updateBatch")
-    public static ValidationContext updateBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+    @Validator(method = "updateObjectBatch")
+    public static ValidationContext updateObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
 
-        return updateBatch(msg, ctx, PUBLIC_API);
+        return updateObjectBatch(msg, ctx, PUBLIC_API);
     }
 
-    static ValidationContext updateBatch(MetadataWriteBatchRequest msg, ValidationContext ctx, boolean apiTrust) {
+    static ValidationContext updateObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx, boolean apiTrust) {
         ctx = ctx.push(BWR_TENANT)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::identifier)
@@ -227,13 +227,13 @@ public class MetadataApiValidator {
         return ctx;
     }
 
-    @Validator(method = "updateBatchTag")
-    public static ValidationContext updateBatchTag(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+    @Validator(method = "updateTagBatch")
+    public static ValidationContext updateTagBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
 
-        return updateBatchTag(msg, ctx, PUBLIC_API);
+        return updateTagBatch(msg, ctx, PUBLIC_API);
     }
 
-    static ValidationContext updateBatchTag(MetadataWriteBatchRequest msg, ValidationContext ctx, boolean apiTrust) {
+    static ValidationContext updateTagBatch(MetadataWriteBatchRequest msg, ValidationContext ctx, boolean apiTrust) {
         ctx = ctx.push(BWR_TENANT)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::identifier)
