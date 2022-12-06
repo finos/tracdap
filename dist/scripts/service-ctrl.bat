@@ -91,6 +91,14 @@ if not "%CONFIG_FILE:~1,1%" == ":" (
 ))))
 
 
+@rem Support deprecated SECRET_KEY env variable.
+@rem Please use TRAC_SECRET_KEY instead.
+if not defined TRAC_SECRET_KEY (
+    if defined SECRET_KEY (
+        set TRAC_SECRET_KEY=%SECRET_KEY%
+    )
+)
+
 @rem Discover Java
 
 if not "%JAVA_HOME%" == "" (

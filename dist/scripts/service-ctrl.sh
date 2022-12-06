@@ -101,6 +101,11 @@ if [ "\${CONFIG_FILE}" != "" ]; then
     esac
 fi
 
+# Support deprecated SECRET_KEY env variable.
+# Please use TRAC_SECRET_KEY instead.
+if [ "\${TRAC_SECRET_KEY}" = "" ] && [ "\${SECRET_KEY}" != "" ]; then
+    export TRAC_SECRET_KEY="\${SECRET_KEY}"
+fi
 
 # Discover Java
 
