@@ -150,7 +150,7 @@ service TracMetadataApi {
     }
 
     /**
-     * Create new objects in the TRAC metadata store.
+     * Create new objects in batch in the TRAC metadata store.
      *
      * To create an object, supply a metadata write request with the tenant code,
      * object type and a definition for the item you want to save. The tag should contain
@@ -222,7 +222,7 @@ service TracMetadataApi {
     }
 
     /**
-     * Update existing objects in the TRAC metadata store.
+     * Update existing objects in batch in the TRAC metadata store.
      *
      * To save a new version, supply a metadata write request with the tenant code,
      * object type and a tag for the item you want to save. The tag should contain
@@ -248,7 +248,7 @@ service TracMetadataApi {
      * ID or version, wrong object type (not the same as the prior version), object
      * version is superseded.
      *
-     * @see TracMetadataApi.updateBatch()
+     * @see TracMetadataApi.updateObject()
      * @see tracdap.metadata.ObjectDefinition
      * @see tracdap.metadata.TagUpdate
      */
@@ -288,7 +288,7 @@ service TracMetadataApi {
     }
 
     /**
-     * Update tags for existing objects in the TRAC metadata store.
+     * Update tags in batch for existing objects in the TRAC metadata store.
      *
      * To save a new tag, supply a metadata write request with the tenant code,
      * object type and a tag for the item you want to save. The tag should contain
@@ -594,10 +594,21 @@ message MetadataBatchRequest {
  */
 message MetadataWriteBatchRequest {
 
+    /**
+     * Tenant code for the requested operation, always required.
+     */
     string tenant = 1;
 
+    /**
+     * Requests to be realized in batch.
+     *
+     * Tenant in requests must be null.
+     */
     repeated MetadataWriteRequest requests = 2;
 
+    /**
+     * These attrs will be appended to tagUpdates in each request.
+     */
     repeated metadata.TagUpdate batchAttrs = 3;
 };
 
@@ -619,7 +630,11 @@ message MetadataBatchResponse {
  * @see TracMetadataApi
  */
 message MetadataWriteBatchResponse {
-
+    /**
+     * Headers of the written tags.
+     *
+     * In the same order as in MetadataWriteBatchRequest.
+     */
     repeated metadata.TagHeader headers = 1;
 };
 
