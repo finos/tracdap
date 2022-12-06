@@ -51,7 +51,7 @@ public class MetadataWriteService {
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
 
-        Tag newTag = prepareCreateObject(definition, tagUpdates);
+        var newTag = prepareCreateObject(definition, tagUpdates);
 
         dal.saveNewObject(tenant, newTag);
 
@@ -62,9 +62,9 @@ public class MetadataWriteService {
             String tenant,
             List<MetadataWriteRequest> requests,
             List<TagUpdate> batchTagUpdates) {
-        List<Tag> newTags = new ArrayList<>();
-        for (MetadataWriteRequest request : requests) {
-            List<TagUpdate> tagUpdates = new ArrayList<>(request.getTagUpdatesList());
+        var newTags = new ArrayList<Tag>();
+        for (var request : requests) {
+            var tagUpdates = new ArrayList<>(request.getTagUpdatesList());
             tagUpdates.addAll(batchTagUpdates);
 
             newTags.add(
@@ -122,7 +122,7 @@ public class MetadataWriteService {
 
         var priorTag = dal.loadObject(tenant, priorVersion);
 
-        Tag newTag = prepareUpdateObject(userInfo, priorTag, definition, tagUpdates);
+        var newTag = prepareUpdateObject(userInfo, priorTag, definition, tagUpdates);
 
         dal.saveNewVersion(tenant, newTag);
 
@@ -136,15 +136,15 @@ public class MetadataWriteService {
 
         var userInfo = AuthConstants.USER_INFO_KEY.get();
 
-        List<TagSelector> priorVersions = requests.stream()
+        var priorVersions = requests.stream()
                 .map(MetadataWriteRequest::getPriorVersion)
                 .collect(Collectors.toList());
         var priorTags = dal.loadObjects(tenant, priorVersions);
 
-        List<Tag> newTags = new ArrayList<>();
+        var newTags = new ArrayList<Tag>();
         for (int i = 0; i < requests.size(); i++) {
-            MetadataWriteRequest r = requests.get(i);
-            List<TagUpdate> tagUpdates = new ArrayList<>(r.getTagUpdatesList());
+            var r = requests.get(i);
+            var tagUpdates = new ArrayList<>(r.getTagUpdatesList());
             tagUpdates.addAll(batchTagUpdates);
 
             newTags.add(
@@ -199,7 +199,7 @@ public class MetadataWriteService {
 
         var priorTag = dal.loadObject(tenant, priorVersion);
 
-        Tag newTag = prepareUpdateTag(priorTag, tagUpdates);
+        var newTag = prepareUpdateTag(priorTag, tagUpdates);
 
         dal.saveNewTag(tenant, newTag);
 
@@ -211,15 +211,15 @@ public class MetadataWriteService {
             List<MetadataWriteRequest> requests,
             List<TagUpdate> batchTagUpdates) {
 
-        List<TagSelector> priorVersions = requests.stream()
+        var priorVersions = requests.stream()
                 .map(MetadataWriteRequest::getPriorVersion)
                 .collect(Collectors.toList());
         var priorTags = dal.loadObjects(tenant, priorVersions);
 
-        List<Tag> newTags = new ArrayList<>();
+        var newTags = new ArrayList<Tag>();
         for (int i = 0; i < requests.size(); i++) {
-            MetadataWriteRequest r = requests.get(i);
-            List<TagUpdate> tagUpdates = new ArrayList<>(r.getTagUpdatesList());
+            var r = requests.get(i);
+            var tagUpdates = new ArrayList<>(r.getTagUpdatesList());
             tagUpdates.addAll(batchTagUpdates);
 
             newTags.add(

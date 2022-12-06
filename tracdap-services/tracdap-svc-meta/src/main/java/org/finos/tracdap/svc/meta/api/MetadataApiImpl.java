@@ -91,13 +91,13 @@ public class MetadataApiImpl {
 
         validateRequest(CREATE_BATCH_METHOD, request);
 
-        List<MetadataWriteRequest> requestsList = request.getRequestsList();
+        var requestsList = request.getRequestsList();
 
-        for (MetadataWriteRequest rq : requestsList) {
+        for (var rq : requestsList) {
             validateObjectType(rq.getObjectType());
         }
 
-        List<TagHeader> tagHeaders = writeService.createObjects(
+        var tagHeaders = writeService.createObjects(
                 request.getTenant(),
                 requestsList,
                 request.getBatchTagUpdatesList()
@@ -123,13 +123,13 @@ public class MetadataApiImpl {
 
         validateRequest(UPDATE_BATCH_METHOD, request);
 
-        List<MetadataWriteRequest> requestsList = request.getRequestsList();
+        var requestsList = request.getRequestsList();
 
-        for (MetadataWriteRequest rq : requestsList) {
+        for (var rq : requestsList) {
             validateObjectType(rq.getObjectType());
         }
 
-        List<TagHeader> tagHeaders = writeService.updateObjects(
+        var tagHeaders = writeService.updateObjects(
                 request.getTenant(),
                 requestsList,
                 request.getBatchTagUpdatesList()
@@ -161,9 +161,9 @@ public class MetadataApiImpl {
 
         validateRequest(UPDATE_BATCH_TAG_METHOD, request);
 
-        List<MetadataWriteRequest> requestsList = request.getRequestsList();
+        var requestsList = request.getRequestsList();
 
-        List<TagHeader> tagHeaders = writeService.updateBatchTag(
+        var tagHeaders = writeService.updateBatchTag(
                 request.getTenant(),
                 requestsList,
                 request.getBatchTagUpdatesList()
