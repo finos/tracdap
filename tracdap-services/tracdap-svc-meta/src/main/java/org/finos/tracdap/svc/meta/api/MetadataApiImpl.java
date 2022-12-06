@@ -99,10 +99,10 @@ public class MetadataApiImpl {
         var tagHeaders = writeService.createObjects(
                 request.getTenant(),
                 requestsList,
-                request.getBatchTagUpdatesList()
+                request.getBatchAttrsList()
         );
         return MetadataWriteBatchResponse.newBuilder()
-                .addAllIds(tagHeaders)
+                .addAllHeaders(tagHeaders)
                 .build();
     }
 
@@ -131,10 +131,10 @@ public class MetadataApiImpl {
         var tagHeaders = writeService.updateObjects(
                 request.getTenant(),
                 requestsList,
-                request.getBatchTagUpdatesList()
+                request.getBatchAttrsList()
         );
         return MetadataWriteBatchResponse.newBuilder()
-                .addAllIds(tagHeaders)
+                .addAllHeaders(tagHeaders)
                 .build();
     }
 
@@ -165,10 +165,10 @@ public class MetadataApiImpl {
         var tagHeaders = writeService.updateTagBatch(
                 request.getTenant(),
                 requestsList,
-                request.getBatchTagUpdatesList()
+                request.getBatchAttrsList()
         );
         return MetadataWriteBatchResponse.newBuilder()
-                .addAllIds(tagHeaders)
+                .addAllHeaders(tagHeaders)
                 .build();
     }
 

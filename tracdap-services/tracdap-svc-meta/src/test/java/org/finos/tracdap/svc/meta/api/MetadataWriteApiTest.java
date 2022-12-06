@@ -387,7 +387,7 @@ abstract class MetadataWriteApiTest {
                 .build();
 
 
-        var tagHeaders = saveApiCall.apply(writeRequest).getIdsList();
+        var tagHeaders = saveApiCall.apply(writeRequest).getHeadersList();
         assertEquals(7, tagHeaders.size());
 
         for (int i = 0; i < tagHeaders.size(); i++) {
@@ -1188,7 +1188,7 @@ abstract class MetadataWriteApiTest {
                 )
                 .build();
 
-        var v2TagHeaders = saveApiCall.apply(updateRequest).getIdsList();
+        var v2TagHeaders = saveApiCall.apply(updateRequest).getHeadersList();
 
         assertEquals(7, v2TagHeaders.size());
 
@@ -1708,7 +1708,7 @@ abstract class MetadataWriteApiTest {
                 )
                 .build();
 
-        var t2headers = trustedApi.updateTagBatch(t2WriteRequest).getIdsList();
+        var t2headers = trustedApi.updateTagBatch(t2WriteRequest).getHeadersList();
 
         assertEquals(7, t2headers.size());
 
@@ -1766,7 +1766,7 @@ abstract class MetadataWriteApiTest {
                 )
                 .build();
 
-        var t3Headers = publicApi.updateTagBatch(t3WriteRequest).getIdsList();
+        var t3Headers = publicApi.updateTagBatch(t3WriteRequest).getHeadersList();
 
         assertEquals(7, t3Headers.size());
 

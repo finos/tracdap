@@ -598,7 +598,7 @@ message MetadataWriteBatchRequest {
 
     repeated MetadataWriteRequest requests = 2;
 
-    repeated metadata.TagUpdate batchTagUpdates = 3;
+    repeated metadata.TagUpdate batchAttrs = 3;
 };
 
 
@@ -620,7 +620,7 @@ message MetadataBatchResponse {
  */
 message MetadataWriteBatchResponse {
 
-    repeated metadata.TagHeader ids = 1;
+    repeated metadata.TagHeader headers = 1;
 };
 
 
