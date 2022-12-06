@@ -19,12 +19,11 @@ package org.finos.tracdap.plugins.aws.storage;
 import io.netty.channel.EventLoopGroup;
 import org.finos.tracdap.common.concurrent.IExecutionContext;
 import org.finos.tracdap.common.data.IDataContext;
+import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.storage.*;
 
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.AwsCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.*;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.core.client.config.ClientAsyncConfiguration;
 import software.amazon.awssdk.core.client.config.SdkAdvancedAsyncClientOption;
@@ -56,8 +55,11 @@ public class S3ObjectStorage implements IFileStorage {
 
     public static final String REGION_PROPERTY = "region";
     public static final String BUCKET_PROPERTY = "bucket";
-    public static final String PATH_PROPERTY = "path";
+    public static final String PREFIX_PROPERTY = "prefix";
 
+    public static final String CREDENTIALS_PROPERTY = "credentials";
+    public static final String CREDENTIALS_DEFAULT = "default";
+    public static final String CREDENTIALS_STATIC = "static";
     public static final String ACCESS_KEY_ID_PROPERTY = "accessKeyId";
     public static final String SECRET_ACCESS_KEY_PROPERTY = "secretAccessKey";
 
@@ -66,8 +68,8 @@ public class S3ObjectStorage implements IFileStorage {
     private final String storageKey;
     private final Region region;
     private final String bucket;
-    private final StoragePath rootPath;
-    private final AwsCredentials credentials;
+    private final StoragePath prefix;
+    private final AwsCredentialsProvider credentials;
 
     private final StorageErrors errors;
 
@@ -78,19 +80,44 @@ public class S3ObjectStorage implements IFileStorage {
 
         this.storageKey = properties.getProperty(IStorageManager.PROP_STORAGE_KEY);
 
-        var bucket = properties.getProperty(BUCKET_PROPERTY);
-        var path = properties.getProperty(PATH_PROPERTY);
         var region = properties.getProperty(REGION_PROPERTY);
-
-        var accessKeyId = properties.getProperty(ACCESS_KEY_ID_PROPERTY);
-        var secretAccessKey = properties.getProperty(SECRET_ACCESS_KEY_PROPERTY);
+        var bucket = properties.getProperty(BUCKET_PROPERTY);
+        var prefix = properties.getProperty(PREFIX_PROPERTY);
 
         this.region = Region.of(region);
         this.bucket = bucket;
-        this.rootPath = path != null ? StoragePath.forPath(path) : StoragePath.root();
-        this.credentials = AwsBasicCredentials.create(accessKeyId, secretAccessKey);
+        this.prefix = prefix != null ? StoragePath.forPath(prefix) : StoragePath.root();
+
+        this.credentials = setupCredentials(properties);
 
         this.errors = new S3StorageErrors(storageKey, log);
+    }
+
+    private AwsCredentialsProvider setupCredentials(Properties properties) {
+
+        var mechanism = properties.containsKey(CREDENTIALS_PROPERTY)
+                ? properties.getProperty(CREDENTIALS_PROPERTY)
+                : CREDENTIALS_DEFAULT;
+
+        if (CREDENTIALS_DEFAULT.equalsIgnoreCase(mechanism)) {
+            log.info("Using [{}] credentials mechanism", CREDENTIALS_DEFAULT);
+            return DefaultCredentialsProvider.create();
+        }
+
+        if (CREDENTIALS_STATIC.equalsIgnoreCase(mechanism)) {
+
+            var accessKeyId = properties.getProperty(ACCESS_KEY_ID_PROPERTY);
+            var secretAccessKey = properties.getProperty(SECRET_ACCESS_KEY_PROPERTY);
+            var credentials = AwsBasicCredentials.create(accessKeyId, secretAccessKey);
+
+            log.info("Using [{}] credentials mechanism, access key id = [{}]", CREDENTIALS_STATIC, accessKeyId);
+
+            return StaticCredentialsProvider.create(credentials);
+        }
+
+        var message = String.format("Unrecognised credentials mechanism: [%s]", mechanism);
+        log.error(message);
+        throw new EStartup(message);
     }
 
     @Override
@@ -126,12 +153,12 @@ public class S3ObjectStorage implements IFileStorage {
 
         this.client = S3AsyncClient.builder()
                 .region(region)
-                .credentialsProvider(StaticCredentialsProvider.create(credentials))
+                .credentialsProvider(credentials)
                 .httpClientBuilder(httpClient)
                 .asyncConfiguration(async)
                 .build();
 
-        log.info("Created S3 storage, region = [{}], bucket = [{}], root path = [{}]", region, bucket, rootPath);
+        log.info("Created S3 storage, region = [{}], bucket = [{}], prefix = [{}]", region, bucket, prefix);
     }
 
     @Override
@@ -300,7 +327,7 @@ public class S3ObjectStorage implements IFileStorage {
         log.info(response.commonPrefixes().toString());
 
         var stats = new ArrayList<FileStat>();
-        var rootPrefix = rootPath.toString();
+        var rootPrefix = prefix.toString();
 
         // First entry should always be the directory being listed
         if (response.contents().isEmpty()) {
@@ -440,15 +467,15 @@ public class S3ObjectStorage implements IFileStorage {
             if (storagePath.startsWith(".."))
                 throw errors.explicitError(STORAGE_PATH_OUTSIDE_ROOT, requestedPath, operationName);
 
-            var absolutePath = rootPath.resolve(storagePath).normalize();
+            var absolutePath = prefix.resolve(storagePath).normalize();
 
-            if (!rootPath.contains(absolutePath))
+            if (!prefix.contains(absolutePath))
                 throw errors.explicitError(STORAGE_PATH_OUTSIDE_ROOT, requestedPath, operationName);
 
-            if (absolutePath.equals(rootPath) && !allowRootDir)
+            if (absolutePath.equals(prefix) && !allowRootDir)
                 throw errors.explicitError(STORAGE_PATH_IS_ROOT, requestedPath, operationName);
 
-            log.info("root: {}, requested: {}, absolute: {}", rootPath, requestedPath, absolutePath);
+            log.info("root: {}, requested: {}, absolute: {}", prefix, requestedPath, absolutePath);
 
             // For bucket storage, do not use "/" for the root path
             // Otherwise everything gets put in a folder called "/"
