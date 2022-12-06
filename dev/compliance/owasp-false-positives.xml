@@ -38,6 +38,24 @@
         <cpe>cpe:/a:services_project:services</cpe>
     </suppress>
 
+    <!-- commons-net is detected as part of commons-cli -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/commons\-cli/commons\-cli@.*$</packageUrl>
+        <cpe>cpe:/a:apache:commons_net</cpe>
+    </suppress>
+
+    <!-- commons-net is detected as part of commons-codec -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/commons\-codec/commons\-codec@.*$</packageUrl>
+        <cpe>cpe:/a:apache:commons_net</cpe>
+    </suppress>
+
+    <!-- commons-net is detected as part of commons-logging -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/commons\-logging/commons\-logging@.*$</packageUrl>
+        <cpe>cpe:/a:apache:commons_net</cpe>
+    </suppress>
+
     <!-- The H2 developers maintain this CVE is not a security vulnerability and have not issued a fix -->
     <!-- The vulnerability only applies when an H2 web console service is running -->
     <!-- https://github.com/h2database/h2database/issues/3175 -->
