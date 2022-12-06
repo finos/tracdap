@@ -16,7 +16,6 @@
 
 package org.finos.tracdap.plugins.aws.storage;
 
-import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import org.finos.tracdap.common.concurrent.ExecutionContext;
@@ -73,7 +72,7 @@ public class S3StorageReadWriteTest extends StorageReadWriteTestSuite {
         execContext = new ExecutionContext(new DefaultEventExecutor(new DefaultThreadFactory("t-events")));
         dataContext = new DataContext(execContext.eventLoopExecutor(), new RootAllocator());
 
-        storageProps.put(S3ObjectStorage.PATH_PROPERTY, testDir);
+        storageProps.put(S3ObjectStorage.PREFIX_PROPERTY, testDir);
         storage = new S3ObjectStorage(storageProps);
         storage.start(elg);
     }

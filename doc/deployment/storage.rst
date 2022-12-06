@@ -13,8 +13,11 @@ For instructions on setting up local storage, see the
 AWS S3 Storage
 --------------
 
-You will need to set up an S3 bucket, and an IAM user with permissions to access that bucket.
-These are the permissions that need to be assigned to the bucket.
+You will need to set up an S3 bucket and suitable role permissions. The role can be managed
+by AWS, or explicitly by creating an IAM user or group assigned to the role.
+
+Permissions can be managed at the bucket level or via role policies, either way you will need
+statements to grant at a minimum these permissions:
 
 .. code-block:: json
 
@@ -22,20 +25,12 @@ These are the permissions that need to be assigned to the bucket.
         "Version": "2012-10-17",
         "Statement": [
             {
-                "Sid": "ListObjectsInBucket",
                 "Effect": "Allow",
-                "Principal": {
-                    "AWS": "arn:aws:iam::<aws_account_id>:user/<iam_user>"
-                },
                 "Action": "s3:ListBucket",
                 "Resource": "arn:aws:s3:::<bucket_name>"
             },
             {
-                "Sid": "AllObjectActions",
                 "Effect": "Allow",
-                "Principal": {
-                    "AWS": "arn:aws:iam::<aws_account_id>:user/<iam_user>"
-                },
                 "Action": [
                     "s3:*Object",
                     "s3:*ObjectAttributes"
@@ -50,11 +45,15 @@ To install the AWS storage plugin, download the plugins package from the latest 
 will find a folder for the AWS storage plugin, copy the contents of this folder into the *plugins*
 folder of your TRAC D.A.P. installation.
 
-You will then be able to configure an S3 storage instance in your platform configuration. The region,
-bucket name and access key properties are required.
+You will then be able to configure an S3 storage instance in your platform configuration. Region and bucket name
+are required. The *prefix* property is optional, if specified it will be used as a prefix for all objects stored
+in the bucket. TRAC follows the convention of using path-like object keys, so backslashes can be used in the
+prefix if desired.
 
-The *path* property is optional, if specified it will be used as a prefix for all objects stored in the bucket.
-TRAC follows the convention of using path-like object keys, so backslashes can be used in the path prefix if desired.
+Credentials can be supplied in various different ways. For deployments where all the TRAC services are running
+in AWS, the •default• mechanism allows permissions to be managed using AWS roles without need for further
+configuration in TRAC. This is the preferred mechanism for deployments where it is available. If the TRAC
+services are not running in AWS the *static* method can be used to authenticate with an access key.
 
 .. code-block:: yaml
 
@@ -67,6 +66,12 @@ TRAC follows the convention of using path-like object keys, so backslashes can b
         properties:
           region: <aws_region>
           bucket: <aws_bucket_name>
-          path: <storage_prefix>
+          prefix: <storage_prefix>
+
+          # For credentials supplied automatically by AWS assigned roles
+          credentials: default
+
+          # Or for credentials assigned to an explicit IAM user
+          credentials: static
           accessKeyId: <aws_access_key_id>
           secretAccessKey: <aws_secret_access_key>
