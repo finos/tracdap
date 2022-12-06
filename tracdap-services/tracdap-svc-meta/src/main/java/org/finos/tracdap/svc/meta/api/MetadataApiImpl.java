@@ -78,14 +78,7 @@ public class MetadataApiImpl {
     TagHeader createObject(MetadataWriteRequest request) {
 
         validateRequest(CREATE_OBJECT_METHOD, request);
-
-        var objectType = request.getObjectType();
-
-        if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
-            var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
-            var status = Status.PERMISSION_DENIED.withDescription(message);
-            throw status.asRuntimeException();
-        }
+        validateObjectType(request.getObjectType());
 
         return writeService.createObject(
                 request.getTenant(),
@@ -93,23 +86,64 @@ public class MetadataApiImpl {
                 request.getTagUpdatesList());
     }
 
+    MetadataWriteBatchResponse createObjectBatch(MetadataWriteBatchRequest request) {
+
+        validateRequest(CREATE_OBJECT_BATCH_METHOD, request);
+
+        var requestsList = request.getRequestsList();
+
+        for (var rq : requestsList) {
+            validateObjectType(rq.getObjectType());
+        }
+
+        var tagHeaders = writeService.createObjects(
+                request.getTenant(),
+                requestsList,
+                request.getBatchAttrsList()
+        );
+        return MetadataWriteBatchResponse.newBuilder()
+                .addAllHeaders(tagHeaders)
+                .build();
+    }
+
     TagHeader updateObject(MetadataWriteRequest request) {
 
         validateRequest(UPDATE_OBJECT_METHOD, request);
-
-        var objectType = request.getObjectType();
-
-        if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
-            var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
-            var status = Status.PERMISSION_DENIED.withDescription(message);
-            throw status.asRuntimeException();
-        }
+        validateObjectType(request.getObjectType());
 
         return writeService.updateObject(
                 request.getTenant(),
                 request.getPriorVersion(),
                 request.getDefinition(),
                 request.getTagUpdatesList());
+    }
+
+    MetadataWriteBatchResponse updateObjectBatch(MetadataWriteBatchRequest request) {
+
+        validateRequest(UPDATE_OBJECT_BATCH_METHOD, request);
+
+        var requestsList = request.getRequestsList();
+
+        for (var rq : requestsList) {
+            validateObjectType(rq.getObjectType());
+        }
+
+        var tagHeaders = writeService.updateObjects(
+                request.getTenant(),
+                requestsList,
+                request.getBatchAttrsList()
+        );
+        return MetadataWriteBatchResponse.newBuilder()
+                .addAllHeaders(tagHeaders)
+                .build();
+    }
+
+    private void validateObjectType(ObjectType objectType) {
+        if (apiTrustLevel == PUBLIC_API && !PUBLIC_WRITABLE_OBJECT_TYPES.contains(objectType)) {
+            var message = String.format("Object type %s cannot be created via the TRAC public API", objectType);
+            var status = Status.PERMISSION_DENIED.withDescription(message);
+            throw status.asRuntimeException();
+        }
     }
 
     TagHeader updateTag(MetadataWriteRequest request) {
@@ -120,6 +154,22 @@ public class MetadataApiImpl {
                 request.getTenant(),
                 request.getPriorVersion(),
                 request.getTagUpdatesList());
+    }
+
+    MetadataWriteBatchResponse updateTagBatch(MetadataWriteBatchRequest request) {
+
+        validateRequest(UPDATE_TAG_BATCH_METHOD, request);
+
+        var requestsList = request.getRequestsList();
+
+        var tagHeaders = writeService.updateTagBatch(
+                request.getTenant(),
+                requestsList,
+                request.getBatchAttrsList()
+        );
+        return MetadataWriteBatchResponse.newBuilder()
+                .addAllHeaders(tagHeaders)
+                .build();
     }
 
     TagHeader preallocateId(MetadataWriteRequest request) {

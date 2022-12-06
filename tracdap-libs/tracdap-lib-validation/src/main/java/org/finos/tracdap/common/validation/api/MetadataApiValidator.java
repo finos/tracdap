@@ -49,6 +49,11 @@ public class MetadataApiValidator {
     private static final Descriptors.FieldDescriptor BRR_TENANT;
     private static final Descriptors.FieldDescriptor BRR_SELECTORS;
 
+    private static final Descriptors.Descriptor BATCH_WRITE_REQUEST;
+    private static final Descriptors.FieldDescriptor BWR_TENANT;
+    private static final Descriptors.FieldDescriptor BWR_REQUESTS;
+    private static final Descriptors.FieldDescriptor BWR_BATCH_ATTRS;
+
     private static final Descriptors.Descriptor METADATA_SEARCH_REQUEST;
     private static final Descriptors.FieldDescriptor MSR_TENANT;
     private static final Descriptors.FieldDescriptor MSR_SEARCH_PARAMS;
@@ -77,6 +82,11 @@ public class MetadataApiValidator {
         BRR_TENANT = field(BATCH_READ_REQUEST, MetadataBatchRequest.TENANT_FIELD_NUMBER);
         BRR_SELECTORS = field(BATCH_READ_REQUEST, MetadataBatchRequest.SELECTOR_FIELD_NUMBER);
 
+        BATCH_WRITE_REQUEST = MetadataWriteBatchRequest.getDescriptor();
+        BWR_TENANT = field(BATCH_WRITE_REQUEST, MetadataWriteBatchRequest.TENANT_FIELD_NUMBER);
+        BWR_REQUESTS = field(BATCH_WRITE_REQUEST, MetadataWriteBatchRequest.REQUESTS_FIELD_NUMBER);
+        BWR_BATCH_ATTRS = field(BATCH_WRITE_REQUEST, MetadataWriteBatchRequest.BATCHATTRS_FIELD_NUMBER);
+
         METADATA_SEARCH_REQUEST = MetadataSearchRequest.getDescriptor();
         MSR_TENANT = field(METADATA_SEARCH_REQUEST, MetadataSearchRequest.TENANT_FIELD_NUMBER);
         MSR_SEARCH_PARAMS = field(METADATA_SEARCH_REQUEST, MetadataSearchRequest.SEARCHPARAMS_FIELD_NUMBER);
@@ -92,12 +102,12 @@ public class MetadataApiValidator {
     @Validator(method = "createObject")
     public static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        return createObject(msg, ctx, PUBLIC_API);
+        return createObject(msg, ctx, PUBLIC_API, true);
     }
 
-    static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust) {
+    static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust, boolean tenantRequired) {
 
-        ctx = createOrUpdate(ctx, false, apiTrust);
+        ctx = createOrUpdate(ctx, false, apiTrust, tenantRequired);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::omitted)
@@ -112,15 +122,42 @@ public class MetadataApiValidator {
         return ctx;
     }
 
+    @Validator(method = "createObjectBatch")
+    public static ValidationContext createObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+
+        return createObjectBatch(msg, ctx, PUBLIC_API);
+    }
+
+    static ValidationContext createObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx, boolean apiTrust) {
+        ctx = ctx.push(BWR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.pushRepeated(BWR_REQUESTS)
+                .apply(CommonValidators::listNotEmpty)
+                .applyRepeated((MetadataWriteRequest r, ValidationContext c) ->
+                        MetadataApiValidator.createObject(r, c, apiTrust, false), MetadataWriteRequest.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(BWR_BATCH_ATTRS)
+                .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                // Only allow reserved attrs for requests on the trusted API
+                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, (apiTrust == TRUSTED_API))
+                .pop();
+
+        return ctx;
+    }
+
     @Validator(method = "updateObject")
     public static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        return updateObject(msg, ctx, PUBLIC_API);
+        return updateObject(msg, ctx, PUBLIC_API, true);
     }
 
-    static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust) {
+    static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust, boolean tenantRequired) {
 
-        ctx = createOrUpdate(ctx, true, apiTrust);
+        ctx = createOrUpdate(ctx, true, apiTrust, tenantRequired);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::required)
@@ -138,15 +175,42 @@ public class MetadataApiValidator {
         return ctx;
     }
 
+    @Validator(method = "updateObjectBatch")
+    public static ValidationContext updateObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+
+        return updateObjectBatch(msg, ctx, PUBLIC_API);
+    }
+
+    static ValidationContext updateObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx, boolean apiTrust) {
+        ctx = ctx.push(BWR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.pushRepeated(BWR_REQUESTS)
+                .apply(CommonValidators::listNotEmpty)
+                .applyRepeated((MetadataWriteRequest r, ValidationContext c) ->
+                        MetadataApiValidator.updateObject(r, c, apiTrust, false), MetadataWriteRequest.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(BWR_BATCH_ATTRS)
+                .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                // Only allow reserved attrs for requests on the trusted API
+                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, (apiTrust == TRUSTED_API))
+                .pop();
+
+        return ctx;
+    }
+
     @Validator(method = "updateTag")
     public static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        return updateTag(msg, ctx, PUBLIC_API);
+        return updateTag(msg, ctx, PUBLIC_API, true);
     }
 
-    static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust) {
+    static ValidationContext updateTag(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust, boolean tenantRequired) {
 
-        ctx = createOrUpdate(ctx, false, apiTrust);
+        ctx = createOrUpdate(ctx, false, apiTrust, tenantRequired);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::required)
@@ -163,9 +227,36 @@ public class MetadataApiValidator {
         return ctx;
     }
 
+    @Validator(method = "updateTagBatch")
+    public static ValidationContext updateTagBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+
+        return updateTagBatch(msg, ctx, PUBLIC_API);
+    }
+
+    static ValidationContext updateTagBatch(MetadataWriteBatchRequest msg, ValidationContext ctx, boolean apiTrust) {
+        ctx = ctx.push(BWR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.pushRepeated(BWR_REQUESTS)
+                .apply(CommonValidators::listNotEmpty)
+                .applyRepeated((MetadataWriteRequest r, ValidationContext c) ->
+                        MetadataApiValidator.updateTag(r, c, apiTrust, false), MetadataWriteRequest.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(BWR_BATCH_ATTRS)
+                .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                // Only allow reserved attrs for requests on the trusted API
+                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, (apiTrust == TRUSTED_API))
+                .pop();
+
+        return ctx;
+    }
+
     static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx, false, TRUSTED_API);
+        ctx = createOrUpdate(ctx, false, TRUSTED_API, true);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::omitted)
@@ -180,7 +271,7 @@ public class MetadataApiValidator {
 
     static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx, false, TRUSTED_API);
+        ctx = createOrUpdate(ctx, false, TRUSTED_API, true);
 
         // Do not use the regular tag selector validator (ObjectIdValidator::tagSelector)
         // The regular validator will enforce object and tag version > 0
@@ -202,12 +293,18 @@ public class MetadataApiValidator {
         return ctx;
     }
 
-    private static ValidationContext createOrUpdate(ValidationContext ctx, boolean isVersioned, boolean apiTrust) {
+    private static ValidationContext createOrUpdate(ValidationContext ctx, boolean isVersioned, boolean apiTrust, boolean tenantRequired) {
 
-        ctx = ctx.push(MWR_TENANT)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::identifier)
-                .pop();
+        if (tenantRequired) {
+            ctx = ctx.push(MWR_TENANT)
+                    .apply(CommonValidators::required)
+                    .apply(CommonValidators::identifier)
+                    .pop();
+        } else {
+            ctx = ctx.push(MWR_TENANT)
+                    .apply(CommonValidators::omitted)
+                    .pop();
+        }
 
         ctx = ctx.push(MWR_OBJECT_TYPE)
                 .apply(CommonValidators::required)

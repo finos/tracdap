@@ -62,6 +62,22 @@ service TrustedMetadataApi {
   }
 
   /**
+   * Create new objects in the TRAC metadata store.
+   *
+   * This call behaves identically to the equivalent public API call, without the
+   * restriction on which types of object can be saved.
+   *
+   * @see TracMetadataApi.createObjectBatch()
+   * @see TracMetadataApi.createObject()
+   */
+  rpc createObjectBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+    option (google.api.http) = {
+      post: "/{tenant}/trusted/create-object-batch"
+      body: "*"
+    };
+  }
+
+  /**
    * Update an existing object in the TRAC metadata store.
    *
    * This call behaves identically to the equivalent public API call, however it
@@ -73,6 +89,23 @@ service TrustedMetadataApi {
   rpc updateObject (MetadataWriteRequest) returns (metadata.TagHeader) {
     option (google.api.http) = {
       post: "/{tenant}/trusted/update-object"
+      body: "*"
+    };
+  }
+
+  /**
+   * Update existing objects in the TRAC metadata store.
+   *
+   * This call behaves identically to the equivalent public API call, however it
+   * can be used with any type of object that supports versioning (currently DATA
+   * and CUSTOM).
+   *
+   * @see TracMetadataApi.updateObjectBatch()
+   * @see TracMetadataApi.updateObject()
+   */
+  rpc updateObjectBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+    option (google.api.http) = {
+      post: "/{tenant}/trusted/update-object-batch"
       body: "*"
     };
   }
@@ -91,6 +124,22 @@ service TrustedMetadataApi {
     };
   }
 
+  /**
+   * Update tags for existing objects in the TRAC metadata store.
+   *
+   * This call behaves identically to the equivalent public API call, however it
+   * can be used with any type of object that supports versioning (currently DATA
+   * and CUSTOM).
+   *
+   * @see TracMetadataApi.updateTagBatch()
+   * @see TracMetadataApi.updateTag()
+   */
+  rpc updateTagBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+    option (google.api.http) = {
+      post: "/{tenant}/trusted/update-batch-tag"
+      body: "*"
+    };
+  }
 
   /**
    * Preallocate an object ID for an object that will be created later.
