@@ -26,12 +26,13 @@ requests == 2.28.1
 # These frameworks are used for passing data to / from client code
 # We want to allow model code to use different versions of these frameworks
 # Constraints are used for supported versions (these constraints are mirrored in setup.cfg)
+# To support new versions, we must also update the latest tested version in CI
 
 
 # Pandas - baseline support for series 1.x
 # We do not support the 0.x series! 1.2 added the new dType for integers which supports nulls
 
-pandas >= 1.2.0, < 2.0.0
+pandas >= 1.2.0, < 1.6.0
 
 # PySpark - Support 2.4.x and the 3.x series
 
