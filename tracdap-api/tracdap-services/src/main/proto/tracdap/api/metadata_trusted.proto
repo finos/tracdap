@@ -160,6 +160,26 @@ service TrustedMetadataApi {
   }
 
   /**
+   * Preallocate object IDs in batch for objects that will be created later.
+   *
+   * This call is for use by TRAC components that need to reserve an ID before
+   * it is used, particularly if the object ID must be included in the definition
+   * of an object that has not been created yet. When creating an ID the tenant
+   * and object type must be specified, the object that is eventually saved must
+   * match these two conditions. Orphan IDs are expected - if a component request
+   * an ID and encounters an error before that ID is used, the orphan ID is just
+   * ignored.
+   *
+   * @see TrustedMetadataApi.preallocateId()
+   */
+  rpc preallocateIdBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+    option (google.api.http) = {
+      post: "/{tenant}/trusted/preallocate-batch"
+      body: "*"
+    };
+  }
+
+  /**
    * Create an object using an ID that was previously preallocated.
    *
    * This call behaves essentially the same as saveNewObject(), with all the
@@ -174,6 +194,27 @@ service TrustedMetadataApi {
   rpc createPreallocatedObject (MetadataWriteRequest) returns (metadata.TagHeader) {
     option (google.api.http) = {
       post: "/{tenant}/trusted/create-preallocated"
+      body: "*"
+    };
+  }
+
+  /**
+   * Create objects in batch using IDs that were previously preallocated.
+   *
+   * This call behaves essentially the same as saveNewObject(), with all the
+   * same validation. The only difference is that the new definition must be
+   * supplied with an object header, including the object ID returned from a
+   * prior call to preallocateId().
+   *
+   * Error conditions include all the error conditions for saveNewObject().
+   * Using a preallocated ID twice, attempting to save to an unknown ID or the
+   * ID of another object that already exists are also errors.
+   *
+   * @see TrustedMetadataApi.createPreallocatedObject()
+   */
+  rpc createPreallocatedObjectBatch (MetadataWriteBatchRequest) returns (MetadataWriteBatchResponse) {
+    option (google.api.http) = {
+      post: "/{tenant}/trusted/create-preallocated-batch"
       body: "*"
     };
   }
