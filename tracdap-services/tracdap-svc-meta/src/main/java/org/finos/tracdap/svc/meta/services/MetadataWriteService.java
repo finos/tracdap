@@ -32,6 +32,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.OBJECT_FIRST_VERSION;
 import static org.finos.tracdap.common.metadata.MetadataConstants.TAG_FIRST_VERSION;
@@ -51,7 +53,7 @@ public class MetadataWriteService {
             ObjectDefinition definition,
             List<TagUpdate> tagUpdates) {
 
-        var newTag = prepareCreateObject(definition, tagUpdates);
+        var newTag = prepareCreateObject(UUID.randomUUID(), definition, tagUpdates);
 
         dal.saveNewObject(tenant, newTag);
 
@@ -69,8 +71,9 @@ public class MetadataWriteService {
 
             newTags.add(
                 prepareCreateObject(
-                    request.getDefinition(),
-                    tagUpdates
+                        UUID.randomUUID(),
+                        request.getDefinition(),
+                        tagUpdates
                 )
             );
         }
@@ -80,8 +83,7 @@ public class MetadataWriteService {
         return newTags.stream().map(Tag::getHeader).collect(Collectors.toList());
     }
 
-    private Tag prepareCreateObject(ObjectDefinition definition, List<TagUpdate> tagUpdates) {
-        var objectId = UUID.randomUUID();
+    private Tag prepareCreateObject(UUID objectId, ObjectDefinition definition, List<TagUpdate> tagUpdates) {
 
         var userInfo = AuthConstants.USER_INFO_KEY.get();
         var userId = userInfo.getUserId();
@@ -270,6 +272,20 @@ public class MetadataWriteService {
         return preallocatedHeader;
     }
 
+    public List<TagHeader> preallocateIdBatch(String tenant, List<ObjectType> objectTypes) {
+        var objectIds = objectTypes.stream().map(objectType -> UUID.randomUUID()).collect(Collectors.toList());
+
+        dal.preallocateObjectIds(tenant, objectTypes, objectIds);
+
+        return IntStream.range(0, objectTypes.size())
+                .mapToObj(
+                        i -> TagHeader.newBuilder()
+                        .setObjectType(objectTypes.get(i))
+                        .setObjectId(objectIds.get(i).toString())
+                        .build()
+                ).collect(Collectors.toList());
+    }
+
     public TagHeader createPreallocatedObject(
             String tenant, TagSelector priorVersion,
             ObjectDefinition definition,
@@ -278,36 +294,36 @@ public class MetadataWriteService {
         // In this case priorVersion refers to the preallocated ID
         var objectId = UUID.fromString(priorVersion.getObjectId());
 
-        var userInfo = AuthConstants.USER_INFO_KEY.get();
-        var userId = userInfo.getUserId();
-        var userName = userInfo.getDisplayName();
-        var timestamp = Instant.now().atOffset(ZoneOffset.UTC);
-
-        var newHeader = TagHeader.newBuilder()
-                .setObjectType(definition.getObjectType())
-                .setObjectId(objectId.toString())
-                .setObjectVersion(OBJECT_FIRST_VERSION)
-                .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
-                .setTagVersion(TAG_FIRST_VERSION)
-                .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
-                .build();
-
-        var newTag = Tag.newBuilder()
-                .setHeader(newHeader)
-                .setDefinition(definition)
-                .build();
-
-        newTag = TagUpdateService.applyTagUpdates(newTag, tagUpdates);
-
-        // Apply the common controlled trac_ tags for newly created objects
-        var createAttrs = commonCreateAttrs(timestamp, userId, userName);
-        var updateAttrs = commonUpdateAttrs(timestamp, userId, userName);
-        newTag = TagUpdateService.applyTagUpdates(newTag, createAttrs);
-        newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
+        var newTag = prepareCreateObject(
+                objectId,
+                definition,
+                tagUpdates
+        );
 
         dal.savePreallocatedObject(tenant, newTag);
 
-        return newHeader;
+        return newTag.getHeader();
+    }
+
+    public List<TagHeader> createPreallocatedObjectBatch(
+            String tenant,
+            List<MetadataWriteRequest> requests,
+            List<TagUpdate> batchTagUpdates) {
+
+        var tags = requests.stream().map(r ->
+                        prepareCreateObject(
+                                UUID.fromString(r.getPriorVersion().getObjectId()),
+                                r.getDefinition(),
+                                Stream.concat(
+                                        r.getTagUpdatesList().stream(),
+                                        batchTagUpdates.stream()
+                                ).collect(Collectors.toList())
+                        )
+                ).collect(Collectors.toList());
+
+        dal.savePreallocatedObjects(tenant, tags);
+
+        return tags.stream().map(Tag::getHeader).collect(Collectors.toList());
     }
 
     private List<TagUpdate> commonCreateAttrs(
