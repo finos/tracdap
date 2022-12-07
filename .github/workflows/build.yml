@@ -74,28 +74,28 @@ jobs:
       matrix:
         enviroment:
 
-          - { ENV_NAME: "Windows, 3.10, PySpark 3.2, Pandas >= 1.4",
+          - { ENV_NAME: "Windows, 3.11, PySpark 3.2, Pandas >= 1.4",
               PLATFORM: 'windows-latest',
-              PYTHON_VERSION: "3.10",
+              PYTHON_VERSION: "3.11",
               PYSPARK_VERSION: ">= 3.2.0, < 3.3.0",
               PANDAS_VERSION: ">= 1.4.0, < 2.0.0",
               PYPANDOC: false }
 
-          - { ENV_NAME: "macOS, 3.10, PySpark 3.2, Pandas >= 1.4",
+          - { ENV_NAME: "macOS, 3.11, PySpark 3.2, Pandas >= 1.4",
               PLATFORM: 'macos-latest',
-              PYTHON_VERSION: "3.10",
+              PYTHON_VERSION: "3.11",
               PYSPARK_VERSION: ">= 3.2.0, < 3.3.0",
               PANDAS_VERSION: ">= 1.4.0, < 2.0.0",
               PYPANDOC: false }
 
-          - { ENV_NAME: "Linux, 3.10, PySpark 3.2, Pandas >= 1.4",
+          - { ENV_NAME: "Linux, 3.11, PySpark 3.2, Pandas >= 1.4",
               PLATFORM: 'ubuntu-latest',
-              PYTHON_VERSION: "3.10",
+              PYTHON_VERSION: "3.11",
               PYSPARK_VERSION: ">= 3.2.0, < 3.3.0",
               PANDAS_VERSION: ">= 1.4.0, < 2.0.0",
               PYPANDOC: false }
 
-          - { ENV_NAME: "Linux, 3.8, PySpark 3.0, Pandas 1.2",
+          - { ENV_NAME: "Linux, 3.9, PySpark 3.0, Pandas 1.2",
               PLATFORM: 'ubuntu-latest',
               PYTHON_VERSION: "3.8",
               PYSPARK_VERSION: "== 3.0.0",
