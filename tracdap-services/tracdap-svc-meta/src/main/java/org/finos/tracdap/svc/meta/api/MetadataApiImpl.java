@@ -29,11 +29,14 @@ import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.PUBLIC_WRITABLE_OBJECT_TYPES;
 import static org.finos.tracdap.svc.meta.api.TracMetadataApi.*;
 import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.CREATE_PREALLOCATED_OBJECT_METHOD;
+import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.CREATE_PREALLOCATED_OBJECT_BATCH_METHOD;
 import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.PREALLOCATE_ID_METHOD;
+import static org.finos.tracdap.svc.meta.api.TrustedMetadataApi.PREALLOCATE_ID_BATCH_METHOD;
 import static org.finos.tracdap.svc.meta.services.MetadataConstants.PUBLIC_API;
 
 
@@ -182,6 +185,21 @@ public class MetadataApiImpl {
         return writeService.preallocateId(tenant, objectType);
     }
 
+    MetadataWriteBatchResponse preallocateIdBatch(MetadataWriteBatchRequest request) {
+
+        validateRequest(PREALLOCATE_ID_BATCH_METHOD, request);
+
+        var tenant = request.getTenant();
+        var objectTypes = request.getRequestsList().stream()
+                .map(MetadataWriteRequest::getObjectType)
+                .collect(Collectors.toList());
+
+        var tagHeaders = writeService.preallocateIdBatch(tenant, objectTypes);
+        return MetadataWriteBatchResponse.newBuilder()
+                .addAllHeaders(tagHeaders)
+                .build();
+    }
+
     TagHeader createPreallocatedObject(MetadataWriteRequest request) {
 
         validateRequest(CREATE_PREALLOCATED_OBJECT_METHOD, request);
@@ -191,6 +209,20 @@ public class MetadataApiImpl {
                 request.getPriorVersion(),
                 request.getDefinition(),
                 request.getTagUpdatesList());
+    }
+
+    MetadataWriteBatchResponse createPreallocatedObjectBatch(MetadataWriteBatchRequest request) {
+
+        validateRequest(CREATE_PREALLOCATED_OBJECT_BATCH_METHOD, request);
+
+        var tagHeaders = writeService.createPreallocatedObjectBatch(
+                request.getTenant(),
+                request.getRequestsList(),
+                request.getBatchAttrsList()
+        );
+        return MetadataWriteBatchResponse.newBuilder()
+                .addAllHeaders(tagHeaders)
+                .build();
     }
 
     Tag readObject(MetadataReadRequest request) {
