@@ -21,13 +21,13 @@ ext {
     // Core platform technologies
     netty_version = '4.1.80.Final'  // gRPC does not support changes in Netty 4.1.75 yet (mar 2022)
     guava_version = '31.1-jre'
-    proto_version = '3.21.7'
+    proto_version = '3.21.10'
     grpc_version = '1.49.0'
     gapi_version = '2.9.2'
 
 
     // Data technologies
-    arrow_version = '9.0.0'
+    arrow_version = '10.0.1'
     jackson_version = '2.14.1'
     jackson_databind_version = '2.14.1'
 
