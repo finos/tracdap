@@ -260,7 +260,7 @@ useful for specifying system settings, such as JAVA_HOME to select a particular 
 or JAVA_OPTS to control the JVM memory parameters. You can also control some of the TRAC options here,
 e.g. setting CONFIG_FILE will tell trac to load a different root config file.
 
-For sandbox setups, the main variable to set in this file is *SECRET_KEY*. This is the master key for
+For sandbox setups, the main variable to set in this file is *TRAC_SECRET_KEY*. This is the master key for
 the TRAC secret store, that unlocks all the other secrets in the configuration. In production setups
 this key should not be stored in a file, but passed in through the environment using a scheduling tool,
 or as part of a containerized job setup.
@@ -273,7 +273,7 @@ or as part of a containerized job setup.
         .. code-block:: shell
             :caption: etc/env.sh
 
-            SECRET_KEY=a_very_secret_password
+            TRAC_SECRET_KEY=a_very_secret_password
 
     .. tab-item:: Windows
         :sync: platform_windows
@@ -281,7 +281,7 @@ or as part of a containerized job setup.
         .. code-block:: batch
             :caption: etc\\env.bat
 
-            set SECRET_KEY=a_very_secret_password
+            set TRAC_SECRET_KEY=a_very_secret_password
 
 
 Setup tools
@@ -295,7 +295,7 @@ sandbox setup, *auth-tool* and *deploy-metadb*.
 The *auth-tool* utility is used to manage secrets, certificates and other sensitive configuration.
 It can also be used to manage users if you are using a local user database. The tool will write secrets
 to the secret store configured in the platform configuration. If this is a local keystore file and it
-does not exist then it will be created. Make sure you have set the *SECRET_KEY* environment variable
+does not exist then it will be created. Make sure you have set the *TRAC_SECRET_KEY* environment variable
 before using *auth-tool*.
 
 For the sandbox setup we need a minimum of one secret, the root authentication key.

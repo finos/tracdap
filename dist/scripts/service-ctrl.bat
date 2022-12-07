@@ -91,6 +91,14 @@ if not "%CONFIG_FILE:~1,1%" == ":" (
 ))))
 
 
+@rem Support deprecated SECRET_KEY env variable.
+@rem Please use TRAC_SECRET_KEY instead.
+if not defined TRAC_SECRET_KEY (
+    if defined SECRET_KEY (
+        set TRAC_SECRET_KEY=%SECRET_KEY%
+    )
+)
+
 @rem Discover Java
 
 if not "%JAVA_HOME%" == "" (
@@ -172,11 +180,7 @@ goto :main
 
     set CWD=%cd%
     cd "%RUN_DIR%"
-    if "%SECRET_KEY%" == "" (
-        "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" %*
-    ) else (
-        "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" --secret-key "%SECRET_KEY%" %*
-    )
+    "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" %*
     set RESULT=%errorlevel%
     cd "%CWD%"
 
@@ -203,11 +207,7 @@ exit /b %RESULT%
     echo Config file: [%CONFIG_FILE%]
     echo.
 
-    if "%SECRET_KEY%" == "" (
-        start "%APPLICATION_NAME%" /D "%RUN_DIR%" /B "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" %*
-    ) else (
-        start "%APPLICATION_NAME%" /D "%RUN_DIR%" /B "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" --secret-key "%SECRET_KEY%" %*
-    )
+    start "%APPLICATION_NAME%" /D "%RUN_DIR%" /B "%JAVA_CMD%" %JAVA_OPTS% %APPLICATION_CLASS% --config "%CONFIG_FILE%" %*
 
     @rem Look up PID using WMIC, name='java.exe' stops wmic from finding itself
     @rem findstr filters out blank lines, which are included in the output

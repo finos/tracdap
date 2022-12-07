@@ -16,6 +16,7 @@
 
 package org.finos.tracdap.common.startup;
 
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.apache.commons.cli.*;
@@ -25,6 +26,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Collections;
 import java.util.stream.Collectors;
 
 
@@ -59,12 +62,13 @@ public class StandardArgsProcessor {
      *
      * @param appName Name of the application, displayed in help messages
      * @param args The command line args received on startup
+     * @param envVariables Environment variables.
      * @return A set of standard args suitable for creating a ConfigManager
      * @throws EStartup The command line args could not be parsed, or --help was specified
      */
-    public static StandardArgs processArgs(String appName, String[] args) {
+    public static StandardArgs processArgs(String appName, String[] args, Map<String, String> envVariables) {
 
-        return processArgs(appName, args, null);
+        return processArgs(appName, args, null, envVariables);
     }
 
     /**
@@ -75,10 +79,14 @@ public class StandardArgsProcessor {
      * @param appName Name of the application, displayed in help messages
      * @param args The command line args received on startup
      * @param availableTasks If present, enable task processing and supply the list of available tasks
+     * @param envVariables Environment variables.
      * @return A set of standard args suitable for creating a ConfigManager
      * @throws EStartup The command line args could not be parsed, or --help was specified
      */
-    public static StandardArgs processArgs(String appName, String[] args, List<StandardArgs.Task> availableTasks) {
+    public static StandardArgs processArgs(String appName, String[] args, List<StandardArgs.Task> availableTasks, Map<String, String> envVariables) {
+        if (envVariables == null) {
+            envVariables = Collections.emptyMap();
+        }
 
         var usingTasks = availableTasks != null && !availableTasks.isEmpty();
         var helpOptions = helpOptions(usingTasks);
@@ -95,6 +103,10 @@ public class StandardArgsProcessor {
             var workingDir = Paths.get(".").toAbsolutePath().normalize();
             var configFile = command.getOptionValue("config");
             var secretKey = command.getOptionValue("secret-key");
+
+            if (secretKey == null) {
+                secretKey = envVariables.get(ConfigKeys.SECRET_KEY_ENV);
+            }
 
             var tasks = usingTasks
                     ? processTasks(command, availableTasks)

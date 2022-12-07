@@ -101,6 +101,11 @@ if [ "\${CONFIG_FILE}" != "" ]; then
     esac
 fi
 
+# Support deprecated SECRET_KEY env variable.
+# Please use TRAC_SECRET_KEY instead.
+if [ "\${TRAC_SECRET_KEY}" = "" ] && [ "\${SECRET_KEY}" != "" ]; then
+    export TRAC_SECRET_KEY="\${SECRET_KEY}"
+fi
 
 # Discover Java
 
@@ -201,11 +206,7 @@ run() {
 
     CWD=`pwd`
     cd "\${RUN_DIR}"
-    if [ "\${SECRET_KEY}" = "" ]; then
-        "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" "\$@"
-    else
-        "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" --secret-key "\${SECRET_KEY}" "\$@"
-    fi
+    "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" "\$@"
     cd "\${CWD}"
 }
 
@@ -233,11 +234,7 @@ start() {
 
     CWD=`pwd`
     cd "\${RUN_DIR}"
-    if [ "\${SECRET_KEY}" = "" ]; then
-        "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" "\$@" &
-    else
-        "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" --secret-key "\${SECRET_KEY}" "\$@" &
-    fi
+    "\${JAVA_CMD}" \${JAVA_OPTS} \$APPLICATION_CLASS --config "\${CONFIG_FILE}" "\$@" &
     PID=\$!
     cd "\${CWD}"
 

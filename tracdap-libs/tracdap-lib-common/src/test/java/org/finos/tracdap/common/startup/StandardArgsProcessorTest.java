@@ -19,7 +19,9 @@ package org.finos.tracdap.common.startup;
 import org.finos.tracdap.common.exception.EStartup;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -27,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class StandardArgsProcessorTest {
 
     private static final String APP_NAME = "Test App";
+    private static final String SECRET_KEY_ENV_VAR = "TRAC_SECRET_KEY";
 
     @Test
     void testArgs_ok() {
@@ -34,7 +37,37 @@ class StandardArgsProcessorTest {
         var command = "--config etc/my_config.props --secret-key Mellon";
         var commandArgs = command.split("\\s");
 
-        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs);
+        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, null);
+
+        assertEquals(System.getProperty("user.dir"), standardArgs.getWorkingDir().toString());
+        assertEquals("etc/my_config.props", standardArgs.getConfigFile());
+        assertEquals("Mellon", standardArgs.getSecretKey());
+    }
+
+    @Test
+    void testArgs_envVariables_ok() {
+
+        Map<String, String> envVariables = Collections.singletonMap(SECRET_KEY_ENV_VAR, "Mellon");
+
+        var command = "--config etc/my_config.props";
+        var commandArgs = command.split("\\s");
+
+        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, envVariables);
+
+        assertEquals(System.getProperty("user.dir"), standardArgs.getWorkingDir().toString());
+        assertEquals("etc/my_config.props", standardArgs.getConfigFile());
+        assertEquals("Mellon", standardArgs.getSecretKey());
+    }
+
+    @Test
+    void testArgs_argsBeatEnvVariables_ok() {
+
+        Map<String, String> envVariables = Collections.singletonMap(SECRET_KEY_ENV_VAR, "Fruit");
+
+        var command = "--config etc/my_config.props --secret-key Mellon";
+        var commandArgs = command.split("\\s");
+
+        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, envVariables);
 
         assertEquals(System.getProperty("user.dir"), standardArgs.getWorkingDir().toString());
         assertEquals("etc/my_config.props", standardArgs.getConfigFile());
@@ -47,7 +80,7 @@ class StandardArgsProcessorTest {
         var command = "";
         var commandArgs = command.split("\\s");
 
-        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs));
+        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, null));
         assertTrue(err.isQuiet());
         assertNotEquals(0, err.getExitCode());
     }
@@ -58,7 +91,7 @@ class StandardArgsProcessorTest {
         var command = "--config etc/my_config.props --secret-key Mellon --unknown option";
         var commandArgs = command.split("\\s");
 
-        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs));
+        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, null));
         assertTrue(err.isQuiet());
         assertNotEquals(0, err.getExitCode());
     }
@@ -69,7 +102,7 @@ class StandardArgsProcessorTest {
         var command = "--secret-key Mellon";
         var commandArgs = command.split("\\s");
 
-        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs));
+        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, null));
         assertTrue(err.isQuiet());
         assertNotEquals(0, err.getExitCode());
     }
@@ -80,7 +113,7 @@ class StandardArgsProcessorTest {
         var command = "--config --secret-key Mellon";
         var commandArgs = command.split("\\s");
 
-        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs));
+        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, null));
         assertTrue(err.isQuiet());
         assertNotEquals(0, err.getExitCode());
     }
@@ -91,7 +124,7 @@ class StandardArgsProcessorTest {
         var command = "--help";
         var commandArgs = command.split("\\s");
 
-        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs));
+        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, null));
         assertTrue(err.isQuiet());
         assertEquals(0, err.getExitCode());
     }
@@ -102,14 +135,14 @@ class StandardArgsProcessorTest {
         var command = "--task_list";
         var commandArgs = command.split("\\s");
 
-        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs));
+        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, null));
         assertTrue(err.isQuiet());
         assertNotEquals(0, err.getExitCode());
 
         var command2 = "--config app.conf --task do_something";
         var commandArgs2 = command2.split("\\s");
 
-        var err2 = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs2));
+        var err2 = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs2, null));
         assertTrue(err2.isQuiet());
         assertNotEquals(0, err2.getExitCode());
     }
@@ -122,7 +155,7 @@ class StandardArgsProcessorTest {
         var command = "--task-list";
         var commandArgs = command.split("\\s");
 
-        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS));
+        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS, null));
         assertTrue(err.isQuiet());
         assertEquals(0, err.getExitCode());
     }
@@ -135,7 +168,7 @@ class StandardArgsProcessorTest {
         var command = "--config app.conf --task do_something";
         var commandArgs = command.split("\\s");
 
-        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS);
+        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS, null);
         var tasks = standardArgs.getTasks();
 
         assertEquals(1, tasks.size());
@@ -151,7 +184,7 @@ class StandardArgsProcessorTest {
         var command = "--config app.conf --task do_something ARG";
         var commandArgs = command.split("\\s");
 
-        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS));
+        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS, null));
         assertFalse(err.isQuiet());
         assertNotEquals(0, err.getExitCode());
     }
@@ -164,7 +197,7 @@ class StandardArgsProcessorTest {
         var command = "--config app.conf --task do_something ARG_VALUE";
         var commandArgs = command.split("\\s");
 
-        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS);
+        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS, null);
         var tasks = standardArgs.getTasks();
 
         assertEquals(1, tasks.size());
@@ -180,7 +213,7 @@ class StandardArgsProcessorTest {
         var command = "--config app.conf --task do_something";
         var commandArgs = command.split("\\s");
 
-        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS));
+        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS, null));
         assertFalse(err.isQuiet());
         assertNotEquals(0, err.getExitCode());
     }
@@ -193,7 +226,7 @@ class StandardArgsProcessorTest {
         var command = "--config app.conf --task do_something ARG1 ARG2";
         var commandArgs = command.split("\\s");
 
-        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS));
+        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS, null));
         assertFalse(err.isQuiet());
         assertNotEquals(0, err.getExitCode());
     }
@@ -208,7 +241,7 @@ class StandardArgsProcessorTest {
         var command = "--config app.conf --task do_something --task do_something_else ARG1 --task do_something_else ARG2";
         var commandArgs = command.split("\\s");
 
-        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS);
+        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS, null);
         var tasks = standardArgs.getTasks();
 
         assertEquals(3, tasks.size());
@@ -230,7 +263,7 @@ class StandardArgsProcessorTest {
         var command = "--config app.conf --task do_something arg_1 arg_2 --task do_something_else arg_3";
         var commandArgs = command.split("\\s");
 
-        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS);
+        var standardArgs = StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS, null);
         var tasks = standardArgs.getTasks();
 
         assertEquals(2, tasks.size());
@@ -251,7 +284,7 @@ class StandardArgsProcessorTest {
         var command = "--config app.conf --task do_something_else";
         var commandArgs = command.split("\\s");
 
-        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS));
+        var err = assertThrows(EStartup.class, () -> StandardArgsProcessor.processArgs(APP_NAME, commandArgs, TASKS, null));
         assertFalse(err.isQuiet());
         assertNotEquals(0, err.getExitCode());
     }

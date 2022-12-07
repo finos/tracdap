@@ -46,7 +46,7 @@ secret store. The available key types are elliptic curve (EC) or RSA. Elliptic c
 considered to give better security with better performance at lower key sizes. For this reason
 we recommended EC 256 keys.
 
-Make sure you have set the *SECRET_KEY* environment variable before running *auth_tool*. For
+Make sure you have set the *TRAC_SECRET_KEY* environment variable before running *auth_tool*. For
 sandbox deployments, this can be set in *etc/env.sh* (or *etc\\env.bat* on Windows).
 
 .. tab-set::
