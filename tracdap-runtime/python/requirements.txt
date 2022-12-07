@@ -67,5 +67,5 @@ packaging >= 21.3
 
 # Compliance dependencies
 
-pip-licenses >= 3.5.2, < 4.0
+pip-licenses >= 4.0.2, < 5.0
 safety >= 2.3, < 3.0
