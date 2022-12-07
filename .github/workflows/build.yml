@@ -75,25 +75,25 @@ jobs:
         environment:
 
           # Latest supported versions on all 3 major platforms
-          - { ENV_NAME: "Windows, 3.11, Pandas 1.5, PySpark 3.2",
+          - { ENV_NAME: "Windows, 3.11, Pandas 1.5, PySpark 3.3",
               PLATFORM: 'windows-latest',
               PYTHON_VERSION: "3.11",
               PANDAS_VERSION: ">= 1.5.0, < 1.6.0",
-              PYSPARK_VERSION: ">= 3.2.0, < 3.3.0",
+              PYSPARK_VERSION: ">= 3.3.0, < 3.4.0",
               PYPANDOC: false }
 
-          - { ENV_NAME: "macOS, 3.11, Pandas 1.5, PySpark 3.2",
+          - { ENV_NAME: "macOS, 3.11, Pandas 1.5, PySpark 3.3",
               PLATFORM: 'macos-latest',
               PYTHON_VERSION: "3.11",
               PANDAS_VERSION: ">= 1.5.0, < 1.6.0",
-              PYSPARK_VERSION: ">= 3.2.0, < 3.3.0",
+              PYSPARK_VERSION: ">= 3.3.0, < 3.4.0",
               PYPANDOC: false }
 
-          - { ENV_NAME: "Linux, 3.11, Pandas 1.5, PySpark 3.2",
+          - { ENV_NAME: "Linux, 3.11, Pandas 1.5, PySpark 3.3",
               PLATFORM: 'ubuntu-latest',
               PYTHON_VERSION: "3.11",
               PANDAS_VERSION: ">= 1.5.0, < 1.6.0",
-              PYSPARK_VERSION: ">= 3.2.0, < 3.3.0",
+              PYSPARK_VERSION: ">= 3.3.0, < 3.4.0",
               PYPANDOC: false }
 
           # Intermediate supported versions
