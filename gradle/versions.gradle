@@ -21,7 +21,7 @@ ext {
     // Core platform technologies
     netty_version = '4.1.80.Final'  // gRPC does not support changes in Netty 4.1.75 yet (mar 2022)
     guava_version = '31.1-jre'
-    proto_version = '3.21.7'
+    proto_version = '3.21.10'
     grpc_version = '1.49.0'
     gapi_version = '2.9.2'
 
