@@ -15,7 +15,7 @@ pyyaml >= 6.0, < 7.0
 
 # Core data framework is based on Arrow
 
-pyarrow >= 9, < 10
+pyarrow >= 10.0.0, < 11
 
 
 # Requests, used for downloading model packages

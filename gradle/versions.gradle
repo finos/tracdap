@@ -27,7 +27,7 @@ ext {
 
 
     // Data technologies
-    arrow_version = '9.0.0'
+    arrow_version = '10.0.1'
     jackson_version = '2.14.1'
     jackson_databind_version = '2.14.1'
 
