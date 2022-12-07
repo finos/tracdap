@@ -256,7 +256,11 @@ public class MetadataApiValidator {
 
     static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx, false, TRUSTED_API, true);
+        return preallocateId(msg, ctx, true);
+    }
+
+    private static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx, boolean tenantRequired) {
+        ctx = createOrUpdate(ctx, false, TRUSTED_API, tenantRequired);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::omitted)
@@ -265,13 +269,33 @@ public class MetadataApiValidator {
         ctx = ctx.push(MWR_DEFINITION)
                 .apply(CommonValidators::omitted)
                 .pop();
+        
+        return ctx;
+    }
+
+    static ValidationContext preallocateIdBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(BWR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.pushRepeated(BWR_REQUESTS)
+                .apply(CommonValidators::listNotEmpty)
+                .applyRepeated((MetadataWriteRequest r, ValidationContext c) ->
+                        MetadataApiValidator.preallocateId(r, c, false), MetadataWriteRequest.class)
+                .pop();
 
         return ctx;
     }
 
     static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx) {
 
-        ctx = createOrUpdate(ctx, false, TRUSTED_API, true);
+        return createPreallocatedObject(msg, ctx, true);
+    }
+
+    private static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx, boolean tenantRequired) {
+        ctx = createOrUpdate(ctx, false, TRUSTED_API, tenantRequired);
 
         // Do not use the regular tag selector validator (ObjectIdValidator::tagSelector)
         // The regular validator will enforce object and tag version > 0
@@ -288,6 +312,27 @@ public class MetadataApiValidator {
                 .apply(CommonValidators::required)
                 .apply(ObjectValidator::objectType, ObjectDefinition.class, msg.getObjectType())
                 .applyRegistered()
+                .pop();
+        return ctx;
+    }
+
+    static ValidationContext createPreallocatedObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(BWR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.pushRepeated(BWR_REQUESTS)
+                .apply(CommonValidators::listNotEmpty)
+                .applyRepeated((MetadataWriteRequest r, ValidationContext c) ->
+                        MetadataApiValidator.createPreallocatedObject(r, c, false), MetadataWriteRequest.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(BWR_BATCH_ATTRS)
+                .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                // Only allow reserved attrs for requests on the trusted API
+                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, true)
                 .pop();
 
         return ctx;
