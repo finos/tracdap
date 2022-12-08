@@ -32,8 +32,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.OBJECT_FIRST_VERSION;
 import static org.finos.tracdap.common.metadata.MetadataConstants.TAG_FIRST_VERSION;
@@ -66,16 +64,13 @@ public class MetadataWriteService {
             List<TagUpdate> batchTagUpdates) {
         var newTags = new ArrayList<Tag>();
         for (var request : requests) {
-            var tagUpdates = new ArrayList<>(request.getTagUpdatesList());
-            tagUpdates.addAll(batchTagUpdates);
 
-            newTags.add(
-                prepareCreateObject(
-                        UUID.randomUUID(),
-                        request.getDefinition(),
-                        tagUpdates
-                )
+            var tag = prepareCreateObject(
+                    UUID.randomUUID(),
+                    request.getDefinition(),
+                    getTagUpdatesInsideBatch(request, batchTagUpdates)
             );
+            newTags.add(tag);
         }
 
         dal.saveNewObjects(tenant, newTags);
@@ -145,18 +140,15 @@ public class MetadataWriteService {
 
         var newTags = new ArrayList<Tag>();
         for (int i = 0; i < requests.size(); i++) {
-            var r = requests.get(i);
-            var tagUpdates = new ArrayList<>(r.getTagUpdatesList());
-            tagUpdates.addAll(batchTagUpdates);
+            var request = requests.get(i);
 
-            newTags.add(
-                    prepareUpdateObject(
-                            userInfo,
-                            priorTags.get(i),
-                            r.getDefinition(),
-                            tagUpdates
-                    )
+            var newTag = prepareUpdateObject(
+                    userInfo,
+                    priorTags.get(i),
+                    request.getDefinition(),
+                    getTagUpdatesInsideBatch(request, batchTagUpdates)
             );
+            newTags.add(newTag);
         }
 
         dal.saveNewVersions(tenant, newTags);
@@ -220,16 +212,13 @@ public class MetadataWriteService {
 
         var newTags = new ArrayList<Tag>();
         for (int i = 0; i < requests.size(); i++) {
-            var r = requests.get(i);
-            var tagUpdates = new ArrayList<>(r.getTagUpdatesList());
-            tagUpdates.addAll(batchTagUpdates);
+            var request = requests.get(i);
 
-            newTags.add(
-                    prepareUpdateTag(
-                            priorTags.get(i),
-                            tagUpdates
-                    )
+            var tag = prepareUpdateTag(
+                    priorTags.get(i),
+                    getTagUpdatesInsideBatch(request, batchTagUpdates)
             );
+            newTags.add(tag);
         }
 
         dal.saveNewTags(tenant, newTags);
@@ -277,13 +266,15 @@ public class MetadataWriteService {
 
         dal.preallocateObjectIds(tenant, objectTypes, objectIds);
 
-        return IntStream.range(0, objectTypes.size())
-                .mapToObj(
-                        i -> TagHeader.newBuilder()
-                        .setObjectType(objectTypes.get(i))
-                        .setObjectId(objectIds.get(i).toString())
-                        .build()
-                ).collect(Collectors.toList());
+        var tagHeaders = new ArrayList<TagHeader>();
+        for (int i = 0; i < objectTypes.size(); i++) {
+            var tagHeader = TagHeader.newBuilder()
+                    .setObjectType(objectTypes.get(i))
+                    .setObjectId(objectIds.get(i).toString())
+                    .build();
+            tagHeaders.add(tagHeader);
+        }
+        return tagHeaders;
     }
 
     public TagHeader createPreallocatedObject(
@@ -310,20 +301,26 @@ public class MetadataWriteService {
             List<MetadataWriteRequest> requests,
             List<TagUpdate> batchTagUpdates) {
 
-        var tags = requests.stream().map(r ->
-                        prepareCreateObject(
-                                UUID.fromString(r.getPriorVersion().getObjectId()),
-                                r.getDefinition(),
-                                Stream.concat(
-                                        r.getTagUpdatesList().stream(),
-                                        batchTagUpdates.stream()
-                                ).collect(Collectors.toList())
-                        )
-                ).collect(Collectors.toList());
+        var tags = new ArrayList<Tag>();
+        for (var request : requests) {
+            var tag = prepareCreateObject(
+                    UUID.fromString(request.getPriorVersion().getObjectId()),
+                    request.getDefinition(),
+                    getTagUpdatesInsideBatch(request, batchTagUpdates)
+            );
+            tags.add(tag);
+        }
 
         dal.savePreallocatedObjects(tenant, tags);
 
         return tags.stream().map(Tag::getHeader).collect(Collectors.toList());
+    }
+
+    private static List<TagUpdate> getTagUpdatesInsideBatch(MetadataWriteRequest r, List<TagUpdate> batchTagUpdates) {
+        var tagUpdates = new ArrayList<>(r.getTagUpdatesList());
+        tagUpdates.addAll(batchTagUpdates);
+
+        return tagUpdates;
     }
 
     private List<TagUpdate> commonCreateAttrs(
