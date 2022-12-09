@@ -47,18 +47,6 @@ public class MetadataWriteService {
         this.dal = dal;
     }
 
-    public TagHeader createObject(
-            String tenant,
-            ObjectDefinition definition,
-            List<TagUpdate> tagUpdates) {
-
-        var newTag = prepareCreateObject(UUID.randomUUID(), definition, tagUpdates);
-
-        dal.saveNewObjects(tenant, Collections.singletonList(newTag));
-
-        return newTag.getHeader();
-    }
-
     public List<TagHeader> createObjects(
             String tenant,
             List<MetadataWriteRequest> requests,
@@ -109,22 +97,6 @@ public class MetadataWriteService {
         newTag = TagUpdateService.applyTagUpdates(newTag, updateAttrs);
 
         return newTag;
-    }
-
-    public TagHeader updateObject(
-            String tenant, TagSelector priorVersion,
-            ObjectDefinition definition,
-            List<TagUpdate> tagUpdates) {
-
-        var userInfo = AuthConstants.USER_INFO_KEY.get();
-
-        var priorTag = dal.loadObject(tenant, priorVersion);
-
-        var newTag = prepareUpdateObject(userInfo, priorTag, definition, tagUpdates);
-
-        dal.saveNewVersions(tenant, Collections.singletonList(newTag));
-
-        return newTag.getHeader();
     }
 
     public List<TagHeader> updateObjects(
@@ -188,19 +160,6 @@ public class MetadataWriteService {
         return newTag;
     }
 
-    public TagHeader updateTag(
-            String tenant, TagSelector priorVersion,
-            List<TagUpdate> tagUpdates) {
-
-        var priorTag = dal.loadObject(tenant, priorVersion);
-
-        var newTag = prepareUpdateTag(priorTag, tagUpdates);
-
-        dal.saveNewTags(tenant, Collections.singletonList(newTag));
-
-        return newTag.getHeader();
-    }
-
     public List<TagHeader> updateTagBatch(
             String tenant,
             List<MetadataWriteRequest> requests,
@@ -245,10 +204,6 @@ public class MetadataWriteService {
         return newTag;
     }
 
-    public TagHeader preallocateId(String tenant, ObjectType objectType) {
-        return preallocateIdBatch(tenant, Collections.singletonList(objectType)).get(0);
-    }
-
     public List<TagHeader> preallocateIdBatch(String tenant, List<ObjectType> objectTypes) {
         var objectIds = objectTypes.stream().map(objectType -> UUID.randomUUID()).collect(Collectors.toList());
 
@@ -263,25 +218,6 @@ public class MetadataWriteService {
             tagHeaders.add(tagHeader);
         }
         return tagHeaders;
-    }
-
-    public TagHeader createPreallocatedObject(
-            String tenant, TagSelector priorVersion,
-            ObjectDefinition definition,
-            List<TagUpdate> tagUpdates) {
-
-        // In this case priorVersion refers to the preallocated ID
-        var objectId = UUID.fromString(priorVersion.getObjectId());
-
-        var newTag = prepareCreateObject(
-                objectId,
-                definition,
-                tagUpdates
-        );
-
-        dal.savePreallocatedObjects(tenant, Collections.singletonList(newTag));
-
-        return newTag.getHeader();
     }
 
     public List<TagHeader> createPreallocatedObjectBatch(

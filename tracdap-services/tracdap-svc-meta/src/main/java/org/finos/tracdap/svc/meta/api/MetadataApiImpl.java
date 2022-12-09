@@ -28,6 +28,7 @@ import com.google.protobuf.Message;
 import io.grpc.MethodDescriptor;
 import io.grpc.Status;
 
+import java.util.Collections;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -83,10 +84,10 @@ public class MetadataApiImpl {
         validateRequest(CREATE_OBJECT_METHOD, request);
         validateObjectType(request.getObjectType());
 
-        return writeService.createObject(
+        return writeService.createObjects(
                 request.getTenant(),
-                request.getDefinition(),
-                request.getTagUpdatesList());
+                Collections.singletonList(request),
+                Collections.emptyList()).get(0);
     }
 
     MetadataWriteBatchResponse createObjectBatch(MetadataWriteBatchRequest request) {
@@ -114,11 +115,10 @@ public class MetadataApiImpl {
         validateRequest(UPDATE_OBJECT_METHOD, request);
         validateObjectType(request.getObjectType());
 
-        return writeService.updateObject(
+        return writeService.updateObjects(
                 request.getTenant(),
-                request.getPriorVersion(),
-                request.getDefinition(),
-                request.getTagUpdatesList());
+                Collections.singletonList(request),
+                Collections.emptyList()).get(0);
     }
 
     MetadataWriteBatchResponse updateObjectBatch(MetadataWriteBatchRequest request) {
@@ -153,10 +153,10 @@ public class MetadataApiImpl {
 
         validateRequest(UPDATE_TAG_METHOD, request);
 
-        return writeService.updateTag(
+        return writeService.updateTagBatch(
                 request.getTenant(),
-                request.getPriorVersion(),
-                request.getTagUpdatesList());
+                Collections.singletonList(request),
+                Collections.emptyList()).get(0);
     }
 
     MetadataWriteBatchResponse updateTagBatch(MetadataWriteBatchRequest request) {
@@ -182,7 +182,7 @@ public class MetadataApiImpl {
         var tenant = request.getTenant();
         var objectType = request.getObjectType();
 
-        return writeService.preallocateId(tenant, objectType);
+        return writeService.preallocateIdBatch(tenant, Collections.singletonList(objectType)).get(0);
     }
 
     MetadataWriteBatchResponse preallocateIdBatch(MetadataWriteBatchRequest request) {
@@ -204,11 +204,10 @@ public class MetadataApiImpl {
 
         validateRequest(CREATE_PREALLOCATED_OBJECT_METHOD, request);
 
-        return writeService.createPreallocatedObject(
+        return writeService.createPreallocatedObjectBatch(
                 request.getTenant(),
-                request.getPriorVersion(),
-                request.getDefinition(),
-                request.getTagUpdatesList());
+                Collections.singletonList(request),
+                Collections.emptyList()).get(0);
     }
 
     MetadataWriteBatchResponse createPreallocatedObjectBatch(MetadataWriteBatchRequest request) {
