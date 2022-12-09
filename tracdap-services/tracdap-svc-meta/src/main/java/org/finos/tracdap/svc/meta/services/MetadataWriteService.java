@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -53,7 +54,7 @@ public class MetadataWriteService {
 
         var newTag = prepareCreateObject(UUID.randomUUID(), definition, tagUpdates);
 
-        dal.saveNewObject(tenant, newTag);
+        dal.saveNewObjects(tenant, Collections.singletonList(newTag));
 
         return newTag.getHeader();
     }
@@ -121,7 +122,7 @@ public class MetadataWriteService {
 
         var newTag = prepareUpdateObject(userInfo, priorTag, definition, tagUpdates);
 
-        dal.saveNewVersion(tenant, newTag);
+        dal.saveNewVersions(tenant, Collections.singletonList(newTag));
 
         return newTag.getHeader();
     }
@@ -195,7 +196,7 @@ public class MetadataWriteService {
 
         var newTag = prepareUpdateTag(priorTag, tagUpdates);
 
-        dal.saveNewTag(tenant, newTag);
+        dal.saveNewTags(tenant, Collections.singletonList(newTag));
 
         return newTag.getHeader();
     }

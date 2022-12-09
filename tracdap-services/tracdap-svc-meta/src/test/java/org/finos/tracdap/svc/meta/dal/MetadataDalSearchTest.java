@@ -34,6 +34,7 @@ import java.lang.Object;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -85,8 +86,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .build();
 
 
-        dal.saveNewObject(TestData.TEST_TENANT, tag1);
-        dal.saveNewObject(TestData.TEST_TENANT, tag2);
+        dal.saveNewObjects(TestData.TEST_TENANT, Collections.singletonList(tag1));
+        dal.saveNewObjects(TestData.TEST_TENANT, Collections.singletonList(tag2));
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -649,7 +650,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .putAttrs(attrToLookFor, MetadataCodec.encodeArrayValue(attrValues, TypeSystem.descriptor(basicType)))
                 .build();
 
-        dal.saveNewObject(TestData.TEST_TENANT, tag);
+        dal.saveNewObjects(TestData.TEST_TENANT, Collections.singletonList(tag));
 
         var inequalities = Set.of(
                 SearchOperator.GT,
@@ -1234,10 +1235,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         var tagV2T1 = tagForNextObject(tagV1T2, defV2, INCLUDE_HEADER);
         var tagV2T2 = TestData.nextTag(tagV2T1, UPDATE_TAG_VERSION);
 
-        dal.saveNewObject(TEST_TENANT, tagV1T1);
-        dal.saveNewTag(TEST_TENANT, tagV1T2);
-        dal.saveNewVersion(TEST_TENANT, tagV2T1);
-        dal.saveNewTag(TEST_TENANT, tagV2T2);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(tagV1T1));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(tagV1T2));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(tagV2T1));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(tagV2T2));
 
         // A regular search with one EQ search term
         // This should bring back only the latest version / tag if no other behaviour is specified
@@ -1302,9 +1303,9 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .putAttrs("dal_prior_version_attr", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
-        dal.saveNewObject(TEST_TENANT, v1Tag);
-        dal.saveNewVersion(TEST_TENANT, v2Tag);
-        dal.saveNewVersion(TEST_TENANT, v3Tag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(v1Tag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(v2Tag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(v3Tag));
 
         var searchExpr = SearchExpression.newBuilder()
                 .setTerm(SearchTerm.newBuilder()
@@ -1352,9 +1353,9 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .putAttrs("dal_prior_tag_attr", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
-        dal.saveNewObject(TEST_TENANT, t1Tag);
-        dal.saveNewTag(TEST_TENANT, t2Tag);
-        dal.saveNewTag(TEST_TENANT, t3Tag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(t1Tag));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(t2Tag));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(t3Tag));
 
         var searchExpr = SearchExpression.newBuilder()
                 .setTerm(SearchTerm.newBuilder()
@@ -1398,7 +1399,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .putAttrs("dal_as_of_attr_1", MetadataCodec.encodeValue("initial_value"))
                 .build();
 
-        dal.saveNewObject(TEST_TENANT, unchangedTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(unchangedTag));
 
         // Ensure unchanged tag has a creation timestamp that is before the versioned object
         Thread.sleep(10);
@@ -1411,7 +1412,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .putAttrs("dal_as_of_attr_1", MetadataCodec.encodeValue("initial_value"))
                 .build();
 
-        dal.saveNewObject(TEST_TENANT, v1Tag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(v1Tag));
 
         // Use a search timestamp after both objects have been created, but before either is updated
         var v1SearchTime = MetadataCodec.decodeDatetime(v1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
@@ -1428,7 +1429,7 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .putAttrs("dal_as_of_attr_1", MetadataCodec.encodeValue("updated_value"))
                 .build();
 
-        dal.saveNewVersion(TEST_TENANT, v2Tag);
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(v2Tag));
 
         // Search without specifying as-of, should return only the extra object that has the original tag
 
@@ -1488,10 +1489,10 @@ abstract class MetadataDalSearchTest implements IDalTestable {
         Thread.sleep(10);
         var v2t2Tag = nextTag(v2t1Tag, UPDATE_TAG_VERSION);
 
-        dal.saveNewObject(TEST_TENANT, v1t1Tag);
-        dal.saveNewTag(TEST_TENANT, v1t2Tag);
-        dal.saveNewVersion(TEST_TENANT, v2t1Tag);
-        dal.saveNewTag(TEST_TENANT, v2t2Tag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(v1t1Tag));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(v1t2Tag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(v2t1Tag));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(v2t2Tag));
 
         var preCreateTime = MetadataCodec.decodeDatetime(v1t1Tag.getHeader().getTagTimestamp()).minusNanos(5000);
         var v1t1Time = MetadataCodec.decodeDatetime(v1t1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
@@ -1586,8 +1587,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .putAttrs("dal_as_of_attr_4", MetadataCodec.encodeValue("the_droids_you_are_looking_for"))
                 .build();
 
-        dal.saveNewObject(TEST_TENANT, obj1t1Tag);
-        dal.saveNewObject(TEST_TENANT, obj2t1Tag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(obj1t1Tag));
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(obj2t1Tag));
 
         var t1Time = MetadataCodec.decodeDatetime(obj2t1Tag.getHeader().getTagTimestamp()).plusNanos(5000);
 
@@ -1603,8 +1604,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
                 .putAttrs("dal_as_of_attr_4", MetadataCodec.encodeValue("not_the_droids_you_are_looking_for"))
                 .build();
 
-        dal.saveNewTag(TEST_TENANT, obj1t2Tag);
-        dal.saveNewTag(TEST_TENANT, obj2t2Tag);
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(obj1t2Tag));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(obj2t2Tag));
 
         var searchExpr = SearchExpression.newBuilder()
                 .setLogical(LogicalExpression.newBuilder()
@@ -1708,12 +1709,12 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         // Save everything
 
-        dal.saveNewObject(TEST_TENANT, v1t1);
-        dal.saveNewTag(TEST_TENANT, v1t2);
-        dal.saveNewTag(TEST_TENANT, v1t3);
-        dal.saveNewVersion(TEST_TENANT, v2t1);
-        dal.saveNewTag(TEST_TENANT, v1t4);
-        dal.saveNewVersion(TEST_TENANT, v3t1);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(v1t1));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(v1t2));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(v1t3));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(v2t1));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(v1t4));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(v3t1));
 
         var searchExpr = SearchExpression.newBuilder()
                 .setLogical(LogicalExpression.newBuilder()
@@ -1769,8 +1770,8 @@ abstract class MetadataDalSearchTest implements IDalTestable {
 
         // Save objects in the wrong order to try to confuse the DAL
 
-        dal.saveNewObject(TEST_TENANT, obj2Tag);
-        dal.saveNewObject(TEST_TENANT, obj1Tag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(obj2Tag));
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(obj1Tag));
 
         var searchParams = SearchParameters.newBuilder()
                 .setObjectType(ObjectType.DATA)
