@@ -98,10 +98,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     public void saveNewObjects(String tenant, List<Tag> tags) {
 
         var parts = separateParts(tags);
-        saveNewObjects(tenant, parts);
-    }
-
-    private void saveNewObjects(String tenant, ObjectParts parts) {
 
         wrapTransaction(conn -> {
 
@@ -121,10 +117,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     public void saveNewVersions(String tenant, List<Tag> tags) {
 
         var parts = separateParts(tags);
-        saveNewVersions(tenant, parts);
-    }
-
-    private void saveNewVersions(String tenant, ObjectParts parts) {
 
         wrapTransaction(conn -> {
 
@@ -148,10 +140,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     public void saveNewTags(String tenant, List<Tag> tags) {
 
         var parts = separateParts(tags);
-        saveNewTags(tenant, parts);
-    }
-
-    private void saveNewTags(String tenant, ObjectParts parts) {
 
         wrapTransaction(conn -> {
 
