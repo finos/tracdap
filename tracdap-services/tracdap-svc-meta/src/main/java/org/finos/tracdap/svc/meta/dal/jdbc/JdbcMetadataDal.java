@@ -94,14 +94,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     // So, use the same implementation for save one and save many
     // I.e. no special optimisation for saving a single item, even though this is the common case
 
-
-    @Override
-    public void saveNewObject(String tenant, Tag tag) {
-
-        var parts = separateParts(tag);
-        saveNewObjects(tenant, parts);
-    }
-
     @Override
     public void saveNewObjects(String tenant, List<Tag> tags) {
 
@@ -123,13 +115,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
             writeBatch.writeTagAttrs(conn, tenantId, tagPk, parts);
         },
         (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts));
-    }
-
-    @Override
-    public void saveNewVersion(String tenant, Tag tag) {
-
-        var parts = separateParts(tag);
-        saveNewVersions(tenant, parts);
     }
 
     @Override
@@ -157,13 +142,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         (error, code) -> JdbcError.handleMissingItem(error, code, parts),
         (error, code) ->  JdbcError.handleDuplicateObjectId(error, code, parts),
         (error, code) ->  JdbcError.newVersion_WrongType(error, code, parts));
-    }
-
-    @Override
-    public void saveNewTag(String tenant, Tag tag) {
-
-        var parts = separateParts(tag);
-        saveNewTags(tenant, parts);
     }
 
     @Override

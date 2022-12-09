@@ -26,15 +26,9 @@ public interface IMetadataDal {
 
     List<TenantInfo> listTenants();
 
-    void saveNewObject(String tenant, Tag tag);
-
     void saveNewObjects(String tenant, List<Tag> tags);
 
-    void saveNewVersion(String tenant, Tag tag);
-
     void saveNewVersions(String tenant, List<Tag> tags);
-
-    void saveNewTag(String tenant, Tag tag);
 
     void saveNewTags(String tenant, List<Tag> tags);
 

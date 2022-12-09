@@ -21,6 +21,7 @@ import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.exception.EMetadataWrongType;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -61,7 +62,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
-        dal.saveNewObject(TEST_TENANT, origTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
         var result = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
 
         assertEquals(origTag, result);
@@ -87,7 +88,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var origTag = addMultiValuedAttr(dummyTag(origDef, INCLUDE_HEADER));
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
-        dal.saveNewObject(TEST_TENANT, origTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
         var result = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1);
 
         assertEquals(origTag, result);
@@ -116,9 +117,9 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         assertThrows(EMetadataNotFound.class, () -> dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1));
 
         // First insert should succeed if they are run one by one
-        assertDoesNotThrow(() -> dal.saveNewObject(TEST_TENANT, origTag));
+        assertDoesNotThrow(() -> dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag)));
         assertDoesNotThrow(() -> dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 1));
-        assertThrows(EMetadataDuplicate.class, () -> dal.saveNewObject(TEST_TENANT, origTag));
+        assertThrows(EMetadataDuplicate.class, () -> dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag)));
     }
 
     @Test
@@ -132,8 +133,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var nextDef = nextDataDef(origDef);
         var nextTag = tagForNextObject(origTag, nextDef, INCLUDE_HEADER);
 
-        dal.saveNewObject(TEST_TENANT, origTag);
-        dal.saveNewVersion(TEST_TENANT, nextTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextTag));
         var result = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1);
 
         assertEquals(nextTag, result);
@@ -166,8 +167,8 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var nextDef = nextDataDef(origDef);
         var nextTag = addMultiValuedAttr(tagForNextObject(origTag, nextDef, INCLUDE_HEADER));
 
-        dal.saveNewObject(TEST_TENANT, origTag);
-        dal.saveNewVersion(TEST_TENANT, nextTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextTag));
         var result = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1);
 
         assertEquals(nextTag, result);
@@ -199,14 +200,14 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var nextDef = nextDataDef(origDef);
         var nextTag = tagForNextObject(origTag, nextDef, INCLUDE_HEADER);
 
-        dal.saveNewObject(TEST_TENANT, origTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
 
         assertThrows(EMetadataDuplicate.class, () -> dal.saveNewVersions(TEST_TENANT, List.of(nextTag, nextTag)));
         assertThrows(EMetadataNotFound.class, () -> dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1));
 
         // First insert should succeed if they are run one by one
-        dal.saveNewVersion(TEST_TENANT, nextTag);
-        assertThrows(EMetadataDuplicate.class, () -> dal.saveNewVersion(TEST_TENANT, nextTag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextTag));
+        assertThrows(EMetadataDuplicate.class, () -> dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextTag)));
 
         var loadDup2 = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 1);
         assertEquals(nextTag, loadDup2);
@@ -221,13 +222,13 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var nextTag = tagForNextObject(origTag, nextDef, INCLUDE_HEADER);
 
         // Save next version, single, without saving original
-        assertThrows(EMetadataNotFound.class, () -> dal.saveNewVersion(TEST_TENANT, nextTag));
+        assertThrows(EMetadataNotFound.class, () -> dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextTag)));
 
         var modelTag = dummyTagForObjectType(ObjectType.MODEL);
         var nextModelTag = tagForNextObject(modelTag, nextModelDef(modelTag.getDefinition()), INCLUDE_HEADER);
 
         // Save next, multiple, one item does not have original
-        dal.saveNewObject(TEST_TENANT, origTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
 
         assertThrows(EMetadataNotFound.class, () -> dal.saveNewVersions(TEST_TENANT, List.of(nextTag, nextModelTag)));
     }
@@ -247,9 +248,9 @@ abstract class MetadataDalWriteTest implements IDalTestable {
                 .build();
 
         // Save next version, single, without saving original
-        dal.saveNewObject(TEST_TENANT, dataTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(dataTag));
 
-        assertThrows(EMetadataWrongType.class, () -> dal.saveNewVersion(TEST_TENANT, nextModelTag));
+        assertThrows(EMetadataWrongType.class, () -> dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextModelTag)));
         assertThrows(EMetadataWrongType.class, () -> dal.saveNewVersions(TEST_TENANT, List.of(nextDataTag, nextModelTag)));
     }
 
@@ -263,9 +264,9 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         // Test saving tag v2 against object v2
-        dal.saveNewObject(TEST_TENANT, origTag);
-        dal.saveNewVersion(TEST_TENANT, nextDefTag1);
-        dal.saveNewTag(TEST_TENANT, nextDefTag2);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextDefTag1));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextDefTag2));
         var result = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 2);
 
         assertEquals(nextDefTag2, result);
@@ -297,9 +298,9 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         // Test saving tag v2 against object v2
-        dal.saveNewObject(TEST_TENANT, origTag);
-        dal.saveNewVersion(TEST_TENANT, nextDefTag1);
-        dal.saveNewTag(TEST_TENANT, nextDefTag2);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextDefTag1));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextDefTag2));
         var result = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 2, 2);
 
         assertEquals(nextDefTag2, result);
@@ -329,14 +330,14 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var nextTag = nextTag(origTag, UPDATE_TAG_VERSION);
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
-        dal.saveNewObject(TEST_TENANT, origTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
 
         assertThrows(EMetadataDuplicate.class, () -> dal.saveNewTags(TEST_TENANT, List.of(nextTag, nextTag)));
         assertThrows(EMetadataNotFound.class, () -> dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 2));
 
         // First insert should succeed if they are run one by one
-        dal.saveNewTag(TEST_TENANT, nextTag);
-        assertThrows(EMetadataDuplicate.class, () -> dal.saveNewTag(TEST_TENANT, nextTag));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextTag));
+        assertThrows(EMetadataDuplicate.class, () -> dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextTag)));
 
         var loadDup2 = dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 2);
         assertEquals(nextTag, loadDup2);
@@ -350,13 +351,13 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var nextTag = nextTag(origTag, UPDATE_TAG_VERSION);
 
         // Save next tag, single, without saving object
-        assertThrows(EMetadataNotFound.class, () -> dal.saveNewTag(TEST_TENANT, nextTag));
+        assertThrows(EMetadataNotFound.class, () -> dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextTag)));
 
         var modelTag = dummyTagForObjectType(ObjectType.MODEL);
         var nextModelTag = tagForNextObject(modelTag, nextModelDef(modelTag.getDefinition()), INCLUDE_HEADER);
 
         // Save next tag, multiple, one item does not have an object
-        dal.saveNewObject(TEST_TENANT, origTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
 
         assertThrows(EMetadataNotFound.class, () -> dal.saveNewTags(TEST_TENANT, List.of(nextTag, nextModelTag)));
     }
@@ -373,23 +374,23 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         // Save next tag (single) on an unknown object version
         // This is an error, even for tag v1
         // saveNewVersion must be called first
-        dal.saveNewObject(TEST_TENANT, origTag);
-        assertThrows(EMetadataNotFound.class, () -> dal.saveNewTag(TEST_TENANT, nextDefTag1));
-        assertThrows(EMetadataNotFound.class, () -> dal.saveNewTag(TEST_TENANT, nextDefTag2));
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
+        assertThrows(EMetadataNotFound.class, () -> dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextDefTag1)));
+        assertThrows(EMetadataNotFound.class, () -> dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextDefTag2)));
 
         var modelTag = dummyTagForObjectType(ObjectType.MODEL);
         var nextModelTag = tagForNextObject(modelTag, nextModelDef(modelTag.getDefinition()), INCLUDE_HEADER);
         var nextModelTag2 = nextTag(nextModelTag, UPDATE_TAG_VERSION);
 
         // Save object 1 version 2, and object 2 version 1
-        dal.saveNewVersion(TEST_TENANT, nextDefTag1);
-        dal.saveNewObject(TEST_TENANT, modelTag);
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextDefTag1));
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(modelTag));
 
         // Save next tag (multiple), second item is missing the required object version
         assertThrows(EMetadataNotFound.class, () -> dal.saveNewTags(TEST_TENANT, List.of(nextDefTag2, nextModelTag2)));
 
         // Saving the valid tag by itself should not throw
-        Assertions.assertDoesNotThrow(() -> dal.saveNewTag(TEST_TENANT, nextDefTag2));
+        Assertions.assertDoesNotThrow(() -> dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextDefTag2)));
     }
 
     @Test
@@ -412,9 +413,9 @@ abstract class MetadataDalWriteTest implements IDalTestable {
                 .setDefinition(nextDef)
                 .build();
 
-        dal.saveNewObject(TEST_TENANT, origTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
 
-        assertThrows(EMetadataWrongType.class, () -> dal.saveNewTag(TEST_TENANT, nextTag));
+        assertThrows(EMetadataWrongType.class, () -> dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextTag)));
         assertThrows(EMetadataNotFound.class, () -> dal.loadTag(TEST_TENANT, ObjectType.DATA, origId, 1, 2));
 
         var origDef2 = dummyModelDef();
@@ -423,7 +424,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
 
         var nextTag2 = nextTag(origTag2, UPDATE_TAG_VERSION);
 
-        dal.saveNewObject(TEST_TENANT, origTag2);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag2));
 
         assertThrows(EMetadataWrongType.class, () -> dal.saveNewTags(TEST_TENANT, List.of(nextTag, nextTag2)));
         assertThrows(EMetadataNotFound.class, () -> dal.loadTags(TEST_TENANT,
@@ -478,7 +479,7 @@ abstract class MetadataDalWriteTest implements IDalTestable {
         var id2 = UUID.fromString(obj2.getHeader().getObjectId());
         var id3 = UUID.randomUUID();
 
-        dal.saveNewObject(TEST_TENANT, obj2);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(obj2));
         assertThrows(EMetadataDuplicate.class,
                 () -> dal.preallocateObjectIds(TEST_TENANT,
                         List.of(ObjectType.MODEL, ObjectType.MODEL),

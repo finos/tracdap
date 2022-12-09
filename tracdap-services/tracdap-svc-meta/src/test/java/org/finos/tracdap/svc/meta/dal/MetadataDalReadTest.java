@@ -22,6 +22,7 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.exception.EMetadataWrongType;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -63,9 +64,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         // Save v1 t1, v2 t1, v2 t2
-        dal.saveNewObject(TEST_TENANT, origTag);
-        dal.saveNewVersion(TEST_TENANT, nextDefTag1);
-        dal.saveNewTag(TEST_TENANT, nextDefTag2);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextDefTag1));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextDefTag2));
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -95,9 +96,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
         // Save v1 t1, v2 t1, v2 t2
-        dal.saveNewObject(TEST_TENANT, origTag);
-        dal.saveNewVersion(TEST_TENANT, nextDefTag1);
-        dal.saveNewTag(TEST_TENANT, nextDefTag2);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextDefTag1));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextDefTag2));
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -130,9 +131,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
         Thread.sleep(1);
         var nextDefTag2 = nextTag(nextDefTag1, UPDATE_TAG_VERSION);
 
-        dal.saveNewObject(TEST_TENANT, origTag);
-        dal.saveNewVersion(TEST_TENANT, nextDefTag1);
-        dal.saveNewTag(TEST_TENANT, nextDefTag2);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextDefTag1));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextDefTag2));
 
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
         var v1t1AsOf = MetadataCodec.decodeDatetime(origTag.getHeader().getTagTimestamp()).plusNanos(500000);
@@ -180,9 +181,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
         Thread.sleep(1);
         var nextDefTag2 = nextTag(nextDefTag1, UPDATE_TAG_VERSION);
 
-        dal.saveNewObject(TEST_TENANT, origTag);
-        dal.saveNewVersion(TEST_TENANT, nextDefTag1);
-        dal.saveNewTag(TEST_TENANT, nextDefTag2);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextDefTag1));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextDefTag2));
 
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
         var v1t1AsOf = MetadataCodec.decodeDatetime(origTag.getHeader().getTagTimestamp()).plusNanos(500000);
@@ -236,13 +237,13 @@ abstract class MetadataDalReadTest implements IDalTestable {
                 .setLatestTag(true)
                 .build();
 
-        dal.saveNewObject(TEST_TENANT, origTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
         var v1t1 = dal.loadObject(TEST_TENANT, selector);
 
-        dal.saveNewVersion(TEST_TENANT, nextDefTag1);
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextDefTag1));
         var v2t1 = dal.loadObject(TEST_TENANT, selector);
-        
-        dal.saveNewTag(TEST_TENANT, nextDefTag2);
+
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextDefTag2));
         var v2t2 = dal.loadObject(TEST_TENANT, selector);
 
         assertEquals(origTag, v1t1);
@@ -258,7 +259,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var extraTag = dummyTag(extraDef, INCLUDE_HEADER);
         var extraId = UUID.fromString(extraTag.getHeader().getObjectId());
 
-        dal.saveNewObject(TEST_TENANT, extraTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(extraTag));
 
         var extraSelector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -280,15 +281,15 @@ abstract class MetadataDalReadTest implements IDalTestable {
                 .setLatestTag(true)
                 .build();
 
-        dal.saveNewObject(TEST_TENANT, origTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
         var v1t1Batch = dal.loadObjects(TEST_TENANT, List.of(selector, extraSelector));
         var v1t1 = v1t1Batch.get(0);
 
-        dal.saveNewVersion(TEST_TENANT, nextDefTag1);
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(nextDefTag1));
         var v2t1Batch = dal.loadObjects(TEST_TENANT, List.of(selector, extraSelector));
         var v2t1 = v2t1Batch.get(0);
 
-        dal.saveNewTag(TEST_TENANT, nextDefTag2);
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(nextDefTag2));
         var v2t2Batch = dal.loadObjects(TEST_TENANT, List.of(selector, extraSelector));
         var v2t2 = v2t2Batch.get(0);
 
@@ -312,10 +313,10 @@ abstract class MetadataDalReadTest implements IDalTestable {
         Thread.sleep(1);
         var v3t1Tag = tagForNextObject(v2t1Tag, nextDataDef(v2t1Tag.getDefinition()), INCLUDE_HEADER);
 
-        dal.saveNewObject(TEST_TENANT, v1Tag);
-        dal.saveNewVersion(TEST_TENANT, v2t1Tag);
-        dal.saveNewTag(TEST_TENANT, v2t2Tag);
-        dal.saveNewVersion(TEST_TENANT, v3t1Tag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(v1Tag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(v2t1Tag));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(v2t2Tag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(v3t1Tag));
 
         var origId = UUID.fromString(v1Tag.getHeader().getObjectId());
         var v2t1AsOf = MetadataCodec.decodeDatetime(v2t1Tag.getHeader().getTagTimestamp()).plusNanos(500000);
@@ -368,10 +369,10 @@ abstract class MetadataDalReadTest implements IDalTestable {
         Thread.sleep(1);
         var v3t1Tag = tagForNextObject(v2t1Tag, nextDataDef(v2t1Tag.getDefinition()), INCLUDE_HEADER);
 
-        dal.saveNewObject(TEST_TENANT, v1Tag);
-        dal.saveNewVersion(TEST_TENANT, v2t1Tag);
-        dal.saveNewTag(TEST_TENANT, v2t2Tag);
-        dal.saveNewVersion(TEST_TENANT, v3t1Tag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(v1Tag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(v2t1Tag));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(v2t2Tag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(v3t1Tag));
 
         var origId = UUID.fromString(v1Tag.getHeader().getObjectId());
         var v2t1AsOf = MetadataCodec.decodeDatetime(v2t1Tag.getHeader().getTagTimestamp()).plusNanos(500000);
@@ -420,7 +421,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origTag = addMultiValuedAttr(dummyTag(origDef, INCLUDE_HEADER));
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
-        dal.saveNewObject(TEST_TENANT, origTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -481,9 +482,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
         Thread.sleep(10);
         var t2Tag = nextTag(v2Tag, UPDATE_TAG_VERSION);
 
-        dal.saveNewObject(TEST_TENANT, v1Tag);
-        dal.saveNewVersion(TEST_TENANT, v2Tag);
-        dal.saveNewTag(TEST_TENANT, t2Tag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(v1Tag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(v2Tag));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(t2Tag));
 
         var origId = UUID.fromString(v1Tag.getHeader().getObjectId());
 
@@ -525,9 +526,9 @@ abstract class MetadataDalReadTest implements IDalTestable {
         Thread.sleep(10);
         var t2Tag = nextTag(v2Tag, UPDATE_TAG_VERSION);
 
-        dal.saveNewObject(TEST_TENANT, v1Tag);
-        dal.saveNewVersion(TEST_TENANT, v2Tag);
-        dal.saveNewTag(TEST_TENANT, t2Tag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(v1Tag));
+        dal.saveNewVersions(TEST_TENANT, Collections.singletonList(v2Tag));
+        dal.saveNewTags(TEST_TENANT, Collections.singletonList(t2Tag));
 
         var origId = UUID.fromString(v1Tag.getHeader().getObjectId());
 
@@ -586,7 +587,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         assertThrows(EMetadataNotFound.class, () -> dal.loadObject(TEST_TENANT, missing4));
 
         // Save an item
-        dal.saveNewObject(TEST_TENANT, origTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
 
         // No selectors should match
         assertThrows(EMetadataNotFound.class, () -> dal.loadObject(TEST_TENANT, missing1));
@@ -602,7 +603,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var validTag = dummyTag(validDef, INCLUDE_HEADER);
         var validId = UUID.fromString(validTag.getHeader().getObjectId());
 
-        dal.saveNewObject(TEST_TENANT, validTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(validTag));
 
         var validSelector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
@@ -634,7 +635,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         assertThrows(EMetadataNotFound.class, () -> dal.loadObjects(TEST_TENANT, List.of(validSelector, missing4)));
 
         // Save an item
-        dal.saveNewObject(TEST_TENANT, origTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
 
         // No selectors should match
         assertThrows(EMetadataNotFound.class, () -> dal.loadObjects(TEST_TENANT, List.of(validSelector, missing1)));
@@ -650,7 +651,7 @@ abstract class MetadataDalReadTest implements IDalTestable {
         var origTag = dummyTag(origDef, INCLUDE_HEADER);
         var origId = UUID.fromString(origTag.getHeader().getObjectId());
 
-        dal.saveNewObject(TEST_TENANT, origTag);
+        dal.saveNewObjects(TEST_TENANT, Collections.singletonList(origTag));
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.MODEL)
