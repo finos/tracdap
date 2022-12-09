@@ -160,20 +160,9 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     }
 
     @Override
-    public void preallocateObjectId(String tenant, ObjectType objectType, UUID objectId) {
-
-        var parts = separateParts(objectType, objectId);
-        preallocateObjectIds(tenant, parts);
-    }
-
-    @Override
     public void preallocateObjectIds(String tenant, List<ObjectType> objectTypes, List<UUID> objectIds) {
 
         var parts = separateParts(objectTypes, objectIds);
-        preallocateObjectIds(tenant, parts);
-    }
-
-    private void preallocateObjectIds(String tenant, ObjectParts parts) {
 
         wrapTransaction(conn -> {
 
@@ -187,20 +176,9 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
     }
 
     @Override
-    public void savePreallocatedObject(String tenant, Tag tag) {
-
-        var parts = separateParts(tag);
-        savePreallocatedObjects(tenant, parts);
-    }
-
-    @Override
     public void savePreallocatedObjects(String tenant, List<Tag> tags) {
 
         var parts = separateParts(tags);
-        savePreallocatedObjects(tenant, parts);
-    }
-
-    private void savePreallocatedObjects(String tenant, ObjectParts parts) {
 
         wrapTransaction(conn -> {
 
@@ -429,28 +407,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
         TagSelector[] selector;
     }
 
-    private ObjectParts separateParts(Tag tag) {
-
-        var header = tag.getHeader();
-
-        var parts = new ObjectParts();
-        parts.objectType = new ObjectType[] {header.getObjectType()};
-        parts.objectId = new UUID[] {UUID.fromString(header.getObjectId())};
-        parts.objectVersion = new int[] {header.getObjectVersion()};
-        parts.tagVersion = new int[] {header.getTagVersion()};
-
-        var objectTimestamp = MetadataCodec.decodeDatetime(header.getObjectTimestamp()).toInstant();
-        var tagTimestamp = MetadataCodec.decodeDatetime(header.getTagTimestamp()).toInstant();
-
-        parts.objectTimestamp = new Instant[] {objectTimestamp};
-        parts.tagTimestamp = new Instant[] {tagTimestamp};
-
-        parts.tag = new Tag[] {tag};
-        parts.definition = new ObjectDefinition[] {tag.getDefinition()};
-
-        return parts;
-    }
-
     private ObjectParts separateParts(List<Tag> tags) {
 
         var headers = tags.stream().map(Tag::getHeader).toArray(TagHeader[]::new);
@@ -475,15 +431,6 @@ public class JdbcMetadataDal extends JdbcBaseDal implements IMetadataDal {
 
         parts.tag = tags.toArray(Tag[]::new);
         parts.definition = tags.stream().map(Tag::getDefinition).toArray(ObjectDefinition[]::new);
-
-        return parts;
-    }
-
-    private ObjectParts separateParts(ObjectType objectType, UUID objectId) {
-
-        var parts = new ObjectParts();
-        parts.objectType = new ObjectType[] {objectType};
-        parts.objectId = new UUID[] {objectId};
 
         return parts;
     }
