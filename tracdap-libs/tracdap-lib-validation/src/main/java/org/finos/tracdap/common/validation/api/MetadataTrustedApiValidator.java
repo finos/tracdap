@@ -69,9 +69,19 @@ public class MetadataTrustedApiValidator {
         return MetadataApiValidator.preallocateId(msg, ctx);  // always a trusted call
     }
 
+    @Validator(method = "preallocateIdBatch")
+    public static ValidationContext preallocateIdBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.preallocateIdBatch(msg, ctx);  // always a trusted call
+    }
+
     @Validator(method = "createPreallocatedObject")
     public static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx) {
         return MetadataApiValidator.createPreallocatedObject(msg, ctx);  // always a trusted call
+    }
+
+    @Validator(method = "createPreallocatedObjectBatch")
+    public static ValidationContext createPreallocatedObjectBatch(MetadataWriteBatchRequest msg, ValidationContext ctx) {
+        return MetadataApiValidator.createPreallocatedObjectBatch(msg, ctx);  // always a trusted call
     }
 
     @Validator(method = "readObject")

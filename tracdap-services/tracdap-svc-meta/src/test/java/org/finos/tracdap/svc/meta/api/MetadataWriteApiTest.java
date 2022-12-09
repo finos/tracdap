@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.finos.tracdap.test.meta.TestData.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -2178,6 +2179,135 @@ abstract class MetadataWriteApiTest {
 
         // noinspection ResultOfMethodCallIgnored
         var error = assertThrows(StatusRuntimeException.class, () -> readApi.readObject(readRequest));
+        assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // PREALLOCATION BATCH
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @Test
+    void preallocateObjectBatch_ok() {
+
+        // Simple round trip
+        // Preallocate IDs, save objects to those IDs and read then back
+
+        var preallocateRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addAllRequests(
+                        IntStream.range(0, 13)
+                                .mapToObj(i -> MetadataWriteRequest.newBuilder()
+                                        .setObjectType(ObjectType.DATA)
+                                        .build())
+                                .collect(Collectors.toList())
+                )
+                .build();
+
+        var preallocatedHeaders = trustedApi.preallocateIdBatch(preallocateRequest).getHeadersList();
+        assertEquals(13, preallocatedHeaders.size());
+
+        class RequestData {
+            Tag newTag;
+            MetadataWriteRequest writeRequest;
+        }
+
+        var requestsData = preallocatedHeaders.stream().map(preallocateHeader -> {
+            var r = new RequestData();
+            var preallocateSelector = selectorForTag(preallocateHeader);
+
+            var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
+            r.newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
+            var tagUpdates = TestData.tagUpdatesForAttrs(r.newTag.getAttrsMap());
+
+            r.writeRequest = MetadataWriteRequest.newBuilder()
+                    .setObjectType(ObjectType.DATA)
+                    .setPriorVersion(preallocateSelector)
+                    .setDefinition(newObject)
+                    .addAllTagUpdates(tagUpdates)
+                    .build();
+
+            return r;
+        }).collect(Collectors.toList());
+
+        var writeRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addAllRequests(requestsData.stream().map(r -> r.writeRequest).collect(Collectors.toList()))
+                .build();
+
+        var tagHeaders = trustedApi.createPreallocatedObjectBatch(writeRequest).getHeadersList();
+        assertEquals(13, tagHeaders.size());
+
+        for (int i = 0; i < 13; i++) {
+            var preallocateHeader = preallocatedHeaders.get(i);
+            var r = requestsData.get(i);
+            var tagHeader = tagHeaders.get(i);
+
+            assertEquals(preallocateHeader.getObjectId(), tagHeader.getObjectId());
+
+            var expectedTag = r.newTag.toBuilder()
+                    .setHeader(tagHeader)
+                    .build();
+
+            var readRequest = MetadataReadRequest.newBuilder()
+                    .setTenant(TEST_TENANT)
+                    .setSelector(TagSelector.newBuilder()
+                            .setObjectType(ObjectType.DATA)
+                            .setObjectId(preallocateHeader.getObjectId())
+                            .setObjectVersion(1)
+                            .setTagVersion(1))
+                    .build();
+
+            var savedTag = readApi.readObject(readRequest);
+
+            assertEquals(expectedTag.getHeader(), savedTag.getHeader());
+            assertEquals(expectedTag.getDefinition(), savedTag.getDefinition());
+
+            for (var attr : expectedTag.getAttrsMap().keySet())
+                assertEquals(expectedTag.getAttrsOrThrow(attr), savedTag.getAttrsOrThrow(attr));
+
+            assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));
+            assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_CREATE_USER_ID));
+            assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_CREATE_USER_NAME));
+            assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_UPDATE_TIME));
+            assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_ID));
+            assertTrue(savedTag.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_NAME));
+        }
+    }
+
+    @Test
+    void preallocateObjectBatch_idNotReserved() {
+
+        // To save a preallocated object, the ID must first be reserved
+        // If the ID is not reserved, that is an item not found error
+
+        var writeRequests = IntStream.range(0, 3).mapToObj(i -> {
+            var newObjectId = UUID.randomUUID();
+            var selector = TagSelector.newBuilder()
+                    .setObjectType(ObjectType.DATA)
+                    .setObjectId(newObjectId.toString())
+                    .setObjectVersion(0)
+                    .setTagVersion(0)
+                    .build();
+
+            var newObject = TestData.dummyDefinitionForType(ObjectType.DATA);
+            var newTag = TestData.dummyTag(newObject, TestData.NO_HEADER);
+            var tagUpdates = TestData.tagUpdatesForAttrs(newTag.getAttrsMap());
+
+            return MetadataWriteRequest.newBuilder()
+                    .setObjectType(ObjectType.DATA)
+                    .setPriorVersion(selector)
+                    .setDefinition(newObject)
+                    .addAllTagUpdates(tagUpdates)
+                    .build();
+        }).collect(Collectors.toList());
+
+        var writeBatchRequest = MetadataWriteBatchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .addAllRequests(writeRequests)
+                .build();
+
+        // noinspection ResultOfMethodCallIgnored
+        var error = assertThrows(StatusRuntimeException.class, () -> trustedApi.createPreallocatedObjectBatch(writeBatchRequest));
         assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
     }
 }

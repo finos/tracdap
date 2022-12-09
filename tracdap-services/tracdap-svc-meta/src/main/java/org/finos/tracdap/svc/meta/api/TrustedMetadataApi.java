@@ -42,7 +42,9 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
     private static final MethodDescriptor<MetadataWriteRequest, TagHeader> UPDATE_TAG_METHOD = TrustedMetadataApiGrpc.getUpdateTagMethod();
     private static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> UPDATE_TAG_BATCH_METHOD = TrustedMetadataApiGrpc.getUpdateTagBatchMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> PREALLOCATE_ID_METHOD = TrustedMetadataApiGrpc.getPreallocateIdMethod();
+    static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> PREALLOCATE_ID_BATCH_METHOD = TrustedMetadataApiGrpc.getPreallocateIdBatchMethod();
     static final MethodDescriptor<MetadataWriteRequest, TagHeader> CREATE_PREALLOCATED_OBJECT_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectMethod();
+    static final MethodDescriptor<MetadataWriteBatchRequest, MetadataWriteBatchResponse> CREATE_PREALLOCATED_OBJECT_BATCH_METHOD = TrustedMetadataApiGrpc.getCreatePreallocatedObjectBatchMethod();
 
     private static final MethodDescriptor<MetadataReadRequest, Tag> READ_OBJECT_METHOD = TrustedMetadataApiGrpc.getReadObjectMethod();
     private static final MethodDescriptor<MetadataBatchRequest, MetadataBatchResponse> READ_BATCH_METHOD = TrustedMetadataApiGrpc.getReadBatchMethod();
@@ -107,9 +109,21 @@ public class TrustedMetadataApi extends TrustedMetadataApiGrpc.TrustedMetadataAp
     }
 
     @Override
+    public void preallocateIdBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
+
+        grpcWrap.unaryCall(PREALLOCATE_ID_BATCH_METHOD, request, response, apiImpl::preallocateIdBatch);
+    }
+
+    @Override
     public void createPreallocatedObject(MetadataWriteRequest request, StreamObserver<TagHeader> response) {
 
         grpcWrap.unaryCall(CREATE_PREALLOCATED_OBJECT_METHOD, request, response, apiImpl::createPreallocatedObject);
+    }
+
+    @Override
+    public void createPreallocatedObjectBatch(MetadataWriteBatchRequest request, StreamObserver<MetadataWriteBatchResponse> response) {
+
+        grpcWrap.unaryCall(CREATE_PREALLOCATED_OBJECT_BATCH_METHOD, request, response, apiImpl::createPreallocatedObjectBatch);
     }
 
     @Override
